@@ -335,8 +335,8 @@ animation:r 0.8s linear infinite}
             $startStr = if ($query.ContainsKey('start')) { [string]$query['start'] } else { '' }
             $endStr   = if ($query.ContainsKey('end'))   { [string]$query['end']   } else { '' }
             $mode = if ($query.ContainsKey('mode'))  { [string]$query['mode']  } else { 'copy' }
-            # precise=1 (defualt) -> re-encode for frame-accurate cuts. precise=0 -> stream-copy, keyframe-snapped (fast lossless).
-            $preciseStr = if ($query.ContainsKey('precise')) { [string]$query['precise'] } else { '1' }
+            # precise=1 -> re-encode for frame-accurate cuts. precise=0 (default) -> stream-copy, keyframe-snapped (fast lossless).
+            $preciseStr = if ($query.ContainsKey('precise')) { [string]$query['precise'] } else { '0' }
             $precise = ($preciseStr -ne '0' -and $preciseStr.ToLowerInvariant() -ne 'false')
             $startSec = [double]::NaN
             $endSec   = [double]::NaN

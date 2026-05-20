@@ -1514,8 +1514,8 @@
         <span>Length <b id="trim-length-time">0:00.00</b></span>
         <button type="button" class="preview-btn" id="trim-preview">Preview</button>
       </div>
-      <label class="trim-mode-row" title="Frame-accurate cuts re-encode the video (libx264 CRF 14, ~clip-length encode time) so the cut lands exactly where you placed the handles. Output is visually indistinguishable from the source but typically ~70-85% of the proportional file size. Audio is stream-copied (no loss). Uncheck to remux only: instant and byte-identical, but the cut snaps to the previous keyframe (1-2s for OBS recordings).">
-        <input type="checkbox" id="trim-precise" checked>
+      <label class="trim-mode-row" title="Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles.">
+        <input type="checkbox" id="trim-precise">
         <span>Frame-accurate (re-encode for exact cut)</span>
       </label>
       <div class="row">
@@ -1912,12 +1912,25 @@
     return Math.max(1, Math.floor(remaining / 60)) + "m";
   }
 
+  let toastTimer = 0;
+  const TOAST_ERROR_MS = 12000;
   function showToast(html, kind) {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = 0; }
     toastEl.innerHTML = html;
     toastEl.classList.add("is-shown");
     toastEl.classList.toggle("is-info", kind === "info");
   }
-  function hideToast() { toastEl.classList.remove("is-shown"); }
+  function hideToast() {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = 0; }
+    toastEl.classList.remove("is-shown");
+  }
+  function scheduleToastHide(delay) {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastTimer = 0;
+      toastEl.classList.remove("is-shown");
+    }, delay);
+  }
 
   function thumbUrlFor(clip) {
     return HELPER + "/thumb/" + encodeURIComponent(clip.name)
@@ -2400,7 +2413,7 @@
       await fetch(HELPER + "/cancel-upload?" + qs.toString(), { method: "POST", cache: "no-store" });
     } catch {}
     showToast("Upload cancelled", "info");
-    setTimeout(hideToast, 2500);
+    scheduleToastHide(2500);
     if (filename) localState.delete(filename);
     else localState.clear();
     anyUploading = localState.size > 0;
@@ -3101,10 +3114,10 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
         showToast("Copied to clipboard - paste anywhere to share the file", "info");
-        setTimeout(hideToast, 3000);
+        scheduleToastHide(3000);
       } catch (err) {
         showToast("Clipboard copy failed: " + (err.message || err));
-        setTimeout(hideToast, 4500);
+        scheduleToastHide(TOAST_ERROR_MS);
       }
     });
     // single "compress..." menu item opens the mode picker. the picker hands the chosen mode to startcompressoverwrite(), which is also reused by callers elsewhere (e.g. if we ever want to re-bind a keyboard shortcut to "compress fast"). keeping the fetch in one function avoids drift between menu vs. modal.
@@ -3148,11 +3161,11 @@
       clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
       renderLoadedClips(loadedClips);
       showToast("Deleted " + escapeHtml(displayClipName(filename)), "info");
-      setTimeout(hideToast, 1800);
+      scheduleToastHide(1800);
       scheduleNextPoll(250);
     } catch (e) {
       showToast("Delete failed: " + escapeHtml(e.message || e));
-      setTimeout(hideToast, 2500);
+      scheduleToastHide(TOAST_ERROR_MS);
     }
   }
 
@@ -3205,7 +3218,7 @@
       } catch (e) {
         if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
         showToast("Rename failed: " + (e.message || e));
-        setTimeout(hideToast, 2500);
+        scheduleToastHide(TOAST_ERROR_MS);
       }
     }
     input.addEventListener("blur", commit);
@@ -3489,7 +3502,7 @@
         openCompressModal(filename, e.sizeMb || 0, e.capMb || 0);
       } else {
         showToast("Couldn't create link: " + (e.message || "Unknown error"));
-        setTimeout(hideToast, 5000);
+        scheduleToastHide(TOAST_ERROR_MS);
       }
     }
   }
@@ -3639,9 +3652,7 @@
       anyUploading = jobSync.active;
       if (uploadError) {
         showToast("Upload failed: " + uploadError);
-        setTimeout(hideToast, 5000);
-      } else {
-        hideToast();
+        scheduleToastHide(TOAST_ERROR_MS);
       }
       if (isFullscreenOrHostTransition()) {
         deferVirtualRenderUntilFullscreenSettles(true);
@@ -3792,10 +3803,10 @@
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
       showToast("Compressing temp copy for " + escapeHtml(file) + ".", "info");
-      setTimeout(hideToast, 3500);
+      scheduleToastHide(3500);
     } catch (e) {
       showToast("Couldn't start compression: " + (e.message || e));
-      setTimeout(hideToast, 5000);
+      scheduleToastHide(TOAST_ERROR_MS);
     }
   });
 
@@ -3876,7 +3887,7 @@
       if (!res.ok || !data.ok) {
         if (data && data.alreadyCompressed) {
           showToast(data.message || "Already compressed.", "info");
-          setTimeout(hideToast, 4000);
+          scheduleToastHide(4000);
           return;
         }
         throw new Error(data.message || ("HTTP " + res.status));
@@ -3887,10 +3898,10 @@
       rerenderCard(file);
       const label = mode === "fast" ? "Compressing (fast)" : "Compressing (smaller)";
       showToast(label + " - " + escapeHtml(file), "info");
-      setTimeout(hideToast, 3000);
+      scheduleToastHide(3000);
     } catch (err) {
       showToast("Couldn't start compress: " + (err.message || err));
-      setTimeout(hideToast, 4500);
+      scheduleToastHide(TOAST_ERROR_MS);
     }
   }
 
@@ -4039,7 +4050,7 @@
     if (done > 0) {
       showToast("Compress All: scheduled " + done + " clip"
         + (done === 1 ? "" : "s") + " for compression.", "info");
-      setTimeout(hideToast, 4000);
+      scheduleToastHide(4000);
     }
   }
 
@@ -4186,6 +4197,7 @@
     disarmOverwrite();
     trimPreviewActive = false;
     trimSeekDragging = false;
+    trimPrecise.checked = false;
     trimVeil.classList.add("is-open");
     syncTrimPlayIcon();
     // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
@@ -4348,11 +4360,11 @@
         ? ("Overwrote " + escapeHtml(sourceName))
         : ("Saved as " + escapeHtml(data.name));
       showToast(msg, "info");
-      setTimeout(hideToast, 3500);
+      scheduleToastHide(3500);
       scheduleNextPoll(50);
     } catch (e) {
       showToast("Trim failed: " + (e.message || e));
-      setTimeout(hideToast, 5000);
+      scheduleToastHide(TOAST_ERROR_MS);
       activeBtn.textContent = originalLabel;
       const valid = trimDuration() >= TRIM_MIN_SECONDS;
       trimSave.disabled = !valid;

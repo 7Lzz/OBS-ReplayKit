@@ -136,6 +136,27 @@ local function enumerate_render_endpoints()
     return results
 end
 
+local function enumerate_obs_monitoring_devices()
+    local results = {}
+    local ok = pcall(function()
+        obs.obs_enum_audio_monitoring_devices(function(_param, name, id)
+            if name and id and #name > 0 and #id > 0 then
+                results[#results + 1] = {
+                    name   = name,
+                    obs_id = id,
+                    active = true,
+                }
+            end
+            return true
+        end, nil)
+    end)
+    if not ok then
+        print("[MonitorPicker] OBS audio-monitor device enumeration failed.")
+        return {}
+    end
+    return results
+end
+
 local function virtual_priority(name)
     local lower = name:lower()
     for i, pat in ipairs(VIRTUAL_DRIVER_PATTERNS) do
@@ -274,7 +295,7 @@ end
 
 function script_load(_settings)
     state.log_path = current_log_path()
-    local devices = enumerate_render_endpoints()
+    local devices = enumerate_obs_monitoring_devices()
     local blacklist = read_blacklist()
 
     local candidates = {}

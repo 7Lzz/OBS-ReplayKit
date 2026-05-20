@@ -98,11 +98,36 @@ function Quote-Arg([string]$arg) {
 function Run-Curl {
     # $args is a reserved powershell automatic variable, so we use $curlargs to avoid silently breaking the splat below.
     param([string[]]$CurlArgs)
-    $out = & curl.exe @CurlArgs
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "curl.exe"
+    $psi.Arguments = (($CurlArgs | ForEach-Object { Quote-Arg $_ }) -join " ")
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    [void]$proc.Start()
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
     return @{
-        ExitCode = $LASTEXITCODE
-        Body     = ($out -join "`n")
+        ExitCode = $proc.ExitCode
+        Body     = [string]$stdout
+        Error    = [string]$stderr
     }
+}
+
+function Get-CurlTransportArgs {
+    return @(
+        "--http1.1",
+        "--tlsv1.2",
+        "--ssl-revoke-best-effort",
+        "--connect-timeout", "15",
+        "--retry", "2",
+        "--retry-delay", "1",
+        "--retry-all-errors"
+    )
 }
 
 function Run-CurlUploadWithProgress {
@@ -198,7 +223,7 @@ try {
     L "Step 1: requesting upload shortcode..."
     Write-Status "uploading" "requesting upload" 10
     $url1 = "https://api-f.streamable.com/api/v1/uploads/shortcode?size=$size&version=unknown"
-    $step1Args = @(
+    $step1Args = @((Get-CurlTransportArgs) + @(
         "-s", "-S", # silent progress, but keep errors
         "-m", "30", # 30s total timeout
         "-c", $jar, # save cookies
@@ -207,12 +232,14 @@ try {
         "-H", "Pragma: no-cache",
         "-H", "Cache-Control: no-cache",
         "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    )
+    ))
     if ($signedIn) { $step1Args += @("-b", $jar) }
     $step1Args += $url1
     $r1 = Run-Curl $step1Args
     if ($r1.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($r1.Body)) {
-        throw "Step 1 curl failed (exit=$($r1.ExitCode)). Output: $($r1.Body)"
+        $detail = ((@($r1.Error, $r1.Body) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join " ").Trim()
+        if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "no curl output" }
+        throw "Step 1 curl failed (exit=$($r1.ExitCode)). Output: $detail"
     }
     $data = $r1.Body | ConvertFrom-Json
     $shortcode = $data.shortcode
@@ -233,7 +260,7 @@ try {
     $forms += "-F"
     $forms += "file=@$($clipItem.FullName)"
 
-    $r2 = Run-CurlUploadWithProgress (@(
+    $r2 = Run-CurlUploadWithProgress (@((Get-CurlTransportArgs) + @(
         "--progress-bar",
         "--stderr", $curlProgressPath,
         "-m", "900", # 15 minute upload cap
@@ -241,7 +268,7 @@ try {
         "-w", "%{http_code}",
         "-X", "POST",
         $data.url
-    ) + $forms) 35 84 $curlProgressPath
+    ) + $forms)) 35 84 $curlProgressPath
     if ($r2.ExitCode -ne 0) {
         throw "S3 upload curl failed (exit=$($r2.ExitCode)). Output: $($r2.Error)"
     }
@@ -260,7 +287,7 @@ try {
     ($data.transcoder_options | ConvertTo-Json -Compress) |
         Out-File -FilePath $transcodeBodyPath -Encoding ASCII -NoNewline
 
-    $r3 = Run-Curl @(
+    $r3 = Run-Curl @((Get-CurlTransportArgs) + @(
         "-s", "-S",
         "-m", "30",
         "-b", $jar, # send cookies
@@ -272,9 +299,17 @@ try {
         "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "--data", "@$transcodeBodyPath",
         "https://api-f.streamable.com/api/v1/transcode/$shortcode"
-    )
+    ))
+    if ($r3.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($r3.Body)) {
+        $detail = ((@($r3.Error, $r3.Body) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join " ").Trim()
+        if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "no curl output" }
+        throw "Transcode trigger curl failed (exit=$($r3.ExitCode)). Output: $detail"
+    }
     $tcLines = $r3.Body -split "`n"
-    $tcStatus = [int]$tcLines[-1].Trim()
+    $tcStatus = 0
+    if (-not [int]::TryParse($tcLines[-1].Trim(), [ref]$tcStatus)) {
+        throw "Transcode trigger returned an unreadable status. Body: $($r3.Body.Substring(0, [Math]::Min(400, $r3.Body.Length)))"
+    }
     if ($tcStatus -lt 200 -or $tcStatus -ge 300) {
         $tcBody = ($tcLines[0..($tcLines.Count-2)] -join "`n")
         throw "Transcode trigger failed: HTTP $tcStatus. Body: $tcBody"
