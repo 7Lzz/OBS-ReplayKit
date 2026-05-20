@@ -1,0 +1,63 @@
+[
+    {
+        "display_name": "",
+        "enabled": true,
+        "encoders": [],
+        "id": "",
+        "module_name": "obs-nopreventsleep",
+        "outputs": [],
+        "services": [],
+        "sources": [],
+        "version": ""
+    },
+    {
+        "display_name": "Logitech G Plugin",
+        "enabled": true,
+        "encoders": [],
+        "id": "",
+        "module_name": "logi_obs_plugin_x64",
+        "outputs": [],
+        "services": [],
+        "sources": [],
+        "version": ""
+    },
+    {
+        "display_name": "",
+        "enabled": true,
+        "encoders": [],
+        "id": "",
+        "module_name": "input-overlay",
+        "outputs": [],
+        "services": [],
+        "sources": [
+            "input-overlay"
+        ],
+        "version": ""
+    },
+    {
+        "display_name": "Bongo Cat",
+        "enabled": true,
+        "encoders": [],
+        "id": "",
+        "module_name": "bongobs-cat",
+        "outputs": [],
+        "services": [],
+        "sources": [
+            "bongobs-cat"
+        ],
+        "version": ""
+    },
+    {
+        "display_name": "",
+        "enabled": true,
+        "encoders": [],
+        "id": "",
+        "module_name": "win-capture-audio",
+        "outputs": [],
+        "services": [],
+        "sources": [
+            "audio_capture"
+        ],
+        "version": ""
+    }
+]

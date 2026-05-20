@@ -1,0 +1,896 @@
+﻿<!DOCTYPE html>
+<html lang="en" style="background:#272A33;color:#FFFFFF">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>Custom Controls</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico" />
+<style>
+  :root {
+    --input_height: 32px;
+    --padding_wide: 16px;
+    --spacing_outer: 4px;
+    --spacing_sides: 6px;
+    --spacing_top: 6px;
+    --border_radius: 4px;
+    --font_size: 13px;
+    --font_family: "Segoe UI", system-ui, sans-serif;
+    --grey1: #5B6273;
+    --grey3: #464B59;
+    --grey4: #3C404D;
+    --grey6: #272A33;
+    --grey7: #1D1F26;
+    --grey8: #13141A;
+    --blue2: #476BD7;
+    --blue3: #284CB8;
+    --green: #37D247;
+    --red: #E33B57;
+    --white1: #FFFFFF;
+    --white5: #969696;
+    --bg_dock: var(--grey6);
+    --bg_window: var(--grey7);
+    --text: var(--white1);
+    --text_muted: var(--white5);
+    --button_bg: var(--grey4);
+    --button_bg_hover: var(--grey3);
+    --button_bg_down: var(--grey7);
+    --button_border: var(--button_bg);
+    --button_border_hover: var(--grey1);
+    --primary: var(--blue3);
+    --primary_light: var(--blue2);
+    --input_bg: var(--grey8);
+    --input_border: var(--grey4);
+  }
+
+  * { box-sizing: border-box; }
+  html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_window);
+    color-scheme: dark;
+  }
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_dock);
+    color: var(--text);
+    font-family: var(--font_family);
+    font-size: var(--font_size);
+    user-select: none;
+    overflow: hidden;
+  }
+  #controlsFrame {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg_dock);
+    border: 1px solid var(--grey4);
+    border-top: none;
+    border-bottom-left-radius: var(--border_radius);
+    border-bottom-right-radius: var(--border_radius);
+    padding: var(--spacing_top) var(--spacing_sides) var(--spacing_outer);
+    gap: var(--spacing_outer);
+    overflow-y: auto;
+  }
+  /* obs yami-style pill scrollbar -- same rules as clips.html so the dock matches the sources / mixer panels. the thumb is narrower than the track becuase the border is transparent + the background is clipped to padding-box, giving the floating-capsule look. */
+  *::-webkit-scrollbar        { width: 14px; height: 14px; background: transparent; }
+  *::-webkit-scrollbar-track  { background: transparent; }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--grey3);
+    border-radius: 7px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    min-height: 30px;
+  }
+  *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
+  *::-webkit-scrollbar-thumb:active { background-color: #6b7387; }
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button_bg);
+    color: var(--text);
+    border: 1px solid var(--button_border);
+    border-radius: var(--border_radius);
+    height: var(--input_height);
+    min-height: var(--input_height);
+    padding: 0 var(--padding_wide);
+    font: inherit;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 60ms linear, border-color 60ms linear;
+  }
+  .btn:hover {
+    background-color: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+  }
+  .btn:focus-visible { border-color: var(--button_border_hover); }
+  .btn:active { background-color: var(--button_bg_down); }
+  .btn:disabled {
+    opacity: 0.65;
+    cursor: progress;
+  }
+  .btn.is-disconnected {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .btn.is-busy {
+    opacity: 0.65;
+    cursor: progress;
+  }
+  /* brief success/error flash on the upload button. we no longer have a seperate url textbox -- status is conveyed by the button itself (e.g. "link copied!" / "upload failed"), then it returns to its defualt label. */
+  .btn.is-flash-success {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+  }
+  .btn.is-flash-error {
+    background-color: var(--red);
+    border-color: var(--red);
+  }
+  .btn.primary {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+  }
+  .btn.primary:hover { background-color: var(--primary_light); }
+
+  /* auth row: third button stacks under view clips; "sign in" when out, "signed in" with a green dot when in. click signed-in opens a tiny dropdown menu (with sign out); click signed-out opens the login modal. */
+  .auth-wrap { position: relative; }
+  .auth-wrap .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .auth-wrap .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text_muted);
+    margin-right: 7px;
+    flex-shrink: 0;
+  }
+  .auth-wrap .btn.is-signed-in .dot { background: var(--green); }
+
+  /* "signing in..." state while the popup is open. pulses the dot blue and disables the button so the user has clear feedback that somethings happening between popup-open and import-success. */
+  .auth-wrap .btn.is-signing-in {
+    opacity: 0.85;
+    cursor: progress;
+    pointer-events: none;
+  }
+  .auth-wrap .btn.is-signing-in .dot {
+    background: var(--blue2);
+    animation: auth-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes auth-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50%      { opacity: 1;    transform: scale(1.15); }
+  }
+
+  /* opens down by defualt; openmenu() flips to .is-up if the menu would extend past #controlsframe and force a scrollbar. direction sets top/bottom + shadow side so the soft edge always points away from the button. */
+  .auth-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    background: var(--grey6);
+    border: 1px solid var(--grey4);
+    border-radius: var(--border_radius);
+    padding: 4px 0;
+    display: none;
+  }
+  .auth-menu.is-open { display: block; }
+  .auth-menu.is-down {
+    top: calc(100% + 3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  }
+  .auth-menu.is-up {
+    bottom: calc(100% + 3px);
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
+  }
+  .auth-menu .info {
+    padding: 7px 10px 5px;
+    font-size: 11px;
+    color: var(--text_muted);
+    line-height: 1.45;
+    border-bottom: 1px solid var(--grey4);
+    margin-bottom: 3px;
+  }
+  .auth-menu .info b { color: var(--text); font-weight: 500; }
+  .auth-menu .spoiler {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--grey1);
+    color: transparent;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .auth-menu .spoiler:hover,
+  .auth-menu .spoiler:focus {
+    background: transparent;
+    color: var(--text);
+    outline: 1px solid var(--grey1);
+  }
+  .auth-menu .item {
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text);
+    user-select: none;
+  }
+  .auth-menu .item:hover { background: var(--button_bg_hover); }
+</style>
+</head>
+<body style="background:#272A33;color:#FFFFFF">
+  <div id="controlsFrame">
+    <button class="btn" id="save-replay-btn">Save Replay</button>
+    <button class="btn" id="upload-btn">Upload Last Clip</button>
+    <button class="btn" id="view-clips-btn">View Clips</button>
+    <button class="btn" id="open-folder-btn">Open Folder</button>
+    <div class="auth-wrap" id="auth-wrap">
+      <button class="btn" id="auth-btn" type="button">
+        <span class="dot"></span>
+        <span id="auth-label">Sign in to Streamable</span>
+      </button>
+      <div class="auth-menu" id="auth-menu">
+        <div class="info" id="auth-info"></div>
+        <div class="item" id="auth-logout">Sign out</div>
+        <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // dock lockdown: stop accidental right-click menu / zoom shortcuts. cef treats the dock like a regular web page, so users can right-click and hit zoom in / refresh / back / inspect / etc. -- all of which are surprises in a dock context. mirrored in controls.html and clips.html.
+  (function lockdown() {
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey) e.preventDefault();
+    }, { passive: false });
+    document.addEventListener("keydown", function (e) {
+      if (e.ctrlKey && (
+            e.key === "+" || e.key === "=" || e.key === "-" ||
+            e.key === "0" || e.key === "r" || e.key === "R")) {
+        e.preventDefault();
+      }
+      if (e.key === "F5") e.preventDefault();
+    });
+  })();
+
+  const HELPER_HTTP_URL = location.protocol === "http:"
+    ? location.origin + "/"
+    : "http://127.0.0.1:8767/";
+
+  const POLL_ACTIVE_MS = 1000;
+  const POLL_IDLE_MS = 5000;
+
+  const S = Object.freeze({
+    IDLE: "idle",
+    TRIGGERED: "triggered",
+    COMPRESSING: "compressing",
+    UPLOADING: "uploading",
+    DONE: "done",
+    ERROR: "error",
+  });
+
+  const uploadBtn = document.getElementById("upload-btn");
+  const viewClipsBtn = document.getElementById("view-clips-btn");
+  const saveReplayBtn = document.getElementById("save-replay-btn");
+  const openFolderBtn = document.getElementById("open-folder-btn");
+
+  let state = S.IDLE;
+  let pollTimerId = null;
+  let flashTimer  = null;
+
+  function setConnected(yes) {
+    uploadBtn.classList.toggle("is-disconnected", !yes);
+    viewClipsBtn.classList.toggle("is-disconnected", !yes);
+    saveReplayBtn.classList.toggle("is-disconnected", !yes);
+    openFolderBtn.classList.toggle("is-disconnected", !yes);
+  }
+
+  // brief tinted message on the upload button itself -- used for done ("link copied!") and error ("upload failed"). after `ms` the button returns to its idle "upload last clip" label. the powershell helper already auto-copies the url to the clipboard and pops a windows toast, so the dock just needs to ack visually.
+  function flashUploadBtn(text, cls, ms) {
+    if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
+    uploadBtn.textContent = text;
+    uploadBtn.classList.remove("is-busy", "is-flash-success", "is-flash-error");
+    if (cls) uploadBtn.classList.add(cls);
+    flashTimer = setTimeout(() => {
+      uploadBtn.classList.remove("is-flash-success", "is-flash-error");
+      uploadBtn.textContent = "Upload Last Clip";
+      flashTimer = null;
+    }, ms);
+  }
+
+  function flashButton(btn, text, cls, ms, fallbackText) {
+    btn.textContent = text;
+    btn.classList.remove("is-flash-success", "is-flash-error");
+    if (cls) btn.classList.add(cls);
+    setTimeout(() => {
+      btn.classList.remove("is-flash-success", "is-flash-error");
+      btn.textContent = fallbackText;
+      btn.disabled = false;
+    }, ms);
+  }
+
+  function setState(next, data) {
+    state = next;
+    data = data || {};
+    if (next !== S.DONE && next !== S.ERROR && flashTimer) {
+      // leaving a flashed state -- cancel its pending revert so we dont snap the label back mid-upload.
+      clearTimeout(flashTimer); flashTimer = null;
+      uploadBtn.classList.remove("is-flash-success", "is-flash-error");
+    }
+    switch (next) {
+      case S.IDLE:
+        uploadBtn.textContent = "Upload Last Clip";
+        uploadBtn.classList.remove("is-busy");
+        break;
+      case S.TRIGGERED:
+        uploadBtn.textContent = "Sending...";
+        uploadBtn.classList.add("is-busy");
+        break;
+      case S.COMPRESSING:
+        uploadBtn.textContent = "Compressing"
+          + (data.percent ? " " + data.percent + "%" : "")
+          + " - Cancel";
+        uploadBtn.classList.add("is-busy");
+        break;
+      case S.UPLOADING:
+        uploadBtn.textContent = "Uploading"
+          + (data.percent ? " " + data.percent + "%" : "")
+          + " - Cancel";
+        uploadBtn.classList.add("is-busy");
+        break;
+      case S.DONE:
+        flashUploadBtn("Link copied to clipboard", "is-flash-success", 2500);
+        break;
+      case S.ERROR:
+        // trim long errors so the button doesnt overflow the dock.
+        flashUploadBtn(("Upload failed: " + (data.error || "")).slice(0, 60),
+                       "is-flash-error", 4500);
+        break;
+    }
+  }
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER_HTTP_URL + path, {
+      cache: "no-store",
+      ...(options || {}),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || body.error || ("HTTP " + res.status));
+    }
+    return body;
+  }
+
+  function obsWebSocketRequest(requestType, requestData) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket("ws://127.0.0.1:4455");
+      const requestId = Math.random().toString(16).slice(2) + Date.now().toString(16);
+      const timer = setTimeout(() => {
+        try { ws.close(); } catch {}
+        reject(new Error("OBS websocket timed out"));
+      }, 3000);
+
+      function finish(err, value) {
+        clearTimeout(timer);
+        try { ws.close(); } catch {}
+        if (err) reject(err);
+        else resolve(value);
+      }
+
+      ws.onerror = () => finish(new Error("OBS websocket is unavailable"));
+      ws.onmessage = (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); }
+        catch { return; }
+
+        if (msg.op === 0) {
+          if (msg.d && msg.d.authentication) {
+            finish(new Error("OBS websocket authentication is enabled"));
+            return;
+          }
+          ws.send(JSON.stringify({ op: 1, d: { rpcVersion: (msg.d && msg.d.rpcVersion) || 1 } }));
+          return;
+        }
+
+        if (msg.op === 2) {
+          const payload = {
+            op: 6,
+            d: {
+              requestType,
+              requestId,
+            },
+          };
+          if (requestData) payload.d.requestData = requestData;
+          ws.send(JSON.stringify(payload));
+          return;
+        }
+
+        if (msg.op === 7 && msg.d && msg.d.requestId === requestId) {
+          const status = msg.d.requestStatus || {};
+          if (status.result) finish(null, msg.d.responseData || {});
+          else finish(new Error(status.comment || (requestType + " failed")));
+        }
+      };
+    });
+  }
+
+  async function saveReplay() {
+    try {
+      return await helperJson("save-replay", { method: "POST" });
+    } catch {
+      return await obsWebSocketRequest("SaveReplayBuffer");
+    }
+  }
+
+  async function openClipFolder() {
+    try {
+      return await helperJson("open-clip-folder", { method: "POST" });
+    } catch {
+      const data = await helperJson("clips?offset=0&limit=1&t=" + Date.now());
+      const clips = Array.isArray(data) ? data : (Array.isArray(data.clips) ? data.clips : []);
+      if (!clips.length || !clips[0].name) throw new Error("No clips found");
+      return await helperJson("open-folder?file=" + encodeURIComponent(clips[0].name), { method: "POST" });
+    }
+  }
+
+  function applyStatus(s) {
+    setConnected(true);
+    if (s.state === "compressing") {
+      setState(S.COMPRESSING, { clipName: s.clipName, percent: Number(s.percent) || 0, phase: s.phase || "" });
+    } else if (s.state === "uploading") {
+      setState(S.UPLOADING, { clipName: s.clipName, percent: Number(s.percent) || 0, phase: s.phase || "" });
+    } else if (s.state === "done" && s.url) {
+      // only flash on the in-dock transition out of an active upload. if the dock just loaded and the helper still has a stale "done" status from a previous session, dont pop the success flash for no reason.
+      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
+        setState(S.DONE, { url: s.url });
+      }
+    } else if (s.state === "error" && s.error) {
+      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
+        setState(S.ERROR, { error: s.error });
+      }
+    } else if (state !== S.DONE && state !== S.ERROR) {
+      setState(S.IDLE);
+    }
+  }
+
+  async function pollStatus() {
+    try {
+      applyStatus(await helperJson("status?t=" + Date.now()));
+    } catch {
+      setConnected(false);
+      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
+        setState(S.ERROR, { error: "Upload helper is offline. Reload streamable_upload.lua." });
+      }
+    }
+  }
+
+  function nextPollDelay() {
+    return (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING)
+      ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+  }
+
+  function schedulePoll() {
+    if (pollTimerId) clearTimeout(pollTimerId);
+    pollTimerId = setTimeout(async () => {
+      await pollStatus();
+      schedulePoll();
+    }, nextPollDelay());
+  }
+
+  function styleClipsTaskbarWindow() {
+    fetch(HELPER_HTTP_URL + "style-window?title=Clips&taskbar=1&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  // server-side foreground-raise. browser window.focus() is unreliable inside cef -- the helpers /focus-window route uses win32 setforegroundwindow + attachthreadinput which always works.
+  function focusClipsWindowNative() {
+    fetch(HELPER_HTTP_URL + "focus-window?title=Clips&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  // hold a reference to the popup so subsequent clicks can refocus it instead of re-navigating window.open() against the same name (which would reload the page and lose scroll position, active filter, fullscreen state, etc.). if the reference is gone (dock reloaded since the popup was opened), the native focus call still raises the window -- the helper finds it by title.
+  let clipsWindow = null;
+  viewClipsBtn.addEventListener("click", () => {
+    if (clipsWindow && !clipsWindow.closed) {
+      // belt-and-suspenders: try the js focus (cheap, sometimes works), but the native call is the one that actualy brings the window to front from inside an obs dock.
+      try { clipsWindow.focus(); } catch (_) {}
+      focusClipsWindowNative();
+      return;
+    }
+    clipsWindow = window.open(
+      HELPER_HTTP_URL + "clips-view",
+      "streamable_clips",
+      "popup=yes,width=1100,height=720"
+    );
+    if (!clipsWindow) {
+      // window.open returned null -- popup blocked or the named window already exists in a state we cant get a handle to (happens after the dock reloads). ask the helper to raise any existing clips window by title; only fall thru to navigating the dock itself if that fails too.
+      focusClipsWindowNative();
+      return;
+    }
+    try { clipsWindow.focus(); } catch (_) {}
+    [80, 250, 750, 1500, 3000].forEach((delay) => {
+      setTimeout(styleClipsTaskbarWindow, delay);
+    });
+  });
+
+  saveReplayBtn.addEventListener("click", async () => {
+    if (saveReplayBtn.disabled) return;
+    saveReplayBtn.disabled = true;
+    saveReplayBtn.textContent = "Saving...";
+    try {
+      await saveReplay();
+      flashButton(saveReplayBtn, "Replay saved", "is-flash-success", 1800, "Save Replay");
+    } catch (e) {
+      flashButton(saveReplayBtn, ("Save failed: " + (e.message || e)).slice(0, 42),
+                  "is-flash-error", 3000, "Save Replay");
+    }
+  });
+
+  openFolderBtn.addEventListener("click", async () => {
+    if (openFolderBtn.disabled) return;
+    openFolderBtn.disabled = true;
+    openFolderBtn.textContent = "Opening...";
+    try {
+      await openClipFolder();
+      flashButton(openFolderBtn, "Folder opened", "is-flash-success", 1200, "Open Folder");
+    } catch (e) {
+      flashButton(openFolderBtn, ("Open failed: " + (e.message || e)).slice(0, 42),
+                  "is-flash-error", 3000, "Open Folder");
+    }
+  });
+
+  async function cancelActiveUpload() {
+    uploadBtn.textContent = "Cancelling...";
+    try { await helperJson("cancel-upload", { method: "POST" }); }
+    catch {}
+    setState(S.ERROR, { error: "Cancelled" });
+    schedulePoll();
+  }
+
+  uploadBtn.addEventListener("click", async () => {
+    if (state === S.COMPRESSING || state === S.UPLOADING) {
+      await cancelActiveUpload();
+      return;
+    }
+    if (state === S.TRIGGERED) return;
+    setState(S.TRIGGERED);
+    schedulePoll();
+    try {
+      const result = await helperJson("upload-latest", { method: "POST" });
+      if (result.ok) {
+        setState(S.UPLOADING, { clipName: result.clip });
+      } else {
+        setState(S.ERROR, { error: result.message || "Upload failed" });
+      }
+    } catch (e) {
+      setState(S.ERROR, { error: e.message || String(e) });
+    }
+  });
+
+  pollStatus().then(schedulePoll);
+
+  // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
+  const authBtn    = document.getElementById("auth-btn");
+  const authLabel  = document.getElementById("auth-label");
+  const authMenu   = document.getElementById("auth-menu");
+  const authInfo   = document.getElementById("auth-info");
+  const authLogout = document.getElementById("auth-logout");
+  const authForce  = document.getElementById("auth-force-signout");
+
+  let authState   = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
+  let loginPopup  = null;
+  let loginWatch  = null;
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : "Free"; }
+
+  function applyAuthData(data) {
+    authState = {
+      signedIn:      !!data.signedIn,
+      username:      data.maskedUsername || data.displayName || data.username || "",
+      plan:          data.plan || "",
+      sizeCap:       Number(data.sizeCap) || 0,
+      retentionDays: Number(data.retentionDays) || 2,
+    };
+    renderAuth();
+  }
+
+  function renderAuth() {
+    if (authState.signedIn) {
+      authBtn.classList.add("is-signed-in");
+      authLabel.textContent = "Signed in";
+      authInfo.innerHTML =
+        '<b class="spoiler" tabindex="0">' +
+        escapeHtml(authState.username || "(signed in)") + "</b><br>" +
+        escapeHtml(planLabel(authState.plan)) + " &middot; " +
+        authState.retentionDays + "d retention";
+    } else {
+      authBtn.classList.remove("is-signed-in");
+      authLabel.textContent = "Sign in to Streamable";
+      authInfo.innerHTML = "Not signed in";
+    }
+  }
+  renderAuth();
+
+  async function fetchMe() {
+    try {
+      const data = await helperJson("me?t=" + Date.now());
+      applyAuthData(data);
+    } catch { /* helper offline -- setConnected(false) already runs via pollStatus */ }
+  }
+  fetchMe();
+
+  // open downward when theres room below the auth button inside the dock; otherwise flip upward so the menu doesnt force a scrollbar. we add is-down before measuring so offsetheight reflects the real rendered height, then swap to is-up if it wont fit. both class changes happen in the same tick so the browser never paints the intermediate state.
+  const authWrap = document.getElementById("auth-wrap");
+  const controlsFrame = document.getElementById("controlsFrame");
+  function openMenu() {
+    authMenu.classList.remove("is-up");
+    authMenu.classList.add("is-down", "is-open");
+    const menuH = authMenu.offsetHeight;
+    const spaceBelow =
+      controlsFrame.getBoundingClientRect().bottom -
+      authWrap.getBoundingClientRect().bottom;
+    // 3px gap from css + a couple pixels of breathing room.
+    if (menuH + 6 > spaceBelow) {
+      authMenu.classList.remove("is-down");
+      authMenu.classList.add("is-up");
+    }
+  }
+  function closeMenu() { authMenu.classList.remove("is-open"); }
+
+  // sign-in popup state. we open the helpers /sign-in-loader page, which paints a branded spinner and meta-refreshes to streamable.com/login -- using helper-served html instead of about:blank avoids a cef compositor race that white-screens third-party spas. we poll /import-session here while the popup is open; when the helper picks up a valid session we win32 wm_close the popup and refresh dock auth state.
+  let importPollTimer = null;
+  let popupCloseTimer = null;
+  let loginTimeoutTimer = null;
+  let importInFlight = null;
+  let loginFlowActive = false;
+  let loginWindowsCloseRequested = false;
+  let loginLastCloseRequestAt = 0;
+  let loginImportArmed = false;
+  const LOGIN_TIMEOUT_MS = 120000;
+  const LOGIN_WINDOW_STATUS_MS = 125;
+  const LOGIN_IMPORT_POLL_MS = 500;
+  const LOGIN_IMPORT_IDLE_MS = 3000;
+
+  function setSigningIn(on, label) {
+    if (on) {
+      authBtn.classList.add("is-signing-in");
+      authLabel.textContent = label || "Signing in…";
+    } else {
+      authBtn.classList.remove("is-signing-in");
+      // renderauth() will set the right label based on current state.
+      renderAuth();
+    }
+  }
+  function clearLoginTimers() {
+    if (importPollTimer)   { clearInterval(importPollTimer);   importPollTimer = null; }
+    if (popupCloseTimer)   { clearInterval(popupCloseTimer);   popupCloseTimer = null; }
+    if (loginTimeoutTimer) { clearTimeout(loginTimeoutTimer);  loginTimeoutTimer = null; }
+    if (loginWatch)        { clearInterval(loginWatch);        loginWatch = null; }
+  }
+  function cleanupLoginFlow() {
+    clearLoginTimers();
+    loginFlowActive = false;
+    setSigningIn(false);
+    // tier 1: try window.close() from js. cef refuses this for cross-origin popups so it usually does nothing, but its free.
+    if (loginPopup && !loginPopup.closed) {
+      try { loginPopup.close(); } catch {}
+    }
+    // tier 2: ask the helper to win32 wm_close the stuck popups. this bypasses cefs same-origin policy entirely by going thru the os message queue. handles our own popup and the streamable / google oauth windows streamables js spawned that we dont have handles for.
+    fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
+    loginPopup = null;
+    loginWindowsCloseRequested = false;
+    loginLastCloseRequestAt = 0;
+    loginImportArmed = false;
+  }
+  function requestSigninWindowClose(label) {
+    if (label) setSigningIn(true, label);
+    const now = Date.now();
+    if (loginWindowsCloseRequested && (now - loginLastCloseRequestAt) < 250) return;
+    loginWindowsCloseRequested = true;
+    loginLastCloseRequestAt = now;
+    if (loginPopup && !loginPopup.closed) {
+      try { loginPopup.close(); } catch {}
+    }
+    fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
+  }
+
+  async function tryImport() {
+    if (importInFlight) return importInFlight;
+    importInFlight = (async () => {
+      try {
+        const res = await fetch(HELPER_HTTP_URL + "import-session?source=obs", {
+          method: "POST", cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) return data;
+      } catch {}
+      return null;
+    })();
+    try { return await importInFlight; }
+    finally { importInFlight = null; }
+  }
+
+  function openLoginPopup() {
+    if (loginPopup && !loginPopup.closed) {
+      try { loginPopup.focus(); } catch {}
+      return;
+    }
+    // open the popup directly to the helpers same-origin loading page. this page paints a branded spinner, then meta-refreshes to streamable.com/login. going thru helper-served html instead of about:blank + document.write avoids a cef race where the popups document wasnt yet writable, leaving the window stuck on a blank about:blank forever (visible as the literal "about:blank" window title).
+    loginPopup = window.open(
+      HELPER_HTTP_URL + "sign-in-loader",
+      "streamable_signin",
+      "width=560,height=720"
+    );
+    if (!loginPopup) {
+      alert("OBS blocked the sign-in window. Try clicking again, or allow popups for this dock.");
+      return;
+    }
+
+    clearLoginTimers(); // wipe any stale timers from a previous attempt
+    loginFlowActive = true;
+    loginWindowsCloseRequested = false;
+    loginLastCloseRequestAt = 0;
+    loginImportArmed = false;
+    setSigningIn(true, "Opening Streamable…");
+
+    // poll the helper for a successfully-imported session. as soon as the user signs in (with google, facebook, or email/pw on streamables own form), streamable sets cookies in obs cef, the helpers vss+sqlite import picks them up, /me validates, and we close the popup automatically. while were waiting, we also poll /signin-windows-status. it lets the button show where the flow is, and once streamable reaches the dashboard we close the popups while cookie import continues in the background.
+    const startedAt = Date.now();
+    let sawStreamable = false;
+    let sawGoogle = false;
+    let sawDashboard = false;
+    let lastImportAttempt = 0;
+    async function refreshStatus() {
+      // bail early if cleanup already happened (loginflowactive is false by cleanuploginflow). without this, an in-flight fetch from the previous poll could complete after cleanup and call setsigningin(true) again, leaving the auth button stuck with the pulsing blue orb even after sign-in succeeded.
+      if (!loginFlowActive) return;
+      try {
+        const r = await fetch(HELPER_HTTP_URL + "signin-windows-status?overlay=1",
+                              { cache: "no-store" });
+        // re-check after the await -- cleanup may have fired during the network round-trip.
+        if (!loginFlowActive) return;
+        const wins = await r.json();
+        if (!loginFlowActive) return;
+        const onStream = wins.some(w => w.streamable);
+        const onGoogle = wins.some(w => w.google);
+        const onDashboard = wins.some(w => /dashboard\s*-\s*streamable/i.test(w.title || ""));
+        let label;
+        if (onDashboard) {
+          sawDashboard = true;
+          loginImportArmed = true;
+          requestSigninWindowClose("Finalizing sign-in...");
+          sawStreamable = true;
+          return;
+        } else if (sawDashboard && (onGoogle || onStream)) {
+          loginImportArmed = true;
+          requestSigninWindowClose("Finalizing sign-in...");
+          return;
+        } else if (onGoogle) {
+          label = "Authenticating with Google…";
+          sawGoogle = true;
+        } else if (sawGoogle && !onGoogle) {
+          loginImportArmed = true;
+          label = "Finalizing sign-in…";
+        } else if (onStream) {
+          label = "Sign in on Streamable's page…";
+          sawStreamable = true;
+        } else if (sawStreamable) {
+          loginImportArmed = true;
+          label = "Finalizing sign-in…";
+        } else {
+          label = "Opening Streamable…";
+        }
+        setSigningIn(true, label);
+      } catch { /* helper offline; harmless */ }
+    }
+
+    refreshStatus();
+    loginWatch = setInterval(refreshStatus, LOGIN_WINDOW_STATUS_MS);
+
+    importPollTimer = setInterval(async () => {
+      const now = Date.now();
+      const interval = loginImportArmed ? LOGIN_IMPORT_POLL_MS : LOGIN_IMPORT_IDLE_MS;
+      if (!loginImportArmed && (now - startedAt) < 2500) return;
+      if ((now - lastImportAttempt) < interval) return;
+      lastImportAttempt = now;
+      const imported = await tryImport();
+      if (imported && loginFlowActive) {
+        applyAuthData(imported);
+        setSigningIn(true, "Signed in! Cleaning up…");
+        cleanupLoginFlow();
+      }
+    }, LOGIN_IMPORT_POLL_MS);
+
+    // fire one immediate poll after a short delay so a returning user with valid cookies signs in within a second.
+    setTimeout(async () => {
+      refreshStatus();
+      if (!loginImportArmed) return;
+      const imported = await tryImport();
+      if (imported && loginFlowActive) {
+        applyAuthData(imported);
+        cleanupLoginFlow();
+      }
+    }, LOGIN_IMPORT_POLL_MS);
+
+    // detect the user manually closing the popup so we re-check auth state right away instead of waiting for the next poll.
+    popupCloseTimer = setInterval(async () => {
+      if (loginPopup && loginPopup.closed) {
+        loginPopup = null;
+        if (loginWindowsCloseRequested) return;
+        // one last import attempt in case the popup closed mid-write.
+        const imported = await tryImport();
+        if (imported) applyAuthData(imported);
+        cleanupLoginFlow();
+        if (!imported) fetchMe();
+      }
+    }, 250);
+
+    // hard timeout: if nothings been picked up after 2 minutes, give up so we dont poll forever.
+    loginTimeoutTimer = setTimeout(() => {
+      cleanupLoginFlow();
+    }, LOGIN_TIMEOUT_MS);
+  }
+
+  authBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (authState.signedIn) {
+      if (authMenu.classList.contains("is-open")) closeMenu();
+      else openMenu();
+    } else {
+      openLoginPopup();
+    }
+  });
+
+  authForce.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeMenu();
+    if (!confirm(
+      "Force re-login will:\n" +
+      "  1. Close OBS\n" +
+      "  2. Wipe the Streamable cookies in OBS\n" +
+      "  3. Re-launch OBS as admin\n\n" +
+      "Save any unsaved scene work first. Continue?"
+    )) return;
+    // the helper kills obs, waits for the cookies file to unlock, deletes streamable.com rows, then re-launches obs. we get killed shortly after this fetch returns -- the helper survives becuase its admin and the parent-watcher exempts admin helpers.
+    try {
+      await fetch(HELPER_HTTP_URL + "restart-obs-clean", { method: "POST", cache: "no-store" });
+    } catch { /* expected -- OBS dies before the response sometimes */ }
+    authState = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
+    renderAuth();
+  });
+
+  authLogout.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeMenu();
+    authState = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
+    renderAuth();
+    fetch(HELPER_HTTP_URL + "logout", { method: "POST", cache: "no-store" }).catch(() => {});
+  });
+
+  // outside-click / mouseleave / blur all close the auth menu.
+  document.addEventListener("mousedown", (e) => {
+    if (e.target.closest("#auth-wrap")) return;
+    closeMenu();
+  });
+  document.documentElement.addEventListener("mouseleave", closeMenu);
+  window.addEventListener("blur", closeMenu);
+
+</script>
+</body>
+</html>

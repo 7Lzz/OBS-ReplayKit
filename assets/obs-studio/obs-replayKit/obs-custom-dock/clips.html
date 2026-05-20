@@ -1,0 +1,4384 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="msapplication-navbutton-color" content="#1D1F26" />
+<title>Clips</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico" />
+<style>
+  :root {
+    --border_radius: 4px;
+    --font_size: 13px;
+    --font_family: "Segoe UI", system-ui, sans-serif;
+    --grey1: #5B6273;
+    --grey3: #464B59;
+    --grey4: #3C404D;
+    --grey5: #2F323C;
+    --grey6: #272A33;
+    --grey7: #1D1F26;
+    --grey8: #13141A;
+    --blue2: #476BD7;
+    --blue3: #284CB8;
+    --green: #37D247;
+    --red: #E33B57;
+    --amber: #E2A33B;
+    --white1: #FFFFFF;
+    --white5: #969696;
+    --bg_window: var(--grey7);
+    --bg_card: var(--grey5);
+    --text: var(--white1);
+    --text_muted: var(--white5);
+    --button_bg: var(--grey4);
+    --button_bg_hover: var(--grey3);
+    --button_bg_down: var(--grey7);
+    --button_border: var(--button_bg);
+    --button_border_hover: var(--grey1);
+    --primary: var(--blue3);
+    --primary_light: var(--blue2);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_window);
+    color: var(--text);
+    font-family: var(--font_family);
+    font-size: var(--font_size);
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  .tabs {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    /* padding-bottom keeps a permanent gap below the tab buttons -- the scroll-areas own padding-top scrolls away with the content, so without this, scrolled cards crowd right up against the tabs. */
+    padding: 10px 14px;
+    background: var(--bg_window);
+    overflow-x: auto;
+  }
+  .tab {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--grey4);
+    border-radius: 4px;
+    background: var(--button_bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab:hover {
+    background: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+  }
+  .tab.is-active {
+    background: var(--primary);
+    border-color: var(--primary_light);
+  }
+  .tab .count {
+    margin-left: 5px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+  /* "compress all" action button -- pushed to the right of the tabs via margin-left:auto, styled distinctly from the filter tabs so users dont read it as a filter. shows a compress icon + label, dims when no compressable clips remain. */
+  .tab-action {
+    margin-left: auto;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--grey4);
+    border-radius: 4px;
+    background: var(--button_bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  .tab-action:hover {
+    background: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+  }
+  .tab-action:disabled,
+  .tab-action.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .tab-action svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    flex: 0 0 14px;
+  }
+  .tab-action.is-running {
+    background: var(--primary);
+    border-color: var(--primary_light);
+    cursor: progress;
+  }
+  .tab-action .progress {
+    color: rgba(255, 255, 255, 0.72);
+    margin-left: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px;
+    overflow-anchor: none;
+  }
+  /* While a clip is fullscreened, OBS CEF still wants to repaint the grid
+     behind the fullscreen top layer when the host window maximizes/restores.
+     Keep non-active UI invisible until the transition settles so leaving
+     fullscreen does not spend seconds repainting dozens of hidden cards. */
+  body.is-clip-fullscreen .tabs,
+  body.is-clip-fullscreen .section-heading,
+  body.is-clip-fullscreen #empty,
+  body.is-clip-fullscreen #toast,
+  body.is-clip-fullscreen #grid .card:not(.is-fullscreen-card),
+  body.is-clip-fullscreen #favorites-grid .card:not(.is-fullscreen-card) {
+    visibility: hidden;
+  }
+  body.is-clip-fullscreen .scroll-area {
+    overflow: hidden;
+  }
+  /* obs yami-style pill scrollbar. the thumb is rendered narrower than the track by giving it a transparent border + padding-box background-clip -- the same trick obs itself uses to get the "floating capsule" look instead of the defualt windows full-width scrollbar. applied with the universal selector so dropdowns and any other scrollables match. */
+  *::-webkit-scrollbar         { width: 14px; height: 14px; background: transparent; }
+  *::-webkit-scrollbar-track   { background: transparent; }
+  *::-webkit-scrollbar-corner  { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--grey3);
+    border-radius: 7px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    min-height: 30px;
+  }
+  *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
+  *::-webkit-scrollbar-thumb:active { background-color: #6b7387; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    align-items: start;
+    overflow-anchor: none;
+  }
+  #grid {
+    display: block;
+    position: relative;
+    min-height: 0;
+    contain: layout style;
+  }
+  #grid .card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--virtual-card-width, 260px);
+    transform: translate3d(var(--virtual-card-x, 0px), var(--virtual-card-y, 0px), 0);
+  }
+  /* favorites sub-section above the main virtualized grid. hidden by defualt; render() toggles `is-shown` on both the heading and the grid when the all filter is active and theres at least one favorite. same goes for the "all clips" heading -- it only shows in that case to seperate the two sub-sections visually. */
+  .favorites-grid { display: none; margin-bottom: 18px; }
+  .favorites-grid.is-shown { display: grid; }
+  .section-heading {
+    display: none;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9aa1b1;
+    margin: 4px 4px 10px 4px;
+  }
+  .section-heading.is-shown { display: block; }
+  .virtual-spacer {
+    height: 0;
+    pointer-events: none;
+    overflow-anchor: none;
+  }
+  .empty {
+    color: var(--text_muted);
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .empty.error { color: var(--red); }
+  .empty .hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text_muted);
+  }
+  .empty code {
+    background: var(--grey8);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .card {
+    position: relative;
+    background: var(--bg_card);
+    border: 1px solid var(--grey4);
+    border-radius: 6px;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 80ms linear;
+    overflow-anchor: none;
+    /* Keep card layout isolated without content-visibility. OBS CEF can flicker
+       grid children after maximize/restore when content-visibility:auto is
+       combined with virtualized rows and lazy media. */
+    contain: layout style;
+  }
+  .card.menu-open { z-index: 20; }
+  .card:hover {
+    border-color: var(--grey1);
+  }
+  .preview {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+  }
+  .preview .thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+  }
+  .preview video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    opacity: 0;
+    transition: opacity 80ms linear;
+  }
+  /* the fullscreen target is the .preview container now (not the <video> itself), so the browser doesnt fire its built-in dblclick=exit-fullscreen shortcut. we size the container to 100%/100% and let the video letterbox-fit inside it. */
+  .preview:fullscreen,
+  .preview:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+  .preview:fullscreen video,
+  .preview:-webkit-full-screen video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    opacity: 1;
+  }
+  .preview.is-playing video {
+    opacity: 1;
+  }
+  .preview .play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 1;
+    transition: opacity 120ms linear;
+    pointer-events: none;
+  }
+  .card:hover .preview .play-overlay { opacity: 0; }
+  .preview .play-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .preview .play-icon::after {
+    content: "";
+    display: block;
+    width: 0;
+    height: 0;
+    border-left: 12px solid rgba(255, 255, 255, 0.9);
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    margin-left: 3px;
+  }
+
+  /* preview controls (volume + fullscreen, bottom of preview) - float over the video, fade in on card hover so resting cards look clean. the two halves (left = volume, right = fullscreen) sit above the progress bar. */
+  .preview-controls {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 4;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms linear;
+  }
+  .card:hover .preview-controls { opacity: 1; pointer-events: auto; }
+
+  .icon-btn {
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 80ms linear;
+  }
+  .icon-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  .icon-btn svg  { width: 16px; height: 16px; fill: currentColor; display: block; }
+  .favorite-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 80ms linear, color 80ms linear;
+  }
+  .favorite-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  /* filled star (favorited) renders in youtube-/imdb-style gold so it reads at a glance against the dark card; outline state keeps the white-on-translucent look so its visible without competing for attention with the play button. */
+  .favorite-btn.is-favorite { color: #f5c518; }
+  .favorite-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    display: block;
+  }
+
+  /* volume "pill": icon and slider live inside one rounded container that expands on hover. no gap, no absolute positioning, no dead zone -- moving the cursor from the icon to the slider keeps the pill hovered the whole way. */
+  .volume-control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 28px;
+    width: 28px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: width 140ms ease, background-color 80ms linear;
+  }
+  .volume-control:hover {
+    width: 124px;
+    background: rgba(0, 0, 0, 0.85);
+  }
+  .volume-btn {
+    flex: 0 0 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .volume-btn svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  .volume-slider-wrap {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 12px 0 2px;
+    min-width: 0;
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .volume-control:hover .volume-slider-wrap { opacity: 1; }
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    margin: 0;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    border: none;
+  }
+
+  /* duration badge: bottom-right pill on the thumbnail, youtube-style. hidden until the js probe fills it in (probeduration reads the video metadata when the card scrolls into view). stays visible in fullscreen but auto-hides with the rest of the overlay via the is-idle rule. */
+  .duration-badge {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    z-index: 3;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    border-radius: 3px;
+    pointer-events: none;
+    line-height: 1.3;
+    display: none;
+  }
+  .duration-badge.is-ready { display: block; }
+  /* the badge is a "thumbnail garnish" -- it shouldnt sit on top of the actual video. hide it whenever the user has expressed intent to watch: .card:hover -- mouse is over the card. the hover preview will start playing in a moment; hide immediately so the badge doesnt lag behind the user and sit on top of live frames. .preview.is-playing -- belt-and-suspenders for the case where playback was started without a hover (programmatic / fullscreen). .preview:fullscreen -- bottom bars "0:36 / 1:00" is the source of truth in fullscreen. wins over .is-ready via the longer selector chain alone; no !important needed. */
+  .card:hover .duration-badge.is-ready,
+  .preview.is-playing .duration-badge.is-ready,
+  .preview:fullscreen .duration-badge.is-ready,
+  .preview:-webkit-full-screen .duration-badge.is-ready {
+    display: none;
+  }
+
+  /* duration progress bar at the very bottom of the preview. always visible -- the empty bar tells you "this is a video", the fill animates while a hover preview plays. in fullscreen the bar is also a click + drag scrubber (handler wired in buildcard). */
+  .progress-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 3;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary_light);
+    /* no css transition: width is repainted every animation frame from the requestanimationframe loop in buildcard(), so easing would just lag the bar behind the real playhead. */
+  }
+  /* fullscreen-only player chrome (youtube-style) - when the .preview container is the fullscreen element (not the <video>), theres no native browser hud to fall back on. we build one that mirrors youtubes bottom-bar shape: a single transparent panel running edge-to-edge along the bottom of the viewport, holding a thin progress bar with a scrub dot up top and a row of [play/pause | volume | time text ........ fs] under it. a dark gradient fades the bottom 25% of the video so light scenes dont make the controls illegible. hide-from-dock: every element added for the fullscreen player (play-toggle-btn, time-display, progress-scrub-dot, settings gear) carries `display: none` here -- the fullscreen rules below switch them on. */
+  .preview .play-toggle-btn,
+  .preview .time-display,
+  .preview .progress-scrub-dot,
+  .preview .settings-wrap { display: none; }
+  .preview:fullscreen .settings-wrap,
+  .preview:-webkit-full-screen .settings-wrap {
+    display: inline-flex;
+    position: relative;
+  }
+  /* youtube-style playback-speed popup. anchored above the gear, opens on .is-open. the styling matches the rest of the docks dark-glass menus (auth menu, card more-menu) -- subtle translucent black background, no flashy accent border. */
+  /* playback-speed popup -- styled 1:1 with youtubes actual ytp-variable-speed-panel. values pulled from getcomputedstyle(.ytp-settings-menu) on a live youtube.com page: 60% black background (not super transparent, not backdrop-blur), 12px radius, no shadow, no border. inner controls are subtle translucent-white pills/chips at 10% alpha (20% when active), no borders. the obs-blue accent is kept only on the active pill so the player chrome reads as "youtube but ours". */
+  .settings-menu {
+    position: absolute;
+    right: 0;
+    /* sit above the progress bar (at bottom:56px in fullscreen). */
+    bottom: calc(100% + 20px);
+    width: 330px;                /* YouTube's exact value */
+    background: rgba(0, 0, 0, 0.6);
+    border: 0;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: none;
+    color: rgb(238, 238, 238);
+    z-index: 10;
+    display: none;
+  }
+  .settings-wrap.is-open .settings-menu { display: block; }
+  /* header: gear glyph + "playback speed" label. no divider line -- youtube uses generous whitespace instead. */
+  .settings-menu .menu-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgb(238, 238, 238);
+    border: 0;
+  }
+  .settings-menu .menu-header svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+  /* big centred current-value readout. youtube uses font-weight: 900 for the "1.00x" -- a very heavy display weight that makes the value stand out without taking up extra room. the number itself is now an <input> so the user can type any custom rate; the "x" suffix is a static sibling so they cant accidentally edit or delete it. */
+  .speed-current {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: rgb(238, 238, 238);
+    font-variant-numeric: tabular-nums;
+    margin: 20px 16px 12px;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 1px;
+  }
+  .speed-current-value {
+    /* strip all defualt <input> chrome so it reads as plain text. */
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    width: 3.5ch;          /* fits "10.0" without horizontal scrolling */
+    cursor: text;
+    /* subtle underline on focus so the user can see theyve activated editing; nothing visible at rest so the layout stays youtube-clean. */
+    border-bottom: 1px solid transparent;
+    transition: border-color 80ms linear;
+  }
+  .speed-current-value:focus {
+    border-bottom-color: rgba(255, 255, 255, 0.5);
+  }
+  .speed-current-unit {
+    margin-left: 1px;
+  }
+  /* slider row: [-] [========o========] [+]. */
+  .speed-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    margin-bottom: 16px;
+  }
+  .speed-step-btn {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 0;
+    border-radius: 16px;
+    color: #FFFFFF;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 80ms ease-out;
+  }
+  .speed-step-btn:hover  { background: rgba(255, 255, 255, 0.20); }
+  .speed-step-btn:active { background: rgba(255, 255, 255, 0.28); }
+  .speed-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    cursor: pointer;
+    border: 0;
+  }
+  /* quick-select preset pills. youtube renders them as a strip of 53x32 chips with 10% white background and 16px radius. active pill flips to obs blue (our accent) rather than youtubes subtle 20% white -- single sharp brand colour across the chrome. */
+  .speed-pills {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+    justify-content: space-between;
+  }
+  .speed-pill {
+    width: 53px;
+    height: 32px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 0;
+    border-radius: 16px;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #FFFFFF;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 80ms ease-out;
+  }
+  .speed-pill:hover { background: rgba(255, 255, 255, 0.20); }
+  .speed-pill.is-active {
+    background: var(--primary);
+    color: #FFFFFF;
+  }
+
+  /* center play/pause flash. pops in with a quick scale+fade-out every time the user toggles playback via click on the video surface, the play-toggle button, or the space key. mirrors the youtube indicator. js adds .is-flashing for 500 ms. */
+  .center-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 72px;
+    height: 72px;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 350ms ease-out, transform 350ms ease-out;
+  }
+  .center-pulse svg { width: 36px; height: 36px; fill: #FFFFFF; }
+  .center-pulse.is-flashing {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+    transition: opacity 80ms linear, transform 80ms linear;
+  }
+
+  /* the shaded backdrop that sits behind the controls when fullscreen. kept short (covers only the control strip + progress bar, not anything above) so it doesnt bleed dark into the settings popup that pops above the gear. earlier this was 110px tall, which meant the popup -- at bottom:64px from the screen, on top of the still-opaque part of the gradient -- read as opaque even at 28% alpha. now the shade tops out at 64px; the popup sits above that and gets the real video as its backdrop. */
+  .preview .player-shade {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 64px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(to top,
+                  rgba(0, 0, 0, 0.85) 0%,
+                  rgba(0, 0, 0, 0.50) 60%,
+                  rgba(0, 0, 0, 0) 100%);
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .preview:fullscreen .player-shade,
+  .preview:-webkit-full-screen .player-shade { opacity: 1; }
+
+  /* hoist the controls row to a youtube-like bottom bar: edge-to-edge, play/volume/time on the left, fullscreen on the right. */
+  .preview:fullscreen .preview-controls,
+  .preview:-webkit-full-screen .preview-controls {
+    opacity: 1;
+    pointer-events: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 8px;
+    gap: 0;
+  }
+  .preview:fullscreen .controls-left,
+  .preview:-webkit-full-screen .controls-left {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preview:fullscreen .controls-right,
+  .preview:-webkit-full-screen .controls-right {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preview:fullscreen .play-toggle-btn,
+  .preview:-webkit-full-screen .play-toggle-btn,
+  .preview:fullscreen .time-display,
+  .preview:-webkit-full-screen .time-display { display: inline-flex; }
+
+  /* big-target icon buttons -- youtubes are about 36 px tall; we match. the hover background is subtle so it doesnt compete with the gradient backdrop. */
+  .preview:fullscreen .preview-controls .icon-btn,
+  .preview:-webkit-full-screen .preview-controls .icon-btn,
+  .preview:fullscreen .play-toggle-btn,
+  .preview:-webkit-full-screen .play-toggle-btn {
+    background: transparent;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    color: #FFFFFF;
+  }
+  .preview:fullscreen .preview-controls .icon-btn:hover,
+  .preview:-webkit-full-screen .preview-controls .icon-btn:hover,
+  .preview:fullscreen .play-toggle-btn:hover,
+  .preview:-webkit-full-screen .play-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+  .preview:fullscreen .preview-controls .icon-btn svg,
+  .preview:-webkit-full-screen .preview-controls .icon-btn svg,
+  .preview:fullscreen .play-toggle-btn svg,
+  .preview:-webkit-full-screen .play-toggle-btn svg {
+    width: 22px; height: 22px; fill: currentColor;
+  }
+  .play-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  /* youtube-style time text: tabular numerics so the seconds tick doesnt shift the layout. uses css variable substitution so the content is js-controlled via setproperty on the badge. */
+  .time-display {
+    align-items: center;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    padding: 0 8px;
+    line-height: 36px;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  }
+
+  /* volume cluster: in fullscreen the slider is collapsed by defualt and expands on hover/focus of the volume button -- the same trick youtube uses. the existing .volume-slider-wrap css handles most of this; we just make the cluster blend with the new bar. */
+  .preview:fullscreen .volume-control,
+  .preview:-webkit-full-screen .volume-control { background: transparent; }
+
+  /* the progress bar is the players seek scrubber in fullscreen. place it above the controls row instead of in its own strip at the bottom of the screen -- the youtube look. */
+  .preview:fullscreen .progress-bar,
+  .preview:-webkit-full-screen .progress-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 56px;
+    height: 4px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+    z-index: 4;
+    transition: height 80ms linear;
+  }
+  .preview:fullscreen .progress-bar:hover,
+  .preview:-webkit-full-screen .progress-bar:hover { height: 6px; }
+  .preview:fullscreen .progress-fill,
+  .preview:-webkit-full-screen .progress-fill {
+    background: var(--primary_light);
+    border-radius: 2px;
+    transition: none;
+    position: relative;  /* anchor the scrub dot to the fill's edge */
+    z-index: 2;
+  }
+  /* youtube-style hover preview fill: a translucent white band that follows the cursors x position along the bar, indicating where a click will seek to. js writes the width onto the element via a css variable on each pointermove; css does the rest. sits behind the real progress fill so it cant visually overpower it when both are present. */
+  .preview:fullscreen .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-hover-fill {
+    display: block;
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: var(--hover-fill, 0%);
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 1;
+    transition: none;
+  }
+  .preview .progress-hover-fill { display: none; }
+  /* time tooltip floating above the cursor when hovering the bar. */
+  .preview .progress-hover-time { display: none; }
+  .preview:fullscreen .progress-bar:hover .progress-hover-time,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-time {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    left: var(--hover-x, 0px);
+    padding: 3px 7px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-radius: 3px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  /* scrub dot riding the playhead. lives inside the .progress-fill so its right:-7px anchor lines up with the playheads actual x position. previously the dot was a sibling of .progress-fill anchored to the right edge of the whole .progress-bar -- which meant it sat at the end of the bar regardless of playback position. hidden by defualt, revealed on bar hover. */
+  .preview:fullscreen .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-scrub-dot {
+    display: block;
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary_light);
+    pointer-events: none;
+    transition: transform 80ms ease-out;
+  }
+  .preview:fullscreen .progress-bar:hover .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-scrub-dot {
+    transform: translateY(-50%) scale(1);
+  }
+
+  /* auto-hide after a few seconds of mouse idleness so the controls dont sit on top of the video forever. .is-idle is toggled from js based on a mousemove timer. */
+  .preview:fullscreen.is-idle,
+  .preview:-webkit-full-screen.is-idle { cursor: none; }
+  .preview:fullscreen.is-idle .preview-controls,
+  .preview:-webkit-full-screen.is-idle .preview-controls,
+  .preview:fullscreen.is-idle .progress-bar,
+  .preview:-webkit-full-screen.is-idle .progress-bar,
+  .preview:fullscreen.is-idle .player-shade,
+  .preview:-webkit-full-screen.is-idle .player-shade {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms linear;
+  }
+
+  /* title row (name + edit pencil + 3-dot menu) */
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .name {
+    /* dont grow -- the name sizes to its text so the pencil sits right next to it. can still shrink (with ellipsis) when the filename is too long for the card. */
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 0;
+  }
+  .name-edit-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--grey7);
+    border: 1px solid var(--button_border_hover);
+    border-radius: 3px;
+    padding: 1px 4px;
+    outline: none;
+  }
+  /* title-row icons are always visible -- the cursor doesnt need to be on the card for them to make sense (the user might already be looking at the card to know they want to rename / open folder). */
+  .icon-mini-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--text_muted);
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 80ms linear, background-color 80ms linear;
+  }
+  .icon-mini-btn:hover { color: var(--text); background: var(--button_bg_hover); }
+  .icon-mini-btn svg   { width: 14px; height: 14px; fill: currentColor; display: block; }
+
+  /* dropdown for the 3-dot menu. positioned beneath its trigger, only visible when .is-open. closes on outside click (wired in js). */
+  /* margin-left:auto eats whatever space is left over after the name + pencil, pinning the 3-dot menu to the right edge. */
+  .menu-container { position: relative; flex-shrink: 0; margin-left: auto; }
+  .menu-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 160px;
+    background: var(--grey6);
+    border: 1px solid var(--grey4);
+    border-radius: 4px;
+    padding: 4px 0;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    display: none;
+  }
+  .menu-dropdown.is-open { display: block; }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .menu-item svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+  .menu-item:hover { background: var(--button_bg_hover); }
+  .menu-item.danger { color: var(--red); }
+  .menu-item.danger:hover {
+    color: #ff6b82;
+    background: rgba(227, 59, 87, 0.16);
+  }
+  /* armed state: the menu item has been clicked once and is waiting for a second click to confirm. filled red background + white text so the second-click target visually matches a "destructive" button -- theres no way to miss that another click commits. */
+  .menu-item.danger.is-armed,
+  .menu-item.danger.is-armed:hover {
+    background: var(--red);
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  .menu-item.danger.is-armed svg { fill: #FFFFFF; }
+
+  /* link icon inside action buttons */
+  .btn .btn-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+  .body {
+    padding: 8px 10px 6px;
+    min-width: 0;
+  }
+  .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .meta {
+    font-size: 11px;
+    color: var(--text_muted);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .meta .dot {
+    width: 3px;
+    height: 3px;
+    background: var(--text_muted);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .meta .link-status { color: var(--green); }
+  .meta .link-status.is-expiring { color: var(--amber); }
+  .actions {
+    padding: 4px 10px 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button_bg);
+    color: var(--text);
+    border: 1px solid var(--button_border);
+    border-radius: var(--border_radius);
+    height: 30px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    transition: background-color 60ms linear, border-color 60ms linear;
+    user-select: none;
+    flex: 1;
+  }
+  .btn:hover {
+    background-color: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+  }
+  .btn:active { background-color: var(--button_bg_down); }
+  /* :disabled blocks pointer events natively; .is-busy is used by the "uploading x% - cancel" button which must remain clickable so the user can cancel. buttons that should be fully locked also set the `disabled` attribute, so this split is safe. */
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: progress;
+    pointer-events: none;
+  }
+  .btn.is-busy {
+    opacity: 0.6;
+    cursor: progress;
+  }
+  .btn.is-flashing,
+  .btn.primary {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+  }
+  .btn.primary:hover { background-color: var(--primary_light); }
+  /* in-card progress button used during compress / upload. a real .progress-fill child holds the blue fill instead of a ::before pseudo -- when renderactions updates the button in-place, the fill element persists across renders so its `width` transition actualy animates instead of snapping. pointer-events:none on the fill so cancel-click still hits the button. */
+  .btn.is-progress {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--button_bg);
+    border-color: var(--primary_light);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn.is-progress .progress-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: var(--primary);
+    transition: width 600ms linear, background-color 60ms linear;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .btn.is-progress > svg,
+  .btn.is-progress > .btn-label,
+  .btn.is-progress > .cancel-label {
+    position: relative;
+    z-index: 1;
+  }
+  /* cancel icon shares the same 14x14 sizing as the link icon -- without this itd render at the defualt unsized-svg dimensions (huge) and dominate the button. fill:currentcolor lets it inherit the hover text color so a single rule covers both states. */
+  .btn.is-progress > .cancel-icon {
+    position: relative;
+    z-index: 1;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+  /* defualt state: progress label + link icon visible, cancel pair hidden. */
+  .btn.is-progress > .cancel-icon,
+  .btn.is-progress > .cancel-label { display: none; }
+  .btn.is-progress {
+    transition: background-color 80ms ease-out, border-color 80ms ease-out;
+  }
+  /* hover state: solid obs red, white text, cancel pair shown. we also paint the progress-fill the same red so it visually disappears into the background instead of leaving a darker stripe on the left edge of the button. */
+  .btn.is-progress:hover {
+    background-color: var(--red);
+    border-color: var(--red);
+    color: #FFFFFF;
+    cursor: pointer;
+  }
+  .btn.is-progress:hover .progress-fill { background: var(--red); }
+  .btn.is-progress:hover > .btn-icon,
+  .btn.is-progress:hover > .btn-label { display: none; }
+  .btn.is-progress:hover > .cancel-icon { display: inline-block; }
+  .btn.is-progress:hover > .cancel-label { display: inline; }
+  .toast {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    background: var(--grey6);
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    max-width: 380px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    z-index: 10;
+    display: none;
+  }
+  .toast.is-shown { display: block; }
+  .toast.is-info  { color: var(--text); border-color: var(--grey4); }
+
+  /* "compress this clip" modal */
+  .modal-veil {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-veil.is-open { display: flex; }
+  .modal {
+    width: 360px;
+    background: var(--grey6);
+    border: 1px solid var(--grey4);
+    border-radius: 8px;
+    padding: 18px 18px 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  }
+  .modal h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  .modal .body { color: var(--text_muted); font-size: 12.5px; line-height: 1.5; }
+  .modal .body code {
+    background: var(--grey8);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .modal .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .modal .row .btn { flex: 0 0 auto; }
+
+  /* trim modal */
+  .trim-modal { width: 640px; max-width: 92vw; }
+  .trim-modal .clip-name {
+    font-size: 12px;
+    color: var(--text_muted);
+    margin: -2px 0 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* the video sits inside a wrapper so we can absolutely-position a youtube-style seek overlay and a centered play/pause icon over it without affecting layout of the surrounding modal. */
+  .trim-video-wrap {
+    position: relative;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trim-modal video {
+    width: 100%;
+    max-height: 320px;
+    background: #000;
+    display: block;
+  }
+  /* centered play/pause button -- visible on hover, fades out so the user can see the underlying frame while scrubbing. */
+  .trim-playpause-btn {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms linear;
+    z-index: 2;
+  }
+  .trim-video-wrap:hover .trim-playpause-btn,
+  .trim-video-wrap.is-paused .trim-playpause-btn { opacity: 1; }
+  .trim-playpause-btn svg { width: 28px; height: 28px; fill: currentColor; display: block; }
+  /* youtube-style seek overlay on the bottom edge of the video. track is faint until the user hovers the video, then brightens. the thumb stays small and circular like youtubes. */
+  .trim-seek-overlay {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 22px;
+    background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0));
+    z-index: 3;
+  }
+  .trim-seek-track {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 6px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.28);
+  }
+  .trim-seek-fill {
+    position: absolute;
+    left: 0;
+    bottom: 6px;
+    height: 4px;
+    background: var(--primary_light);
+    pointer-events: none;
+  }
+  .trim-seek-overlay input[type=range] {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 16px;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 4px;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--white1);
+    border: none;
+    cursor: grab;
+    margin-top: -4px;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+  /* danger-tinted "overwrite original" button. the first click "arms" it (turns red + text changes to "click again to confirm"); a second click within 3s actualy fires. avoids the ugly browser confirm() dialog. */
+  .btn.danger-action {
+    background-color: transparent;
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn.danger-action:hover {
+    background-color: rgba(227, 59, 87, 0.12);
+    border-color: var(--red);
+  }
+  .btn.danger-action.is-armed {
+    background-color: var(--red);
+    color: var(--white1);
+    border-color: var(--red);
+  }
+  .btn.danger-action.is-armed:hover {
+    background-color: #c4324b;
+    color: var(--white1);
+  }
+  /* dual-handle range built from two overlapping <input type=range>. the inputs themselves are transparent and pointer-events:none so they dont block each other -- only the ::-webkit-slider-thumb gets pointer-events:auto, which is what gives the user two independent draggable handles sitting on a single track. */
+  .trim-bar {
+    position: relative;
+    height: 28px;
+    margin: 16px 4px 6px;
+  }
+  .trim-bar-track {
+    position: absolute;
+    top: 12px;
+    left: 0; right: 0;
+    height: 4px;
+    background: var(--grey4);
+    border-radius: 2px;
+  }
+  .trim-bar-range {
+    position: absolute;
+    top: 12px;
+    height: 4px;
+    background: var(--primary);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  .trim-bar input[type=range] {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    width: 100%;
+    height: 16px;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+  }
+  .trim-bar input[type=range]::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 4px;
+  }
+  .trim-bar input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--white1);
+    border: 2px solid var(--primary_light);
+    cursor: grab;
+    pointer-events: auto;
+    margin-top: -6px;
+  }
+  .trim-bar input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+  .trim-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text_muted);
+    margin-top: 2px;
+  }
+  .trim-info b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .trim-info .preview-btn {
+    background: transparent;
+    border: 1px solid var(--grey4);
+    color: var(--text_muted);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .trim-info .preview-btn:hover { color: var(--text); border-color: var(--button_border_hover); }
+  .trim-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 4px 0;
+    font-size: 12px;
+    color: var(--text_muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .trim-mode-row input[type=checkbox] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+  .trim-mode-row:hover { color: var(--text); }
+
+  /* compress mode picker */
+  /* two stacked cards, each one click-to-pick. title + one-line trade-off blurb so the user doesnt have to remember which mode is which. */
+  .compress-mode-modal .clip-name {
+    font-size: 12px;
+    color: var(--text_muted);
+    margin: -2px 0 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .compress-mode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .compress-mode-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--grey7);
+    border: 1px solid var(--grey4);
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    font: inherit;
+    transition: background 80ms linear, border-color 80ms linear;
+  }
+  .compress-mode-card:hover,
+  .compress-mode-card:focus-visible {
+    background: var(--grey5);
+    border-color: var(--button_border_hover);
+    outline: none;
+  }
+  .compress-mode-card .title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .compress-mode-card .blurb {
+    font-size: 11.5px;
+    color: var(--text_muted);
+    line-height: 1.4;
+  }
+  /* sits between the filename and the mode cards. visible warning that this flow replaces the source file -- the per-card blurbs talk about encode strategy, this one-liner makes the destructive nature of the operation impossible to miss. matches the .menu-item.danger color so destructive actions read consistently across the dock. */
+  .compress-mode-warning {
+    font-size: 12px;
+    color: var(--red);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .compress-mode-warning svg {
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+  /* disabled mode card -- used when the clip is already compressed in a way that makes this mode pointless (e.g. fast on an already-fast-compressed clip, or any mode on an already-slow-compressed clip). greyed out, no hover, no click. */
+  .compress-mode-card.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .compress-mode-card .reason {
+    display: none;
+    font-size: 11.5px;
+    color: var(--text_muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .compress-mode-card.is-disabled .reason { display: block; }
+  /* banner shown when the clip is already at maximum compression (slow) and no further compression would improve it. */
+  .compress-mode-locked {
+    display: none;
+    font-size: 12px;
+    color: var(--text_muted);
+    line-height: 1.5;
+    padding: 10px 12px;
+    background: var(--grey7);
+    border: 1px solid var(--grey4);
+    border-radius: 6px;
+  }
+  .compress-mode-locked b { color: var(--text); font-weight: 600; }
+  .compress-mode-modal.is-locked .compress-mode-list,
+  .compress-mode-modal.is-locked .compress-mode-warning { display: none; }
+  .compress-mode-modal.is-locked .compress-mode-locked { display: block; }
+</style>
+</head>
+<body>
+  <div class="modal-veil" id="compress-veil">
+    <div class="modal" id="compress-modal">
+      <h2>Clip is too big for Streamable</h2>
+      <div class="body" id="compress-body"></div>
+      <div class="row">
+        <button class="btn"         type="button" id="compress-cancel">Cancel</button>
+        <button class="btn primary" type="button" id="compress-go">Compress</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="compress-all-veil">
+    <div class="modal" id="compress-all-modal">
+      <h2>Compress all clips</h2>
+      <div class="body" id="compress-all-body"></div>
+      <div class="row">
+        <button class="btn"         type="button" id="compress-all-cancel">Cancel</button>
+        <button class="btn primary" type="button" id="compress-all-go">Compress all</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="compress-mode-veil">
+    <div class="modal compress-mode-modal" id="compress-mode-modal">
+      <h2>Compress clip</h2>
+      <div class="clip-name" id="compress-mode-clip-name"></div>
+      <div class="compress-mode-warning" role="note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm0 5.5L19.5 19h-15L12 7.5zM11 11v4h2v-4h-2zm0 5v2h2v-2h-2z"/></svg>
+        <span>Replaces the original file on disk &mdash; this can&rsquo;t be undone.</span>
+      </div>
+      <div class="compress-mode-locked" role="note">
+        This clip is <b>already at maximum compression</b> (Smaller mode).
+        Re-encoding wouldn&rsquo;t reduce the size further, only the quality.
+      </div>
+      <div class="compress-mode-list">
+        <button type="button" class="compress-mode-card" data-mode="fast">
+          <span class="title">Fast</span>
+          <span class="blurb">Quick re-encode. Smaller than the original; finishes in roughly clip-length time.</span>
+          <span class="reason">Already compressed in Fast mode &mdash; choose Smaller for further reduction.</span>
+        </button>
+        <button type="button" class="compress-mode-card" data-mode="smaller">
+          <span class="title">Smaller</span>
+          <span class="blurb">Slower re-encode for a smaller file. Roughly 30-50% smaller than Fast; takes 2-4&times; longer.</span>
+          <span class="reason">Already at maximum compression.</span>
+        </button>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" id="compress-mode-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="trim-veil">
+    <div class="modal trim-modal" id="trim-modal">
+      <h2>Trim clip</h2>
+      <div class="clip-name" id="trim-clip-name"></div>
+      <div class="trim-video-wrap">
+        <video id="trim-video" preload="metadata" muted playsinline
+               controlsList="nodownload noplaybackrate noremoteplayback"
+               disablePictureInPicture></video>
+        <button class="trim-playpause-btn" id="trim-playpause" type="button"
+                aria-label="Play/Pause">
+          <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
+        </button>
+        <div class="trim-seek-overlay">
+          <div class="trim-seek-track"></div>
+          <div class="trim-seek-fill" id="trim-seek-fill"></div>
+          <input type="range" id="trim-seek" min="0" max="100" step="0.01" value="0" aria-label="Seek">
+        </div>
+      </div>
+      <div class="trim-bar">
+        <div class="trim-bar-track"></div>
+        <div class="trim-bar-range" id="trim-range-fill"></div>
+        <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0">
+        <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100">
+      </div>
+      <div class="trim-info">
+        <span>Start <b id="trim-start-time">0:00.00</b></span>
+        <span>End <b id="trim-end-time">0:00.00</b></span>
+        <span>Length <b id="trim-length-time">0:00.00</b></span>
+        <button type="button" class="preview-btn" id="trim-preview">Preview</button>
+      </div>
+      <label class="trim-mode-row" title="Frame-accurate cuts re-encode the video (libx264 CRF 14, ~clip-length encode time) so the cut lands exactly where you placed the handles. Output is visually indistinguishable from the source but typically ~70-85% of the proportional file size. Audio is stream-copied (no loss). Uncheck to remux only: instant and byte-identical, but the cut snaps to the previous keyframe (1-2s for OBS recordings).">
+        <input type="checkbox" id="trim-precise" checked>
+        <span>Frame-accurate (re-encode for exact cut)</span>
+      </label>
+      <div class="row">
+        <button class="btn"               type="button" id="trim-cancel">Cancel</button>
+        <button class="btn danger-action" type="button" id="trim-overwrite">Overwrite original</button>
+        <button class="btn primary"       type="button" id="trim-save">Save copy</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="clip-tabs" role="tablist" aria-label="Clip filters">
+    <button class="tab is-active" type="button" data-filter="all" data-label="All">All</button>
+    <button class="tab" type="button" data-filter="favorites" data-label="Favorites">Favorites</button>
+    <button class="tab" type="button" data-filter="linked" data-label="Linked">Linked</button>
+    <button class="tab" type="button" data-filter="local" data-label="Local">Local</button>
+    <button class="tab-action" type="button" id="compress-all-btn"
+            title="Fast-compress every clip that isn't already compressed.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/></svg>
+      <span id="compress-all-label">Compress All</span>
+    </button>
+  </div>
+
+  <div class="scroll-area">
+    <!-- Favorites sub-section. Only rendered when the All filter is
+         active AND the user has at least one favorite. The grid below
+         it (id="grid") is the virtualized list of NON-favorites in
+         that case, otherwise the full filtered list. Both grids live
+         inside the same scroll-area so they scroll together. -->
+    <div class="section-heading" id="favorites-heading">Favorites</div>
+    <div class="grid favorites-grid" id="favorites-grid"></div>
+    <div class="section-heading section-heading-rest" id="rest-heading">All clips</div>
+    <div class="virtual-spacer" id="top-spacer"></div>
+    <div class="grid" id="grid" style="display:none"></div>
+    <div class="virtual-spacer" id="bottom-spacer"></div>
+    <div class="empty" id="empty">Looking for clips...</div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  // dock lockdown: stop accidental right-click menu / zoom shortcuts. cef treats this popup like a regular web page, so users can right-click and hit zoom in / refresh / back / inspect / etc. -- all of which are surprises in a clip-browser context. mirrored in controls.html and controls_app.html.
+  (function lockdown() {
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey) e.preventDefault();
+    }, { passive: false });
+    document.addEventListener("keydown", function (e) {
+      if (e.ctrlKey && (
+            e.key === "+" || e.key === "=" || e.key === "-" ||
+            e.key === "0" || e.key === "r" || e.key === "R")) {
+        e.preventDefault();
+      }
+      if (e.key === "F5") e.preventDefault();
+    });
+  })();
+
+  // self-style the title bar from inside the popup. previously only the parent dock fired /style-window on a 5-retry schedule; if all 5 hits missed (window not yet visible to enumwindows, or its title hadnt settled to "clips" yet), the popup ended up with a defualt white windows chrome and the generic app icon. triggering from inside the popup -- on domcontentloaded, load, and a few late timeouts -- is the reliable path becuase the popup knows exactly when its own title and visibility are set. we also observe the <title> element so a transient title change (e.g. a fullscreen api setting "clips - fullscreen") would still re-style.
+  (function selfStyle() {
+    const origin = (location.protocol === "http:")
+      ? location.origin
+      : "http://127.0.0.1:8767";
+    const url = origin + "/style-window?title=Clips&taskbar=1";
+    function poke() {
+      try {
+        fetch(url + "&t=" + Date.now(), { cache: "no-store" }).catch(function () {});
+      } catch (e) {}
+    }
+    // fire immediately, on domcontentloaded, on load, and a few late retries to cover slow systems where enumwindows still doesnt see the window when the earlier calls landed.
+    poke();
+    document.addEventListener("DOMContentLoaded", poke);
+    window.addEventListener("load", poke);
+    [400, 900, 1800, 3500].forEach(function (d) { setTimeout(poke, d); });
+    // long-tail self-heal: every 15 s for the lifetime of this popup, ping /style-window again. this recovers the title bar even if the popup happened to load during a helper restart (e.g. user reloaded tools -> scripts so the helper handed off between two obs replaykit processes) and all the bursty retries above fired against a not-yet-bound helper. the endpoint is idempotent server-side so the periodic poke is essentially free.
+    setInterval(poke, 15000);
+    try {
+      const t = document.querySelector("title");
+      if (t) new MutationObserver(poke).observe(t, { childList: true });
+    } catch (e) {}
+  })();
+
+  const HELPER = location.protocol === "http:"
+    ? location.origin
+    : "http://127.0.0.1:8767";
+  const POLL_FAST_MS = 2500;
+  const POLL_IDLE_MS = 1000;
+  const CLIPS_FORCE_REFRESH_EVERY = 4;
+  const TWO_DAYS_SEC = 2 * 24 * 60 * 60;
+
+  // material-style icon svg path data. inlined so we dont pay a round-trip per card. each card duplicates the markup, but each <svg> is ~80 bytes -- not worth a sprite sheet.
+  const ICON = {
+    // material volume_off, but with the x subpath shifted right by 2 units so it clears the speaker cone (which ends at x=12) with a visible gap instead of biting into it.
+    VOL_MUTED:  '<path d="M3 9v6h4l5 5V4L7 9H3zm15.59 3L21 14.41 19.59 16 17 13.41 14.41 16 13 14.41 15.59 12 13 9.59 14.41 8.17 17 10.59 19.59 8 21 9.41 18.59 12z"/>',
+    VOL_ON:     '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>',
+    FULLSCREEN: '<path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/>',
+    MORE:       '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
+    EDIT:       '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
+    LINK:       '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>',
+    TRASH:      '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"/>',
+    STAR:       '<path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>',
+    STAR_BORDER:'<path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/>',
+    CONTENT_CUT:'<path d="M9.64 7.64c.23-.5.36-1.05.36-1.64 0-2.21-1.79-4-4-4S2 3.79 2 6s1.79 4 4 4c.59 0 1.14-.13 1.64-.36L10 12l-2.36 2.36C7.14 14.13 6.59 14 6 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4c0-.59-.13-1.14-.36-1.64L12 14l7 7h3v-1L9.64 7.64zM6 8c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm0 12c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm6-7.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM19 3l-6 6 2 2 7-7V3z"/>',
+    CONTENT_COPY:'<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>',
+    COMPRESS:   '<path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/>',
+    PLAY:       '<path d="M8 5v14l11-7z"/>',
+    PAUSE:      '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
+    CLOSE:      '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
+    // 1:1 youtube fullscreen icons. both paths are copied verbatim from youtubes production ytp-fullscreen-button svg -- enter is the "full screen" variant (rounded diagonal arrows pointing out at nw + se corners), exit is the "exit full screen" variant (rounded arrows pointing in at nw + se corners with the l-bracket pulled toward center). same 24x24 viewbox; the pair renders identically sized.
+    FULLSCREEN_EXIT: '<path d="M3.29 3.29C3.11 3.46 3.01 3.70 3.00 3.94C2.98 4.19 3.06 4.43 3.22 4.63L3.29 4.70L7.58 8.99H5C4.73 8.99 4.48 9.10 4.29 9.29C4.10 9.47 4 9.73 4 9.99C4 10.26 4.10 10.51 4.29 10.70C4.48 10.89 4.73 10.99 5 10.99H11V4.99C11 4.73 10.89 4.47 10.70 4.29C10.51 4.10 10.26 3.99 10 3.99C9.73 3.99 9.48 4.10 9.29 4.29C9.10 4.47 9 4.73 9 4.99V7.58L4.70 3.29L4.63 3.22C4.43 3.06 4.19 2.98 3.94 3.00C3.70 3.01 3.46 3.11 3.29 3.29ZM19 13H13V19C13 19.26 13.10 19.51 13.29 19.70C13.48 19.89 13.73 20 14 20C14.26 20 14.51 19.89 14.70 19.70C14.89 19.51 15 19.26 15 19V16.41L19.29 20.70L19.36 20.77C19.56 20.92 19.80 21.00 20.04 20.99C20.29 20.98 20.52 20.87 20.70 20.70C20.87 20.52 20.98 20.29 20.99 20.04C21.00 19.80 20.92 19.56 20.77 19.36L20.70 19.29L16.41 15H19C19.26 15 19.51 14.89 19.70 14.70C19.89 14.51 20 14.26 20 14C20 13.73 19.89 13.48 19.70 13.29C19.51 13.10 19.26 13 19 13Z"/>',
+    // material "settings" gear. opens the playback-speed popup.
+    SETTINGS:   '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
+  };
+
+  // volume state is global so its "sticky" across cards -- youtube-like ux. defualt muted (autoplay wont work otherwise on hover).
+  const VolumeState = { muted: true, volume: 0.6 };
+  function applyVolume(video) {
+    video.muted  = VolumeState.muted;
+    video.volume = VolumeState.volume;
+  }
+  // paint the icon + slider on one card to reflect volumestate.
+  function syncVolumeUi(btn, slider) {
+    if (btn)    btn.innerHTML = `<svg viewBox="0 0 24 24">${VolumeState.muted ? ICON.VOL_MUTED : ICON.VOL_ON}</svg>`;
+    if (slider) slider.value  = Math.round(VolumeState.volume * 100);
+  }
+  // broadcast: rewrite every cards volume ui + push the new volume to the currently-playing preview (if any). this is what makes the "global volume" ux work -- toggle mute on one card and every other card shows the unmuted icon too.
+  function notifyVolumeSync() {
+    document.querySelectorAll(".card").forEach((c) => {
+      syncVolumeUi(c.querySelector(".volume-btn"), c.querySelector(".volume-slider"));
+    });
+    if (typeof activePreview !== "undefined" && activePreview) {
+      applyVolume(activePreview);
+    }
+  }
+
+  function styleNativeChrome() {
+    fetch(HELPER + "/style-window?title=Clips&taskbar=1&t=" + Date.now(), { cache: "no-store" })
+      .catch(() => {});
+  }
+  styleNativeChrome();
+  [500, 1500, 3000, 5000].forEach((delay) => {
+    setTimeout(styleNativeChrome, delay);
+  });
+
+  const scrollAreaEl = document.querySelector(".scroll-area");
+  const favoritesHeadingEl = document.getElementById("favorites-heading");
+  const favoritesGridEl    = document.getElementById("favorites-grid");
+  const restHeadingEl      = document.getElementById("rest-heading");
+  const gridEl = document.getElementById("grid");
+  const topSpacerEl = document.getElementById("top-spacer");
+  const bottomSpacerEl = document.getElementById("bottom-spacer");
+  const emptyEl = document.getElementById("empty");
+  const toastEl = document.getElementById("toast");
+  const tabBtns = Array.from(document.querySelectorAll(".tab[data-filter]"));
+
+  const FAVORITES_STORAGE_KEY = "streamable.favoriteClips.v1";
+  const localState = new Map();
+  let favoriteNames = loadFavoriteNames();
+  let activeFilter = "all";
+  let loadedClips = [];
+  let allClips = [];
+  let allClipsSignature = "";
+  let lastClipsByName = new Map();
+  let pollTimer = null;
+  let pollInFlight = false;
+  let anyUploading = false;
+  let activePreview = null;
+  let lastUploadStatus = null;
+  let lastUploadJobsByName = new Map();
+  const seenUploadErrors = new Set();
+  let didInitialClipRender = false;
+  let clipsPageVersion = "";
+  let clipsTotal = 0;
+  let clipsNextOffset = 0;
+  let clipsLoadingMore = false;
+  let clipsRefreshCounter = 0;
+  let virtualRangeStart = -1;
+  let virtualRangeEnd = -1;
+  let virtualColumns = 1;
+  let virtualCardWidth = 260;
+  let virtualRowStride = 278;
+  let virtualRenderQueued = false;
+  let virtualRenderForceQueued = false;
+  let resizeRenderRaf = 0;
+  const recycledCards = [];
+  // set to true when a render is suppressed becuase a card inside the grid is fullscreened. onfullscreenchange re-queues the render once the user exits. declared with the rest of the virtual-window state so its lifecycle is visible alongside its siblings.
+  let pendingRenderOnFsExit = false;
+  let fullscreenHostTransition = false;
+  let fullscreenHostTransitionSeq = 0;
+  let fullscreenHostTransitionTimer = 0;
+  let deferredFullscreenRender = false;
+  let deferredFullscreenRenderForce = false;
+  let pendingLoadedRenderAfterFullscreen = false;
+  const GRID_MIN_COL_WIDTH = 260;
+  const GRID_GAP = 14;
+  const GRID_SIDE_PADDING = 28;
+  const MAX_RECYCLED_CARDS = 96;
+  // Rows of cards kept above/below the viewport. In a maximized CEF popup each
+  // row can be 8-10 heavy cards, so keep overscan tight and rely on thumbnail
+  // predecode instead of rendering many hidden rows.
+  const VIRTUAL_OVERSCAN_ROWS = 1;
+  const CLIPS_PAGE_LIMIT = 200;
+  const CLIPS_LOAD_AHEAD_ROWS = 8;
+  const EMPTY_THUMB = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+  const thumbObserver = ("IntersectionObserver" in window)
+    ? new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const img = entry.target;
+          thumbObserver.unobserve(img);
+          loadThumb(img);
+        }
+      }, { root: document.querySelector(".scroll-area"), rootMargin: "1400px 0px", threshold: 0.01 })
+    : null;
+
+  // per-session duration cache, keyed by clip name. we dont bother with localstorage becuase the browser http cache already holds the metadata bytes -- a fresh probe is cheap on reload (~10 kb moov-atom range read), but in-memory is instant for the common case of scrolling the same dock window all session.
+  const durationCache = new Map();
+
+  function formatDuration(seconds) {
+    if (!isFinite(seconds) || seconds <= 0) return "";
+    const total = Math.round(seconds);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      return h + ":" + String(mm).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    }
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  // read just the duration of a video url without affecting the cards main <video>. a transient element with preload="metadata" makes the browser fetch only the moov atom (10-50 kb for a properly faststart-encoded mp4) and fires loadedmetadata; we grab the duration and dispose. the promise never rejects -- failures resolve to 0 so the badge just stays hidden.
+  function probeDuration(url) {
+    return new Promise((resolve) => {
+      const probe = document.createElement("video");
+      probe.preload = "metadata";
+      probe.muted = true;
+      // crossorigin not needed -- the helper serves with permissive cors already (same-origin in practice) and the metadata read doesnt trigger corb.
+      let settled = false;
+      const finish = (val) => {
+        if (settled) return;
+        settled = true;
+        try { probe.removeAttribute("src"); probe.load(); } catch {}
+        resolve(val);
+      };
+      probe.addEventListener("loadedmetadata", () => {
+        finish(isFinite(probe.duration) ? probe.duration : 0);
+      }, { once: true });
+      probe.addEventListener("error", () => finish(0), { once: true });
+      // safety timeout -- a stuck request shouldnt leave the probe tying up a connection forever.
+      setTimeout(() => finish(0), 8000);
+      probe.src = url;
+    });
+  }
+
+  // fill in a cards duration badge. cached results are instant; first lookups kick off a probe. idempotent -- safe to call multiple times on the same card (e.g. when scroll re-triggers the observer after a filter switch).
+  function fillDurationBadge(card) {
+    const badge = card.querySelector(".duration-badge");
+    if (!badge || badge.classList.contains("is-ready")) return;
+    const name = card.dataset.name;
+    const url  = card.dataset.previewUrl;
+    if (!name || !url) return;
+
+    const cached = durationCache.get(name);
+    if (cached !== undefined) {
+      if (cached > 0) {
+        badge.textContent = formatDuration(cached);
+        badge.classList.add("is-ready");
+      }
+      return;
+    }
+    probeDuration(url).then((dur) => {
+      durationCache.set(name, dur);
+      if (dur > 0) {
+        badge.textContent = formatDuration(dur);
+        badge.classList.add("is-ready");
+      }
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function displayClipName(filename) {
+    return String(filename || "").replace(/\.(mp4|mkv|mov)$/i, "");
+  }
+
+  function loadFavoriteNames() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
+      return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveFavoriteNames() {
+    try {
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favoriteNames)));
+    } catch {}
+  }
+
+  function isFavorite(name) {
+    return favoriteNames.has(String(name || ""));
+  }
+
+  function setFavorite(name, enabled) {
+    name = String(name || "");
+    if (!name) return;
+    if (enabled) favoriteNames.add(name);
+    else favoriteNames.delete(name);
+    saveFavoriteNames();
+  }
+
+  function transferFavorite(oldName, newName) {
+    if (!isFavorite(oldName) || !newName || oldName === newName) return;
+    favoriteNames.delete(oldName);
+    favoriteNames.add(newName);
+    saveFavoriteNames();
+  }
+
+  function updateTabs(source) {
+    source = Array.isArray(source) ? source : [];
+    const counts = {
+      all: clipsTotal || source.length,
+      favorites: source.filter(c => isFavorite(c.name)).length,
+      linked: source.filter(c => !!c.streamable_url).length,
+      local: source.filter(c => !c.streamable_url).length,
+    };
+    for (const btn of tabBtns) {
+      const key = btn.dataset.filter;
+      btn.classList.toggle("is-active", key === activeFilter);
+      btn.innerHTML = escapeHtml(btn.dataset.label || key)
+        + '<span class="count">' + (counts[key] || 0) + '</span>';
+    }
+  }
+
+  function clipMatchesFilter(clip) {
+    if (activeFilter === "favorites") return isFavorite(clip.name);
+    if (activeFilter === "linked") return !!clip.streamable_url;
+    if (activeFilter === "local") return !clip.streamable_url;
+    return true;
+  }
+
+  function applyClipFilter(clips) {
+    return (Array.isArray(clips) ? clips : []).filter(clipMatchesFilter);
+  }
+
+  function emptyMessageForFilter() {
+    if (activeFilter === "favorites") return "No favorite clips yet.";
+    if (activeFilter === "linked") return "No linked clips yet.";
+    if (activeFilter === "local") return "No local-only clips.";
+    return "No clips found.";
+  }
+
+  function renderLoadedClips(clips) {
+    loadedClips = Array.isArray(clips) ? clips : [];
+    updateTabs(loadedClips);
+    if (isFullscreenOrHostTransition()) {
+      pendingLoadedRenderAfterFullscreen = true;
+      deferVirtualRenderUntilFullscreenSettles(true);
+      return;
+    }
+    render(applyClipFilter(loadedClips));
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " MB";
+    return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+  }
+
+  function formatTimeAgo(unixSec) {
+    const diff = Math.max(0, Math.floor(Date.now() / 1000 - unixSec));
+    if (diff < 5) return "just now";
+    if (diff < 60) return diff + " seconds ago";
+    if (diff < 120) return "a minute ago";
+    if (diff < 3600) return Math.floor(diff / 60) + " minutes ago";
+    if (diff < 7200) return "an hour ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
+    if (diff < 172800) return "a day ago";
+    return Math.floor(diff / 86400) + " days ago";
+  }
+
+  // honors the per-clip retention sent by the helper. anonymous uploads are 2 days; signed-in uploads carry their own retention_days field.
+  function formatExpiry(uploadedAt, retentionDays) {
+    const retSec = (retentionDays && retentionDays > 0 ? retentionDays : 2) * 86400;
+    const remaining = retSec - (Math.floor(Date.now() / 1000) - uploadedAt);
+    if (remaining <= 0) return null;
+    const h = Math.floor(remaining / 3600);
+    if (h >= 24) return Math.floor(h / 24) + "d " + (h % 24) + "h";
+    if (h >= 1) return h + "h " + Math.floor((remaining % 3600) / 60) + "m";
+    return Math.max(1, Math.floor(remaining / 60)) + "m";
+  }
+
+  function showToast(html, kind) {
+    toastEl.innerHTML = html;
+    toastEl.classList.add("is-shown");
+    toastEl.classList.toggle("is-info", kind === "info");
+  }
+  function hideToast() { toastEl.classList.remove("is-shown"); }
+
+  function thumbUrlFor(clip) {
+    return HELPER + "/thumb/" + encodeURIComponent(clip.name)
+      + "?v=" + encodeURIComponent(String(clip.size) + "-" + String(clip.mtime));
+  }
+
+  function setThumbSource(img, src) {
+    if (!img || !src) return;
+    if (img.dataset.src === src && img.dataset.loaded === "1") return;
+    if (thumbObserver) thumbObserver.unobserve(img);
+    img.dataset.src = src;
+    delete img.dataset.loaded;
+    delete img.dataset.loadingSrc;
+    img.src = EMPTY_THUMB;
+    const badge = img.closest && img.closest(".card") && img.closest(".card").querySelector(".duration-badge");
+    if (badge) {
+      badge.textContent = "";
+      badge.classList.remove("is-ready");
+    }
+    observeThumb(img);
+  }
+
+  function loadThumb(img) {
+    const src = img && img.dataset ? img.dataset.src : "";
+    if (!src) return;
+    if (thumbObserver) thumbObserver.unobserve(img);
+    if (img.dataset.loaded === "1" && img.src === src) {
+      const card = img.closest && img.closest(".card");
+      if (card) fillDurationBadge(card);
+      return;
+    }
+    if (img.dataset.loadingSrc === src) return;
+    img.dataset.loadingSrc = src;
+
+    const loader = new Image();
+    loader.decoding = "async";
+    let failed = false;
+    loader.onerror = () => { failed = true; };
+    loader.src = src;
+    const ready = loader.decode
+      ? loader.decode()
+      : new Promise(resolve => {
+        loader.onload = resolve;
+        loader.onerror = () => { failed = true; resolve(); };
+      });
+    ready.then(() => {
+      if (!img.dataset || img.dataset.src !== src || failed) return;
+      img.src = src;
+      img.dataset.loaded = "1";
+      delete img.dataset.loadingSrc;
+      // Piggyback on the same near-viewport trigger to lazy-fill the duration
+      // badge. Keep it out of the scroll renderer so CEF is not decoding
+      // thumbnails and probing video metadata during every scroll frame.
+      const card = img.closest && img.closest(".card");
+      if (card) fillDurationBadge(card);
+    }).catch(() => {
+      if (img.dataset && img.dataset.src === src) delete img.dataset.loadingSrc;
+    });
+  }
+
+  function observeThumb(img) {
+    if (!img) return;
+    if (img.dataset && img.dataset.loaded === "1") return;
+    if (img.dataset && img.dataset.loadingSrc) return;
+    if (thumbObserver) thumbObserver.observe(img);
+    else loadThumb(img);
+  }
+
+  function clipSignature(clip) {
+    return [
+      clip.name,
+      clip.size,
+      clip.mtime,
+      clip.streamable_url || "",
+      clip.uploaded_at || 0,
+      clip.retention_days || 0,
+      isFavorite(clip.name) ? 1 : 0,
+    ].join("|");
+  }
+
+  function clipsListSignature(clips) {
+    return clips.map(clipSignature).join("\n");
+  }
+
+  function computeVirtualLayout() {
+    const width = Math.max(0, scrollAreaEl.clientWidth - GRID_SIDE_PADDING);
+    const columns = Math.max(1, Math.floor((width + GRID_GAP) / (GRID_MIN_COL_WIDTH + GRID_GAP)));
+    const cardWidth = Math.max(
+      GRID_MIN_COL_WIDTH,
+      Math.floor((width - GRID_GAP * (columns - 1)) / columns)
+    );
+    return { columns, cardWidth };
+  }
+
+  function clearTransientCardState(card) {
+    if (!card) return;
+    card.classList.remove("menu-open");
+    const menu = card.querySelector(".menu-dropdown");
+    if (menu) menu.classList.remove("is-open");
+    const preview = card.querySelector(".preview");
+    if (preview) preview.classList.remove("is-playing", "is-idle");
+    const progress = card.querySelector(".progress-fill");
+    if (progress) progress.style.width = "0%";
+    const badge = card.querySelector(".duration-badge");
+    if (badge) {
+      badge.textContent = "";
+      badge.classList.remove("is-ready");
+    }
+    const video = card.querySelector("video");
+    if (video) {
+      if (activePreview === video) activePreview = null;
+      abortVideoLoad(video);
+    }
+  }
+
+  function bindCardToClip(card, clip) {
+    if (!card || !clip) return card;
+    if (card.dataset.name !== clip.name) {
+      clearTransientCardState(card);
+      card.dataset.clipSig = "";
+      card.dataset.actionSig = "";
+    }
+    updateCard(card, clip);
+    return card;
+  }
+
+  function acquireCard(clip) {
+    const card = recycledCards.pop();
+    return card ? bindCardToClip(card, clip) : buildCard(clip);
+  }
+
+  function releaseCard(card) {
+    if (!card) return;
+    clearTransientCardState(card);
+    const thumb = card.querySelector(".thumb");
+    if (thumb) {
+      if (thumbObserver) thumbObserver.unobserve(thumb);
+      delete thumb.dataset.loaded;
+      delete thumb.dataset.loadingSrc;
+      thumb.src = EMPTY_THUMB;
+    }
+    card.remove();
+    card.style.removeProperty("--virtual-card-x");
+    card.style.removeProperty("--virtual-card-y");
+    card.style.removeProperty("--virtual-card-width");
+    if (recycledCards.length < MAX_RECYCLED_CARDS) recycledCards.push(card);
+  }
+
+  function isFullscreenOrHostTransition() {
+    return fullscreenHostTransition || !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function updateFullscreenBodyState() {
+    document.body.classList.toggle("is-clip-fullscreen", isFullscreenOrHostTransition());
+  }
+
+  function beginFullscreenHostTransition() {
+    fullscreenHostTransitionSeq += 1;
+    fullscreenHostTransition = true;
+    if (fullscreenHostTransitionTimer) {
+      clearTimeout(fullscreenHostTransitionTimer);
+      fullscreenHostTransitionTimer = 0;
+    }
+    updateFullscreenBodyState();
+    return fullscreenHostTransitionSeq;
+  }
+
+  function deferVirtualRenderUntilFullscreenSettles(force) {
+    deferredFullscreenRender = true;
+    deferredFullscreenRenderForce = deferredFullscreenRenderForce || !!force;
+  }
+
+  function flushDeferredFullscreenRender(delayMs) {
+    if (!deferredFullscreenRender) return;
+    const delay = Math.max(0, Number(delayMs) || 0);
+    setTimeout(() => {
+      if (!deferredFullscreenRender || isFullscreenOrHostTransition()) return;
+      const force = deferredFullscreenRenderForce;
+      deferredFullscreenRender = false;
+      deferredFullscreenRenderForce = false;
+      if (pendingLoadedRenderAfterFullscreen) {
+        pendingLoadedRenderAfterFullscreen = false;
+        render(applyClipFilter(loadedClips));
+        return;
+      }
+      queueVirtualRender(force);
+    }, delay);
+  }
+
+  function finishFullscreenHostTransition(seq) {
+    if (seq !== fullscreenHostTransitionSeq) return;
+    if (fullscreenHostTransitionTimer) clearTimeout(fullscreenHostTransitionTimer);
+    fullscreenHostTransitionTimer = setTimeout(() => {
+      if (seq !== fullscreenHostTransitionSeq) return;
+      fullscreenHostTransition = false;
+      if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
+        document.querySelectorAll(".card.is-fullscreen-card").forEach((card) => {
+          card.classList.remove("is-fullscreen-card");
+        });
+      }
+      updateFullscreenBodyState();
+      flushDeferredFullscreenRender(0);
+    }, 180);
+  }
+
+  function positionVirtualCard(card, index, columns, cardWidth) {
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+    card.style.setProperty("--virtual-card-width", cardWidth + "px");
+    card.style.setProperty("--virtual-card-x", (col * (cardWidth + GRID_GAP)) + "px");
+    card.style.setProperty("--virtual-card-y", (row * virtualRowStride) + "px");
+  }
+
+  function resetVirtualWindow() {
+    virtualRangeStart = -1;
+    virtualRangeEnd = -1;
+    virtualRenderForceQueued = false;
+    topSpacerEl.style.height = "0px";
+    bottomSpacerEl.style.height = "0px";
+    gridEl.style.height = "0px";
+    gridEl.querySelectorAll(".card").forEach(releaseCard);
+  }
+
+  function updateVisibleCards() {
+    gridEl.querySelectorAll(".card").forEach((card) => {
+      const clip = lastClipsByName.get(card.dataset.name);
+      if (clip) updateCard(card, clip);
+    });
+  }
+
+  function measureVirtualRow() {
+    const card = gridEl.querySelector(".card");
+    if (!card) return;
+    const measured = Math.ceil(card.getBoundingClientRect().height) + GRID_GAP;
+    if (Number.isFinite(measured) && measured > 80 && Math.abs(measured - virtualRowStride) > 2) {
+      virtualRowStride = measured;
+      queueVirtualRender(true);
+    }
+  }
+
+  function renderVirtualWindow(force) {
+    virtualRenderQueued = false;
+    if (document.hidden || !allClips.length) return;
+
+    // If a card inside the grid is currently fullscreened, skip the render
+    // entirely. Removing or recycling the fullscreen element forces an
+    // immediate fullscreen exit in Chromium/CEF.
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl && gridEl.contains(fsEl)) {
+      pendingRenderOnFsExit = true;
+      return;
+    }
+
+    const previousScrollTop = scrollAreaEl.scrollTop;
+    const layout = computeVirtualLayout();
+    const columns = layout.columns;
+    const cardWidth = layout.cardWidth;
+    const totalRows = Math.ceil(allClips.length / columns);
+    // The virtualized grid sits below an optional favorites sub-section. Subtract
+    // that section height from scrollTop before computing visible rows.
+    const virtScrollTop = Math.max(0,
+      scrollAreaEl.scrollTop - (gridEl.offsetTop - scrollAreaEl.offsetTop));
+    const startRow = Math.max(0, Math.floor(virtScrollTop / virtualRowStride) - VIRTUAL_OVERSCAN_ROWS);
+    const endRow = Math.min(
+      totalRows,
+      Math.ceil((virtScrollTop + scrollAreaEl.clientHeight) / virtualRowStride) + VIRTUAL_OVERSCAN_ROWS
+    );
+    const start = Math.min(allClips.length, startRow * columns);
+    const end = Math.min(allClips.length, endRow * columns);
+
+    if (!force &&
+        columns === virtualColumns &&
+        cardWidth === virtualCardWidth &&
+        start === virtualRangeStart &&
+        end === virtualRangeEnd) {
+      return;
+    }
+
+    virtualColumns = columns;
+    virtualCardWidth = cardWidth;
+    virtualRangeStart = start;
+    virtualRangeEnd = end;
+    topSpacerEl.style.height = "0px";
+    bottomSpacerEl.style.height = "0px";
+    gridEl.style.height = Math.max(0, totalRows * virtualRowStride) + "px";
+
+    const desiredNames = new Set();
+    for (let i = start; i < end; i++) {
+      if (allClips[i] && allClips[i].name) desiredNames.add(allClips[i].name);
+    }
+
+    const existingByName = new Map();
+    gridEl.querySelectorAll(".card").forEach(c => {
+      const name = c.dataset.name;
+      if (desiredNames.has(name)) existingByName.set(name, c);
+      else releaseCard(c);
+    });
+
+    for (let i = start; i < end; i++) {
+      const clip = allClips[i];
+      let card = existingByName.get(clip.name);
+      if (card) {
+        if (card.dataset.clipSig !== clipSignature(clip)) updateCard(card, clip);
+      } else {
+        card = acquireCard(clip);
+        gridEl.appendChild(card);
+      }
+      positionVirtualCard(card, i, columns, cardWidth);
+      observeThumb(card.querySelector(".thumb"));
+    }
+
+    // The active preview belongs to the user's current hover or a fullscreened
+    // card. Abort only when it is no longer in the virtual window or favorites.
+    if (activePreview &&
+        !gridEl.contains(activePreview) &&
+        !favoritesGridEl.contains(activePreview)) {
+      abortVideoLoad(activePreview);
+      activePreview = null;
+    }
+    const maxScrollTop = Math.max(0, scrollAreaEl.scrollHeight - scrollAreaEl.clientHeight);
+    const restoredScrollTop = Math.min(previousScrollTop, maxScrollTop);
+    if (Math.abs(scrollAreaEl.scrollTop - restoredScrollTop) > 1) {
+      scrollAreaEl.scrollTop = restoredScrollTop;
+    }
+    requestAnimationFrame(measureVirtualRow);
+    loadMoreClipsIfNeeded(false);
+  }
+
+  function queueVirtualRender(force) {
+    if (fullscreenHostTransition) {
+      deferVirtualRenderUntilFullscreenSettles(force);
+      return;
+    }
+    if (force) {
+      virtualRangeStart = -1;
+      virtualRangeEnd = -1;
+    }
+    virtualRenderForceQueued = virtualRenderForceQueued || !!force;
+    if (virtualRenderQueued) return;
+    virtualRenderQueued = true;
+    requestAnimationFrame(() => {
+      const shouldForce = virtualRenderForceQueued;
+      virtualRenderForceQueued = false;
+      renderVirtualWindow(shouldForce);
+    });
+  }
+
+  function normalizeClipsPayload(data, requestedOffset) {
+    if (Array.isArray(data)) {
+      return {
+        paged: false,
+        version: clipsListSignature(data),
+        total: data.length,
+        offset: 0,
+        clips: data,
+      };
+    }
+    const clips = Array.isArray(data && data.clips) ? data.clips : [];
+    return {
+      paged: true,
+      version: String((data && data.version) || ""),
+      total: Math.max(0, Number((data && data.total) || clips.length) || 0),
+      offset: Math.max(0, Number((data && data.offset) || requestedOffset) || 0),
+      clips,
+    };
+  }
+
+  async function fetchClipsPage(offset, refresh) {
+    const url = HELPER + "/clips?offset=" + encodeURIComponent(offset)
+      + "&limit=" + encodeURIComponent(CLIPS_PAGE_LIMIT)
+      + (refresh ? "&refresh=1" : "")
+      + "&t=" + Date.now();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return normalizeClipsPayload(await res.json(), offset);
+  }
+
+  function mergeClipsPage(page, base) {
+    const merged = base.slice(0, Math.max(base.length, page.offset + page.clips.length));
+    for (let i = 0; i < page.clips.length; i++) {
+      merged[page.offset + i] = page.clips[i];
+    }
+    if (page.total < merged.length) merged.length = page.total;
+    return merged.filter(Boolean);
+  }
+
+  async function fetchClips() {
+    const forceRefresh = clipsRefreshCounter++ % CLIPS_FORCE_REFRESH_EVERY === 0;
+    const page = await fetchClipsPage(0, forceRefresh);
+    if (!page.paged) {
+      clipsPageVersion = page.version;
+      clipsTotal = page.total;
+      clipsNextOffset = page.clips.length;
+      return page.clips;
+    }
+    const sameVersion = page.version && page.version === clipsPageVersion;
+    clipsPageVersion = page.version;
+    clipsTotal = page.total;
+    clipsNextOffset = Math.min(page.total, page.offset + page.clips.length);
+    if (sameVersion && loadedClips.length) {
+      return mergeClipsPage(page, loadedClips);
+    }
+    return page.clips;
+  }
+
+  async function loadMoreClipsIfNeeded(force) {
+    if (clipsLoadingMore || document.hidden || clipsNextOffset >= clipsTotal) return;
+    const remainingPx = scrollAreaEl.scrollHeight - scrollAreaEl.scrollTop - scrollAreaEl.clientHeight;
+    if (!force && remainingPx > virtualRowStride * CLIPS_LOAD_AHEAD_ROWS) return;
+    clipsLoadingMore = true;
+    try {
+      const page = await fetchClipsPage(clipsNextOffset, false);
+      if (!page.paged) return;
+      if (page.version !== clipsPageVersion) {
+        clipsPageVersion = "";
+        scheduleNextPoll(0);
+        return;
+      }
+      clipsTotal = page.total;
+      clipsNextOffset = Math.min(page.total, page.offset + page.clips.length);
+      const merged = mergeClipsPage(page, loadedClips);
+      const byName = new Map(lastClipsByName);
+      for (const c of page.clips) byName.set(c.name, c);
+      lastClipsByName = byName;
+      renderLoadedClips(merged);
+    } catch {
+      // the regular poll path will surface helper connectivity errors.
+    } finally {
+      clipsLoadingMore = false;
+    }
+  }
+
+  async function fetchUploadStatus() {
+    const res = await fetch(HELPER + "/status?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  }
+
+  function uploadJobsFromStatus(status) {
+    if (!status) return [];
+    const jobs = Array.isArray(status.jobs) ? status.jobs.slice() : [];
+    if (status.clipName && !jobs.some(j => j && j.requestId === status.requestId)) {
+      jobs.push(status);
+    }
+    return jobs.filter(j => j && j.clipName);
+  }
+
+  function syncUploadJobState(status) {
+    const jobs = uploadJobsFromStatus(status);
+    const byName = new Map();
+    const newErrors = [];
+    let active = false;
+    for (const job of jobs) {
+      const st = job.state || "";
+      const isBusy = job.active && (st === "uploading" || st === "compressing");
+      if (isBusy) {
+        active = true;
+        byName.set(job.clipName, job);
+        localState.set(job.clipName, st);
+      } else if (st === "error" && job.error && !seenUploadErrors.has(job.requestId || job.clipName)) {
+        seenUploadErrors.add(job.requestId || job.clipName);
+        newErrors.push(job);
+        byName.set(job.clipName, job);
+      }
+    }
+    lastUploadJobsByName = byName;
+    for (const [name, st] of Array.from(localState)) {
+      if ((st === "uploading" || st === "compressing") && !byName.has(name)) {
+        localState.delete(name);
+      }
+    }
+    return { active, jobs, newErrors };
+  }
+
+  async function cancelActiveUpload(filename, requestId) {
+    try {
+      const qs = new URLSearchParams({ t: String(Date.now()) });
+      if (filename) qs.set("file", filename);
+      if (requestId) qs.set("requestId", requestId);
+      await fetch(HELPER + "/cancel-upload?" + qs.toString(), { method: "POST", cache: "no-store" });
+    } catch {}
+    showToast("Upload cancelled", "info");
+    setTimeout(hideToast, 2500);
+    if (filename) localState.delete(filename);
+    else localState.clear();
+    anyUploading = localState.size > 0;
+    scheduleNextPoll(POLL_FAST_MS);
+  }
+
+  async function triggerUpload(filename) {
+    const url = HELPER + "/upload?file=" + encodeURIComponent(filename) + "&t=" + Date.now();
+    const res = await fetch(url, { method: "POST", cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // attach the toobig signal + size info to the thrown error so oncreatelink can pop the "compress this" modal instead of showing a generic toast.
+      const err = new Error(data.message || data.error || ("HTTP " + res.status));
+      if (data.tooBig) {
+        err.tooBig = true;
+        err.sizeMb = Number(data.sizeMb) || 0;
+        err.capMb  = Number(data.capMb)  || 0;
+      }
+      throw err;
+    }
+    return data;
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  function abortVideoLoad(video) {
+    video.pause();
+    video.removeAttribute("src");
+    try { video.load(); } catch {}
+  }
+
+  function syncFavoriteButton(card, name) {
+    const btn = card.querySelector(".favorite-btn");
+    if (!btn) return;
+    const fav = isFavorite(name);
+    btn.classList.toggle("is-favorite", fav);
+    btn.title = fav ? "Remove favorite" : "Favorite clip";
+    btn.setAttribute("aria-label", btn.title);
+    btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
+  }
+
+  function currentClipForCard(card) {
+    const name = card && card.dataset ? card.dataset.name : "";
+    if (!name) return null;
+    return lastClipsByName.get(name) || loadedClips.find(c => c && c.name === name) || null;
+  }
+
+  function buildCard(clip) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.name = clip.name;
+    card.dataset.clipSig = clipSignature(clip);
+    // cache-bust the file url with size + mtime so an overwritten clip (trim-overwrite, compress-overwrite) is fetched fresh instead of cefs stale-cached bytes. mtime alone isnt enough: the compress worker deliberately restores the source mtime so clips dont jump to the top of the list, but the file content and size both change. with v=<size>-<mtime>, any of those three changing (rename, trim, compress) yields a fresh url and a clean fetch.
+    card.dataset.previewUrl = HELPER + "/file/" + encodeURIComponent(clip.name)
+        + "?v=" + encodeURIComponent(String(clip.size || 0) + "-" + String(clip.mtime || 0));
+    const thumbUrl   = thumbUrlFor(clip);
+    const nameEsc    = escapeHtml(displayClipName(clip.name));
+
+    card.innerHTML = `
+      <div class="preview">
+        <img class="thumb" src="${EMPTY_THUMB}" data-src="${thumbUrl}" loading="lazy" decoding="async" alt="">
+        <button class="favorite-btn" type="button" title="Favorite clip" aria-label="Favorite clip">
+          <svg viewBox="0 0 24 24">${isFavorite(clip.name) ? ICON.STAR : ICON.STAR_BORDER}</svg>
+        </button>
+        <!-- Chrome's fullscreen / right-click "more options" 3-dot
+             menu only appears when at least one item is enabled.
+             Disable every possible entry and the 3-dot button itself
+             disappears.
+                controlsList:
+                  nodownload         -> hide Download
+                  noplaybackrate     -> hide Playback speed
+                  noremoteplayback   -> hide Cast / remote playback
+                disablePictureInPicture -> hide Picture in picture
+             We deliberately do NOT add 'nofullscreen' -- that flag
+             hides the fullscreen TOGGLE BUTTON, which is a separate
+             control, not part of the 3-dot menu. -->
+        <video preload="none" muted loop playsinline
+               controlsList="nodownload noplaybackrate noremoteplayback"
+               disablePictureInPicture></video>
+        <div class="play-overlay"><div class="play-icon"></div></div>
+        <!-- YouTube-style flash: pops up in the center for ~500ms
+             every time the user toggles play/pause via click or
+             Space, then fades out. JS picks which icon to show. -->
+        <div class="center-pulse">
+          <svg viewBox="0 0 24 24" class="cp-play">${ICON.PLAY}</svg>
+          <svg viewBox="0 0 24 24" class="cp-pause" style="display:none">${ICON.PAUSE}</svg>
+        </div>
+        <div class="player-shade"></div>
+        <div class="preview-controls">
+          <div class="controls-left">
+            <button class="play-toggle-btn" type="button" aria-label="Play / pause">
+              <svg viewBox="0 0 24 24" class="pt-play">${ICON.PLAY}</svg>
+              <svg viewBox="0 0 24 24" class="pt-pause" style="display:none">${ICON.PAUSE}</svg>
+            </button>
+            <div class="volume-control">
+              <button class="volume-btn" type="button">
+                <svg viewBox="0 0 24 24">${ICON.VOL_MUTED}</svg>
+              </button>
+              <div class="volume-slider-wrap">
+                <input type="range" class="volume-slider" min="0" max="100" step="1" value="60">
+              </div>
+            </div>
+            <span class="time-display"><span class="time-current">0:00</span> / <span class="time-total">0:00</span></span>
+          </div>
+          <div class="controls-right">
+            <div class="settings-wrap">
+              <button class="icon-btn settings-btn" type="button" aria-label="Playback settings">
+                <svg viewBox="0 0 24 24">${ICON.SETTINGS}</svg>
+              </button>
+              <div class="settings-menu" role="menu">
+                <div class="menu-header">
+                  <svg viewBox="0 0 24 24">${ICON.SETTINGS}</svg>
+                  <span>Playback speed</span>
+                </div>
+                <div class="speed-current">
+                  <!-- Editable readout. Type any number; on Enter or
+                       blur we parse + clamp + apply. The "x" suffix
+                       is a static span so the user can't accidentally
+                       erase or commit a bogus character. -->
+                  <input type="text" class="speed-current-value"
+                         inputmode="decimal"
+                         autocomplete="off" spellcheck="false"
+                         maxlength="5" value="1.00" />
+                  <span class="speed-current-unit">x</span>
+                </div>
+                <div class="speed-slider-row">
+                  <button class="speed-step-btn speed-down" type="button" aria-label="Slower">&minus;</button>
+                  <input type="range" class="speed-slider" min="0.25" max="2" step="0.25" value="1">
+                  <button class="speed-step-btn speed-up" type="button" aria-label="Faster">&plus;</button>
+                </div>
+                <div class="speed-pills">
+                  <button class="speed-pill" data-speed="0.25">0.25</button>
+                  <button class="speed-pill" data-speed="0.5">0.5</button>
+                  <button class="speed-pill is-active" data-speed="1">1.0</button>
+                  <button class="speed-pill" data-speed="1.5">1.5</button>
+                  <button class="speed-pill" data-speed="2">2.0</button>
+                </div>
+              </div>
+            </div>
+            <button class="icon-btn fullscreen-btn" type="button" aria-label="Toggle fullscreen">
+              <!-- viewBox matches YouTube's ytp-fullscreen-button SVG
+                   exactly (24x24); the ENTER path is copied verbatim
+                   from YouTube's production player chrome, and the
+                   EXIT path is Material Symbols' close_fullscreen
+                   which is the matching inward-arrow companion. -->
+              <svg viewBox="0 0 24 24" class="fs-enter-icon">${ICON.FULLSCREEN}</svg>
+              <svg viewBox="0 0 24 24" class="fs-exit-icon" style="display:none">${ICON.FULLSCREEN_EXIT}</svg>
+            </button>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <!-- Hover "ghost fill" sits behind the real fill. CSS
+               sizes it from 0 to the cursor's x position so the user
+               can preview where a click will seek to. YouTube's
+               player has the exact same lighter-coloured band. -->
+          <div class="progress-hover-fill"></div>
+          <div class="progress-fill">
+            <div class="progress-scrub-dot"></div>
+          </div>
+          <!-- Timestamp tooltip that follows the cursor. JS positions
+               it horizontally and fills it with the formatted time at
+               that x; CSS handles centering above the bar. -->
+          <div class="progress-hover-time"></div>
+        </div>
+        <span class="duration-badge" data-duration=""></span>
+      </div>
+      <div class="body">
+        <div class="title-row">
+          <span class="name" title="${nameEsc}">${nameEsc}</span>
+          <button class="icon-mini-btn edit-btn" title="Rename" type="button">
+            <svg viewBox="0 0 24 24">${ICON.EDIT}</svg>
+          </button>
+          <div class="menu-container">
+            <button class="icon-mini-btn menu-btn" title="More options" type="button">
+              <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
+            </button>
+            <div class="menu-dropdown">
+              <div class="menu-item open-folder-item">Open file location</div>
+              <div class="menu-item trim-clip-item">
+                <svg viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
+                <span>Trim clip</span>
+              </div>
+              <div class="menu-item clipboard-clip-item">
+                <svg viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
+                <span>Copy to clipboard</span>
+              </div>
+              <div class="menu-item compress-clip-item">
+                <svg viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
+                <span>Compress&hellip;</span>
+              </div>
+              <div class="menu-item danger delete-clip-item">
+                <svg viewBox="0 0 24 24">${ICON.TRASH}</svg>
+                <span>Delete clip</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="meta">
+          <span class="size">${formatSize(clip.size)}</span>
+          <span class="dot"></span>
+          <span class="age" data-mtime="${clip.mtime}">${formatTimeAgo(clip.mtime)}</span>
+        </div>
+      </div>
+      <div class="actions"></div>
+    `;
+
+    const video        = card.querySelector("video");
+    const preview      = card.querySelector(".preview");
+    const progressFill = card.querySelector(".progress-fill");
+    const volumeBtn    = card.querySelector(".volume-btn");
+    const volumeSlider = card.querySelector(".volume-slider");
+    const fullscreenBtn= card.querySelector(".fullscreen-btn");
+    const favoriteBtn  = card.querySelector(".favorite-btn");
+    const editBtn      = card.querySelector(".edit-btn");
+    const menuBtn      = card.querySelector(".menu-btn");
+    const menuDropdown = card.querySelector(".menu-dropdown");
+    const openFolderEl = card.querySelector(".open-folder-item");
+    const deleteClipEl = card.querySelector(".delete-clip-item");
+
+    favoriteBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const name = card.dataset.name;
+      const next = !isFavorite(name);
+      setFavorite(name, next);
+      syncFavoriteButton(card, name);
+      updateTabs(loadedClips);
+      // re-render when the toggle changes which section the card belongs to: on the favorites filter an unfavorite removes the card from view; on the all filter any toggle moves the card between the favorites sub-section and the main list.
+      if ((activeFilter === "favorites" && !next) || activeFilter === "all") {
+        renderLoadedClips(loadedClips);
+      }
+    });
+
+    // preview playback
+    video.addEventListener("playing", () => {
+      if (video === activePreview) preview.classList.add("is-playing");
+    });
+    video.addEventListener("error", () => {
+      preview.classList.remove("is-playing");
+    });
+
+    // youtube-style play/pause button + live time display the play-toggle button (only visible in fullscreen via css) is a third way to toggle playback alongside space and click-on-video. the two svgs inside it are swapped to reflect the current state; we listen on the native play/pause events so any other path (space key, end-of-video, etc.) keeps the icon in sync.
+    const playToggleBtn = card.querySelector(".play-toggle-btn");
+    const playIconShow  = playToggleBtn ? playToggleBtn.querySelector(".pt-play")  : null;
+    const playIconHide  = playToggleBtn ? playToggleBtn.querySelector(".pt-pause") : null;
+    function syncPlayIcon() {
+      if (!playIconShow || !playIconHide) return;
+      // show the opposite of the current state -- "play" icon when paused (becuase clicking will start playback), "pause" icon when playing (becuase clicking will pause). standard player affordance.
+      if (video.paused) {
+        playIconShow.style.display = "";
+        playIconHide.style.display = "none";
+      } else {
+        playIconShow.style.display = "none";
+        playIconHide.style.display = "";
+      }
+    }
+    if (playToggleBtn) {
+      playToggleBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // route thru the shared togglevideoplayback so the center-pulse fires whether you tap the bottom bar button, click on the video itself, or hit space -- one indicator, every toggle path.
+        toggleVideoPlayback();
+        try { playToggleBtn.blur(); } catch {}
+      });
+    }
+    video.addEventListener("play",  syncPlayIcon);
+    video.addEventListener("pause", syncPlayIcon);
+    video.addEventListener("ended", syncPlayIcon);
+
+    // live time display ("0:36 / 1:00"). wired into the same raf loop that drives the progress-fill (tickprogress, below) so we dont have two animation frames running for one playhead.
+    const timeCurrentEl = card.querySelector(".time-current");
+    const timeTotalEl   = card.querySelector(".time-total");
+    function setTimeDisplay() {
+      if (!timeCurrentEl || !timeTotalEl) return;
+      if (isFinite(video.duration) && video.duration > 0) {
+        timeTotalEl.textContent   = formatDuration(video.duration);
+        timeCurrentEl.textContent = formatDuration(video.currentTime);
+      }
+    }
+    // first fill once metadata is in (so total time replaces the placeholder "0:00" the markup ships with).
+    video.addEventListener("loadedmetadata", setTimeDisplay);
+    video.addEventListener("timeupdate",     setTimeDisplay);
+    // block dblclick from exiting fullscreen. two redundant guards becuase chromium has multiple paths that can toggle fullscreen off, and we want to be sure none of them fire from a dblclick: on the <video>: chromiums mediaelementscontroller used to respond to a video-level dblclick by toggling fullscreen. since we now fullscreen the .preview container (not the <video>) that path is mostly inert, but the listener stays as belt-and-suspenders in case cef behaviour drifts. on the .preview container: a dblclick on the now-fullscreen <div> can still bubble to a parent handler that calls exitfullscreen. preventdefault + stoppropagation + capture phase + a stopimmediatepropagation kills every pathway. esc and the in-overlay close button still work -- they go thru document.exitfullscreen() directly, not dom dblclick.
+    const blockDblclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    };
+    video.addEventListener("dblclick", blockDblclick, true);
+    preview.addEventListener("dblclick", blockDblclick, true);
+    // the htmlmediaelement `timeupdate` event only fires every ~250ms, which makes the bar visibly step. drive it from raf instead so it moves smoothly at the display refresh rate while the video plays, and stops cleanly when the video pauses/ends/aborts.
+    let progressRaf = 0;
+    function tickProgress() {
+      if (video.duration > 0) {
+        progressFill.style.width = (video.currentTime / video.duration * 100) + "%";
+      }
+      progressRaf = (video.paused || video.ended) ? 0 : requestAnimationFrame(tickProgress);
+    }
+    video.addEventListener("play", () => {
+      if (!progressRaf) progressRaf = requestAnimationFrame(tickProgress);
+    });
+    video.addEventListener("pause", () => {
+      if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = 0; }
+    });
+    video.addEventListener("ended", () => {
+      if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = 0; }
+      progressFill.style.width = "0%";
+    });
+
+    preview.addEventListener("mouseenter", () => {
+      // dont disturb the currently-fullscreened video.
+      if (document.fullscreenElement) return;
+      if (activePreview && activePreview !== video) {
+        abortVideoLoad(activePreview);
+      }
+      if (!video.src && card.dataset.previewUrl) video.src = card.dataset.previewUrl;
+      activePreview = video;
+      preview.classList.remove("is-playing");
+      applyVolume(video);
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    });
+    preview.addEventListener("mouseleave", () => {
+      // skip teardown while this preview (or its video) is the fullscreen element. with the fullscreen target now being the .preview container -- not the <video> -- the previous check for ``document.fullscreenelement === video`` always failed, so the moment the cursor left the original card rect (which is instantly, becuase the preview snaps to fill the screen) wed abort the video and the user saw a frozen first frame. match both the new container path and the old video path so a future revert doesnt break this again.
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl === preview || fsEl === video) return;
+      if (video === activePreview) activePreview = null;
+      preview.classList.remove("is-playing");
+      progressFill.style.width = "0%";
+      abortVideoLoad(video);
+    });
+
+    // scrubber (click + drag on the progress bar to seek) the .progress-bars hit area grows in fullscreen via css; the pointer-event listeners below are wired in every mode so a future "show scrubber in the dock too" tweak is just a css change. uses pointer events so the drag survives the cursor briefly leaving the bar -- mouse events would lose the drag the moment the cursor went above the bars 10 px strip.
+    const progressBar = card.querySelector(".progress-bar");
+    const hoverTimeEl = card.querySelector(".progress-hover-time");
+    function seekToPointer(e) {
+      const rect = progressBar.getBoundingClientRect();
+      const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      if (video.duration > 0 && isFinite(video.duration)) {
+        video.currentTime = pct * video.duration;
+        // repaint the fill immediately so dragging feels responsive even if the raf loop is paused (e.g. video is paused).
+        progressFill.style.width = (pct * 100) + "%";
+      }
+    }
+    // youtube-style hover preview: writes two css vars on the bar each pointermove. --hover-fill is the band that fills from 0 to the cursor x (rendered by .progress-hover-fill); --hover-x is the pixel x position used to centre the time tooltip above the bar. both pure-css once the vars are set, so no relayout cost per move. skipped entirely when the bar isnt being hovered in fullscreen (the css only renders the elements inside .preview:fullscreen .progress-bar:hover anyway).
+    progressBar.addEventListener("pointermove", (e) => {
+      const rect = progressBar.getBoundingClientRect();
+      const xPx  = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const pct  = rect.width ? xPx / rect.width : 0;
+      progressBar.style.setProperty("--hover-fill", (pct * 100) + "%");
+      progressBar.style.setProperty("--hover-x",     xPx + "px");
+      if (hoverTimeEl && isFinite(video.duration) && video.duration > 0) {
+        hoverTimeEl.textContent = formatDuration(pct * video.duration);
+      }
+    });
+    progressBar.addEventListener("pointerleave", () => {
+      // wipe the hover-fill back to 0 so it doesnt get stuck at the last cursor position the next time the bar is shown.
+      progressBar.style.setProperty("--hover-fill", "0%");
+    });
+    let scrubbing = false;
+    progressBar.addEventListener("pointerdown", (e) => {
+      // only react to the primary mouse button / touch contact -- right-click on a scrubber should never seek.
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      scrubbing = true;
+      try { progressBar.setPointerCapture(e.pointerId); } catch {}
+      seekToPointer(e);
+      e.stopPropagation();
+      e.preventDefault();
+    });
+    progressBar.addEventListener("pointermove", (e) => {
+      if (!scrubbing) return;
+      seekToPointer(e);
+    });
+    const endScrub = (e) => {
+      if (!scrubbing) return;
+      scrubbing = false;
+      try { progressBar.releasePointerCapture(e.pointerId); } catch {}
+    };
+    progressBar.addEventListener("pointerup",     endScrub);
+    progressBar.addEventListener("pointercancel", endScrub);
+
+    // fullscreen idle-hide for the overlay controls after 2.5 s with no mouse movement inside the fullscreened preview, fade the controls + scrubber out and hide the cursor. any movement reveals them again instantly. mirrors the standard "video player" idle behaviour the user expects.
+    let idleTimer = 0;
+    function bumpIdle() {
+      preview.classList.remove("is-idle");
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => preview.classList.add("is-idle"), 2500);
+    }
+    preview.addEventListener("mousemove", () => {
+      if (document.fullscreenElement === preview) bumpIdle();
+    });
+    preview.addEventListener("fullscreenchange", () => {
+      const inFs = (document.fullscreenElement === preview);
+      card.classList.toggle("is-fullscreen-card", inFs);
+      updateFullscreenBodyState();
+      if (inFs) bumpIdle();
+      else {
+        preview.classList.remove("is-idle");
+        if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+      }
+      // swap the fullscreen toggle icon so it always shows the action itll perform next (youtube convention): the "exit" brackets when were in fullscreen, the "enter" brackets when were out. same listener fires for both directions.
+      const enterIcon = fullscreenBtn.querySelector(".fs-enter-icon");
+      const exitIcon  = fullscreenBtn.querySelector(".fs-exit-icon");
+      if (enterIcon) enterIcon.style.display = inFs ? "none" : "";
+      if (exitIcon)  exitIcon.style.display  = inFs ? ""     : "none";
+      // leaving fullscreen also closes any open settings popup so a re-entry starts clean.
+      if (!inFs) settingsWrap && settingsWrap.classList.remove("is-open");
+    });
+
+    // click-to-toggle play/pause on the video surface youtube convention: clicking the video toggles playback. we bind on the .preview container in capture phase so it only fires for empty space, not for clicks on overlays (controls, settings menu, scrubber, etc) -- those each call stoppropagation in their own handlers above. hover-only (dock) preview play stays untouched: this click only takes effect once a video is loaded.
+    const centerPulse = card.querySelector(".center-pulse");
+    const cpPlayIcon  = centerPulse ? centerPulse.querySelector(".cp-play")  : null;
+    const cpPauseIcon = centerPulse ? centerPulse.querySelector(".cp-pause") : null;
+    let pulseTimer = 0;
+    function flashCenterPulse(showingPauseAfter) {
+      if (!centerPulse) return;
+      // show the icon that represents the new state after the click. after a play() the new state is "playing" -> pause icon.
+      if (cpPlayIcon && cpPauseIcon) {
+        cpPlayIcon.style.display  = showingPauseAfter ? "none" : "";
+        cpPauseIcon.style.display = showingPauseAfter ? ""     : "none";
+      }
+      centerPulse.classList.remove("is-flashing");
+      // force a reflow so re-adding the class restarts the transition even when the user mashes space rapidly.
+      void centerPulse.offsetWidth;
+      centerPulse.classList.add("is-flashing");
+      if (pulseTimer) clearTimeout(pulseTimer);
+      pulseTimer = setTimeout(
+        () => centerPulse.classList.remove("is-flashing"),
+        500
+      );
+    }
+    function toggleVideoPlayback() {
+      if (!video.src) return; // hover-only preview not yet loaded
+      if (video.paused) {
+        video.play().catch(() => {});
+        flashCenterPulse(true); // about to be playing -> pause glyph
+      } else {
+        video.pause();
+        flashCenterPulse(false); // about to be paused -> play glyph
+      }
+    }
+    // expose on the card so the document-level space-key handler (which doesnt share this closure) can fire the same toggle + center-pulse path. keeps every toggle gesture visually consistent without having to plumb a global registry.
+    card._togglePlayback = toggleVideoPlayback;
+    // bind on .preview, not on the video element directly: the video is overlaid by .play-overlay (which already has its own click handler) and the player-shade gradient, both of which would swallow the click. using the preview catches the click for the visible video region while still respecting stoppropagation calls from inner controls.
+    preview.addEventListener("click", (e) => {
+      // only react to plain left clicks on the bare video area. skip any click that originated on a button / input / link / menu the user might be using.
+      if (e.button !== 0) return;
+      if (e.target.closest &&
+          e.target.closest("button, input, a, .settings-menu, .progress-bar, .volume-slider-wrap")) {
+        return;
+      }
+      toggleVideoPlayback();
+    });
+
+    // playback-speed settings popup anchored to the gear; only ever visible in fullscreen (the .settings-wrap is display:none outside via css). gear toggles the popup; slider + pills both write video.playbackrate and mirror each other so changing one updates the other instantly.
+    const settingsWrap   = card.querySelector(".settings-wrap");
+    const settingsBtn    = card.querySelector(".settings-btn");
+    const settingsMenu   = card.querySelector(".settings-menu");
+    const speedSlider    = card.querySelector(".speed-slider");
+    const speedCurrent   = card.querySelector(".speed-current-value");
+    const speedDownBtn   = card.querySelector(".speed-down");
+    const speedUpBtn     = card.querySelector(".speed-up");
+    const speedPills     = card.querySelectorAll(".speed-pill");
+    // clamp ranges. the slider widget hardcodes 0.25-2.0 in its html attributes; the typed input can go wider (browsers support up to 16x via htmlmediaelement.playbackrate). anything outside [0.1, 16] is silently rejected.
+    const SPEED_MIN = 0.1;
+    const SPEED_MAX = 16;
+    function setPlaybackRate(rate, source) {
+      const parsed = parseFloat(rate);
+      if (!isFinite(parsed)) return;
+      rate = Math.max(SPEED_MIN, Math.min(SPEED_MAX, parsed));
+      // playbackrate has weird floating-point precision quirks; snap to the nearest 0.05 so the readout stays clean.
+      rate = Math.round(rate * 20) / 20;
+      video.playbackRate = rate;
+      // dont stomp the input while the user is mid-edit -- theyd see their typing get rewritten character-by-character.
+      if (speedCurrent && source !== "input") {
+        speedCurrent.value = rate.toFixed(2);
+      }
+      // mirror state across slider + pills. skip the source so we dont fight the users in-flight input.
+      if (speedSlider && source !== "slider") {
+        // slider min/max is 0.25-2; clamp the visible thumb position even when the input went higher than the sliders range.
+        speedSlider.value = String(Math.max(0.25, Math.min(2, rate)));
+      }
+      speedPills.forEach((el) => {
+        const v = parseFloat(el.dataset.speed);
+        el.classList.toggle("is-active", Math.abs(v - rate) < 0.001);
+      });
+    }
+    if (settingsBtn) {
+      settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        settingsWrap.classList.toggle("is-open");
+        // reset the idle timer on open so the menu doesnt fade out a moment after the user opens it.
+        if (document.fullscreenElement === preview) bumpIdle();
+      });
+    }
+    if (settingsMenu) {
+      // swallow internal clicks so the document-level outside-click dismiss below doesnt close us when the user picks a pill or moves the slider.
+      settingsMenu.addEventListener("click", (e) => e.stopPropagation());
+    }
+    // editable custom-rate input. commits on enter or blur; escape reverts. focus() selects the whole text so typing replaces the current value instead of inserting next to it (matches the behaviour of every other "tap to retype" numeric field).
+    if (speedCurrent) {
+      speedCurrent.addEventListener("focus", () => {
+        try { speedCurrent.select(); } catch {}
+      });
+      const commitTyped = () => {
+        const v = parseFloat(speedCurrent.value);
+        if (isFinite(v) && v > 0) {
+          setPlaybackRate(v); // setplaybackrate clamps + rewrites the input
+        } else {
+          // restore the last good value so the field never sits in a bad state after blur.
+          speedCurrent.value = (video.playbackRate || 1).toFixed(2);
+        }
+      };
+      speedCurrent.addEventListener("blur", commitTyped);
+      speedCurrent.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitTyped();
+          try { speedCurrent.blur(); } catch {}
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          speedCurrent.value = (video.playbackRate || 1).toFixed(2);
+          try { speedCurrent.blur(); } catch {}
+        }
+        // block the docks document-level space=play-pause and escape=exit-fullscreen handlers from firing while were editing -- the user wants those keys to type/cancel here.
+        e.stopPropagation();
+      });
+      // same defence for keyup -- the keydown stop above doesnt automatically prevent the document-level handlers re-firing on keyup in some browsers.
+      speedCurrent.addEventListener("keyup", (e) => e.stopPropagation());
+    }
+    if (speedSlider) {
+      speedSlider.addEventListener("input", (e) => {
+        setPlaybackRate(e.target.value, "slider");
+      });
+    }
+    if (speedDownBtn) {
+      speedDownBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setPlaybackRate(video.playbackRate - 0.25);
+      });
+    }
+    if (speedUpBtn) {
+      speedUpBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setPlaybackRate(video.playbackRate + 0.25);
+      });
+    }
+    speedPills.forEach((pill) => {
+      pill.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setPlaybackRate(pill.dataset.speed);
+      });
+    });
+    // outside-click dismiss. limited to the document becuase the popup only exists while in fullscreen, where theres nothing outside this card to click anyway.
+    document.addEventListener("click", (e) => {
+      if (!settingsWrap || !settingsWrap.classList.contains("is-open")) return;
+      if (e.target.closest && e.target.closest(".settings-wrap")) return;
+      settingsWrap.classList.remove("is-open");
+    });
+
+    // volume + slider local ui updates immediately, then notifyvolumesync rewrites every other cards icon + slider so volume is truly global.
+    syncVolumeUi(volumeBtn, volumeSlider);
+    volumeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      VolumeState.muted = !VolumeState.muted;
+      notifyVolumeSync();
+    });
+    volumeSlider.addEventListener("input", () => {
+      VolumeState.volume = Math.max(0, Math.min(1, volumeSlider.value / 100));
+      // dragging the slider implies "i want to hear sound" -- unmute. dropping to 0 implies mute.
+      VolumeState.muted = (VolumeState.volume === 0);
+      notifyVolumeSync();
+    });
+
+    // fullscreen requestfullscreen() must run synchronously inside the user-gesture event handler. if we wait for play() to resolve before calling it (the obvious shape: "load, play, then go fullscreen"), the gesture is "stale" by the time we get there and the browser silently rejects the request -- which is why the previous version refused to fullscreen until the clip had already started playing. instead: request fullscreen now, kick off loading + play in parallel, and let the video pop into the fullscreened element once its first frame is ready.
+    fullscreenBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      // toggle behaviour: if this preview is currently fullscreen, clicking the button exits. matches the user expectation that the same button "owns" both directions of the toggle (same gesture pattern as f, esc, and the back mouse button). we check both the preview and the video element so the toggle still works if someone reverts to fullscreening <video>.
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl === preview || fsEl === video) {
+        if (document.exitFullscreen)            document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        try { fullscreenBtn.blur(); } catch {}
+        return;
+      }
+
+      if (activePreview && activePreview !== video) abortVideoLoad(activePreview);
+      activePreview = video;
+      applyVolume(video);
+
+      // we fullscreen the .preview container, not the <video> itself. reason: when the <video> element is the fullscreen target, chromium/cefs mediaelementscontroller intercepts dblclick on it as a built-in "toggle fullscreen" shortcut that runs at a lower level than dom events -- preventdefault on dblclick doesnt reliably block it. fullscreening the container shifts the dblclick to a plain <div>, so our dom-level preventdefault below actualy works and the overlay controls (volume slider, close button) stay reachable while fullscreened.
+      if (preview.requestFullscreen)            preview.requestFullscreen().catch(() => {});
+      else if (preview.webkitRequestFullscreen) preview.webkitRequestFullscreen();
+      // drop focus from the button so space/enter dont re-activate it (which would toggle fullscreen back off). play/pause is handled by the document-level space handler.
+      try { fullscreenBtn.blur(); } catch {}
+
+      if (!video.src && card.dataset.previewUrl) video.src = card.dataset.previewUrl;
+      const tryPlay = () => video.play().catch(() => {});
+      tryPlay();
+      // backup: if the synchronous play() rejected becuase the source wasnt loaded yet, retry once enough data has arrived. safe to also fire if play already succeeded -- a second play() on a playing video is a no-op.
+      video.addEventListener("loadeddata", tryPlay, { once: true });
+    });
+
+    // rename (pencil)
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      startRename(card);
+    });
+
+    // 3-dot menu
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
+        if (d !== menuDropdown) {
+          d.classList.remove("is-open");
+          const openCard = d.closest(".card");
+          if (openCard) openCard.classList.remove("menu-open");
+        }
+      });
+      menuDropdown.classList.toggle("is-open");
+      card.classList.toggle("menu-open", menuDropdown.classList.contains("is-open"));
+    });
+    openFolderEl.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.remove("is-open");
+      card.classList.remove("menu-open");
+      try {
+        await fetch(HELPER + "/open-folder?file=" + encodeURIComponent(card.dataset.name), {
+          method: "POST", cache: "no-store",
+        });
+      } catch {}
+    });
+    // two-click delete confirmation directly inside the menu, no browser confirm() dialog. first click flips the menu item into an "are you sure click to confirm" state for 3 seconds; second click within that window actualy deletes. click anywhere else / wait it out / press escape cancels with no destructive action.
+    let deleteArmed = false;
+    let deleteArmTimer = 0;
+    const deleteLabel = deleteClipEl.querySelector("span");
+    const deleteIcon  = deleteClipEl.querySelector("svg");
+    const _resetDeleteState = () => {
+      deleteArmed = false;
+      if (deleteArmTimer) { clearTimeout(deleteArmTimer); deleteArmTimer = 0; }
+      deleteClipEl.classList.remove("is-armed");
+      if (deleteLabel) deleteLabel.textContent = "Delete";
+    };
+    // reset whenever the menu closes -- otherwise a stale armed state from a previous open would surprise the next opener with a one-click delete. hook into the same toggles that show/hide it.
+    const menuObserver = new MutationObserver(() => {
+      if (!menuDropdown.classList.contains("is-open")) _resetDeleteState();
+    });
+    menuObserver.observe(menuDropdown, { attributes: true, attributeFilter: ["class"] });
+
+    deleteClipEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!deleteArmed) {
+        deleteArmed = true;
+        deleteClipEl.classList.add("is-armed");
+        if (deleteLabel) deleteLabel.textContent = "Click again to delete";
+        // 3 s arm window. long enough for a confident user to commit, short enough that a forgotten arm doesnt lie in wait for the next menu open. the mutationobserver above also resets it as soon as the menu closes.
+        deleteArmTimer = setTimeout(_resetDeleteState, 3000);
+        return;
+      }
+      _resetDeleteState();
+      menuDropdown.classList.remove("is-open");
+      card.classList.remove("menu-open");
+      deleteClip(card);
+    });
+    card.querySelector(".trim-clip-item").addEventListener("click", (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.remove("is-open");
+      card.classList.remove("menu-open");
+      const currentClip = currentClipForCard(card);
+      if (currentClip) openTrimModal(currentClip);
+    });
+    card.querySelector(".clipboard-clip-item").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      menuDropdown.classList.remove("is-open");
+      card.classList.remove("menu-open");
+      const currentClip = currentClipForCard(card);
+      if (!currentClip) return;
+      // clipboard puts the file on the windows clipboard as cf_hdrop, same as ctrl+c on the file in explorer. the user can then paste into discord / slack / explorer / etc.
+      try {
+        const res = await fetch(HELPER + "/clipboard?file=" + encodeURIComponent(currentClip.name) + "&t=" + Date.now(),
+                                { method: "POST", cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+        showToast("Copied to clipboard - paste anywhere to share the file", "info");
+        setTimeout(hideToast, 3000);
+      } catch (err) {
+        showToast("Clipboard copy failed: " + (err.message || err));
+        setTimeout(hideToast, 4500);
+      }
+    });
+    // single "compress..." menu item opens the mode picker. the picker hands the chosen mode to startcompressoverwrite(), which is also reused by callers elsewhere (e.g. if we ever want to re-bind a keyboard shortcut to "compress fast"). keeping the fetch in one function avoids drift between menu vs. modal.
+    card.querySelectorAll(".compress-clip-item").forEach((item) => {
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menuDropdown.classList.remove("is-open");
+        card.classList.remove("menu-open");
+        const currentClip = currentClipForCard(card);
+        if (currentClip) openCompressModePicker(currentClip.name);
+      });
+    });
+
+    observeThumb(card.querySelector(".thumb"));
+    renderActions(card, clip, true);
+    return card;
+  }
+
+  async function deleteClip(card) {
+    const filename = card.dataset.name;
+    if (!filename) return;
+    // confirmation now happens inline in the menu (the "click again to delete" two-click pattern wired up in rendercard). by the time this runs the user has explicitly clicked delete twice, so a redundant browser confirm() would be condescending.
+    try {
+      const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(filename), {
+        method: "POST", cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || ("HTTP " + res.status));
+      }
+      const video = card.querySelector("video");
+      if (video) {
+        if (activePreview === video) activePreview = null;
+        abortVideoLoad(video);
+      }
+      localState.delete(filename);
+      setFavorite(filename, false);
+      lastClipsByName.delete(filename);
+      loadedClips = loadedClips.filter((clip) => clip.name !== filename);
+      clipsTotal = Math.max(0, clipsTotal - 1);
+      clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
+      renderLoadedClips(loadedClips);
+      showToast("Deleted " + escapeHtml(displayClipName(filename)), "info");
+      setTimeout(hideToast, 1800);
+      scheduleNextPoll(250);
+    } catch (e) {
+      showToast("Delete failed: " + escapeHtml(e.message || e));
+      setTimeout(hideToast, 2500);
+    }
+  }
+
+  // inline rename replace the .name span with an input, commit on enter / blur, revert on escape. server is asked via post /rename; on success the next poll picks up the new card identity, on failure we restore.
+  function startRename(card) {
+    const currentName = card.dataset.name;
+    const titleRow = card.querySelector(".title-row");
+    const nameSpan = card.querySelector(".name");
+    if (!nameSpan) return;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "name-edit-input";
+    input.value = currentName;
+    // pre-select the basename (without extension) so the user can just start typing a new name without manually deselecting the dot.
+    titleRow.replaceChild(input, nameSpan);
+    input.focus();
+    const dot = currentName.lastIndexOf(".");
+    if (dot > 0) input.setSelectionRange(0, dot);
+    else input.select();
+
+    let settled = false;
+    function restore() {
+      if (settled) return;
+      settled = true;
+      if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+    }
+    async function commit() {
+      if (settled) return;
+      const newName = input.value.trim();
+      if (!newName || newName === currentName) { restore(); return; }
+      settled = true;
+      try {
+        const res = await fetch(HELPER + "/rename"
+          + "?file=" + encodeURIComponent(currentName)
+          + "&to="   + encodeURIComponent(newName),
+          { method: "POST", cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || ("HTTP " + res.status));
+        }
+        // optimistically update the card so we dont wait for the next /clips poll to relabel. the next poll will reconcile.
+        const finalName = data.name || newName;
+        transferFavorite(currentName, finalName);
+        card.dataset.name = finalName;
+        nameSpan.textContent = displayClipName(card.dataset.name);
+        nameSpan.title       = displayClipName(card.dataset.name);
+        syncFavoriteButton(card, card.dataset.name);
+        if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+        scheduleNextPoll(500);
+      } catch (e) {
+        if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+        showToast("Rename failed: " + (e.message || e));
+        setTimeout(hideToast, 2500);
+      }
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter")  { e.preventDefault(); input.blur(); }
+      if (e.key === "Escape") { e.preventDefault(); input.removeEventListener("blur", commit); restore(); }
+    });
+  }
+
+  // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
+  function closeAllMenus() {
+    document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
+      d.classList.remove("is-open");
+      const card = d.closest(".card");
+      if (card) card.classList.remove("menu-open");
+    });
+  }
+  document.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".menu-btn, .menu-dropdown")) return;
+    closeAllMenus();
+  });
+  document.documentElement.addEventListener("mouseleave", closeAllMenus);
+  window.addEventListener("blur", closeAllMenus);
+
+  // defensive: explicitly exit fullscreen on esc. browsers normally handle this themselves at the chrome level, but on some chromium builds the built-in gesture can get lost (especially in popup windows opened via window.open). this makes esc work unconditionally as long as the keydown reaches the document. also: pressing space on the fullscreen <video> should play/pause -- without this handler the focused fullscreen button receives the space activation and toggles fullscreen off instead. try to exit the current fullscreen element. returns true if we were in fullscreen and an exit was requested, false otherwise. centralised here becuase three diffrent inputs trigger the same action (esc key, f key while fullscreen, back mouse button).
+  function tryExitFullscreen() {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!fsEl) return false;
+    if (document.exitFullscreen)            document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    return true;
+  }
+
+  // find the .preview container to fullscreen when the user hits f outside fullscreen. priority: the card whose video is currently the activepreview (auto-set whenever a video starts playing on hover or click), falling back to the card under the cursor. the cursor-based fallback handles the case where nothing is playing yet -- hovering over a card and pressing f still works.
+  let _lastHoveredCard = null;
+  document.addEventListener("mouseover", (e) => {
+    const card = e.target && e.target.closest && e.target.closest(".card");
+    if (card) _lastHoveredCard = card;
+  });
+
+  function previewToFullscreen() {
+    let preview = null;
+    if (activePreview) {
+      preview = activePreview.closest && activePreview.closest(".preview");
+    }
+    if (!preview && _lastHoveredCard) {
+      preview = _lastHoveredCard.querySelector(".preview");
+    }
+    if (!preview) return false;
+    if (preview.requestFullscreen)            preview.requestFullscreen().catch(() => {});
+    else if (preview.webkitRequestFullscreen) preview.webkitRequestFullscreen();
+    return true;
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+    // f = toggle fullscreen, whether or not were currently in it. outside fullscreen we promote the active / hovered card. inside we just exit. skip when focus is in an editable surface so the letter f still types in inline rename fields / search boxes.
+    if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      const editing =
+        tag === "INPUT" || tag === "TEXTAREA" ||
+        (document.activeElement && document.activeElement.isContentEditable);
+      if (editing) return;
+      e.preventDefault();
+      if (fsEl) tryExitFullscreen();
+      else      previewToFullscreen();
+      return;
+    }
+
+    if (!fsEl) return;
+
+    if (e.key === "Escape") {
+      tryExitFullscreen();
+      return;
+    }
+    if (e.key === " " || e.code === "Space") {
+      // space = toggle play/pause. prefer routing thru the cards own _toggleplayback (buildcard attaches it) so the same center-pulse animation fires for space as for click + button. falls back to a direct play/pause for any odd edge case where the card couldnt be located (e.g. an external <video> element ever ends up fullscreened directly).
+      e.preventDefault();
+      const fsCard = fsEl.closest && fsEl.closest(".card");
+      if (fsCard && typeof fsCard._togglePlayback === "function") {
+        fsCard._togglePlayback();
+        return;
+      }
+      let v = null;
+      if (fsEl instanceof HTMLVideoElement) v = fsEl;
+      else if (fsEl.querySelector)          v = fsEl.querySelector("video");
+      if (!v) return;
+      if (v.paused) v.play().catch(() => {});
+      else          v.pause();
+    }
+  });
+
+  // back mouse button (xbutton1, button === 3) exits fullscreen. "back" reads as "go back to the grid" in the users mental model. forward button (xbutton2 = 4) is left alone since theres no natural "forward" action from within fullscreen. mouseup is used instead of mousedown so the gesture matches windows/chromiums back-button convention (fires on release).
+  document.addEventListener("mouseup", (e) => {
+    if (e.button !== 3) return;
+    if (tryExitFullscreen()) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  // the browser also fires `mousedown` on the back button which it would normally interpret as "navigate back" -- swallow that separately so it doesnt yank the dock out from under us.
+  document.addEventListener("mousedown", (e) => {
+    if (e.button === 3 &&
+        (document.fullscreenElement || document.webkitFullscreenElement)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
+  // when any clip enters fullscreen, ask the helper to maximize this browser popups host window via win32. on exit, restore the saved size only if the host is still maximized. if the user drags or unmaximizes the Clips host while fullscreened, that manual placement must win. cef in obs exposes no js api to resize its own host, so the helper does the heavy lifting via showwindow. we coalesce per-element fullscreenchange events: the dock binds a listener per preview card, and document.fullscreenelement is the single source of truth for "is anything fullscreen right now" -- track our last-known state so duplicate events dont double-fire the http call. the win32 call is deferred two animation frames after the fullscreenchange event to avoid racing cefs fullscreen animation.
+  let lastFsActive = false;
+  let pendingWindowOp = 0;
+  function handleHostFullscreenChange() {
+    const fsActive = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (fsActive === lastFsActive) return;
+    lastFsActive = fsActive;
+    const route = fsActive ? "/window/maximize" : "/window/restore";
+    const transitionSeq = beginFullscreenHostTransition();
+    deferVirtualRenderUntilFullscreenSettles(true);
+
+    // cancel any in-flight stagger from a previous (very fast) toggle so we dont fire both calls in the wrong order.
+    if (pendingWindowOp) cancelAnimationFrame(pendingWindowOp);
+    pendingWindowOp = requestAnimationFrame(() => {
+      pendingWindowOp = requestAnimationFrame(() => {
+        pendingWindowOp = 0;
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          finishFullscreenHostTransition(transitionSeq);
+        };
+        const safety = setTimeout(finish, 1200);
+        fetch(HELPER + route + "?title=Clips&t=" + Date.now(),
+              { method: "POST", cache: "no-store" })
+          .catch(() => {})
+          .then(() => {
+            clearTimeout(safety);
+            finish();
+          });
+      });
+    });
+  }
+  document.addEventListener("fullscreenchange", handleHostFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
+
+  function renderActions(card, clip, force) {
+    const actions = card.querySelector(".actions");
+    const meta = card.querySelector(".meta");
+    const status = lastUploadJobsByName.get(clip.name)
+      || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
+    const state = status && status.active && (status.state === "compressing" || status.state === "uploading")
+      ? status.state
+      : (localState.get(clip.name) || "idle");
+    const uploadPct = status && Number(status.percent) ? Number(status.percent) : 0;
+    // ready/transcode_percent/transcode_status flow from the background poller that runs after each upload. older entries omit them, in which case the link is always shown as ready.
+    const processing = clip.ready === false;
+    const failed     = clip.transcode_status === 3;
+    const transPct   = Number(clip.transcode_percent) || 0;
+    const stillTicking = (state === "compressing" || state === "uploading");
+    const actionSig = [
+      state,
+      clip.streamable_url || "",
+      clip.uploaded_at || 0,
+      clip.retention_days || 0,
+      uploadPct,
+      processing ? 1 : 0,
+      failed ? 1 : 0,
+      transPct,
+    ].join("|");
+    // always re-render while an operation is active so the eta ticks forward between percent changes (otherwise the button text freezes whenever ffmpeg holds at the same integer percent for multiple polls).
+    if (!force && !stillTicking && card.dataset.actionSig === actionSig) return;
+    card.dataset.actionSig = actionSig;
+    meta.querySelectorAll(".link-status, .link-status-dot").forEach(n => n.remove());
+    actions.innerHTML = "";
+
+    if (clip.streamable_url) {
+      const btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Copy Link</span>`;
+      btn.dataset.url = clip.streamable_url;
+      btn.addEventListener("click", async () => {
+        const ok = await copyText(btn.dataset.url);
+        if (!ok) return;
+        const label = btn.querySelector(".btn-label");
+        const orig  = label.textContent;
+        btn.classList.add("is-flashing");
+        label.textContent = "Copied!";
+        setTimeout(() => {
+          btn.classList.remove("is-flashing");
+          label.textContent = orig;
+        }, 1100);
+      });
+      actions.appendChild(btn);
+
+      // streamables transcode runs server-side after our upload succeeds. the link works immediately to share, but viewers see "were processing this video" until status flips to ready. surface that here so the user knows whether the link will play right now.
+      let statusText = "", statusExpiring = false;
+      if (failed) {
+        statusText = "Streamable processing failed";
+        statusExpiring = true;
+      } else if (processing) {
+        statusText = transPct > 0
+          ? "Processing on Streamable - " + transPct + "%"
+          : "Processing on Streamable...";
+        statusExpiring = true;
+      } else {
+        const expiry = formatExpiry(clip.uploaded_at, clip.retention_days);
+        if (expiry) {
+          // "expiring soon" highlight when <6 h remaining for short retentions or <24 h for longer ones.
+          const retSec = (clip.retention_days || 2) * 86400;
+          const remaining = retSec - (Math.floor(Date.now() / 1000) - clip.uploaded_at);
+          const threshold = retSec > 7 * 86400 ? 24 * 3600 : 6 * 3600;
+          statusText = "Link " + expiry + " left";
+          statusExpiring = remaining < threshold;
+        }
+      }
+      if (statusText) {
+        const dot = document.createElement("span");
+        dot.className = "dot link-status-dot";
+        const span = document.createElement("span");
+        span.className = "link-status" + (statusExpiring ? " is-expiring" : "");
+        span.textContent = statusText;
+        meta.appendChild(dot);
+        meta.appendChild(span);
+      }
+    } else if (state === "compressing" || state === "uploading") {
+      // reuse the existing progress button if one already exists -- the .progress-fill element needs to persist across re-renders so its width transition animates between polls instead of snapping each time renderactions runs.
+      let btn = actions.querySelector(".btn.is-progress");
+      if (!btn) {
+        actions.innerHTML = "";
+        btn = document.createElement("button");
+        btn.className = "btn is-progress";
+        btn.title = "Click to cancel";
+        // two icon+label pairs in the same button. css swaps them on hover so the user sees the upload/compress progress at rest and a pastel-red "cancel" affordance the moment they aim at it -- click handler is unchanged either way.
+        btn.innerHTML =
+          '<span class="progress-fill"></span>' +
+          '<svg class="btn-icon" viewBox="0 0 24 24">' + ICON.LINK + '</svg>' +
+          '<span class="btn-label"></span>' +
+          '<svg class="cancel-icon" viewBox="0 0 24 24">' + ICON.CLOSE + '</svg>' +
+          '<span class="cancel-label">Cancel</span>';
+        btn.addEventListener("click", () => cancelActiveUpload(clip.name, status && status.requestId));
+        actions.appendChild(btn);
+      }
+      let labelText;
+      if (uploadPct >= 100) {
+        labelText = "Finalizing...";
+      } else if (uploadPct >= 1) {
+        labelText = uploadPct + "%";
+      } else {
+        labelText = (state === "compressing" ? "Compressing..." : "Uploading...");
+      }
+      btn.querySelector(".progress-fill").style.width = uploadPct + "%";
+      btn.querySelector(".btn-label").textContent = labelText;
+    } else {
+      const btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Create Link</span>`;
+      btn.addEventListener("click", () => onCreateLink(clip.name, btn));
+      actions.appendChild(btn);
+    }
+  }
+
+  async function onCreateLink(filename, btn) {
+    btn.disabled = true;
+    btn.classList.add("is-busy");
+    // the button now has an <svg> + <span class="btn-label"> inside, so we swap only the label text -- otherwise textcontent would also wipe out the link icon.
+    const label = btn.querySelector(".btn-label") || btn;
+    label.textContent = "Sending...";
+    try {
+      await triggerUpload(filename);
+      localState.set(filename, "uploading");
+      anyUploading = true;
+      scheduleNextPoll(POLL_FAST_MS);
+      rerenderCard(filename);
+    } catch (e) {
+      btn.classList.remove("is-busy");
+      btn.disabled = false;
+      label.textContent = "Create Link";
+      // if the helper said "too big", offer the temp-compress path instead of a generic error toast. otherwise fall thru to the toast like before.
+      if (e && e.tooBig) {
+        openCompressModal(filename, e.sizeMb || 0, e.capMb || 0);
+      } else {
+        showToast("Couldn't create link: " + (e.message || "Unknown error"));
+        setTimeout(hideToast, 5000);
+      }
+    }
+  }
+
+  function rerenderCard(filename) {
+    const clip = lastClipsByName.get(filename);
+    if (!clip) return;
+    const card = gridEl.querySelector('.card[data-name="' + CSS.escape(filename) + '"]');
+    if (card) renderActions(card, clip, true);
+  }
+
+  function updateCard(card, clip) {
+    const sig = clipSignature(clip);
+    if (card.dataset.clipSig !== sig) {
+      card.dataset.name = clip.name;
+      card.dataset.clipSig = sig;
+      // refresh the cache-busted preview url and drop any previously-loaded src. after a trim/compress overwrite the file on disk is diffrent; without resetting video.src the next hover would replay cefs cached old bytes (and crash on seek becuase the byte offsets no longer match the file). cache key is size+mtime, not mtime alone, becuase compress-overwrite restores the source mtime to preserve sort order -- so the size delta is what guarantees a fresh url.
+      card.dataset.previewUrl = HELPER + "/file/" + encodeURIComponent(clip.name)
+          + "?v=" + encodeURIComponent(String(clip.size || 0) + "-" + String(clip.mtime || 0));
+      const v = card.querySelector("video");
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (v && v.src && v !== fsEl) abortVideoLoad(v);
+      const nameEl = card.querySelector(".name");
+      if (nameEl) {
+        nameEl.textContent = displayClipName(clip.name);
+        nameEl.title = displayClipName(clip.name);
+      }
+      const sizeEl = card.querySelector(".size");
+      if (sizeEl) sizeEl.textContent = formatSize(clip.size);
+      const thumb = card.querySelector(".thumb");
+      const thumbUrl = thumbUrlFor(clip);
+      if (thumb && thumb.dataset.src !== thumbUrl) setThumbSource(thumb, thumbUrl);
+    }
+    syncFavoriteButton(card, clip.name);
+    const ageEl = card.querySelector(".age");
+    if (ageEl) {
+      ageEl.dataset.mtime = String(clip.mtime);
+      ageEl.textContent = formatTimeAgo(clip.mtime);
+    }
+    renderActions(card, clip);
+  }
+
+  function render(clips) {
+    const nextSignature = clipsListSignature(clips);
+    const listChanged = nextSignature !== allClipsSignature;
+    allClipsSignature = nextSignature;
+    // on the "all" tab, split favorites into their own sub-section above the main grid. the favorites are rendered as a plain (non-virtualized) grid -- a user typically has at most a few dozen favorites, well below the count where virtualization matters. the main grid still virtualizes the rest of the clips, so its existing math is unchanged: it just operates on the non-favorites array. on any other filter the favorites section is hidden and the main grid renders the full filtered list as before.
+    const allFilterActive = (activeFilter === "all");
+    const favClips = allFilterActive ? clips.filter(c => isFavorite(c.name)) : [];
+    const restClips = allFilterActive ? clips.filter(c => !isFavorite(c.name)) : clips;
+    const showFavSection = allFilterActive && favClips.length > 0;
+    favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
+    favoritesGridEl.classList.toggle("is-shown", showFavSection);
+    restHeadingEl.classList.toggle("is-shown", showFavSection);
+    if (showFavSection) renderFavoritesGrid(favClips);
+    else favoritesGridEl.replaceChildren();
+    allClips = restClips;
+    if (!restClips.length) {
+      resetVirtualWindow();
+      gridEl.style.display = "none";
+      topSpacerEl.style.display = "none";
+      bottomSpacerEl.style.display = "none";
+      // empty placeholder only when the whole view (favorites + rest) is empty. if favorites are visible but the rest is empty, hide the placeholder entirely -- the user can clearly see their favorites at the top.
+      if (showFavSection) {
+        emptyEl.style.display = "none";
+      } else {
+        emptyEl.style.display = "block";
+        emptyEl.classList.remove("error");
+        if (loadedClips.length > 0) {
+          emptyEl.innerHTML = escapeHtml(emptyMessageForFilter());
+          if (activeFilter !== "all" && clipsNextOffset < clipsTotal) {
+            emptyEl.innerHTML += "<div class=\"hint\">Loading more clips for this filter...</div>";
+            loadMoreClipsIfNeeded(true);
+          }
+        } else {
+          emptyEl.innerHTML = "No clips found.<div class=\"hint\">"
+            + "Set the clip folder in Tools &gt; Scripts &gt; "
+            + "<code>streamable_upload.lua</code>, or record a clip.</div>";
+        }
+      }
+      return;
+    }
+    if (!didInitialClipRender) {
+      scrollAreaEl.scrollTop = 0;
+      didInitialClipRender = true;
+    }
+    emptyEl.style.display = "none";
+    gridEl.style.display = "block";
+    topSpacerEl.style.display = "none";
+    bottomSpacerEl.style.display = "none";
+    if (listChanged) queueVirtualRender(true);
+    else {
+      updateVisibleCards();
+      queueVirtualRender(false);
+    }
+  }
+
+  // render the favorites sub-section. reuses buildcard / updatecard so cards in the favorites section get the same interactivity (hover preview, fullscreen, compress menu, etc.) as cards in the main grid. non-virtualized becuase the favorites list is small; if a user somehow ends up with 500 favorites the next pass can wrap this in the same virtualization the main grid uses.
+  function renderFavoritesGrid(favClips) {
+    const existing = new Map();
+    favoritesGridEl.querySelectorAll(".card").forEach(c => existing.set(c.dataset.name, c));
+    const frag = document.createDocumentFragment();
+    for (const clip of favClips) {
+      let card = existing.get(clip.name);
+      if (card) updateCard(card, clip);
+      else card = buildCard(clip);
+      frag.appendChild(card);
+    }
+    favoritesGridEl.replaceChildren(frag);
+  }
+
+  async function poll() {
+    if (document.hidden) return;
+    // never refresh while a video is in fullscreen. render() reorders cards by moving them thru a documentfragment, which briefly detaches the fullscreened <video> from the dom -- and per the fullscreen api spec, removing the fullscreen element from the document forces an immediate exit. result: the popup would randomly drop out of fullscreen on the next poll tick. just pause polling for the duration of the session; well resume on the next tick after exit.
+    if (isFullscreenOrHostTransition()) {
+      scheduleNextPoll(POLL_FAST_MS);
+      return;
+    }
+    if (pollInFlight) return;
+    pollInFlight = true;
+    try {
+      const clips = await fetchClips();
+      let uploadStatus = null;
+      try { uploadStatus = await fetchUploadStatus(); } catch {}
+      lastUploadStatus = uploadStatus;
+      const jobSync = syncUploadJobState(uploadStatus);
+      const byName = new Map();
+      for (const c of clips) byName.set(c.name, c);
+      lastClipsByName = byName;
+      const uploadError = jobSync.newErrors.length ? jobSync.newErrors[0].error : "";
+      // decide whether each locally-tracked pending operation is still in flight. the helper now reports all active jobs, so this also restores bars after the clips popup is refreshed or reopened.
+      for (const [name, st] of Array.from(localState)) {
+        if (st !== "uploading" && st !== "compressing") continue;
+        const c = byName.get(name);
+        if (c && c.streamable_url) { localState.delete(name); continue; }
+        const job = lastUploadJobsByName.get(name);
+        const helperRunningThisClip = !!(job && job.active &&
+          (job.state === "uploading" || job.state === "compressing"));
+        if (helperRunningThisClip) {
+          // follow the helpers reported phase, so e.g. the compress-then-upload flow flips the card label from compressing -> uploading mid-way.
+          if (job.state !== st) localState.set(name, job.state);
+          continue;
+        }
+        // helper isnt running this clips operation. drop the stale pending flag so finished compress-overwrite jobs return the button to "create link" after /clips sees the new mtime/size.
+        localState.delete(name);
+      }
+      anyUploading = jobSync.active;
+      if (uploadError) {
+        showToast("Upload failed: " + uploadError);
+        setTimeout(hideToast, 5000);
+      } else {
+        hideToast();
+      }
+      if (isFullscreenOrHostTransition()) {
+        deferVirtualRenderUntilFullscreenSettles(true);
+        return;
+      }
+      renderLoadedClips(clips);
+    } catch (e) {
+      gridEl.style.display = "none";
+      topSpacerEl.style.display = "none";
+      bottomSpacerEl.style.display = "none";
+      // hide the favorites sub-section too so the "helper offline" placeholder isnt bracketed by stale heading rows.
+      favoritesHeadingEl.classList.remove("is-shown");
+      favoritesGridEl.classList.remove("is-shown");
+      restHeadingEl.classList.remove("is-shown");
+      emptyEl.style.display = "block";
+      emptyEl.classList.add("error");
+      emptyEl.innerHTML = "Can't reach the upload helper at <code>"
+        + HELPER + "</code>."
+        + "<div class=\"hint\">Reload <code>streamable_upload.lua</code> in OBS.</div>";
+      showToast("Helper offline");
+    } finally {
+      pollInFlight = false;
+      scheduleNextPoll(anyUploading ? POLL_FAST_MS : POLL_IDLE_MS);
+    }
+  }
+
+  function scheduleNextPoll(delay) {
+    if (pollTimer) clearTimeout(pollTimer);
+    if (document.hidden) return;
+    pollTimer = setTimeout(poll, delay);
+  }
+
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = btn.dataset.filter || "all";
+      if (next === activeFilter) return;
+      activeFilter = next;
+      scrollAreaEl.scrollTop = 0;
+      resetVirtualWindow();
+      renderLoadedClips(loadedClips);
+    });
+  });
+
+  scrollAreaEl.addEventListener("scroll", () => {
+    if (fullscreenHostTransition) {
+      deferVirtualRenderUntilFullscreenSettles(false);
+      return;
+    }
+    queueVirtualRender(false);
+    loadMoreClipsIfNeeded(false);
+  }, { passive: true });
+  // window resizes (especially maximize) reflow the grid via queuevirtualrender, which moves cards thru a documentfragment. the render itself guards against tearing down a fullscreened card (see rendervirtualwindow), so this handler just kicks the renderer and lets that guard suppress the work when needed.
+  window.addEventListener("resize", () => {
+    if (resizeRenderRaf) cancelAnimationFrame(resizeRenderRaf);
+    resizeRenderRaf = requestAnimationFrame(() => {
+      resizeRenderRaf = 0;
+      if (isFullscreenOrHostTransition()) {
+        deferVirtualRenderUntilFullscreenSettles(true);
+        return;
+      }
+      measureVirtualRow();
+      queueVirtualRender(true);
+    });
+  });
+  function onFullscreenChange() {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    updateFullscreenBodyState();
+    if (!fsEl && pendingRenderOnFsExit) {
+      pendingRenderOnFsExit = false;
+      deferVirtualRenderUntilFullscreenSettles(true);
+      flushDeferredFullscreenRender(220);
+    }
+  }
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      // dont tear down a fullscreened preview when the popup is backgrounded (alt-tab, system notification, etc). aborting clears the <video>s src, which forces an exit from fullscreen -- and the user is presumably still actively watching it.
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (activePreview && !(fsEl && (activePreview === fsEl || (fsEl.contains && fsEl.contains(activePreview))))) {
+        abortVideoLoad(activePreview);
+        activePreview = null;
+      }
+    } else {
+      poll();
+      queueVirtualRender(true);
+    }
+  });
+
+  setInterval(() => {
+    if (document.hidden) return;
+    document.querySelectorAll(".age").forEach(el => {
+      const m = parseInt(el.dataset.mtime, 10);
+      if (m) el.textContent = formatTimeAgo(m);
+    });
+    document.querySelectorAll(".card").forEach(card => {
+      const clip = lastClipsByName.get(card.dataset.name);
+      if (clip && clip.streamable_url) renderActions(card, clip, true);
+    });
+  }, 60 * 1000);
+
+  // "clip too big -> compress temp copy and upload" flow. when /upload returns toobig=true (helper rejected becuase the clip exceeds the current auth states size cap), we surface a confirmation modal. accepting posts /compress to the helper, which creates a temp compressed mp4, uploads that temp file, and records the streamable link against the original clip name.
+  const compressVeil   = document.getElementById("compress-veil");
+  const compressBody   = document.getElementById("compress-body");
+  const compressGo     = document.getElementById("compress-go");
+  const compressCancel = document.getElementById("compress-cancel");
+
+  let pendingCompressFile = null;
+
+  function openCompressModal(filename, sizeMb, capMb) {
+    pendingCompressFile = filename;
+    compressBody.innerHTML =
+      "<p><code>" + escapeHtml(filename) + "</code> is <b>" + sizeMb +
+      " MB</b>, which is over Streamable's <b>" + capMb +
+      " MB</b> limit for your current plan.</p>" +
+      "<p>Create a temporary compressed copy and upload that instead?</p>";
+    compressVeil.classList.add("is-open");
+  }
+  function closeCompressModal() {
+    compressVeil.classList.remove("is-open");
+    pendingCompressFile = null;
+  }
+
+  compressCancel.addEventListener("click", closeCompressModal);
+  compressVeil.addEventListener("mousedown", (e) => {
+    if (e.target === compressVeil) closeCompressModal();
+  });
+  compressVeil.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeCompressModal(); }
+  });
+
+  compressGo.addEventListener("click", async () => {
+    if (!pendingCompressFile) { closeCompressModal(); return; }
+    const file = pendingCompressFile;
+    closeCompressModal();
+    try {
+      const res = await fetch(HELPER + "/compress?file=" + encodeURIComponent(file)
+                              + "&t=" + Date.now(),
+                              { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || ("HTTP " + res.status));
+      }
+      localState.set(file, "compressing");
+      anyUploading = true;
+      scheduleNextPoll(POLL_FAST_MS);
+      rerenderCard(file);
+      showToast("Compressing temp copy for " + escapeHtml(file) + ".", "info");
+      setTimeout(hideToast, 3500);
+    } catch (e) {
+      showToast("Couldn't start compression: " + (e.message || e));
+      setTimeout(hideToast, 5000);
+    }
+  });
+
+  // compress-overwrite mode picker. the clip cards 3-dot menu has a single "compress..." entry that opens this modal. the user picks fast (veryfast preset, smaller than source) or smaller (slower preset, ~30-50% smaller still), and the click fires post /compress-overwritemode=... which replaces the source clip in place.
+  const compressModeVeil     = document.getElementById("compress-mode-veil");
+  const compressModeModal    = document.getElementById("compress-mode-modal");
+  const compressModeCancel   = document.getElementById("compress-mode-cancel");
+  const compressModeClipName = document.getElementById("compress-mode-clip-name");
+  const compressModeCards    = compressModeVeil.querySelectorAll(".compress-mode-card");
+
+  let pendingCompressOverwriteFile = null;
+
+  // apply the compress-history rules to the modal: clip already at slow -> lock the modal entirely, show the "already at max compression" banner, no cards clickable. clip already at fast -> fast card disabled, smaller still availible (fast -> slow upgrade path). unmarked -> both cards availible (defualt). the rules are also enforced server-side; this is the ux layer so the user never has to click into an error to discover them.
+  function applyCompressModeRules(existingMode) {
+    compressModeModal.classList.remove("is-locked");
+    compressModeCards.forEach(function (card) {
+      card.classList.remove("is-disabled");
+      card.removeAttribute("aria-disabled");
+    });
+    if (existingMode === "slow") {
+      compressModeModal.classList.add("is-locked");
+      compressModeCards.forEach(function (card) {
+        card.classList.add("is-disabled");
+        card.setAttribute("aria-disabled", "true");
+      });
+      return "locked";
+    }
+    if (existingMode === "fast") {
+      compressModeCards.forEach(function (card) {
+        if (card.dataset.mode === "fast") {
+          card.classList.add("is-disabled");
+          card.setAttribute("aria-disabled", "true");
+        }
+      });
+      return "fast-disabled";
+    }
+    return "open";
+  }
+
+  function openCompressModePicker(filename) {
+    pendingCompressOverwriteFile = filename;
+    compressModeClipName.textContent = filename || "";
+    compressModeClipName.title = filename || "";
+
+    // look up the clips hidden compress marker (mirrored by the helper from the mp4s comment atom). cards / banner are tuned accordingly before the modal becomes visible.
+    let existingMode = "";
+    if (filename) {
+      const clip = lastClipsByName.get(filename);
+      if (clip && (clip.cmp_mode === "fast" || clip.cmp_mode === "slow")) {
+        existingMode = clip.cmp_mode;
+      }
+    }
+    const result = applyCompressModeRules(existingMode);
+
+    compressModeVeil.classList.add("is-open");
+    // focus the first enabled card so enter commits to a valid option and the user can navigate with arrow keys / tab. if everything is locked, focus cancel.
+    if (result === "locked") {
+      try { compressModeCancel.focus(); } catch (_) {}
+      return;
+    }
+    const firstEnabled = compressModeVeil.querySelector(".compress-mode-card:not(.is-disabled)");
+    if (firstEnabled) { try { firstEnabled.focus(); } catch (_) {} }
+  }
+  function closeCompressModePicker() {
+    compressModeVeil.classList.remove("is-open");
+    pendingCompressOverwriteFile = null;
+  }
+
+  // centralised so we dont drift between the modal cards and any other caller that might want to start an overwrite-compress. the server enforces the same compress-history rules as the modal; alreadycompressed comes back as 409 with a message we surface verbatim so the user sees the same wording either way.
+  async function startCompressOverwrite(file, mode) {
+    if (!file) return;
+    try {
+      const res = await fetch(HELPER + "/compress-overwrite?file=" + encodeURIComponent(file)
+                              + "&mode=" + encodeURIComponent(mode)
+                              + "&t=" + Date.now(),
+                              { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (data && data.alreadyCompressed) {
+          showToast(data.message || "Already compressed.", "info");
+          setTimeout(hideToast, 4000);
+          return;
+        }
+        throw new Error(data.message || ("HTTP " + res.status));
+      }
+      localState.set(file, "compressing");
+      anyUploading = true;
+      scheduleNextPoll(POLL_FAST_MS);
+      rerenderCard(file);
+      const label = mode === "fast" ? "Compressing (fast)" : "Compressing (smaller)";
+      showToast(label + " - " + escapeHtml(file), "info");
+      setTimeout(hideToast, 3000);
+    } catch (err) {
+      showToast("Couldn't start compress: " + (err.message || err));
+      setTimeout(hideToast, 4500);
+    }
+  }
+
+  compressModeCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      // defensive: css pointer-events:none already blocks the click for .is-disabled cards, but if a future tweak loosens that css we still want the rule enforced here. disabled cards simply do nothing instead of opening a confusing error.
+      if (card.classList.contains("is-disabled")) return;
+      const file = pendingCompressOverwriteFile;
+      const mode = card.dataset.mode || "smaller";
+      closeCompressModePicker();
+      startCompressOverwrite(file, mode);
+    });
+  });
+  compressModeCancel.addEventListener("click", closeCompressModePicker);
+  compressModeVeil.addEventListener("mousedown", (e) => {
+    if (e.target === compressModeVeil) closeCompressModePicker();
+  });
+  compressModeVeil.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeCompressModePicker(); }
+  });
+
+  // compress all: bulk fast-compress of every clip that isnt already marked. client-side queue with busy-retry so the servers concurrency limiter (steady-state + cpu-gated burst) does the actual scheduling without us having to mirror its state. fast mode only -- bulk compress on smaller would take hours on a typical folder; users who want max compression on a specific clip still have the per-card 3-dot menu.
+  const compressAllBtn        = document.getElementById("compress-all-btn");
+  const compressAllLabelEl    = document.getElementById("compress-all-label");
+  const compressAllVeil       = document.getElementById("compress-all-veil");
+  const compressAllBody       = document.getElementById("compress-all-body");
+  const compressAllGo         = document.getElementById("compress-all-go");
+  const compressAllCancel     = document.getElementById("compress-all-cancel");
+
+  // mutated by the queue runner. when true, the button label flips to "stop (x/y)" and clicking it stops scheduling new jobs. in-flight ffmpeg encodes continue -- we dont kill them mid-run becuase the servers atomic-replace is what makes that safe.
+  let compressAllRunning = false;
+  let compressAllAbort   = false;
+
+  function compressAllCandidates() {
+    // walk the full known clips list. skip anything already marked fast or slow (the rules say re-fast is a no-op, and slow is already maximally compressed), and anything currently mid-job so we dont pile on top of a manual operation.
+    const list = [];
+    for (const clip of allClips) {
+      if (!clip || !clip.name) continue;
+      if (clip.cmp_mode === "fast" || clip.cmp_mode === "slow") continue;
+      const st = localState.get(clip.name);
+      if (st === "compressing" || st === "uploading") continue;
+      list.push(clip.name);
+    }
+    return list;
+  }
+
+  function setCompressAllButton(state, info) {
+    compressAllBtn.classList.toggle("is-running", state === "running");
+    compressAllBtn.classList.toggle("is-disabled", state === "disabled");
+    if (state === "running" && info) {
+      compressAllLabelEl.innerHTML = "Stop "
+        + '<span class="progress">(' + info.done + " / " + info.total + ")</span>";
+      compressAllBtn.title = "Click to stop scheduling new compresses. "
+        + "In-flight encodes will finish.";
+    } else if (state === "disabled") {
+      compressAllLabelEl.textContent = "Compress All";
+      compressAllBtn.title = "Every clip is already compressed.";
+    } else {
+      compressAllLabelEl.textContent = "Compress All";
+      compressAllBtn.title = "Fast-compress every clip that isn't already compressed.";
+    }
+  }
+
+  function refreshCompressAllButton() {
+    if (compressAllRunning) return;
+    const remaining = compressAllCandidates().length;
+    if (remaining === 0) {
+      setCompressAllButton("disabled");
+    } else {
+      setCompressAllButton("idle");
+    }
+  }
+
+  function openCompressAllModal() {
+    const candidates = compressAllCandidates();
+    const total = allClips.length;
+    const skipped = total - candidates.length;
+    compressAllBody.innerHTML =
+      "<p>Fast-compress <b>" + candidates.length + "</b> clip"
+        + (candidates.length === 1 ? "" : "s") + ".</p>"
+      + (skipped > 0
+          ? "<p><b>" + skipped + "</b> clip" + (skipped === 1 ? "" : "s")
+            + " will be skipped (already compressed or busy).</p>"
+          : "")
+      + "<p>Each clip's original file will be replaced. "
+        + "Only Fast mode runs in bulk &mdash; for Smaller, use a clip's "
+        + "3-dot menu individually.</p>";
+    compressAllGo.disabled = (candidates.length === 0);
+    compressAllVeil.classList.add("is-open");
+  }
+  function closeCompressAllModal() {
+    compressAllVeil.classList.remove("is-open");
+  }
+
+  // worker that drains the queue. we fire one request, wait for the response, then immediately fire the next. the servers get-uploadjobstartdecision returns busy=true when at the cap, so we back off briefly and retry the same clip. cpu-low bursts above the steady-state cap happen server-side -- we dont need to mirror the logic here, just keep firing.
+  async function runCompressAll(queue) {
+    compressAllRunning = true;
+    compressAllAbort = false;
+    const total = queue.length;
+    let done = 0;
+    setCompressAllButton("running", { done, total });
+
+    while (queue.length > 0 && !compressAllAbort) {
+      const name = queue[0];
+      let started = false;
+      let attempts = 0;
+      while (!started && !compressAllAbort) {
+        try {
+          const res = await fetch(HELPER + "/compress-overwrite?file="
+              + encodeURIComponent(name) + "&mode=fast&t=" + Date.now(),
+              { method: "POST", cache: "no-store" });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.ok) {
+            started = true;
+            localState.set(name, "compressing");
+            anyUploading = true;
+            scheduleNextPoll(POLL_FAST_MS);
+            rerenderCard(name);
+          } else if (data && data.alreadyCompressed) {
+            // race: marker appeared between candidate scan and now. skip silently.
+            started = true;
+          } else if (data && data.busy) {
+            // server is at the (steady or burst) cap. short wait.
+            attempts++;
+            const wait = Math.min(3000, 600 + attempts * 200);
+            await new Promise(r => setTimeout(r, wait));
+          } else {
+            // genuine error -- skip this clip, dont get stuck.
+            started = true;
+          }
+        } catch (e) {
+          attempts++;
+          const wait = Math.min(5000, 800 + attempts * 400);
+          await new Promise(r => setTimeout(r, wait));
+          if (attempts > 8) started = true; // bail to avoid infinite loop
+        }
+      }
+      queue.shift();
+      done++;
+      setCompressAllButton("running", { done, total });
+    }
+
+    compressAllRunning = false;
+    compressAllAbort = false;
+    refreshCompressAllButton();
+    if (done > 0) {
+      showToast("Compress All: scheduled " + done + " clip"
+        + (done === 1 ? "" : "s") + " for compression.", "info");
+      setTimeout(hideToast, 4000);
+    }
+  }
+
+  compressAllBtn.addEventListener("click", () => {
+    if (compressAllBtn.classList.contains("is-disabled")) return;
+    if (compressAllRunning) {
+      // button doubles as a stop when running. aborting just stops scheduling new clips. without also cancelling the in-flight encodes, ffmpeg keeps burning the gpu/cpu on whatevers already running, which is what the user wanted to interrupt. walk localstate for anything currently in "compressing" and post cancel for each.
+      compressAllAbort = true;
+      const inflight = [];
+      localState.forEach((s, name) => {
+        if (s === "compressing") inflight.push(name);
+      });
+      inflight.forEach((name) => {
+        fetch(HELPER + "/cancel-upload?file=" + encodeURIComponent(name)
+              + "&t=" + Date.now(),
+              { method: "POST", cache: "no-store" }).catch(() => {});
+      });
+      return;
+    }
+    openCompressAllModal();
+  });
+  compressAllCancel.addEventListener("click", closeCompressAllModal);
+  compressAllVeil.addEventListener("mousedown", (e) => {
+    if (e.target === compressAllVeil) closeCompressAllModal();
+  });
+  compressAllVeil.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeCompressAllModal(); }
+  });
+  compressAllGo.addEventListener("click", () => {
+    const queue = compressAllCandidates();
+    closeCompressAllModal();
+    if (queue.length === 0) return;
+    runCompressAll(queue);
+  });
+
+  // keep the buttons enabled/disabled state in sync with the current clip list every render.
+  const _origRender = render;
+  render = function (clips) {
+    const r = _origRender.apply(this, arguments);
+    refreshCompressAllButton();
+    return r;
+  };
+
+  // trim modal -- ffmpeg stream-copy via post /trim. dual-handle range: two <input type="range"> elements share the same track. css makes the inputs pointer-events:none and only the thumbs recieve clicks, so the two handles never block each other and the underlying highlight bar reflects the selected window.
+  const trimVeil         = document.getElementById("trim-veil");
+  const trimClipName     = document.getElementById("trim-clip-name");
+  const trimVideoWrap    = document.querySelector(".trim-video-wrap");
+  const trimVideo        = document.getElementById("trim-video");
+  const trimPlayPauseBtn = document.getElementById("trim-playpause");
+  const trimPlayPauseIcn = document.getElementById("trim-playpause-icon");
+  const trimStart        = document.getElementById("trim-start");
+  const trimEnd          = document.getElementById("trim-end");
+  const trimSeek         = document.getElementById("trim-seek");
+  const trimSeekFill     = document.getElementById("trim-seek-fill");
+  const trimRangeFill    = document.getElementById("trim-range-fill");
+  const trimStartTime    = document.getElementById("trim-start-time");
+  const trimEndTime      = document.getElementById("trim-end-time");
+  const trimLengthTime   = document.getElementById("trim-length-time");
+  const trimPreview      = document.getElementById("trim-preview");
+  const trimCancel       = document.getElementById("trim-cancel");
+  const trimSave         = document.getElementById("trim-save");
+  const trimOverwrite    = document.getElementById("trim-overwrite");
+  const trimPrecise      = document.getElementById("trim-precise");
+
+  // minimum trimmed length the backend will accept.
+  const TRIM_MIN_SECONDS = 0.5;
+  // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
+  let trimPreviewActive = false;
+  let trimSourceClip = null;
+  // set while a pointer is held on the seek bar so timeupdate doesnt overwrite the value while the user is dragging it.
+  let trimSeekDragging = false;
+
+  function fmtTrimTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    const minutes = Math.floor(s / 60);
+    const seconds = s - minutes * 60;
+    // m:ss.cc -- centiseconds give the user a sense of precision without overwhelming the display.
+    const ss = seconds.toFixed(2).padStart(5, "0");
+    return minutes + ":" + ss;
+  }
+
+  function trimDuration() {
+    return Math.max(0, Number(trimEnd.value) - Number(trimStart.value));
+  }
+
+  // fastseek() is the right primitive for scrubbing: it returns immediately and the browser decodes the nearest seekable point. plain currenttime= forces a precise decode which lags noticeably while the user is dragging. fall back to currenttime when fastseek isnt availible.
+  function previewSeek(t) {
+    if (!isFinite(t)) return;
+    if (trimVideo.fastSeek) {
+      try { trimVideo.fastSeek(t); return; } catch {}
+    }
+    trimVideo.currentTime = t;
+  }
+
+  function updateSeekFill() {
+    const max = Number(trimSeek.max) || 0;
+    if (max <= 0) { trimSeekFill.style.width = "0%"; return; }
+    trimSeekFill.style.width = ((Number(trimSeek.value) / max) * 100) + "%";
+  }
+
+  function updateTrimUi() {
+    const max = Number(trimEnd.max) || 0;
+    const s = Number(trimStart.value);
+    const e = Number(trimEnd.value);
+    trimStartTime.textContent  = fmtTrimTime(s);
+    trimEndTime.textContent    = fmtTrimTime(e);
+    trimLengthTime.textContent = fmtTrimTime(e - s);
+    if (max > 0) {
+      const sPct = (s / max) * 100;
+      const ePct = (e / max) * 100;
+      trimRangeFill.style.left  = sPct + "%";
+      trimRangeFill.style.width = Math.max(0, ePct - sPct) + "%";
+    } else {
+      trimRangeFill.style.width = "0%";
+    }
+    const valid = (e - s) >= TRIM_MIN_SECONDS;
+    trimSave.disabled = !valid;
+    trimOverwrite.disabled = !valid;
+  }
+
+  function syncTrimPlayIcon() {
+    const paused = trimVideo.paused || trimVideo.ended;
+    trimPlayPauseIcn.innerHTML = paused ? ICON.PLAY : ICON.PAUSE;
+    trimVideoWrap.classList.toggle("is-paused", paused);
+  }
+
+  // overwrite needs two clicks within 3s to fire -- first click "arms" the button (red fill + "click again to confirm"). avoids the browser-dock confirm() dialog while still preventing one-click destructive operations.
+  let overwriteArmed = false;
+  let overwriteArmTimer = 0;
+  function disarmOverwrite() {
+    overwriteArmed = false;
+    if (overwriteArmTimer) { clearTimeout(overwriteArmTimer); overwriteArmTimer = 0; }
+    trimOverwrite.classList.remove("is-armed");
+    trimOverwrite.textContent = "Overwrite original";
+  }
+
+  function openTrimModal(clip) {
+    if (!clip || !clip.name) return;
+    trimSourceClip = clip;
+    trimClipName.textContent = clip.name;
+    trimSave.disabled = true;
+    trimSave.textContent = "Save copy";
+    trimOverwrite.disabled = true;
+    disarmOverwrite();
+    trimPreviewActive = false;
+    trimSeekDragging = false;
+    trimVeil.classList.add("is-open");
+    syncTrimPlayIcon();
+    // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
+    trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) +
+                    "?v=" + (clip.mtime || Date.now());
+    trimVideo.currentTime = 0;
+    const onMeta = () => {
+      const dur = isFinite(trimVideo.duration) ? trimVideo.duration : 0;
+      trimStart.min = trimEnd.min = trimSeek.min = "0";
+      trimStart.max = trimEnd.max = trimSeek.max = String(dur);
+      trimStart.value = "0";
+      trimEnd.value   = String(dur);
+      trimSeek.value  = "0";
+      updateTrimUi();
+      updateSeekFill();
+    };
+    trimVideo.addEventListener("loadedmetadata", onMeta, { once: true });
+  }
+
+  function closeTrimModal() {
+    trimVeil.classList.remove("is-open");
+    trimPreviewActive = false;
+    trimSeekDragging = false;
+    disarmOverwrite();
+    try { trimVideo.pause(); } catch {}
+    // release the streaming connection back to the helper -- otherwise the /file slot stays occupied (helper caps concurrent previews).
+    trimVideo.removeAttribute("src");
+    try { trimVideo.load(); } catch {}
+    trimSourceClip = null;
+  }
+
+  function clampHandles(activeWasStart) {
+    // keep at least trim_min_seconds between the two handles. whichever handle the user just moved is the one we anchor to; the other gets pushed.
+    const s = Number(trimStart.value);
+    const e = Number(trimEnd.value);
+    if (e - s < TRIM_MIN_SECONDS) {
+      if (activeWasStart) {
+        trimStart.value = Math.max(0, e - TRIM_MIN_SECONDS);
+      } else {
+        const max = Number(trimEnd.max);
+        trimEnd.value = Math.min(max, s + TRIM_MIN_SECONDS);
+      }
+    }
+  }
+
+  // trim handles: while dragging, fastseek for live preview; on release, do a precise seek so the visible frame matches the cut.
+  trimStart.addEventListener("input", () => {
+    clampHandles(true);
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(Number(trimStart.value));
+    trimSeek.value = trimStart.value;
+    updateTrimUi();
+    updateSeekFill();
+  });
+  trimStart.addEventListener("change", () => {
+    trimVideo.currentTime = Number(trimStart.value);
+  });
+  trimEnd.addEventListener("input", () => {
+    clampHandles(false);
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(Number(trimEnd.value));
+    trimSeek.value = trimEnd.value;
+    updateTrimUi();
+    updateSeekFill();
+  });
+  trimEnd.addEventListener("change", () => {
+    trimVideo.currentTime = Number(trimEnd.value);
+  });
+
+  // seek scrubber: independent playhead. dragging seeks anywhere in the source (including outside the trim window). pointer flag stops timeupdate from fighting the user mid-drag.
+  trimSeek.addEventListener("pointerdown", () => { trimSeekDragging = true; });
+  ["pointerup", "pointercancel", "blur"].forEach(ev => {
+    trimSeek.addEventListener(ev, () => { trimSeekDragging = false; });
+  });
+  trimSeek.addEventListener("input", () => {
+    trimPreviewActive = false;
+    previewSeek(Number(trimSeek.value));
+    updateSeekFill();
+  });
+  trimSeek.addEventListener("change", () => {
+    trimVideo.currentTime = Number(trimSeek.value);
+  });
+
+  trimVideo.addEventListener("timeupdate", () => {
+    // follow playback in the scrubber unless the user is currently dragging it.
+    if (!trimSeekDragging) {
+      trimSeek.value = String(trimVideo.currentTime);
+      updateSeekFill();
+    }
+    // loop within the trim selection during preview.
+    if (trimPreviewActive && trimVideo.currentTime >= Number(trimEnd.value)) {
+      trimVideo.pause();
+      trimVideo.currentTime = Number(trimStart.value);
+      trimPreviewActive = false;
+    }
+  });
+
+  trimPreview.addEventListener("click", () => {
+    trimVideo.currentTime = Number(trimStart.value);
+    trimPreviewActive = true;
+    trimVideo.play().catch(() => { trimPreviewActive = false; });
+  });
+
+  // click the centered play/pause button or the video itself to toggle playback (youtube convention). pause/play events keep the icon and wrappers .is-paused class in sync.
+  function togglePlayback() {
+    if (trimVideo.paused || trimVideo.ended) {
+      trimVideo.play().catch(() => {});
+    } else {
+      trimPreviewActive = false;
+      trimVideo.pause();
+    }
+  }
+  trimPlayPauseBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePlayback(); });
+  trimVideo.addEventListener("click", togglePlayback);
+  trimVideo.addEventListener("play",  syncTrimPlayIcon);
+  trimVideo.addEventListener("pause", syncTrimPlayIcon);
+  trimVideo.addEventListener("ended", syncTrimPlayIcon);
+
+  trimCancel.addEventListener("click", closeTrimModal);
+  trimVeil.addEventListener("mousedown", (e) => {
+    if (e.target === trimVeil) closeTrimModal();
+  });
+  trimVeil.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeTrimModal(); }
+  });
+
+  // single submit helper -- both buttons funnel thru here with a diffrent mode.
+  async function submitTrim(mode) {
+    if (!trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
+    const sourceName = trimSourceClip.name;
+    const startSec = Number(trimStart.value);
+    const endSec   = Number(trimEnd.value);
+    const activeBtn = mode === "overwrite" ? trimOverwrite : trimSave;
+    const originalLabel = activeBtn.textContent;
+    trimSave.disabled = true;
+    trimOverwrite.disabled = true;
+    const precise = trimPrecise.checked;
+    // the precise path re-encodes -- give the user a hint so they dont think the dock is stuck during the ~clip-length wait.
+    if (precise) {
+      activeBtn.textContent = mode === "overwrite" ? "Re-encoding..." : "Re-encoding...";
+    } else {
+      activeBtn.textContent = mode === "overwrite" ? "Overwriting..." : "Trimming...";
+    }
+    try {
+      const url = HELPER + "/trim?file=" + encodeURIComponent(sourceName) +
+                  "&start=" + startSec.toFixed(3) +
+                  "&end="   + endSec.toFixed(3) +
+                  "&mode="  + encodeURIComponent(mode) +
+                  "&precise=" + (precise ? "1" : "0") +
+                  "&t=" + Date.now();
+      const res = await fetch(url, { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || ("HTTP " + res.status));
+      }
+      closeTrimModal();
+      const msg = mode === "overwrite"
+        ? ("Overwrote " + escapeHtml(sourceName))
+        : ("Saved as " + escapeHtml(data.name));
+      showToast(msg, "info");
+      setTimeout(hideToast, 3500);
+      scheduleNextPoll(50);
+    } catch (e) {
+      showToast("Trim failed: " + (e.message || e));
+      setTimeout(hideToast, 5000);
+      activeBtn.textContent = originalLabel;
+      const valid = trimDuration() >= TRIM_MIN_SECONDS;
+      trimSave.disabled = !valid;
+      trimOverwrite.disabled = !valid;
+      disarmOverwrite();
+    }
+  }
+  trimSave.addEventListener("click", () => {
+    disarmOverwrite();
+    submitTrim("copy");
+  });
+  // first click arms (3s window), second click fires. mirrors the "double-click to confirm" pattern in githubs "delete repository" flow -- visually obvious without an os dialog.
+  trimOverwrite.addEventListener("click", () => {
+    if (trimOverwrite.disabled) return;
+    if (!overwriteArmed) {
+      overwriteArmed = true;
+      trimOverwrite.classList.add("is-armed");
+      trimOverwrite.textContent = "Click again to confirm";
+      overwriteArmTimer = setTimeout(disarmOverwrite, 3000);
+      return;
+    }
+    disarmOverwrite();
+    submitTrim("overwrite");
+  });
+
+  poll();
+</script>
+</body>
+</html>
