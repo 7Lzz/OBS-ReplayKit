@@ -236,6 +236,10 @@ def startup_label(prefs: Preferences) -> str:
     return "On" if prefs.obs_startup_enabled else "Off"
 
 
+def clip_notification_label(prefs: Preferences) -> str:
+    return "On" if prefs.clip_notification_enabled else "Off"
+
+
 def render_menu(prefs: Preferences) -> None:
     clear()
     preset = get_preset(prefs.recording_preset)
@@ -264,6 +268,7 @@ def render_menu(prefs: Preferences) -> None:
     row("Microphone", prefs.microphone_name)
     row("Overlay", overlay_label(prefs))
     row("Windows startup", startup_label(prefs), "Start OBS automatically when you sign in.")
+    row("Clip saved popup", clip_notification_label(prefs), "Show a small desktop popup after OBS saves a replay.")
     row("OBS audio device", audio_status())
 
     section("Change settings")
@@ -276,6 +281,7 @@ def render_menu(prefs: Preferences) -> None:
     menu_line("7", "Clip keybind", "hotkey that saves the replay buffer")
     menu_line("8", "Overlay", "off, WASD/mouse, or Bongo Cat")
     menu_line("9", "Windows startup", "turn automatic OBS launch on or off")
+    menu_line("10", "Clip saved popup", "show or hide the replay saved popup")
     print()
     menu_line("A", "Apply and launch OBS", "write settings, install selected tools, start OBS", C.good)
     menu_line("R", "Clean reset", "remove ReplayKit OBS config and audio device changes", C.bad)
@@ -471,6 +477,27 @@ def choose_windows_startup(prefs: Preferences) -> None:
         pause("Invalid choice. Press Enter...")
 
 
+def choose_clip_notification(prefs: Preferences) -> None:
+    clear()
+    section("Clip saved popup")
+    print(color("Choose whether ReplayKit shows a small desktop popup after OBS saves a replay.", C.dim))
+    print()
+    option_line("1", "On", "Show a ReplayKit popup like: Saved the last 20s.", prefs.clip_notification_enabled)
+    option_line("2", "Off", "Only use the save sound and OBS status.", not prefs.clip_notification_enabled)
+    cancel_line()
+    choice = prompt()
+    if choice == "1":
+        prefs.clip_notification_enabled = True
+        prefs.save()
+    elif choice == "2":
+        prefs.clip_notification_enabled = False
+        prefs.save()
+    elif choice.lower() == "q":
+        return
+    else:
+        pause("Invalid choice. Press Enter...")
+
+
 def clean_reset() -> None:
     clear()
     section("Clean reset")
@@ -548,8 +575,8 @@ class InstallProgress:
         if not text:
             return
         lowered = text.lower()
-        if "download" in lowered:
-            self.current_detail = "Downloading support files. This can take a moment."
+        if lowered.startswith("downloading ") or lowered.startswith("downloaded "):
+            self.current_detail = text
             self.render(max(0, self.current_step), self.current_title, self.current_detail)
         issue_words = ("warn", "failed", "missing", "not found", "skipped", "timed out", "permission denied")
         if any(word in lowered for word in issue_words):
@@ -678,6 +705,8 @@ def run_cli() -> int:
             input_overlay_menu(prefs)
         elif choice == "9":
             choose_windows_startup(prefs)
+        elif choice == "10":
+            choose_clip_notification(prefs)
         elif choice == "a":
             apply_settings(prefs)
         elif choice == "r":

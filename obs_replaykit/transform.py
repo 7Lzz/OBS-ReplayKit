@@ -300,13 +300,15 @@ def _default_clip_dir_norm() -> str:
 
 
 def _apply_streamable_settings(settings: dict, prefs: Preferences) -> None:
-    """inject the users recording path into replaykit script settings. write blank for the default ~/pictures/videos so the obs scripts dialog placeholder ux is kept intact."""
+    """Inject ReplayKit runtime settings into the managed OBS script entry."""
     rec_dir_norm = prefs.recording_path.replace("\\", "/").rstrip("/").lower()
     if rec_dir_norm == _default_clip_dir_norm():
         settings["clip_dir"] = ""
     else:
         # forward slashes so the value round-trips thru the lua json writer without re-escaping.
         settings["clip_dir"] = prefs.recording_path.replace("\\", "/")
+    settings["clip_notification_enabled"] = bool(getattr(prefs, "clip_notification_enabled", True))
+    settings["clip_notification_seconds"] = int(prefs.replay_buffer_seconds)
 
 
 def _replaykit_script_path() -> str:

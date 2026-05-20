@@ -31,6 +31,7 @@ DEFAULT_REPLAY_BUFFER_SECS  = 90
 REPLAY_BUFFER_MIN           = 5
 REPLAY_BUFFER_MAX           = 600
 DEFAULT_OBS_STARTUP         = True
+DEFAULT_CLIP_NOTIFICATION   = True
 
 # "auto" picks the best HEVC/H.264 combo the user's GPU can run; the user can
 # force a specific codec for playback support (H.264) or quality/size (AV1 on
@@ -72,6 +73,7 @@ class Preferences:
     codec_preference:        str  = DEFAULT_CODEC_PREFERENCE
     compression_mode:        str  = DEFAULT_COMPRESSION_MODE
     obs_startup_enabled:     bool = DEFAULT_OBS_STARTUP
+    clip_notification_enabled: bool = DEFAULT_CLIP_NOTIFICATION
 
     def save(self) -> None:
         PREFS_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,4 +128,5 @@ def load_prefs() -> Preferences:
         codec_preference         = codec_pref,
         compression_mode         = compression_mode,
         obs_startup_enabled      = _coerce_bool(data.get("obs_startup_enabled"), DEFAULT_OBS_STARTUP),
+        clip_notification_enabled = _coerce_bool(data.get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),
     )

@@ -13,6 +13,7 @@ local MODULES = {
     { id = "capture",       path = "capture/auto_capture_switch.lua" },
     { id = "replay_start",  path = "replay_buffer/auto_start_replay_buffer.lua" },
     { id = "replay_sound",  path = "replay_buffer/replay_buffer_save_beep.lua" },
+    { id = "replay_popup",  path = "replay_buffer/clip_saved_notification.lua" },
     { id = "streamable",    path = "streamable/streamable_upload.lua" },
     { id = "virtual_cam",   path = "virtual_camera/auto_start_virtual_camera.lua" },
 }
@@ -144,6 +145,17 @@ function script_properties()
         "",
         ""
     )
+    obs.obs_properties_add_bool(
+        props,
+        "clip_notification_enabled",
+        "Show replay saved popup"
+    )
+    obs.obs_properties_add_int(
+        props,
+        "clip_notification_seconds",
+        "Replay saved popup seconds",
+        1, 600, 1
+    )
 
     return props
 end
@@ -156,6 +168,8 @@ function script_defaults(settings)
     obs.obs_data_set_default_bool(settings, "verbose", false)
     obs.obs_data_set_default_string(settings, "audio_file", "")
     obs.obs_data_set_default_string(settings, "clip_dir", "")
+    obs.obs_data_set_default_bool(settings, "clip_notification_enabled", true)
+    obs.obs_data_set_default_int(settings, "clip_notification_seconds", 90)
     call_all("script_defaults", settings)
 end
 
