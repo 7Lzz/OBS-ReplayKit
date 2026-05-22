@@ -10,7 +10,7 @@ from .display import primary_display
 from .dock import DOCK_TARGET
 from .encoder import EncoderChoice, pick_encoder
 from .gpu import primary_gpu
-from .keybind import to_basic_ini_value
+from .keybind import to_basic_ini_value, to_obs_hotkey_value
 from .prefs import Preferences
 from .recording import get_preset
 
@@ -99,6 +99,10 @@ def apply_basic_ini(text: str, prefs: Preferences) -> str:
     text = _set_ini_value(
         text, "Hotkeys", "ReplayBuffer", to_basic_ini_value(prefs.clip_keybind)
     )
+    if prefs.recording_keybind:
+        recording_hotkey = to_obs_hotkey_value(prefs.recording_keybind)
+        text = _set_ini_value(text, "Hotkeys", "OBSBasic.StartRecording", recording_hotkey)
+        text = _set_ini_value(text, "Hotkeys", "OBSBasic.StopRecording", recording_hotkey)
 
     return text
 
@@ -271,12 +275,12 @@ _BONGO_CAT_SOURCE_W      = 1280.0
 _BONGO_CAT_SOURCE_H      = 768.0
 _BONGO_CAT_CANVAS_W      = 1920.0
 _BONGO_CAT_CANVAS_H      = 1080.0
-_BONGO_CAT_POS_REL_X     = -1.7777777910232544
-_BONGO_CAT_POS_REL_Y     = 0.6296296119689941
-_BONGO_CAT_SCALE_X       = 0.26093751192092896
-_BONGO_CAT_SCALE_Y       = 0.2604166567325592
-_BONGO_CAT_SCALE_REL_X   = 0.185555562376976
-_BONGO_CAT_SCALE_REL_Y   = 0.18518517911434174
+_BONGO_CAT_POS_REL_X     = -1.7777777777777777
+_BONGO_CAT_POS_REL_Y     = 0.47962962962962963
+_BONGO_CAT_SCALE_X       = 0.3669433891773224
+_BONGO_CAT_SCALE_Y       = 0.3662109375
+_BONGO_CAT_SCALE_REL_X   = 0.26093751192092896
+_BONGO_CAT_SCALE_REL_Y   = 0.2604166567325592
 _BONGO_CAT_ITEM_ID       = 13
 _MIC_SOURCE_ID           = "wasapi_input_capture"
 _MONITOR_SOURCE_ID       = "monitor_capture"
@@ -308,7 +312,29 @@ def _apply_streamable_settings(settings: dict, prefs: Preferences) -> None:
         # forward slashes so the value round-trips thru the lua json writer without re-escaping.
         settings["clip_dir"] = prefs.recording_path.replace("\\", "/")
     settings["clip_notification_enabled"] = bool(getattr(prefs, "clip_notification_enabled", True))
+    settings["recording_notification_enabled"] = bool(getattr(prefs, "recording_notification_enabled", True))
     settings["clip_notification_seconds"] = int(prefs.replay_buffer_seconds)
+
+
+def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
+    """Write the runtime settings consumed by the OBS dock helper."""
+    rec_dir_norm = prefs.recording_path.replace("\\", "/").rstrip("/").lower()
+    clip_dir = "" if rec_dir_norm == _default_clip_dir_norm() else prefs.recording_path.replace("\\", "/")
+    return json.dumps({
+        "recordingPreset": prefs.recording_preset,
+        "compressionMode": prefs.compression_mode,
+        "codecPreference": prefs.codec_preference,
+        "replaySeconds": int(prefs.replay_buffer_seconds),
+        "clipDir": clip_dir,
+        "clipKeybind": prefs.clip_keybind,
+        "recordingKeybind": prefs.recording_keybind,
+        "overlayStyle": prefs.overlay_style,
+        "obsStartupEnabled": bool(prefs.obs_startup_enabled),
+        "clipNotificationEnabled": bool(prefs.clip_notification_enabled),
+        "recordingNotificationEnabled": bool(prefs.recording_notification_enabled),
+        "clipNotificationSeconds": int(prefs.replay_buffer_seconds),
+        "trimPreciseDefault": bool(prefs.trim_precise_default),
+    }, indent=2)
 
 
 def _replaykit_script_path() -> str:
@@ -463,7 +489,6 @@ def _new_bongo_source() -> dict:
         "id": _BONGO_CAT_SOURCE_ID,
         "versioned_id": _BONGO_CAT_SOURCE_ID,
         "settings": {
-            "mode": "standard",
             "Mode": "standard",
             "width": int(_BONGO_CAT_SOURCE_W),
             "height": int(_BONGO_CAT_SOURCE_H),
@@ -477,7 +502,7 @@ def _new_bongo_source() -> dict:
             "eyeblink": True,
             "track": True,
             "live2d": True,
-            "relative_mouse": False,
+            "relative_mouse": True,
             "mouse_horizontal_flip": True,
             "mouse_vertical_flip": True,
             "mask": False,
@@ -699,6 +724,7 @@ _DISPATCH = {
     "basic/profiles/Untitled/basic.ini":          apply_basic_ini,
     "basic/profiles/Untitled/recordEncoder.json": apply_record_encoder_json,
     "basic/scenes/Untitled.json":                 apply_scenes_json,
+    "obs-replayKit/scripts/replaykit_settings.json": apply_replaykit_settings_json,
     "user.ini":                                   apply_user_ini,
     "global.ini":                                 apply_global_ini,
 }

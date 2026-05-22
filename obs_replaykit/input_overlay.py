@@ -30,6 +30,10 @@ LogFn = Optional[Callable[[str], None]]
 _PLUGIN_DLL  = PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "input-overlay.dll"
 _PLUGIN_SDL2 = PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "SDL2.dll"
 
+_MOUSE_LAYOUT_REL = Path("mouse") / "mouse-no-movement.json"
+_MOUSE_LAYOUT_WIDTH = 285
+_MOUSE_LAYOUT_HEIGHT = 421
+
 
 def _extract_installer(name: str, log: LogFn = None) -> Optional[Path]:
     """extract one installer from installers.zip to a temp dir. ships as zip_stored so pyinstaller/upx dont alter the pe bytes (which would break inno setups crc check)."""
@@ -302,6 +306,8 @@ def install_input_overlay_presets(log: LogFn = None) -> bool:
     # known sample at the correct un-nested location.
     wasd_sample = target / "wasd" / "wasd.png"
     if wasd_sample.is_file():
+        if not _repair_mouse_overlay_layout(target, log=log):
+            return False
         if log:
             log(f"already extracted -> {target}")
         return True
@@ -321,4 +327,41 @@ def install_input_overlay_presets(log: LogFn = None) -> bool:
 
     if log:
         log(f"extracted -> {target}")
+    return _repair_mouse_overlay_layout(target, log=log)
+
+
+def _repair_mouse_overlay_layout(target: Path, log: LogFn = None) -> bool:
+    """Ensure the mouse preset has explicit source dimensions so OBS does not render it as a canvas-sized source."""
+    layout = target / _MOUSE_LAYOUT_REL
+    if not layout.is_file():
+        if log:
+            log(f"warn: missing input-overlay mouse layout: {layout}")
+        return False
+
+    try:
+        data = json.loads(layout.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        if log:
+            log(f"warn: invalid input-overlay mouse layout: {exc}")
+        return False
+
+    if not isinstance(data, dict):
+        if log:
+            log("warn: invalid input-overlay mouse layout structure")
+        return False
+
+    if data.get("default_width") == _MOUSE_LAYOUT_WIDTH and data.get("default_height") == _MOUSE_LAYOUT_HEIGHT:
+        return True
+
+    data["default_width"] = _MOUSE_LAYOUT_WIDTH
+    data["default_height"] = _MOUSE_LAYOUT_HEIGHT
+    try:
+        layout.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    except OSError as exc:
+        if log:
+            log(f"warn: failed to repair input-overlay mouse layout: {exc}")
+        return False
+
+    if log:
+        log(f"repaired input-overlay mouse layout dimensions -> {layout}")
     return True

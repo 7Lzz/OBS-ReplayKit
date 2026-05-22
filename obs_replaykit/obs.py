@@ -12,7 +12,11 @@ from .config import OBS_CONFIG, OBS_EXE_CANDIDATES, OBS_PROCESSES
 
 LogFn = Optional[Callable[[str], None]]
 
-OBS_START_ARGS = "--background-color=ff272a33 --default-background-color=ff272a33"
+OBS_START_ARGS = (
+    "--background-color=ff272a33 "
+    "--default-background-color=ff272a33 "
+    "--disable-direct-composition-video-overlays"
+)
 
 
 def find_obs_exe() -> Optional[Path]:

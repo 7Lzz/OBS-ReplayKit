@@ -14,6 +14,7 @@ local MODULES = {
     { id = "replay_start",  path = "replay_buffer/auto_start_replay_buffer.lua" },
     { id = "replay_sound",  path = "replay_buffer/replay_buffer_save_beep.lua" },
     { id = "replay_popup",  path = "replay_buffer/clip_saved_notification.lua" },
+    { id = "recording_hotkey", path = "recording/recording_hotkey.lua" },
     { id = "streamable",    path = "streamable/streamable_upload.lua" },
     { id = "virtual_cam",   path = "virtual_camera/auto_start_virtual_camera.lua" },
 }
@@ -94,10 +95,11 @@ end
 
 function script_description()
     return [[<b>OBS ReplayKit</b><br><br>
-Single OBS-facing script for the ReplayKit setup. It starts the replay
-buffer, routes OBS monitoring, switches capture sources for fullscreen
-games, starts the virtual camera, plays the replay-saved sound, handles
-OBS elevation, and launches the Streamable helper.<br><br>
+Single OBS-facing script for the ReplayKit setup. It starts clipping
+capture, routes OBS monitoring, switches capture sources for fullscreen
+games, starts the virtual camera, plays the clip-saved sound, handles
+OBS elevation, syncs recording hotkeys, and launches the Streamable
+helper.<br><br>
 The implementation stays split into internal feature files so the OBS
 Scripts panel stays clean without turning the codebase into one giant file.]]
 end
@@ -132,7 +134,23 @@ function script_properties()
     obs.obs_properties_add_path(
         props,
         "audio_file",
-        "Replay saved sound",
+        "Clip saved sound",
+        obs.OBS_PATH_FILE,
+        "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
+        SCRIPT_ROOT .. "replay_buffer"
+    )
+    obs.obs_properties_add_path(
+        props,
+        "recording_start_audio_file",
+        "Recording started sound",
+        obs.OBS_PATH_FILE,
+        "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
+        SCRIPT_ROOT .. "replay_buffer"
+    )
+    obs.obs_properties_add_path(
+        props,
+        "recording_stop_audio_file",
+        "Recording stopped sound",
         obs.OBS_PATH_FILE,
         "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
         SCRIPT_ROOT .. "replay_buffer"
@@ -148,12 +166,17 @@ function script_properties()
     obs.obs_properties_add_bool(
         props,
         "clip_notification_enabled",
-        "Show replay saved popup"
+        "Show clip saved popup"
+    )
+    obs.obs_properties_add_bool(
+        props,
+        "recording_notification_enabled",
+        "Show recording popups"
     )
     obs.obs_properties_add_int(
         props,
         "clip_notification_seconds",
-        "Replay saved popup seconds",
+        "Clip popup seconds",
         1, 600, 1
     )
 
@@ -167,8 +190,11 @@ function script_defaults(settings)
     obs.obs_data_set_default_int(settings, "check_interval", 500)
     obs.obs_data_set_default_bool(settings, "verbose", false)
     obs.obs_data_set_default_string(settings, "audio_file", "")
+    obs.obs_data_set_default_string(settings, "recording_start_audio_file", "")
+    obs.obs_data_set_default_string(settings, "recording_stop_audio_file", "")
     obs.obs_data_set_default_string(settings, "clip_dir", "")
     obs.obs_data_set_default_bool(settings, "clip_notification_enabled", true)
+    obs.obs_data_set_default_bool(settings, "recording_notification_enabled", true)
     obs.obs_data_set_default_int(settings, "clip_notification_seconds", 90)
     call_all("script_defaults", settings)
 end

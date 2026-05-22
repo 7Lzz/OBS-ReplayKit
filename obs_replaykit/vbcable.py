@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -27,6 +28,20 @@ _ENDPOINT_RENAMES = {
     "CABLE Output":   "OBS Stream Audio Loopback",
     "CABLE Out 16ch": "OBS Stream Audio Loopback (Surround)",
 }
+
+_DISCORD_PROCESS_NAMES = (
+    "Discord.exe",
+    "DiscordCanary.exe",
+    "DiscordPTB.exe",
+    "DiscordDevelopment.exe",
+    "DiscordSystemHelper.exe",
+)
+_DISCORD_RESTART_PROCESS_NAMES = frozenset({
+    "Discord.exe",
+    "DiscordCanary.exe",
+    "DiscordPTB.exe",
+    "DiscordDevelopment.exe",
+})
 
 
 # powershell helper that compiles a c# class at runtime via add-type and calls IMMDeviceEnumerator + IPolicyConfigVistaClient. doing this from powershell instead of python+ctypes saves ~150 lines of com vtable glue at the cost of one powershell process per call (~300ms).
@@ -226,33 +241,52 @@ foreach ($root in @($render, $capture)) {{
         if (-not (Test-Path $props)) {{ continue }}
         $cur = (Get-ItemProperty -LiteralPath $props -Name $friendlyKey -ErrorAction SilentlyContinue).$friendlyKey
         if (-not $cur) {{ continue }}
-        if (-not $renames.ContainsKey($cur)) {{ continue }}
+        $newName = $null
+        if ($renames.ContainsKey($cur)) {{
+            $newName = $renames[$cur]
+        }} else {{
+            $lower = $cur.ToLowerInvariant()
+            if ($lower.StartsWith('cable input')) {{
+                $newName = 'OBS Stream Audio'
+            }} elseif ($lower.StartsWith('cable in 16ch')) {{
+                $newName = 'OBS Stream Audio (Surround)'
+            }} elseif ($lower.StartsWith('cable output')) {{
+                $newName = 'OBS Stream Audio Loopback'
+            }} elseif ($lower.StartsWith('cable out 16ch')) {{
+                $newName = 'OBS Stream Audio Loopback (Surround)'
+            }}
+        }}
+        if (-not $newName) {{ continue }}
 
         # mmdevice id format: "{{0.0.x.00000000}}.{{guid}}" -- x=0 render, x=1 capture.
         $dataFlow = if ($root -eq $render) {{ '0' }} else {{ '1' }}
         $deviceId = "{{0.0.$dataFlow.00000000}}.$guid"
-        $rc = [AudioHelper]::RenameEndpoint($deviceId, $renames[$cur])
+        $rc = [AudioHelper]::RenameEndpoint($deviceId, $newName)
         if ($rc -eq 0) {{
             $successes++
-            Write-Host "renamed: $cur -> $($renames[$cur])"
+            Write-Host "renamed: $cur -> $newName"
         }} else {{
             Write-Host "rename FAILED for ${{cur}}: rc=0x$('{{0:x}}' -f $rc)"
         }}
     }}
 }}
 
-# bounce the audio stack so the new names appear in the sound output picker + quick settings without a reboot. win11 quick settings is fed by audioendpointbuilder + a shell cache in explorer.exe, both of which hold their own copies. start-service on the parent doesnt cascade-start dependents, so audiosrv needs an explicit start after audioendpointbuilder -- skip it and the user loses audio until reboot.
-Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
-Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
-Start-Service Audiosrv -ErrorAction SilentlyContinue  # cascade-stopped above
-Start-Sleep -Milliseconds 500
-Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-# windows auto-respawns explorer; no start-process needed.
+if ($successes -gt 0) {{
+    # bounce the audio stack so the new names appear in the sound output picker + quick settings without a reboot. win11 quick settings is fed by audioendpointbuilder + a shell cache in explorer.exe, both of which hold their own copies. start-service on the parent doesnt cascade-start dependents, so audiosrv needs an explicit start after audioendpointbuilder -- skip it and the user loses audio until reboot.
+    Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
+    Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
+    Start-Service Audiosrv -ErrorAction SilentlyContinue  # cascade-stopped above
+    Start-Sleep -Milliseconds 500
+    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+    # windows auto-respawns explorer; no start-process needed.
 
-# sanity-report so the install log shows whether anythings still stopped.
-$aeb = (Get-Service AudioEndpointBuilder -ErrorAction SilentlyContinue).Status
-$asr = (Get-Service Audiosrv               -ErrorAction SilentlyContinue).Status
-Write-Host "renames=$successes audio-stack=AEB:$aeb Audiosrv:$asr explorer=restarted"
+    # sanity-report so the install log shows whether anythings still stopped.
+    $aeb = (Get-Service AudioEndpointBuilder -ErrorAction SilentlyContinue).Status
+    $asr = (Get-Service Audiosrv               -ErrorAction SilentlyContinue).Status
+    Write-Host "renames=$successes audio-stack=AEB:$aeb Audiosrv:$asr explorer=restarted"
+}} else {{
+    Write-Host "renames=0 audio-stack=unchanged explorer=unchanged"
+}}
 """
 
     try:
@@ -413,8 +447,90 @@ def ensure_vbcable(log: LogFn = None) -> bool:
     if is_vbcable_installed():
         if log:
             log("OBS Stream Audio device already installed")
+        _rename_endpoints(log=log)
         return True
     return install_vbcable(log=log)
+
+
+def _stop_discord_for_driver_uninstall(log: LogFn = None) -> tuple[bool, list[Path]]:
+    """Stop Discord variants that commonly hold the ReplayKit cable open."""
+    names = ",".join("'" + name.replace("'", "''") + "'" for name in _DISCORD_PROCESS_NAMES)
+    restart_names = ",".join("'" + name.replace("'", "''") + "'" for name in _DISCORD_RESTART_PROCESS_NAMES)
+    script = rf"""
+$ErrorActionPreference = 'Stop'
+$names = @({names})
+$restartNames = @({restart_names})
+$procs = @(Get-CimInstance Win32_Process | Where-Object {{ $names -contains $_.Name }})
+$restart = @($procs | Where-Object {{ $restartNames -contains $_.Name -and -not [string]::IsNullOrWhiteSpace($_.ExecutablePath) }} | Select-Object -ExpandProperty ExecutablePath -Unique)
+foreach ($p in $procs) {{
+    try {{ Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction Stop }} catch {{ }}
+}}
+if ($procs.Count -gt 0) {{ Start-Sleep -Milliseconds 1200 }}
+$left = @(Get-CimInstance Win32_Process | Where-Object {{ $names -contains $_.Name }})
+[pscustomobject]@{{
+    stopped = [int]$procs.Count
+    remaining = [int]$left.Count
+    restart = $restart
+}} | ConvertTo-Json -Compress
+if ($left.Count -gt 0) {{ exit 2 }}
+"""
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except Exception as exc:
+        if log:
+            log(f"OBS Stream Audio cleanup could not check Discord: {exc}")
+        return False, []
+
+    restart_paths: list[Path] = []
+    try:
+        info = json.loads((result.stdout or "{}").strip() or "{}")
+        restart_value = info.get("restart", [])
+        if isinstance(restart_value, str):
+            restart_value = [restart_value]
+        restart_paths = [Path(str(p)) for p in restart_value if str(p).strip()]
+        stopped = int(info.get("stopped", 0) or 0)
+        remaining = int(info.get("remaining", 0) or 0)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        stopped = 0
+        remaining = 0
+
+    if stopped and log:
+        log(f"stopped Discord audio client(s) before driver removal ({stopped})")
+    if result.returncode != 0:
+        if log:
+            detail = (result.stderr or result.stdout or "").strip().splitlines()
+            msg = detail[0] if detail else f"{remaining} Discord process(es) still running"
+            log(f"OBS Stream Audio cleanup blocked by Discord: {msg}")
+        return False, restart_paths
+    return True, restart_paths
+
+
+def _restart_discord_apps(paths: list[Path], log: LogFn = None) -> None:
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+    for exe in dict.fromkeys(paths):
+        if not exe.is_file():
+            continue
+        try:
+            subprocess.Popen(
+                [str(exe)],
+                cwd=str(exe.parent),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                creationflags=flags,
+            )
+            if log:
+                log(f"restarted Discord -> {exe}")
+        except Exception as exc:
+            if log:
+                log(f"warn: could not restart Discord at {exe}: {exc}")
 
 
 def uninstall_vbcable(log: LogFn = None) -> bool:
@@ -422,8 +538,14 @@ def uninstall_vbcable(log: LogFn = None) -> bool:
     if not is_vbcable_installed():
         return True
 
+    ok_to_uninstall, restart_apps = _stop_discord_for_driver_uninstall(log=log)
+    if not ok_to_uninstall:
+        _restart_discord_apps(restart_apps, log=log)
+        return False
+
     pack_dir = _extract_driver_pack(log=log)
     if pack_dir is None:
+        _restart_discord_apps(restart_apps, log=log)
         return False
 
     setup = pack_dir / VBCABLE_SETUP_EXE_NAME
@@ -446,6 +568,7 @@ def uninstall_vbcable(log: LogFn = None) -> bool:
         return False
     finally:
         shutil.rmtree(pack_dir, ignore_errors=True)
+        _restart_discord_apps(restart_apps, log=log)
 
     if result.returncode != 0:
         if log:

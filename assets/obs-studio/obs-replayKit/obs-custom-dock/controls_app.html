@@ -232,7 +232,7 @@
 </head>
 <body style="background:#272A33;color:#FFFFFF">
   <div id="controlsFrame">
-    <button class="btn" id="save-replay-btn">Save Replay</button>
+    <button class="btn" id="save-replay-btn">Save Clip</button>
     <button class="btn" id="upload-btn">Upload Last Clip</button>
     <button class="btn" id="view-clips-btn">View Clips</button>
     <button class="btn" id="open-folder-btn">Open Folder</button>
@@ -247,6 +247,7 @@
         <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
       </div>
     </div>
+    <button class="btn" id="settings-btn">Settings</button>
   </div>
 
 <script>
@@ -286,6 +287,7 @@
   const viewClipsBtn = document.getElementById("view-clips-btn");
   const saveReplayBtn = document.getElementById("save-replay-btn");
   const openFolderBtn = document.getElementById("open-folder-btn");
+  const settingsBtn = document.getElementById("settings-btn");
 
   let state = S.IDLE;
   let pollTimerId = null;
@@ -296,6 +298,7 @@
     viewClipsBtn.classList.toggle("is-disconnected", !yes);
     saveReplayBtn.classList.toggle("is-disconnected", !yes);
     openFolderBtn.classList.toggle("is-disconnected", !yes);
+    settingsBtn.classList.toggle("is-disconnected", !yes);
   }
 
   // brief tinted message on the upload button itself -- used for done ("link copied!") and error ("upload failed"). after `ms` the button returns to its idle "upload last clip" label. the powershell helper already auto-copies the url to the clipboard and pops a windows toast, so the dock just needs to ack visually.
@@ -503,6 +506,39 @@
 
   // hold a reference to the popup so subsequent clicks can refocus it instead of re-navigating window.open() against the same name (which would reload the page and lose scroll position, active filter, fullscreen state, etc.). if the reference is gone (dock reloaded since the popup was opened), the native focus call still raises the window -- the helper finds it by title.
   let clipsWindow = null;
+  let settingsWindow = null;
+
+  function styleSettingsTaskbarWindow() {
+    fetch(HELPER_HTTP_URL + "style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  function focusSettingsWindowNative() {
+    fetch(HELPER_HTTP_URL + "focus-window?title=ReplayKit%20Settings&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  settingsBtn.addEventListener("click", () => {
+    if (settingsWindow && !settingsWindow.closed) {
+      try { settingsWindow.focus(); } catch (_) {}
+      focusSettingsWindowNative();
+      return;
+    }
+    settingsWindow = window.open(
+      HELPER_HTTP_URL + "settings-view",
+      "replaykit_settings",
+      "popup=yes,width=980,height=760"
+    );
+    if (!settingsWindow) {
+      focusSettingsWindowNative();
+      return;
+    }
+    try { settingsWindow.focus(); } catch (_) {}
+    [80, 250, 750, 1500, 3000].forEach((delay) => {
+      setTimeout(styleSettingsTaskbarWindow, delay);
+    });
+  });
+
   viewClipsBtn.addEventListener("click", () => {
     if (clipsWindow && !clipsWindow.closed) {
       // belt-and-suspenders: try the js focus (cheap, sometimes works), but the native call is the one that actualy brings the window to front from inside an obs dock.
@@ -532,10 +568,10 @@
     saveReplayBtn.textContent = "Saving...";
     try {
       await saveReplay();
-      flashButton(saveReplayBtn, "Replay saved", "is-flash-success", 1800, "Save Replay");
+      flashButton(saveReplayBtn, "Clip saved", "is-flash-success", 1800, "Save Clip");
     } catch (e) {
       flashButton(saveReplayBtn, ("Save failed: " + (e.message || e)).slice(0, 42),
-                  "is-flash-error", 3000, "Save Replay");
+                  "is-flash-error", 3000, "Save Clip");
     }
   });
 

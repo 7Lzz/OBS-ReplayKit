@@ -124,4 +124,4 @@ ClearSentinel shell.ExpandEnvironmentStrings("%APPDATA%") & "\obs-studio\.sentin
 
 obsDir = fso.GetParentFolderName(obsPath)
 If Len(obsDir) > 0 Then shell.CurrentDirectory = obsDir
-shell.Run """" & obsPath & """ --background-color=ff272a33 --default-background-color=ff272a33", 1, False
+shell.Run """" & obsPath & """ --background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays", 1, False

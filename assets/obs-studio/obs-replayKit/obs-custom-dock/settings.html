@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Settings</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico" />
+<style>
+  :root {
+    --window:#1D1F26;
+    --side:#272A33;
+    --panel:#272A33;
+    --field:#3C404D;
+    --field2:#323540;
+    --field-dark:#1D1F26;
+    --line:#3C404D;
+    --line2:#5B6273;
+    --selected:#284CB8;
+    --selected2:#476BD7;
+    --text:#ffffff;
+    --muted:#969696;
+    --disabled:#969696;
+    --danger:#e33b57;
+    --button:#3C404D;
+    --button-hover:#464B59;
+    --font:"Segoe UI",system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; min-width:760px; min-height:620px; margin:0; overflow:hidden;
+    background:var(--window); color:var(--text); font:13px var(--font);
+    user-select:none;
+  }
+  button,input { font:inherit; }
+  *::-webkit-scrollbar { width:14px; height:14px; background:transparent; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-corner { background:transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color:var(--field);
+    border-radius:7px;
+    border:4px solid transparent;
+    background-clip:padding-box;
+    min-height:30px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
+  .shell {
+    width:100vw;
+    height:100vh;
+    min-width:760px;
+    min-height:620px;
+    display:grid;
+    grid-template-columns:190px 1fr;
+    grid-template-rows:1fr 58px;
+    gap:0;
+    background:var(--window);
+    padding:10px 8px 0 10px;
+    position:relative;
+  }
+  .sidebar {
+    grid-row:1 / span 2;
+    background:var(--side);
+    border-radius:4px;
+    padding:10px 6px;
+    margin:0 8px 50px 0;
+  }
+  .search-wrap {
+    padding:0 3px 8px;
+  }
+  .search-wrap .search-input {
+    height:30px;
+    background:#1D1F26;
+  }
+  .nav-btn {
+    width:100%;
+    height:34px;
+    border:1px solid transparent;
+    border-radius:4px;
+    background:transparent;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:0 10px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .nav-btn:hover { background:#3a3f4d; }
+  .nav-btn.is-active {
+    background:var(--selected);
+    border-color:#5c78df;
+  }
+  .nav-btn svg { width:17px; height:17px; fill:currentColor; flex:0 0 auto; }
+  .main {
+    overflow:auto;
+    padding:0 10px 10px 0;
+  }
+  .page { display:none; }
+  .page.is-active { display:block; }
+  body.is-searching .page { display:block; }
+  body.is-searching .page.search-hidden { display:none; }
+  .search-empty {
+    display:none;
+    color:var(--muted);
+    padding:12px 8px;
+  }
+  body.is-searching .search-empty.is-visible { display:block; }
+  .search-hidden-row { display:none !important; }
+  .form-row.search-hit,
+  .hotkey-row.search-hit {
+    background:#323746;
+  }
+  .nav-btn.search-match {
+    border-color:#5c78df;
+  }
+  .box {
+    background:var(--panel);
+    border-radius:4px;
+    padding:0 0 11px;
+    margin:0 8px 10px 0;
+  }
+  .box-title {
+    height:30px;
+    display:flex;
+    align-items:center;
+    padding:0 8px;
+    font-weight:700;
+  }
+  .form-row {
+    display:grid;
+    grid-template-columns:180px minmax(260px,1fr);
+    align-items:center;
+    column-gap:8px;
+    min-height:42px;
+    padding:3px 8px;
+  }
+  .form-row.tight { min-height:30px; }
+  .label {
+    justify-self:end;
+    text-align:right;
+    color:var(--text);
+    line-height:1.25;
+  }
+  .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
+  .hint { color:var(--muted); font-size:12px; margin-left:4px; }
+  .combo {
+    position:relative;
+    flex:1;
+    min-width:0;
+  }
+  .combo-button,.text-input,.spin-input,.hotkey-input {
+    width:100%;
+    height:32px;
+    border:1px solid var(--field);
+    border-radius:4px;
+    background:var(--field);
+    color:var(--text);
+    outline:none;
+  }
+  .combo-button {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 37px 0 9px;
+    cursor:pointer;
+    text-align:left;
+    position:relative;
+  }
+  .combo-arrow {
+    position:absolute;
+    right:0;
+    top:1px;
+    width:28px;
+    height:30px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+  }
+  .combo-arrow svg { width:16px; height:16px; fill:currentColor; }
+  .combo-button::before {
+    content:"";
+    position:absolute;
+    top:1px;
+    bottom:1px;
+    right:28px;
+    width:1px;
+    background:#272A33;
+    pointer-events:none;
+  }
+  .combo.is-open .combo-button {
+    border-color:#284CB8;
+    background:#1D1F26;
+    border-radius:4px;
+  }
+  .combo-label {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .combo-menu {
+    display:none;
+    position:absolute;
+    z-index:20;
+    top:34px;
+    left:0;
+    right:0;
+    max-height:214px;
+    overflow:auto;
+    background:#272A33;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:3px;
+    box-shadow:0 10px 24px rgba(0,0,0,.28);
+  }
+  .combo.is-open .combo-menu { display:block; }
+  .combo-option {
+    min-height:28px;
+    display:flex;
+    align-items:center;
+    padding:0 10px;
+    border-radius:3px;
+    color:var(--text);
+    cursor:pointer;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .combo-option:hover,
+  .combo-option.is-selected {
+    background:var(--selected);
+  }
+  .combo-option.is-selected {
+    outline:1px solid rgba(232,236,255,.7);
+    outline-offset:-1px;
+  }
+  .combo-option.is-disabled {
+    color:#8f96a5;
+    cursor:default;
+    background:transparent;
+  }
+  .combo-option .option-blurb {
+    color:var(--muted);
+    margin-left:4px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .combo-option.is-selected .option-blurb { color:#d9deff; }
+  .text-input { padding:0 9px; }
+  .spin {
+    position:relative;
+    width:100%;
+    max-width:none;
+  }
+  .spin-input {
+    padding:0 37px 0 9px;
+  }
+  .spin-buttons {
+    position:absolute;
+    right:0;
+    top:0;
+    width:28px;
+    height:32px;
+    border-left:1px solid #272A33;
+    display:grid;
+    grid-template-rows:1fr 1fr;
+    background:var(--field);
+  }
+  .spin-btn {
+    border:0;
+    background:transparent;
+    color:#dce0ea;
+    cursor:pointer;
+    line-height:1;
+    padding:0;
+  }
+  .spin-btn:hover { background:var(--button-hover); }
+  .spin-btn + .spin-btn { border-top:1px solid #272A33; }
+  .spin-btn svg { width:9px; height:9px; fill:currentColor; }
+  .check-row {
+    min-height:28px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .check-row input {
+    appearance:none;
+    -webkit-appearance:none;
+    position:relative;
+    width:14px;
+    height:14px;
+    margin:0;
+    border:1px solid #8b92a1;
+    border-radius:2px;
+    background:transparent;
+  }
+  .check-row input:checked {
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:center;
+    background-size:14px 14px;
+  }
+  .check-row input:focus-visible {
+    border-color:#6f89ee;
+  }
+  .hotkey-grid {
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:12px 0;
+    margin-right:8px;
+    min-height:380px;
+  }
+  .hotkey-section {
+    font-weight:700;
+    padding:9px 8px 5px;
+  }
+  .hotkey-row {
+    display:grid;
+    grid-template-columns:280px minmax(240px,1fr) auto;
+    gap:6px;
+    align-items:center;
+    min-height:36px;
+    padding:0 8px;
+  }
+  .hotkey-row .label { justify-self:end; }
+  .hotkey-input {
+    display:flex;
+    align-items:center;
+    padding:0 9px;
+    overflow:hidden;
+    white-space:nowrap;
+  }
+  .hotkey-input:focus {
+    border-color:#6f89ee;
+    background:#11141d;
+  }
+  .hotkey-input.is-empty { color:var(--muted); }
+  .hotkey-actions { display:flex; gap:3px; }
+  .icon-btn {
+    width:28px;
+    height:28px;
+    border:1px solid var(--line2);
+    border-radius:4px;
+    background:var(--button);
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    padding:0;
+  }
+  .icon-btn:hover { background:var(--button-hover); }
+  .icon-btn:disabled {
+    color:var(--disabled);
+    opacity:.65;
+    cursor:default;
+  }
+  .icon-btn svg { width:16px; height:16px; fill:currentColor; }
+  .status-line {
+    color:var(--muted);
+    font-size:12px;
+    min-height:18px;
+    padding:3px 8px 0;
+  }
+  .status-line.good { color:#9bd88f; }
+  .status-line.bad { color:#ff8da0; }
+  .footer {
+    grid-column:2;
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:8px;
+    padding:9px 8px 13px 0;
+  }
+  .btn {
+    min-width:52px;
+    height:30px;
+    border:1px solid #3C404D;
+    border-radius:4px;
+    background:#3C404D;
+    color:var(--text);
+    padding:0 13px;
+    cursor:pointer;
+  }
+  .btn:hover { background:var(--button-hover); }
+  .btn.is-primary {
+    background:var(--selected);
+    border-color:#5c78df;
+  }
+  .btn.is-primary:hover { background:var(--selected2); }
+  .btn:disabled {
+    color:#8b91a0;
+    opacity:1;
+    cursor:default;
+    background:#272A33;
+    border-color:#3C404D;
+  }
+  .resize-grip {
+    position:absolute;
+    right:3px;
+    bottom:5px;
+    width:12px;
+    height:12px;
+    opacity:.95;
+    cursor:nwse-resize;
+    pointer-events:auto;
+  }
+  .resize-grip span {
+    position:absolute;
+    width:2px;
+    height:2px;
+    background:#ffffff;
+    border-radius:50%;
+  }
+  .resize-grip span:nth-child(1) { right:0; bottom:0; }
+  .resize-grip span:nth-child(2) { right:3px; bottom:0; }
+  .resize-grip span:nth-child(3) { right:6px; bottom:0; }
+  .resize-grip span:nth-child(4) { right:0; bottom:3px; }
+  .resize-grip span:nth-child(5) { right:3px; bottom:3px; }
+  .resize-grip span:nth-child(6) { right:0; bottom:6px; }
+  @media (max-width:760px) {
+    .shell { min-width:0; grid-template-columns:154px 1fr; }
+    .form-row { grid-template-columns:130px minmax(180px,1fr); }
+    .hotkey-row { grid-template-columns:180px minmax(180px,1fr) auto; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" aria-label="Settings sections">
+    <div class="search-wrap">
+      <input class="text-input search-input" id="settingsSearch" type="search" placeholder="Search settings" spellcheck="false" autocomplete="off">
+    </div>
+    <button class="nav-btn is-active" type="button" data-page="general">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7.5 1.019531 c -0.550781 0 -0.996094 0.445313 -0.996094 0.996094 v 0.453125 c -0.472656 0.128906 -0.929687 0.320312 -1.355468 0.566406 l -0.324219 -0.324218 c -0.390625 -0.390626 -1.019531 -0.390626 -1.410157 0 l -0.703124 0.707031 c -0.390626 0.390625 -0.390626 1.019531 0 1.410156 l 0.320312 0.320313 c -0.246094 0.425781 -0.433594 0.882812 -0.5625 1.355468 h -0.453125 c -0.550781 0 -0.996094 0.445313 -0.996094 0.996094 v 1 c 0 0.550781 0.445313 0.996094 0.996094 0.996094 h 0.449219 c 0.132812 0.472656 0.320312 0.929687 0.566406 1.355468 l -0.320312 0.320313 c -0.390626 0.390625 -0.390626 1.019531 0 1.410156 l 0.703124 0.707031 c 0.390626 0.390626 1.019532 0.390626 1.410157 0 l 0.320312 -0.320312 c 0.429688 0.242188 0.882813 0.433594 1.359375 0.558594 v 0.457031 c 0 0.550781 0.445313 0.996094 0.996094 0.996094 h 0.996094 c 0.554687 0 1 -0.445313 1 -0.996094 v -0.453125 c 0.472656 -0.128906 0.929687 -0.320312 1.355468 -0.566406 l 0.320313 0.324218 c 0.390625 0.390626 1.019531 0.390626 1.410156 0 l 0.707031 -0.707031 c 0.390626 -0.390625 0.390626 -1.019531 0 -1.410156 l -0.320312 -0.320313 c 0.242188 -0.425781 0.433594 -0.882812 0.558594 -1.355468 h 0.453125 c 0.554687 0 1 -0.445313 1 -0.996094 v -1 c 0 -0.550781 -0.445313 -0.996094 -1 -0.996094 h -0.449219 c -0.128906 -0.472656 -0.320312 -0.929687 -0.566406 -1.355468 l 0.324218 -0.320313 c 0.390626 -0.390625 0.390626 -1.019531 0 -1.410156 l -0.707031 -0.707031 c -0.390625 -0.390626 -1.019531 -0.390626 -1.410156 0 l -0.320313 0.320312 c -0.425781 -0.242188 -0.882812 -0.429688 -1.355468 -0.558594 v -0.457031 c 0 -0.550781 -0.445313 -0.996094 -1 -0.996094 z m 0.515625 3.976563 c 1.660156 0 3 1.34375 3 3 s -1.339844 3 -3 3 c -1.65625 0 -3 -1.34375 -3 -3 s 1.34375 -3 3 -3 z m 0 0"/></svg>
+      <span>General</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="output">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 3.011719 1 c -1.652344 0 -3.011719 1.359375 -3.011719 3.011719 v 4.976562 c 0 1.652344 1.359375 3.011719 3.011719 3.011719 c 0.550781 0 1 -0.449219 1 -1 s -0.449219 -1 -1 -1 c -0.578125 0 -1.011719 -0.433594 -1.011719 -1.011719 v -4.976562 c 0 -0.578125 0.433594 -1.011719 1.011719 -1.011719 h 7.976562 c 0.578125 0 1.011719 0.433594 1.011719 1.011719 v 1.953125 c 0 0.554687 0.449219 1 1 1 s 1 -0.445313 1 -1 v -1.953125 c 0 -1.652344 -1.359375 -3.011719 -3.011719 -3.011719 z m 3.917969 7.011719 c -1.070313 0 -1.929688 0.863281 -1.929688 1.929687 v 3.140625 c 0 1.070313 0.859375 1.929688 1.929688 1.929688 h 4.140624 c 1.070313 0 1.929688 -0.859375 1.929688 -1.929688 v -0.578125 l 1.851562 1.378906 c 0.214844 0.160157 0.5 0.183594 0.738282 0.066407 c 0.242187 -0.121094 0.390625 -0.367188 0.390625 -0.636719 v -3.601562 c 0.003906 -0.269532 -0.148438 -0.515626 -0.390625 -0.636719 c -0.238282 -0.121094 -0.527344 -0.09375 -0.742188 0.066406 l -1.847656 1.371094 v -0.570313 c 0 -1.066406 -0.859375 -1.929687 -1.929688 -1.929687 z m 0 0"/></svg>
+      <span>Output</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="hotkeys">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 1 2 c -0.554688 0 -1 0.445312 -1 1 v 10 c 0 0.554688 0.445312 1 1 1 h 14 c 0.554688 0 1 -0.445312 1 -1 v -10 c 0 -0.554688 -0.445312 -1 -1 -1 z m 1.25 2 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m -8 3 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m -10 3 h 1.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -1.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 3 0 h 5.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -5.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 7 0 h 2.5 c 0.140625 0 0.25 0.113281 0.25 0.25 v 1.5 c 0 0.136719 -0.109375 0.25 -0.25 0.25 h -2.5 c -0.136719 0 -0.25 -0.113281 -0.25 -0.25 v -1.5 c 0 -0.136719 0.113281 -0.25 0.25 -0.25 z m 0 0"/></svg>
+      <span>Hotkeys</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="overlay">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 2.984375 1.003906 c -1.664063 0 -3 1.339844 -3 3 v 7 c 0 1.664063 1.335937 3 3 3 h 10 c 1.660156 0 3 -1.335937 3 -3 v -7 c 0 -1.660156 -1.339844 -3 -3 -3 z m 0 2 h 10 c 0.550781 0 1 0.445313 1 1 v 7 c 0 0.554688 -0.449219 1 -1 1 h -10 c -0.554687 0 -1 -0.445312 -1 -1 v -7 c 0 -0.554687 0.445313 -1 1 -1 z m 0 0"/><path d="m 7.984375 16.003906 c 3 0 4 -1 4 -1 h -8 s 1 1 4 1 z m 0 0"/></svg>
+      <span>Overlay</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="advanced">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.855469 0 l -1.539063 1.4375 c -0.453125 0.421875 -0.53125 1.148438 -0.269531 1.707031 l -5.886719 5.996094 c -0.011718 0 -0.019531 0 -0.03125 0 c -0.257812 -0.128906 -0.550781 -0.183594 -0.839844 -0.148437 c -0.328124 0.046874 -0.632812 0.199218 -0.867187 0.441406 l -3.945313 3.996094 c -0.3906245 0.375 -0.5468745 0.933593 -0.4062495 1.457031 c 0.1406255 0.523437 0.5546875 0.929687 1.0820315 1.058593 c 0.527344 0.132813 1.082031 -0.03125 1.453125 -0.425781 l 3.945312 -3.996093 c 0.472657 -0.453126 0.59375 -1.15625 0.296875 -1.738282 l 5.890625 -5.964844 c 0.558594 0.25 1.273438 0.148438 1.707031 -0.289062 l 1.414063 -1.5625 z m -10.308594 0.0898438 c -0.398437 0 -0.785156 0.0937502 -1.140625 0.2187502 l 1.882812 1.878906 c 0.390626 0.382812 0.390626 1 0 1.386719 l -0.710937 0.707031 c -0.386719 0.386719 -1 0.386719 -1.390625 0 l -1.882812 -1.878906 c -0.125 0.355468 -0.2187505 0.742187 -0.2187505 1.140625 c 0 1.90625 1.5507815 3.453125 3.4609375 3.453125 c 0.402344 0 0.789063 -0.09375 1.144531 -0.21875 l 1.175782 1.171875 h 0.058593 l 2.070313 -2.0625 l -1.203125 -1.203125 c 0.125 -0.359375 0.214843 -0.742188 0.214843 -1.140625 c 0 -1.90625 -1.546874 -3.4531252 -3.460937 -3.4531252 z m 6.550781 7.8906252 l -2.070312 2.066406 c 0.011718 0.027344 0.023437 0.058594 0.03125 0.089844 l 1.144531 1.140625 c -0.125 0.355468 -0.21875 0.742187 -0.21875 1.140625 c 0 1.902343 1.550781 3.449219 3.460937 3.449219 c 0.433594 0 0.855469 -0.101563 1.238282 -0.246094 l -2.007813 -2 c -0.386719 -0.386719 -0.386719 -1.035156 0 -1.417969 l 0.679688 -0.679687 c 0.195312 -0.191407 0.457031 -0.308594 0.710937 -0.308594 s 0.515625 0.117187 0.710938 0.308594 l 1.945312 1.941406 c 0.105469 -0.328125 0.183594 -0.683594 0.183594 -1.046875 c 0 -1.90625 -1.546875 -3.453125 -3.460938 -3.453125 c -0.398437 0 -0.785156 0.09375 -1.140624 0.21875 z m 0 0"/></svg>
+      <span>Advanced</span>
+    </button>
+  </aside>
+
+  <main class="main">
+    <div class="search-empty" id="searchEmpty">No matching settings</div>
+    <section class="page is-active" id="page-general">
+      <div class="box">
+        <div class="box-title">General</div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="obsStartupEnabled">
+            <span>Start OBS when Windows starts</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="clipNotificationEnabled">
+            <span>Show clip saved popup</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="recordingNotificationEnabled">
+            <span>Show recording started/stopped popup</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-output">
+      <div class="box">
+        <div class="box-title">Recording</div>
+        <div class="form-row">
+          <div class="label">Recording Quality</div>
+          <div class="field-wrap"><div class="combo" id="recordingPreset" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
+          <div class="label">GPU Use and Clip Size</div>
+          <div class="field-wrap"><div class="combo" id="compressionMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
+          <div class="label">Recording Codec</div>
+          <div class="field-wrap"><div class="combo" id="codecPreference" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
+          <div class="label">Clip Length</div>
+          <div class="field-wrap">
+            <div class="spin">
+              <input class="spin-input" id="replaySeconds" type="text" inputmode="numeric" autocomplete="off">
+              <div class="spin-buttons">
+                <button class="spin-btn" type="button" data-spin="up" aria-label="Increase clip length">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 1 11 c 0 -0.265625 0.105469 -0.519531 0.292969 -0.707031 l 6 -6 c 0.390625 -0.390625 1.023437 -0.390625 1.414062 0 l 6 6 c 0.1875 0.1875 0.292969 0.441406 0.292969 0.707031 s -0.105469 0.519531 -0.292969 0.707031 c -0.390625 0.390625 -1.023437 0.390625 -1.414062 0 l -5.292969 -5.292969 l -5.292969 5.292969 c -0.390625 0.390625 -1.023437 0.390625 -1.414062 0 c -0.1875 -0.1875 -0.292969 -0.441406 -0.292969 -0.707031 z m 0 0"/></svg>
+                </button>
+                <button class="spin-btn" type="button" data-spin="down" aria-label="Decrease clip length">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 1 5 c 0 -0.265625 0.105469 -0.519531 0.292969 -0.707031 c 0.390625 -0.390625 1.023437 -0.390625 1.414062 0 l 5.292969 5.292969 l 5.292969 -5.292969 c 0.390625 -0.390625 1.023437 -0.390625 1.414062 0 c 0.1875 0.1875 0.292969 0.441406 0.292969 0.707031 s -0.105469 0.519531 -0.292969 0.707031 l -6 6 c -0.390625 0.390625 -1.023437 0.390625 -1.414062 0 l -6 -6 c -0.1875 -0.1875 -0.292969 -0.441406 -0.292969 -0.707031 z m 0 0"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Recording Path</div>
+          <div class="field-wrap">
+            <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Pictures\Videos">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-hotkeys">
+      <div class="hotkey-grid">
+        <div class="hotkey-section">Clipping</div>
+        <div class="hotkey-row" data-hotkey-name="Save Clip">
+          <div class="label">Save Clip</div>
+          <div class="hotkey-input" id="clipKeybind" tabindex="0" role="textbox" aria-label="Save Clip hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" id="resetHotkey" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="clearHotkey" title="Clear hotkey">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 6 2 l -6 6 l 6 6 h 9.035156 c 0.53125 -0.023438 0.964844 -0.492188 0.964844 -1 v -10 c 0 -0.53125 -0.34375 -1 -1.007812 -1 z m 1 3 h 1 h 0.03125 c 0.253906 0.011719 0.511719 0.128906 0.6875 0.3125 l 1.28125 1.28125 l 1.3125 -1.28125 c 0.265625 -0.230469 0.445312 -0.304688 0.6875 -0.3125 h 1 v 1 c 0 0.285156 -0.035156 0.550781 -0.25 0.75 l -1.28125 1.28125 l 1.25 1.25 c 0.1875 0.1875 0.28125 0.453125 0.28125 0.71875 v 1 h -1 c -0.265625 0 -0.53125 -0.09375 -0.71875 -0.28125 l -1.28125 -1.28125 l -1.28125 1.28125 c -0.1875 0.1875 -0.453125 0.28125 -0.71875 0.28125 h -1 v -1 c 0 -0.265625 0.09375 -0.53125 0.28125 -0.71875 l 1.28125 -1.25 l -1.28125 -1.28125 c -0.210938 -0.195312 -0.304688 -0.46875 -0.28125 -0.75 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="addHotkey" title="One ReplayKit hotkey is supported" disabled>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="trashHotkey" title="Clear hotkey">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5.984375 0.00390625 l -1 0.99609375 l -3 0.003906 s -1 0 -1 1 l 0.015625 0.996094 h 15 l -0.015625 -0.996094 c 0 -1 -1 -1 -1 -1 l -3 -0.003906 l -1 -0.99609375 z m -3.984375 3.99609375 v 9 c 0 3 3 3 3 3 h 7 c 3 0 3 -3 3 -3 v -9 h -2 v 9 c 0 1 -1 1 -1 1 h -7 s -1 0 -1 -1 v -9 z m 4 1 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 0 0"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hotkey-section">Recording</div>
+        <div class="hotkey-row" data-hotkey-name="Start / Stop Recording">
+          <div class="label">Start / Stop Recording</div>
+          <div class="hotkey-input" id="recordingKeybind" tabindex="0" role="textbox" aria-label="Start or Stop Recording hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" id="resetRecordingHotkey" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="clearRecordingHotkey" title="Clear hotkey">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 6 2 l -6 6 l 6 6 h 9.035156 c 0.53125 -0.023438 0.964844 -0.492188 0.964844 -1 v -10 c 0 -0.53125 -0.34375 -1 -1.007812 -1 z m 1 3 h 1 h 0.03125 c 0.253906 0.011719 0.511719 0.128906 0.6875 0.3125 l 1.28125 1.28125 l 1.3125 -1.28125 c 0.265625 -0.230469 0.445312 -0.304688 0.6875 -0.3125 h 1 v 1 c 0 0.285156 -0.035156 0.550781 -0.25 0.75 l -1.28125 1.28125 l 1.25 1.25 c 0.1875 0.1875 0.28125 0.453125 0.28125 0.71875 v 1 h -1 c -0.265625 0 -0.53125 -0.09375 -0.71875 -0.28125 l -1.28125 -1.28125 l -1.28125 1.28125 c -0.1875 0.1875 -0.453125 0.28125 -0.71875 0.28125 h -1 v -1 c 0 -0.265625 0.09375 -0.53125 0.28125 -0.71875 l 1.28125 -1.25 l -1.28125 -1.28125 c -0.210938 -0.195312 -0.304688 -0.46875 -0.28125 -0.75 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="addRecordingHotkey" title="One ReplayKit recording hotkey is supported" disabled>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="trashRecordingHotkey" title="Clear hotkey">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5.984375 0.00390625 l -1 0.99609375 l -3 0.003906 s -1 0 -1 1 l 0.015625 0.996094 h 15 l -0.015625 -0.996094 c 0 -1 -1 -1 -1 -1 l -3 -0.003906 l -1 -0.99609375 z m -3.984375 3.99609375 v 9 c 0 3 3 3 3 3 h 7 c 3 0 3 -3 3 -3 v -9 h -2 v 9 c 0 1 -1 1 -1 1 h -7 s -1 0 -1 -1 v -9 z m 4 1 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 0 0"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-overlay">
+      <div class="box">
+        <div class="box-title">Input Overlay</div>
+        <div class="form-row">
+          <div class="label">Overlay</div>
+          <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-advanced">
+      <div class="box">
+        <div class="box-title">Advanced</div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="trimPreciseDefault">
+            <span>Enable frame-accurate trim by default</span>
+          </label>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Status</div>
+        <div class="status-line" id="statusLine">Loading settings...</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <button class="btn" type="button" id="okBtn">OK</button>
+    <button class="btn" type="button" id="cancelBtn">Cancel</button>
+    <button class="btn" type="button" id="applyBtn" disabled>Apply</button>
+  </footer>
+  <div class="resize-grip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+</div>
+
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey) e.preventDefault();
+    }, { passive:false });
+    document.addEventListener("keydown", function (e) {
+      if (e.ctrlKey && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0" || e.key === "r" || e.key === "R")) {
+        e.preventDefault();
+      }
+      if (e.key === "F5") e.preventDefault();
+    });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const DEFAULT_CLIP_KEYBIND = { shift:true, key:"OBS_KEY_BACKSLASH" };
+  const DEFAULT_RECORDING_KEYBIND = {};
+  const state = {};
+  let originalState = {};
+  let dirty = false;
+
+  const compressionByPreset = {
+    performance:"lower_gpu",
+    balanced:"balanced",
+    quality:"smaller_files",
+  };
+  // Bongo Cat cannot reliably be initialized after switching overlays in a running OBS session.
+  // WASD/mouse and Off can be applied live; only switching to Bongo Cat needs the restart path.
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "replaySeconds"]);
+
+  const els = {
+    recordingPreset: document.getElementById("recordingPreset"),
+    compressionMode: document.getElementById("compressionMode"),
+    codecPreference: document.getElementById("codecPreference"),
+    overlayStyle: document.getElementById("overlayStyle"),
+    replaySeconds: document.getElementById("replaySeconds"),
+    clipDir: document.getElementById("clipDir"),
+    clipKeybind: document.getElementById("clipKeybind"),
+    recordingKeybind: document.getElementById("recordingKeybind"),
+    obsStartupEnabled: document.getElementById("obsStartupEnabled"),
+    clipNotificationEnabled: document.getElementById("clipNotificationEnabled"),
+    recordingNotificationEnabled: document.getElementById("recordingNotificationEnabled"),
+    trimPreciseDefault: document.getElementById("trimPreciseDefault"),
+    settingsSearch: document.getElementById("settingsSearch"),
+    searchEmpty: document.getElementById("searchEmpty"),
+    applyBtn: document.getElementById("applyBtn"),
+    okBtn: document.getElementById("okBtn"),
+    cancelBtn: document.getElementById("cancelBtn"),
+    statusLine: document.getElementById("statusLine"),
+    resizeGrip: document.querySelector(".resize-grip"),
+  };
+
+  function styleNativeChrome() {
+    fetch(HELPER + "/style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(), { cache:"no-store" }).catch(() => {});
+  }
+  styleNativeChrome();
+  [400, 900, 1800, 3500].forEach((d) => setTimeout(styleNativeChrome, d));
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value || {}));
+  }
+
+  function setStatus(text, kind) {
+    els.statusLine.textContent = text || "";
+    els.statusLine.classList.toggle("good", kind === "good");
+    els.statusLine.classList.toggle("bad", kind === "bad");
+  }
+
+  function searchText(el) {
+    const parts = [el.textContent || "", el.dataset.search || "", el.dataset.hotkeyName || ""];
+    el.querySelectorAll("[aria-label], [title], input").forEach((child) => {
+      parts.push(child.getAttribute("aria-label") || "");
+      parts.push(child.getAttribute("title") || "");
+      parts.push(child.id || "");
+      parts.push(child.placeholder || "");
+    });
+    return parts.join(" ").toLowerCase();
+  }
+
+  function clearSearchClasses() {
+    document.querySelectorAll(".search-hidden,.search-hidden-row,.search-hit,.search-match").forEach((el) => {
+      el.classList.remove("search-hidden", "search-hidden-row", "search-hit", "search-match");
+    });
+  }
+
+  function applySettingsSearch() {
+    const query = (els.settingsSearch.value || "").trim().toLowerCase();
+    const searching = query.length > 0;
+    document.body.classList.toggle("is-searching", searching);
+    clearSearchClasses();
+    if (!searching) {
+      els.searchEmpty.classList.remove("is-visible");
+      const active = document.querySelector(".nav-btn.is-active");
+      const pageName = active ? active.dataset.page : "general";
+      document.querySelectorAll(".page").forEach((page) => {
+        page.classList.toggle("is-active", page.id === "page-" + pageName);
+      });
+      setStatus(dirty ? "Settings changed" : "Settings loaded", dirty ? "" : "good");
+      return;
+    }
+
+    releaseHotkeyCapture();
+    closeCombos();
+    let matches = 0;
+    document.querySelectorAll(".nav-btn").forEach((btn) => btn.classList.remove("is-active"));
+    document.querySelectorAll(".page").forEach((page) => {
+      let pageMatched = false;
+      page.querySelectorAll(".form-row,.hotkey-row").forEach((row) => {
+        const hit = searchText(row).includes(query);
+        row.classList.toggle("search-hidden-row", !hit);
+        row.classList.toggle("search-hit", hit);
+        if (hit) {
+          pageMatched = true;
+          matches += 1;
+        }
+      });
+      page.querySelectorAll(".box").forEach((box) => {
+        const rows = Array.from(box.querySelectorAll(".form-row"));
+        const boxMatched = rows.length ? rows.some((row) => !row.classList.contains("search-hidden-row")) : searchText(box).includes(query);
+        box.classList.toggle("search-hidden-row", !boxMatched);
+        if (boxMatched) pageMatched = true;
+      });
+      const hotkeyGrid = page.querySelector(".hotkey-grid");
+      if (hotkeyGrid) {
+        const rowMatched = Array.from(hotkeyGrid.querySelectorAll(".hotkey-row")).some((row) => !row.classList.contains("search-hidden-row"));
+        hotkeyGrid.classList.toggle("search-hidden-row", !rowMatched);
+        if (rowMatched) pageMatched = true;
+      }
+      page.classList.toggle("search-hidden", !pageMatched);
+      const nav = document.querySelector('.nav-btn[data-page="' + page.id.slice(5) + '"]');
+      if (pageMatched && nav) nav.classList.add("search-match");
+    });
+    els.searchEmpty.classList.toggle("is-visible", matches === 0);
+    setStatus(matches ? matches + " matching setting" + (matches === 1 ? "" : "s") : "No matching settings", matches ? "" : "bad");
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + "/" + path, { cache:"no-store", ...(options || {}) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      throw new Error(body.message || body.error || ("HTTP " + res.status));
+    }
+    return body;
+  }
+
+  function settingValueChanged(key) {
+    return JSON.stringify(state[key] ?? null) !== JSON.stringify(originalState[key] ?? null);
+  }
+
+  function needsObsRestart() {
+    const switchingToBongo = settingValueChanged("overlayStyle") && state.overlayStyle === "bongo_cat";
+    return switchingToBongo || Array.from(restartSettingKeys).some(settingValueChanged);
+  }
+
+  function updateApplyButton() {
+    const restart = dirty && needsObsRestart();
+    els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
+    els.applyBtn.classList.toggle("is-primary", restart);
+    els.applyBtn.disabled = !dirty;
+  }
+
+  function markDirty() {
+    dirty = JSON.stringify(state) !== JSON.stringify(originalState);
+    updateApplyButton();
+  }
+
+  function acceptSettings(nextSettings) {
+    Object.assign(state, nextSettings || {});
+    originalState = clone(state);
+    dirty = false;
+    syncUi();
+    dirty = false;
+    els.applyBtn.disabled = true;
+  }
+
+  function comboOptionHtml(option, selectedValue) {
+    const selected = option.value === selectedValue ? " is-selected" : "";
+    const disabled = option.disabled ? " is-disabled" : "";
+    const blurb = option.blurb ? '<span class="option-blurb">- ' + escapeHtml(option.blurb) + '</span>' : "";
+    return '<div class="combo-option' + selected + disabled + '" role="option" data-value="' +
+      escapeHtml(option.value) + '" aria-selected="' + (option.value === selectedValue ? "true" : "false") + '">' +
+      '<span>' + escapeHtml(option.label) + '</span>' + blurb + '</div>';
+  }
+
+  function comboValue(combo) {
+    return combo.dataset.value || "";
+  }
+
+  function comboOptions(combo) {
+    try { return JSON.parse(combo.dataset.options || "[]"); }
+    catch { return []; }
+  }
+
+  function renderCombo(combo) {
+    const options = comboOptions(combo);
+    const value = comboValue(combo);
+    const option = options.find((o) => o.value === value) || options[0] || { label:"" };
+    combo.querySelector(".combo-label").textContent = option.label || "";
+    combo.querySelector(".combo-menu").innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
+  }
+
+  function setComboValue(combo, value, notify) {
+    const options = comboOptions(combo);
+    const selected = options.find((o) => o.value === value && !o.disabled) || options.find((o) => !o.disabled);
+    combo.dataset.value = selected ? selected.value : "";
+    renderCombo(combo);
+    if (notify) combo.dispatchEvent(new CustomEvent("combochange", { bubbles:true }));
+  }
+
+  function fillCombo(combo, options) {
+    combo.dataset.options = JSON.stringify(options || []);
+    setComboValue(combo, comboValue(combo), false);
+  }
+
+  function closeCombos(except) {
+    document.querySelectorAll(".combo.is-open").forEach((combo) => {
+      if (combo !== except) {
+        combo.classList.remove("is-open");
+        combo.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+
+  function openCombo(combo) {
+    closeCombos(combo);
+    combo.classList.add("is-open");
+    combo.setAttribute("aria-expanded", "true");
+  }
+
+  function closeWindow() {
+    releaseHotkeyCapture();
+    fetch(HELPER + "/close-window?title=ReplayKit%20Settings&t=" + Date.now(), {
+      method:"POST",
+      cache:"no-store",
+    }).catch(() => {});
+    window.close();
+    setTimeout(() => {
+      try { window.open("", "_self"); } catch (_) {}
+      try { window.close(); } catch (_) {}
+    }, 25);
+  }
+
+  let hotkeyCaptureActive = false;
+  let hotkeyCapturePending = null;
+  let hotkeyCaptureDesired = false;
+  let activeHotkeyField = null;
+  const hotkeyFields = {
+    clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
+    recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
+  };
+
+  function setHotkeyCapture(active, keepalive) {
+    hotkeyCaptureDesired = !!active;
+    if (!active && hotkeyCapturePending) {
+      return hotkeyCapturePending.finally(() => setHotkeyCapture(false, keepalive));
+    }
+    if (active && hotkeyCaptureActive) return Promise.resolve(true);
+    if (!active && !hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
+    const url = HELPER + "/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now();
+    const request = fetch(url, {
+      method:"POST",
+      cache:"no-store",
+      keepalive:!!keepalive,
+    }).then((res) => res.json()).then((body) => {
+      if (!body || body.ok !== true) throw new Error((body && body.message) || "Hotkey capture failed");
+      if (hotkeyCaptureDesired === !!active) hotkeyCaptureActive = !!active;
+      return true;
+    }).catch(() => false).finally(() => {
+      if (hotkeyCapturePending === request) hotkeyCapturePending = null;
+    });
+    hotkeyCapturePending = request;
+    return request;
+  }
+
+  function beginHotkeyCapture(fieldName) {
+    const field = hotkeyFields[fieldName];
+    if (!field) return;
+    activeHotkeyField = fieldName;
+    field.el.textContent = "Preparing shortcut...";
+    field.el.classList.add("is-empty");
+    setHotkeyCapture(true, false).then((ok) => {
+      if (document.activeElement !== field.el || activeHotkeyField !== fieldName) return;
+      if (comboToLabel(state[fieldName])) {
+        syncHotkeyField(fieldName);
+        return;
+      }
+      field.el.textContent = ok ? "Press shortcut..." : "Could not pause OBS hotkey";
+      field.el.classList.add("is-empty");
+    });
+  }
+
+  function releaseHotkeyCapture(keepalive) {
+    activeHotkeyField = null;
+    if (!hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
+    return setHotkeyCapture(false, keepalive !== false);
+  }
+
+  function beginResizeWindow(e) {
+    e.preventDefault();
+    closeCombos();
+    fetch(HELPER + "/window/resize?title=ReplayKit%20Settings&t=" + Date.now(), {
+      method:"POST",
+      cache:"no-store",
+    }).then((res) => res.json()).then((body) => {
+      if (!body || body.resizing !== true) setStatus("Resize could not start from this OBS window.", "bad");
+    }).catch(() => {
+      setStatus("Resize could not start from this OBS window.", "bad");
+    });
+  }
+
+  function comboToLabel(combo) {
+    combo = combo || {};
+    if (!combo.key) return "";
+    const parts = [];
+    if (combo.control) parts.push("Ctrl");
+    if (combo.alt) parts.push("Alt");
+    if (combo.shift) parts.push("Shift");
+    if (combo.command) parts.push("Win");
+    parts.push(keyLabel(combo.key));
+    return parts.join(" + ");
+  }
+
+  function keyLabel(obsKey) {
+    const named = {
+      OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space",
+      OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc", OBS_KEY_TAB:"Tab",
+      OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
+      OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
+    };
+    if (named[obsKey]) return named[obsKey];
+    if (obsKey.startsWith("OBS_KEY_")) return obsKey.slice(8).replace(/_/g, " ");
+    return obsKey;
+  }
+
+  function obsKeyFromEvent(e) {
+    const k = e.key;
+    if (!k || ["Shift","Control","Alt","Meta"].includes(k)) return "";
+    const byCode = {
+      Backslash:"OBS_KEY_BACKSLASH", Slash:"OBS_KEY_SLASH",
+      Minus:"OBS_KEY_MINUS", Equal:"OBS_KEY_EQUAL",
+      BracketLeft:"OBS_KEY_BRACKETLEFT", BracketRight:"OBS_KEY_BRACKETRIGHT",
+      Semicolon:"OBS_KEY_SEMICOLON", Quote:"OBS_KEY_APOSTROPHE",
+      Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
+    };
+    if (byCode[e.code]) return byCode[e.code];
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
+    if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
+    if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
+    const byKey = {
+      "\\":"OBS_KEY_BACKSLASH", "|":"OBS_KEY_BACKSLASH", "/":"OBS_KEY_SLASH", "?":"OBS_KEY_SLASH", " ":"OBS_KEY_SPACE",
+      "Enter":"OBS_KEY_RETURN", "Escape":"OBS_KEY_ESCAPE", "Tab":"OBS_KEY_TAB",
+      "Delete":"OBS_KEY_DELETE", "Backspace":"OBS_KEY_BACKSPACE",
+      "ArrowUp":"OBS_KEY_UP", "ArrowDown":"OBS_KEY_DOWN",
+      "ArrowLeft":"OBS_KEY_LEFT", "ArrowRight":"OBS_KEY_RIGHT",
+      "-":"OBS_KEY_MINUS", "=":"OBS_KEY_EQUAL", "[":"OBS_KEY_BRACKETLEFT",
+      "]":"OBS_KEY_BRACKETRIGHT", ";":"OBS_KEY_SEMICOLON", "'":"OBS_KEY_APOSTROPHE",
+      ",":"OBS_KEY_COMMA", ".":"OBS_KEY_PERIOD", "`":"OBS_KEY_QUOTELEFT",
+    };
+    return byKey[k] || "";
+  }
+
+  function syncHotkeyField(fieldName) {
+    const field = hotkeyFields[fieldName];
+    if (!field) return;
+    const label = comboToLabel(state[fieldName]);
+    field.el.textContent = label || "";
+    field.el.classList.toggle("is-empty", !label);
+  }
+
+  function syncHotkeyFields() {
+    Object.keys(hotkeyFields).forEach(syncHotkeyField);
+  }
+
+  function readReplaySeconds() {
+    const n = parseInt(els.replaySeconds.value, 10);
+    return Number.isFinite(n) ? Math.max(5, Math.min(600, n)) : 90;
+  }
+
+  function replaySecondsLabel(value) {
+    return String(value) + " s";
+  }
+
+  function syncUi() {
+    setComboValue(els.recordingPreset, state.recordingPreset || "balanced", false);
+    setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
+    setComboValue(els.codecPreference, state.codecPreference || "auto", false);
+    setComboValue(els.overlayStyle, state.overlayStyle || "input_overlay", false);
+    els.replaySeconds.value = replaySecondsLabel(state.replaySeconds || 90);
+    els.clipDir.value = state.clipDir || "";
+    els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
+    els.clipNotificationEnabled.checked = !!state.clipNotificationEnabled;
+    els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
+    els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
+    syncHotkeyFields();
+    markDirty();
+    if ((els.settingsSearch.value || "").trim()) applySettingsSearch();
+  }
+
+  function readUi() {
+    state.recordingPreset = comboValue(els.recordingPreset);
+    state.compressionMode = comboValue(els.compressionMode);
+    state.codecPreference = comboValue(els.codecPreference);
+    state.overlayStyle = comboValue(els.overlayStyle);
+    state.replaySeconds = readReplaySeconds();
+    state.clipNotificationSeconds = state.replaySeconds;
+    state.clipDir = els.clipDir.value.trim();
+    state.obsStartupEnabled = els.obsStartupEnabled.checked;
+    state.clipNotificationEnabled = els.clipNotificationEnabled.checked;
+    state.recordingNotificationEnabled = els.recordingNotificationEnabled.checked;
+    state.trimPreciseDefault = els.trimPreciseDefault.checked;
+  }
+
+  function activatePage(name) {
+    if (name !== "hotkeys") releaseHotkeyCapture();
+    document.querySelectorAll(".nav-btn").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.page === name);
+    });
+    document.querySelectorAll(".page").forEach((page) => {
+      page.classList.toggle("is-active", page.id === "page-" + name);
+    });
+  }
+
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (els.settingsSearch.value) {
+        els.settingsSearch.value = "";
+        applySettingsSearch();
+      }
+      activatePage(btn.dataset.page);
+    });
+  });
+
+  document.querySelectorAll(".combo").forEach((combo) => {
+    combo.querySelector(".combo-button").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (combo.classList.contains("is-open")) closeCombos();
+      else openCombo(combo);
+    });
+    combo.addEventListener("click", (e) => {
+      const option = e.target.closest(".combo-option");
+      if (!option || option.classList.contains("is-disabled")) return;
+      setComboValue(combo, option.dataset.value, true);
+      closeCombos();
+    });
+    combo.addEventListener("keydown", (e) => {
+      const options = comboOptions(combo).filter((o) => !o.disabled);
+      if (!options.length) return;
+      const current = Math.max(0, options.findIndex((o) => o.value === comboValue(combo)));
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (combo.classList.contains("is-open")) closeCombos();
+        else openCombo(combo);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeCombos();
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        const next = options[(current + delta + options.length) % options.length];
+        setComboValue(combo, next.value, true);
+      }
+    });
+  });
+  document.addEventListener("click", () => closeCombos());
+
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.overlayStyle].forEach((combo) => {
+    combo.addEventListener("combochange", () => {
+      readUi();
+      if (combo === els.recordingPreset) {
+        state.compressionMode = compressionByPreset[state.recordingPreset] || "balanced";
+        setComboValue(els.compressionMode, state.compressionMode, false);
+      }
+      markDirty();
+    });
+  });
+
+  [els.replaySeconds, els.clipDir].forEach((input) => {
+    input.addEventListener("input", () => { readUi(); markDirty(); });
+    input.addEventListener("change", () => { readUi(); syncUi(); });
+  });
+
+  [els.obsStartupEnabled, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.trimPreciseDefault].forEach((input) => {
+    input.addEventListener("change", () => { readUi(); markDirty(); });
+  });
+  els.settingsSearch.addEventListener("input", applySettingsSearch);
+
+  document.querySelectorAll("[data-spin]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const step = btn.dataset.spin === "up" ? 5 : -5;
+      els.replaySeconds.value = replaySecondsLabel(Math.max(5, Math.min(600, readReplaySeconds() + step)));
+      readUi();
+      markDirty();
+    });
+  });
+
+  function attachHotkeyField(fieldName) {
+    const field = hotkeyFields[fieldName];
+    field.el.addEventListener("pointerdown", () => { setHotkeyCapture(true, false); });
+    field.el.addEventListener("focus", () => beginHotkeyCapture(fieldName));
+    field.el.addEventListener("blur", () => {
+      releaseHotkeyCapture(true);
+      syncHotkeyField(fieldName);
+    });
+    field.el.addEventListener("keydown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+      if (activeHotkeyField !== fieldName) {
+        activeHotkeyField = fieldName;
+      }
+      if (!hotkeyCaptureActive && !hotkeyCapturePending) {
+        setHotkeyCapture(true, false);
+      }
+      const obsKey = obsKeyFromEvent(e);
+      if (!obsKey) return;
+      const combo = { key:obsKey };
+      if (e.ctrlKey) combo.control = true;
+      if (e.altKey) combo.alt = true;
+      if (e.shiftKey) combo.shift = true;
+      if (e.metaKey) combo.command = true;
+      state[fieldName] = combo;
+      syncHotkeyField(fieldName);
+      markDirty();
+    });
+  }
+
+  function resetHotkey(fieldName) {
+    state[fieldName] = clone(hotkeyFields[fieldName].defaultValue);
+    syncHotkeyField(fieldName);
+    markDirty();
+  }
+
+  function clearHotkey(fieldName) {
+    state[fieldName] = {};
+    syncHotkeyField(fieldName);
+    markDirty();
+  }
+
+  Object.keys(hotkeyFields).forEach(attachHotkeyField);
+  document.getElementById("resetHotkey").addEventListener("click", () => resetHotkey("clipKeybind"));
+  document.getElementById("clearHotkey").addEventListener("click", () => clearHotkey("clipKeybind"));
+  document.getElementById("trashHotkey").addEventListener("click", () => clearHotkey("clipKeybind"));
+  document.getElementById("resetRecordingHotkey").addEventListener("click", () => resetHotkey("recordingKeybind"));
+  document.getElementById("clearRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
+  document.getElementById("trashRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
+  els.resizeGrip.addEventListener("pointerdown", beginResizeWindow);
+
+  async function loadSettings() {
+    setStatus("Loading settings...", "");
+    els.applyBtn.disabled = true;
+    try {
+      const data = await helperJson("settings?t=" + Date.now());
+      fillCombo(els.recordingPreset, data.options.recordingPresets || []);
+      fillCombo(els.compressionMode, data.options.compressionModes || []);
+      fillCombo(els.codecPreference, data.options.codecs || []);
+      fillCombo(els.overlayStyle, data.options.overlays || []);
+      acceptSettings(data.settings || {});
+      setStatus("Settings loaded", "good");
+    } catch (e) {
+      setStatus("Could not load settings: " + (e.message || e), "bad");
+    }
+  }
+
+  async function saveSettings(closeAfter) {
+    readUi();
+    const restartAfterApply = needsObsRestart();
+    els.applyBtn.disabled = true;
+    els.okBtn.disabled = true;
+    setStatus(restartAfterApply ? "Applying settings and restarting OBS..." : "Applying settings...", "");
+    try {
+      await releaseHotkeyCapture(false);
+      const data = await helperJson("settings" + (restartAfterApply ? "?restart=1" : ""), {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify(state),
+      });
+      acceptSettings(data.settings || {});
+      const warnings = data.warnings || [];
+      if (warnings.length) setStatus(warnings.join(" "), "bad");
+      else setStatus(restartAfterApply ? "Settings saved. OBS is restarting..." : "Settings applied", "good");
+      if (closeAfter) closeWindow();
+    } catch (e) {
+      setStatus("Apply failed: " + (e.message || e), "bad");
+      markDirty();
+    } finally {
+      els.okBtn.disabled = false;
+    }
+  }
+
+  async function refreshExternalSettings() {
+    if (dirty || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending) return;
+    try {
+      const data = await helperJson("settings?t=" + Date.now());
+      const next = data.settings || {};
+      if (JSON.stringify(next) !== JSON.stringify(state)) {
+        acceptSettings(next);
+      }
+    } catch (e) {}
+  }
+
+  els.applyBtn.addEventListener("click", () => saveSettings(false));
+  els.okBtn.addEventListener("click", () => saveSettings(true));
+  els.cancelBtn.addEventListener("click", closeWindow);
+  window.addEventListener("pagehide", releaseHotkeyCapture);
+  window.addEventListener("beforeunload", releaseHotkeyCapture);
+  loadSettings();
+  setInterval(refreshExternalSettings, 2000);
+</script>
+</body>
+</html>

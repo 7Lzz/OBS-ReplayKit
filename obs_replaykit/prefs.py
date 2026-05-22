@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from .audio import DEFAULT_DEVICE_ID, DEFAULT_DEVICE_NAME
-from .config import USERPROFILE
+from .config import REPLAYKIT_CONFIG, USERPROFILE
 from .keybind import default_combo
 
 
@@ -20,6 +20,7 @@ def _prefs_dir() -> Path:
 
 PREFS_DIR  = _prefs_dir()
 PREFS_FILE = PREFS_DIR / "prefs.json"
+RUNTIME_SETTINGS_FILE = REPLAYKIT_CONFIG / "scripts" / "replaykit_settings.json"
 
 
 # defaults match the bundled config so an unconfigured run produces the same install the previous version did.
@@ -32,6 +33,8 @@ REPLAY_BUFFER_MIN           = 5
 REPLAY_BUFFER_MAX           = 600
 DEFAULT_OBS_STARTUP         = True
 DEFAULT_CLIP_NOTIFICATION   = True
+DEFAULT_RECORDING_NOTIFICATION = True
+DEFAULT_TRIM_PRECISE        = False
 
 # "auto" picks the best HEVC/H.264 combo the user's GPU can run; the user can
 # force a specific codec for playback support (H.264) or quality/size (AV1 on
@@ -70,10 +73,13 @@ class Preferences:
     replay_buffer_seconds:   int  = DEFAULT_REPLAY_BUFFER_SECS
     recording_path:          str  = field(default_factory=_default_recording_path)
     clip_keybind:            Dict[str, Any] = field(default_factory=default_combo)
+    recording_keybind:       Dict[str, Any] = field(default_factory=dict)
     codec_preference:        str  = DEFAULT_CODEC_PREFERENCE
     compression_mode:        str  = DEFAULT_COMPRESSION_MODE
     obs_startup_enabled:     bool = DEFAULT_OBS_STARTUP
     clip_notification_enabled: bool = DEFAULT_CLIP_NOTIFICATION
+    recording_notification_enabled: bool = DEFAULT_RECORDING_NOTIFICATION
+    trim_precise_default:    bool = DEFAULT_TRIM_PRECISE
 
     def save(self) -> None:
         PREFS_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,23 +91,73 @@ class Preferences:
 
 def _coerce_keybind(value: Any) -> Dict[str, Any]:
     """fall back to the default combo on anything malformed so a corrupted prefs file never blocks startup."""
+    if value == {}:
+        return {}
     if isinstance(value, dict) and isinstance(value.get("key"), str):
         return value
     return default_combo()
+
+
+def _coerce_optional_keybind(value: Any) -> Dict[str, Any]:
+    """recording hotkeys default to none; malformed values stay disabled."""
+    if isinstance(value, dict) and (value == {} or isinstance(value.get("key"), str)):
+        return value
+    return {}
 
 
 def _coerce_bool(value: Any, default: bool) -> bool:
     return value if isinstance(value, bool) else default
 
 
+def _runtime_settings_overlay() -> Dict[str, Any]:
+    """Import settings changed from the in-OBS Custom Controls window."""
+    if not RUNTIME_SETTINGS_FILE.is_file():
+        return {}
+    try:
+        runtime = json.loads(RUNTIME_SETTINGS_FILE.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(runtime, dict):
+        return {}
+
+    mapped: Dict[str, Any] = {}
+    key_map = {
+        "recordingPreset": "recording_preset",
+        "compressionMode": "compression_mode",
+        "codecPreference": "codec_preference",
+        "replaySeconds": "replay_buffer_seconds",
+        "overlayStyle": "overlay_style",
+        "obsStartupEnabled": "obs_startup_enabled",
+        "clipNotificationEnabled": "clip_notification_enabled",
+        "recordingNotificationEnabled": "recording_notification_enabled",
+        "trimPreciseDefault": "trim_precise_default",
+    }
+    for src, dst in key_map.items():
+        if src in runtime:
+            mapped[dst] = runtime[src]
+
+    if "clipDir" in runtime:
+        clip_dir = str(runtime.get("clipDir") or "").strip()
+        mapped["recording_path"] = clip_dir or _default_recording_path()
+    if isinstance(runtime.get("clipKeybind"), dict):
+        mapped["clip_keybind"] = runtime["clipKeybind"]
+    if isinstance(runtime.get("recordingKeybind"), dict):
+        mapped["recording_keybind"] = runtime["recordingKeybind"]
+
+    return mapped
+
+
 def load_prefs() -> Preferences:
     """return saved preferences, or defaults if the file is missing/corrupt."""
-    if not PREFS_FILE.is_file():
-        return Preferences()
-    try:
-        data: Dict[str, Any] = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return Preferences()
+    data: Dict[str, Any] = {}
+    if PREFS_FILE.is_file():
+        try:
+            data = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+    data.update(_runtime_settings_overlay())
 
     codec_pref = data.get("codec_preference", DEFAULT_CODEC_PREFERENCE)
     if codec_pref not in ALLOWED_CODEC_PREFERENCES:
@@ -125,8 +181,11 @@ def load_prefs() -> Preferences:
         replay_buffer_seconds    = int(data.get("replay_buffer_seconds",    DEFAULT_REPLAY_BUFFER_SECS)),
         recording_path           = data.get("recording_path",           _default_recording_path()),
         clip_keybind             = _coerce_keybind(data.get("clip_keybind")),
+        recording_keybind        = _coerce_optional_keybind(data.get("recording_keybind")),
         codec_preference         = codec_pref,
         compression_mode         = compression_mode,
         obs_startup_enabled      = _coerce_bool(data.get("obs_startup_enabled"), DEFAULT_OBS_STARTUP),
         clip_notification_enabled = _coerce_bool(data.get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),
+        recording_notification_enabled = _coerce_bool(data.get("recording_notification_enabled"), DEFAULT_RECORDING_NOTIFICATION),
+        trim_precise_default     = _coerce_bool(data.get("trim_precise_default"), DEFAULT_TRIM_PRECISE),
     )

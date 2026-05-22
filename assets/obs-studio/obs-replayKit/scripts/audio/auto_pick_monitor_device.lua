@@ -65,6 +65,8 @@ local CHECK_DELAY_TICKS = 200 -- ~3.3s at 60fps; enough for wasapi init to log a
 -- ReplayKit renames the render endpoint to this user-facing name during Apply.
 local VIRTUAL_DRIVER_PATTERNS = {
     "obs stream audio",
+    "cable input",
+    "cable in 16ch",
 }
 
 local function w(s)

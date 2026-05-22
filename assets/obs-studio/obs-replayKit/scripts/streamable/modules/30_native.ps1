@@ -85,6 +85,8 @@ public static class StreamableNative {
     [DllImport("user32.dll")]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("gdi32.dll")]
+    static extern IntPtr CreateSolidBrush(int crColor);
     [DllImport("user32.dll", EntryPoint="GetWindowLongPtr", SetLastError=true)]
     static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll", EntryPoint="SetWindowLongPtr", SetLastError=true)]
@@ -93,6 +95,10 @@ public static class StreamableNative {
     static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll", EntryPoint="SetWindowLong", SetLastError=true)]
     static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll", EntryPoint="SetClassLongPtr", SetLastError=true)]
+    static extern IntPtr SetClassLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+    [DllImport("user32.dll", EntryPoint="SetClassLong", SetLastError=true)]
+    static extern int SetClassLong32(IntPtr hWnd, int nIndex, int dwNewLong);
     [ComImport]
     [Guid("56FDF344-FD6D-11d0-958A-006097C9A090")]
     public class CTaskbarList { }
@@ -113,8 +119,21 @@ public static class StreamableNative {
         public int Right;
         public int Bottom;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT {
+        public int X;
+        public int Y;
+    }
     [DllImport("user32.dll")]
     static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")]
+    static extern bool GetCursorPos(out POINT lpPoint);
+    [DllImport("user32.dll")]
+    static extern short GetAsyncKeyState(int vKey);
+    [DllImport("winmm.dll")]
+    static extern uint timeBeginPeriod(uint uPeriod);
+    [DllImport("winmm.dll")]
+    static extern uint timeEndPeriod(uint uPeriod);
     // redrawwindow is the forcing function stylewindow needs to make the dwmsetwindowattribute changes actualy paint on first creation. setwindowpos+swp_framechanged schedules a frame recompute, but cef popups frequently dont honor the async repaint for the non-client area -- you set the attributes, dwm accepts them, but the title bar stays painted in defualt chrome until something else triggers a frame redraw. rdw_frame|rdw_invalidate|rdw_updatenow is the synchronous version and resolves the race.
     [DllImport("user32.dll")]
     static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
@@ -128,18 +147,25 @@ public static class StreamableNative {
     const uint SWP_NOSIZE       = 0x0001;
     const uint SWP_NOMOVE       = 0x0002;
     const uint SWP_NOZORDER     = 0x0004;
+    const uint SWP_NOACTIVATE   = 0x0010;
     const uint SWP_FRAMECHANGED = 0x0020;
     const uint SWP_SHOWWINDOW   = 0x0040;
     const int GWL_EXSTYLE       = -20;
     const int GWLP_HWNDPARENT   = -8;
+    const int GCLP_HBRBACKGROUND = -10;
     const long WS_EX_APPWINDOW  = 0x00040000L;
     const long WS_EX_TOOLWINDOW = 0x00000080L;
+    const int VK_LBUTTON        = 0x01;
     static readonly IntPtr HWND_TOPMOST    = new IntPtr(-1);
     static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
     static object taskbarLock = new object();
     static System.Collections.Generic.HashSet<long> taskbarTabs =
         new System.Collections.Generic.HashSet<long>();
     static ITaskbarList taskbarList = null;
+    static object resizeLock = new object();
+    static System.Collections.Generic.HashSet<long> resizeTracking =
+        new System.Collections.Generic.HashSet<long>();
+    static IntPtr settingsResizeBrush = IntPtr.Zero;
 
     static IntPtr GetWindowLongPtrCompat(IntPtr hWnd, int nIndex) {
         if (IntPtr.Size == 8) return GetWindowLongPtr64(hWnd, nIndex);
@@ -149,6 +175,22 @@ public static class StreamableNative {
     static IntPtr SetWindowLongPtrCompat(IntPtr hWnd, int nIndex, IntPtr value) {
         if (IntPtr.Size == 8) return SetWindowLongPtr64(hWnd, nIndex, value);
         return new IntPtr(SetWindowLong32(hWnd, nIndex, value.ToInt32()));
+    }
+
+    static IntPtr SetClassLongPtrCompat(IntPtr hWnd, int nIndex, IntPtr value) {
+        if (IntPtr.Size == 8) return SetClassLongPtr64(hWnd, nIndex, value);
+        return new IntPtr(SetClassLong32(hWnd, nIndex, value.ToInt32()));
+    }
+
+    static void PrimeResizeBackground(IntPtr hWnd) {
+        if (settingsResizeBrush == IntPtr.Zero) {
+            settingsResizeBrush = CreateSolidBrush(0x00261F1D); // OBS Yami grey7, COLORREF 0x00BBGGRR.
+        }
+        if (settingsResizeBrush != IntPtr.Zero) {
+            SetClassLongPtrCompat(hWnd, GCLP_HBRBACKGROUND, settingsResizeBrush);
+            RedrawWindow(hWnd, IntPtr.Zero, IntPtr.Zero,
+                RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOCHILDREN);
+        }
     }
 
     static void EnsureTaskbarWindow(IntPtr hWnd) {
@@ -325,13 +367,15 @@ public static class StreamableNative {
     static extern IntPtr GetCurrentProcess();
     const int JobObjectExtendedLimitInformation = 9;
     const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+    // breakaway_ok lets a child opt out of the job via create_breakaway_from_job. existing workers (which dont pass that flag) still inherit the job and still get cleaned up on helper exit.
+    const uint JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x0800;
 
-    // create a job object, mark it kill-on-close, and bind the current process to it. children created later via createprocess inherit the job automatically on windows 8+ (no breakaway flag required), so this single call covers every spawned worker. returns the job handle; caller doesnt need to close it -- when the process exits, all handles release, the last reference to the job triggers kill_on_job_close.
+    // create a job object, mark it kill-on-close + breakaway-allowed, and bind the current process to it. children created later via createprocess inherit the job automatically on windows 8+ (no breakaway flag required), so this single call covers every spawned worker. callers that need to outlive helper exit (e.g. the obs restart relauncher) opt out by passing create_breakaway_from_job in createprocess. returns the job handle; caller doesnt need to close it -- when the process exits, all handles release, the last reference to the job triggers kill_on_job_close.
     public static IntPtr CreateKillOnCloseJob() {
         IntPtr hJob = CreateJobObject(IntPtr.Zero, null);
         if (hJob == IntPtr.Zero) return IntPtr.Zero;
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
         int size = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
         IntPtr p = Marshal.AllocHGlobal(size);
         try {
@@ -342,6 +386,68 @@ public static class StreamableNative {
             Marshal.FreeHGlobal(p);
         }
         return hJob;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct STARTUPINFOW {
+        public uint cb;
+        public IntPtr lpReserved;
+        public IntPtr lpDesktop;
+        public IntPtr lpTitle;
+        public uint dwX;
+        public uint dwY;
+        public uint dwXSize;
+        public uint dwYSize;
+        public uint dwXCountChars;
+        public uint dwYCountChars;
+        public uint dwFillAttribute;
+        public uint dwFlags;
+        public ushort wShowWindow;
+        public ushort cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput;
+        public IntPtr hStdOutput;
+        public IntPtr hStdError;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_INFORMATION {
+        public IntPtr hProcess;
+        public IntPtr hThread;
+        public uint dwProcessId;
+        public uint dwThreadId;
+    }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateProcessW(
+        string lpApplicationName,
+        System.Text.StringBuilder lpCommandLine,
+        IntPtr lpProcessAttributes,
+        IntPtr lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        IntPtr lpEnvironment,
+        string lpCurrentDirectory,
+        ref STARTUPINFOW lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
+    // closehandle + sw_hide are already declared earlier in this class. dont redeclare. createprocess flags are scoped here.
+    private const uint CREATE_NO_WINDOW_SPAWN = 0x08000000;
+    private const uint CREATE_BREAKAWAY_FROM_JOB = 0x01000000;
+    private const uint STARTF_USESHOWWINDOW_SPAWN = 0x00000001;
+
+    // spawn a child outside the helpers kill-on-close job so it survives helper exit. used for the obs restart relauncher: helper queues the relaunch, kills obs, then exits -- the relauncher needs to outlive the helper to actualy launch the new obs. create_no_window + startf_useshowwindow/sw_hide gets us zero console flash; create_breakaway_from_job is the actual escape hatch. deliberately not combining with detached_process -- powershell.exe queries its console handle at startup and refuses to run without one. returns the spawned pid, or 0 on failure.
+    public static int SpawnDetached(string commandLine, string workingDirectory) {
+        STARTUPINFOW si = new STARTUPINFOW();
+        si.cb = (uint)Marshal.SizeOf(typeof(STARTUPINFOW));
+        si.dwFlags = STARTF_USESHOWWINDOW_SPAWN;
+        si.wShowWindow = (ushort)SW_HIDE;
+        PROCESS_INFORMATION pi;
+        System.Text.StringBuilder cmd = new System.Text.StringBuilder(commandLine);
+        uint flags = CREATE_NO_WINDOW_SPAWN | CREATE_BREAKAWAY_FROM_JOB;
+        bool ok = CreateProcessW(null, cmd, IntPtr.Zero, IntPtr.Zero, false, flags, IntPtr.Zero, workingDirectory, ref si, out pi);
+        if (!ok) return 0;
+        int pid = (int)pi.dwProcessId;
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        return pid;
     }
 
     // returns a json-style report of relevant sign-in popups so the dock can adjust its status label. [{title,hwnd,visible}, ...] we hide google popups while reporting them so the user never sees a white google window.
@@ -555,6 +661,58 @@ public static class StreamableNative {
         int h = Math.Max(100, r.Bottom - r.Top);
         ShowWindow(hwnd, SW_RESTORE);
         SetWindowPos(hwnd, IntPtr.Zero, r.Left, r.Top, w, h, SWP_NOZORDER);
+        return true;
+    }
+
+    public static bool BeginResizeWindow(string needle) {
+        IntPtr hwnd = FindObsWindow(needle);
+        if (hwnd == IntPtr.Zero) return false;
+        RECT startRect;
+        POINT startPoint;
+        if (!GetWindowRect(hwnd, out startRect)) return false;
+        if (!GetCursorPos(out startPoint)) return false;
+        PrimeResizeBackground(hwnd);
+
+        long key = hwnd.ToInt64();
+        lock (resizeLock) {
+            if (resizeTracking.Contains(key)) return true;
+            resizeTracking.Add(key);
+        }
+
+        System.Threading.Thread t = new System.Threading.Thread(delegate() {
+            bool highResTimer = false;
+            try {
+                highResTimer = (timeBeginPeriod(1) == 0);
+                int startW = Math.Max(760, startRect.Right - startRect.Left);
+                int startH = Math.Max(620, startRect.Bottom - startRect.Top);
+                int lastW = startW;
+                int lastH = startH;
+                while ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) {
+                    POINT pt;
+                    if (!GetCursorPos(out pt)) break;
+                    int w = Math.Max(760, Math.Min(2400, startW + (pt.X - startPoint.X)));
+                    int h = Math.Max(620, Math.Min(1800, startH + (pt.Y - startPoint.Y)));
+                    if (w != lastW || h != lastH) {
+                        SetWindowPos(hwnd, IntPtr.Zero, startRect.Left, startRect.Top, w, h,
+                            SWP_NOZORDER | SWP_NOACTIVATE);
+                        RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero,
+                            RDW_INVALIDATE | RDW_NOCHILDREN);
+                        lastW = w;
+                        lastH = h;
+                    }
+                    System.Threading.Thread.Sleep(1);
+                }
+            } finally {
+                if (highResTimer) {
+                    try { timeEndPeriod(1); } catch {}
+                }
+                lock (resizeLock) {
+                    resizeTracking.Remove(key);
+                }
+            }
+        });
+        t.IsBackground = true;
+        t.Start();
         return true;
     }
 }

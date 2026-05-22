@@ -357,7 +357,7 @@ try {
             # use processstartinfo so we can set workingdirectory to obss install dir (it needs that for relative dll loads).
             $psi = New-Object System.Diagnostics.ProcessStartInfo
             $psi.FileName         = $obsPath
-            $psi.Arguments        = '--background-color=ff272a33 --default-background-color=ff272a33'
+            $psi.Arguments        = '--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays'
             $psi.WorkingDirectory = [System.IO.Path]::GetDirectoryName($obsPath)
             $psi.UseShellExecute  = $true
             [void][System.Diagnostics.Process]::Start($psi)

@@ -765,30 +765,57 @@
   .preview:-webkit-full-screen .progress-bar {
     left: 12px;
     right: 12px;
-    bottom: 56px;
-    height: 4px;
+    bottom: 51px;
+    height: 14px;
     cursor: pointer;
+    background: transparent;
+    border-radius: 0;
+    z-index: 4;
+  }
+  .preview:fullscreen .progress-bar::before,
+  .preview:-webkit-full-screen .progress-bar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    height: 4px;
     background: rgba(255, 255, 255, 0.25);
     border-radius: 2px;
-    z-index: 4;
-    transition: height 80ms linear;
+    transition: top 80ms linear, height 80ms linear;
   }
-  .preview:fullscreen .progress-bar:hover,
-  .preview:-webkit-full-screen .progress-bar:hover { height: 6px; }
+  .preview:fullscreen .progress-bar:hover::before,
+  .preview:-webkit-full-screen .progress-bar:hover::before,
+  .preview:fullscreen .progress-bar.is-scrubbing::before,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing::before {
+    top: 4px;
+    height: 6px;
+  }
   .preview:fullscreen .progress-fill,
   .preview:-webkit-full-screen .progress-fill {
     background: var(--primary_light);
     border-radius: 2px;
     transition: none;
-    position: relative;  /* anchor the scrub dot to the fill's edge */
+    position: absolute;  /* anchor the scrub dot to the fill's edge */
+    left: 0;
+    top: 5px;
+    height: 4px;
     z-index: 2;
+  }
+  .preview:fullscreen .progress-bar:hover .progress-fill,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-fill,
+  .preview:fullscreen .progress-bar.is-scrubbing .progress-fill,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-fill {
+    top: 4px;
+    height: 6px;
   }
   /* youtube-style hover preview fill: a translucent white band that follows the cursors x position along the bar, indicating where a click will seek to. js writes the width onto the element via a css variable on each pointermove; css does the rest. sits behind the real progress fill so it cant visually overpower it when both are present. */
   .preview:fullscreen .progress-hover-fill,
   .preview:-webkit-full-screen .progress-hover-fill {
     display: block;
     position: absolute;
-    left: 0; top: 0; bottom: 0;
+    left: 0; top: 5px;
+    height: 4px;
     width: var(--hover-fill, 0%);
     background: rgba(255, 255, 255, 0.35);
     border-radius: 2px;
@@ -796,11 +823,20 @@
     z-index: 1;
     transition: none;
   }
+  .preview:fullscreen .progress-bar:hover .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-fill,
+  .preview:fullscreen .progress-bar.is-scrubbing .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-hover-fill {
+    top: 4px;
+    height: 6px;
+  }
   .preview .progress-hover-fill { display: none; }
   /* time tooltip floating above the cursor when hovering the bar. */
   .preview .progress-hover-time { display: none; }
   .preview:fullscreen .progress-bar:hover .progress-hover-time,
-  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-time {
+  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-time,
+  .preview:fullscreen .progress-bar.is-scrubbing .progress-hover-time,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-hover-time {
     display: block;
     position: absolute;
     bottom: calc(100% + 6px);
@@ -832,7 +868,9 @@
     transition: transform 80ms ease-out;
   }
   .preview:fullscreen .progress-bar:hover .progress-scrub-dot,
-  .preview:-webkit-full-screen .progress-bar:hover .progress-scrub-dot {
+  .preview:-webkit-full-screen .progress-bar:hover .progress-scrub-dot,
+  .preview:fullscreen .progress-bar.is-scrubbing .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-scrub-dot {
     transform: translateY(-50%) scale(1);
   }
 
@@ -1602,6 +1640,19 @@
   const POLL_IDLE_MS = 1000;
   const CLIPS_FORCE_REFRESH_EVERY = 4;
   const TWO_DAYS_SEC = 2 * 24 * 60 * 60;
+  const replayKitSettings = { trimPreciseDefault: false };
+
+  async function loadReplayKitSettings() {
+    try {
+      const res = await fetch(HELPER + "/settings?t=" + Date.now(), { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok && data.settings) {
+        replayKitSettings.trimPreciseDefault = !!data.settings.trimPreciseDefault;
+      }
+    } catch (_) {}
+  }
+  loadReplayKitSettings();
+  window.addEventListener("focus", loadReplayKitSettings);
 
   // material-style icon svg path data. inlined so we dont pay a round-trip per card. each card duplicates the markup, but each <svg> is ~80 bytes -- not worth a sprite sheet.
   const ICON = {
@@ -1706,6 +1757,7 @@
   let deferredFullscreenRender = false;
   let deferredFullscreenRenderForce = false;
   let pendingLoadedRenderAfterFullscreen = false;
+  let pendingLoadedRenderAfterRename = false;
   const GRID_MIN_COL_WIDTH = 260;
   const GRID_GAP = 14;
   const GRID_SIDE_PADDING = 28;
@@ -1874,6 +1926,10 @@
   function renderLoadedClips(clips) {
     loadedClips = Array.isArray(clips) ? clips : [];
     updateTabs(loadedClips);
+    if (isClipRenameActive()) {
+      pendingLoadedRenderAfterRename = true;
+      return;
+    }
     if (isFullscreenOrHostTransition()) {
       pendingLoadedRenderAfterFullscreen = true;
       deferVirtualRenderUntilFullscreenSettles(true);
@@ -1913,7 +1969,7 @@
   }
 
   let toastTimer = 0;
-  const TOAST_ERROR_MS = 12000;
+  const TOAST_ERROR_MS = 4000;
   function showToast(html, kind) {
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = 0; }
     toastEl.innerHTML = html;
@@ -2173,6 +2229,10 @@
 
   function renderVirtualWindow(force) {
     virtualRenderQueued = false;
+    if (isClipRenameActive()) {
+      pendingLoadedRenderAfterRename = true;
+      return;
+    }
     if (document.hidden || !allClips.length) return;
 
     // If a card inside the grid is currently fullscreened, skip the render
@@ -2793,19 +2853,27 @@
       // only react to the primary mouse button / touch contact -- right-click on a scrubber should never seek.
       if (e.button !== 0 && e.pointerType === "mouse") return;
       scrubbing = true;
+      // keep the bar in its expanded "hovered" look while the user drags. without this the bar collapses the moment the cursor moves vertically off the 14px strip, even though setpointercapture still routes the move events here.
+      progressBar.classList.add("is-scrubbing");
       try { progressBar.setPointerCapture(e.pointerId); } catch {}
+      // pointer capture suppresses the bubbled mousemove on .preview, so the idle-hide timer would fire 2.5s into a drag and yank the whole scrubber out from under the user. bumping idle here (and on every captured move below) keeps the controls visible for the whole drag.
+      bumpIdle();
       seekToPointer(e);
       e.stopPropagation();
       e.preventDefault();
     });
     progressBar.addEventListener("pointermove", (e) => {
       if (!scrubbing) return;
+      bumpIdle();
       seekToPointer(e);
     });
     const endScrub = (e) => {
       if (!scrubbing) return;
       scrubbing = false;
+      progressBar.classList.remove("is-scrubbing");
       try { progressBar.releasePointerCapture(e.pointerId); } catch {}
+      // restart a fresh idle countdown from "now" so the user gets the full 2.5s after they let go.
+      bumpIdle();
     };
     progressBar.addEventListener("pointerup",     endScrub);
     progressBar.addEventListener("pointercancel", endScrub);
@@ -2814,7 +2882,9 @@
     let idleTimer = 0;
     function bumpIdle() {
       preview.classList.remove("is-idle");
-      if (idleTimer) clearTimeout(idleTimer);
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+      // dont arm the idle timer while the user is mid-drag on the scrubber. the drag handler clears it; endscrub re-arms it.
+      if (scrubbing) return;
       idleTimer = setTimeout(() => preview.classList.add("is-idle"), 2500);
     }
     preview.addEventListener("mousemove", () => {
@@ -3170,6 +3240,17 @@
   }
 
   // inline rename replace the .name span with an input, commit on enter / blur, revert on escape. server is asked via post /rename; on success the next poll picks up the new card identity, on failure we restore.
+  function isClipRenameActive() {
+    const input = document.querySelector(".name-edit-input");
+    return !!(input && document.body.contains(input));
+  }
+
+  function flushRenderAfterRename() {
+    if (!pendingLoadedRenderAfterRename || isClipRenameActive()) return;
+    pendingLoadedRenderAfterRename = false;
+    renderLoadedClips(loadedClips);
+  }
+
   function startRename(card) {
     const currentName = card.dataset.name;
     const titleRow = card.querySelector(".title-row");
@@ -3191,6 +3272,7 @@
       if (settled) return;
       settled = true;
       if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+      flushRenderAfterRename();
     }
     async function commit() {
       if (settled) return;
@@ -3214,11 +3296,13 @@
         nameSpan.title       = displayClipName(card.dataset.name);
         syncFavoriteButton(card, card.dataset.name);
         if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+        flushRenderAfterRename();
         scheduleNextPoll(500);
       } catch (e) {
         if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
         showToast("Rename failed: " + (e.message || e));
         scheduleToastHide(TOAST_ERROR_MS);
+        flushRenderAfterRename();
       }
     }
     input.addEventListener("blur", commit);
@@ -3616,6 +3700,10 @@
 
   async function poll() {
     if (document.hidden) return;
+    if (isClipRenameActive()) {
+      scheduleNextPoll(POLL_IDLE_MS);
+      return;
+    }
     // never refresh while a video is in fullscreen. render() reorders cards by moving them thru a documentfragment, which briefly detaches the fullscreened <video> from the dom -- and per the fullscreen api spec, removing the fullscreen element from the document forces an immediate exit. result: the popup would randomly drop out of fullscreen on the next poll tick. just pause polling for the duration of the session; well resume on the next tick after exit.
     if (isFullscreenOrHostTransition()) {
       scheduleNextPoll(POLL_FAST_MS);
@@ -4197,7 +4285,7 @@
     disarmOverwrite();
     trimPreviewActive = false;
     trimSeekDragging = false;
-    trimPrecise.checked = false;
+    trimPrecise.checked = !!replayKitSettings.trimPreciseDefault;
     trimVeil.classList.add("is-open");
     syncTrimPlayIcon();
     // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.

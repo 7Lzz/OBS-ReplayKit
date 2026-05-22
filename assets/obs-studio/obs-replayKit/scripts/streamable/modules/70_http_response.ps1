@@ -92,6 +92,7 @@ function Get-StatusText([int]$code) {
         206 { 'Partial Content' }
         302 { 'Found' }
         400 { 'Bad Request' }
+        403 { 'Forbidden' }
         404 { 'Not Found' }
         405 { 'Method Not Allowed' }
         409 { 'Conflict' }

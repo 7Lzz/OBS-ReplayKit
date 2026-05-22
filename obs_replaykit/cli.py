@@ -240,6 +240,14 @@ def clip_notification_label(prefs: Preferences) -> str:
     return "On" if prefs.clip_notification_enabled else "Off"
 
 
+def recording_notification_label(prefs: Preferences) -> str:
+    return "On" if prefs.recording_notification_enabled else "Off"
+
+
+def trim_precise_label(prefs: Preferences) -> str:
+    return "Precise" if prefs.trim_precise_default else "Fast"
+
+
 def render_menu(prefs: Preferences) -> None:
     clear()
     preset = get_preset(prefs.recording_preset)
@@ -256,6 +264,7 @@ def render_menu(prefs: Preferences) -> None:
     row("OBS config", str(OBS_CONFIG))
     row("OBS install", str(obs_exe) if obs_exe else "OBS was not found")
     row("Clip keybind", combo_to_label(prefs.clip_keybind))
+    row("Recording keybind", combo_to_label(prefs.recording_keybind))
 
     section("Setup overview")
     row("Recording quality", preset.label, preset.description)
@@ -263,25 +272,30 @@ def render_menu(prefs: Preferences) -> None:
     row("GPU detected", gpu_text())
     row("Recording encoder", encoder.label, encoder.description)
     row("Display capture", display_text())
-    row("Replay length", f"{prefs.replay_buffer_seconds} seconds")
+    row("Clip length", f"{prefs.replay_buffer_seconds} seconds")
     row("Save folder", prefs.recording_path)
     row("Microphone", prefs.microphone_name)
     row("Overlay", overlay_label(prefs))
     row("Windows startup", startup_label(prefs), "Start OBS automatically when you sign in.")
-    row("Clip saved popup", clip_notification_label(prefs), "Show a small desktop popup after OBS saves a replay.")
+    row("Clip saved popup", clip_notification_label(prefs), "Show a small desktop popup after saving a clip.")
+    row("Recording popups", recording_notification_label(prefs), "Show a small desktop popup when recording starts or stops.")
+    row("Trim default", trim_precise_label(prefs), "Default clip trimmer mode.")
     row("OBS audio device", audio_status())
 
     section("Change settings")
     menu_line("1", "Recording quality", "resolution, FPS, and visual quality")
     menu_line("2", "GPU load vs file size", "choose lower GPU use or smaller clips")
     menu_line("3", "Recording codec", "auto, H.264, HEVC, or AV1")
-    menu_line("4", "Replay length", "how many seconds the hotkey saves")
+    menu_line("4", "Clip length", "how many seconds the hotkey saves")
     menu_line("5", "Save folder", "where recordings and clips go")
     menu_line("6", "Microphone", "system default or a specific device")
-    menu_line("7", "Clip keybind", "hotkey that saves the replay buffer")
-    menu_line("8", "Overlay", "off, WASD/mouse, or Bongo Cat")
-    menu_line("9", "Windows startup", "turn automatic OBS launch on or off")
-    menu_line("10", "Clip saved popup", "show or hide the replay saved popup")
+    menu_line("7", "Clip keybind", "hotkey that saves a clip")
+    menu_line("8", "Recording keybind", "hotkey that starts and stops recording")
+    menu_line("9", "Overlay", "off, WASD/mouse, or Bongo Cat")
+    menu_line("10", "Windows startup", "turn automatic OBS launch on or off")
+    menu_line("11", "Clip saved popup", "show or hide the clip saved popup")
+    menu_line("12", "Recording popups", "show or hide recording started/stopped popups")
+    menu_line("13", "Trim default", "fast keyframe trim or precise re-encode trim")
     print()
     menu_line("A", "Apply and launch OBS", "write settings, install selected tools, start OBS", C.good)
     menu_line("R", "Clean reset", "remove ReplayKit OBS config and audio device changes", C.bad)
@@ -355,7 +369,7 @@ def choose_codec(prefs: Preferences) -> None:
 
 def choose_replay_length(prefs: Preferences) -> None:
     clear()
-    section("Replay length")
+    section("Clip length")
     row("Current", f"{prefs.replay_buffer_seconds} seconds")
     row("Allowed", f"{REPLAY_BUFFER_MIN}-{REPLAY_BUFFER_MAX} seconds")
     value = prompt("Seconds, or Q to cancel")
@@ -364,10 +378,10 @@ def choose_replay_length(prefs: Preferences) -> None:
     try:
         seconds = int(value)
     except ValueError:
-        pause("Replay length must be a number. Press Enter...")
+        pause("Clip length must be a number. Press Enter...")
         return
     if not (REPLAY_BUFFER_MIN <= seconds <= REPLAY_BUFFER_MAX):
-        pause(f"Replay length must be between {REPLAY_BUFFER_MIN} and {REPLAY_BUFFER_MAX}. Press Enter...")
+        pause(f"Clip length must be between {REPLAY_BUFFER_MIN} and {REPLAY_BUFFER_MAX}. Press Enter...")
         return
     prefs.replay_buffer_seconds = seconds
     prefs.save()
@@ -426,6 +440,28 @@ def choose_keybind(prefs: Preferences) -> None:
     prefs.save()
 
 
+def choose_recording_keybind(prefs: Preferences) -> None:
+    clear()
+    section("Recording keybind")
+    row("Current", combo_to_label(prefs.recording_keybind))
+    print(color("This same key starts and stops OBS recording.", C.dim))
+    print(color("Examples: ctrl+f9, alt+r, f10. Type CLEAR to disable it.", C.dim))
+    value = prompt("New keybind, CLEAR, or Q to cancel")
+    low = value.lower()
+    if low == "q":
+        return
+    if low == "clear":
+        prefs.recording_keybind = {}
+        prefs.save()
+        return
+    combo = parse_combo(value)
+    if combo is None or combo.get("key") is None:
+        pause("Invalid keybind. Press Enter...")
+        return
+    prefs.recording_keybind = combo
+    prefs.save()
+
+
 def input_overlay_menu(prefs: Preferences) -> None:
     clear()
     section("Overlay")
@@ -480,7 +516,7 @@ def choose_windows_startup(prefs: Preferences) -> None:
 def choose_clip_notification(prefs: Preferences) -> None:
     clear()
     section("Clip saved popup")
-    print(color("Choose whether ReplayKit shows a small desktop popup after OBS saves a replay.", C.dim))
+    print(color("Choose whether ReplayKit shows a small desktop popup after OBS saves a clip.", C.dim))
     print()
     option_line("1", "On", "Show a ReplayKit popup like: Saved the last 20s.", prefs.clip_notification_enabled)
     option_line("2", "Off", "Only use the save sound and OBS status.", not prefs.clip_notification_enabled)
@@ -491,6 +527,48 @@ def choose_clip_notification(prefs: Preferences) -> None:
         prefs.save()
     elif choice == "2":
         prefs.clip_notification_enabled = False
+        prefs.save()
+    elif choice.lower() == "q":
+        return
+    else:
+        pause("Invalid choice. Press Enter...")
+
+
+def choose_recording_notification(prefs: Preferences) -> None:
+    clear()
+    section("Recording popups")
+    print(color("Choose whether ReplayKit shows a small desktop popup when OBS recording starts or stops.", C.dim))
+    print()
+    option_line("1", "On", "Show Recording started and Recording stopped popups.", prefs.recording_notification_enabled)
+    option_line("2", "Off", "Only use OBS status for recording state.", not prefs.recording_notification_enabled)
+    cancel_line()
+    choice = prompt()
+    if choice == "1":
+        prefs.recording_notification_enabled = True
+        prefs.save()
+    elif choice == "2":
+        prefs.recording_notification_enabled = False
+        prefs.save()
+    elif choice.lower() == "q":
+        return
+    else:
+        pause("Invalid choice. Press Enter...")
+
+
+def choose_trim_default(prefs: Preferences) -> None:
+    clear()
+    section("Trim default")
+    print(color("Choose the default mode for clip trimming.", C.dim))
+    print()
+    option_line("1", "Fast", "Trim at nearby keyframes without re-encoding.", not prefs.trim_precise_default)
+    option_line("2", "Precise", "Re-encode around the trim points for exact timing.", prefs.trim_precise_default)
+    cancel_line()
+    choice = prompt()
+    if choice == "1":
+        prefs.trim_precise_default = False
+        prefs.save()
+    elif choice == "2":
+        prefs.trim_precise_default = True
         prefs.save()
     elif choice.lower() == "q":
         return
@@ -622,27 +700,23 @@ def run_apply_flow(prefs: Preferences) -> list[str]:
     add("Back up current OBS settings", "Keeps a restore copy before ReplayKit writes the new setup.", lambda: backup_existing_config(log=progress.log) or True)
     add("Prepare OBS settings folder", "Creates the OBS config folder and clears crash-recovery prompts.", lambda: (OBS_CONFIG.mkdir(parents=True, exist_ok=True), cleanup_crash_flags(log=progress.log), True)[-1])
     add("Build ReplayKit helper", "Makes sure the local Clips and controls helper is ready.", lambda: ensure_launcher_built(log=progress.log))
-    add("Write ReplayKit OBS profile", "Applies your quality, replay, encoder, microphone, and overlay choices.", lambda: install_obs_config(prefs, log=progress.log) > 0)
+    add("Write ReplayKit OBS profile", "Applies your quality, clip, encoder, microphone, and overlay choices.", lambda: install_obs_config(prefs, log=progress.log) > 0)
     add("Enable OBS WebSocket", "Lets the Clips and controls windows talk to OBS locally.", lambda: configure_obs_websocket(log=progress.log))
     add("Install Custom Controls and Clips", "Adds the ReplayKit dock and Clips browser files.", lambda: install_obs_custom_dock(log=progress.log) > 0)
     add("Register launcher permission", "Avoids a UAC prompt every time OBS starts ReplayKit.", lambda: install_obs_elevation_task(log=progress.log))
-    add("Allow monitor sleep", "Keeps replay capture running even if the display powers down.", lambda: install_obs_sleep_override(log=progress.log))
+    add("Allow monitor sleep", "Keeps clipping running even if the display powers down.", lambda: install_obs_sleep_override(log=progress.log))
     add("Install video tools", "Downloads or verifies the trim/compress tools used by Clips.", lambda: install_obs_ffmpeg(log=progress.log))
 
-    if prefs.overlay_style == "input_overlay":
-        add(
-            "Install WASD/mouse overlay",
-            "Adds the keyboard and mouse overlay plugin and presets.",
-            lambda: install_input_overlay_plugin(log=progress.log) and install_input_overlay_presets(log=progress.log),
-        )
-    elif prefs.overlay_style == "bongo_cat":
-        add(
-            "Install Bongo Cat overlay",
-            "Adds the Bongo Cat keyboard and mouse overlay plugin.",
-            lambda: install_bongo_cat_plugin(log=progress.log),
-        )
-    else:
-        add("Skip overlay", "Overlay is off for this setup.", lambda: True)
+    add(
+        "Install WASD/mouse overlay",
+        "Adds the keyboard and mouse overlay plugin and presets so Settings can switch to it later.",
+        lambda: install_input_overlay_plugin(log=progress.log) and install_input_overlay_presets(log=progress.log),
+    )
+    add(
+        "Install Bongo Cat overlay",
+        "Adds the Bongo Cat keyboard and mouse overlay plugin so Settings can switch to it later.",
+        lambda: install_bongo_cat_plugin(log=progress.log),
+    )
 
     add("Install desktop audio capture", "Adds clean desktop/game audio capture for OBS.", lambda: install_win_capture_audio(log=progress.log))
     add(
@@ -651,7 +725,7 @@ def run_apply_flow(prefs: Preferences) -> list[str]:
         lambda: ensure_vbcable(log=progress.log),
     )
     add("Select OBS Stream Audio", "Routes OBS monitoring to the ReplayKit audio device.", lambda: set_monitoring_device_to_obs_audio(log=progress.log))
-    add("Prepare clip folders", "Creates the recording and replay folders if needed.", lambda: (ensure_recording_dirs(prefs, log=progress.log), True)[-1])
+    add("Prepare clip folders", "Creates the recording and clip folders if needed.", lambda: (ensure_recording_dirs(prefs, log=progress.log), True)[-1])
     add("Set Windows startup", "Adds or removes OBS from Windows startup based on your setup choice.", lambda: configure_obs_startup(prefs.obs_startup_enabled, log=progress.log))
     add("Launch OBS", "Starts OBS with the updated ReplayKit setup.", lambda: launch_obs(log=progress.log))
 
@@ -702,11 +776,17 @@ def run_cli() -> int:
         elif choice == "7":
             choose_keybind(prefs)
         elif choice == "8":
-            input_overlay_menu(prefs)
+            choose_recording_keybind(prefs)
         elif choice == "9":
-            choose_windows_startup(prefs)
+            input_overlay_menu(prefs)
         elif choice == "10":
+            choose_windows_startup(prefs)
+        elif choice == "11":
             choose_clip_notification(prefs)
+        elif choice == "12":
+            choose_recording_notification(prefs)
+        elif choice == "13":
+            choose_trim_default(prefs)
         elif choice == "a":
             apply_settings(prefs)
         elif choice == "r":

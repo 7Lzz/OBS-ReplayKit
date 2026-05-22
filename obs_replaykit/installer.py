@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from .audio import find_render_endpoint
+from .audio import find_replaykit_monitoring_endpoint
 from .config import BUNDLE_ROOT, OBS_ASSETS_DIR, OBS_CONFIG, TEXT_EXTS, USERNAME, USERPROFILE
 from .dock import verify_dock_install
 from .ffmpeg_install import install_ffmpeg as _install_ffmpeg
@@ -94,10 +94,10 @@ def backup_existing_config(log: LogFn = None) -> Optional[Path]:
 
 def set_monitoring_device_to_obs_audio(log: LogFn = None) -> bool:
     """Point OBS audio monitoring at OBS Stream Audio before the first launch."""
-    device_id = find_render_endpoint(OBS_AUDIO_FRIENDLY_NAME)
-    if device_id is None:
+    device = find_replaykit_monitoring_endpoint()
+    if device is None:
         if log:
-            log(f"(couldn't find render endpoint '{OBS_AUDIO_FRIENDLY_NAME}' - leaving monitoring at Default)")
+            log(f"(couldn't find an active '{OBS_AUDIO_FRIENDLY_NAME}' render endpoint - leaving monitoring at Default)")
         return False
 
     basic_ini = OBS_CONFIG / "basic" / "profiles" / "Untitled" / "basic.ini"
@@ -111,13 +111,13 @@ def set_monitoring_device_to_obs_audio(log: LogFn = None) -> bool:
     except UnicodeDecodeError:
         text = basic_ini.read_text(encoding="latin-1")
 
-    text = set_ini_value(text, "Audio", "MonitoringDeviceId",   device_id)
-    text = set_ini_value(text, "Audio", "MonitoringDeviceName", OBS_AUDIO_FRIENDLY_NAME)
+    text = set_ini_value(text, "Audio", "MonitoringDeviceId",   device.device_id)
+    text = set_ini_value(text, "Audio", "MonitoringDeviceName", device.name)
     basic_ini.write_text(text, encoding="utf-8")
 
     if log:
-        log(f"set monitoring device -> {OBS_AUDIO_FRIENDLY_NAME}")
-        log(f"    id: {device_id}")
+        log(f"set monitoring device -> {device.name}")
+        log(f"    id: {device.device_id}")
     return True
 
 

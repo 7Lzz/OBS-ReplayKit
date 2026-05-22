@@ -1,0 +1,18 @@
+{
+  "recordingPreset": "balanced",
+  "compressionMode": "balanced",
+  "codecPreference": "auto",
+  "replaySeconds": 90,
+  "clipDir": "",
+  "clipKeybind": {
+    "shift": true,
+    "key": "OBS_KEY_BACKSLASH"
+  },
+  "recordingKeybind": {},
+  "overlayStyle": "input_overlay",
+  "obsStartupEnabled": true,
+  "clipNotificationEnabled": true,
+  "recordingNotificationEnabled": true,
+  "clipNotificationSeconds": 90,
+  "trimPreciseDefault": false
+}

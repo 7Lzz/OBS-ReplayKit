@@ -188,6 +188,8 @@ def combo_to_label(combo: Dict[str, object]) -> str:
 
 def to_basic_ini_value(combo: Dict[str, object]) -> str:
     """serialise the combo into the exact json obs writes for ReplayBuffer. compact form: no whitespace, modifiers before key, only true-valued modifiers emitted."""
+    if not combo or "key" not in combo:
+        return json.dumps({"ReplayBuffer.Save": []}, separators=(",", ":"))
     ordered: Dict[str, object] = {}
     for mod in _MOD_ORDER:
         if combo.get(mod):
@@ -195,6 +197,19 @@ def to_basic_ini_value(combo: Dict[str, object]) -> str:
     ordered["key"] = combo["key"]
     inner = json.dumps(ordered, separators=(",", ":"))
     return json.dumps({"ReplayBuffer.Save": [json.loads(inner)]}, separators=(",", ":"))
+
+
+def to_obs_hotkey_value(combo: Dict[str, object]) -> str:
+    """serialise a frontend OBS hotkey value such as OBSBasic.StartRecording."""
+    if not combo or "key" not in combo:
+        return json.dumps({"bindings": []}, separators=(",", ":"))
+    ordered: Dict[str, object] = {}
+    for mod in _MOD_ORDER:
+        if combo.get(mod):
+            ordered[mod] = True
+    ordered["key"] = combo["key"]
+    inner = json.dumps(ordered, separators=(",", ":"))
+    return json.dumps({"bindings": [json.loads(inner)]}, separators=(",", ":"))
 
 
 def from_basic_ini_value(text: str) -> Optional[Dict[str, object]]:

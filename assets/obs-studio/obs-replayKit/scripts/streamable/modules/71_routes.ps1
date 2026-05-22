@@ -1,4 +1,62 @@
 ﻿# request dispatcher.
+function Get-ReplayKitRunningObsPath {
+    $procs = @(Get-Process -Name @('obs64', 'obs32', 'obs') -ErrorAction SilentlyContinue)
+    foreach ($p in $procs) {
+        try {
+            if ($p.Path) { return [string]$p.Path }
+        } catch {}
+    }
+    foreach ($p in $procs) {
+        try {
+            $cim = Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction SilentlyContinue
+            if ($cim -and $cim.ExecutablePath) { return [string]$cim.ExecutablePath }
+        } catch {}
+    }
+    return $null
+}
+
+function Stop-ReplayKitObsForRestart([string]$reason) {
+    Start-Sleep -Milliseconds 300
+    $procs = @(Get-Process -Name @('obs64', 'obs32', 'obs', 'obs-browser-page') -ErrorAction SilentlyContinue)
+    foreach ($p in $procs) {
+        try { Stop-Process -Id $p.Id -Force -ErrorAction Stop } catch {
+            Write-Log "${reason}: Stop-Process PID $($p.Id) failed: $($_.Exception.Message)"
+        }
+    }
+    $script:State.Shutdown = $true
+}
+
+# spawn restart_obs.ps1 outside our kill-on-close job so it lives past helper exit. the in-process finally-block relaunch was unreliable -- by the time obs is dead and the cookie wait completes, this powershell host has often been torn down already (parent-process watchdog exit, abandoned-mutex on takeover, etc.) and never reaches the launch line. doing the relaunch from a sibling process owned by the os instead of by us is the only way to make it survive every shutdown path.
+function Start-DetachedObsRelauncher([string]$obsPath, [int]$obsPid) {
+    $scriptDir = Get-ScriptDir
+    if ([string]::IsNullOrWhiteSpace($scriptDir)) { return $false }
+    $scriptPath = Join-Path $scriptDir 'restart_obs.ps1'
+    if (-not (Test-Path -LiteralPath $scriptPath)) {
+        Write-Log "Start-DetachedObsRelauncher: missing $scriptPath"
+        return $false
+    }
+    # build the command line the same way createprocess expects it: argv[0] quoted, args appended. powershell.exe is resolved off path; we deliberately do not hardcode the system32 location so 32/64-bit launches both work.
+    $psExe = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+    if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell.exe' }
+    $cmd = '"' + $psExe + '"' +
+           ' -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $scriptPath + '"' +
+           ' -ObsPath "' + $obsPath + '"' +
+           ' -ObsPid ' + [string]$obsPid
+    try {
+        # $pid is an automatic variable in powershell -- use a different name for the child pid we get back.
+        $relauncherPid = [StreamableNative]::SpawnDetached($cmd, $scriptDir)
+        if ($relauncherPid -le 0) {
+            Write-Log "Start-DetachedObsRelauncher: SpawnDetached returned 0"
+            return $false
+        }
+        Write-Log "Start-DetachedObsRelauncher: PID $relauncherPid will relaunch '$obsPath' after this OBS exits."
+        return $true
+    } catch {
+        Write-Log "Start-DetachedObsRelauncher threw: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Dispatch-Request($stream, [hashtable]$req) {
     Load-Config
 
@@ -15,6 +73,75 @@ function Dispatch-Request($stream, [hashtable]$req) {
         '^/(?:controls\.html)?$' { Serve-Html $stream 'controls.html'; return }
         '^/controls_app\.html$' { Serve-Html $stream 'controls_app.html'; return }
         '^/clips-view$|^/clips\.html$' { Serve-Html $stream 'clips.html'; return }
+        '^/settings-view$|^/settings\.html$' { Serve-Html $stream 'settings.html'; return }
+        '^/settings$' {
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            if ($req.Method -eq 'GET') {
+                try {
+                    Send-Json $stream 200 (Get-ReplayKitSettingsPayload)
+                } catch {
+                    Send-Json $stream 500 @{ ok = $false; message = $_.Exception.Message }
+                }
+                return
+            }
+            if ($req.Method -eq 'POST') {
+                try {
+                    $restartRequested = $query.ContainsKey('restart') -and [string]$query['restart'] -eq '1'
+                    $result = Save-ReplayKitSettingsFromRequest ([string]$req.Body) $restartRequested
+                    if ([bool]$result.restartRequired) {
+                        $obsPath = $null
+                        $obsTargetPid = 0
+                        $obsPath = Get-ReplayKitRunningObsPath
+                        if (-not $obsPath) {
+                            Send-Json $stream 500 @{ ok = $false; message = 'Could not locate OBS executable path to relaunch from.' }
+                            return
+                        }
+                        # parent pid is the obs64 instance we want gone before relaunching. fall back to scanning for an obs process if we somehow lost the parent reference.
+                        if ($script:ParentPid -gt 0) {
+                            $obsTargetPid = [int]$script:ParentPid
+                        } else {
+                            $found = @(Get-Process -Name @('obs64', 'obs32', 'obs') -ErrorAction SilentlyContinue) | Select-Object -First 1
+                            if ($found) { $obsTargetPid = [int]$found.Id }
+                        }
+                        # spawn the relauncher BEFORE killing obs. it lives outside our job (create_breakaway_from_job) and will block on waitforexit of the obs pid we pass it, so the new obs launches the moment the old one is gone -- regardless of whether this helper made it to its finally block.
+                        $detached = Start-DetachedObsRelauncher $obsPath $obsTargetPid
+                        if (-not $detached) {
+                            # fallback: keep the old in-process path so users on a stale install (missing restart_obs.ps1, or a build without spawndetached) still get a relaunch attempt, even if it is less reliable.
+                            $script:RestartAfterClean = @{ obsPath = $obsPath }
+                            Write-Log "/settings: detached relauncher unavailable; queued legacy in-process restart for '$obsPath'."
+                        } else {
+                            Write-Log "/settings: detached relauncher armed for '$obsPath' (target PID $obsTargetPid)."
+                        }
+                        Send-Json $stream 200 $result
+                        Stop-ReplayKitObsForRestart '/settings'
+                        return
+                    }
+                    Send-Json $stream 200 $result
+                } catch {
+                    Send-Json $stream 400 @{ ok = $false; message = $_.Exception.Message }
+                }
+                return
+            }
+            Send-Text $stream 405 'Method Not Allowed' 'GET or POST required'
+            return
+        }
+        '^/settings/hotkey-capture$' {
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            $active = $query.ContainsKey('active') -and [string]$query['active'] -eq '1'
+            try {
+                Send-Json $stream 200 (Set-ReplayKitHotkeyCapture $active)
+            } catch {
+                Send-Json $stream 500 @{ ok = $false; message = $_.Exception.Message }
+            }
+            return
+        }
         '^/signin-windows-status$' {
             # returns visible sign-in popups owned by obss process family so the dock can update its status label. with overlay=1, the google oauth popup is moved onto the streamable login window so the flow presents as one window while preserving streamables popup-based oauth.
             if ($req.Method -ne 'GET') { Send-Text $stream 405 'Method Not Allowed' 'GET required'; return }
@@ -116,6 +243,19 @@ animation:r 0.8s linear infinite}
             Send-Json $stream 200 @{ ok = $true; focused = [bool]$focused }
             return
         }
+        '^/close-window$' {
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            $title = if ($query.ContainsKey('title')) { [string]$query['title'] } else { '' }
+            if ($title -ne 'ReplayKit Settings') {
+                Send-Json $stream 400 @{ ok = $false; message = 'Unsupported window title.' }
+                return
+            }
+            $ownerPid = if ($script:ParentPid) { [uint32]$script:ParentPid } else { [uint32]0 }
+            $closed = 0
+            try { $closed = [StreamableNative]::CloseWindowsByTitle(@($title), $ownerPid) } catch {}
+            Send-Json $stream 200 @{ ok = $true; closed = [int]$closed }
+            return
+        }
         '^/window/maximize$' {
             # server-side maximize for a dock-spawned popup. called from clips.html when the user enters fullscreen on a clip so the host window fills the screen. js in cef cant resize its own host, hence the win32 round-trip. the native side snapshots the original rect so /window/restore can put it back unless the user manually unmaximized or dragged the host while fullscreened.
             $title = if ($query.ContainsKey('title')) { $query['title'] } else { 'Clips' }
@@ -130,6 +270,18 @@ animation:r 0.8s linear infinite}
             $restored = $false
             try { $restored = [StreamableNative]::RestoreObsWindow($title) } catch {}
             Send-Json $stream 200 @{ ok = $true; restored = [bool]$restored }
+            return
+        }
+        '^/window/resize$' {
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            $title = if ($query.ContainsKey('title')) { [string]$query['title'] } else { '' }
+            if ($title -ne 'ReplayKit Settings') {
+                Send-Json $stream 400 @{ ok = $false; message = 'Unsupported window title.' }
+                return
+            }
+            $resizing = $false
+            try { $resizing = [StreamableNative]::BeginResizeWindow($title) } catch {}
+            Send-Json $stream 200 @{ ok = $true; resizing = [bool]$resizing }
             return
         }
         '^/open_clips$' {
@@ -514,15 +666,7 @@ animation:r 0.8s linear infinite}
         '^/restart-obs-clean$' {
             # full-cycle "force re-login": note the obs executable path before we kill it wipe the helpers saved auth state immediately send the response so the dock can react forcibly close obs64 + every obs-browser-page child set shutdown = true so our accept loop exits and the finally block runs the cookie cleanup (which needs the file unlocked, which happens once obs is dead) the finally block then re-launches obs via the path we saved, inheriting our admin token
             if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
-            $obs = Get-Process obs64 -ErrorAction SilentlyContinue | Select-Object -First 1
-            $obsPath = $null
-            if ($obs) { $obsPath = $obs.Path }
-            if (-not $obsPath) {
-                try {
-                    $cim = Get-CimInstance Win32_Process -Filter "ProcessId=$($obs.Id)" -ErrorAction SilentlyContinue
-                    if ($cim) { $obsPath = $cim.ExecutablePath }
-                } catch {}
-            }
+            $obsPath = Get-ReplayKitRunningObsPath
             if (-not $obsPath) {
                 Send-Json $stream 500 @{ ok = $false; message = 'Could not locate OBS executable path to relaunch from.' }
                 return
@@ -535,14 +679,7 @@ animation:r 0.8s linear infinite}
             Send-Json $stream 200 @{ ok = $true; message = 'OBS will restart with a clean Streamable session.' }
 
             # give the response a moment to flush before we kill obs (otherwise the docks fetch sees a torn connection).
-            Start-Sleep -Milliseconds 300
-            $procs = @(Get-Process obs64,obs-browser-page -ErrorAction SilentlyContinue)
-            foreach ($p in $procs) {
-                try { Stop-Process -Id $p.Id -Force -ErrorAction Stop } catch {
-                    Write-Log "Stop-Process PID $($p.Id) failed: $($_.Exception.Message)"
-                }
-            }
-            $script:State.Shutdown = $true
+            Stop-ReplayKitObsForRestart '/restart-obs-clean'
             return
         }
     }

@@ -8,6 +8,8 @@ ffi.cdef[[
 ]]
 
 local DEFAULT_SOUND_BASENAME = "replay_buffer_saved"
+local DEFAULT_RECORDING_START_SOUND_BASENAME = "recording_start_saved"
+local DEFAULT_RECORDING_STOP_SOUND_BASENAME = "recording_ended_saved"
 local MCI_ALIAS = "obs_replay_buffer_saved_alert"
 local SUPPORTED_EXTS = {
     ".wav", ".mp3", ".m4a", ".aac", ".wma", ".mid", ".midi"
@@ -24,9 +26,11 @@ local SND_NODEFAULT = 0x00000002
 local SND_FILENAME = 0x00020000
 
 local active_audio_file = ""
+local active_recording_start_audio_file = ""
+local active_recording_stop_audio_file = ""
 
 local function log(level, message)
-    obs.script_log(level, "[ReplayBufferSound] " .. tostring(message))
+    obs.script_log(level, "[ClipSound] " .. tostring(message))
 end
 
 local function join_path(dir, name)
@@ -55,9 +59,9 @@ local function is_supported(path)
     return false
 end
 
-local function find_default_sound()
+local function find_default_sound(basename)
     for _, ext in ipairs(SUPPORTED_EXTS) do
-        local candidate = join_path(script_path(), DEFAULT_SOUND_BASENAME .. ext)
+        local candidate = join_path(script_path(), basename .. ext)
         if file_exists(candidate) then
             return candidate
         end
@@ -65,17 +69,17 @@ local function find_default_sound()
     return ""
 end
 
-local function resolve_sound(path)
+local function resolve_sound(path, default_basename)
     path = tostring(path or "")
     if path ~= "" then
         if not is_supported(path) then
             log(obs.LOG_WARNING, "Unsupported audio type: " .. path)
-            return find_default_sound()
+            return find_default_sound(default_basename)
         end
         if file_exists(path) then return path end
         log(obs.LOG_WARNING, "Configured audio file is missing: " .. path)
     end
-    return find_default_sound()
+    return find_default_sound(default_basename)
 end
 
 local function mci_quote(path)
@@ -123,11 +127,15 @@ end
 local function on_event(event)
     if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED then
         play_sound(active_audio_file)
+    elseif event == obs.OBS_FRONTEND_EVENT_RECORDING_STARTED then
+        play_sound(active_recording_start_audio_file)
+    elseif event == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED then
+        play_sound(active_recording_stop_audio_file)
     end
 end
 
 function script_description()
-    return "Plays a local audio alert after OBS saves a replay-buffer clip."
+    return "Plays local audio alerts after OBS saves a clip or recording starts/stops."
 end
 
 function script_properties()
@@ -135,7 +143,23 @@ function script_properties()
     obs.obs_properties_add_path(
         props,
         "audio_file",
-        "Replay saved sound",
+        "Clip saved sound",
+        obs.OBS_PATH_FILE,
+        "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
+        script_path()
+    )
+    obs.obs_properties_add_path(
+        props,
+        "recording_start_audio_file",
+        "Recording started sound",
+        obs.OBS_PATH_FILE,
+        "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
+        script_path()
+    )
+    obs.obs_properties_add_path(
+        props,
+        "recording_stop_audio_file",
+        "Recording stopped sound",
         obs.OBS_PATH_FILE,
         "Audio Files (*.wav *.mp3 *.m4a *.aac *.wma *.mid *.midi);;All Files (*.*)",
         script_path()
@@ -144,9 +168,23 @@ function script_properties()
 end
 
 function script_update(settings)
-    active_audio_file = resolve_sound(obs.obs_data_get_string(settings, "audio_file"))
+    active_audio_file = resolve_sound(obs.obs_data_get_string(settings, "audio_file"), DEFAULT_SOUND_BASENAME)
+    active_recording_start_audio_file = resolve_sound(
+        obs.obs_data_get_string(settings, "recording_start_audio_file"),
+        DEFAULT_RECORDING_START_SOUND_BASENAME
+    )
+    active_recording_stop_audio_file = resolve_sound(
+        obs.obs_data_get_string(settings, "recording_stop_audio_file"),
+        DEFAULT_RECORDING_STOP_SOUND_BASENAME
+    )
     if active_audio_file == "" then
-        log(obs.LOG_WARNING, "No replay-buffer sound file found. Add replay_buffer_saved.wav/mp3/etc. beside this script or set a custom file.")
+        log(obs.LOG_WARNING, "No clip sound file found. Add replay_buffer_saved.wav/mp3/etc. beside this script or set a custom file.")
+    end
+    if active_recording_start_audio_file == "" then
+        log(obs.LOG_WARNING, "No recording started sound file found. Add recording_start_saved.wav/mp3/etc. beside this script or set a custom file.")
+    end
+    if active_recording_stop_audio_file == "" then
+        log(obs.LOG_WARNING, "No recording stopped sound file found. Add recording_ended_saved.wav/mp3/etc. beside this script or set a custom file.")
     end
 end
 

@@ -241,7 +241,7 @@ end
 local function save_replay()
     if obs.obs_frontend_replay_buffer_save then
         obs.obs_frontend_replay_buffer_save()
-        log(obs.LOG_INFO, "Saved replay buffer from ReplayKit menu.")
+        log(obs.LOG_INFO, "Saved clip from ReplayKit menu.")
     end
 end
 
@@ -319,7 +319,7 @@ function script_load(settings)
 
     if obs.obs_frontend_add_tools_menu_item then
         obs.obs_frontend_add_tools_menu_item(
-            "ReplayKit: Save Replay",
+            "ReplayKit: Save Clip",
             on_save_replay_menu_clicked
         )
         obs.obs_frontend_add_tools_menu_item(

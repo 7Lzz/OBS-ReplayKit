@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('clip', 'recording-started', 'recording-stopped')][string]$Kind = 'clip',
     [ValidateRange(1, 600)][int]$Seconds = 90,
     [ValidateRange(500, 10000)][int]$DurationMs = 3200
 )
@@ -8,7 +9,11 @@ $ErrorActionPreference = 'Stop'
 try {
     Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 
-    $message = "Saved the last ${Seconds}s"
+    $message = switch ($Kind) {
+        'clip' { "Saved the last ${Seconds}s" }
+        'recording-started' { 'Recording started' }
+        'recording-stopped' { 'Recording stopped' }
+    }
     $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

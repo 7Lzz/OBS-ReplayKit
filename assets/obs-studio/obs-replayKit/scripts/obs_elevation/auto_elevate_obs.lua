@@ -17,6 +17,7 @@ ffi.cdef[[
 
     HANDLE GetCurrentProcess();
     DWORD  GetCurrentProcessId();
+    const char* GetCommandLineA();
     DWORD  GetModuleFileNameA(void* hModule, char* lpFilename, DWORD nSize);
     BOOL   CloseHandle(HANDLE hObject);
 
@@ -58,6 +59,7 @@ local SW_HIDE                 = 0
 local SEE_MASK_NOCLOSEPROCESS = 0x00000040
 
 local OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
+local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
 
 -- name of the task scheduler entry the obs replaykit installer registers. keep in sync with task_name in obs_replaykit/scheduled_task.py. if this constant ever changes both sides have to move at once or the no-uac path silently degrades to shellexecuteex (which still works, but the friends uac popup comes back).
 local SCHTASKS_TASK_NAME = "OBSReplayKit-Elevate"
@@ -87,6 +89,12 @@ local function is_elevated()
     kernel32.CloseHandle(token[0])
     if ok == 0 then return false end
     return elevation[0] ~= 0
+end
+
+local function has_required_obs_flag()
+    local cmd = kernel32.GetCommandLineA()
+    if cmd == nil then return false end
+    return ffi.string(cmd):lower():find(REQUIRED_OBS_FLAG, 1, true) ~= nil
 end
 
 -- write the runtime obs path + pid into the handoff file the elevated wscript will read. returns true on success, false otherwise; the caller treats a failed write as "fall back to uac flow".
@@ -168,8 +176,11 @@ local function launch_helper_uac(helper_path, obs_pid)
 end
 
 function script_load(settings)
-    if is_elevated() then
-        print("[ElevateOBS] Already running as administrator - nothing to do.")
+    local elevated = is_elevated()
+    local has_flag = has_required_obs_flag()
+
+    if elevated and has_flag then
+        print("[ElevateOBS] Already elevated with ReplayKit OBS flags - nothing to do.")
         return
     end
 
@@ -187,7 +198,11 @@ function script_load(settings)
     local obs_pid = tonumber(kernel32.GetCurrentProcessId()) or 0
 
     -- preferred path: scheduled task fires the relauncher elevated without a uac popup. apply registers the task once during install; this branch covers every subsequent launch.
-    print("[ElevateOBS] Not elevated - attempting silent elevation via scheduled task...")
+    if not elevated then
+        print("[ElevateOBS] Not elevated - attempting silent elevation via scheduled task...")
+    else
+        print("[ElevateOBS] Missing required OBS launch flag - relaunching with ReplayKit flags...")
+    end
     if try_scheduled_task(obs_pid) then return end
 
     -- fall back to the original shellexecuteex flow only if the scheduled task path fails (task missing becuase the user is on a bundle older than the task-installer, or becuase they deleted it from task scheduler manually).

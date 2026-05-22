@@ -70,7 +70,7 @@ def install_sleep_override(log: LogFn = None) -> bool:
 
     if log:
         log(f"sleep override installed ({_OBS_EXE_NAME} -> {_DISPLAY_FLAG} requests ignored)")
-        log("monitors can now power off while OBS is open; replay buffer / streams")
+        log("monitors can now power off while OBS is open; clipping / streams")
         log("keep running (SYSTEM/AWAYMODE locks left intact).")
     return True
 
