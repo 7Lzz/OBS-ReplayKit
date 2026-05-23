@@ -63,11 +63,24 @@ local BLACKLIST_FILE   = APPDATA .. "\\obs-studio\\monitor_picker_blacklist.txt"
 local CHECK_DELAY_TICKS = 200 -- ~3.3s at 60fps; enough for wasapi init to log a failure
 
 -- ReplayKit renames the render endpoint to this user-facing name during Apply.
-local VIRTUAL_DRIVER_PATTERNS = {
-    "obs stream audio",
-    "cable input",
-    "cable in 16ch",
+local MONITOR_STATUS = {
+    pending = true,
+    ready = false,
+    failed = false,
+    device_name = nil,
+    device_id = nil,
+    message = "not started",
 }
+_G.ReplayKitMonitorPicker = MONITOR_STATUS
+
+local function set_monitor_status(kind, message, name, obs_id)
+    MONITOR_STATUS.pending = (kind == "pending")
+    MONITOR_STATUS.ready = (kind == "ready")
+    MONITOR_STATUS.failed = (kind == "failed")
+    MONITOR_STATUS.device_name = name
+    MONITOR_STATUS.device_id = obs_id
+    MONITOR_STATUS.message = message or ""
+end
 
 local function w(s)
     local buf = ffi.new("WCHAR[?]", #s + 1)
@@ -161,10 +174,39 @@ end
 
 local function virtual_priority(name)
     local lower = name:lower()
-    for i, pat in ipairs(VIRTUAL_DRIVER_PATTERNS) do
-        if lower:find(pat, 1, true) then return i end
+    if lower == "obs stream audio" then
+        return 0
+    end
+    if lower:find("obs stream audio", 1, true) and not lower:find("loopback", 1, true) then
+        return 10
+    end
+    if lower:find("cable input", 1, true) then
+        return 20
+    end
+    if lower:find("cable in 16ch", 1, true) then
+        return 30
     end
     return 999
+end
+
+local function add_virtual_candidates(out, seen, devices, blacklist, source_name)
+    local added = 0
+    for _, d in ipairs(devices) do
+        if d.active and not blacklist[d.obs_id] then
+            local rank = virtual_priority(d.name)
+            if rank < 999 and not seen[d.obs_id] then
+                seen[d.obs_id] = true
+                out[#out + 1] = {
+                    name = d.name,
+                    obs_id = d.obs_id,
+                    rank = rank,
+                    source = source_name,
+                }
+                added = added + 1
+            end
+        end
+    end
+    return added
 end
 
 local function read_blacklist()
@@ -258,6 +300,7 @@ local function stop_without_change()
     print("[MonitorPicker] OBS Stream Audio was not available.")
     print("[MonitorPicker] Open OBS Settings > Audio > Advanced > Monitoring Device")
     print("[MonitorPicker] and select 'OBS Stream Audio'.")
+    set_monitor_status("failed", "OBS Stream Audio was not available")
     state.done = true
 end
 
@@ -269,6 +312,7 @@ local function try_next()
     end
     local c = state.candidates[state.current_idx]
     state.current_name, state.current_obs_id = c.name, c.obs_id
+    set_monitor_status("pending", "trying " .. c.name, c.name, c.obs_id)
     if not obs.obs_set_audio_monitoring_device(c.name, c.obs_id) then
         print(string.format("[MonitorPicker] OBS rejected #%d %s - blacklisting", state.current_idx, c.name))
         add_to_blacklist(c.obs_id, c.name)
@@ -291,24 +335,31 @@ function script_tick(seconds)
         try_next()
     else
         print(string.format("[MonitorPicker] '%s' is working - clean audio to Discord, no local echo", state.current_name))
+        set_monitor_status("ready", "OBS Stream Audio monitoring device is active", state.current_name, state.current_obs_id)
         state.done = true
     end
 end
 
 function script_load(_settings)
+    set_monitor_status("pending", "selecting OBS Stream Audio")
     state.log_path = current_log_path()
-    local devices = enumerate_obs_monitoring_devices()
     local blacklist = read_blacklist()
 
     local candidates = {}
-    for _, d in ipairs(devices) do
-        if d.active and not blacklist[d.obs_id] then
-            local rank = virtual_priority(d.name)
-            if rank < 999 then
-                candidates[#candidates + 1] = { name = d.name, obs_id = d.obs_id, rank = rank }
-            end
+    local seen = {}
+
+    local obs_devices = enumerate_obs_monitoring_devices()
+    add_virtual_candidates(candidates, seen, obs_devices, blacklist, "OBS")
+
+    if #candidates == 0 then
+        print("[MonitorPicker] OBS did not expose OBS Stream Audio - checking Windows render endpoints.")
+        local render_devices = enumerate_render_endpoints()
+        local added = add_virtual_candidates(candidates, seen, render_devices, blacklist, "Windows")
+        if added > 0 then
+            print(string.format("[MonitorPicker] Windows render endpoint fallback found %d candidate(s).", added))
         end
     end
+
     table.sort(candidates, function(a, b)
         if a.rank == b.rank then return a.name < b.name end
         return a.rank < b.rank
@@ -323,7 +374,7 @@ function script_load(_settings)
 
     print(string.format("[MonitorPicker] %d virtual sink candidate(s):", #candidates))
     for i, c in ipairs(candidates) do
-        print(string.format("  %d. (rank %d) %s", i, c.rank, c.name))
+        print(string.format("  %d. (rank %d, %s) %s", i, c.rank, c.source, c.name))
     end
     try_next()
 end

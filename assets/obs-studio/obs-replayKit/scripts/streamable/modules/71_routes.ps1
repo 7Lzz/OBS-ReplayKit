@@ -74,6 +74,7 @@ function Dispatch-Request($stream, [hashtable]$req) {
         '^/controls_app\.html$' { Serve-Html $stream 'controls_app.html'; return }
         '^/clips-view$|^/clips\.html$' { Serve-Html $stream 'clips.html'; return }
         '^/settings-view$|^/settings\.html$' { Serve-Html $stream 'settings.html'; return }
+        '^/update-prompt$|^/update-prompt\.html$' { Serve-Html $stream 'update_prompt.html'; return }
         '^/settings$' {
             if (-not (Test-ReplayKitSettingsOrigin $req)) {
                 Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
@@ -139,6 +140,51 @@ function Dispatch-Request($stream, [hashtable]$req) {
                 Send-Json $stream 200 (Set-ReplayKitHotkeyCapture $active)
             } catch {
                 Send-Json $stream 500 @{ ok = $false; message = $_.Exception.Message }
+            }
+            return
+        }
+        '^/update/check$' {
+            if ($req.Method -ne 'GET' -and $req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'GET or POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            Send-Json $stream 200 (Get-ReplayKitUpdateStatus)
+            return
+        }
+        '^/update/auto-check$' {
+            if ($req.Method -ne 'GET' -and $req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'GET or POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            Send-Json $stream 200 (Get-ReplayKitAutoUpdateStatus)
+            return
+        }
+        '^/update/apply$' {
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            Send-Json $stream 200 (Invoke-ReplayKitApplyUpdate)
+            return
+        }
+        '^/update/later$' {
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            try {
+                $version = if ($query.ContainsKey('version')) { [string]$query['version'] } else { '' }
+                if ([string]::IsNullOrWhiteSpace($version) -and -not [string]::IsNullOrWhiteSpace([string]$req.Body)) {
+                    $body = ConvertTo-PlainHash (ConvertFrom-Json ([string]$req.Body))
+                    if ($body.ContainsKey('version')) { $version = [string]$body['version'] }
+                }
+                Send-Json $stream 200 (Set-ReplayKitUpdatePromptDismissed $version)
+            } catch {
+                Send-Json $stream 400 @{ ok = $false; message = $_.Exception.Message }
             }
             return
         }
@@ -246,7 +292,7 @@ animation:r 0.8s linear infinite}
         '^/close-window$' {
             if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
             $title = if ($query.ContainsKey('title')) { [string]$query['title'] } else { '' }
-            if ($title -ne 'ReplayKit Settings') {
+            if (@('ReplayKit Settings', 'ReplayKit Update') -notcontains $title) {
                 Send-Json $stream 400 @{ ok = $false; message = 'Unsupported window title.' }
                 return
             }

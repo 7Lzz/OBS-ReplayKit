@@ -25,6 +25,7 @@ $script:HelperModules = @(
     '60_media.ps1',
     '61_obs_websocket.ps1',
     '62_replaykit_settings.ps1',
+    '63_update.ps1',
     '70_http_response.ps1',
     '71_routes.ps1',
     '80_connection.ps1',

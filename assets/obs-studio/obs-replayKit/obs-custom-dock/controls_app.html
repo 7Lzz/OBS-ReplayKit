@@ -247,7 +247,7 @@
         <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
       </div>
     </div>
-    <button class="btn" id="settings-btn">Settings</button>
+    <button class="btn" id="settings-btn">Custom Settings</button>
   </div>
 
 <script>
@@ -273,6 +273,8 @@
 
   const POLL_ACTIVE_MS = 1000;
   const POLL_IDLE_MS = 5000;
+  const UPDATE_AUTO_CHECK_INITIAL_MS = 8000;
+  const UPDATE_AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
   const S = Object.freeze({
     IDLE: "idle",
@@ -507,6 +509,7 @@
   // hold a reference to the popup so subsequent clicks can refocus it instead of re-navigating window.open() against the same name (which would reload the page and lose scroll position, active filter, fullscreen state, etc.). if the reference is gone (dock reloaded since the popup was opened), the native focus call still raises the window -- the helper finds it by title.
   let clipsWindow = null;
   let settingsWindow = null;
+  let updateWindow = null;
 
   function styleSettingsTaskbarWindow() {
     fetch(HELPER_HTTP_URL + "style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(),
@@ -516,6 +519,52 @@
   function focusSettingsWindowNative() {
     fetch(HELPER_HTTP_URL + "focus-window?title=ReplayKit%20Settings&t=" + Date.now(),
           { cache: "no-store" }).catch(() => {});
+  }
+
+  function styleUpdatePromptWindow() {
+    fetch(HELPER_HTTP_URL + "style-window?title=ReplayKit%20Update&taskbar=1&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  function focusUpdatePromptWindowNative() {
+    fetch(HELPER_HTTP_URL + "focus-window?title=ReplayKit%20Update&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  function openUpdatePrompt(data) {
+    if (updateWindow && !updateWindow.closed) {
+      try { updateWindow.focus(); } catch (_) {}
+      focusUpdatePromptWindowNative();
+      return;
+    }
+    const version = data && data.latestVersion ? encodeURIComponent(data.latestVersion) : "";
+    updateWindow = window.open(
+      HELPER_HTTP_URL + "update-prompt" + (version ? "?version=" + version : ""),
+      "replaykit_update_prompt",
+      "popup=yes,width=520,height=300"
+    );
+    if (!updateWindow) {
+      focusUpdatePromptWindowNative();
+      return;
+    }
+    try { updateWindow.focus(); } catch (_) {}
+    [80, 250, 750, 1500, 3000].forEach((delay) => {
+      setTimeout(styleUpdatePromptWindow, delay);
+    });
+  }
+
+  async function runAutoUpdateCheck() {
+    try {
+      const data = await helperJson("update/auto-check?t=" + Date.now());
+      if (data && data.ok && data.prompt) openUpdatePrompt(data);
+    } catch (_) {}
+  }
+
+  function scheduleAutoUpdateChecks() {
+    setTimeout(() => {
+      runAutoUpdateCheck();
+      setInterval(runAutoUpdateCheck, UPDATE_AUTO_CHECK_INTERVAL_MS);
+    }, UPDATE_AUTO_CHECK_INITIAL_MS);
   }
 
   settingsBtn.addEventListener("click", () => {
@@ -617,6 +666,7 @@
   });
 
   pollStatus().then(schedulePoll);
+  scheduleAutoUpdateChecks();
 
   // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
   const authBtn    = document.getElementById("auth-btn");

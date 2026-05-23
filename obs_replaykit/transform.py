@@ -314,6 +314,8 @@ def _apply_streamable_settings(settings: dict, prefs: Preferences) -> None:
     settings["clip_notification_enabled"] = bool(getattr(prefs, "clip_notification_enabled", True))
     settings["recording_notification_enabled"] = bool(getattr(prefs, "recording_notification_enabled", True))
     settings["clip_notification_seconds"] = int(prefs.replay_buffer_seconds)
+    settings["clip_sound_volume"] = int(getattr(prefs, "clip_sound_volume", 100))
+    settings["recording_sound_volume"] = int(getattr(prefs, "recording_sound_volume", 100))
 
 
 def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
@@ -334,6 +336,8 @@ def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
         "recordingNotificationEnabled": bool(prefs.recording_notification_enabled),
         "clipNotificationSeconds": int(prefs.replay_buffer_seconds),
         "trimPreciseDefault": bool(prefs.trim_precise_default),
+        "clipSoundVolume": int(getattr(prefs, "clip_sound_volume", 100)),
+        "recordingSoundVolume": int(getattr(prefs, "recording_sound_volume", 100)),
     }, indent=2)
 
 

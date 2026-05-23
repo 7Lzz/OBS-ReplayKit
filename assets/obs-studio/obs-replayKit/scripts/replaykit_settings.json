@@ -14,5 +14,9 @@
   "clipNotificationEnabled": true,
   "recordingNotificationEnabled": true,
   "clipNotificationSeconds": 90,
-  "trimPreciseDefault": false
+  "trimPreciseDefault": false,
+  "autoUpdateEnabled": true,
+  "lastUpdatePromptVersion": "",
+  "clipSoundVolume": 100,
+  "recordingSoundVolume": 100
 }

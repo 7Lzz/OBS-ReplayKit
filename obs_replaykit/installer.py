@@ -2,12 +2,14 @@
 
 import shutil
 import subprocess
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
+from . import __version__
 from .audio import find_replaykit_monitoring_endpoint
-from .config import BUNDLE_ROOT, OBS_ASSETS_DIR, OBS_CONFIG, TEXT_EXTS, USERNAME, USERPROFILE
+from .config import BUNDLE_ROOT, OBS_ASSETS_DIR, OBS_CONFIG, REPLAYKIT_CONFIG, TEXT_EXTS, USERNAME, USERPROFILE
 from .dock import verify_dock_install
 from .ffmpeg_install import install_ffmpeg as _install_ffmpeg
 from .pathrewrite import rewrite_user_paths
@@ -42,6 +44,16 @@ def _install_file(src: Path, rel: Path, dst: Path, prefs: Preferences) -> None:
         shutil.copy2(src, dst)
 
 
+def write_replaykit_version(log: LogFn = None) -> Path:
+    """Write the installed ReplayKit runtime version used by the updater."""
+    path = REPLAYKIT_CONFIG / "version.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"version": __version__}, indent=2) + "\n", encoding="utf-8")
+    if log:
+        log(f"ReplayKit version -> {__version__}")
+    return path
+
+
 def install_obs_config(prefs: Preferences, log: LogFn = None) -> int:
     """mirror assets/obs-studio/ into %appdata%/obs-studio/. returns the file count."""
     if not OBS_ASSETS_DIR.is_dir():
@@ -59,6 +71,73 @@ def install_obs_config(prefs: Preferences, log: LogFn = None) -> int:
         if log:
             log(f"-> {rel.as_posix()}")
         count += 1
+    write_replaykit_version(log=log)
+    cleanup_replaykit_legacy_files(log=log)
+    return count
+
+
+_RUNTIME_PRESERVE_RELS = {
+    Path("obs-replayKit/scripts/replaykit_settings.json"),
+}
+
+_RUNTIME_DELETE_RELS = {
+    Path("obs-replayKit/scripts/replay_buffer/replay_buffer_saved.mp3"),
+}
+
+
+def cleanup_replaykit_legacy_files(log: LogFn = None) -> int:
+    """Remove ReplayKit-managed files that were renamed or retired."""
+    removed = 0
+    for rel in _RUNTIME_DELETE_RELS:
+        target = OBS_CONFIG / rel
+        try:
+            if target.exists() and target.is_file():
+                target.unlink()
+                removed += 1
+                if log:
+                    log(f"removed legacy: {rel.as_posix()}")
+        except OSError as exc:
+            if log:
+                log(f"warn: could not remove legacy {rel.as_posix()}: {exc}")
+    return removed
+
+
+def _install_runtime_file(src: Path, rel: Path, dst: Path) -> None:
+    """Copy one ReplayKit runtime file for update mode without applying user prefs."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if src.suffix.lower() in TEXT_EXTS:
+        try:
+            content = src.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = src.read_text(encoding="latin-1")
+        dst.write_text(rewrite_user_paths(content, USERNAME), encoding="utf-8")
+    else:
+        shutil.copy2(src, dst)
+
+
+def install_replaykit_runtime_update(log: LogFn = None) -> int:
+    """Refresh only ReplayKit-managed runtime files, preserving user OBS config/state."""
+    runtime_src = OBS_ASSETS_DIR / "obs-replayKit"
+    if not runtime_src.is_dir():
+        raise FileNotFoundError(f"ReplayKit runtime assets not found: {runtime_src}")
+
+    count = 0
+    for src in runtime_src.rglob("*"):
+        if src.is_dir():
+            continue
+        rel = Path("obs-replayKit") / src.relative_to(runtime_src)
+        dst = OBS_CONFIG / rel
+        if rel in _RUNTIME_PRESERVE_RELS and dst.exists():
+            if log:
+                log(f"preserve: {rel.as_posix()}")
+            continue
+        _install_runtime_file(src, rel, dst)
+        if log:
+            log(f"-> {rel.as_posix()}")
+        count += 1
+
+    write_replaykit_version(log=log)
+    cleanup_replaykit_legacy_files(log=log)
     return count
 
 

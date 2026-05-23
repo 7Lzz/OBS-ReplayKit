@@ -17,6 +17,11 @@ echo [1/4] Checking PyInstaller ...
 %PY% -m PyInstaller --version >nul 2>nul
 if errorlevel 1 goto :no_pyinstaller
 
+rem obs_replaykit\__init__.py is the single source of truth for release version.
+echo Syncing bundled ReplayKit version ...
+%PY% -c "import json,pathlib,obs_replaykit; p=pathlib.Path('assets/obs-studio/obs-replayKit/version.json'); p.write_text(json.dumps({'version': obs_replaykit.__version__}, indent=2) + '\n', encoding='utf-8'); print('    ReplayKit version ' + obs_replaykit.__version__)"
+if errorlevel 1 goto :build_fail
+
 rem use upx only when it is already on path. otherwise build without compression instead of downloading tools into the repo.
 echo [2/4] Locating UPX ...
 set "UPX_ARG=--noupx"
@@ -78,6 +83,9 @@ if exist "OBSReplayKit.spec" del   /Q   "OBSReplayKit.spec"
 
 set "EXE_PATH=%CD%\OBSReplayKit.exe"
 if not exist "%EXE_PATH%" goto :build_fail
+echo Generating release hash ...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-FileHash -LiteralPath '%EXE_PATH%' -Algorithm SHA256).Hash + '  OBSReplayKit.exe' | Set-Content -LiteralPath '%EXE_PATH%.sha256' -Encoding ASCII"
+if errorlevel 1 goto :build_fail
 for %%I in ("%EXE_PATH%") do set /a "EXE_MB=%%~zI / 1048576"
 for %%I in ("%EXE_PATH%") do set "EXE_BYTES=%%~zI"
 
@@ -86,6 +94,7 @@ echo ============================================================
 echo  Build complete.
 echo ============================================================
 echo  Output:  %EXE_PATH%
+echo  Hash:    %EXE_PATH%.sha256
 echo  Size:    ~%EXE_MB% MB  (%EXE_BYTES% bytes)
 echo  UPX:     %UPX_STATUS%
 echo.

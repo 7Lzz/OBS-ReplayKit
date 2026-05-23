@@ -888,7 +888,7 @@
     transition: opacity 200ms linear;
   }
 
-  /* title row (name + edit pencil + 3-dot menu) */
+  /* title row (name + edit pencil + delete + 3-dot menu) */
   .title-row {
     display: flex;
     align-items: center;
@@ -938,10 +938,57 @@
   }
   .icon-mini-btn:hover { color: var(--text); background: var(--button_bg_hover); }
   .icon-mini-btn svg   { width: 14px; height: 14px; fill: currentColor; display: block; }
+  .title-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .icon-mini-btn.delete-btn {
+    color: var(--red);
+    overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: width 140ms ease, color 80ms linear, background-color 80ms linear;
+  }
+  .icon-mini-btn.delete-btn:hover {
+    color: #ff6b82;
+    background: rgba(227, 59, 87, 0.16);
+  }
+  .icon-mini-btn.delete-btn svg {
+    transition: width 140ms ease, opacity 80ms linear;
+  }
+  .delete-confirm-text {
+    display: inline-block;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    transform: translateX(-4px);
+    transition: max-width 140ms ease, opacity 80ms linear, transform 140ms ease;
+  }
+  /* armed state: the trash icon has been clicked once and is waiting for a second click to confirm. */
+  .icon-mini-btn.delete-btn.is-armed,
+  .icon-mini-btn.delete-btn.is-armed:hover {
+    width: 64px;
+    background: var(--red);
+    color: #FFFFFF;
+  }
+  .icon-mini-btn.delete-btn.is-armed svg {
+    width: 0;
+    opacity: 0;
+  }
+  .icon-mini-btn.delete-btn.is-armed .delete-confirm-text {
+    max-width: 48px;
+    opacity: 1;
+    transform: translateX(0);
+  }
 
   /* dropdown for the 3-dot menu. positioned beneath its trigger, only visible when .is-open. closes on outside click (wired in js). */
-  /* margin-left:auto eats whatever space is left over after the name + pencil, pinning the 3-dot menu to the right edge. */
-  .menu-container { position: relative; flex-shrink: 0; margin-left: auto; }
+  .menu-container { position: relative; flex-shrink: 0; }
   .menu-dropdown {
     position: absolute;
     top: calc(100% + 4px);
@@ -974,19 +1021,6 @@
     flex-shrink: 0;
   }
   .menu-item:hover { background: var(--button_bg_hover); }
-  .menu-item.danger { color: var(--red); }
-  .menu-item.danger:hover {
-    color: #ff6b82;
-    background: rgba(227, 59, 87, 0.16);
-  }
-  /* armed state: the menu item has been clicked once and is waiting for a second click to confirm. filled red background + white text so the second-click target visually matches a "destructive" button -- theres no way to miss that another click commits. */
-  .menu-item.danger.is-armed,
-  .menu-item.danger.is-armed:hover {
-    background: var(--red);
-    color: #FFFFFF;
-    font-weight: 600;
-  }
-  .menu-item.danger.is-armed svg { fill: #FFFFFF; }
 
   /* link icon inside action buttons */
   .btn .btn-icon {
@@ -1423,7 +1457,7 @@
     color: var(--text_muted);
     line-height: 1.4;
   }
-  /* sits between the filename and the mode cards. visible warning that this flow replaces the source file -- the per-card blurbs talk about encode strategy, this one-liner makes the destructive nature of the operation impossible to miss. matches the .menu-item.danger color so destructive actions read consistently across the dock. */
+  /* sits between the filename and the mode cards. visible warning that this flow replaces the source file -- the per-card blurbs talk about encode strategy, this one-liner makes the destructive nature of the operation impossible to miss. matches other destructive actions across the dock. */
   .compress-mode-warning {
     font-size: 12px;
     color: var(--red);
@@ -2086,6 +2120,7 @@
     card.classList.remove("menu-open");
     const menu = card.querySelector(".menu-dropdown");
     if (menu) menu.classList.remove("is-open");
+    resetDeleteButton(card.querySelector(".delete-btn"));
     const preview = card.querySelector(".preview");
     if (preview) preview.classList.remove("is-playing", "is-idle");
     const progress = card.querySelector(".progress-fill");
@@ -2537,6 +2572,32 @@
     return lastClipsByName.get(name) || loadedClips.find(c => c && c.name === name) || null;
   }
 
+  function resetDeleteButton(btn) {
+    if (!btn) return;
+    if (btn._deleteArmTimer) {
+      clearTimeout(btn._deleteArmTimer);
+      btn._deleteArmTimer = 0;
+    }
+    btn.classList.remove("is-armed");
+    btn.title = "Delete clip";
+    btn.setAttribute("aria-label", "Delete clip");
+  }
+
+  function resetAllArmedDeleteButtons(exceptBtn) {
+    document.querySelectorAll(".delete-btn.is-armed").forEach((btn) => {
+      if (btn !== exceptBtn) resetDeleteButton(btn);
+    });
+  }
+
+  function armDeleteButton(btn) {
+    if (!btn) return;
+    resetDeleteButton(btn);
+    btn.classList.add("is-armed");
+    btn.title = "Click again to delete";
+    btn.setAttribute("aria-label", "Click again to delete");
+    btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
+  }
+
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card";
@@ -2662,27 +2723,29 @@
           <button class="icon-mini-btn edit-btn" title="Rename" type="button">
             <svg viewBox="0 0 24 24">${ICON.EDIT}</svg>
           </button>
-          <div class="menu-container">
-            <button class="icon-mini-btn menu-btn" title="More options" type="button">
-              <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
+          <div class="title-actions">
+            <button class="icon-mini-btn delete-btn" title="Delete clip" aria-label="Delete clip" type="button">
+              <svg viewBox="0 0 24 24">${ICON.TRASH}</svg>
+              <span class="delete-confirm-text">Delete?</span>
             </button>
-            <div class="menu-dropdown">
-              <div class="menu-item open-folder-item">Open file location</div>
-              <div class="menu-item trim-clip-item">
-                <svg viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
-                <span>Trim clip</span>
-              </div>
-              <div class="menu-item clipboard-clip-item">
-                <svg viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
-                <span>Copy to clipboard</span>
-              </div>
-              <div class="menu-item compress-clip-item">
-                <svg viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
-                <span>Compress&hellip;</span>
-              </div>
-              <div class="menu-item danger delete-clip-item">
-                <svg viewBox="0 0 24 24">${ICON.TRASH}</svg>
-                <span>Delete clip</span>
+            <div class="menu-container">
+              <button class="icon-mini-btn menu-btn" title="More options" type="button">
+                <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
+              </button>
+              <div class="menu-dropdown">
+                <div class="menu-item open-folder-item">Open file location</div>
+                <div class="menu-item trim-clip-item">
+                  <svg viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
+                  <span>Trim clip</span>
+                </div>
+                <div class="menu-item clipboard-clip-item">
+                  <svg viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
+                  <span>Copy to clipboard</span>
+                </div>
+                <div class="menu-item compress-clip-item">
+                  <svg viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
+                  <span>Compress&hellip;</span>
+                </div>
               </div>
             </div>
           </div>
@@ -2707,7 +2770,7 @@
     const menuBtn      = card.querySelector(".menu-btn");
     const menuDropdown = card.querySelector(".menu-dropdown");
     const openFolderEl = card.querySelector(".open-folder-item");
-    const deleteClipEl = card.querySelector(".delete-clip-item");
+    const deleteClipEl = card.querySelector(".delete-btn");
 
     favoriteBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -3112,6 +3175,7 @@
     // 3-dot menu
     menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      resetAllArmedDeleteButtons();
       document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
         if (d !== menuDropdown) {
           d.classList.remove("is-open");
@@ -3132,36 +3196,18 @@
         });
       } catch {}
     });
-    // two-click delete confirmation directly inside the menu, no browser confirm() dialog. first click flips the menu item into an "are you sure click to confirm" state for 3 seconds; second click within that window actualy deletes. click anywhere else / wait it out / press escape cancels with no destructive action.
-    let deleteArmed = false;
-    let deleteArmTimer = 0;
-    const deleteLabel = deleteClipEl.querySelector("span");
-    const deleteIcon  = deleteClipEl.querySelector("svg");
-    const _resetDeleteState = () => {
-      deleteArmed = false;
-      if (deleteArmTimer) { clearTimeout(deleteArmTimer); deleteArmTimer = 0; }
-      deleteClipEl.classList.remove("is-armed");
-      if (deleteLabel) deleteLabel.textContent = "Delete";
-    };
-    // reset whenever the menu closes -- otherwise a stale armed state from a previous open would surprise the next opener with a one-click delete. hook into the same toggles that show/hide it.
-    const menuObserver = new MutationObserver(() => {
-      if (!menuDropdown.classList.contains("is-open")) _resetDeleteState();
-    });
-    menuObserver.observe(menuDropdown, { attributes: true, attributeFilter: ["class"] });
-
+    // two-click delete confirmation on the trash icon, no browser confirm() dialog. first click arms the icon for 3 seconds; second click within that window actualy deletes. click anywhere else / wait it out cancels with no destructive action.
     deleteClipEl.addEventListener("click", (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      if (!deleteArmed) {
-        deleteArmed = true;
-        deleteClipEl.classList.add("is-armed");
-        if (deleteLabel) deleteLabel.textContent = "Click again to delete";
-        // 3 s arm window. long enough for a confident user to commit, short enough that a forgotten arm doesnt lie in wait for the next menu open. the mutationobserver above also resets it as soon as the menu closes.
-        deleteArmTimer = setTimeout(_resetDeleteState, 3000);
+      closeAllMenus();
+      resetAllArmedDeleteButtons(deleteClipEl);
+      if (!deleteClipEl.classList.contains("is-armed")) {
+        // 3 s arm window. long enough for a confident user to commit, short enough that a forgotten arm doesnt lie in wait.
+        armDeleteButton(deleteClipEl);
         return;
       }
-      _resetDeleteState();
-      menuDropdown.classList.remove("is-open");
-      card.classList.remove("menu-open");
+      resetDeleteButton(deleteClipEl);
       deleteClip(card);
     });
     card.querySelector(".trim-clip-item").addEventListener("click", (e) => {
@@ -3209,7 +3255,7 @@
   async function deleteClip(card) {
     const filename = card.dataset.name;
     if (!filename) return;
-    // confirmation now happens inline in the menu (the "click again to delete" two-click pattern wired up in rendercard). by the time this runs the user has explicitly clicked delete twice, so a redundant browser confirm() would be condescending.
+    // confirmation now happens on the trash icon (the two-click pattern wired up in rendercard). by the time this runs the user has explicitly clicked delete twice, so a redundant browser confirm() would be condescending.
     try {
       const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(filename), {
         method: "POST", cache: "no-store",
@@ -3321,11 +3367,18 @@
     });
   }
   document.addEventListener("mousedown", (e) => {
-    if (e.target.closest(".menu-btn, .menu-dropdown")) return;
+    if (e.target.closest(".menu-btn, .menu-dropdown, .delete-btn")) return;
     closeAllMenus();
+    resetAllArmedDeleteButtons();
   });
-  document.documentElement.addEventListener("mouseleave", closeAllMenus);
-  window.addEventListener("blur", closeAllMenus);
+  document.documentElement.addEventListener("mouseleave", () => {
+    closeAllMenus();
+    resetAllArmedDeleteButtons();
+  });
+  window.addEventListener("blur", () => {
+    closeAllMenus();
+    resetAllArmedDeleteButtons();
+  });
 
   // defensive: explicitly exit fullscreen on esc. browsers normally handle this themselves at the chrome level, but on some chromium builds the built-in gesture can get lost (especially in popup windows opened via window.open). this makes esc work unconditionally as long as the keydown reaches the document. also: pressing space on the fullscreen <video> should play/pause -- without this handler the focused fullscreen button receives the space activation and toggles fullscreen off instead. try to exit the current fullscreen element. returns true if we were in fullscreen and an exit was requested, false otherwise. centralised here becuase three diffrent inputs trigger the same action (esc key, f key while fullscreen, back mouse button).
   function tryExitFullscreen() {

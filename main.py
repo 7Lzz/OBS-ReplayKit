@@ -8,10 +8,14 @@ from obs_replaykit.fast_exit import fast_exit, install_console_close_handler
 install_console_close_handler()
 
 from obs_replaykit.cli import run_cli
+from obs_replaykit.update import try_run_update_from_argv
 
 
 def main() -> int:
     try:
+        update_rc = try_run_update_from_argv()
+        if update_rc is not None:
+            return update_rc
         return run_cli()
     except KeyboardInterrupt:
         return 1

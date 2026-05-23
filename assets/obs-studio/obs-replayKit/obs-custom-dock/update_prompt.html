@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Update</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico" />
+<style>
+  :root {
+    --window:#1D1F26;
+    --panel:#272A33;
+    --field:#3C404D;
+    --line:#5B6273;
+    --selected:#284CB8;
+    --selected2:#476BD7;
+    --text:#ffffff;
+    --muted:#969696;
+    --bad:#ff8da0;
+    --good:#9bd88f;
+    --font:"Segoe UI",system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%;
+    height:100%;
+    min-width:420px;
+    min-height:240px;
+    margin:0;
+    overflow:hidden;
+    background:var(--window);
+    color:var(--text);
+    font:13px var(--font);
+    user-select:none;
+  }
+  button { font:inherit; }
+  .shell {
+    width:100vw;
+    height:100vh;
+    display:grid;
+    grid-template-rows:1fr auto;
+    background:var(--window);
+    padding:14px;
+  }
+  .content {
+    background:var(--panel);
+    border-radius:4px;
+    padding:18px 18px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    min-height:0;
+  }
+  .title {
+    font-size:18px;
+    font-weight:700;
+    line-height:1.25;
+  }
+  .body {
+    color:var(--text);
+    line-height:1.45;
+  }
+  .meta {
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+  }
+  .status {
+    min-height:18px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.4;
+  }
+  .status.good { color:var(--good); }
+  .status.bad { color:var(--bad); }
+  .footer {
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    padding-top:12px;
+  }
+  .btn {
+    min-width:82px;
+    height:30px;
+    border:1px solid var(--field);
+    border-radius:4px;
+    background:var(--field);
+    color:var(--text);
+    padding:0 13px;
+    cursor:pointer;
+  }
+  .btn:hover { background:#464B59; border-color:var(--line); }
+  .btn.primary {
+    background:var(--selected);
+    border-color:#5c78df;
+  }
+  .btn.primary:hover { background:var(--selected2); }
+  .btn:disabled {
+    color:#8b91a0;
+    cursor:default;
+    background:#272A33;
+    border-color:#3C404D;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <main class="content">
+    <div class="title" id="title">Checking for ReplayKit update...</div>
+    <div class="body" id="body">ReplayKit is checking the latest GitHub release.</div>
+    <div class="meta" id="meta"></div>
+    <div class="status" id="status"></div>
+  </main>
+  <footer class="footer">
+    <button class="btn" type="button" id="laterBtn">Later</button>
+    <button class="btn primary" type="button" id="downloadBtn" disabled>Download?</button>
+  </footer>
+</div>
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey) e.preventDefault();
+    }, { passive:false });
+    document.addEventListener("keydown", function (e) {
+      if (e.ctrlKey && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0" || e.key === "r" || e.key === "R")) {
+        e.preventDefault();
+      }
+      if (e.key === "F5") e.preventDefault();
+    });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const params = new URLSearchParams(location.search);
+  const requestedVersion = params.get("version") || "";
+  const els = {
+    title: document.getElementById("title"),
+    body: document.getElementById("body"),
+    meta: document.getElementById("meta"),
+    status: document.getElementById("status"),
+    laterBtn: document.getElementById("laterBtn"),
+    downloadBtn: document.getElementById("downloadBtn"),
+  };
+  let latest = null;
+
+  function styleNativeChrome() {
+    fetch(HELPER + "/style-window?title=ReplayKit%20Update&taskbar=1&t=" + Date.now(), { cache:"no-store" }).catch(() => {});
+  }
+  styleNativeChrome();
+  [400, 900, 1800, 3500].forEach((d) => setTimeout(styleNativeChrome, d));
+
+  function setStatus(text, kind) {
+    els.status.textContent = text || "";
+    els.status.classList.toggle("good", kind === "good");
+    els.status.classList.toggle("bad", kind === "bad");
+  }
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + "/" + path, {
+      cache:"no-store",
+      ...(options || {}),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      throw new Error(body.message || body.error || ("HTTP " + res.status));
+    }
+    return body;
+  }
+
+  function closeWindow() {
+    fetch(HELPER + "/close-window?title=ReplayKit%20Update&t=" + Date.now(), {
+      method:"POST",
+      cache:"no-store",
+    }).catch(() => {});
+    window.close();
+    setTimeout(() => {
+      try { window.open("", "_self"); } catch (_) {}
+      try { window.close(); } catch (_) {}
+    }, 25);
+  }
+
+  async function loadUpdate() {
+    els.downloadBtn.disabled = true;
+    setStatus("Checking...", "");
+    try {
+      const data = await helperJson("update/check?t=" + Date.now());
+      latest = data;
+      if (!data.updateAvailable) {
+        els.title.textContent = "ReplayKit is up to date";
+        els.body.textContent = data.message || "No ReplayKit update is available right now.";
+        els.meta.textContent = data.installedVersion ? "Installed version: " + data.installedVersion : "";
+        setStatus("", "");
+        return;
+      }
+      els.title.textContent = "ReplayKit update available";
+      els.body.textContent = "ReplayKit " + data.latestVersion + " is ready to install.";
+      els.meta.textContent = "Installed: " + data.installedVersion + "  |  Latest: " + data.latestVersion;
+      els.downloadBtn.disabled = false;
+      setStatus("OBS will restart after the download is verified.", "");
+    } catch (e) {
+      els.title.textContent = "Update check failed";
+      els.body.textContent = "ReplayKit could not check for updates.";
+      els.meta.textContent = "";
+      setStatus(e.message || String(e), "bad");
+    }
+  }
+
+  async function downloadUpdate() {
+    els.downloadBtn.disabled = true;
+    els.laterBtn.disabled = true;
+    setStatus("Downloading update...", "");
+    try {
+      const data = await helperJson("update/apply", { method:"POST" });
+      if (data.updateAvailable === false) {
+        setStatus("ReplayKit is already up to date.", "good");
+        els.laterBtn.disabled = false;
+        return;
+      }
+      setStatus(data.message || "Installing update. OBS will restart.", "good");
+    } catch (e) {
+      setStatus("Update failed: " + (e.message || e), "bad");
+      els.downloadBtn.disabled = !latest || !latest.updateAvailable;
+      els.laterBtn.disabled = false;
+    }
+  }
+
+  async function later() {
+    const version = (latest && latest.latestVersion) || requestedVersion;
+    els.laterBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    try {
+      if (version) {
+        await helperJson("update/later", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body:JSON.stringify({ version }),
+        });
+      }
+      closeWindow();
+    } catch (e) {
+      setStatus("Could not dismiss update: " + (e.message || e), "bad");
+      els.laterBtn.disabled = false;
+      els.downloadBtn.disabled = !latest || !latest.updateAvailable;
+    }
+  }
+
+  els.downloadBtn.addEventListener("click", downloadUpdate);
+  els.laterBtn.addEventListener("click", later);
+  loadUpdate();
+</script>
+</body>
+</html>

@@ -23,6 +23,10 @@ function Get-DefaultReplayKitSettings {
         recordingNotificationEnabled = $true
         clipNotificationSeconds  = 90
         trimPreciseDefault       = $false
+        autoUpdateEnabled        = $true
+        lastUpdatePromptVersion  = ''
+        clipSoundVolume          = 100
+        recordingSoundVolume     = 100
     }
 }
 
@@ -64,6 +68,16 @@ function Get-EnumSetting($data, [string]$key, [string]$default, [string[]]$allow
     $v = ([string]$data[$key]).Trim()
     if ($allowed -contains $v) { return $v }
     throw "Invalid option for ${key}: $v"
+}
+
+function Get-VersionMarkerSetting($data, [string]$key, [string]$default) {
+    if (-not $data.ContainsKey($key)) { return $default }
+    $v = ([string]$data[$key]).Trim()
+    if ([string]::IsNullOrWhiteSpace($v)) { return '' }
+    if ($v.Length -gt 32 -or $v -notmatch '^\d+(?:\.\d+){0,3}$') {
+        throw "Invalid version setting: $key"
+    }
+    return $v
 }
 
 function Resolve-ClipDirSetting([string]$value) {
@@ -135,6 +149,10 @@ function Normalize-ReplayKitSettings($raw) {
         recordingNotificationEnabled = Get-BoolSetting $data 'recordingNotificationEnabled' $defaults.recordingNotificationEnabled
         clipNotificationSeconds  = Get-IntSetting $data 'clipNotificationSeconds' $replaySeconds 1 600
         trimPreciseDefault       = Get-BoolSetting $data 'trimPreciseDefault' $defaults.trimPreciseDefault
+        autoUpdateEnabled        = Get-BoolSetting $data 'autoUpdateEnabled' $defaults.autoUpdateEnabled
+        lastUpdatePromptVersion  = Get-VersionMarkerSetting $data 'lastUpdatePromptVersion' $defaults.lastUpdatePromptVersion
+        clipSoundVolume          = Get-IntSetting $data 'clipSoundVolume' $defaults.clipSoundVolume 0 100
+        recordingSoundVolume     = Get-IntSetting $data 'recordingSoundVolume' $defaults.recordingSoundVolume 0 100
     }
 }
 
@@ -172,7 +190,17 @@ function Get-ObsRunCommand {
         $candidate = Join-Path $env:ProgramFiles 'obs-studio\bin\64bit\obs64.exe'
         if (Test-Path -LiteralPath $candidate) { $obs = $candidate }
     }
-    return '"' + $obs + '" --background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays'
+    $psExe = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+    if (-not (Test-Path -LiteralPath $psExe)) { $psExe = 'powershell.exe' }
+    $obsLiteral = "'" + ([string]$obs).Replace("'", "''") + "'"
+    $script = @"
+`$obsPath = $obsLiteral
+if (Test-Path -LiteralPath `$obsPath) {
+    Start-Process -FilePath `$obsPath -WorkingDirectory ([System.IO.Path]::GetDirectoryName(`$obsPath)) -ArgumentList @('--background-color=ff272a33', '--default-background-color=ff272a33', '--disable-direct-composition-video-overlays')
+}
+"@
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($script))
+    return '"' + $psExe + '" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand ' + $encoded
 }
 
 function Set-ObsStartupSetting([bool]$enabled) {
@@ -1122,7 +1150,13 @@ function Set-ReplayKitBongoSceneItemJson($item, [string]$uuid, [hashtable]$prese
     Set-ReplayKitJsonValue $item 'group_item_backup' $false
 }
 
-function Set-ReplayKitInputOverlaySceneItemJson($item, [string]$name, [hashtable]$preset, [bool]$visible, [string]$sourceUuid = '') {
+function New-ReplayKitJsonTransition([int]$duration) {
+    $transition = New-ReplayKitJsonObject
+    Set-ReplayKitJsonValue $transition 'duration' $duration
+    return ,$transition
+}
+
+function Set-ReplayKitInputOverlaySceneItemJson($item, [string]$name, [hashtable]$preset, [bool]$visible, [string]$sourceUuid = '', [bool]$groupBackup = $false) {
     $canvasW = [double]$preset.video.baseWidth
     $canvasH = [double]$preset.video.baseHeight
     $transform = Get-ReplayKitInputOverlayTransform $name $preset
@@ -1137,6 +1171,107 @@ function Set-ReplayKitInputOverlaySceneItemJson($item, [string]$name, [hashtable
     Set-ReplayKitJsonValue $item 'pos_rel' (New-ReplayKitJsonPoint ((([double]$transform.positionX - $canvasW / 2.0) / ($canvasH / 2.0))) ((([double]$transform.positionY - $canvasH / 2.0) / ($canvasH / 2.0))))
     Set-ReplayKitJsonValue $item 'scale' (New-ReplayKitJsonPoint ([double]$transform.scaleX) ([double]$transform.scaleY))
     Set-ReplayKitJsonValue $item 'scale_rel' (New-ReplayKitJsonPoint (([double]$transform.scaleX * 1440.0 / $canvasH)) (([double]$transform.scaleY * 1440.0 / $canvasH)))
+    Set-ReplayKitJsonValue $item 'group_item_backup' $groupBackup
+}
+
+function Set-ReplayKitInputOverlayGroupMemberJson($item, [string]$name, [string]$sourceUuid, [hashtable]$preset, [int]$id) {
+    $canvasW = 2560.0
+    $canvasH = 1440.0
+    if ($name -eq 'Mouse Overlay') {
+        $x = 431.0
+        $y = 0.0
+        $scaleX = 0.6909722089767456
+        $scaleY = 0.6909722089767456
+        $scaleRelX = 0.6909722089767456
+        $scaleRelY = 0.6909722089767456
+    } else {
+        $x = 0.0
+        $y = 0.0
+        $scaleX = 0.7395833134651184
+        $scaleY = 0.7388888597488403
+        $scaleRelX = 0.7395833134651184
+        $scaleRelY = 0.7388888597488403
+    }
+    Set-ReplayKitSceneItemBaseJson $item $name $true
+    Set-ReplayKitJsonValue $item 'source_uuid' $sourceUuid
+    Set-ReplayKitJsonValue $item 'scale_ref' (New-ReplayKitJsonPoint $canvasW $canvasH)
+    Set-ReplayKitJsonValue $item 'id' $id
+    Set-ReplayKitJsonValue $item 'group_item_backup' $false
+    Set-ReplayKitJsonValue $item 'pos' (New-ReplayKitJsonPoint $x $y)
+    Set-ReplayKitJsonValue $item 'pos_rel' (New-ReplayKitJsonPoint (($x - $canvasW / 2.0) / ($canvasH / 2.0)) (($y - $canvasH / 2.0) / ($canvasH / 2.0)))
+    Set-ReplayKitJsonValue $item 'scale' (New-ReplayKitJsonPoint $scaleX $scaleY)
+    Set-ReplayKitJsonValue $item 'scale_rel' (New-ReplayKitJsonPoint $scaleRelX $scaleRelY)
+    Set-ReplayKitJsonValue $item 'show_transition' (New-ReplayKitJsonTransition 300)
+    Set-ReplayKitJsonValue $item 'hide_transition' (New-ReplayKitJsonTransition 300)
+}
+
+function Set-ReplayKitInputOverlayGroupSourceJson($group, [string]$groupUuid, [hashtable]$inputSources, [hashtable]$preset) {
+    Set-ReplayKitJsonValue $group 'prev_ver' 536936450
+    Set-ReplayKitJsonValue $group 'name' 'Group'
+    Set-ReplayKitJsonValue $group 'uuid' $groupUuid
+    Set-ReplayKitJsonValue $group 'id' 'group'
+    Set-ReplayKitJsonValue $group 'versioned_id' 'group'
+
+    $settings = New-ReplayKitJsonObject
+    Set-ReplayKitJsonValue $settings 'id_counter' 0
+    Set-ReplayKitJsonValue $settings 'custom_size' $true
+    Set-ReplayKitJsonValue $settings 'cx' 628
+    Set-ReplayKitJsonValue $settings 'cy' 292
+    $items = [System.Collections.ArrayList]::new()
+    foreach ($name in @('WASD Overlay', 'Mouse Overlay')) {
+        if (-not $inputSources.ContainsKey($name)) { continue }
+        $member = New-ReplayKitJsonObject
+        Set-ReplayKitInputOverlayGroupMemberJson $member $name ([string]$inputSources[$name]['uuid']) $preset ([int]$inputSources[$name]['id'])
+        [void]$items.Add($member)
+    }
+    Set-ReplayKitJsonValue $settings 'items' $items
+    Set-ReplayKitJsonValue $group 'settings' $settings
+
+    Set-ReplayKitJsonValue $group 'mixers' 0
+    Set-ReplayKitJsonValue $group 'sync' 0
+    Set-ReplayKitJsonValue $group 'flags' 0
+    Set-ReplayKitJsonValue $group 'volume' 1.0
+    Set-ReplayKitJsonValue $group 'balance' 0.5
+    Set-ReplayKitJsonValue $group 'enabled' $true
+    Set-ReplayKitJsonValue $group 'muted' $false
+    Set-ReplayKitJsonValue $group 'push-to-mute' $false
+    Set-ReplayKitJsonValue $group 'push-to-mute-delay' 0
+    Set-ReplayKitJsonValue $group 'push-to-talk' $false
+    Set-ReplayKitJsonValue $group 'push-to-talk-delay' 0
+    $hotkeys = New-ReplayKitJsonObject
+    foreach ($name in @('WASD Overlay', 'Mouse Overlay')) {
+        if (-not $inputSources.ContainsKey($name)) { continue }
+        $id = [int]$inputSources[$name]['id']
+        Set-ReplayKitJsonValue $hotkeys "libobs.show_scene_item.$id" ([System.Collections.ArrayList]::new())
+        Set-ReplayKitJsonValue $hotkeys "libobs.hide_scene_item.$id" ([System.Collections.ArrayList]::new())
+    }
+    Set-ReplayKitJsonValue $group 'hotkeys' $hotkeys
+    Set-ReplayKitJsonValue $group 'deinterlace_mode' 0
+    Set-ReplayKitJsonValue $group 'deinterlace_field_order' 0
+    Set-ReplayKitJsonValue $group 'monitoring_type' 0
+    Set-ReplayKitJsonValue $group 'canvas_uuid' '6c69626f-6273-4c00-9d88-c5136d61696e'
+    Set-ReplayKitJsonValue $group 'private_settings' (New-ReplayKitJsonObject)
+}
+
+function Set-ReplayKitInputOverlayGroupSceneItemJson($item, [string]$groupUuid, [hashtable]$preset, [bool]$visible) {
+    $canvasW = [double]$preset.video.baseWidth
+    $canvasH = [double]$preset.video.baseHeight
+    $ratio = $canvasH / 1440.0
+    $x = 19.0 * $ratio
+    $y = 1099.0 * $ratio
+    Set-ReplayKitSceneItemBaseJson $item 'Group' $visible
+    Set-ReplayKitJsonValue $item 'source_uuid' $groupUuid
+    Set-ReplayKitJsonValue $item 'scale_ref' (New-ReplayKitJsonPoint $canvasW $canvasH)
+    Set-ReplayKitJsonValue $item 'group_item_backup' $false
+    Set-ReplayKitJsonValue $item 'pos' (New-ReplayKitJsonPoint $x $y)
+    Set-ReplayKitJsonValue $item 'pos_rel' (New-ReplayKitJsonPoint (($x - $canvasW / 2.0) / ($canvasH / 2.0)) (($y - $canvasH / 2.0) / ($canvasH / 2.0)))
+    Set-ReplayKitJsonValue $item 'scale' (New-ReplayKitJsonPoint $ratio $ratio)
+    Set-ReplayKitJsonValue $item 'scale_rel' (New-ReplayKitJsonPoint 1.0 1.0)
+    Set-ReplayKitJsonValue $item 'show_transition' (New-ReplayKitJsonTransition 0)
+    Set-ReplayKitJsonValue $item 'hide_transition' (New-ReplayKitJsonTransition 0)
+    $private = New-ReplayKitJsonObject
+    Set-ReplayKitJsonValue $private 'collapsed' $false
+    Set-ReplayKitJsonValue $item 'private_settings' $private
 }
 
 function Get-ReplayKitNextJsonSceneItemId($items) {
@@ -1148,6 +1283,15 @@ function Get-ReplayKitNextJsonSceneItemId($items) {
         } catch {}
     }
     return $max + 1
+}
+
+function Remove-ReplayKitJsonListWhere($list, [scriptblock]$predicate) {
+    if ($null -eq $list) { return }
+    for ($i = [int]$list.Count - 1; $i -ge 0; $i--) {
+        if (& $predicate $list[$i]) {
+            $list.RemoveAt($i)
+        }
+    }
 }
 
 function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset) {
@@ -1164,11 +1308,56 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
         if ($null -eq $sources) { throw 'OBS scene collection has no sources list.' }
         $sources = ConvertTo-ReplayKitJsonList $sources
         Set-ReplayKitJsonValue $data 'sources' $sources
+        $groups = Get-ReplayKitJsonValue $data 'groups'
+        if ($null -eq $groups) {
+            $groups = [System.Collections.ArrayList]::new()
+        } else {
+            $groups = ConvertTo-ReplayKitJsonList $groups
+        }
+        Set-ReplayKitJsonValue $data 'groups' $groups
 
         $overlayStyle = [string]$settings.overlayStyle
         $useInputOverlay = $overlayStyle -eq 'input_overlay'
         $useBongo = $overlayStyle -eq 'bongo_cat'
         $inputSources = @{}
+        $inputSourceNames = @('WASD Overlay', 'Mouse Overlay')
+        $inputGroup = $null
+        foreach ($group in @($groups)) {
+            if ([string](Get-ReplayKitJsonValue $group 'name' '') -eq 'Group') {
+                $inputGroup = $group
+                break
+            }
+        }
+        $inputGroupUuid = if ($null -ne $inputGroup) { [string](Get-ReplayKitJsonValue $inputGroup 'uuid' '') } else { '' }
+        if ([string]::IsNullOrWhiteSpace($inputGroupUuid)) {
+            $inputGroupUuid = [guid]::NewGuid().ToString()
+        }
+
+        $existingInputUuids = @{}
+        foreach ($source in @($sources)) {
+            $name = [string](Get-ReplayKitJsonValue $source 'name' '')
+            if ($inputSourceNames -contains $name) {
+                $uuid = [string](Get-ReplayKitJsonValue $source 'uuid' '')
+                if (-not [string]::IsNullOrWhiteSpace($uuid)) { $existingInputUuids[$uuid] = $true }
+            }
+        }
+
+        $bongoSource = $null
+        foreach ($source in @($sources)) {
+            if ([string](Get-ReplayKitJsonValue $source 'name' '') -eq 'Bongo Cat Overlay') {
+                $bongoSource = $source
+                break
+            }
+        }
+        if ($null -eq $bongoSource) {
+            foreach ($source in @($sources)) {
+                if ([string](Get-ReplayKitJsonValue $source 'id' '') -eq 'bongobs-cat') {
+                    $bongoSource = $source
+                    break
+                }
+            }
+        }
+        $bongoUuid = if ($null -ne $bongoSource) { [string](Get-ReplayKitJsonValue $bongoSource 'uuid' '') } else { '' }
 
         if ($useInputOverlay) {
             $inputSpecs = @(
@@ -1195,32 +1384,36 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
                 }
                 $inputSources[[string]$spec.name] = @{ uuid = $inputUuid }
             }
+        } else {
+            Remove-ReplayKitJsonListWhere $sources {
+                param($source)
+                $inputSourceNames -contains [string](Get-ReplayKitJsonValue $source 'name' '')
+            }
+            Remove-ReplayKitJsonListWhere $groups {
+                param($group)
+                [string](Get-ReplayKitJsonValue $group 'name' '') -eq 'Group' -or
+                    [string](Get-ReplayKitJsonValue $group 'uuid' '') -eq $inputGroupUuid
+            }
         }
 
-        $bongoSource = $null
-        foreach ($source in @($sources)) {
-            if ([string](Get-ReplayKitJsonValue $source 'name' '') -eq 'Bongo Cat Overlay') {
-                $bongoSource = $source
-                break
-            }
-        }
-        if ($null -eq $bongoSource) {
-            foreach ($source in @($sources)) {
-                if ([string](Get-ReplayKitJsonValue $source 'id' '') -eq 'bongobs-cat') {
-                    $bongoSource = $source
-                    break
-                }
-            }
-        }
-        if ($null -eq $bongoSource) {
+        if ($useBongo -and $null -eq $bongoSource) {
             $bongoSource = New-ReplayKitBongoSourceJson ([guid]::NewGuid().ToString())
             [void]$sources.Add($bongoSource)
         }
-        $bongoUuid = [string](Get-ReplayKitJsonValue $bongoSource 'uuid' '')
-        if ([string]::IsNullOrWhiteSpace($bongoUuid)) {
-            $bongoUuid = [guid]::NewGuid().ToString()
+        if ($useBongo) {
+            $bongoUuid = [string](Get-ReplayKitJsonValue $bongoSource 'uuid' '')
+            if ([string]::IsNullOrWhiteSpace($bongoUuid)) {
+                $bongoUuid = [guid]::NewGuid().ToString()
+            }
+            Set-ReplayKitBongoSourceJson $bongoSource $bongoUuid
+        } else {
+            Remove-ReplayKitJsonListWhere $sources {
+                param($source)
+                [string](Get-ReplayKitJsonValue $source 'name' '') -eq 'Bongo Cat Overlay' -or
+                    [string](Get-ReplayKitJsonValue $source 'id' '') -eq 'bongobs-cat' -or
+                    (-not [string]::IsNullOrWhiteSpace($bongoUuid) -and [string](Get-ReplayKitJsonValue $source 'uuid' '') -eq $bongoUuid)
+            }
         }
-        Set-ReplayKitBongoSourceJson $bongoSource $bongoUuid
 
         foreach ($source in @($sources)) {
             if ([string](Get-ReplayKitJsonValue $source 'id' '') -ne 'scene') { continue }
@@ -1230,19 +1423,45 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
             if ($null -eq $items) { continue }
             $items = ConvertTo-ReplayKitJsonList $items
             Set-ReplayKitJsonValue $sceneSettings 'items' $items
+            if (-not $useInputOverlay) {
+                Remove-ReplayKitJsonListWhere $items {
+                    param($item)
+                    $name = [string](Get-ReplayKitJsonValue $item 'name' '')
+                    $sourceUuid = [string](Get-ReplayKitJsonValue $item 'source_uuid' '')
+                    ($inputSourceNames -contains $name) -or
+                        $name -eq 'Group' -or
+                        $sourceUuid -eq $inputGroupUuid -or
+                        ($existingInputUuids.ContainsKey($sourceUuid))
+                }
+            }
+            if (-not $useBongo) {
+                Remove-ReplayKitJsonListWhere $items {
+                    param($item)
+                    $name = [string](Get-ReplayKitJsonValue $item 'name' '')
+                    $sourceUuid = [string](Get-ReplayKitJsonValue $item 'source_uuid' '')
+                    $name -eq 'Bongo Cat Overlay' -or
+                        (-not [string]::IsNullOrWhiteSpace($bongoUuid) -and $sourceUuid -eq $bongoUuid)
+                }
+            }
 
             $foundBongoItem = $false
             $foundInputItems = @{ 'WASD Overlay' = $false; 'Mouse Overlay' = $false }
+            $foundInputGroupItem = $false
             foreach ($item in @($items)) {
                 $name = [string](Get-ReplayKitJsonValue $item 'name' '')
                 $sourceUuid = [string](Get-ReplayKitJsonValue $item 'source_uuid' '')
                 if ($name -eq 'WASD Overlay' -or $name -eq 'Mouse Overlay') {
                     $inputUuid = ''
-                    if ($inputSources.ContainsKey($name)) { $inputUuid = [string]$inputSources[$name].uuid }
-                    Set-ReplayKitInputOverlaySceneItemJson $item $name $preset $useInputOverlay $inputUuid
+                    if ($inputSources.ContainsKey($name)) { $inputUuid = [string]$inputSources[$name]['uuid'] }
+                    if ([string]::IsNullOrWhiteSpace($inputUuid)) { $inputUuid = $sourceUuid }
+                    Set-ReplayKitInputOverlaySceneItemJson $item $name $preset $useInputOverlay $inputUuid $true
                     $foundInputItems[$name] = $true
-                } elseif ($name -eq 'Group') {
-                    Set-ReplayKitJsonValue $item 'visible' $useInputOverlay
+                    if ($inputSources.ContainsKey($name)) {
+                        $inputSources[$name]['id'] = [int](Get-ReplayKitJsonValue $item 'id' 0)
+                    }
+                } elseif ($name -eq 'Group' -or $sourceUuid -eq $inputGroupUuid) {
+                    Set-ReplayKitInputOverlayGroupSceneItemJson $item $inputGroupUuid $preset $useInputOverlay
+                    $foundInputGroupItem = $true
                 } elseif ($name -eq 'Bongo Cat Overlay' -or $sourceUuid -eq $bongoUuid) {
                     Set-ReplayKitBongoSceneItemJson $item $bongoUuid $preset $useBongo
                     $foundBongoItem = $true
@@ -1262,9 +1481,21 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
                     if (-not $inputSources.ContainsKey($name)) { throw "Input overlay source was not prepared for $name." }
                     $newItem = New-ReplayKitJsonObject
                     Set-ReplayKitJsonValue $newItem 'id' (Get-ReplayKitNextJsonSceneItemId $items)
-                    Set-ReplayKitInputOverlaySceneItemJson $newItem $name $preset $true ([string]$inputSources[$name].uuid)
-                    Set-ReplayKitJsonValue $newItem 'group_item_backup' $false
+                    Set-ReplayKitInputOverlaySceneItemJson $newItem $name $preset $true ([string]$inputSources[$name]['uuid']) $true
+                    $inputSources[$name]['id'] = [int](Get-ReplayKitJsonValue $newItem 'id' 0)
                     [void]$items.Add($newItem)
+                    Set-ReplayKitJsonValue $sceneSettings 'id_counter' (Get-ReplayKitNextJsonSceneItemId $items)
+                }
+                if ($null -eq $inputGroup) {
+                    $inputGroup = New-ReplayKitJsonObject
+                    [void]$groups.Add($inputGroup)
+                }
+                Set-ReplayKitInputOverlayGroupSourceJson $inputGroup $inputGroupUuid $inputSources $preset
+                if (-not $foundInputGroupItem) {
+                    $groupItem = New-ReplayKitJsonObject
+                    Set-ReplayKitJsonValue $groupItem 'id' (Get-ReplayKitNextJsonSceneItemId $items)
+                    Set-ReplayKitInputOverlayGroupSceneItemJson $groupItem $inputGroupUuid $preset $true
+                    [void]$items.Add($groupItem)
                     Set-ReplayKitJsonValue $sceneSettings 'id_counter' (Get-ReplayKitNextJsonSceneItemId $items)
                 }
             }
@@ -1698,10 +1929,10 @@ function Get-ReplayKitSettingsPayload {
 }
 
 function Test-ReplayKitRestartRequired([hashtable]$previous, [hashtable]$settings) {
-    foreach ($key in @('recordingPreset', 'compressionMode', 'codecPreference', 'replaySeconds')) {
+    foreach ($key in @('recordingPreset', 'compressionMode', 'codecPreference')) {
         if ([string]$previous[$key] -ne [string]$settings[$key]) { return $true }
     }
-    return ([string]$previous.overlayStyle -ne [string]$settings.overlayStyle -and [string]$settings.overlayStyle -eq 'bongo_cat')
+    return ([string]$previous.overlayStyle -ne [string]$settings.overlayStyle)
 }
 
 function Save-ReplayKitSettingsFromRequest([string]$body, [bool]$restartObs = $false) {

@@ -35,6 +35,8 @@ DEFAULT_OBS_STARTUP         = True
 DEFAULT_CLIP_NOTIFICATION   = True
 DEFAULT_RECORDING_NOTIFICATION = True
 DEFAULT_TRIM_PRECISE        = False
+DEFAULT_CLIP_SOUND_VOLUME   = 100
+DEFAULT_RECORDING_SOUND_VOLUME = 100
 
 # "auto" picks the best HEVC/H.264 combo the user's GPU can run; the user can
 # force a specific codec for playback support (H.264) or quality/size (AV1 on
@@ -80,6 +82,8 @@ class Preferences:
     clip_notification_enabled: bool = DEFAULT_CLIP_NOTIFICATION
     recording_notification_enabled: bool = DEFAULT_RECORDING_NOTIFICATION
     trim_precise_default:    bool = DEFAULT_TRIM_PRECISE
+    clip_sound_volume:       int  = DEFAULT_CLIP_SOUND_VOLUME
+    recording_sound_volume:  int  = DEFAULT_RECORDING_SOUND_VOLUME
 
     def save(self) -> None:
         PREFS_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,6 +113,14 @@ def _coerce_bool(value: Any, default: bool) -> bool:
     return value if isinstance(value, bool) else default
 
 
+def _coerce_int_range(value: Any, default: int, minimum: int, maximum: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, number))
+
+
 def _runtime_settings_overlay() -> Dict[str, Any]:
     """Import settings changed from the in-OBS Custom Controls window."""
     if not RUNTIME_SETTINGS_FILE.is_file():
@@ -131,6 +143,8 @@ def _runtime_settings_overlay() -> Dict[str, Any]:
         "clipNotificationEnabled": "clip_notification_enabled",
         "recordingNotificationEnabled": "recording_notification_enabled",
         "trimPreciseDefault": "trim_precise_default",
+        "clipSoundVolume": "clip_sound_volume",
+        "recordingSoundVolume": "recording_sound_volume",
     }
     for src, dst in key_map.items():
         if src in runtime:
@@ -188,4 +202,6 @@ def load_prefs() -> Preferences:
         clip_notification_enabled = _coerce_bool(data.get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),
         recording_notification_enabled = _coerce_bool(data.get("recording_notification_enabled"), DEFAULT_RECORDING_NOTIFICATION),
         trim_precise_default     = _coerce_bool(data.get("trim_precise_default"), DEFAULT_TRIM_PRECISE),
+        clip_sound_volume        = _coerce_int_range(data.get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, 0, 100),
+        recording_sound_volume   = _coerce_int_range(data.get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, 0, 100),
     )
