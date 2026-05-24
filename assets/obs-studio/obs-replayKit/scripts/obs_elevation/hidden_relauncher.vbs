@@ -1,4 +1,4 @@
-﻿Option Explicit
+Option Explicit
 
 Dim fso, shell, wmi, obsPath, existingObsPid, obsDir, handoffPath
 Set fso = CreateObject("Scripting.FileSystemObject")

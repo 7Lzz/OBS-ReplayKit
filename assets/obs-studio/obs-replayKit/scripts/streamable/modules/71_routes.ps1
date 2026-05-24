@@ -152,6 +152,15 @@ function Dispatch-Request($stream, [hashtable]$req) {
             Send-Json $stream 200 (Get-ReplayKitUpdateStatus)
             return
         }
+        '^/update/startup-check$' {
+            if ($req.Method -ne 'GET' -and $req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'GET or POST required'; return }
+            if (-not (Test-ReplayKitSettingsOrigin $req)) {
+                Send-Json $stream 403 @{ ok = $false; message = 'Untrusted origin.' }
+                return
+            }
+            Send-Json $stream 200 (Get-ReplayKitStartupUpdateStatus)
+            return
+        }
         '^/update/auto-check$' {
             if ($req.Method -ne 'GET' -and $req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'GET or POST required'; return }
             if (-not (Test-ReplayKitSettingsOrigin $req)) {
@@ -296,7 +305,16 @@ animation:r 0.8s linear infinite}
                 Send-Json $stream 400 @{ ok = $false; message = 'Unsupported window title.' }
                 return
             }
-            $ownerPid = if ($script:ParentPid) { [uint32]$script:ParentPid } else { [uint32]0 }
+            # the update popup can be hosted by msedge.exe (--app launched from the bootstrap), which
+            # is not an obs-family process. pass 0 for that title so closewindowsbytitle finds it by
+            # title alone. settings still goes thru the obs-family gate.
+            $ownerPid = if ($title -eq 'ReplayKit Update') {
+                [uint32]0
+            } elseif ($script:ParentPid) {
+                [uint32]$script:ParentPid
+            } else {
+                [uint32]0
+            }
             $closed = 0
             try { $closed = [StreamableNative]::CloseWindowsByTitle(@($title), $ownerPid) } catch {}
             Send-Json $stream 200 @{ ok = $true; closed = [int]$closed }

@@ -181,6 +181,34 @@ end
 -- set to true once weve successfully launched the helper this session. re-spawn attempts are skipped while its true (the os port-bind would just fail anyway). stays false if the launch errored so the next helper_request() retries after a failed helper launch.
 local helper_started = false
 
+local function update_bootstrap_path()
+    return script_dir() .. "replaykit_update_bootstrap.ps1"
+end
+
+-- spawn the standalone update-prompt launcher alongside the helper. lives outside the dock so the
+-- popup still appears when obs starts minimized to the system tray (cef suspends docks in that
+-- state, which is why the dock-driven window.open never fired). bootstrap waits for the helper to
+-- bind its port, then either shows update_prompt.html in msedge --app or falls back to a winforms
+-- dialog. debug log: %temp%\replaykit_update_debug.log.
+local update_bootstrap_started = false
+local function start_update_bootstrap()
+    if update_bootstrap_started then return true end
+    local bootstrap = update_bootstrap_path()
+    if not file_exists(bootstrap) then
+        log(obs.LOG_INFO, "Update bootstrap script missing; skipping startup update check: " .. bootstrap)
+        return false
+    end
+    local cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ' ..
+                win_quote(bootstrap) .. ' -Port ' .. HTTP_PORT
+    local ok, err = spawn_hidden(cmd)
+    if not ok then
+        log(obs.LOG_ERROR, "Update bootstrap spawn failed. Win32 error: " .. tostring(err))
+        return false
+    end
+    update_bootstrap_started = true
+    return true
+end
+
 local function start_helper()
     if helper_started then return true end
 
@@ -211,6 +239,7 @@ local function start_helper()
         return false
     end
     helper_started = true
+    start_update_bootstrap()
     return true
 end
 

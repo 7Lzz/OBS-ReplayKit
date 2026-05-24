@@ -273,8 +273,7 @@
 
   const POLL_ACTIVE_MS = 1000;
   const POLL_IDLE_MS = 5000;
-  const UPDATE_AUTO_CHECK_INITIAL_MS = 8000;
-  const UPDATE_AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+  const UPDATE_STARTUP_CHECK_DELAY_MS = 8000;
 
   const S = Object.freeze({
     IDLE: "idle",
@@ -531,41 +530,67 @@
           { cache: "no-store" }).catch(() => {});
   }
 
+  // returns true when the popup is up (or already up). false means cef declined window.open --
+  // either popup-blocked or document hidden -- and the caller should retry later.
   function openUpdatePrompt(data) {
     if (updateWindow && !updateWindow.closed) {
       try { updateWindow.focus(); } catch (_) {}
       focusUpdatePromptWindowNative();
-      return;
+      return true;
     }
     const version = data && data.latestVersion ? encodeURIComponent(data.latestVersion) : "";
-    updateWindow = window.open(
+    const w = window.open(
       HELPER_HTTP_URL + "update-prompt" + (version ? "?version=" + version : ""),
       "replaykit_update_prompt",
       "popup=yes,width=520,height=300"
     );
-    if (!updateWindow) {
+    if (!w) {
       focusUpdatePromptWindowNative();
-      return;
+      return false;
     }
+    updateWindow = w;
     try { updateWindow.focus(); } catch (_) {}
     [80, 250, 750, 1500, 3000].forEach((delay) => {
       setTimeout(styleUpdatePromptWindow, delay);
     });
+    return true;
   }
 
-  async function runAutoUpdateCheck() {
+  // hold the startup-check result until obs is actually on screen. opening the popup while the dock
+  // is hidden (obs minimized / not foregrounded yet) makes cef silently drop the window.open, which
+  // is why the popup never appeared when the user launched obs into the background.
+  let pendingUpdateData = null;
+  let updatePopupAttempted = false;
+
+  function tryOpenPendingUpdate() {
+    if (updatePopupAttempted || !pendingUpdateData) return;
+    if (document.visibilityState !== "visible") return;
+    if (openUpdatePrompt(pendingUpdateData)) {
+      updatePopupAttempted = true;
+    }
+  }
+
+  async function runStartupUpdateCheck() {
     try {
-      const data = await helperJson("update/auto-check?t=" + Date.now());
-      if (data && data.ok && data.prompt) openUpdatePrompt(data);
+      const data = await helperJson("update/startup-check?t=" + Date.now());
+      if (data && data.ok && data.prompt) {
+        pendingUpdateData = data;
+        tryOpenPendingUpdate();
+      }
     } catch (_) {}
   }
 
-  function scheduleAutoUpdateChecks() {
+  function scheduleStartupUpdateCheck() {
     setTimeout(() => {
-      runAutoUpdateCheck();
-      setInterval(runAutoUpdateCheck, UPDATE_AUTO_CHECK_INTERVAL_MS);
-    }, UPDATE_AUTO_CHECK_INITIAL_MS);
+      runStartupUpdateCheck();
+    }, UPDATE_STARTUP_CHECK_DELAY_MS);
   }
+
+  // re-attempt the pending popup whenever the dock becomes visible/focused. handles the "obs started
+  // in the background" case: the check runs immediately, the data sits in pendingUpdateData, and the
+  // popup opens the first time the user brings obs to the foreground.
+  document.addEventListener("visibilitychange", tryOpenPendingUpdate);
+  window.addEventListener("focus", tryOpenPendingUpdate);
 
   settingsBtn.addEventListener("click", () => {
     if (settingsWindow && !settingsWindow.closed) {
@@ -666,7 +691,7 @@
   });
 
   pollStatus().then(schedulePoll);
-  scheduleAutoUpdateChecks();
+  scheduleStartupUpdateCheck();
 
   // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
   const authBtn    = document.getElementById("auth-btn");

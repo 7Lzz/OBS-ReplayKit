@@ -4,6 +4,17 @@ $script:REPLAYKIT_UPDATE_OWNER = '7Lzz'
 $script:REPLAYKIT_UPDATE_REPO = 'OBS-ReplayKit'
 $script:REPLAYKIT_UPDATE_INSTALLER_ASSET = 'OBSReplayKit.exe'
 $script:REPLAYKIT_UPDATE_HASH_ASSET = 'OBSReplayKit.exe.sha256'
+$script:ReplayKitStartupUpdateChecked = $false
+
+# temp debug log shared with replaykit_update_bootstrap.ps1. always writes regardless of the helpers
+# logging-enabled flag so we can diagnose the "popup didnt appear" path without enabling logging.
+$script:ReplayKitUpdateDebugLog = Join-Path $env:TEMP 'replaykit_update_debug.log'
+function Write-ReplayKitUpdateDebug([string]$msg) {
+    try {
+        $line = '[{0}] PID={1} helper {2}' -f (Get-Date -Format 'o'), $PID, $msg
+        Add-Content -LiteralPath $script:ReplayKitUpdateDebugLog -Value $line -ErrorAction SilentlyContinue
+    } catch {}
+}
 
 function Get-ReplayKitRootDir {
     $streamableDir = ([string](Get-ScriptDir)).TrimEnd('\', '/')
@@ -74,6 +85,10 @@ function Get-ReplayKitLatestRelease {
         htmlUrl = [string]$release.html_url
         installerUrl = [string]$installer.browser_download_url
         hashUrl = if ($hash -and $hash.browser_download_url) { [string]$hash.browser_download_url } else { '' }
+        # body and name are part of the same /releases/latest payload -- no extra api call. body is
+        # github-flavored markdown; the popup does the rendering and escaping client-side.
+        body = if ($release.body) { [string]$release.body } else { '' }
+        name = if ($release.name) { [string]$release.name } else { '' }
     }
 }
 
@@ -88,6 +103,8 @@ function Get-ReplayKitUpdateStatus {
             latestVersion = [string]$latest.latestVersion
             tagName = [string]$latest.tagName
             releaseUrl = [string]$latest.htmlUrl
+            releaseName = [string]$latest.name
+            releaseNotes = [string]$latest.body
             updateAvailable = ($cmp -lt 0)
             hashRequired = $true
         }
@@ -100,6 +117,8 @@ function Get-ReplayKitUpdateStatus {
                 latestVersion = ''
                 tagName = ''
                 releaseUrl = ''
+                releaseName = ''
+                releaseNotes = ''
                 updateAvailable = $false
                 hashRequired = $true
                 message = 'No GitHub Release has been published yet.'
@@ -137,6 +156,55 @@ function Get-ReplayKitAutoUpdateStatus {
     } catch {
         return @{ ok = $false; prompt = $false; message = $_.Exception.Message }
     }
+}
+
+function Get-ReplayKitStartupUpdateStatus {
+    Write-ReplayKitUpdateDebug "Get-ReplayKitStartupUpdateStatus invoked (alreadyChecked=$script:ReplayKitStartupUpdateChecked admin=$script:IsAdmin)"
+    if ($script:ReplayKitStartupUpdateChecked) {
+        Write-ReplayKitUpdateDebug "returning alreadyChecked"
+        return @{
+            ok = $true
+            prompt = $false
+            startupCheck = $true
+            alreadyChecked = $true
+            message = 'Startup update check already ran.'
+        }
+    }
+
+    $script:ReplayKitStartupUpdateChecked = $true
+
+    # honor the autoUpdateEnabled toggle so users can opt out in settings, but intentionally do NOT
+    # consult lastUpdatePromptVersion here. user wants the popup on every launch -- a previous
+    # "later" click should not suppress it forever. admin gate is also dropped; install self-elevates
+    # via uac if needed.
+    try {
+        $settings = Read-ReplayKitSettings
+    } catch {
+        $settings = @{ autoUpdateEnabled = $true }
+    }
+    $enabled = [bool]$settings['autoUpdateEnabled']
+    if (-not $enabled) {
+        $disabled = @{
+            ok = $true
+            prompt = $false
+            startupCheck = $true
+            admin = [bool]$script:IsAdmin
+            autoUpdateEnabled = $false
+            message = 'Automatic update prompts are disabled in settings.'
+        }
+        Write-ReplayKitUpdateDebug "autoUpdateEnabled=false; returning prompt=false"
+        return $disabled
+    }
+
+    $status = Get-ReplayKitUpdateStatus
+    $status['startupCheck'] = $true
+    $status['admin'] = [bool]$script:IsAdmin
+    $status['autoUpdateEnabled'] = $true
+    $status['prompt'] = ($status['ok'] -and [bool]$status['updateAvailable'] -and -not [string]::IsNullOrWhiteSpace([string]$status['latestVersion']))
+    try {
+        Write-ReplayKitUpdateDebug ("startup-check result: " + (ConvertTo-Json -InputObject $status -Compress -Depth 4))
+    } catch {}
+    return $status
 }
 
 function Set-ReplayKitUpdatePromptDismissed([string]$version) {
@@ -222,20 +290,41 @@ function Get-ReplayKitUpdateObsPath {
 function Start-ReplayKitUpdater([string]$installerPath, [string]$tempDir) {
     $obsPath = Get-ReplayKitUpdateObsPath
     $waitPid = if ($script:ParentPid -gt 0) { [int]$script:ParentPid } else { 0 }
-    $args = @('--update', '--cleanup-dir', $tempDir, '--start-delay-ms', '1200')
+    $argList = @('--update', '--cleanup-dir', $tempDir, '--start-delay-ms', '1200')
     if (-not [string]::IsNullOrWhiteSpace($obsPath)) {
-        $args += @('--relaunch-obs', $obsPath)
+        $argList += @('--relaunch-obs', $obsPath)
     }
     if ($waitPid -gt 0) {
-        $args += @('--wait-pid', [string]$waitPid)
+        $argList += @('--wait-pid', [string]$waitPid)
     }
 
+    if ($script:IsAdmin -eq $true) {
+        # helper is already elevated. spawn detached with create_breakaway_from_job so the installer
+        # is NOT inside the helpers kill-on-close job. otherwise the chain is:
+        #   installer taskkill obs64 -> obs dies -> helpers parent-watchdog exits -> job closes ->
+        #   installer is killed mid-copy, version.json never updates, obs never relaunches.
+        # this was the actual bug. spawndetached is the same primitive Start-DetachedObsRelauncher
+        # uses for the /settings restart flow for the same reason.
+        $cmdLine = (Quote-ReplayKitProcessArg $installerPath) + ' ' +
+                   (($argList | ForEach-Object { Quote-ReplayKitProcessArg ([string]$_) }) -join ' ')
+        Write-ReplayKitUpdateDebug "Start-ReplayKitUpdater (admin, detached): $cmdLine"
+        $installerPid = [StreamableNative]::SpawnDetached($cmdLine, $tempDir)
+        if ($installerPid -le 0) {
+            throw 'SpawnDetached returned 0 for installer'
+        }
+        return @{ ok = $true; processId = [int]$installerPid }
+    }
+
+    # helper is unelevated. shellexecuteex+verb=runas triggers uac. the new admin process is its
+    # own session (different token) so it is NOT inherited into the helpers job -- the kill-on-close
+    # chain that affects admin spawns doesnt apply here.
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $installerPath
-    $psi.Arguments = (($args | ForEach-Object { Quote-ReplayKitProcessArg ([string]$_) }) -join ' ')
+    $psi.Arguments = (($argList | ForEach-Object { Quote-ReplayKitProcessArg ([string]$_) }) -join ' ')
     $psi.WorkingDirectory = $tempDir
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
+    $psi.UseShellExecute = $true
+    $psi.Verb = 'runas'
+    Write-ReplayKitUpdateDebug "Start-ReplayKitUpdater (non-admin, runas): $installerPath"
     $p = [System.Diagnostics.Process]::Start($psi)
     return @{ ok = $true; processId = [int]$p.Id }
 }
