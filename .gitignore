@@ -9,6 +9,7 @@ dist/
 /OBSReplayKit.exe
 /OBSReplayKit.exe.sha256
 /prefs.json
+/test_update_mode.bat
 *.spec
 
 # --- One-off smoke / scratch scripts ----------------------------

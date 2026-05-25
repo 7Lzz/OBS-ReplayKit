@@ -303,7 +303,7 @@ foreach ($root in @($render, $capture)) {{
                 Write-Host "rename FAILED for ${{cur}}: rc=0x$('{{0:x}}' -f $rc)"
             }}
         }}
-        if ($hideEndpoint -and (($state -band 1) -ne 0) -and (($state -band $hiddenStateFlag) -eq 0)) {{
+        if ($hideEndpoint -and (($state -band $hiddenStateFlag) -eq 0)) {{
             $label = $cur
             if ($newName) {{ $label = $newName }}
             $vrc = [AudioHelper]::SetEndpointVisible($deviceId, $false)
@@ -318,18 +318,17 @@ foreach ($root in @($render, $capture)) {{
 }}
 
 if (($successes + $hidden) -gt 0) {{
-    # bounce the audio stack so the new names appear in the sound output picker + quick settings without a reboot. win11 quick settings is fed by audioendpointbuilder + a shell cache in explorer.exe, both of which hold their own copies. start-service on the parent doesnt cascade-start dependents, so audiosrv needs an explicit start after audioendpointbuilder -- skip it and the user loses audio until reboot.
+    # bounce the audio stack so endpoint names/visibility are refreshed without a reboot. Explorer
+    # does not need to be restarted for disabling/hiding endpoints.
     Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
     Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
     Start-Service Audiosrv -ErrorAction SilentlyContinue  # cascade-stopped above
     Start-Sleep -Milliseconds 500
-    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-    # windows auto-respawns explorer; no start-process needed.
 
     # sanity-report so the install log shows whether anythings still stopped.
     $aeb = (Get-Service AudioEndpointBuilder -ErrorAction SilentlyContinue).Status
     $asr = (Get-Service Audiosrv               -ErrorAction SilentlyContinue).Status
-    Write-Host "renames=$successes hidden=$hidden audio-stack=AEB:$aeb Audiosrv:$asr explorer=restarted"
+    Write-Host "renames=$successes hidden=$hidden audio-stack=AEB:$aeb Audiosrv:$asr explorer=unchanged"
 }} else {{
     Write-Host "renames=0 hidden=0 audio-stack=unchanged explorer=unchanged"
 }}

@@ -19,6 +19,7 @@ from .scheduled_task import install_elevation_task as _install_elevation_task
 from .sleep_override import install_sleep_override as _install_sleep_override
 from .shaderfilter import install_replaykit_motion_blur_plugin
 from .transform import apply_preferences, set_ini_value
+from .vbcable import ensure_vbcable
 from .websocket import install_websocket_config
 
 LogFn = Optional[Callable[[str], None]]
@@ -272,6 +273,12 @@ def run_update_driver_refresh(log: LogFn = None) -> None:
     except Exception as exc:
         if log:
             log(f"warn: OBS Shaderfilter refresh skipped: {exc}")
+
+    try:
+        ensure_vbcable(log=log)
+    except Exception as exc:
+        if log:
+            log(f"warn: OBS Stream Audio refresh skipped: {exc}")
 
     try:
         install_obs_elevation_task(log=log)
