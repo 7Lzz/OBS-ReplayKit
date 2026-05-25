@@ -1156,7 +1156,7 @@
 
   function clampMotionBlurStrength(value) {
     const n = parseFloat(value);
-    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.07;
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.075;
   }
 
   function syncVolumeControl(slider, input, value) {
@@ -1186,7 +1186,7 @@
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 100);
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 100);
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
-    syncMotionBlurControl(state.motionBlurStrength ?? 0.07);
+    syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
     els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
     syncHotkeyFields();

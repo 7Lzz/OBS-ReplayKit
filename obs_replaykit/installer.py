@@ -94,9 +94,11 @@ _RUNTIME_DELETE_RELS = {
 # source (the users uuid, their volume slider, hotkeys, custom filters, etc.) is left alone. add
 # entries here when shipping a release that needs to change a source property on existing installs.
 _SCENE_SOURCE_PATCHES: dict[str, dict[str, Any]] = {
-    # empty for now. example for the next release:
-    #   "Game Capture": { "settings.capture_audio": False },
-    #   "Desktop Audio (excl. Discord)": { "monitoring_type": 0 },
+    "Game Capture": {
+        "settings.capture_audio": False,
+        "settings.hook_rate": 2,
+        "settings.limit_framerate": True,
+    },
 }
 
 # scene path inside %APPDATA%\obs-studio\ that gets patched. mirrors what install_obs_config writes

@@ -288,6 +288,9 @@ _GROUP_SOURCE_ID         = "group"
 _MOTION_BLUR_FILTER_NAME = "ReplayKit Motion Blur"
 _MOTION_BLUR_FILTER_ID   = "shader_filter"
 _RETIRED_MOTION_BLUR_FILTER_ID = "obs_composite_blur"
+_GAME_CAPTURE_SOURCE_ID  = "game_capture"
+_GAME_CAPTURE_SOURCE_NAME = "Game Capture"
+_GAME_CAPTURE_HOOK_RATE_FAST = 2
 _MOTION_BLUR_SOURCE_UUIDS = {
     "Display Capture": "e371efc8-8c99-44cb-95e7-94381d9c9e41",
     "Game Capture": "26bc5a11-5315-4390-b028-f77667c7fda3",
@@ -347,7 +350,7 @@ def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
         "recordingSoundVolume": int(getattr(prefs, "recording_sound_volume", 100)),
         "shareMode": getattr(prefs, "share_mode", "vcam"),
         "motionBlurEnabled": bool(getattr(prefs, "motion_blur_enabled", False)),
-        "motionBlurStrength": float(getattr(prefs, "motion_blur_strength", 0.07)),
+        "motionBlurStrength": float(getattr(prefs, "motion_blur_strength", 0.075)),
     }, indent=2)
 
 
@@ -728,6 +731,15 @@ def _ensure_bongo_scene_item(items: list, settings: dict, canvas_w: float, canva
         settings["id_counter"] = max(_scene_item_ids(items))
 
 
+def _apply_game_capture_defaults(source: dict) -> None:
+    if source.get("id") != _GAME_CAPTURE_SOURCE_ID and source.get("name") != _GAME_CAPTURE_SOURCE_NAME:
+        return
+    settings = source.setdefault("settings", {})
+    settings["capture_audio"] = False
+    settings["hook_rate"] = _GAME_CAPTURE_HOOK_RATE_FAST
+    settings["limit_framerate"] = True
+
+
 def apply_scenes_json(text: str, prefs: Preferences) -> str:
     """apply user prefs to the scenes file: mic device, display id, selected overlay, display + game capture fit-to-canvas, scripts-tool replaykit entry."""
     data    = json.loads(text)
@@ -740,7 +752,7 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
     use_input_overlay   = overlay_style == "input_overlay"
     use_bongo_cat       = overlay_style == "bongo_cat"
     use_motion_blur     = bool(getattr(prefs, "motion_blur_enabled", False))
-    motion_blur_strength = float(getattr(prefs, "motion_blur_strength", 0.07))
+    motion_blur_strength = float(getattr(prefs, "motion_blur_strength", 0.075))
     overlay_uuids       = _collect_overlay_uuids(sources)
     overlay_group_names = _collect_overlay_group_names(sources, groups)
 
@@ -767,6 +779,8 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
 
         elif sid == _MONITOR_SOURCE_ID and primary is not None:
             src.setdefault("settings", {})["monitor_id"] = primary.device_id
+
+        _apply_game_capture_defaults(src)
 
         if src.get("name") in _MOTION_BLUR_SOURCE_UUIDS:
             if use_motion_blur:

@@ -5,7 +5,7 @@ local cfg = {
     game_source    = "Game Capture",
     display_source = "Display Capture",
     scene_name     = "",
-    check_interval = 500,
+    check_interval = 1000,
     verbose        = false,
 }
 
@@ -26,6 +26,14 @@ local IGNORE_LIST = {
     ["logonui.exe"]                 = true,
     ["dwm.exe"]                     = true,
     ["taskmgr.exe"]                 = true,
+    ["snippingtool.exe"]            = true,
+    ["screenclippinghost.exe"]      = true,
+    -- Roblox's player/client hooks are unreliable for this workflow; keep it on Display Capture.
+    ["robloxplayer.exe"]            = true,
+    ["robloxplayerbeta.exe"]        = true,
+    ["robloxplayerlauncher.exe"]    = true,
+    ["robloxstudiobeta.exe"]        = true,
+    ["windows10universal.exe"]      = true,
 }
 
 local GRAPHICS_APIS = {
@@ -37,10 +45,16 @@ local GRAPHICS_APIS = {
     ["vulkan-1.dll"] = true,
 }
 
-local hook_blocked         = {}
-local HOOK_CHECK_DELAY     = 3000
-local pending_exe          = nil
-local hook_check_scheduled = false
+local hook_blocked             = {}
+local graphics_api_seen        = {}
+local HOOK_CHECK_INITIAL_DELAY = 2000
+local HOOK_CHECK_INTERVAL      = 1000
+local HOOK_CHECK_MAX_ATTEMPTS  = 10
+local DESKTOP_SWITCH_GRACE     = 1000
+local pending_exe              = nil
+local pending_attempts         = 0
+local hook_check_scheduled     = false
+local desktop_switch_scheduled = false
 
 ffi.cdef[[
     typedef void*          HWND;
@@ -197,14 +211,46 @@ local function apply_switch(game_active)
     obs.source_list_release(scenes)
 end
 
+local hook_check_callback
+local desktop_switch_callback
+
+local function schedule_hook_check(delay_ms)
+    if hook_check_scheduled then
+        obs.timer_remove(hook_check_callback)
+    end
+    hook_check_scheduled = true
+    obs.timer_add(hook_check_callback, delay_ms)
+end
+
+local function cancel_hook_check()
+    if hook_check_scheduled then
+        obs.timer_remove(hook_check_callback)
+        hook_check_scheduled = false
+    end
+    pending_exe      = nil
+    pending_attempts = 0
+end
+
+local function cancel_desktop_switch()
+    if desktop_switch_scheduled then
+        obs.timer_remove(desktop_switch_callback)
+        desktop_switch_scheduled = false
+    end
+end
+
+local function schedule_desktop_switch()
+    if desktop_switch_scheduled then return end
+    desktop_switch_scheduled = true
+    obs.timer_add(desktop_switch_callback, DESKTOP_SWITCH_GRACE)
+end
+
 -- named function so obs.timer_remove can actualy find and kill it
-local function hook_check_callback()
+function hook_check_callback()
     -- always remove self first — this is a one-shot
     obs.timer_remove(hook_check_callback)
     hook_check_scheduled = false
 
     local checked_exe = pending_exe
-    pending_exe = nil
 
     -- if theres no exe we were checking, nothing to do
     if checked_exe == nil then return end
@@ -213,19 +259,33 @@ local function hook_check_callback()
     local current_exe = get_exe_from_hwnd(ffi.C.GetForegroundWindow())
     if current_exe ~= checked_exe then
         log("Hook check cancelled — " .. checked_exe .. " is no longer foreground")
+        pending_exe      = nil
+        pending_attempts = 0
         return
     end
 
     if game_capture_is_live() then
         log("Hook confirmed live for " .. checked_exe)
+        pending_exe      = nil
+        pending_attempts = 0
+        return
+    end
+
+    pending_attempts = pending_attempts + 1
+    if pending_attempts < HOOK_CHECK_MAX_ATTEMPTS then
+        log(string.format("Waiting for Game Capture hook for %s (%d/%d)",
+            checked_exe, pending_attempts, HOOK_CHECK_MAX_ATTEMPTS))
+        schedule_hook_check(HOOK_CHECK_INTERVAL)
         return
     end
 
     -- still 0x0 and still in the foreground — genuinely hook-blocked
     print(string.format(
-        "[AutoSwitch] Game Capture got no frame from '%s' — hook blocked, falling back to Display Capture",
-        checked_exe))
+        "[AutoSwitch] Game Capture got no frame from '%s' after %d checks — falling back to Display Capture",
+        checked_exe, HOOK_CHECK_MAX_ATTEMPTS))
     hook_blocked[checked_exe] = true
+    pending_exe              = nil
+    pending_attempts         = 0
     apply_switch(false)
 end
 
@@ -252,7 +312,7 @@ local function is_exclusive_fullscreen(hwnd)
     end
 
     if hook_blocked[exe_lower] then
-        log("Hook-blocked (cached): " .. exe)
+        log("Hook-blocked: " .. exe)
         ffi.C.CloseHandle(handle)
         return false
     end
@@ -288,45 +348,61 @@ local function is_exclusive_fullscreen(hwnd)
         log(exe .. " is borderless windowed fullscreen")
     end
 
-    if not has_graphics_api(handle) then
+    if not graphics_api_seen[exe_lower] and not has_graphics_api(handle) then
         log(exe .. " has no graphics API — not a game")
         ffi.C.CloseHandle(handle)
         return false
     end
+    graphics_api_seen[exe_lower] = true
 
     ffi.C.CloseHandle(handle)
     return true, exe_lower
+end
+
+function desktop_switch_callback()
+    obs.timer_remove(desktop_switch_callback)
+    desktop_switch_scheduled = false
+
+    local hwnd = ffi.C.GetForegroundWindow()
+    local game_active = is_exclusive_fullscreen(hwnd)
+    if game_active then
+        log("Desktop switch cancelled — game returned before grace elapsed")
+        return
+    end
+
+    cancel_hook_check()
+    last_state = false
+    apply_switch(false)
+    print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
 end
 
 local function check_fullscreen()
     local hwnd             = ffi.C.GetForegroundWindow()
     local game_active, exe = is_exclusive_fullscreen(hwnd)
 
-    if game_active ~= last_state then
-        last_state = game_active
-        apply_switch(game_active)
-
-        if game_active then
-            -- cancel any previously scheduled check before scheduling a new one
-            if hook_check_scheduled then
-                obs.timer_remove(hook_check_callback)
-                hook_check_scheduled = false
-            end
-            pending_exe          = exe
-            hook_check_scheduled = true
-            obs.timer_add(hook_check_callback, HOOK_CHECK_DELAY)
+    if game_active then
+        cancel_desktop_switch()
+        if last_state ~= true then
+            last_state = true
+            apply_switch(true)
+            pending_exe      = exe
+            pending_attempts = 0
+            schedule_hook_check(HOOK_CHECK_INITIAL_DELAY)
             print(string.format("[AutoSwitch] %s → GAME MODE [%s] (verifying hook...)",
                 exe or "unknown", cfg.game_source))
-        else
-            -- tabbed out — cancel pending hook check so it never fires
-            if hook_check_scheduled then
-                obs.timer_remove(hook_check_callback)
-                hook_check_scheduled = false
-                pending_exe          = nil
-                log("Hook check cancelled — tabbed out before check fired")
-            end
-            print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
         end
+        return
+    end
+
+    if last_state == true then
+        schedule_desktop_switch()
+        return
+    end
+
+    if last_state ~= false then
+        last_state = false
+        apply_switch(false)
+        print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
     end
 end
 
@@ -334,7 +410,7 @@ function script_description()
     return [[<b>Universal Fullscreen Auto-Switch</b><br><br>
 Detects exclusive fullscreen games via graphics API (D3D/Vulkan/OpenGL).<br>
 Automatically falls back to Display Capture if Game Capture hook is blocked (e.g. anti-cheat).<br>
-Hook-blocked detection only fires if the game is still in the foreground after the delay.]]
+Game Capture stays active through brief focus changes to avoid hook churn.]]
 end
 
 function script_properties()
@@ -342,7 +418,7 @@ function script_properties()
     obs.obs_properties_add_text(props, "game_source",    "Game Capture source name",       obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(props, "display_source", "Display Capture source name",     obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(props, "scene_name",     "Scene to apply to (blank = all)", obs.OBS_TEXT_DEFAULT)
-    obs.obs_properties_add_int (props, "check_interval", "Check interval (ms)", 100, 5000, 100)
+    obs.obs_properties_add_int (props, "check_interval", "Check interval (ms)", 500, 5000, 250)
     obs.obs_properties_add_bool(props, "verbose",        "Verbose logging")
     return props
 end
@@ -351,22 +427,26 @@ function script_defaults(settings)
     obs.obs_data_set_default_string(settings, "game_source",    "Game Capture")
     obs.obs_data_set_default_string(settings, "display_source", "Display Capture")
     obs.obs_data_set_default_string(settings, "scene_name",     "")
-    obs.obs_data_set_default_int   (settings, "check_interval", 500)
+    obs.obs_data_set_default_int   (settings, "check_interval", 1000)
     obs.obs_data_set_default_bool  (settings, "verbose",        false)
 end
 
 function script_update(settings)
     obs.timer_remove(check_fullscreen)
     obs.timer_remove(hook_check_callback)
+    obs.timer_remove(desktop_switch_callback)
     hook_check_scheduled = false
+    desktop_switch_scheduled = false
     pending_exe          = nil
+    pending_attempts     = 0
     cfg.game_source    = obs.obs_data_get_string(settings, "game_source")
     cfg.display_source = obs.obs_data_get_string(settings, "display_source")
     cfg.scene_name     = obs.obs_data_get_string(settings, "scene_name")
-    cfg.check_interval = obs.obs_data_get_int   (settings, "check_interval")
+    cfg.check_interval = math.max(obs.obs_data_get_int(settings, "check_interval"), 1000)
     cfg.verbose        = obs.obs_data_get_bool  (settings, "verbose")
     last_state  = nil
     hook_blocked = {}
+    graphics_api_seen = {}
     obs.timer_add(check_fullscreen, cfg.check_interval)
     print("[AutoSwitch] Active — dynamic hook detection enabled")
 end
@@ -375,5 +455,6 @@ function script_load(settings)   script_update(settings) end
 function script_unload()
     obs.timer_remove(check_fullscreen)
     obs.timer_remove(hook_check_callback)
+    obs.timer_remove(desktop_switch_callback)
     print("[AutoSwitch] Unloaded.")
 end

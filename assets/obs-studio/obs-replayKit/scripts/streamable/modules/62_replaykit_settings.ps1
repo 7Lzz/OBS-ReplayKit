@@ -28,7 +28,7 @@ function Get-DefaultReplayKitSettings {
         clipSoundVolume          = 100
         recordingSoundVolume     = 100
         motionBlurEnabled        = $false
-        motionBlurStrength       = 0.07
+        motionBlurStrength       = 0.075
         # share-mode toggle on the dock. "vcam" = audio relays via OBS Stream Audio cable for the
         # virtual-camera path; "screenshare" = monitor off so plain discord desktop screenshare does
         # not double the audio. dock applies this to obs over websocket on each load. neutral name

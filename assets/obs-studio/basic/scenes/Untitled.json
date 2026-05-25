@@ -34,7 +34,9 @@
             "id": "game_capture",
             "versioned_id": "game_capture",
             "settings": {
-                "capture_audio": true
+                "capture_audio": false,
+                "hook_rate": 2,
+                "limit_framerate": true
             },
             "mixers": 255,
             "sync": 0,
