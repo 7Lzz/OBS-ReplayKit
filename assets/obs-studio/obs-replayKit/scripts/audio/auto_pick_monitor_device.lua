@@ -174,6 +174,9 @@ end
 
 local function virtual_priority(name)
     local lower = name:lower()
+    if lower:find("surround", 1, true) or lower:find("16ch", 1, true) then
+        return 999
+    end
     if lower == "obs stream audio" then
         return 0
     end
@@ -182,9 +185,6 @@ local function virtual_priority(name)
     end
     if lower:find("cable input", 1, true) then
         return 20
-    end
-    if lower:find("cable in 16ch", 1, true) then
-        return 30
     end
     return 999
 end

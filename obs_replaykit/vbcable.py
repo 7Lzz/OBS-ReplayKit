@@ -96,6 +96,9 @@ public struct PROPVARIANT {
 [ComImport, Guid("294935CE-F637-4E7C-A41B-AB255460B862")]
 public class _CPolicyConfigVistaClient { }
 
+[ComImport, Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")]
+public class _CPolicyConfigClient { }
+
 [Guid("568B9108-44BF-40B4-9006-86AFE5B5A620"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 public interface IPolicyConfigVistaClient {
@@ -110,6 +113,23 @@ public interface IPolicyConfigVistaClient {
     [PreserveSig] int SetPropertyValue(string deviceId, bool bFxStore, ref PROPERTYKEY key, ref PROPVARIANT pv);
     [PreserveSig] int SetDefaultEndpoint(string deviceId, uint role);
     [PreserveSig] int SetEndpointVisibility(string a, bool b);
+}
+
+[Guid("F8679F50-850A-41CF-9C72-430F290290C8"),
+ InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IPolicyConfigClient {
+    [PreserveSig] int GetMixFormat([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
+    [PreserveSig] int GetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a, int b, IntPtr c);
+    [PreserveSig] int ResetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a);
+    [PreserveSig] int SetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b, IntPtr c);
+    [PreserveSig] int GetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string a, int b, IntPtr c, IntPtr d);
+    [PreserveSig] int SetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
+    [PreserveSig] int GetShareMode([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
+    [PreserveSig] int SetShareMode([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
+    [PreserveSig] int GetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string a, ref PROPERTYKEY key, IntPtr pv);
+    [PreserveSig] int SetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string a, ref PROPERTYKEY key, ref PROPVARIANT pv);
+    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
+    [PreserveSig] int SetEndpointVisibility([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int visible);
 }
 
 public static class AudioHelper {
@@ -137,6 +157,10 @@ public static class AudioHelper {
     public static string GetDefaultCapture()     { return _GetDefault(1); }
     public static int    SetDefaultRender(string id)  { return _SetDefault(id); }
     public static int    SetDefaultCapture(string id) { return _SetDefault(id); }
+    public static int    SetEndpointVisible(string id, bool visible) {
+        var client = (IPolicyConfigClient)(new _CPolicyConfigClient());
+        return client.SetEndpointVisibility(id, visible ? 1 : 0);
+    }
     // Rename an endpoint's PKEY_Device_FriendlyName. The audio service
     // honours this even when direct registry writes are blocked by the
     // TrustedInstaller ACL on \MMDevices\Audio\...\<guid>\Properties.
@@ -233,19 +257,28 @@ $renames = @{{
 $render  = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render'
 $capture = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Capture'
 $friendlyKey = '{{a45c254e-df1c-4efd-8020-67d146a850e0}},2'
+$hiddenStateFlag = 0x10000000
 
 $successes = 0
+$hidden = 0
 foreach ($root in @($render, $capture)) {{
     foreach ($guid in (Get-ChildItem $root -ErrorAction SilentlyContinue).PSChildName) {{
+        $endpoint = Join-Path $root $guid
         $props = Join-Path $root "$guid\\Properties"
         if (-not (Test-Path $props)) {{ continue }}
         $cur = (Get-ItemProperty -LiteralPath $props -Name $friendlyKey -ErrorAction SilentlyContinue).$friendlyKey
         if (-not $cur) {{ continue }}
+        $state = (Get-ItemProperty -LiteralPath $endpoint -Name 'DeviceState' -ErrorAction SilentlyContinue).DeviceState
+        if ($null -eq $state) {{ $state = 0 }}
         $newName = $null
+        $lower = $cur.ToLowerInvariant()
+        $hideEndpoint = $lower.StartsWith('cable in 16ch') -or
+            $lower.StartsWith('cable out 16ch') -or
+            $lower -eq 'obs stream audio (surround)' -or
+            $lower -eq 'obs stream audio loopback (surround)'
         if ($renames.ContainsKey($cur)) {{
             $newName = $renames[$cur]
         }} else {{
-            $lower = $cur.ToLowerInvariant()
             if ($lower.StartsWith('cable input')) {{
                 $newName = 'OBS Stream Audio'
             }} elseif ($lower.StartsWith('cable in 16ch')) {{
@@ -256,22 +289,35 @@ foreach ($root in @($render, $capture)) {{
                 $newName = 'OBS Stream Audio Loopback (Surround)'
             }}
         }}
-        if (-not $newName) {{ continue }}
+        if (-not $newName -and -not $hideEndpoint) {{ continue }}
 
         # mmdevice id format: "{{0.0.x.00000000}}.{{guid}}" -- x=0 render, x=1 capture.
         $dataFlow = if ($root -eq $render) {{ '0' }} else {{ '1' }}
         $deviceId = "{{0.0.$dataFlow.00000000}}.$guid"
-        $rc = [AudioHelper]::RenameEndpoint($deviceId, $newName)
-        if ($rc -eq 0) {{
-            $successes++
-            Write-Host "renamed: $cur -> $newName"
-        }} else {{
-            Write-Host "rename FAILED for ${{cur}}: rc=0x$('{{0:x}}' -f $rc)"
+        if ($newName) {{
+            $rc = [AudioHelper]::RenameEndpoint($deviceId, $newName)
+            if ($rc -eq 0) {{
+                $successes++
+                Write-Host "renamed: $cur -> $newName"
+            }} else {{
+                Write-Host "rename FAILED for ${{cur}}: rc=0x$('{{0:x}}' -f $rc)"
+            }}
+        }}
+        if ($hideEndpoint -and (($state -band 1) -ne 0) -and (($state -band $hiddenStateFlag) -eq 0)) {{
+            $label = $cur
+            if ($newName) {{ $label = $newName }}
+            $vrc = [AudioHelper]::SetEndpointVisible($deviceId, $false)
+            if ($vrc -eq 0) {{
+                $hidden++
+                Write-Host "hidden: $label"
+            }} else {{
+                Write-Host "hide FAILED for ${{label}}: rc=0x$('{{0:x}}' -f $vrc)"
+            }}
         }}
     }}
 }}
 
-if ($successes -gt 0) {{
+if (($successes + $hidden) -gt 0) {{
     # bounce the audio stack so the new names appear in the sound output picker + quick settings without a reboot. win11 quick settings is fed by audioendpointbuilder + a shell cache in explorer.exe, both of which hold their own copies. start-service on the parent doesnt cascade-start dependents, so audiosrv needs an explicit start after audioendpointbuilder -- skip it and the user loses audio until reboot.
     Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
     Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
@@ -283,9 +329,9 @@ if ($successes -gt 0) {{
     # sanity-report so the install log shows whether anythings still stopped.
     $aeb = (Get-Service AudioEndpointBuilder -ErrorAction SilentlyContinue).Status
     $asr = (Get-Service Audiosrv               -ErrorAction SilentlyContinue).Status
-    Write-Host "renames=$successes audio-stack=AEB:$aeb Audiosrv:$asr explorer=restarted"
+    Write-Host "renames=$successes hidden=$hidden audio-stack=AEB:$aeb Audiosrv:$asr explorer=restarted"
 }} else {{
-    Write-Host "renames=0 audio-stack=unchanged explorer=unchanged"
+    Write-Host "renames=0 hidden=0 audio-stack=unchanged explorer=unchanged"
 }}
 """
 

@@ -111,14 +111,14 @@ def _list_render_endpoints() -> List[AudioDevice]:
 def _replaykit_monitor_rank(name: str) -> Optional[int]:
     """Rank only the ReplayKit/VB-CABLE render sink; never match normal speakers."""
     lower = name.strip().lower()
+    if "surround" in lower or "16ch" in lower:
+        return None
     if lower == "obs stream audio":
         return 0
     if lower.startswith("obs stream audio") and "loopback" not in lower:
         return 10
     if lower.startswith("cable input"):
         return 20
-    if lower.startswith("cable in 16ch"):
-        return 30
     return None
 
 
