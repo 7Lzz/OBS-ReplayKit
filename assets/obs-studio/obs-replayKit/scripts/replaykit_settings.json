@@ -18,5 +18,8 @@
   "autoUpdateEnabled": true,
   "lastUpdatePromptVersion": "",
   "clipSoundVolume": 100,
-  "recordingSoundVolume": 100
+  "recordingSoundVolume": 100,
+  "shareMode": "vcam",
+  "motionBlurEnabled": false,
+  "motionBlurStrength": 0.07
 }

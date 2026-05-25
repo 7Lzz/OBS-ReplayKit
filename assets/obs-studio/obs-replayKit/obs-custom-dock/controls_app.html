@@ -141,6 +141,26 @@
   }
   .btn.primary:hover { background-color: var(--primary_light); }
 
+  /* share-mode toggle. purple when virtual camera + obs audio relay is the active path to discord;
+     plain grey (default .btn) when monitoring is off and discord screenshares own audio path is
+     used. state is persisted in replaykit_settings.json as shareMode and synced into obs over the
+     existing websocket on each dock load. border-color matches background and focus-visible is
+     overridden so there is no visible outline around the button in any state. */
+  .btn.mode-vcam {
+    background-color: #8B5CF6;
+    border-color: #8B5CF6;
+  }
+  .btn.mode-vcam:hover {
+    background-color: #A78BFA;
+    border-color: #A78BFA;
+  }
+  .btn.mode-vcam:focus-visible {
+    border-color: #8B5CF6;
+  }
+  .btn.mode-vcam:hover:focus-visible {
+    border-color: #A78BFA;
+  }
+
   /* auth row: third button stacks under view clips; "sign in" when out, "signed in" with a green dot when in. click signed-in opens a tiny dropdown menu (with sign out); click signed-out opens the login modal. */
   .auth-wrap { position: relative; }
   .auth-wrap .btn {
@@ -233,7 +253,7 @@
 <body style="background:#272A33;color:#FFFFFF">
   <div id="controlsFrame">
     <button class="btn" id="save-replay-btn">Save Clip</button>
-    <button class="btn" id="upload-btn">Upload Last Clip</button>
+    <button class="btn" id="mode-btn">Loading share mode...</button>
     <button class="btn" id="view-clips-btn">View Clips</button>
     <button class="btn" id="open-folder-btn">Open Folder</button>
     <div class="auth-wrap" id="auth-wrap">
@@ -271,48 +291,39 @@
     ? location.origin + "/"
     : "http://127.0.0.1:8767/";
 
-  const POLL_ACTIVE_MS = 1000;
   const POLL_IDLE_MS = 5000;
   const UPDATE_STARTUP_CHECK_DELAY_MS = 8000;
+  const SHARE_MODE_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000, 5000];
 
-  const S = Object.freeze({
-    IDLE: "idle",
-    TRIGGERED: "triggered",
-    COMPRESSING: "compressing",
-    UPLOADING: "uploading",
-    DONE: "done",
-    ERROR: "error",
-  });
-
-  const uploadBtn = document.getElementById("upload-btn");
+  // share-mode constants. these match the values written into replaykit_settings.json so the
+  // settings page and dock agree on the spelling. NOT called "streaming" because that would clash
+  // with twitch/youtube streaming presets, which are a separate concept.
+  const MODE_VCAM = "vcam";
+  const MODE_SCREENSHARE = "screenshare";
+  const modeBtn = document.getElementById("mode-btn");
   const viewClipsBtn = document.getElementById("view-clips-btn");
   const saveReplayBtn = document.getElementById("save-replay-btn");
   const openFolderBtn = document.getElementById("open-folder-btn");
   const settingsBtn = document.getElementById("settings-btn");
 
-  let state = S.IDLE;
   let pollTimerId = null;
-  let flashTimer  = null;
+  let helperConnected = false;
+  let shareModeLoaded = false;
+  let shareModeLoadTimer = null;
+  let shareModeLoadAttempt = 0;
 
-  function setConnected(yes) {
-    uploadBtn.classList.toggle("is-disconnected", !yes);
+  function setConnected(yes, options) {
+    const changed = helperConnected !== yes;
+    const skipShareModeLoad = options && options.skipShareModeLoad;
+    helperConnected = yes;
+    modeBtn.classList.toggle("is-disconnected", !yes);
     viewClipsBtn.classList.toggle("is-disconnected", !yes);
     saveReplayBtn.classList.toggle("is-disconnected", !yes);
     openFolderBtn.classList.toggle("is-disconnected", !yes);
     settingsBtn.classList.toggle("is-disconnected", !yes);
-  }
-
-  // brief tinted message on the upload button itself -- used for done ("link copied!") and error ("upload failed"). after `ms` the button returns to its idle "upload last clip" label. the powershell helper already auto-copies the url to the clipboard and pops a windows toast, so the dock just needs to ack visually.
-  function flashUploadBtn(text, cls, ms) {
-    if (flashTimer) { clearTimeout(flashTimer); flashTimer = null; }
-    uploadBtn.textContent = text;
-    uploadBtn.classList.remove("is-busy", "is-flash-success", "is-flash-error");
-    if (cls) uploadBtn.classList.add(cls);
-    flashTimer = setTimeout(() => {
-      uploadBtn.classList.remove("is-flash-success", "is-flash-error");
-      uploadBtn.textContent = "Upload Last Clip";
-      flashTimer = null;
-    }, ms);
+    if (!skipShareModeLoad && yes && (changed || !shareModeLoaded) && !modeApplyInFlight) {
+      scheduleLoadShareMode(0);
+    }
   }
 
   function flashButton(btn, text, cls, ms, fallbackText) {
@@ -324,46 +335,6 @@
       btn.textContent = fallbackText;
       btn.disabled = false;
     }, ms);
-  }
-
-  function setState(next, data) {
-    state = next;
-    data = data || {};
-    if (next !== S.DONE && next !== S.ERROR && flashTimer) {
-      // leaving a flashed state -- cancel its pending revert so we dont snap the label back mid-upload.
-      clearTimeout(flashTimer); flashTimer = null;
-      uploadBtn.classList.remove("is-flash-success", "is-flash-error");
-    }
-    switch (next) {
-      case S.IDLE:
-        uploadBtn.textContent = "Upload Last Clip";
-        uploadBtn.classList.remove("is-busy");
-        break;
-      case S.TRIGGERED:
-        uploadBtn.textContent = "Sending...";
-        uploadBtn.classList.add("is-busy");
-        break;
-      case S.COMPRESSING:
-        uploadBtn.textContent = "Compressing"
-          + (data.percent ? " " + data.percent + "%" : "")
-          + " - Cancel";
-        uploadBtn.classList.add("is-busy");
-        break;
-      case S.UPLOADING:
-        uploadBtn.textContent = "Uploading"
-          + (data.percent ? " " + data.percent + "%" : "")
-          + " - Cancel";
-        uploadBtn.classList.add("is-busy");
-        break;
-      case S.DONE:
-        flashUploadBtn("Link copied to clipboard", "is-flash-success", 2500);
-        break;
-      case S.ERROR:
-        // trim long errors so the button doesnt overflow the dock.
-        flashUploadBtn(("Upload failed: " + (data.error || "")).slice(0, 60),
-                       "is-flash-error", 4500);
-        break;
-    }
   }
 
   async function helperJson(path, options) {
@@ -450,40 +421,15 @@
     }
   }
 
-  function applyStatus(s) {
-    setConnected(true);
-    if (s.state === "compressing") {
-      setState(S.COMPRESSING, { clipName: s.clipName, percent: Number(s.percent) || 0, phase: s.phase || "" });
-    } else if (s.state === "uploading") {
-      setState(S.UPLOADING, { clipName: s.clipName, percent: Number(s.percent) || 0, phase: s.phase || "" });
-    } else if (s.state === "done" && s.url) {
-      // only flash on the in-dock transition out of an active upload. if the dock just loaded and the helper still has a stale "done" status from a previous session, dont pop the success flash for no reason.
-      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
-        setState(S.DONE, { url: s.url });
-      }
-    } else if (s.state === "error" && s.error) {
-      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
-        setState(S.ERROR, { error: s.error });
-      }
-    } else if (state !== S.DONE && state !== S.ERROR) {
-      setState(S.IDLE);
-    }
-  }
-
+  // helper liveness check. without the per-second upload-state polling the dock used to do, this
+  // just keeps the disconnected styling in sync with whether the helper is responding.
   async function pollStatus() {
     try {
-      applyStatus(await helperJson("status?t=" + Date.now()));
+      await helperJson("status?t=" + Date.now());
+      setConnected(true);
     } catch {
       setConnected(false);
-      if (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING) {
-        setState(S.ERROR, { error: "Upload helper is offline. Reload streamable_upload.lua." });
-      }
     }
-  }
-
-  function nextPollDelay() {
-    return (state === S.TRIGGERED || state === S.COMPRESSING || state === S.UPLOADING)
-      ? POLL_ACTIVE_MS : POLL_IDLE_MS;
   }
 
   function schedulePoll() {
@@ -491,7 +437,7 @@
     pollTimerId = setTimeout(async () => {
       await pollStatus();
       schedulePoll();
-    }, nextPollDelay());
+    }, POLL_IDLE_MS);
   }
 
   function styleClipsTaskbarWindow() {
@@ -662,36 +608,120 @@
     }
   });
 
-  async function cancelActiveUpload() {
-    uploadBtn.textContent = "Cancelling...";
-    try { await helperJson("cancel-upload", { method: "POST" }); }
-    catch {}
-    setState(S.ERROR, { error: "Cancelled" });
-    schedulePoll();
+  // share-mode toggle. flips Desktop Audio (excl. Discord) between Monitor and Output (audio
+  // relays through the obs stream audio cable -> voicemeeter -> discord voice channel, used when
+  // sharing via virtual camera or screensharing the obs scene window) and Monitor Off (relay is
+  // disabled, used for plain discord desktop screenshare so the audio is not doubled). also starts
+  // or stops the obs virtual camera output to save gpu/cpu when its not the active discord source.
+  // the chosen mode is persisted in replaykit_settings.shareMode and re-applied on every dock
+  // load so obs and the dock stay in sync across restarts. NOT called "streaming mode" or
+  // "discord mode" to avoid colliding with twitch/youtube streaming presets and to keep the name
+  // neutral -- this is about how the user shares with friends in a call.
+  let currentShareMode = MODE_VCAM;
+  let modeApplyInFlight = false;
+
+  function paintModeButton(mode) {
+    const isVcam = mode === MODE_VCAM;
+    modeBtn.classList.toggle("mode-vcam", isVcam);
+    modeBtn.textContent = isVcam
+      ? "Share screen with virtual camera (discord)"
+      : "Normal share screen (discord)";
+    modeBtn.title = isVcam
+      ? "Sharing through OBS Virtual Camera. OBS audio is relayed to Discord through the OBS Stream Audio cable. Click to switch to plain Discord desktop screenshare (avoids the doubled-audio path)."
+      : "Sharing through plain Discord desktop screenshare. OBS audio relay is off so friends do not hear the same audio twice. Click to switch back to Virtual Camera Mode.";
   }
 
-  uploadBtn.addEventListener("click", async () => {
-    if (state === S.COMPRESSING || state === S.UPLOADING) {
-      await cancelActiveUpload();
+  async function saveShareMode(mode) {
+    return await helperJson("settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shareMode: mode }),
+    });
+  }
+
+  async function loadShareMode() {
+    if (modeApplyInFlight) return;
+    if (shareModeLoadTimer) {
+      clearTimeout(shareModeLoadTimer);
+      shareModeLoadTimer = null;
+    }
+    let saved = "";
+    try {
+      const payload = await helperJson("settings?t=" + Date.now());
+      saved = payload && payload.settings && payload.settings.shareMode;
+      setConnected(true, { skipShareModeLoad: true });
+    } catch (e) {
+      shareModeLoaded = false;
+      setConnected(false);
+      const delay = SHARE_MODE_RETRY_DELAYS_MS[Math.min(shareModeLoadAttempt, SHARE_MODE_RETRY_DELAYS_MS.length - 1)];
+      shareModeLoadAttempt += 1;
+      modeBtn.classList.remove("mode-vcam");
+      modeBtn.textContent = shareModeLoadAttempt < 4 ? "Starting ReplayKit..." : "ReplayKit unavailable";
+      modeBtn.title = "ReplayKit helper is not responding yet. Retrying automatically. Last error: " + (e.message || e);
+      scheduleLoadShareMode(delay);
       return;
     }
-    if (state === S.TRIGGERED) return;
-    setState(S.TRIGGERED);
-    schedulePoll();
+    if (saved !== MODE_VCAM && saved !== MODE_SCREENSHARE) {
+      shareModeLoaded = false;
+      modeBtn.classList.remove("mode-vcam");
+      modeBtn.textContent = "Share mode invalid";
+      modeBtn.title = "ReplayKit returned an invalid share mode. Open Custom Settings or re-run setup.";
+      return;
+    }
+    shareModeLoaded = true;
+    shareModeLoadAttempt = 0;
+    currentShareMode = saved;
+    paintModeButton(currentShareMode);
     try {
-      const result = await helperJson("upload-latest", { method: "POST" });
-      if (result.ok) {
-        setState(S.UPLOADING, { clipName: result.clip });
-      } else {
-        setState(S.ERROR, { error: result.message || "Upload failed" });
+      await saveShareMode(currentShareMode);
+    } catch (_) {}
+  }
+
+  function scheduleLoadShareMode(delay) {
+    if (shareModeLoadTimer) clearTimeout(shareModeLoadTimer);
+    shareModeLoadTimer = setTimeout(() => {
+      shareModeLoadTimer = null;
+      loadShareMode();
+    }, delay);
+  }
+
+  modeBtn.addEventListener("click", async () => {
+    if (modeApplyInFlight) return;
+    modeApplyInFlight = true;
+    modeBtn.classList.add("is-busy");
+    const previous = currentShareMode;
+    const next = currentShareMode === MODE_VCAM ? MODE_SCREENSHARE : MODE_VCAM;
+    let saved = false;
+    try {
+      const result = await saveShareMode(next);
+      saved = true;
+      const savedMode = result && result.settings && result.settings.shareMode;
+      currentShareMode = (savedMode === MODE_VCAM || savedMode === MODE_SCREENSHARE) ? savedMode : next;
+      paintModeButton(currentShareMode);
+      const warnings = Array.isArray(result && result.warnings) ? result.warnings : [];
+      if (warnings.length) {
+        const fallbackText = modeBtn.textContent;
+        flashButton(modeBtn, ("Mode saved; OBS apply warning").slice(0, 42),
+                    "is-flash-error", 3000, fallbackText);
       }
     } catch (e) {
-      setState(S.ERROR, { error: e.message || String(e) });
+      currentShareMode = saved ? next : previous;
+      paintModeButton(currentShareMode);
+      const fallbackText = modeBtn.textContent;
+      const prefix = saved ? "Mode saved; restart OBS: " : "Mode save failed: ";
+      flashButton(modeBtn, (prefix + (e.message || e)).slice(0, 42),
+                  "is-flash-error", 3000, fallbackText);
+    } finally {
+      modeBtn.classList.remove("is-busy");
+      modeApplyInFlight = false;
     }
   });
 
   pollStatus().then(schedulePoll);
   scheduleStartupUpdateCheck();
+  // paint the persisted share mode and sync it into obs (obs may have come up with the scene
+  // file default monitor state which can differ from the users last choice).
+  scheduleLoadShareMode(0);
 
   // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
   const authBtn    = document.getElementById("auth-btn");

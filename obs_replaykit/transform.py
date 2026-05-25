@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from .config import INPUT_OVERLAY_TARGET, OBS_CONFIG
+from .config import INPUT_OVERLAY_TARGET, OBS_CONFIG, PROGRAMFILES_OBS_DIR
 from .display import primary_display
 from .dock import DOCK_TARGET
 from .encoder import EncoderChoice, pick_encoder
@@ -285,6 +285,13 @@ _BONGO_CAT_ITEM_ID       = 13
 _MIC_SOURCE_ID           = "wasapi_input_capture"
 _MONITOR_SOURCE_ID       = "monitor_capture"
 _GROUP_SOURCE_ID         = "group"
+_MOTION_BLUR_FILTER_NAME = "ReplayKit Motion Blur"
+_MOTION_BLUR_FILTER_ID   = "shader_filter"
+_RETIRED_MOTION_BLUR_FILTER_ID = "obs_composite_blur"
+_MOTION_BLUR_SOURCE_UUIDS = {
+    "Display Capture": "e371efc8-8c99-44cb-95e7-94381d9c9e41",
+    "Game Capture": "26bc5a11-5315-4390-b028-f77667c7fda3",
+}
 
 # Match an input-overlay preset path and capture the tail so it can be re-rooted.
 _INPUT_OVERLAY_PATH_RE = re.compile(
@@ -338,6 +345,9 @@ def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
         "trimPreciseDefault": bool(prefs.trim_precise_default),
         "clipSoundVolume": int(getattr(prefs, "clip_sound_volume", 100)),
         "recordingSoundVolume": int(getattr(prefs, "recording_sound_volume", 100)),
+        "shareMode": getattr(prefs, "share_mode", "vcam"),
+        "motionBlurEnabled": bool(getattr(prefs, "motion_blur_enabled", False)),
+        "motionBlurStrength": float(getattr(prefs, "motion_blur_strength", 0.07)),
     }, indent=2)
 
 
@@ -483,6 +493,94 @@ def _remove_sources_by_uuid_or_id(sources: list, uuids: set, source_id: str) -> 
 
 def _remove_bongo_sources(sources: list) -> None:
     _remove_sources_by_uuid_or_id(sources, {_BONGO_CAT_SOURCE_UUID}, _BONGO_CAT_SOURCE_ID)
+
+
+def _motion_blur_shader_path() -> str:
+    return (PROGRAMFILES_OBS_DIR / "data" / "obs-plugins" / "obs-shaderfilter" / "examples" / "motion_blur.shader").as_posix()
+
+
+def _motion_blur_filter_settings(strength: float) -> dict:
+    return {
+        "from_file": True,
+        "shader_file_name": _motion_blur_shader_path(),
+        "override_entire_effect": False,
+        "strength": max(0.0, min(1.0, float(strength))),
+    }
+
+
+def _new_motion_blur_filter(source_name: str, enabled: bool, strength: float) -> dict:
+    return {
+        "prev_ver": 536936450,
+        "name": _MOTION_BLUR_FILTER_NAME,
+        "uuid": _MOTION_BLUR_SOURCE_UUIDS[source_name],
+        "id": _MOTION_BLUR_FILTER_ID,
+        "versioned_id": _MOTION_BLUR_FILTER_ID,
+        "settings": _motion_blur_filter_settings(strength),
+        "mixers": 0,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": bool(enabled),
+        "muted": False,
+        "push-to-mute": False,
+        "push-to-mute-delay": 0,
+        "push-to-talk": False,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "private_settings": {},
+    }
+
+
+def _is_shaderfilter_motion_blur(filter_obj: dict) -> bool:
+    settings = filter_obj.get("settings", {})
+    shader_file = str(settings.get("shader_file_name", "")).replace("\\", "/").lower()
+    return filter_obj.get("id") == _MOTION_BLUR_FILTER_ID and shader_file.endswith("/motion_blur.shader")
+
+
+def _apply_motion_blur_filter(src: dict, enabled: bool, strength: float) -> None:
+    source_name = str(src.get("name", ""))
+    if source_name not in _MOTION_BLUR_SOURCE_UUIDS:
+        return
+    filters = src.get("filters")
+    if not isinstance(filters, list):
+        filters = []
+        src["filters"] = filters
+
+    found = False
+    for filter_obj in filters:
+        if (
+            filter_obj.get("name") == _MOTION_BLUR_FILTER_NAME
+            or filter_obj.get("uuid") == _MOTION_BLUR_SOURCE_UUIDS[source_name]
+            or filter_obj.get("id") == _RETIRED_MOTION_BLUR_FILTER_ID
+            or _is_shaderfilter_motion_blur(filter_obj)
+        ):
+            filter_obj.update(_new_motion_blur_filter(source_name, enabled, strength))
+            found = True
+            break
+    if not found:
+        filters.append(_new_motion_blur_filter(source_name, enabled, strength))
+
+
+def _remove_motion_blur_filter(src: dict) -> None:
+    filters = src.get("filters")
+    if not isinstance(filters, list):
+        return
+    managed_uuid = _MOTION_BLUR_SOURCE_UUIDS.get(str(src.get("name", "")))
+    filters[:] = [
+        item for item in filters
+        if (
+            item.get("name") != _MOTION_BLUR_FILTER_NAME
+            and item.get("uuid") != managed_uuid
+            and item.get("id") != _RETIRED_MOTION_BLUR_FILTER_ID
+            and not _is_shaderfilter_motion_blur(item)
+        )
+    ]
+    if not filters:
+        src.pop("filters", None)
 
 
 def _new_bongo_source() -> dict:
@@ -641,6 +739,8 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
     overlay_style       = _selected_overlay_style(prefs)
     use_input_overlay   = overlay_style == "input_overlay"
     use_bongo_cat       = overlay_style == "bongo_cat"
+    use_motion_blur     = bool(getattr(prefs, "motion_blur_enabled", False))
+    motion_blur_strength = float(getattr(prefs, "motion_blur_strength", 0.07))
     overlay_uuids       = _collect_overlay_uuids(sources)
     overlay_group_names = _collect_overlay_group_names(sources, groups)
 
@@ -668,7 +768,13 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
         elif sid == _MONITOR_SOURCE_ID and primary is not None:
             src.setdefault("settings", {})["monitor_id"] = primary.device_id
 
-        elif sid == _INPUT_OVERLAY_SOURCE_ID:
+        if src.get("name") in _MOTION_BLUR_SOURCE_UUIDS:
+            if use_motion_blur:
+                _apply_motion_blur_filter(src, True, motion_blur_strength)
+            else:
+                _remove_motion_blur_filter(src)
+
+        if sid == _INPUT_OVERLAY_SOURCE_ID:
             src["enabled"] = use_input_overlay
             _resolve_overlay_paths(src)
 

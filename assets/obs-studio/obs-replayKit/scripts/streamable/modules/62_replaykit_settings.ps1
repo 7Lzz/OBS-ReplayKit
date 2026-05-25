@@ -27,6 +27,13 @@ function Get-DefaultReplayKitSettings {
         lastUpdatePromptVersion  = ''
         clipSoundVolume          = 100
         recordingSoundVolume     = 100
+        motionBlurEnabled        = $false
+        motionBlurStrength       = 0.07
+        # share-mode toggle on the dock. "vcam" = audio relays via OBS Stream Audio cable for the
+        # virtual-camera path; "screenshare" = monitor off so plain discord desktop screenshare does
+        # not double the audio. dock applies this to obs over websocket on each load. neutral name
+        # (not "streaming" or "discord") to avoid collision with twitch/youtube streaming presets.
+        shareMode                = 'vcam'
     }
 }
 
@@ -55,6 +62,18 @@ function Get-IntSetting($data, [string]$key, [int]$default, [int]$min, [int]$max
     if (-not $data.ContainsKey($key)) { return $default }
     $n = $default
     if (-not [int]::TryParse(([string]$data[$key]), [ref]$n)) {
+        throw "Invalid number setting: $key"
+    }
+    if ($n -lt $min -or $n -gt $max) {
+        throw "$key must be between $min and $max."
+    }
+    return $n
+}
+
+function Get-FloatSetting($data, [string]$key, [double]$default, [double]$min, [double]$max) {
+    if (-not $data.ContainsKey($key)) { return $default }
+    $n = $default
+    if (-not [double]::TryParse(([string]$data[$key]), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$n)) {
         throw "Invalid number setting: $key"
     }
     if ($n -lt $min -or $n -gt $max) {
@@ -153,6 +172,9 @@ function Normalize-ReplayKitSettings($raw) {
         lastUpdatePromptVersion  = Get-VersionMarkerSetting $data 'lastUpdatePromptVersion' $defaults.lastUpdatePromptVersion
         clipSoundVolume          = Get-IntSetting $data 'clipSoundVolume' $defaults.clipSoundVolume 0 100
         recordingSoundVolume     = Get-IntSetting $data 'recordingSoundVolume' $defaults.recordingSoundVolume 0 100
+        motionBlurEnabled        = Get-BoolSetting $data 'motionBlurEnabled' $defaults.motionBlurEnabled
+        motionBlurStrength       = Get-FloatSetting $data 'motionBlurStrength' $defaults.motionBlurStrength 0.0 1.0
+        shareMode                = Get-EnumSetting $data 'shareMode' $defaults.shareMode @('vcam', 'screenshare')
     }
 }
 
@@ -962,12 +984,24 @@ function New-ReplayKitJsonObject {
 }
 
 function Set-ReplayKitJsonValue($obj, [string]$key, $value) {
-    if ($obj.ContainsKey($key)) { $obj[$key] = $value }
-    else { $obj.Add($key, $value) }
+    if ($obj -is [System.Collections.IDictionary]) {
+        if ($obj.ContainsKey($key)) { $obj[$key] = $value }
+        else { $obj.Add($key, $value) }
+        return
+    }
+    $prop = $obj.PSObject.Properties[$key]
+    if ($null -ne $prop) { $prop.Value = $value }
+    else { Add-Member -InputObject $obj -NotePropertyName $key -NotePropertyValue $value }
 }
 
 function Get-ReplayKitJsonValue($obj, [string]$key, $default = $null) {
-    if ($null -ne $obj -and $obj.ContainsKey($key)) { return ,$obj[$key] }
+    if ($null -eq $obj) { return ,$default }
+    if ($obj -is [System.Collections.IDictionary]) {
+        if ($obj.ContainsKey($key)) { return ,$obj[$key] }
+        return ,$default
+    }
+    $prop = $obj.PSObject.Properties[$key]
+    if ($null -ne $prop) { return ,$prop.Value }
     return ,$default
 }
 
@@ -1294,6 +1328,260 @@ function Remove-ReplayKitJsonListWhere($list, [scriptblock]$predicate) {
     }
 }
 
+function Get-ReplayKitMotionBlurFilterUuid([string]$sourceName) {
+    switch ($sourceName) {
+        'Display Capture' { return 'e371efc8-8c99-44cb-95e7-94381d9c9e41' }
+        'Game Capture'    { return '26bc5a11-5315-4390-b028-f77667c7fda3' }
+        default           { return '' }
+    }
+}
+
+function Get-ReplayKitObsInstallRoot {
+    $obs = [string]$script:OBS_EXE
+    if ([string]::IsNullOrWhiteSpace($obs) -or -not (Test-Path -LiteralPath $obs)) {
+        $candidate = Join-Path $env:ProgramFiles 'obs-studio\bin\64bit\obs64.exe'
+        if (Test-Path -LiteralPath $candidate) { $obs = $candidate }
+    }
+    try {
+        return [System.IO.Directory]::GetParent([System.IO.Directory]::GetParent([System.IO.Directory]::GetParent($obs).FullName).FullName).FullName
+    } catch {
+        return (Join-Path $env:ProgramFiles 'obs-studio')
+    }
+}
+
+function Get-ReplayKitShaderfilterMotionBlurPath {
+    $path = Join-Path (Get-ReplayKitObsInstallRoot) 'data\obs-plugins\obs-shaderfilter\examples\motion_blur.shader'
+    return $path.Replace('\', '/')
+}
+
+function Get-ReplayKitMotionBlurStrength([hashtable]$settings) {
+    $value = [double]$settings.motionBlurStrength
+    if ($value -lt 0.0) { return 0.0 }
+    if ($value -gt 1.0) { return 1.0 }
+    return $value
+}
+
+function Get-ReplayKitMotionBlurFilterSettingsJson([double]$strength) {
+    $settings = New-ReplayKitJsonObject
+    Set-ReplayKitJsonValue $settings 'from_file' $true
+    Set-ReplayKitJsonValue $settings 'shader_file_name' (Get-ReplayKitShaderfilterMotionBlurPath)
+    Set-ReplayKitJsonValue $settings 'override_entire_effect' $false
+    Set-ReplayKitJsonValue $settings 'strength' $strength
+    return ,$settings
+}
+
+function Get-ReplayKitMotionBlurFilterSettingsLive([double]$strength) {
+    return @{
+        from_file              = $true
+        shader_file_name       = (Get-ReplayKitShaderfilterMotionBlurPath)
+        override_entire_effect = $false
+        strength               = $strength
+    }
+}
+
+function Set-ReplayKitMotionBlurFilterJson($filter, [string]$sourceName, [bool]$enabled, [double]$strength) {
+    $uuid = Get-ReplayKitMotionBlurFilterUuid $sourceName
+    if ([string]::IsNullOrWhiteSpace($uuid)) { throw "Unsupported motion blur source: $sourceName" }
+    Set-ReplayKitJsonValue $filter 'prev_ver' 536936450
+    Set-ReplayKitJsonValue $filter 'name' 'ReplayKit Motion Blur'
+    Set-ReplayKitJsonValue $filter 'uuid' $uuid
+    Set-ReplayKitJsonValue $filter 'id' 'shader_filter'
+    Set-ReplayKitJsonValue $filter 'versioned_id' 'shader_filter'
+    Set-ReplayKitJsonValue $filter 'settings' (Get-ReplayKitMotionBlurFilterSettingsJson $strength)
+    Set-ReplayKitJsonValue $filter 'mixers' 0
+    Set-ReplayKitJsonValue $filter 'sync' 0
+    Set-ReplayKitJsonValue $filter 'flags' 0
+    Set-ReplayKitJsonValue $filter 'volume' 1.0
+    Set-ReplayKitJsonValue $filter 'balance' 0.5
+    Set-ReplayKitJsonValue $filter 'enabled' $enabled
+    Set-ReplayKitJsonValue $filter 'muted' $false
+    Set-ReplayKitJsonValue $filter 'push-to-mute' $false
+    Set-ReplayKitJsonValue $filter 'push-to-mute-delay' 0
+    Set-ReplayKitJsonValue $filter 'push-to-talk' $false
+    Set-ReplayKitJsonValue $filter 'push-to-talk-delay' 0
+    Set-ReplayKitJsonValue $filter 'hotkeys' (New-ReplayKitJsonObject)
+    Set-ReplayKitJsonValue $filter 'deinterlace_mode' 0
+    Set-ReplayKitJsonValue $filter 'deinterlace_field_order' 0
+    Set-ReplayKitJsonValue $filter 'monitoring_type' 0
+    Set-ReplayKitJsonValue $filter 'private_settings' (New-ReplayKitJsonObject)
+}
+
+function New-ReplayKitMotionBlurFilterJson([string]$sourceName, [bool]$enabled, [double]$strength) {
+    $filter = New-ReplayKitJsonObject
+    Set-ReplayKitMotionBlurFilterJson $filter $sourceName $enabled $strength
+    return ,$filter
+}
+
+function Test-ReplayKitShaderfilterMotionBlurJson($filter) {
+    if ([string](Get-ReplayKitJsonValue $filter 'id' '') -ne 'shader_filter') { return $false }
+    $filterSettings = Get-ReplayKitJsonValue $filter 'settings'
+    if ($null -eq $filterSettings) { return $false }
+    $shaderFile = [string](Get-ReplayKitJsonValue $filterSettings 'shader_file_name' '')
+    return $shaderFile.Replace('\', '/').ToLowerInvariant().EndsWith('/motion_blur.shader')
+}
+
+function Test-ReplayKitManagedMotionBlurJson($filter, [string]$uuid) {
+    $name = [string](Get-ReplayKitJsonValue $filter 'name' '')
+    $filterUuid = [string](Get-ReplayKitJsonValue $filter 'uuid' '')
+    $filterId = [string](Get-ReplayKitJsonValue $filter 'id' '')
+    return (
+        $name -eq 'ReplayKit Motion Blur' -or
+        $filterUuid -eq $uuid -or
+        $filterId -eq 'obs_composite_blur' -or
+        (Test-ReplayKitShaderfilterMotionBlurJson $filter)
+    )
+}
+
+function Set-ReplayKitMotionBlurSourceJson($source, [bool]$enabled, [double]$strength) {
+    $sourceName = [string](Get-ReplayKitJsonValue $source 'name' '')
+    $uuid = Get-ReplayKitMotionBlurFilterUuid $sourceName
+    if ([string]::IsNullOrWhiteSpace($uuid)) { return }
+
+    $filters = Get-ReplayKitJsonValue $source 'filters'
+    if ($null -eq $filters) {
+        $filters = [System.Collections.ArrayList]::new()
+    } else {
+        $filters = ConvertTo-ReplayKitJsonList $filters
+    }
+    Set-ReplayKitJsonValue $source 'filters' $filters
+
+    foreach ($filter in @($filters)) {
+        if (Test-ReplayKitManagedMotionBlurJson $filter $uuid) {
+            Set-ReplayKitMotionBlurFilterJson $filter $sourceName $enabled $strength
+            return
+        }
+    }
+    [void]$filters.Add((New-ReplayKitMotionBlurFilterJson $sourceName $enabled $strength))
+}
+
+function Remove-ReplayKitMotionBlurSourceJson($source) {
+    $sourceName = [string](Get-ReplayKitJsonValue $source 'name' '')
+    $uuid = Get-ReplayKitMotionBlurFilterUuid $sourceName
+    if ([string]::IsNullOrWhiteSpace($uuid)) { return }
+
+    $filters = Get-ReplayKitJsonValue $source 'filters'
+    if ($null -eq $filters) { return }
+    $filters = ConvertTo-ReplayKitJsonList $filters
+    Remove-ReplayKitJsonListWhere $filters {
+        param($filter)
+        Test-ReplayKitManagedMotionBlurJson $filter $uuid
+    }
+    Set-ReplayKitJsonValue $source 'filters' $filters
+}
+
+function Test-ReplayKitShaderfilterPluginInstalled {
+    $root = Get-ReplayKitObsInstallRoot
+    $dll = Join-Path $root 'obs-plugins\64bit\obs-shaderfilter.dll'
+    $shader = Join-Path $root 'data\obs-plugins\obs-shaderfilter\examples\motion_blur.shader'
+    return (Test-Path -LiteralPath $dll) -and (Test-Path -LiteralPath $shader)
+}
+
+function Get-ReplayKitMotionBlurLiveFilterName($filters) {
+    foreach ($filter in @($filters)) {
+        $name = [string](Get-ReplayKitJsonValue $filter 'filterName' '')
+        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        if ($name -eq 'ReplayKit Motion Blur') { return $name }
+        $kind = [string](Get-ReplayKitJsonValue $filter 'filterKind' '')
+        if ($kind -eq 'shader_filter') {
+            $filterSettings = Get-ReplayKitJsonValue $filter 'filterSettings'
+            $shaderFile = [string](Get-ReplayKitJsonValue $filterSettings 'shader_file_name' '')
+            if ($shaderFile.Replace('\', '/').ToLowerInvariant().EndsWith('/motion_blur.shader')) {
+                return $name
+            }
+        }
+    }
+    return ''
+}
+
+function Get-ReplayKitRetiredMotionBlurLiveFilterNames($filters) {
+    $names = @()
+    foreach ($filter in @($filters)) {
+        $name = [string](Get-ReplayKitJsonValue $filter 'filterName' '')
+        $kind = [string](Get-ReplayKitJsonValue $filter 'filterKind' '')
+        if ($name -and $kind -eq 'obs_composite_blur') { $names += $name }
+    }
+    return $names
+}
+
+function Apply-ReplayKitMotionBlurLive([hashtable]$settings) {
+    $warnings = @()
+    $applied = @()
+    $enabled = [bool]$settings.motionBlurEnabled
+    $strength = Get-ReplayKitMotionBlurStrength $settings
+    $filterName = 'ReplayKit Motion Blur'
+    $sourceNames = @('Display Capture', 'Game Capture')
+
+    if ($enabled -and -not (Test-ReplayKitShaderfilterPluginInstalled)) {
+        $warnings += 'Motion blur was saved, but OBS Shaderfilter is not installed. Re-run ReplayKit setup, then restart OBS after the plugin install.'
+        return @{ applied = $applied; warnings = $warnings }
+    }
+
+    foreach ($sourceName in $sourceNames) {
+        $list = Invoke-ObsWebSocketRequest 'GetSourceFilterList' @{ sourceName = $sourceName } 3000
+        if (-not $list.ok) {
+            $warnings += "Motion blur was saved, but ${sourceName} filters could not be read: $($list.message)"
+            continue
+        }
+        $filters = Get-ReplayKitJsonValue $list.data 'filters' $null
+        if ($null -eq $filters) {
+            $filters = Get-ReplayKitJsonValue $list.data 'sourceFilters' @()
+        }
+        foreach ($retiredName in @(Get-ReplayKitRetiredMotionBlurLiveFilterNames $filters)) {
+            $removeRetired = Invoke-ObsWebSocketRequest 'RemoveSourceFilter' @{
+                sourceName = $sourceName
+                filterName = $retiredName
+            } 3000
+            if (-not $removeRetired.ok) {
+                $warnings += "Could not remove retired ${sourceName} Composite Blur filter: $($removeRetired.message)"
+            }
+        }
+        $existingFilterName = Get-ReplayKitMotionBlurLiveFilterName $filters
+
+        if ($enabled) {
+            if (-not [string]::IsNullOrWhiteSpace($existingFilterName)) {
+                $set = Invoke-ObsWebSocketRequest 'SetSourceFilterSettings' @{
+                    sourceName     = $sourceName
+                    filterName     = $existingFilterName
+                    filterSettings = (Get-ReplayKitMotionBlurFilterSettingsLive $strength)
+                    overlay        = $false
+                } 3000
+                if (-not $set.ok) {
+                    $warnings += "Could not update ${sourceName} motion blur settings: $($set.message)"
+                    continue
+                }
+            } else {
+                $create = Invoke-ObsWebSocketRequest 'CreateSourceFilter' @{
+                    sourceName     = $sourceName
+                    filterName     = $filterName
+                    filterKind     = 'shader_filter'
+                    filterSettings = (Get-ReplayKitMotionBlurFilterSettingsLive $strength)
+                } 3000
+                if (-not $create.ok) {
+                    $warnings += "Could not create ${sourceName} motion blur filter: $($create.message)"
+                    continue
+                }
+                $existingFilterName = $filterName
+            }
+            $enable = Invoke-ObsWebSocketRequest 'SetSourceFilterEnabled' @{
+                sourceName    = $sourceName
+                filterName    = $existingFilterName
+                filterEnabled = $true
+            } 3000
+            if ($enable.ok) { $applied += "${sourceName} motion blur on" }
+            else { $warnings += "Could not enable ${sourceName} motion blur: $($enable.message)" }
+        } elseif (-not [string]::IsNullOrWhiteSpace($existingFilterName)) {
+            $remove = Invoke-ObsWebSocketRequest 'RemoveSourceFilter' @{
+                sourceName = $sourceName
+                filterName = $existingFilterName
+            } 3000
+            if ($remove.ok) { $applied += "${sourceName} motion blur off" }
+            else { $warnings += "Could not remove ${sourceName} motion blur filter: $($remove.message)" }
+        }
+    }
+
+    return @{ applied = $applied; warnings = $warnings }
+}
+
 function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset) {
     try {
         $path = Get-ReplayKitSceneCollectionPath
@@ -1319,6 +1607,8 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
         $overlayStyle = [string]$settings.overlayStyle
         $useInputOverlay = $overlayStyle -eq 'input_overlay'
         $useBongo = $overlayStyle -eq 'bongo_cat'
+        $useMotionBlur = [bool]$settings.motionBlurEnabled
+        $motionBlurStrength = Get-ReplayKitMotionBlurStrength $settings
         $inputSources = @{}
         $inputSourceNames = @('WASD Overlay', 'Mouse Overlay')
         $inputGroup = $null
@@ -1412,6 +1702,16 @@ function Set-ReplayKitOverlaySceneFile([hashtable]$settings, [hashtable]$preset)
                 [string](Get-ReplayKitJsonValue $source 'name' '') -eq 'Bongo Cat Overlay' -or
                     [string](Get-ReplayKitJsonValue $source 'id' '') -eq 'bongobs-cat' -or
                     (-not [string]::IsNullOrWhiteSpace($bongoUuid) -and [string](Get-ReplayKitJsonValue $source 'uuid' '') -eq $bongoUuid)
+            }
+        }
+
+        foreach ($source in @($sources)) {
+            $sourceName = [string](Get-ReplayKitJsonValue $source 'name' '')
+            if ($sourceName -ne 'Display Capture' -and $sourceName -ne 'Game Capture') { continue }
+            if ($useMotionBlur) {
+                Set-ReplayKitMotionBlurSourceJson $source $true $motionBlurStrength
+            } else {
+                Remove-ReplayKitMotionBlurSourceJson $source
             }
         }
 
@@ -1666,6 +1966,166 @@ function Apply-ReplayKitRuntimeOutputsLive([hashtable]$settings, [hashtable]$pre
     return @{ applied = $applied; warnings = $warnings }
 }
 
+function Apply-ReplayKitShareModeLive([string]$shareMode) {
+    $warnings = @()
+    $applied = @()
+    $inputName = 'Desktop Audio (excl. Discord)'
+    $isVcam = [string]$shareMode -eq 'vcam'
+    $monitorType = if ($isVcam) { 'OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT' } else { 'OBS_MONITORING_TYPE_NONE' }
+    $monitoringValue = if ($isVcam) { 2 } else { 0 }
+
+    $sceneFile = Set-ReplayKitShareModeSceneFile $monitoringValue $false
+    if ($sceneFile.ok -and $sceneFile.changed) {
+        $applied += if ($isVcam) { 'scene file desktop audio unmuted and monitor on' } else { 'scene file desktop audio unmuted and monitor off' }
+    } elseif (-not $sceneFile.ok) {
+        $warnings += "Share mode was saved, but the scene file monitor state could not be updated: $($sceneFile.message)"
+    }
+
+    $mixer = Set-ReplayKitDesktopAudioMixerState $inputName $monitorType
+    if ($mixer.ok) {
+        $applied += $mixer.applied
+    } else {
+        $warnings += "Share mode was saved, but Desktop Audio mixer state could not be changed: $($mixer.message)"
+    }
+
+    $status = Invoke-ObsWebSocketRequest 'GetVirtualCamStatus' $null 3000
+    if (-not $status.ok) {
+        $warnings += "Share mode was saved, but virtual camera state could not be read: $($status.message)"
+        return @{ applied = $applied; warnings = $warnings; restartRequired = $false; restartReason = '' }
+    }
+
+    $running = [bool]$status.data.outputActive
+    if ($isVcam -and -not $running) {
+        $start = Invoke-ObsWebSocketRequest 'StartVirtualCam' $null 8000
+        if ($start.ok) { $applied += 'virtual camera started' }
+        else { $warnings += "Share mode was saved, but virtual camera could not be started: $($start.message)" }
+    } elseif ((-not $isVcam) -and $running) {
+        $stop = Invoke-ObsWebSocketRequest 'StopVirtualCam' $null 8000
+        if ($stop.ok) { $applied += 'virtual camera stopped' }
+        else { $warnings += "Share mode was saved, but virtual camera could not be stopped: $($stop.message)" }
+    } else {
+        $applied += if ($isVcam) { 'virtual camera already on' } else { 'virtual camera already off' }
+    }
+
+    return @{ applied = $applied; warnings = $warnings; restartRequired = $false; restartReason = '' }
+}
+
+function Set-ReplayKitDesktopAudioMixerState([string]$inputName, [string]$monitorType) {
+    $applied = @()
+    $current = Get-ReplayKitInputMonitorTypeValue $inputName
+    $forceMonitorSignal = $current.ok -and [string]$current.value -eq $monitorType
+    $targetIsOff = $monitorType -eq 'OBS_MONITORING_TYPE_NONE'
+
+    if ($forceMonitorSignal -and $targetIsOff) {
+        $preMute = Set-ReplayKitInputMuteState $inputName $true
+        if (-not $preMute.ok) {
+            return @{ ok = $false; applied = $applied; message = "could not temporarily mute before refreshing monitor-off state: $($preMute.message)" }
+        }
+    }
+
+    if ($forceMonitorSignal) {
+        $alternate = if ($targetIsOff) { 'OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT' } else { 'OBS_MONITORING_TYPE_NONE' }
+        $prime = Set-ReplayKitInputMonitorTypeRaw $inputName $alternate
+        if (-not $prime.ok) {
+            return @{ ok = $false; applied = $applied; message = "could not refresh OBS mixer monitor button: $($prime.message)" }
+        }
+        Start-Sleep -Milliseconds 75
+    }
+
+    $monitor = Set-ReplayKitInputMonitorTypeRaw $inputName $monitorType
+    if (-not $monitor.ok) {
+        return @{ ok = $false; applied = $applied; message = $monitor.message }
+    }
+    if (-not (Test-ReplayKitInputMonitorType $inputName $monitorType)) {
+        return @{ ok = $false; applied = $applied; message = 'OBS did not report the requested monitor state after setting it.' }
+    }
+
+    $unmute = Set-ReplayKitInputMuteState $inputName $false
+    if (-not $unmute.ok) {
+        return @{ ok = $false; applied = $applied; message = "monitor state changed, but Desktop Audio could not be unmuted: $($unmute.message)" }
+    }
+
+    $applied += 'desktop audio unmuted'
+    $applied += if ($targetIsOff) { 'desktop audio monitor off' } else { 'desktop audio monitor on' }
+    if ($forceMonitorSignal) { $applied += 'OBS mixer monitor button refreshed' }
+    return @{ ok = $true; applied = $applied; message = '' }
+}
+
+function Set-ReplayKitInputMonitorTypeRaw([string]$inputName, [string]$monitorType) {
+    $result = Invoke-ObsWebSocketRequest 'SetInputAudioMonitorType' @{
+        inputName = $inputName
+        monitorType = $monitorType
+    } 3000
+    if ($result.ok) { return @{ ok = $true; message = '' } }
+    return @{ ok = $false; message = $result.message }
+}
+
+function Set-ReplayKitInputMuteState([string]$inputName, [bool]$muted) {
+    $result = Invoke-ObsWebSocketRequest 'SetInputMute' @{
+        inputName = $inputName
+        inputMuted = $muted
+    } 3000
+    if (-not $result.ok) { return @{ ok = $false; message = $result.message } }
+    if (Test-ReplayKitInputMuteState $inputName $muted) { return @{ ok = $true; message = '' } }
+    return @{ ok = $false; message = 'OBS did not report the requested mute state after setting it.' }
+}
+
+function Get-ReplayKitInputMonitorTypeValue([string]$inputName) {
+    $verify = Invoke-ObsWebSocketRequest 'GetInputAudioMonitorType' @{ inputName = $inputName } 3000
+    if (-not $verify.ok) { return @{ ok = $false; value = ''; message = $verify.message } }
+    $monitorType = Get-ReplayKitJsonValue $verify.data 'monitorType' ''
+    $inputAudioMonitorType = Get-ReplayKitJsonValue $verify.data 'inputAudioMonitorType' ''
+    if ($monitorType) { return @{ ok = $true; value = [string]$monitorType; message = '' } }
+    if ($inputAudioMonitorType) { return @{ ok = $true; value = [string]$inputAudioMonitorType; message = '' } }
+    return @{ ok = $false; value = ''; message = 'OBS did not return an input monitor type.' }
+}
+
+function Test-ReplayKitInputMonitorType([string]$inputName, [string]$expected) {
+    $actual = Get-ReplayKitInputMonitorTypeValue $inputName
+    if (-not $actual.ok) { return $false }
+    return [string]$actual.value -eq $expected
+}
+
+function Test-ReplayKitInputMuteState([string]$inputName, [bool]$expected) {
+    $verify = Invoke-ObsWebSocketRequest 'GetInputMute' @{ inputName = $inputName } 3000
+    if (-not $verify.ok) { return $false }
+    $value = Get-ReplayKitJsonValue $verify.data 'inputMuted' $null
+    if ($null -eq $value) { return $false }
+    return [bool]$value -eq $expected
+}
+
+function Set-ReplayKitShareModeSceneFile([int]$monitoringType, [bool]$muted) {
+    try {
+        $path = Get-ReplayKitSceneCollectionPath
+        if (-not (Test-Path -LiteralPath $path)) {
+            return @{ ok = $true; changed = $false }
+        }
+        $data = ConvertFrom-Json ([System.IO.File]::ReadAllText($path))
+        $sources = Get-ReplayKitJsonValue $data 'sources'
+        if ($null -eq $sources) { return @{ ok = $true; changed = $false } }
+        $changed = $false
+        foreach ($source in @($sources)) {
+            if ([string](Get-ReplayKitJsonValue $source 'name' '') -ne 'Desktop Audio (excl. Discord)') { continue }
+            $current = [int](Get-ReplayKitJsonValue $source 'monitoring_type' -1)
+            if ($current -ne $monitoringType) {
+                Set-ReplayKitJsonValue $source 'monitoring_type' $monitoringType
+                $changed = $true
+            }
+            $currentMuted = [bool](Get-ReplayKitJsonValue $source 'muted' $true)
+            if ($currentMuted -ne $muted) {
+                Set-ReplayKitJsonValue $source 'muted' $muted
+                $changed = $true
+            }
+        }
+        if ($changed) {
+            Write-Utf8 $path (ConvertTo-Json $data -Depth 80)
+        }
+        return @{ ok = $true; changed = $changed }
+    } catch {
+        return @{ ok = $false; changed = $false; message = $_.Exception.Message }
+    }
+}
+
 function Get-RecordingHotkeyRestore([hashtable]$settings) {
     $start = Get-ObsProfileParameterSafe 'Hotkeys' 'OBSBasic.StartRecording'
     $stop = Get-ObsProfileParameterSafe 'Hotkeys' 'OBSBasic.StopRecording'
@@ -1788,12 +2248,15 @@ function Set-ReplayKitHotkeyCapture([bool]$active) {
     return @{ ok = $true; active = $false }
 }
 
-function Apply-ReplayKitLiveSettings([hashtable]$settings, [bool]$restartObs = $false, [bool]$applyOverlay = $true, [bool]$recreateBongo = $true) {
+function Apply-ReplayKitLiveSettings([hashtable]$settings, [bool]$restartObs = $false, [bool]$applyOverlay = $true, [bool]$recreateBongo = $true, [bool]$applyMotionBlur = $true) {
     $warnings = @()
     $applied = @()
     $preset = Get-ReplayKitPresetSpec ([string]$settings.recordingPreset)
     $encoder = Get-ReplayKitEncoderSpec $settings $preset
     if ($encoder.warning) { $warnings += [string]$encoder.warning }
+    if ([bool]$settings.motionBlurEnabled -and -not (Test-ReplayKitShaderfilterPluginInstalled)) {
+        $warnings += 'Motion blur was saved, but OBS Shaderfilter is not installed. Re-run ReplayKit setup, then restart OBS after the plugin install.'
+    }
 
     try {
         if ($settings.clipDir) {
@@ -1849,15 +2312,22 @@ function Apply-ReplayKitLiveSettings([hashtable]$settings, [bool]$restartObs = $
     $applied += $outputs.applied
     $warnings += $outputs.warnings
 
-    if ($applyOverlay) {
+    if ($applyOverlay -or $applyMotionBlur) {
         if ($restartObs) {
             $overlayFile = Set-ReplayKitOverlaySceneFile $settings $preset
             if ($overlayFile.ok) { $applied += 'OBS overlay scene file' }
             else { $warnings += "Overlay setting was saved, but the OBS scene file could not be prepared for restart: $($overlayFile.message)" }
         } else {
-            $overlay = Apply-ReplayKitOverlayLive $settings $preset $recreateBongo
-            if ($overlay.ok) { $applied += 'OBS overlay' }
-            else { $warnings += $overlay.warnings }
+            if ($applyOverlay) {
+                $overlay = Apply-ReplayKitOverlayLive $settings $preset $recreateBongo
+                if ($overlay.ok) { $applied += 'OBS overlay' }
+                else { $warnings += $overlay.warnings }
+            }
+            if ($applyMotionBlur) {
+                $motionBlur = Apply-ReplayKitMotionBlurLive $settings
+                $applied += $motionBlur.applied
+                $warnings += $motionBlur.warnings
+            }
         }
     }
 
@@ -1878,10 +2348,35 @@ function Test-ReplayKitSettingsOrigin([hashtable]$req) {
     if (-not $req.Headers.ContainsKey('origin')) { return $true }
     $origin = ([string]$req.Headers['origin']).Trim().ToLowerInvariant()
     $port = if ($script:State.Config.port) { [int]$script:State.Config.port } else { $script:DEFAULT_PORT }
-    return (
-        $origin -eq "http://127.0.0.1:$port" -or
-        $origin -eq "http://localhost:$port"
-    )
+    if ($origin -eq "http://127.0.0.1:$port" -or $origin -eq "http://localhost:$port") {
+        return $true
+    }
+    if ($origin -eq 'null') {
+        return (Test-ReplayKitInstalledDockReferer $req) -or (Test-ReplayKitObsBrowserUserAgent $req)
+    }
+    return $false
+}
+
+function Test-ReplayKitObsBrowserUserAgent([hashtable]$req) {
+    if (-not $req.Headers.ContainsKey('user-agent')) { return $false }
+    return ([string]$req.Headers['user-agent']) -match '(?i)\bOBS/'
+}
+
+function Test-ReplayKitInstalledDockReferer([hashtable]$req) {
+    if (-not $req.Headers.ContainsKey('referer')) { return $false }
+    try {
+        $uri = [System.Uri]::new([string]$req.Headers['referer'])
+        if (-not $uri.IsFile) { return $false }
+        $path = [System.IO.Path]::GetFullPath($uri.LocalPath)
+        $dockRoot = [System.IO.Path]::GetFullPath((Get-DockDir)).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+        $defaultRoot = [System.IO.Path]::GetFullPath((Get-DefaultDockDir)).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+        return (
+            $path.StartsWith($dockRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+            $path.StartsWith($defaultRoot, [System.StringComparison]::OrdinalIgnoreCase)
+        )
+    } catch {
+        return $false
+    }
 }
 
 function Get-ReplayKitSettingsPayload {
@@ -1935,6 +2430,33 @@ function Test-ReplayKitRestartRequired([hashtable]$previous, [hashtable]$setting
     return ([string]$previous.overlayStyle -ne [string]$settings.overlayStyle)
 }
 
+function Test-ReplayKitShareModeOnlyRequest([hashtable]$incoming) {
+    if ($incoming.Count -ne 1) { return $false }
+    return $incoming.ContainsKey('shareMode')
+}
+
+function Test-ReplayKitIncomingSettingsChanged([hashtable]$incoming, [hashtable]$previous, [hashtable]$settings) {
+    foreach ($key in $incoming.Keys) {
+        $before = ConvertTo-Json $previous[$key] -Depth 20 -Compress
+        $after = ConvertTo-Json $settings[$key] -Depth 20 -Compress
+        if ($before -ne $after) { return $true }
+    }
+    return $false
+}
+
+function Test-ReplayKitOnlyMotionBlurChanged([hashtable]$previous, [hashtable]$settings) {
+    foreach ($key in (Get-DefaultReplayKitSettings).Keys) {
+        if ($key -eq 'motionBlurEnabled' -or $key -eq 'motionBlurStrength') { continue }
+        $before = ConvertTo-Json $previous[$key] -Depth 20 -Compress
+        $after = ConvertTo-Json $settings[$key] -Depth 20 -Compress
+        if ($before -ne $after) { return $false }
+    }
+    return (
+        ([bool]$previous.motionBlurEnabled -ne [bool]$settings.motionBlurEnabled) -or
+        ([double]$previous.motionBlurStrength -ne [double]$settings.motionBlurStrength)
+    )
+}
+
 function Save-ReplayKitSettingsFromRequest([string]$body, [bool]$restartObs = $false) {
     if ([string]::IsNullOrWhiteSpace($body)) {
         throw 'Missing settings body.'
@@ -1950,12 +2472,46 @@ function Save-ReplayKitSettingsFromRequest([string]$body, [bool]$restartObs = $f
     }
     $settings = Normalize-ReplayKitSettings $current
     Write-ReplayKitSettings $settings
+    if (-not (Test-ReplayKitIncomingSettingsChanged $incoming $previous $settings)) {
+        return @{
+            ok = $true
+            settings = $settings
+            applied = @()
+            warnings = @()
+            restartRequired = $false
+            restartReason = ''
+        }
+    }
+    if (Test-ReplayKitShareModeOnlyRequest $incoming) {
+        $live = Apply-ReplayKitShareModeLive ([string]$settings.shareMode)
+        return @{
+            ok = $true
+            settings = $settings
+            applied = $live.applied
+            warnings = $live.warnings
+            restartRequired = $false
+            restartReason = ''
+        }
+    }
+    if (Test-ReplayKitOnlyMotionBlurChanged $previous $settings) {
+        $live = Apply-ReplayKitMotionBlurLive $settings
+        return @{
+            ok = $true
+            settings = $settings
+            applied = $live.applied
+            warnings = $live.warnings
+            restartRequired = $false
+            restartReason = ''
+        }
+    }
     $overlayStyleChanged = [string]$previous.overlayStyle -ne [string]$settings.overlayStyle
     $overlayGeometryChanged = [string]$previous.recordingPreset -ne [string]$settings.recordingPreset
+    $motionBlurChanged = ([bool]$previous.motionBlurEnabled -ne [bool]$settings.motionBlurEnabled) -or
+        ([double]$previous.motionBlurStrength -ne [double]$settings.motionBlurStrength)
     $applyOverlay = $overlayStyleChanged -or $overlayGeometryChanged
     $recreateBongo = $overlayStyleChanged -and [string]$settings.overlayStyle -eq 'bongo_cat'
     $restartObs = Test-ReplayKitRestartRequired $previous $settings
-    $live = Apply-ReplayKitLiveSettings $settings $restartObs $applyOverlay $recreateBongo
+    $live = Apply-ReplayKitLiveSettings $settings $restartObs $applyOverlay $recreateBongo $motionBlurChanged
     $script:ReplayKitHotkeyCaptureActive = $false
     $script:ReplayKitHotkeyCaptureRestore = $null
     return @{

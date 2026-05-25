@@ -678,6 +678,27 @@
           <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
       </div>
+      <div class="box">
+        <div class="box-title">Capture Effects</div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="motionBlurEnabled">
+            <span>Enable motion blur on capture sources</span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div class="label">Strength</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="motionBlurStrengthValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Motion blur strength">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="motionBlurStrength" type="range" min="0" max="1" step="0.001" aria-label="Motion blur strength slider">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="page-advanced">
@@ -749,7 +770,7 @@
     balanced:"balanced",
     quality:"smaller_files",
   };
-  // Overlay and encoder/video changes use the restart path. Clip length applies live through the replay buffer output settings.
+  // Encoder/video changes use the restart path. Clip length and motion blur apply through runtime settings.
   const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference"]);
 
   const els = {
@@ -768,6 +789,9 @@
     clipSoundVolumeValue: document.getElementById("clipSoundVolumeValue"),
     recordingSoundVolume: document.getElementById("recordingSoundVolume"),
     recordingSoundVolumeValue: document.getElementById("recordingSoundVolumeValue"),
+    motionBlurEnabled: document.getElementById("motionBlurEnabled"),
+    motionBlurStrength: document.getElementById("motionBlurStrength"),
+    motionBlurStrengthValue: document.getElementById("motionBlurStrengthValue"),
     trimPreciseDefault: document.getElementById("trimPreciseDefault"),
     autoUpdateEnabled: document.getElementById("autoUpdateEnabled"),
     settingsSearch: document.getElementById("settingsSearch"),
@@ -1130,11 +1154,23 @@
     return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
   }
 
+  function clampMotionBlurStrength(value) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.07;
+  }
+
   function syncVolumeControl(slider, input, value) {
     const volume = clampVolume(value);
     slider.value = String(volume);
     slider.style.setProperty("--fill", volume + "%");
     input.value = String(volume);
+  }
+
+  function syncMotionBlurControl(value) {
+    const strength = clampMotionBlurStrength(value);
+    els.motionBlurStrength.value = String(strength);
+    els.motionBlurStrength.style.setProperty("--fill", (strength * 100) + "%");
+    els.motionBlurStrengthValue.value = strength.toFixed(3);
   }
 
   function syncUi() {
@@ -1149,6 +1185,8 @@
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 100);
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 100);
+    els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
+    syncMotionBlurControl(state.motionBlurStrength ?? 0.07);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
     els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
     syncHotkeyFields();
@@ -1169,6 +1207,8 @@
     state.recordingNotificationEnabled = els.recordingNotificationEnabled.checked;
     state.clipSoundVolume = clampVolume(els.clipSoundVolume.value);
     state.recordingSoundVolume = clampVolume(els.recordingSoundVolume.value);
+    state.motionBlurEnabled = els.motionBlurEnabled.checked;
+    state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
     state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
   }
@@ -1264,7 +1304,24 @@
     });
   });
 
-  [els.obsStartupEnabled, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.trimPreciseDefault, els.autoUpdateEnabled].forEach((input) => {
+  els.motionBlurStrength.addEventListener("input", () => {
+    state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
+    syncMotionBlurControl(state.motionBlurStrength);
+    markDirty();
+  });
+  els.motionBlurStrengthValue.addEventListener("input", () => {
+    state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrengthValue.value);
+    els.motionBlurStrength.value = String(state.motionBlurStrength);
+    els.motionBlurStrength.style.setProperty("--fill", (state.motionBlurStrength * 100) + "%");
+    markDirty();
+  });
+  els.motionBlurStrengthValue.addEventListener("change", () => {
+    state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrengthValue.value);
+    syncMotionBlurControl(state.motionBlurStrength);
+    markDirty();
+  });
+
+  [els.obsStartupEnabled, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.autoUpdateEnabled].forEach((input) => {
     input.addEventListener("change", () => { readUi(); markDirty(); });
   });
   els.settingsSearch.addEventListener("input", applySettingsSearch);
@@ -1348,6 +1405,11 @@
 
   async function saveSettings(closeAfter) {
     readUi();
+    if (!dirty) {
+      if (closeAfter) closeWindow();
+      else setStatus("No settings changed", "good");
+      return;
+    }
     const restartAfterApply = needsObsRestart();
     els.applyBtn.disabled = true;
     els.okBtn.disabled = true;

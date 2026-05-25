@@ -9,8 +9,14 @@ local OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT = 2
 local MIC_SOURCE_NAME           = "Audio Input Capture"
 local DESKTOP_AUDIO_SOURCE_NAME = "Desktop Audio (excl. Discord)"
 local DISCORD_AUDIO_SOURCE_NAME = "Discord Audio (record only)"
+local MODE_VCAM                 = "vcam"
+local MODE_SCREENSHARE          = "screenshare"
+local DEFAULT_SHARE_MODE        = MODE_VCAM
+local FAIL_CLOSED_SHARE_MODE    = MODE_SCREENSHARE
+local MAX_SETTINGS_BYTES        = 65536
 local MONITOR_WAIT_MS           = 500
 local MONITOR_WAIT_LIMIT        = 30
+local active_share_mode         = DEFAULT_SHARE_MODE
 
 -- discord runs many processes (a main discord.exe plus a seperate discordsystemhelper.exe, plus electron renderer/utility processes). we still patch the exclude list to cover the named variants -- mainly so the discord audio (record only) source can record friend voices properly even though were not streaming them. the streaming path doesnt depend on this exclude list working perfectly anymore.
 local DISCORD_PROCESS_NAMES = {
@@ -21,9 +27,72 @@ local DISCORD_PROCESS_NAMES = {
     "DiscordDevelopment.exe",
 }
 
+-- replaykit_settings.json is the persisted source of truth for the dock share-mode toggle. read it
+-- before changing virtual camera or monitoring state so OBS startup matches the users last choice.
+
+local function normalize_path(path)
+    return tostring(path or ""):gsub("\\", "/")
+end
+
+local function parent_dir(path)
+    path = normalize_path(path):gsub("/+$", "")
+    return path:match("^(.*)/[^/]+$") or ""
+end
+
+local function join_path(a, b)
+    a = normalize_path(a):gsub("/+$", "")
+    b = normalize_path(b):gsub("^/+", "")
+    if a == "" then return b end
+    return a .. "/" .. b
+end
+
+local function read_text(path)
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local text = f:read(MAX_SETTINGS_BYTES + 1)
+    f:close()
+    if text and #text > MAX_SETTINGS_BYTES then return nil end
+    return text
+end
+
+local function runtime_settings_path()
+    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+end
+
+local function read_share_mode()
+    local text = read_text(runtime_settings_path())
+    if not text or text == "" then
+        print("[AutoVirtCam] WARN: replaykit_settings.json missing; using screenshare-safe startup")
+        return FAIL_CLOSED_SHARE_MODE
+    end
+
+    local data = obs.obs_data_create_from_json(text)
+    if data == nil then
+        print("[AutoVirtCam] WARN: replaykit_settings.json invalid; using screenshare-safe startup")
+        return FAIL_CLOSED_SHARE_MODE
+    end
+
+    local mode = DEFAULT_SHARE_MODE
+    if obs.obs_data_has_user_value(data, "shareMode") then
+        mode = obs.obs_data_get_string(data, "shareMode")
+    end
+    obs.obs_data_release(data)
+
+    if mode == MODE_VCAM or mode == MODE_SCREENSHARE then
+        return mode
+    end
+
+    print(string.format("[AutoVirtCam] WARN: invalid shareMode '%s'; using screenshare-safe startup", tostring(mode)))
+    return FAIL_CLOSED_SHARE_MODE
+end
+
+local function share_mode_uses_vcam()
+    return active_share_mode == MODE_VCAM
+end
+
 -- monitoring-type setter (idempotent, logs on transition)
 
-local function _set_monitoring(source_name, target, friendly_target_name, log_missing, log_unchanged)
+local function _set_monitoring(source_name, target, friendly_target_name, log_missing, log_unchanged, ensure_unmuted)
     if log_missing == nil then log_missing = true end
     if log_unchanged == nil then log_unchanged = true end
     local src = obs.obs_get_source_by_name(source_name)
@@ -41,8 +110,12 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
     else
         if log_unchanged then
             print(string.format("[AutoVirtCam] %s monitoring already %d (%s)",
-                source_name, target, friendly_target_name))
+            source_name, target, friendly_target_name))
         end
+    end
+    if ensure_unmuted and obs.obs_source_muted(src) then
+        obs.obs_source_set_muted(src, false)
+        print(string.format("[AutoVirtCam] %s unmuted for ReplayKit audio routing", source_name))
     end
     obs.obs_source_release(src)
     return true
@@ -56,12 +129,12 @@ end
 
 local function ensure_desktop_audio_to_cable()
     _set_monitoring(DESKTOP_AUDIO_SOURCE_NAME,
-        OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT, "Monitor and Output")
+        OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT, "Monitor and Output", nil, nil, true)
 end
 
 local function ensure_desktop_audio_not_monitored(reason, log_missing, log_unchanged)
     return _set_monitoring(DESKTOP_AUDIO_SOURCE_NAME,
-        OBS_MONITORING_TYPE_NONE, reason or "Monitor Off", log_missing, log_unchanged)
+        OBS_MONITORING_TYPE_NONE, reason or "Monitor Off", log_missing, log_unchanged, true)
 end
 
 -- process-audio-capture exec-list patching (best-effort for record source)
@@ -149,6 +222,16 @@ end
 
 local function start_vcam()
     obs.timer_remove(start_vcam)
+    active_share_mode = read_share_mode()
+    if not share_mode_uses_vcam() then
+        if obs.obs_frontend_virtualcam_active() then
+            obs.obs_frontend_stop_virtualcam()
+            print("[AutoVirtCam] stopped virtual camera (share mode screenshare)")
+        else
+            print("[AutoVirtCam] virtual camera remains off (share mode screenshare)")
+        end
+        return
+    end
     if obs.obs_frontend_virtualcam_active() then
         print("[AutoVirtCam] virtual camera already active")
         return
@@ -157,7 +240,25 @@ local function start_vcam()
     obs.timer_add(verify_vcam_started, 1500)
 end
 
+local function stop_vcam_if_active(reason)
+    obs.timer_remove(start_vcam)
+    obs.timer_remove(verify_vcam_started)
+    if obs.obs_frontend_virtualcam_active() then
+        obs.obs_frontend_stop_virtualcam()
+        print(string.format("[AutoVirtCam] stopped virtual camera (%s)", reason or "not needed"))
+    else
+        print(string.format("[AutoVirtCam] virtual camera remains off (%s)", reason or "not needed"))
+    end
+end
+
 configure_desktop_audio_when_monitor_ready = function()
+    active_share_mode = read_share_mode()
+    if not share_mode_uses_vcam() then
+        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
+        ensure_desktop_audio_not_monitored("Monitor Off - share mode screenshare")
+        return
+    end
+
     local status = rawget(_G, "ReplayKitMonitorPicker")
 
     if type(status) == "table" and status.ready then
@@ -194,12 +295,11 @@ end
 function script_description()
     return [[<b>Auto Start Virtual Camera</b><br>
 On OBS launch:<br>
-&nbsp;&nbsp;1. Routes <i>mic</i> + <i>Game Capture</i> audio to the
-monitoring bus (-&gt; OBS Stream Audio -&gt; Discord mic).<br>
-&nbsp;&nbsp;2. Routes <i>Desktop Audio (excl. Discord)</i> OFF the
-monitoring bus to eliminate Discord-voice leak through Process Audio
-Capture exclude-mode bugs.<br>
-&nbsp;&nbsp;3. Starts OBS Virtual Camera.<br><br>
+&nbsp;&nbsp;1. Reads the saved ReplayKit share mode.<br>
+&nbsp;&nbsp;2. In virtual-camera mode, routes <i>Desktop Audio
+(excl. Discord)</i> to OBS Stream Audio and starts OBS Virtual Camera.<br>
+&nbsp;&nbsp;3. In normal screen-share mode, keeps monitoring off and
+keeps OBS Virtual Camera stopped.<br><br>
 Pair with Discord: Camera = <code>OBS Virtual Camera</code>,
 Mic = <code>OBS Stream Audio Loopback</code>. Friends see your
 OBS scene as your webcam and hear mic + game audio.<br><br>
@@ -213,21 +313,32 @@ end
 
 function script_load(_settings)
     print("[AutoVirtCam] loaded")
+    active_share_mode = read_share_mode()
+    print("[AutoVirtCam] share mode: " .. active_share_mode)
     -- force mic off monitoring -- routing mic to cable creates a feedback echo loop (discord plays friends voices on speakers -> mic captures bleed -> back into cable -> back to discord -> friends hear themselves). user voice should travel via discords native mic input with its built-in echo cancellation.
     ensure_mic_NOT_to_cable()
-    -- fail closed until the companion monitor picker confirms that OBS monitoring is pointed at OBS Stream Audio. Otherwise Monitor and Output can play desktop audio through the users speakers twice.
-    ensure_desktop_audio_not_monitored("Monitor Off until OBS Stream Audio is confirmed")
-    monitor_wait_attempts = 0
-    monitor_failure_logged = false
-    obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-    obs.timer_add(configure_desktop_audio_when_monitor_ready, MONITOR_WAIT_MS)
-    configure_desktop_audio_when_monitor_ready()
+    if share_mode_uses_vcam() then
+        -- fail closed until the companion monitor picker confirms that OBS monitoring is pointed at OBS Stream Audio. Otherwise Monitor and Output can play desktop audio through the users speakers twice.
+        ensure_desktop_audio_not_monitored("Monitor Off until OBS Stream Audio is confirmed")
+        monitor_wait_attempts = 0
+        monitor_failure_logged = false
+        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
+        obs.timer_add(configure_desktop_audio_when_monitor_ready, MONITOR_WAIT_MS)
+        configure_desktop_audio_when_monitor_ready()
+    else
+        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
+        ensure_desktop_audio_not_monitored("Monitor Off - share mode screenshare")
+    end
     -- cover every discord build variant in the exclude list so the record-only source captures discord audio properly for local recordings.
     ensure_discord_processes_covered(DESKTOP_AUDIO_SOURCE_NAME, true)
     ensure_discord_processes_covered(DISCORD_AUDIO_SOURCE_NAME, true)
-    -- defer the virtual-camera start a bit so obss frontend is fully up.
-    print("[AutoVirtCam] starting virtual camera in 2s")
-    obs.timer_add(start_vcam, 2000)
+    if share_mode_uses_vcam() then
+        -- defer the virtual-camera start a bit so obss frontend is fully up.
+        print("[AutoVirtCam] starting virtual camera in 2s")
+        obs.timer_add(start_vcam, 2000)
+    else
+        stop_vcam_if_active("share mode screenshare")
+    end
 end
 
 function script_unload()

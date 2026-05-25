@@ -37,6 +37,12 @@ DEFAULT_RECORDING_NOTIFICATION = True
 DEFAULT_TRIM_PRECISE        = False
 DEFAULT_CLIP_SOUND_VOLUME   = 100
 DEFAULT_RECORDING_SOUND_VOLUME = 100
+DEFAULT_SHARE_MODE          = "vcam"
+ALLOWED_SHARE_MODES         = ("vcam", "screenshare")
+DEFAULT_MOTION_BLUR         = False
+DEFAULT_MOTION_BLUR_STRENGTH = 0.07
+MOTION_BLUR_STRENGTH_MIN    = 0.0
+MOTION_BLUR_STRENGTH_MAX    = 1.0
 
 # "auto" picks the best HEVC/H.264 combo the user's GPU can run; the user can
 # force a specific codec for playback support (H.264) or quality/size (AV1 on
@@ -84,6 +90,9 @@ class Preferences:
     trim_precise_default:    bool = DEFAULT_TRIM_PRECISE
     clip_sound_volume:       int  = DEFAULT_CLIP_SOUND_VOLUME
     recording_sound_volume:  int  = DEFAULT_RECORDING_SOUND_VOLUME
+    share_mode:              str  = DEFAULT_SHARE_MODE
+    motion_blur_enabled:     bool = DEFAULT_MOTION_BLUR
+    motion_blur_strength:    float = DEFAULT_MOTION_BLUR_STRENGTH
 
     def save(self) -> None:
         PREFS_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,6 +130,14 @@ def _coerce_int_range(value: Any, default: int, minimum: int, maximum: int) -> i
     return max(minimum, min(maximum, number))
 
 
+def _coerce_float_range(value: Any, default: float, minimum: float, maximum: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, number))
+
+
 def _runtime_settings_overlay() -> Dict[str, Any]:
     """Import settings changed from the in-OBS Custom Controls window."""
     if not RUNTIME_SETTINGS_FILE.is_file():
@@ -145,6 +162,9 @@ def _runtime_settings_overlay() -> Dict[str, Any]:
         "trimPreciseDefault": "trim_precise_default",
         "clipSoundVolume": "clip_sound_volume",
         "recordingSoundVolume": "recording_sound_volume",
+        "shareMode": "share_mode",
+        "motionBlurEnabled": "motion_blur_enabled",
+        "motionBlurStrength": "motion_blur_strength",
     }
     for src, dst in key_map.items():
         if src in runtime:
@@ -186,6 +206,10 @@ def load_prefs() -> Preferences:
         overlay_style = DEFAULT_OVERLAY_STYLE
     input_overlay_enabled = overlay_style != "off"
 
+    share_mode = data.get("share_mode", DEFAULT_SHARE_MODE)
+    if share_mode not in ALLOWED_SHARE_MODES:
+        share_mode = DEFAULT_SHARE_MODE
+
     return Preferences(
         recording_preset         = data.get("recording_preset",         DEFAULT_RECORDING_PRESET),
         input_overlay_enabled    = input_overlay_enabled,
@@ -204,4 +228,12 @@ def load_prefs() -> Preferences:
         trim_precise_default     = _coerce_bool(data.get("trim_precise_default"), DEFAULT_TRIM_PRECISE),
         clip_sound_volume        = _coerce_int_range(data.get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, 0, 100),
         recording_sound_volume   = _coerce_int_range(data.get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, 0, 100),
+        share_mode               = share_mode,
+        motion_blur_enabled      = _coerce_bool(data.get("motion_blur_enabled"), DEFAULT_MOTION_BLUR),
+        motion_blur_strength     = _coerce_float_range(
+            data.get("motion_blur_strength"),
+            DEFAULT_MOTION_BLUR_STRENGTH,
+            MOTION_BLUR_STRENGTH_MIN,
+            MOTION_BLUR_STRENGTH_MAX,
+        ),
     )

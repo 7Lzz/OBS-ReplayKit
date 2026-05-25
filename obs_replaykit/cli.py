@@ -42,6 +42,7 @@ from .prefs import (
     load_prefs,
 )
 from .recording import PRESETS, get_preset
+from .shaderfilter import install_replaykit_motion_blur_plugin
 from .startup import configure_obs_startup
 from .vbcable import ensure_vbcable, is_vbcable_installed
 from .wincapture import install_win_capture_audio
@@ -716,6 +717,11 @@ def run_apply_flow(prefs: Preferences) -> list[str]:
         "Install Bongo Cat overlay",
         "Adds the Bongo Cat keyboard and mouse overlay plugin so Settings can switch to it later.",
         lambda: install_bongo_cat_plugin(log=progress.log),
+    )
+    add(
+        "Install motion blur filter",
+        "Adds the bundled OBS Shaderfilter plugin and removes the retired Composite Blur plugin.",
+        lambda: install_replaykit_motion_blur_plugin(log=progress.log),
     )
 
     add("Install desktop audio capture", "Adds clean desktop/game audio capture for OBS.", lambda: install_win_capture_audio(log=progress.log))

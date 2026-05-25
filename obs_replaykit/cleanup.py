@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Optional
 
-from .config import OBS_CONFIG, PROGRAMFILES_OBS_DIR
+from .config import OBS_CONFIG, PROGRAMDATA, PROGRAMFILES_OBS_DIR
 from .obs import close_obs
 from .scheduled_task import delete_elevation_task
 from .sleep_override import remove_sleep_override
@@ -82,6 +82,13 @@ def remove_replaykit_plugins(log: LogFn = None) -> bool:
         PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "bongobs-cat.dll",
         PROGRAMFILES_OBS_DIR / "bin" / "64bit" / "Bango Cat",
         PROGRAMFILES_OBS_DIR / "data" / "obs-plugins" / "bongobs-cat",
+        PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-composite-blur.dll",
+        PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-composite-blur.pdb",
+        PROGRAMFILES_OBS_DIR / "data" / "obs-plugins" / "obs-composite-blur",
+        PROGRAMDATA / "obs-studio" / "plugins" / "obs-composite-blur",
+        PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-shaderfilter.dll",
+        PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-shaderfilter.pdb",
+        PROGRAMFILES_OBS_DIR / "data" / "obs-plugins" / "obs-shaderfilter",
     )
     ok = True
     for target in targets:

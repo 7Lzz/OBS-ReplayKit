@@ -10,6 +10,7 @@ from pathlib import Path
 USERNAME    = os.environ.get("USERNAME") or os.environ.get("USER") or "User"
 USERPROFILE = Path(os.environ.get("USERPROFILE") or Path.home())
 APPDATA     = Path(os.environ.get("APPDATA") or USERPROFILE / "AppData" / "Roaming")
+PROGRAMDATA = Path(os.environ.get("ProgramData", r"C:\ProgramData"))
 
 
 # obs install / config
@@ -75,6 +76,12 @@ WIN_CAPTURE_AUDIO_DLL_REL = "obs-plugins/64bit/win-capture-audio.dll"
 # extract; installer code strips the top-level folder and writes only safe
 # relative paths into PROGRAMFILES_OBS_DIR.
 BONGO_CAT_ZIP = ASSETS_DIR / "Bango Cat.zip"
+
+
+# OBS Shaderfilter plugin. ReplayKit uses its bundled motion_blur.shader when
+# the optional motion blur setting is enabled.
+SHADERFILTER_ZIP = ASSETS_DIR / "obs-shaderfilter.zip"
+SHADERFILTER_ZIP_SHA256 = "0e75fc5f2523befd9c66c0adb14f9c838cc0cd705b32487e121abb03ad2f2486"
 
 
 # file extensions the installer treats as text (rewrite_user_paths + apply_preferences).

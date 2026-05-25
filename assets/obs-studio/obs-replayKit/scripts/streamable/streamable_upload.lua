@@ -52,17 +52,61 @@ ffi.cdef[[
     );
     BOOL CloseHandle(HANDLE hObject);
     DWORD GetLastError(void);
+    void Sleep(DWORD dwMilliseconds);
+    unsigned long long GetTickCount64(void);
+
+    typedef unsigned long long SOCKET;
+    typedef struct WSAData {
+        unsigned short wVersion;
+        unsigned short wHighVersion;
+        char szDescription[257];
+        char szSystemStatus[129];
+        unsigned short iMaxSockets;
+        unsigned short iMaxUdpDg;
+        char* lpVendorInfo;
+    } WSADATA;
+    struct in_addr {
+        unsigned long s_addr;
+    };
+    struct sockaddr {
+        unsigned short sa_family;
+        char sa_data[14];
+    };
+    struct sockaddr_in {
+        short sin_family;
+        unsigned short sin_port;
+        struct in_addr sin_addr;
+        char sin_zero[8];
+    };
+    int WSAStartup(unsigned short wVersionRequested, WSADATA* lpWSAData);
+    int WSACleanup(void);
+    SOCKET socket(int af, int type, int protocol);
+    int connect(SOCKET s, const struct sockaddr *name, int namelen);
+    int closesocket(SOCKET s);
+    unsigned short htons(unsigned short hostshort);
+    unsigned long inet_addr(const char *cp);
 ]]
 
 local kernel32 = ffi.load("kernel32")
+local ws2_32 = ffi.load("ws2_32")
 local CREATE_NO_WINDOW     = 0x08000000
 local STARTF_USESHOWWINDOW = 0x00000001
 local SW_HIDE              = 0
+local AF_INET              = 2
+local SOCK_STREAM          = 1
+local IPPROTO_TCP          = 6
+local INVALID_SOCKET       = ffi.cast("SOCKET", -1)
 
 local HTTP_PORT = 8767
+local HELPER_START_WAIT_MS = 3000
+local HELPER_WATCHDOG_MS = 10000
+local HELPER_RESTART_COOLDOWN_MS = 15000
 -- global streamable helper logging switch. keep false for production. flip this one constant to true when debugging lua/helper/upload/compress logs.
 local STREAMABLE_LOGGING_ENABLED = false
 local hotkey_id = obs.OBS_INVALID_HOTKEY_ID
+local helper_watchdog_started = false
+local helper_last_restart_ms = 0
+local winsock_started = false
 
 local cfg = {
     clip_dir = "",
@@ -88,6 +132,46 @@ local function file_exists(path)
     if not f then return false end
     f:close()
     return true
+end
+
+local function now_ms()
+    return tonumber(kernel32.GetTickCount64())
+end
+
+local function ensure_winsock()
+    if winsock_started then return true end
+    local data = ffi.new("WSADATA")
+    if ws2_32.WSAStartup(0x0202, data) ~= 0 then
+        return false
+    end
+    winsock_started = true
+    return true
+end
+
+local function helper_port_open()
+    if not ensure_winsock() then return false end
+    local s = ws2_32.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+    if s == INVALID_SOCKET then return false end
+    local addr = ffi.new("struct sockaddr_in")
+    addr.sin_family = AF_INET
+    addr.sin_port = ws2_32.htons(HTTP_PORT)
+    addr.sin_addr.s_addr = ws2_32.inet_addr("127.0.0.1")
+    local ok = ws2_32.connect(
+        s,
+        ffi.cast("const struct sockaddr*", addr),
+        ffi.sizeof(addr)
+    ) == 0
+    ws2_32.closesocket(s)
+    return ok
+end
+
+local function wait_for_helper_port(timeout_ms)
+    local deadline = now_ms() + timeout_ms
+    repeat
+        if helper_port_open() then return true end
+        kernel32.Sleep(100)
+    until now_ms() >= deadline
+    return helper_port_open()
 end
 
 local function win_quote(arg)
@@ -210,7 +294,10 @@ local function start_update_bootstrap()
 end
 
 local function start_helper()
-    if helper_started then return true end
+    if helper_started then
+        if helper_port_open() then return true end
+        helper_started = false
+    end
 
     local helper = helper_path()
     if not file_exists(helper) then
@@ -239,12 +326,33 @@ local function start_helper()
         return false
     end
     helper_started = true
+    wait_for_helper_port(HELPER_START_WAIT_MS)
     start_update_bootstrap()
     return true
 end
 
+local function helper_watchdog()
+    if helper_port_open() then
+        helper_started = true
+        return
+    end
+    local now = now_ms()
+    if helper_started or (now - helper_last_restart_ms) >= HELPER_RESTART_COOLDOWN_MS then
+        helper_started = false
+        helper_last_restart_ms = now
+        start_helper()
+    end
+end
+
+local function start_helper_watchdog()
+    if helper_watchdog_started then return end
+    helper_watchdog_started = true
+    obs.timer_add(helper_watchdog, HELPER_WATCHDOG_MS)
+end
+
 local function helper_request(path)
-    start_helper()
+    if not start_helper() then return false end
+    if not wait_for_helper_port(2000) then return false end
     local url = "http://127.0.0.1:" .. HTTP_PORT .. path
     local cmd = "curl.exe -s -S --max-time 2 -X POST " .. win_quote(url)
     local ok, err = spawn_hidden(cmd)
@@ -257,6 +365,7 @@ end
 
 local function open_url(path)
     if not start_helper() then return false end
+    wait_for_helper_port(2000)
     local url = "http://127.0.0.1:" .. HTTP_PORT .. path
     local cmd = "rundll32.exe url.dll,FileProtocolHandler " .. win_quote(url)
     local ok, err = spawn_hidden(cmd)
@@ -368,6 +477,7 @@ function script_load(settings)
     if start_helper() then
         log(obs.LOG_INFO, "Streamable helper launched outside OBS on http://127.0.0.1:" .. HTTP_PORT)
     end
+    start_helper_watchdog()
 end
 
 function script_save(settings)
@@ -377,6 +487,14 @@ function script_save(settings)
 end
 
 function script_unload()
+    if helper_watchdog_started then
+        obs.timer_remove(helper_watchdog)
+        helper_watchdog_started = false
+    end
     spawn_hidden("curl.exe -s --max-time 1 -X POST " ..
         win_quote("http://127.0.0.1:" .. HTTP_PORT .. "/shutdown"))
+    if winsock_started then
+        ws2_32.WSACleanup()
+        winsock_started = false
+    end
 end
