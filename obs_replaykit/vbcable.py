@@ -492,7 +492,25 @@ def ensure_vbcable(log: LogFn = None) -> bool:
     if is_vbcable_installed():
         if log:
             log("OBS Stream Audio device already installed")
+        saved_render = _get_default_playback(log=log)
+        saved_capture = _get_default_capture(log=log)
+        voicemeeter_snapshot = snapshot_voicemeeter_inputs(log=log)
         _rename_endpoints(log=log)
+        if saved_render:
+            if _set_default_playback(saved_render, log=log):
+                if log:
+                    log(f"restored default playback  -> {saved_render}")
+            else:
+                if log:
+                    log("warn: failed to restore default playback - fix manually in Sound settings")
+        if saved_capture:
+            if _set_default_capture(saved_capture, log=log):
+                if log:
+                    log(f"restored default recording -> {saved_capture}")
+            else:
+                if log:
+                    log("warn: failed to restore default recording - fix manually in Sound settings")
+        restore_voicemeeter_inputs(voicemeeter_snapshot, log=log)
         return True
     return install_vbcable(log=log)
 
