@@ -124,6 +124,7 @@ def run_update_mode(
     relaunch_obs: str | None = None,
     wait_pid: int = 0,
     start_delay_ms: int = 0,
+    relaunch: bool = True,
 ) -> int:
     """Run a non-interactive repair/update install from a downloaded release exe."""
     def log(message: str) -> None:
@@ -143,7 +144,8 @@ def run_update_mode(
         cleanup_crash_flags(log=log)
         count = install_replaykit_runtime_update(log=log)
         log(f"runtime update copied {count} file(s)")
-        _launch_obs_path(relaunch_obs, log=log)
+        if relaunch:
+            _launch_obs_path(relaunch_obs, log=log)
         return 0
     except Exception as exc:
         _log(f"update failed: {exc}")
@@ -159,6 +161,7 @@ def update_arg_parser():
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--cleanup-dir", default="")
     parser.add_argument("--relaunch-obs", default="")
+    parser.add_argument("--no-relaunch-obs", action="store_true")
     parser.add_argument("--wait-pid", type=int, default=0)
     parser.add_argument("--start-delay-ms", type=int, default=0)
     return parser
@@ -174,4 +177,5 @@ def try_run_update_from_argv(argv: list[str] | None = None) -> Optional[int]:
         relaunch_obs=args.relaunch_obs,
         wait_pid=args.wait_pid,
         start_delay_ms=args.start_delay_ms,
+        relaunch=not args.no_relaunch_obs,
     )

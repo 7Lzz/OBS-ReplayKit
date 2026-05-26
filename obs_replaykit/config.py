@@ -1,6 +1,8 @@
-"""constants + resolved paths derived from env vars (USERNAME, USERPROFILE, APPDATA, ProgramFiles) so the tool works for any user without code changes."""
+"""constants + resolved paths derived from env vars and the local OBS install."""
 
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,11 +27,173 @@ DOCK_TARGET = REPLAYKIT_CONFIG / "obs-custom-dock"
 
 OBS_PROCESSES = ("obs64.exe", "obs32.exe", "obs.exe")
 
-OBS_EXE_CANDIDATES = (
-    Path(os.environ.get("ProgramFiles",      r"C:\Program Files"))     / "obs-studio" / "bin" / "64bit" / "obs64.exe",
-    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "obs-studio" / "bin" / "64bit" / "obs64.exe",
-    Path(os.environ.get("ProgramW6432",      r"C:\Program Files"))     / "obs-studio" / "bin" / "64bit" / "obs64.exe",
+_DEFAULT_OBS_DIR = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "obs-studio"
+
+
+def _valid_obs_exe(path: Path) -> bool:
+    return path.name.lower() in OBS_PROCESSES and path.is_file()
+
+
+def _obs_exe_from_root(root: Path) -> Path:
+    return root / "bin" / "64bit" / "obs64.exe"
+
+
+def _obs_root_from_exe(path: Path) -> Path | None:
+    try:
+        path = path.resolve(strict=False)
+        if path.parent.name.lower() == "64bit" and path.parent.parent.name.lower() == "bin":
+            return path.parent.parent.parent
+    except OSError:
+        pass
+    return None
+
+
+def _env_obs_candidates() -> list[Path]:
+    out: list[Path] = []
+    exe = os.environ.get("OBS_REPLAYKIT_OBS_EXE", "").strip().strip('"')
+    if exe:
+        out.append(Path(exe))
+    root = os.environ.get("OBS_REPLAYKIT_OBS_DIR", "").strip().strip('"')
+    if root:
+        out.append(_obs_exe_from_root(Path(root)))
+    return out
+
+
+def _running_obs_candidates() -> list[Path]:
+    if os.name != "nt":
+        return []
+    names = "','".join(name.replace("'", "''") for name in OBS_PROCESSES)
+    script = (
+        f"Get-CimInstance Win32_Process | "
+        f"Where-Object {{ $_.Name -in @('{names}') -and $_.ExecutablePath }} | "
+        f"Select-Object -ExpandProperty ExecutablePath -Unique"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if result.returncode != 0:
+        return []
+    return [Path(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+
+
+def _registry_obs_candidates() -> list[Path]:
+    if os.name != "nt":
+        return []
+    try:
+        import winreg
+    except ImportError:
+        return []
+
+    out: list[Path] = []
+    views = [0]
+    if hasattr(winreg, "KEY_WOW64_64KEY"):
+        views.append(winreg.KEY_WOW64_64KEY)
+    if hasattr(winreg, "KEY_WOW64_32KEY"):
+        views.append(winreg.KEY_WOW64_32KEY)
+
+    def add_root(value: str | None) -> None:
+        if value:
+            out.append(_obs_exe_from_root(Path(value.strip().strip('"'))))
+
+    def add_exe(value: str | None) -> None:
+        if value:
+            raw = value.strip().strip('"')
+            if "," in raw:
+                raw = raw.split(",", 1)[0].strip().strip('"')
+            out.append(Path(raw))
+
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        for view in views:
+            access = winreg.KEY_READ | view
+            try:
+                with winreg.OpenKeyEx(hive, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe", 0, access) as key:
+                    value, _ = winreg.QueryValueEx(key, "")
+                    add_exe(str(value))
+            except OSError:
+                pass
+            for root_key in (
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+            ):
+                try:
+                    with winreg.OpenKeyEx(hive, root_key, 0, access) as root:
+                        for i in range(winreg.QueryInfoKey(root)[0]):
+                            try:
+                                sub_name = winreg.EnumKey(root, i)
+                                with winreg.OpenKeyEx(root, sub_name, 0, access) as sub:
+                                    display, _ = winreg.QueryValueEx(sub, "DisplayName")
+                                    if not str(display).lower().startswith("obs studio"):
+                                        continue
+                                    try:
+                                        install_location, _ = winreg.QueryValueEx(sub, "InstallLocation")
+                                        add_root(str(install_location))
+                                    except OSError:
+                                        pass
+                                    try:
+                                        display_icon, _ = winreg.QueryValueEx(sub, "DisplayIcon")
+                                        add_exe(str(display_icon))
+                                    except OSError:
+                                        pass
+                            except OSError:
+                                continue
+                except OSError:
+                    pass
+    return out
+
+
+def _path_obs_candidates() -> list[Path]:
+    return [Path(found) for name in OBS_PROCESSES if (found := shutil.which(name))]
+
+
+def _default_obs_candidates() -> list[Path]:
+    roots = (
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "obs-studio",
+        Path(os.environ.get("ProgramW6432", r"C:\Program Files")) / "obs-studio",
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "obs-studio",
+    )
+    return [_obs_exe_from_root(root) for root in roots]
+
+
+def _unique_paths(paths: list[Path]) -> tuple[Path, ...]:
+    out: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path.resolve(strict=False)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return tuple(out)
+
+
+OBS_EXE_CANDIDATES = _unique_paths(
+    _env_obs_candidates()
+    + _running_obs_candidates()
+    + _registry_obs_candidates()
+    + _path_obs_candidates()
+    + _default_obs_candidates()
 )
+
+
+def find_obs_exe_candidate() -> Path | None:
+    for candidate in OBS_EXE_CANDIDATES:
+        if _valid_obs_exe(candidate):
+            return candidate
+    return None
+
+
+def find_obs_install_dir() -> Path | None:
+    exe = find_obs_exe_candidate()
+    if exe is None:
+        return None
+    return _obs_root_from_exe(exe)
 
 
 # bundled assets root. source mode -> project dir. pyinstaller --onefile -> _meipass temp dir where the bundle is extracted at runtime.
@@ -45,7 +209,8 @@ OBS_ASSETS_DIR = ASSETS_DIR / "obs-studio"  # mirrors %appdata%/obs-studio
 
 # OBS plugin install location. %APPDATA%\obs-studio\plugins\ is not scanned.
 
-PROGRAMFILES_OBS_DIR = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "obs-studio"
+OBS_INSTALL_DIR = find_obs_install_dir() or _DEFAULT_OBS_DIR
+PROGRAMFILES_OBS_DIR = OBS_INSTALL_DIR
 
 # input-overlay plugin + its vc++ redist prerequisite. plugin installer is bundled in installers.zip; vc++ is downloaded from microsoft only when missing and is signature-checked before running.
 

@@ -15,7 +15,75 @@ Remove-Variable __cpu -ErrorAction SilentlyContinue
 $script:PREVIEW_CHUNK      = 1024 * 1024
 $script:MAX_PREVIEW_STREAM = 2
 $script:THUMB_DIR          = Join-Path $env:TEMP 'streamable_helper_thumbs'
-$script:OBS_EXE            = 'C:\Program Files\obs-studio\bin\64bit\obs64.exe'
+function Test-ReplayKitObsExe([string]$path) {
+    if ([string]::IsNullOrWhiteSpace($path)) { return $false }
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+    $name = [System.IO.Path]::GetFileName($path).ToLowerInvariant()
+    return @('obs64.exe', 'obs32.exe', 'obs.exe') -contains $name
+}
+
+function Get-ReplayKitObsExeFromRoot([string]$root) {
+    if ([string]::IsNullOrWhiteSpace($root)) { return '' }
+    return (Join-Path $root 'bin\64bit\obs64.exe')
+}
+
+function Resolve-ReplayKitObsExe {
+    $candidates = New-Object System.Collections.Generic.List[string]
+    if ($env:OBS_REPLAYKIT_OBS_EXE) {
+        [void]$candidates.Add($env:OBS_REPLAYKIT_OBS_EXE)
+    }
+    if ($env:OBS_REPLAYKIT_OBS_DIR) {
+        [void]$candidates.Add((Get-ReplayKitObsExeFromRoot $env:OBS_REPLAYKIT_OBS_DIR))
+    }
+
+    try {
+        $self = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction SilentlyContinue
+        if ($self -and $self.ParentProcessId) {
+            $parent = Get-CimInstance Win32_Process -Filter "ProcessId=$($self.ParentProcessId)" -ErrorAction SilentlyContinue
+            if ($parent -and $parent.ExecutablePath) {
+                [void]$candidates.Add([string]$parent.ExecutablePath)
+            }
+        }
+    } catch {}
+
+    foreach ($procName in @('obs64.exe', 'obs32.exe', 'obs.exe')) {
+        try {
+            Get-CimInstance Win32_Process -Filter "Name='$procName'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.ExecutablePath } |
+                ForEach-Object { [void]$candidates.Add([string]$_.ExecutablePath) }
+        } catch {}
+    }
+
+    foreach ($regPath in @(
+        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe',
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe'
+    )) {
+        try {
+            $key = Get-Item -LiteralPath $regPath -ErrorAction Stop
+            $value = [string]$key.GetValue('')
+            if ($value) { [void]$candidates.Add(($value -replace ',.*$', '').Trim('"')) }
+        } catch {}
+    }
+
+    $defaultRoots = New-Object System.Collections.Generic.List[string]
+    foreach ($base in @($env:ProgramFiles, $env:ProgramW6432, ${env:ProgramFiles(x86)})) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) {
+            [void]$defaultRoots.Add((Join-Path $base 'obs-studio'))
+        }
+    }
+    foreach ($root in $defaultRoots) {
+        [void]$candidates.Add((Get-ReplayKitObsExeFromRoot $root))
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-ReplayKitObsExe $candidate) {
+            return [System.IO.Path]::GetFullPath($candidate)
+        }
+    }
+    return 'C:\Program Files\obs-studio\bin\64bit\obs64.exe'
+}
+
+$script:OBS_EXE            = Resolve-ReplayKitObsExe
 $script:OBS_ICON_CACHE     = Join-Path $script:THUMB_DIR 'obs-icon.ico'
 
 # auth-state tunables streamables free anonymous flow gives 250 mb / 2 days. signing in (free streamable account) bumps retention to 90 days but keeps the size cap. paid plans lift both. we adjust state.auth.sizecap and retentiondays whenever /me comes back from streamable with new plan info. set sizecap to 0 to mean "no cap".

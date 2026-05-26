@@ -58,7 +58,7 @@ local TokenElevation          = 20
 local SW_HIDE                 = 0
 local SEE_MASK_NOCLOSEPROCESS = 0x00000040
 
-local OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
+local DEFAULT_OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
 local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
 
 -- name of the task scheduler entry the obs replaykit installer registers. keep in sync with task_name in obs_replaykit/scheduled_task.py. if this constant ever changes both sides have to move at once or the no-uac path silently degrades to shellexecuteex (which still works, but the friends uac popup comes back).
@@ -67,6 +67,17 @@ local SCHTASKS_TASK_NAME = "OBSReplayKit-Elevate"
 -- handoff file that the lua side fills in with the current obs path + pid right before triggering the scheduled task. wscript cant recieve command-line arguments thru schtasks /run, so this is the only way for the elevated relauncher to know which process to terminate. path matches the one hidden_relauncher.vbs reads.
 local HANDOFF_PATH = (os.getenv("TEMP") or "C:\\Windows\\Temp") ..
                      "\\obsreplaykit_elevate.txt"
+
+local function get_current_obs_exe()
+    local buf = ffi.new("char[?]", 32768)
+    local len = kernel32.GetModuleFileNameA(nil, buf, 32768)
+    if len > 0 and len < 32768 then
+        return ffi.string(buf, len)
+    end
+    return DEFAULT_OBS_EXE
+end
+
+local OBS_EXE = get_current_obs_exe()
 
 local function get_helper_path()
     -- script_path() returns the current script directory with a trailing slash.

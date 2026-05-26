@@ -254,6 +254,7 @@ def install_input_overlay_plugin(log: LogFn = None) -> bool:
                 "/VERYSILENT",
                 "/SUPPRESSMSGBOXES",
                 "/NORESTART",
+                f"/DIR={PROGRAMFILES_OBS_DIR}",
             ],
             capture_output=True,
             text=True,

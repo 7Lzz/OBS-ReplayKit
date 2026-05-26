@@ -209,7 +209,7 @@ function Write-ReplayKitSettings([hashtable]$settings) {
 function Get-ObsRunCommand {
     $obs = $script:OBS_EXE
     if (-not (Test-Path -LiteralPath $obs)) {
-        $candidate = Join-Path $env:ProgramFiles 'obs-studio\bin\64bit\obs64.exe'
+        $candidate = Resolve-ReplayKitObsExe
         if (Test-Path -LiteralPath $candidate) { $obs = $candidate }
     }
     $psExe = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -1339,13 +1339,14 @@ function Get-ReplayKitMotionBlurFilterUuid([string]$sourceName) {
 function Get-ReplayKitObsInstallRoot {
     $obs = [string]$script:OBS_EXE
     if ([string]::IsNullOrWhiteSpace($obs) -or -not (Test-Path -LiteralPath $obs)) {
-        $candidate = Join-Path $env:ProgramFiles 'obs-studio\bin\64bit\obs64.exe'
+        $candidate = Resolve-ReplayKitObsExe
         if (Test-Path -LiteralPath $candidate) { $obs = $candidate }
     }
     try {
         return [System.IO.Directory]::GetParent([System.IO.Directory]::GetParent([System.IO.Directory]::GetParent($obs).FullName).FullName).FullName
     } catch {
-        return (Join-Path $env:ProgramFiles 'obs-studio')
+        if ($env:ProgramFiles) { return (Join-Path $env:ProgramFiles 'obs-studio') }
+        return 'C:\Program Files\obs-studio'
     }
 }
 

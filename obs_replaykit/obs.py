@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from .config import OBS_CONFIG, OBS_EXE_CANDIDATES, OBS_PROCESSES
+from .config import OBS_CONFIG, OBS_PROCESSES, find_obs_exe_candidate
 
 LogFn = Optional[Callable[[str], None]]
 
@@ -20,11 +20,8 @@ OBS_START_ARGS = (
 
 
 def find_obs_exe() -> Optional[Path]:
-    """first existing obs binary from OBS_EXE_CANDIDATES, or None."""
-    for candidate in OBS_EXE_CANDIDATES:
-        if candidate.exists():
-            return candidate
-    return None
+    """Best detected OBS executable path, or None."""
+    return find_obs_exe_candidate()
 
 
 def close_obs(log: LogFn = None) -> int:
@@ -135,7 +132,7 @@ def launch_obs(log: LogFn = None) -> bool:
     obs_exe = find_obs_exe()
     if obs_exe is None:
         if log:
-            log("OBS install not found in Program Files - install OBS, then re-run.")
+            log("OBS install was not found - install OBS, set OBS_REPLAYKIT_OBS_EXE, or re-run from an active OBS install.")
         return False
 
     if log:

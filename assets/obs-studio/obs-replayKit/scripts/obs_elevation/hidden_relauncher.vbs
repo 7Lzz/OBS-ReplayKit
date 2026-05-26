@@ -14,7 +14,7 @@ ElseIf fso.FileExists(handoffPath) Then
   obsPath = ReadHandoffLine(handoffPath, 1)
 End If
 If Len(obsPath) = 0 Then
-  obsPath = "C:\Program Files\obs-studio\bin\64bit\obs64.exe"
+  obsPath = FindObsPath()
 End If
 
 If WScript.Arguments.Count >= 2 Then
@@ -58,6 +58,65 @@ Function TryCLng(ByVal value, ByVal fallback)
     TryCLng = fallback
   End If
   On Error GoTo 0
+End Function
+
+Function CleanExePath(ByVal value)
+  Dim s, comma
+  s = Trim(CStr(value))
+  If Left(s, 1) = """" Then s = Mid(s, 2)
+  If Right(s, 1) = """" Then s = Left(s, Len(s) - 1)
+  comma = InStr(1, s, ",")
+  If comma > 0 Then s = Left(s, comma - 1)
+  CleanExePath = Trim(s)
+End Function
+
+Function ObsPathFromRoot(ByVal root)
+  If Len(root) = 0 Then
+    ObsPathFromRoot = ""
+  Else
+    ObsPathFromRoot = fso.BuildPath(root, "bin\64bit\obs64.exe")
+  End If
+End Function
+
+Function FindObsPath()
+  Dim value, candidate, roots, i
+  FindObsPath = "C:\Program Files\obs-studio\bin\64bit\obs64.exe"
+
+  On Error Resume Next
+  value = shell.ExpandEnvironmentStrings("%OBS_REPLAYKIT_OBS_EXE%")
+  On Error GoTo 0
+  candidate = CleanExePath(value)
+  If fso.FileExists(candidate) Then FindObsPath = candidate: Exit Function
+
+  On Error Resume Next
+  value = shell.ExpandEnvironmentStrings("%OBS_REPLAYKIT_OBS_DIR%")
+  On Error GoTo 0
+  candidate = ObsPathFromRoot(CleanExePath(value))
+  If fso.FileExists(candidate) Then FindObsPath = candidate: Exit Function
+
+  On Error Resume Next
+  value = shell.RegRead("HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe\")
+  If Err.Number <> 0 Then Err.Clear: value = ""
+  On Error GoTo 0
+  candidate = CleanExePath(value)
+  If fso.FileExists(candidate) Then FindObsPath = candidate: Exit Function
+
+  On Error Resume Next
+  value = shell.RegRead("HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe\")
+  If Err.Number <> 0 Then Err.Clear: value = ""
+  On Error GoTo 0
+  candidate = CleanExePath(value)
+  If fso.FileExists(candidate) Then FindObsPath = candidate: Exit Function
+
+  roots = Array( _
+    shell.ExpandEnvironmentStrings("%ProgramFiles%") & "\obs-studio", _
+    shell.ExpandEnvironmentStrings("%ProgramW6432%") & "\obs-studio", _
+    shell.ExpandEnvironmentStrings("%ProgramFiles(x86)%") & "\obs-studio" _
+  )
+  For i = 0 To UBound(roots)
+    candidate = ObsPathFromRoot(CleanExePath(roots(i)))
+    If fso.FileExists(candidate) Then FindObsPath = candidate: Exit Function
+  Next
 End Function
 
 WScript.Sleep 300
