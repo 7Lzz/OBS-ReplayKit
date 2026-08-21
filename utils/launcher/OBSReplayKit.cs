@@ -14,8 +14,8 @@ using Microsoft.PowerShell;
 [assembly: AssemblyProduct("OBS ReplayKit")]
 [assembly: AssemblyCompany("OBS ReplayKit")]
 [assembly: AssemblyCopyright("Released under the MIT license. See LICENSE.")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+
+// AssemblyVersion / AssemblyFileVersion live in AssemblyVersion.Generated.cs, written by build_launcher.ps1 from obs_replaykit/__init__.py so there is one version to bump instead of two.
 
 namespace OBSReplayKit
 {

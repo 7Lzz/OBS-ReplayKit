@@ -12,6 +12,12 @@ dist/
 /test_update_mode.bat
 *.spec
 
+# regenerated from obs_replaykit/__init__.py by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches __init__.py
+/assets/obs-studio/obs-replayKit/version.json
+
+# regenerated from obs_replaykit/__init__.py by build_launcher.ps1, see utils/launcher/OBSReplayKit.cs
+/utils/launcher/AssemblyVersion.Generated.cs
+
 # one-off smoke / scratch scripts
 _smoke_test.py
 scratch_*.py
