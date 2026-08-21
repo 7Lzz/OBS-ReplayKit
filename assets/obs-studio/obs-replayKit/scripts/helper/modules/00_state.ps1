@@ -87,7 +87,7 @@ function Resolve-ReplayKitObsExe {
 }
 
 $script:OBS_EXE            = Resolve-ReplayKitObsExe
-$script:OBS_ICON_CACHE     = Join-Path $script:THUMB_DIR 'obs-icon.ico'
+$script:OBS_ICON_PATH      = Join-Path $script:HelperRoot 'obs-replaykit.ico'
 
 # auth-state tunables -- streamables free anonymous flow gives 250 mb / 1 days. signing in (free streamable account) bumps retention to 90 days but keeps the size cap. paid plans lift both. we adjust state.auth.sizecap and retentiondays whenever /me comes back from streamable with new plan info. set sizecap to 0 to mean "no cap".
 $script:ANON_SIZE_CAP      = 250 * 1024 * 1024
@@ -255,7 +255,7 @@ function Get-EntryRetentionSec($entry) {
 $script:PooledConstantNames = @(
     'HOST_ADDR', 'DEFAULT_PORT', 'CLIPS_CACHE_MAX_AGE_MS', 'CLIPS_PAGE_LIMIT_MAX', 'MAX_CLIPS',
     'MAX_CONCURRENT_VIDEO_JOBS', 'MAX_BURST_CONCURRENT_VIDEO_JOBS', 'CPU_BURST_THRESHOLD_PCT',
-    'PREVIEW_CHUNK', 'MAX_PREVIEW_STREAM', 'REPLAYKIT_TEMP_ROOT', 'THUMB_DIR', 'OBS_EXE', 'OBS_ICON_CACHE',
+    'PREVIEW_CHUNK', 'MAX_PREVIEW_STREAM', 'REPLAYKIT_TEMP_ROOT', 'THUMB_DIR', 'OBS_EXE', 'OBS_ICON_PATH',
     'ANON_SIZE_CAP', 'ANON_RETENTION_DAYS', 'SIGNED_IN_DEFAULT_RETENTION', 'AUTH_DIR', 'AUTH_FILE',
     'STREAMABLE_API', 'DEFAULT_LOG_ENABLED', 'LOG_DIR', 'HELPER_LOG_PATH', 'UPLOAD_LOG_PATH',
     'COMPRESS_LOG_PATH', 'COMPRESS_TMP_DIR', 'SCRATCH_DIR', 'ALLOWED_EXTS', 'CONTENT_TYPES',

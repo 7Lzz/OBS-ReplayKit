@@ -58,17 +58,8 @@ function Get-ObsIconSvg {
 }
 
 function Get-ObsIconIco {
-    if (Test-Path -LiteralPath $script:OBS_ICON_CACHE) { return $script:OBS_ICON_CACHE }
-    if (-not (Test-Path -LiteralPath $script:OBS_EXE)) { return $null }
-    if (-not (Test-Path -LiteralPath $script:THUMB_DIR)) {
-        [void](New-Item -ItemType Directory -Path $script:THUMB_DIR -Force)
-    }
-    try {
-        [ReplayKitNative]::SaveAssociatedIcon($script:OBS_EXE, $script:OBS_ICON_CACHE)
-        return $script:OBS_ICON_CACHE
-    } catch {
-        Write-Log "OBS icon extraction failed: $($_.Exception.Message)"
-        return $null
-    }
+    # bundled next to the helper exe instead of extracted from obs64.exe at runtime -- Icon.ExtractAssociatedIcon only ever returned a single low-res frame, so dock/toast/window icons looked blurry next to the real multi-resolution icon the launcher and installer exes use.
+    if (Test-Path -LiteralPath $script:OBS_ICON_PATH) { return $script:OBS_ICON_PATH }
+    return $null
 }
 

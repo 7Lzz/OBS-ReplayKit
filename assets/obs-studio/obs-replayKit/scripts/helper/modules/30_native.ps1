@@ -73,12 +73,6 @@ public static class ReplayKitNative {
         }
     }
 
-    public static void SaveAssociatedIcon(string srcExe, string dst) {
-        using (Icon ic = Icon.ExtractAssociatedIcon(srcExe))
-        using (FileStream fs = File.Create(dst))
-            ic.Save(fs);
-    }
-
     // dark win32 title bar for the popup window
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);

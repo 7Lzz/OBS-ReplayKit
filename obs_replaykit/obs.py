@@ -28,14 +28,16 @@ def close_obs(log: LogFn = None) -> int:
     """taskkill any running obs process. returns the kill count."""
     killed = 0
     for proc in OBS_PROCESSES:
-        # /T also reaps the obs-browser-page.exe children -- without it they outlive obs64.exe and keep plugin_config/obs-browser locked, which stalls the backup step right after this.
+        # no /T: this runs from the update flow, where this very process can be a descendant of obs64.exe (helper -> updater) -- /T walks the whole tree by parent pid regardless of job/breakaway state, so it would take the updater down with obs mid-copy. obs-browser-page.exe is reaped separately below instead.
         result = subprocess.run(
-            ["taskkill", "/F", "/T", "/IM", proc], capture_output=True, text=True
+            ["taskkill", "/F", "/IM", proc], capture_output=True, text=True
         )
         if result.returncode == 0:
             if log:
                 log(f"killed {proc}")
             killed += 1
+    # cef renderer children outlive obs64.exe otherwise and keep plugin_config/obs-browser locked, which stalls the backup step right after this.
+    subprocess.run(["taskkill", "/F", "/IM", "obs-browser-page.exe"], capture_output=True, text=True)
     if killed:
         time.sleep(1.5)  # give the process tree time to actualy exit
     return killed
