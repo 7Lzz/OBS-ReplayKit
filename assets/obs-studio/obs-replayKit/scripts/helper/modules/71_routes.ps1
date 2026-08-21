@@ -364,6 +364,11 @@ animation:r 0.8s linear infinite}
             return
         }
         '^/obs-icon\.ico$' { Serve-ObsIcon $stream; return }
+        '^/version$' {
+            # local file read only, no github call -- for ui labels that just want "what am i running", not the update-check flow.
+            Send-Json $stream 200 @{ ok = $true; version = (Get-ReplayKitInstalledVersion) }
+            return
+        }
         '^/style-window$' {
             $title = if ($query.ContainsKey('title')) { $query['title'] } else { 'Clips' }
             $taskbar = $query.ContainsKey('taskbar') -and ([string]$query['taskbar'] -eq '1')
