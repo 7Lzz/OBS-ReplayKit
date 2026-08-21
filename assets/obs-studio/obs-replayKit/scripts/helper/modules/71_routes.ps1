@@ -369,6 +369,17 @@ animation:r 0.8s linear infinite}
             Send-Json $stream 200 @{ ok = $true; version = (Get-ReplayKitInstalledVersion) }
             return
         }
+        '^/open-url$' {
+            # target=_blank inside these docks opens a bare cef popup (obs' own embedded chromium), not the users actual browser -- shelling out here hands it to whatever the os has registered for http/https instead.
+            $target = if ($query.ContainsKey('url')) { [string]$query['url'] } else { '' }
+            $ok = $false
+            if ($target -match '^https://[^\s"]+$') {
+                try { Start-Process -FilePath $target | Out-Null; $ok = $true }
+                catch { Write-Log "/open-url failed for '$target': $($_.Exception.Message)" }
+            }
+            Send-Json $stream 200 @{ ok = $ok }
+            return
+        }
         '^/style-window$' {
             $title = if ($query.ContainsKey('title')) { $query['title'] } else { 'Clips' }
             $taskbar = $query.ContainsKey('taskbar') -and ([string]$query['taskbar'] -eq '1')
