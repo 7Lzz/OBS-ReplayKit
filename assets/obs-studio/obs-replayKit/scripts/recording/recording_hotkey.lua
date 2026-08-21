@@ -1,5 +1,4 @@
--- recording_hotkey.lua synchronizes ReplayKit's saved clip and recording
--- keybinds into OBS's native hotkeys when the saved keys change.
+-- synchronizes ReplayKits saved clip and recording keybinds into OBSs native hotkeys when the saved keys change.
 
 local obs = obslua
 local ffi_ok, ffi = pcall(require, "ffi")
@@ -69,6 +68,9 @@ local function read_text(path)
     local text = f:read(MAX_SETTINGS_BYTES + 1)
     f:close()
     if text and #text > MAX_SETTINGS_BYTES then return nil end
+    if text then
+        text = text:gsub("^\239\187\191", "")
+    end
     return text
 end
 

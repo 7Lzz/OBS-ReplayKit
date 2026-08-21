@@ -1,4 +1,4 @@
-﻿-- start the obs virtual camera + configure audio routing for the vcam-into-discord workflow. two seperate paths: voice -> physical mic -> discord native mic input (so discords echo cancellation can do its job); game audio -> 'Desktop Audio (excl. Discord)' -> obs monitoring -> vb-cable -> discords second mic input. mic source deliberately doesnt go thru obs monitoring -- that would loop discord audio bleed back to friends via cable output. discord-side: set camera = obs virtual camera, input device = your physical mic (not the cable loopback).
+﻿-- Discord output startup. default path is an OBS Windowed Projector that Discord can select as a window share. OBS Virtual Camera is legacy/manual only and is not started unless replaykit_settings.json explicitly sets discord_output_mode="virtual_camera_legacy".
 
 obs = obslua
 
@@ -9,14 +9,18 @@ local OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT = 2
 local MIC_SOURCE_NAME           = "Audio Input Capture"
 local DESKTOP_AUDIO_SOURCE_NAME = "Desktop Audio (excl. Discord)"
 local DISCORD_AUDIO_SOURCE_NAME = "Discord Audio (record only)"
-local MODE_VCAM                 = "vcam"
-local MODE_SCREENSHARE          = "screenshare"
-local DEFAULT_SHARE_MODE        = MODE_VCAM
-local FAIL_CLOSED_SHARE_MODE    = MODE_SCREENSHARE
+local MODE_PROJECTOR            = "projector"
+local MODE_SHARE_BRIDGE         = "share_bridge"
+local MODE_VCAM_LEGACY          = "virtual_camera_legacy"
+local DEFAULT_DISCORD_OUTPUT_MODE = MODE_PROJECTOR
+local FAIL_CLOSED_OUTPUT_MODE   = MODE_PROJECTOR
 local MAX_SETTINGS_BYTES        = 65536
-local MONITOR_WAIT_MS           = 500
-local MONITOR_WAIT_LIMIT        = 30
-local active_share_mode         = DEFAULT_SHARE_MODE
+local SETTINGS_SYNC_INTERVAL_MS = 500
+local active_discord_output_mode = DEFAULT_DISCORD_OUTPUT_MODE
+local active_projector_enabled  = false
+local have_discord_output_settings = false
+local last_discord_output_signature = ""
+local stop_vcam_if_active
 
 -- discord runs many processes (a main discord.exe plus a seperate discordsystemhelper.exe, plus electron renderer/utility processes). we still patch the exclude list to cover the named variants -- mainly so the discord audio (record only) source can record friend voices properly even though were not streaming them. the streaming path doesnt depend on this exclude list working perfectly anymore.
 local DISCORD_PROCESS_NAMES = {
@@ -27,8 +31,7 @@ local DISCORD_PROCESS_NAMES = {
     "DiscordDevelopment.exe",
 }
 
--- replaykit_settings.json is the persisted source of truth for the dock share-mode toggle. read it
--- before changing virtual camera or monitoring state so OBS startup matches the users last choice.
+-- replaykit_settings.json is the persisted source of truth for the Discord output mode -- read it before changing output or monitoring state so OBS startup matches the users last choice.
 
 local function normalize_path(path)
     return tostring(path or ""):gsub("\\", "/")
@@ -55,46 +58,85 @@ local function read_text(path)
     return text
 end
 
-local function runtime_settings_path()
-    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+local function strip_utf8_bom(text)
+    if text and text:sub(1, 3) == "\239\187\191" then
+        return text:sub(4)
+    end
+    return text
 end
 
-local function read_share_mode()
-    local text = read_text(runtime_settings_path())
+local function runtime_settings_paths()
+    local scriptDir = parent_dir(script_path())
+    local parentDir = parent_dir(scriptDir)
+    return {
+        join_path(scriptDir, "replaykit_settings.json"),
+        join_path(parentDir, "replaykit_settings.json"),
+        join_path(join_path(parentDir, "scripts"), "replaykit_settings.json"),
+    }
+end
+
+local function read_runtime_settings_text()
+    for _, path in ipairs(runtime_settings_paths()) do
+        local text = strip_utf8_bom(read_text(path))
+        if text and text ~= "" then return text end
+    end
+    return nil
+end
+
+local function _read_bool(data, key, default)
+    if not obs.obs_data_has_user_value(data, key) then return default end
+    return obs.obs_data_get_bool(data, key)
+end
+
+local function read_discord_output_settings()
+    local text = read_runtime_settings_text()
     if not text or text == "" then
-        print("[AutoVirtCam] WARN: replaykit_settings.json missing; using screenshare-safe startup")
-        return FAIL_CLOSED_SHARE_MODE
+        print("[DiscordProjector] WARN: replaykit_settings.json missing; disabling Discord share monitoring")
+        return FAIL_CLOSED_OUTPUT_MODE, false, false
     end
 
     local data = obs.obs_data_create_from_json(text)
     if data == nil then
-        print("[AutoVirtCam] WARN: replaykit_settings.json invalid; using screenshare-safe startup")
-        return FAIL_CLOSED_SHARE_MODE
+        print("[DiscordProjector] WARN: replaykit_settings.json invalid; disabling Discord share monitoring")
+        return FAIL_CLOSED_OUTPUT_MODE, false, false
     end
 
-    local mode = DEFAULT_SHARE_MODE
-    if obs.obs_data_has_user_value(data, "shareMode") then
-        mode = obs.obs_data_get_string(data, "shareMode")
+    local mode = DEFAULT_DISCORD_OUTPUT_MODE
+    if obs.obs_data_has_user_value(data, "discord_output_mode") then
+        mode = obs.obs_data_get_string(data, "discord_output_mode")
+    elseif obs.obs_data_has_user_value(data, "shareMode") then
+        local legacy = obs.obs_data_get_string(data, "shareMode")
+        if legacy == MODE_PROJECTOR or legacy == MODE_SHARE_BRIDGE then
+            mode = MODE_PROJECTOR
+        else
+            print(string.format("[DiscordProjector] WARN: shareMode=%s ignored; using OBS projector mode", tostring(legacy)))
+        end
     end
+    local screenshare_enabled = _read_bool(data, "discord_screenshare_enabled", true)
+    local projector_enabled = screenshare_enabled and _read_bool(data, "discord_projector_enabled", true)
     obs.obs_data_release(data)
 
-    if mode == MODE_VCAM or mode == MODE_SCREENSHARE then
-        return mode
+    if mode == MODE_SHARE_BRIDGE then
+        print("[DiscordProjector] WARN: share_bridge is disabled; using OBS projector mode")
+        mode = MODE_PROJECTOR
+    elseif mode ~= MODE_PROJECTOR then
+        print(string.format("[DiscordProjector] WARN: discord_output_mode=%s ignored; using OBS projector mode", tostring(mode)))
+        mode = MODE_PROJECTOR
     end
 
-    print(string.format("[AutoVirtCam] WARN: invalid shareMode '%s'; using screenshare-safe startup", tostring(mode)))
-    return FAIL_CLOSED_SHARE_MODE
+    return mode, projector_enabled, true
 end
 
-local function share_mode_uses_vcam()
-    return active_share_mode == MODE_VCAM
+local function discord_output_uses_legacy_vcam()
+    return active_discord_output_mode == MODE_VCAM_LEGACY
 end
 
 -- monitoring-type setter (idempotent, logs on transition)
 
-local function _set_monitoring(source_name, target, friendly_target_name, log_missing, log_unchanged, ensure_unmuted)
+local function _set_monitoring(source_name, target, friendly_target_name, log_missing, log_unchanged, ensure_unmuted, refresh_when_unchanged)
     if log_missing == nil then log_missing = true end
     if log_unchanged == nil then log_unchanged = true end
+    if refresh_when_unchanged == nil then refresh_when_unchanged = true end
     local src = obs.obs_get_source_by_name(source_name)
     if src == nil then
         if log_missing then
@@ -103,7 +145,8 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
         return false
     end
     local current = obs.obs_source_get_monitoring_type(src)
-    if current ~= target then
+    local changed = current ~= target
+    if changed then
         obs.obs_source_set_monitoring_type(src, target)
         print(string.format("[AutoVirtCam] %s monitoring %d -> %d (%s)",
             source_name, current, target, friendly_target_name))
@@ -113,28 +156,76 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
             source_name, target, friendly_target_name))
         end
     end
-    if ensure_unmuted and obs.obs_source_muted(src) then
-        obs.obs_source_set_muted(src, false)
-        print(string.format("[AutoVirtCam] %s unmuted for ReplayKit audio routing", source_name))
+    if ensure_unmuted then
+        local muted = obs.obs_source_muted(src)
+        if muted then
+            print(string.format("[AutoVirtCam] %s unmuted while syncing monitoring", source_name))
+        end
+        -- OBS 32.1 can leave the mixer monitor icon stale without a source state signal.
+        if changed or refresh_when_unchanged or muted then
+            obs.obs_source_set_muted(src, false)
+        end
     end
     obs.obs_source_release(src)
     return true
 end
 
--- do not route the mic thru monitoring to cable input. that creates an open-mic feedback loop: discord plays friends voices thru the users speakers, the mic picks up the bleed, and routing it to cable input echoes their voices straight back at them thru the streams "mic" channel. the mic still feeds obss normal mixer (for recording / stream output to twitch/youtube), it just doesnt go to discord via cable output. user-voice-to-friends should travel thru discords native mic input (with discords echo cancellation enabled), not thru obss monitoring bus.
+-- mic monitoring stays off; the desktop source is monitored only while the projector preview is enabled so Discord can capture OBS Stream Audio.
 local function ensure_mic_NOT_to_cable()
     _set_monitoring(MIC_SOURCE_NAME,
         OBS_MONITORING_TYPE_NONE, "Monitor Off")
 end
 
-local function ensure_desktop_audio_to_cable()
-    _set_monitoring(DESKTOP_AUDIO_SOURCE_NAME,
-        OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT, "Monitor and Output", nil, nil, true)
+local function ensure_desktop_audio_not_monitored(reason, log_missing, log_unchanged, refresh_when_unchanged)
+    return _set_monitoring(DESKTOP_AUDIO_SOURCE_NAME,
+        OBS_MONITORING_TYPE_NONE, reason or "Monitor Off", log_missing, log_unchanged, true, refresh_when_unchanged)
 end
 
-local function ensure_desktop_audio_not_monitored(reason, log_missing, log_unchanged)
+local function ensure_desktop_audio_projector_monitoring(log_missing, log_unchanged, refresh_when_unchanged)
     return _set_monitoring(DESKTOP_AUDIO_SOURCE_NAME,
-        OBS_MONITORING_TYPE_NONE, reason or "Monitor Off", log_missing, log_unchanged, true)
+        OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT, "Monitor and Output - Projector audio", log_missing, log_unchanged, true, refresh_when_unchanged)
+end
+
+local function ensure_desktop_audio_monitoring_for_current_mode(log_missing, log_unchanged, refresh_when_unchanged)
+    if active_discord_output_mode == MODE_PROJECTOR and active_projector_enabled then
+        return ensure_desktop_audio_projector_monitoring(log_missing, log_unchanged, refresh_when_unchanged)
+    end
+    return ensure_desktop_audio_not_monitored("Monitor Off - Share Preview disabled", log_missing, log_unchanged, refresh_when_unchanged)
+end
+
+local function discord_output_signature(mode, enabled)
+    return tostring(mode or "") .. "|" .. tostring(enabled == true)
+end
+
+local function apply_discord_output_settings(reason, force)
+    local mode, enabled, settings_ok = read_discord_output_settings()
+    if not settings_ok and have_discord_output_settings then
+        print(string.format("[DiscordProjector] WARN: settings sync (%s) could not read settings; keeping last mode=%s enabled=%s",
+            reason or "poll", tostring(active_discord_output_mode), tostring(active_projector_enabled)))
+        ensure_desktop_audio_monitoring_for_current_mode(false, false, false)
+        return
+    end
+    have_discord_output_settings = settings_ok
+    local signature = discord_output_signature(mode, enabled)
+    if not force and signature == last_discord_output_signature then
+        active_discord_output_mode = mode
+        active_projector_enabled = enabled
+        ensure_desktop_audio_monitoring_for_current_mode(false, false, false)
+        return
+    end
+    last_discord_output_signature = signature
+    active_discord_output_mode = mode
+    active_projector_enabled = enabled
+    print(string.format("[DiscordProjector] settings sync (%s): mode=%s enabled=%s",
+        reason or "poll", tostring(mode), tostring(enabled)))
+    ensure_desktop_audio_monitoring_for_current_mode()
+    if not discord_output_uses_legacy_vcam() then
+        stop_vcam_if_active("Discord share mode")
+    end
+end
+
+local function poll_discord_output_settings()
+    apply_discord_output_settings("settings poll", false)
 end
 
 -- process-audio-capture exec-list patching (best-effort for record source)
@@ -207,9 +298,6 @@ end
 
 -- forward-declare so the verification timer can remove itself by name.
 local verify_vcam_started
-local configure_desktop_audio_when_monitor_ready
-local monitor_wait_attempts = 0
-local monitor_failure_logged = false
 
 verify_vcam_started = function()
     obs.timer_remove(verify_vcam_started)
@@ -222,25 +310,26 @@ end
 
 local function start_vcam()
     obs.timer_remove(start_vcam)
-    active_share_mode = read_share_mode()
-    if not share_mode_uses_vcam() then
+    active_discord_output_mode, active_projector_enabled, have_discord_output_settings = read_discord_output_settings()
+    if not discord_output_uses_legacy_vcam() then
         if obs.obs_frontend_virtualcam_active() then
             obs.obs_frontend_stop_virtualcam()
-            print("[AutoVirtCam] stopped virtual camera (share mode screenshare)")
+            print("[DiscordProjector] stopped OBS Virtual Camera (Discord projector mode)")
         else
-            print("[AutoVirtCam] virtual camera remains off (share mode screenshare)")
+            print("[DiscordProjector] Skipping OBS Virtual Camera for Discord output")
         end
         return
     end
     if obs.obs_frontend_virtualcam_active() then
-        print("[AutoVirtCam] virtual camera already active")
+        print("[DiscordProjector] virtual camera already active (legacy)")
         return
     end
+    print("[DiscordProjector] WARN: starting OBS Virtual Camera only because virtual_camera_legacy is explicitly selected")
     obs.obs_frontend_start_virtualcam()
     obs.timer_add(verify_vcam_started, 1500)
 end
 
-local function stop_vcam_if_active(reason)
+stop_vcam_if_active = function(reason)
     obs.timer_remove(start_vcam)
     obs.timer_remove(verify_vcam_started)
     if obs.obs_frontend_virtualcam_active() then
@@ -251,58 +340,18 @@ local function stop_vcam_if_active(reason)
     end
 end
 
-configure_desktop_audio_when_monitor_ready = function()
-    active_share_mode = read_share_mode()
-    if not share_mode_uses_vcam() then
-        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        ensure_desktop_audio_not_monitored("Monitor Off - share mode screenshare")
-        return
-    end
-
-    local status = rawget(_G, "ReplayKitMonitorPicker")
-
-    if type(status) == "table" and status.ready then
-        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        print(string.format("[AutoVirtCam] OBS monitoring device confirmed: %s", tostring(status.device_name or "OBS Stream Audio")))
-        ensure_desktop_audio_to_cable()
-        return
-    end
-
-    if type(status) == "table" and status.failed then
-        local disabled = ensure_desktop_audio_not_monitored("Monitor Off - OBS Stream Audio unavailable", false, false)
-        if not monitor_failure_logged then
-            print("[AutoVirtCam] OBS Stream Audio unavailable - keeping desktop audio monitoring off to avoid double audio")
-            monitor_failure_logged = true
-        end
-        monitor_wait_attempts = monitor_wait_attempts + 1
-        if disabled or monitor_wait_attempts >= MONITOR_WAIT_LIMIT then
-            obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        end
-        return
-    end
-
-    ensure_desktop_audio_not_monitored("Monitor Off until OBS Stream Audio is confirmed", false, false)
-    monitor_wait_attempts = monitor_wait_attempts + 1
-    if monitor_wait_attempts >= MONITOR_WAIT_LIMIT then
-        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        ensure_desktop_audio_not_monitored("Monitor Off - OBS Stream Audio not confirmed")
-        print("[AutoVirtCam] OBS Stream Audio was not confirmed - keeping desktop audio monitoring off to avoid double audio")
-    end
-end
-
 -- lifecycle
 
 function script_description()
-    return [[<b>Auto Start Virtual Camera</b><br>
+    return [[<b>Discord Share Ready Projector</b><br>
 On OBS launch:<br>
-&nbsp;&nbsp;1. Reads the saved ReplayKit share mode.<br>
-&nbsp;&nbsp;2. In virtual-camera mode, routes <i>Desktop Audio
-(excl. Discord)</i> to OBS Stream Audio and starts OBS Virtual Camera.<br>
-&nbsp;&nbsp;3. In normal screen-share mode, keeps monitoring off and
-keeps OBS Virtual Camera stopped.<br><br>
-Pair with Discord: Camera = <code>OBS Virtual Camera</code>,
-Mic = <code>OBS Stream Audio Loopback</code>. Friends see your
-OBS scene as your webcam and hear mic + game audio.<br><br>
+&nbsp;&nbsp;1. Reads the saved ReplayKit Discord output mode.<br>
+&nbsp;&nbsp;2. Keeps OBS Virtual Camera stopped and lets the ReplayKit helper
+open and move an OBS Windowed Projector for Discord Go Live.<br>
+&nbsp;&nbsp;3. Polls the saved Share Preview state for audio monitoring sync.<br><br>
+Pair with Discord: share the window named
+<code>OBS ReplayKit Discord Share (Projector - Desktop Audio)</code> through application screenshare.<br>
+The OBS projector window is renamed, moved, and hidden from the taskbar by ReplayKit.<br><br>
 <b>Important:</b> for friends to hear your game audio, the
 <i>Game Capture</i> source must be hooking the game (its preview shows
 the game). If only <i>Display Capture</i> is showing the game, friends
@@ -312,39 +361,33 @@ Automatic Gain Control.]]
 end
 
 function script_load(_settings)
-    print("[AutoVirtCam] loaded")
-    active_share_mode = read_share_mode()
-    print("[AutoVirtCam] share mode: " .. active_share_mode)
-    -- force mic off monitoring -- routing mic to cable creates a feedback echo loop (discord plays friends voices on speakers -> mic captures bleed -> back into cable -> back to discord -> friends hear themselves). user voice should travel via discords native mic input with its built-in echo cancellation.
-    ensure_mic_NOT_to_cable()
-    if share_mode_uses_vcam() then
-        -- fail closed until the companion monitor picker confirms that OBS monitoring is pointed at OBS Stream Audio. Otherwise Monitor and Output can play desktop audio through the users speakers twice.
-        ensure_desktop_audio_not_monitored("Monitor Off until OBS Stream Audio is confirmed")
-        monitor_wait_attempts = 0
-        monitor_failure_logged = false
-        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        obs.timer_add(configure_desktop_audio_when_monitor_ready, MONITOR_WAIT_MS)
-        configure_desktop_audio_when_monitor_ready()
-    else
-        obs.timer_remove(configure_desktop_audio_when_monitor_ready)
-        ensure_desktop_audio_not_monitored("Monitor Off - share mode screenshare")
+    print("[DiscordProjector] loaded")
+    active_discord_output_mode, active_projector_enabled, have_discord_output_settings = read_discord_output_settings()
+    last_discord_output_signature = discord_output_signature(active_discord_output_mode, active_projector_enabled)
+    print("[DiscordProjector] discord_output_mode: " .. active_discord_output_mode)
+    if active_discord_output_mode == MODE_PROJECTOR and active_projector_enabled then
+        print("[DiscordProjector] Discord share preview enabled")
     end
+    -- match OBS startup monitoring to the saved Share Preview state.
+    ensure_mic_NOT_to_cable()
+    ensure_desktop_audio_monitoring_for_current_mode()
     -- cover every discord build variant in the exclude list so the record-only source captures discord audio properly for local recordings.
     ensure_discord_processes_covered(DESKTOP_AUDIO_SOURCE_NAME, true)
     ensure_discord_processes_covered(DISCORD_AUDIO_SOURCE_NAME, true)
-    if share_mode_uses_vcam() then
+    if discord_output_uses_legacy_vcam() then
         -- defer the virtual-camera start a bit so obss frontend is fully up.
-        print("[AutoVirtCam] starting virtual camera in 2s")
+        print("[DiscordProjector] starting legacy virtual camera in 2s")
         obs.timer_add(start_vcam, 2000)
     else
-        stop_vcam_if_active("share mode screenshare")
+        stop_vcam_if_active("Discord projector mode")
     end
+    obs.timer_add(poll_discord_output_settings, SETTINGS_SYNC_INTERVAL_MS)
 end
 
 function script_unload()
     obs.timer_remove(start_vcam)
     obs.timer_remove(verify_vcam_started)
-    obs.timer_remove(configure_desktop_audio_when_monitor_ready)
+    obs.timer_remove(poll_discord_output_settings)
     if obs.obs_frontend_virtualcam_active() then
         obs.obs_frontend_stop_virtualcam()
         print("[AutoVirtCam] stopped virtual camera at OBS shutdown")

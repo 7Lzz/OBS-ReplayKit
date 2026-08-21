@@ -1,9 +1,9 @@
-# --- Python -----------------------------------------------------
+# python
 __pycache__/
 *.py[cod]
 *$py.class
 
-# --- PyInstaller build outputs ----------------------------------
+# pyinstaller build outputs
 build/
 dist/
 /OBSReplayKit.exe
@@ -12,14 +12,11 @@ dist/
 /test_update_mode.bat
 *.spec
 
-# --- One-off smoke / scratch scripts ----------------------------
+# one-off smoke / scratch scripts
 _smoke_test.py
 scratch_*.py
 
-# --- Runtime state written by the installer or helper ----------
-# These live in the user's APPDATA but in case someone copies them
-# into the repo by mistake, ignore them so credentials / cookie
-# stores / per-user paths can never accidentally be committed.
+# runtime state written by the installer or helper -- these live in the users appdata, but in case someone copies them into the repo by mistake, ignore them so credentials/cookie stores/per-user paths can never accidentally be committed.
 helper_config.json
 clips_db.json
 auth.jar
@@ -28,22 +25,22 @@ cookies.txt
 .env
 .env.local
 
-# --- Backups created by the installer + cleanup script ---------
+# backups created by the installer + cleanup script
 obs-studio.bak.*/
 obs-custom-dock.bak.*/
 
-# --- Logs -------------------------------------------------------
+# logs
 *.log
 logs/
 
-# --- Editors / IDEs --------------------------------------------
+# editors / ides
 .vscode/
 .idea/
 *.swp
 *~
 .claude/
 
-# --- OS clutter -----------------------------------------------
+# os clutter
 Thumbs.db
 desktop.ini
 .DS_Store

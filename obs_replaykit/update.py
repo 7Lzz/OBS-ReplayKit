@@ -1,4 +1,4 @@
-"""Updater mode for OBS ReplayKit release installers."""
+"""updater mode for OBS ReplayKit release installers."""
 
 from __future__ import annotations
 
@@ -126,7 +126,7 @@ def run_update_mode(
     start_delay_ms: int = 0,
     relaunch: bool = True,
 ) -> int:
-    """Run a non-interactive repair/update install from a downloaded release exe."""
+    """run a non-interactive repair/update install from a downloaded release exe."""
     def log(message: str) -> None:
         _log(message)
         try:
@@ -154,6 +154,62 @@ def run_update_mode(
         _schedule_cleanup(cleanup_dir)
 
 
+class CleanupProgress:
+    def __init__(self) -> None:
+        self.total_steps = 0
+        self.issues: list[str] = []
+
+    def render(self, completed: int, title: str, detail: str, state: str = "working") -> None:
+        status = "done" if state == "done" else ("failed" if state == "failed" else "working")
+        message = f"[{completed}/{max(1, self.total_steps)}] {status}: {title}"
+        if detail:
+            message += f" - {detail}"
+        _log(message)
+        try:
+            print(message)
+        except Exception:
+            pass
+
+    def log(self, message: str) -> None:
+        text = str(message or "").strip()
+        if not text:
+            return
+        _log(text)
+        lowered = text.lower()
+        if any(word in lowered for word in ("warn", "failed", "missing", "not found", "skipped", "timed out", "permission denied")):
+            self.add_issue(text)
+        try:
+            print(text)
+        except Exception:
+            pass
+
+    def add_issue(self, message: str) -> None:
+        cleaned = " ".join(str(message or "").split())
+        if len(cleaned) > 118:
+            cleaned = cleaned[:115] + "..."
+        if cleaned and cleaned not in self.issues:
+            self.issues.append(cleaned)
+
+
+def run_cleanup_mode(start_delay_ms: int = 0, keep_user_settings: bool = True) -> int:
+    from .cleanup import run_cleanup
+
+    try:
+        _log("cleanup starting")
+        if start_delay_ms > 0:
+            time.sleep(min(start_delay_ms, 5000) / 1000.0)
+        progress = CleanupProgress()
+        issues = run_cleanup(progress, keep_user_settings=keep_user_settings)
+        if issues:
+            _log(f"cleanup complete with {len(issues)} warning(s)")
+        else:
+            _log("cleanup complete")
+        return 0
+    except Exception as exc:
+        _log(f"cleanup failed: {exc}")
+        return 1
+
+
 def update_arg_parser():
     import argparse
 
@@ -167,8 +223,21 @@ def update_arg_parser():
     return parser
 
 
+def cleanup_arg_parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--cleanup", action="store_true")
+    parser.add_argument("--start-delay-ms", type=int, default=0)
+    parser.add_argument("--remove-user-settings", action="store_true")
+    return parser
+
+
 def try_run_update_from_argv(argv: list[str] | None = None) -> Optional[int]:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--cleanup" in argv:
+        args, _ = cleanup_arg_parser().parse_known_args(argv)
+        return run_cleanup_mode(start_delay_ms=args.start_delay_ms, keep_user_settings=not args.remove_user_settings)
     if "--update" not in argv:
         return None
     args, _ = update_arg_parser().parse_known_args(argv)

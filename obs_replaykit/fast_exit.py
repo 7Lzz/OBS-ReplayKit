@@ -1,4 +1,4 @@
-"""Fast process exit helpers for the console setup app."""
+"""fast process exit helpers for the console setup app."""
 
 from __future__ import annotations
 
@@ -124,7 +124,7 @@ else:
             _terminate_pid(parent, rc)
 
     def fast_exit(rc: int = 0) -> None:
-        """Exit now, including the PyInstaller onefile parent when present."""
+        """exit now, including the PyInstaller onefile parent when present."""
         try:
             _terminate_onefile_parent(rc)
         except Exception:

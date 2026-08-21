@@ -101,9 +101,7 @@
     background:#272A33;
     border-color:#3C404D;
   }
-  /* release notes panel. github markdown lands here -- the popups js does the rendering + html
-     escaping, so the helper just passes the raw body through. fixed height + scroll so a long
-     changelog doesnt blow out the popup. */
+  /* release notes panel. github markdown lands here -- the popups js does the rendering + html escaping, so the helper just passes the raw body through. fixed height + scroll so a long changelog doesnt blow out the popup. */
   .notes {
     display:none;
     margin-top:4px;
@@ -120,8 +118,7 @@
     word-break:break-word;
   }
   .notes.is-visible { display:block; }
-  /* h1->h3, h2->h4, h3->h5 (the renderer offsets levels by +2 so the popups dom hierarchy stays
-     under the page title). distinct sizes so multi-section changelogs read clearly. */
+  /* h1->h3, h2->h4, h3->h5 (the renderer offsets levels by +2 so the popups dom hierarchy stays under the page title). distinct sizes so multi-section changelogs read clearly. */
   .notes h3 { margin:10px 0 4px; font-size:15px; font-weight:600; color:var(--text); }
   .notes h4 { margin:10px 0 4px; font-size:13px; font-weight:600; color:var(--text); }
   .notes h5 { margin:8px 0 4px;  font-size:12px; font-weight:600; color:var(--text); }
@@ -171,9 +168,7 @@
   }
   .notes-label.is-visible { display:block; }
 
-  /* install progress: revealed once the user clicks download. matches the obs settings-apply look:
-     thin track, accent fill, status line underneath. stage transitions are time-anchored to the
-     /update/apply call so we dont need to expose a polling endpoint from a single-threaded helper. */
+  /* install progress: revealed once the user clicks download. matches the obs settings-apply look: thin track, accent fill, status line underneath. stage transitions are time-anchored to the /update/apply call so we dont need to expose a polling endpoint from a single-threaded helper. */
   .progress {
     display:none;
     margin-top:4px;
@@ -225,16 +220,30 @@
 </div>
 <script>
   (function lockdown() {
-    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
     document.addEventListener("wheel", function (e) {
-      if (e.ctrlKey) e.preventDefault();
-    }, { passive:false });
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive:false, capture:true });
     document.addEventListener("keydown", function (e) {
-      if (e.ctrlKey && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0" || e.key === "r" || e.key === "R")) {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") {
+        e.preventDefault();
+        return;
+      }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
         e.preventDefault();
       }
-      if (e.key === "F5") e.preventDefault();
-    });
+      if (e.key === "BrowserBack" || e.key === "BrowserForward" || e.code === "BrowserBack" || e.code === "BrowserForward") {
+        e.preventDefault();
+      }
+    }, true);
   })();
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
@@ -256,9 +265,7 @@
   let latest = null;
   let restartWatchTimer = null;
 
-  // tiny github-flavored markdown subset. escape first, then transform inline patterns. handles
-  // what we typically see in replaykit release notes: headers, bullets, **bold**, `code`,
-  // [text](url), and bare https urls. anything else falls thru as plain text.
+  // tiny github-flavored markdown subset -- escape first, then transform inline patterns; handles what we typically see in replaykit release notes: headers, bullets, **bold**, `code`, [text](url), and bare https urls, anything else falls thru as plain text.
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, "&amp;")
@@ -405,8 +412,7 @@
         showReleaseNotes("");
         return;
       }
-      // prefer the github release name when present (e.g. "ReplayKit 1.0.1 - hotfix"), fall back to
-      // the version-only string.
+      // prefer the github release name when present (e.g. "ReplayKit 1.0.1 - hotfix"), fall back to the version-only string.
       els.title.textContent = data.releaseName ? data.releaseName : ("ReplayKit " + data.latestVersion + " available");
       els.body.textContent = "ReplayKit " + data.latestVersion + " is ready to install.";
       els.meta.textContent = "Installed: " + data.installedVersion + "  |  Latest: " + data.latestVersion;
@@ -432,11 +438,7 @@
     els.progressStage.classList.toggle("is-failed", kind === "failed");
   }
 
-  // after the helper spawns the detached installer it has only seconds to live: the installer
-  // taskkills obs, obs death triggers the helpers parent-watchdog and the helper exits. we poll
-  // /update/check on a short interval -- a connection error means the install window is in flight,
-  // a successful response from a fresh helper means the new obs is back up and we can close. cap
-  // the wait so a stuck install eventually surfaces in the ui.
+  // after the helper spawns the detached installer it has only seconds to live: the installer taskkills obs, obs death triggers the helpers parent-watchdog and the helper exits. we poll /update/check on a short interval -- a connection error means the install window is in flight, a successful response from a fresh helper means the new obs is back up and we can close; capped so a stuck install eventually surfaces in the ui.
   function watchForRestart(onComplete) {
     let seenHelperDown = false;
     const started = Date.now();
@@ -456,8 +458,7 @@
         seenHelperDown = true;
       }
       if (Date.now() - started > 180000) {
-        // 3 minute safety net -- if obs hasnt come back by now, stop polling and leave the popup
-        // open so the user can see the last status.
+        // 3 minute safety net -- if obs hasnt come back by now, stop polling and leave the popup open so the user can see the last status.
         clearInterval(restartWatchTimer);
         restartWatchTimer = null;
       }
@@ -470,9 +471,7 @@
     setStatus("", "");
     setProgress(8, "Preparing download...");
 
-    // crawl the bar from ~8% to ~70% while /update/apply is in-flight (download is the slow part
-    // and we cant get a real byte count from a single-threaded ps5 helper without restructuring it).
-    // step is gentle so it doesnt hit 70% before the download actually finishes on a fast network.
+    // crawl the bar from ~8% to ~70% while /update/apply is in-flight (download is the slow part and we cant get a real byte count from a single-threaded ps5 helper without restructuring it) -- step is gentle so it doesnt hit 70% before the download actually finishes on a fast network.
     let pulsePercent = 8;
     const pulseTimer = setInterval(() => {
       pulsePercent = Math.min(pulsePercent + 1.5, 68);
@@ -491,8 +490,7 @@
       setProgress(80, "Installing update...");
       setTimeout(() => setProgress(92, "Closing OBS to apply files..."), 1500);
       setTimeout(() => setProgress(96, "Copying ReplayKit files..."),    3500);
-      // wait for the installer to kill obs, copy files, and relaunch obs. when the new helper is
-      // up, finish the bar and close the popup so the user is back in obs cleanly.
+      // wait for the installer to kill obs, copy files, and relaunch obs -- when the new helper is up, finish the bar and close the popup so the user is back in obs cleanly.
       watchForRestart(() => {
         setProgress(100, "OBS is back up -- update complete.", "done");
         setTimeout(closeWindow, 1500);

@@ -136,7 +136,7 @@ def is_elevation_task_installed() -> bool:
 
 
 def delete_elevation_task(log: LogFn = None) -> bool:
-    """Delete the ReplayKit scheduled task. Safe when the task is not present."""
+    """delete the ReplayKit scheduled task. safe when the task is not present."""
     try:
         result = subprocess.run(
             ["schtasks.exe", "/Delete", "/TN", TASK_NAME, "/F"],

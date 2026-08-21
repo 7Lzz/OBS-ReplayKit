@@ -20,7 +20,7 @@ OBS_START_ARGS = (
 
 
 def find_obs_exe() -> Optional[Path]:
-    """Best detected OBS executable path, or None."""
+    """best detected OBS executable path, or None."""
     return find_obs_exe_candidate()
 
 
@@ -28,8 +28,9 @@ def close_obs(log: LogFn = None) -> int:
     """taskkill any running obs process. returns the kill count."""
     killed = 0
     for proc in OBS_PROCESSES:
+        # /T also reaps the obs-browser-page.exe children -- without it they outlive obs64.exe and keep plugin_config/obs-browser locked, which stalls the backup step right after this.
         result = subprocess.run(
-            ["taskkill", "/F", "/IM", proc], capture_output=True, text=True
+            ["taskkill", "/F", "/T", "/IM", proc], capture_output=True, text=True
         )
         if result.returncode == 0:
             if log:
@@ -72,7 +73,7 @@ def _vbs_literal(value: str) -> str:
 
 
 def _launch_obs_via_wscript(obs_exe: Path, log: LogFn = None) -> bool:
-    """Start OBS from a temporary GUI-script host so native plugins cannot write to our console."""
+    """start OBS from a temporary GUI-script host so native plugins cannot write to our console."""
     command = f'"{obs_exe}" {OBS_START_ARGS}'
     script = f"""Option Explicit
 On Error Resume Next
@@ -128,7 +129,7 @@ WScript.Quit rc
 
 
 def launch_obs(log: LogFn = None) -> bool:
-    """Launch OBS without attaching it to the setup console."""
+    """launch OBS without attaching it to the setup console."""
     obs_exe = find_obs_exe()
     if obs_exe is None:
         if log:

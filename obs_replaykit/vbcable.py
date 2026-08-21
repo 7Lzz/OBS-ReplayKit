@@ -1,4 +1,4 @@
-"""Install and rename the virtual audio device used for OBS stream audio."""
+"""install and rename the virtual audio device used for OBS stream audio."""
 
 from __future__ import annotations
 
@@ -20,8 +20,7 @@ from .voicemeeter import restore_voicemeeter_inputs, snapshot_voicemeeter_inputs
 LogFn = Optional[Callable[[str], None]]
 
 
-# Post-install rename table. The render endpoint is what OBS monitors to; the
-# loopback endpoint is what Discord captures when the user selects it.
+# post-install rename table -- the render endpoint is what obs monitors to, the loopback endpoint is what discord captures when the user selects it.
 _ENDPOINT_RENAMES = {
     "CABLE Input":    "OBS Stream Audio",
     "CABLE In 16ch":  "OBS Stream Audio (Surround)",
@@ -71,18 +70,14 @@ public interface IMMDevice {
     [PreserveSig] int GetState(out int pdwState);
 }
 
-// PROPERTYKEY: identifies a property (GUID + pid pair). For PKEY_Device_FriendlyName
-// the GUID is {a45c254e-df1c-4efd-8020-67d146a850e0} and pid=2.
+// PROPERTYKEY identifies a property (GUID + pid pair); for PKEY_Device_FriendlyName the GUID is {a45c254e-df1c-4efd-8020-67d146a850e0} and pid=2.
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 public struct PROPERTYKEY {
     public Guid fmtid;
     public uint pid;
 }
 
-// PROPVARIANT: 16 bytes header + 8 bytes payload union (24 bytes on x64
-// with the trailing padding the layout below adds explicitly). We only
-// ever store a VT_LPWSTR (=31) pointing to a CoTaskMem-allocated UTF-16
-// string, so the other union slots aren't declared.
+// PROPVARIANT is 16 bytes header + 8 bytes payload union (24 bytes on x64 with trailing padding); we only ever store a VT_LPWSTR (=31) pointing to a CoTaskMem-allocated UTF-16 string, so the other union slots arent declared.
 [StructLayout(LayoutKind.Sequential)]
 public struct PROPVARIANT {
     public ushort vt;
@@ -133,9 +128,7 @@ public interface IPolicyConfigClient {
 }
 
 public static class AudioHelper {
-    // EDataFlow: 0 = eRender (playback / speakers / sinks)
-    //            1 = eCapture (recording / mic / sources)
-    // ERole:     0 = eConsole, 1 = eMultimedia, 2 = eCommunications
+    // EDataFlow: 0 = eRender (playback/speakers/sinks), 1 = eCapture (recording/mic/sources). ERole: 0 = eConsole, 1 = eMultimedia, 2 = eCommunications.
     private static string _GetDefault(int dataFlow) {
         var enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumerator());
         IMMDevice dev;
@@ -147,7 +140,7 @@ public static class AudioHelper {
     }
     private static int _SetDefault(string id) {
         var client = (IPolicyConfigVistaClient)(new _CPolicyConfigVistaClient());
-        // Apply to all three roles so apps following any of them follow us.
+        // apply to all three roles so apps following any of them follow us.
         int rc0 = client.SetDefaultEndpoint(id, 0);  // Console
         int rc1 = client.SetDefaultEndpoint(id, 1);  // Multimedia
         int rc2 = client.SetDefaultEndpoint(id, 2);  // Communications
@@ -161,9 +154,7 @@ public static class AudioHelper {
         var client = (IPolicyConfigClient)(new _CPolicyConfigClient());
         return client.SetEndpointVisibility(id, visible ? 1 : 0);
     }
-    // Rename an endpoint's PKEY_Device_FriendlyName. The audio service
-    // honours this even when direct registry writes are blocked by the
-    // TrustedInstaller ACL on \MMDevices\Audio\...\<guid>\Properties.
+    // renames an endpoints PKEY_Device_FriendlyName; the audio service honours this even when direct registry writes are blocked by the TrustedInstaller ACL on \MMDevices\Audio\...\<guid>\Properties.
     public static int RenameEndpoint(string deviceId, string newName) {
         var client = (IPolicyConfigVistaClient)(new _CPolicyConfigVistaClient());
         var key = new PROPERTYKEY {
@@ -243,7 +234,7 @@ def _set_default_capture(device_id: str, log: LogFn = None) -> bool:
 
 
 def _rename_endpoints(log: LogFn = None) -> None:
-    """Rename the installed audio endpoints to OBS Stream Audio names."""
+    """rename the installed audio endpoints to OBS Stream Audio names."""
     # build the ps rename table from _endpoint_renames; lookup names are simple ascii so no escaping needed.
     ps_pairs = ";\n".join(
         f"    '{orig}' = '{new}'"
@@ -271,13 +262,14 @@ foreach ($root in @($render, $capture)) {{
         $state = (Get-ItemProperty -LiteralPath $endpoint -Name 'DeviceState' -ErrorAction SilentlyContinue).DeviceState
         if ($null -eq $state) {{ $state = 0 }}
         $newName = $null
-        $lower = $cur.ToLowerInvariant()
+        $canonical = ([string]$cur -replace '^\\s*\\d+\\s*-\\s*', '').Trim()
+        $lower = $canonical.ToLowerInvariant()
         $hideEndpoint = $lower.StartsWith('cable in 16ch') -or
             $lower.StartsWith('cable out 16ch') -or
             $lower -eq 'obs stream audio (surround)' -or
             $lower -eq 'obs stream audio loopback (surround)'
-        if ($renames.ContainsKey($cur)) {{
-            $newName = $renames[$cur]
+        if ($renames.ContainsKey($canonical)) {{
+            $newName = $renames[$canonical]
         }} else {{
             if ($lower.StartsWith('cable input')) {{
                 $newName = 'OBS Stream Audio'
@@ -318,8 +310,7 @@ foreach ($root in @($render, $capture)) {{
 }}
 
 if (($successes + $hidden) -gt 0) {{
-    # bounce the audio stack so endpoint names/visibility are refreshed without a reboot. Explorer
-    # does not need to be restarted for disabling/hiding endpoints.
+    # bounce the audio stack so endpoint names/visibility refresh without a reboot; explorer does not need a restart for this.
     Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
     Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
     Start-Service Audiosrv -ErrorAction SilentlyContinue  # cascade-stopped above
@@ -354,7 +345,7 @@ if (($successes + $hidden) -gt 0) {{
 
 
 def is_vbcable_installed() -> bool:
-    """True iff the bundled virtual audio driver is registered."""
+    """true iff the bundled virtual audio driver is registered."""
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command",
@@ -370,7 +361,7 @@ def is_vbcable_installed() -> bool:
 
 
 def _extract_driver_pack(log: LogFn = None) -> Optional[Path]:
-    """Unpack the bundled audio-driver installer into a temp directory."""
+    """unpack the bundled audio-driver installer into a temp directory."""
     if not INPUT_OVERLAY_INSTALLERS_ZIP.is_file():
         if log:
             log(f"(no {INPUT_OVERLAY_INSTALLERS_ZIP.name} bundled)")
@@ -400,7 +391,7 @@ def _extract_driver_pack(log: LogFn = None) -> Optional[Path]:
 
 
 def install_vbcable(log: LogFn = None) -> bool:
-    """Install the OBS Stream Audio device and restore the user's audio defaults."""
+    """install the OBS Stream Audio device and restore the users audio defaults."""
     if is_vbcable_installed():
         if log:
             log("OBS Stream Audio device already installed")
@@ -488,7 +479,7 @@ def install_vbcable(log: LogFn = None) -> bool:
 
 
 def ensure_vbcable(log: LogFn = None) -> bool:
-    """Install OBS Stream Audio if it is missing."""
+    """install OBS Stream Audio if it is missing."""
     if is_vbcable_installed():
         if log:
             log("OBS Stream Audio device already installed")
@@ -516,7 +507,7 @@ def ensure_vbcable(log: LogFn = None) -> bool:
 
 
 def _stop_discord_for_driver_uninstall(log: LogFn = None) -> tuple[bool, list[Path]]:
-    """Stop Discord variants that commonly hold the ReplayKit cable open."""
+    """stop Discord variants that commonly hold the ReplayKit cable open."""
     names = ",".join("'" + name.replace("'", "''") + "'" for name in _DISCORD_PROCESS_NAMES)
     restart_names = ",".join("'" + name.replace("'", "''") + "'" for name in _DISCORD_RESTART_PROCESS_NAMES)
     script = rf"""
@@ -597,7 +588,7 @@ def _restart_discord_apps(paths: list[Path], log: LogFn = None) -> None:
 
 
 def uninstall_vbcable(log: LogFn = None) -> bool:
-    """Uninstall the OBS Stream Audio virtual audio driver."""
+    """uninstall the OBS Stream Audio virtual audio driver."""
     if not is_vbcable_installed():
         return True
 

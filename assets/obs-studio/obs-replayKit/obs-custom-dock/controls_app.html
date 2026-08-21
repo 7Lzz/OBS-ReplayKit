@@ -141,23 +141,19 @@
   }
   .btn.primary:hover { background-color: var(--primary_light); }
 
-  /* share-mode toggle. purple when virtual camera + obs audio relay is the active path to discord;
-     plain grey (default .btn) when monitoring is off and discord screenshares own audio path is
-     used. state is persisted in replaykit_settings.json as shareMode and synced into obs over the
-     existing websocket on each dock load. border-color matches background and focus-visible is
-     overridden so there is no visible outline around the button in any state. */
-  .btn.mode-vcam {
+  /* share preview toggle. highlighted when the Discord/application-share preview is enabled. */
+  .btn.projector-mode {
     background-color: #8B5CF6;
     border-color: #8B5CF6;
   }
-  .btn.mode-vcam:hover {
+  .btn.projector-mode:hover {
     background-color: #A78BFA;
     border-color: #A78BFA;
   }
-  .btn.mode-vcam:focus-visible {
+  .btn.projector-mode:focus-visible {
     border-color: #8B5CF6;
   }
-  .btn.mode-vcam:hover:focus-visible {
+  .btn.projector-mode:hover:focus-visible {
     border-color: #A78BFA;
   }
 
@@ -253,7 +249,7 @@
 <body style="background:#272A33;color:#FFFFFF">
   <div id="controlsFrame">
     <button class="btn" id="save-replay-btn">Save Clip</button>
-    <button class="btn" id="mode-btn">Loading share mode...</button>
+    <button class="btn" id="mode-btn">Enable Share Preview</button>
     <button class="btn" id="view-clips-btn">View Clips</button>
     <button class="btn" id="open-folder-btn">Open Folder</button>
     <div class="auth-wrap" id="auth-wrap">
@@ -273,18 +269,30 @@
 <script>
   // dock lockdown: stop accidental right-click menu / zoom shortcuts. cef treats the dock like a regular web page, so users can right-click and hit zoom in / refresh / back / inspect / etc. -- all of which are surprises in a dock context. mirrored in controls.html and clips.html.
   (function lockdown() {
-    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
     document.addEventListener("wheel", function (e) {
-      if (e.ctrlKey) e.preventDefault();
-    }, { passive: false });
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive: false, capture: true });
     document.addEventListener("keydown", function (e) {
-      if (e.ctrlKey && (
-            e.key === "+" || e.key === "=" || e.key === "-" ||
-            e.key === "0" || e.key === "r" || e.key === "R")) {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") {
+        e.preventDefault();
+        return;
+      }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
         e.preventDefault();
       }
-      if (e.key === "F5") e.preventDefault();
-    });
+      if (e.key === "BrowserBack" || e.key === "BrowserForward" || e.code === "BrowserBack" || e.code === "BrowserForward") {
+        e.preventDefault();
+      }
+    }, true);
   })();
 
   const HELPER_HTTP_URL = location.protocol === "http:"
@@ -293,13 +301,6 @@
 
   const POLL_IDLE_MS = 5000;
   const UPDATE_STARTUP_CHECK_DELAY_MS = 8000;
-  const SHARE_MODE_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000, 5000];
-
-  // share-mode constants. these match the values written into replaykit_settings.json so the
-  // settings page and dock agree on the spelling. NOT called "streaming" because that would clash
-  // with twitch/youtube streaming presets, which are a separate concept.
-  const MODE_VCAM = "vcam";
-  const MODE_SCREENSHARE = "screenshare";
   const modeBtn = document.getElementById("mode-btn");
   const viewClipsBtn = document.getElementById("view-clips-btn");
   const saveReplayBtn = document.getElementById("save-replay-btn");
@@ -308,22 +309,17 @@
 
   let pollTimerId = null;
   let helperConnected = false;
-  let shareModeLoaded = false;
-  let shareModeLoadTimer = null;
-  let shareModeLoadAttempt = 0;
+  let sharePreviewActionInFlight = false;
+  let sharePreviewEnabled = false;
+  let sharePreviewAvailable = true;
 
-  function setConnected(yes, options) {
-    const changed = helperConnected !== yes;
-    const skipShareModeLoad = options && options.skipShareModeLoad;
+  function setConnected(yes) {
     helperConnected = yes;
     modeBtn.classList.toggle("is-disconnected", !yes);
     viewClipsBtn.classList.toggle("is-disconnected", !yes);
     saveReplayBtn.classList.toggle("is-disconnected", !yes);
     openFolderBtn.classList.toggle("is-disconnected", !yes);
     settingsBtn.classList.toggle("is-disconnected", !yes);
-    if (!skipShareModeLoad && yes && (changed || !shareModeLoaded) && !modeApplyInFlight) {
-      scheduleLoadShareMode(0);
-    }
   }
 
   function flashButton(btn, text, cls, ms, fallbackText) {
@@ -333,7 +329,7 @@
     setTimeout(() => {
       btn.classList.remove("is-flash-success", "is-flash-error");
       btn.textContent = fallbackText;
-      btn.disabled = false;
+      btn.disabled = btn === modeBtn && !sharePreviewAvailable;
     }, ms);
   }
 
@@ -349,9 +345,32 @@
     return body;
   }
 
+  function sharePreviewLabel(enabled, available) {
+    if (available === false) return "Share Preview Disabled";
+    return enabled ? "Disable Share Preview" : "Enable Share Preview";
+  }
+
+  function renderSharePreview(enabled, available) {
+    sharePreviewAvailable = available !== false;
+    sharePreviewEnabled = sharePreviewAvailable && !!enabled;
+    modeBtn.classList.toggle("projector-mode", sharePreviewEnabled);
+    modeBtn.textContent = sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable);
+    modeBtn.disabled = sharePreviewActionInFlight || !sharePreviewAvailable;
+    modeBtn.title = !sharePreviewAvailable
+      ? "Discord screenshare support is disabled in Custom Settings > Advanced."
+      : sharePreviewEnabled
+      ? "Stop letting Discord or other apps capture your OBS scene (Application screen share)."
+      : "Let Discord or other apps capture your OBS scene (use Application screen share).";
+  }
+
+  async function refreshSharePreviewState() {
+    const result = await helperJson("share-preview?t=" + Date.now());
+    renderSharePreview(!!(result && result.enabled), !(result && result.available === false));
+  }
+
   function obsWebSocketRequest(requestType, requestData) {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket("ws://127.0.0.1:4455");
+      const ws = new WebSocket("ws://127.0.0.1:6455");
       const requestId = Math.random().toString(16).slice(2) + Date.now().toString(16);
       const timer = setTimeout(() => {
         try { ws.close(); } catch {}
@@ -421,12 +440,12 @@
     }
   }
 
-  // helper liveness check. without the per-second upload-state polling the dock used to do, this
-  // just keeps the disconnected styling in sync with whether the helper is responding.
+  // helper liveness check -- without the per-second upload-state polling the dock used to do, this just keeps the disconnected styling in sync with whether the helper is responding.
   async function pollStatus() {
     try {
       await helperJson("status?t=" + Date.now());
       setConnected(true);
+      await refreshSharePreviewState();
     } catch {
       setConnected(false);
     }
@@ -446,9 +465,12 @@
   }
 
   // server-side foreground-raise. browser window.focus() is unreliable inside cef -- the helpers /focus-window route uses win32 setforegroundwindow + attachthreadinput which always works.
+  // resolves true if an existing clips window was found and focused -- either one this dock itself opened in a since-reloaded session, or the replaykit tray icons own "view clips" item, which opens a real top-level obs window rather than a window.open() popup; native title search finds either case, since both are real top-level windows owned by the obs process.
   function focusClipsWindowNative() {
-    fetch(HELPER_HTTP_URL + "focus-window?title=Clips&t=" + Date.now(),
-          { cache: "no-store" }).catch(() => {});
+    return fetch(HELPER_HTTP_URL + "focus-window?title=Clips&t=" + Date.now(), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => !!(data && data.focused))
+      .catch(() => false);
   }
 
   // hold a reference to the popup so subsequent clicks can refocus it instead of re-navigating window.open() against the same name (which would reload the page and lose scroll position, active filter, fullscreen state, etc.). if the reference is gone (dock reloaded since the popup was opened), the native focus call still raises the window -- the helper finds it by title.
@@ -476,8 +498,7 @@
           { cache: "no-store" }).catch(() => {});
   }
 
-  // returns true when the popup is up (or already up). false means cef declined window.open --
-  // either popup-blocked or document hidden -- and the caller should retry later.
+  // returns true when the popup is up (or already up); false means cef declined window.open (either popup-blocked or document hidden) and the caller should retry later.
   function openUpdatePrompt(data) {
     if (updateWindow && !updateWindow.closed) {
       try { updateWindow.focus(); } catch (_) {}
@@ -502,9 +523,7 @@
     return true;
   }
 
-  // hold the startup-check result until obs is actually on screen. opening the popup while the dock
-  // is hidden (obs minimized / not foregrounded yet) makes cef silently drop the window.open, which
-  // is why the popup never appeared when the user launched obs into the background.
+  // hold the startup-check result until obs is actually on screen -- opening the popup while the dock is hidden (obs minimized / not foregrounded yet) makes cef silently drop the window.open, which is why the popup never appeared when the user launched obs into the background.
   let pendingUpdateData = null;
   let updatePopupAttempted = false;
 
@@ -532,9 +551,7 @@
     }, UPDATE_STARTUP_CHECK_DELAY_MS);
   }
 
-  // re-attempt the pending popup whenever the dock becomes visible/focused. handles the "obs started
-  // in the background" case: the check runs immediately, the data sits in pendingUpdateData, and the
-  // popup opens the first time the user brings obs to the foreground.
+  // re-attempt the pending popup whenever the dock becomes visible/focused -- handles the "obs started in the background" case: the check runs immediately, the data sits in pendingUpdateData, and the popup opens the first time the user brings obs to the foreground.
   document.addEventListener("visibilitychange", tryOpenPendingUpdate);
   window.addEventListener("focus", tryOpenPendingUpdate);
 
@@ -559,16 +576,18 @@
     });
   });
 
-  viewClipsBtn.addEventListener("click", () => {
+  viewClipsBtn.addEventListener("click", async () => {
     if (clipsWindow && !clipsWindow.closed) {
       // belt-and-suspenders: try the js focus (cheap, sometimes works), but the native call is the one that actualy brings the window to front from inside an obs dock.
       try { clipsWindow.focus(); } catch (_) {}
       focusClipsWindowNative();
       return;
     }
+    // this docks own clipsWindow reference is empty, but a clips window may already be open from elsewhere -- check native first so we reuse it instead of opening a second window on top of it, since window.open()s own name-based reuse only ever sees windows opened by a prior window.open() call in this exact dock session.
+    if (await focusClipsWindowNative()) return;
     clipsWindow = window.open(
       HELPER_HTTP_URL + "clips-view",
-      "streamable_clips",
+      "replaykit_clips",
       "popup=yes,width=1100,height=720"
     );
     if (!clipsWindow) {
@@ -608,120 +627,42 @@
     }
   });
 
-  // share-mode toggle. flips Desktop Audio (excl. Discord) between Monitor and Output (audio
-  // relays through the obs stream audio cable -> voicemeeter -> discord voice channel, used when
-  // sharing via virtual camera or screensharing the obs scene window) and Monitor Off (relay is
-  // disabled, used for plain discord desktop screenshare so the audio is not doubled). also starts
-  // or stops the obs virtual camera output to save gpu/cpu when its not the active discord source.
-  // the chosen mode is persisted in replaykit_settings.shareMode and re-applied on every dock
-  // load so obs and the dock stay in sync across restarts. NOT called "streaming mode" or
-  // "discord mode" to avoid colliding with twitch/youtube streaming presets and to keep the name
-  // neutral -- this is about how the user shares with friends in a call.
-  let currentShareMode = MODE_VCAM;
-  let modeApplyInFlight = false;
-
-  function paintModeButton(mode) {
-    const isVcam = mode === MODE_VCAM;
-    modeBtn.classList.toggle("mode-vcam", isVcam);
-    modeBtn.textContent = isVcam
-      ? "Share screen with virtual camera (discord)"
-      : "Normal share screen (discord)";
-    modeBtn.title = isVcam
-      ? "Sharing through OBS Virtual Camera. OBS audio is relayed to Discord through the OBS Stream Audio cable. Click to switch to plain Discord desktop screenshare (avoids the doubled-audio path)."
-      : "Sharing through plain Discord desktop screenshare. OBS audio relay is off so friends do not hear the same audio twice. Click to switch back to Virtual Camera Mode.";
-  }
-
-  async function saveShareMode(mode) {
-    return await helperJson("settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shareMode: mode }),
-    });
-  }
-
-  async function loadShareMode() {
-    if (modeApplyInFlight) return;
-    if (shareModeLoadTimer) {
-      clearTimeout(shareModeLoadTimer);
-      shareModeLoadTimer = null;
-    }
-    let saved = "";
-    try {
-      const payload = await helperJson("settings?t=" + Date.now());
-      saved = payload && payload.settings && payload.settings.shareMode;
-      setConnected(true, { skipShareModeLoad: true });
-    } catch (e) {
-      shareModeLoaded = false;
-      setConnected(false);
-      const delay = SHARE_MODE_RETRY_DELAYS_MS[Math.min(shareModeLoadAttempt, SHARE_MODE_RETRY_DELAYS_MS.length - 1)];
-      shareModeLoadAttempt += 1;
-      modeBtn.classList.remove("mode-vcam");
-      modeBtn.textContent = shareModeLoadAttempt < 4 ? "Starting ReplayKit..." : "ReplayKit unavailable";
-      modeBtn.title = "ReplayKit helper is not responding yet. Retrying automatically. Last error: " + (e.message || e);
-      scheduleLoadShareMode(delay);
-      return;
-    }
-    if (saved !== MODE_VCAM && saved !== MODE_SCREENSHARE) {
-      shareModeLoaded = false;
-      modeBtn.classList.remove("mode-vcam");
-      modeBtn.textContent = "Share mode invalid";
-      modeBtn.title = "ReplayKit returned an invalid share mode. Open Custom Settings or re-run setup.";
-      return;
-    }
-    shareModeLoaded = true;
-    shareModeLoadAttempt = 0;
-    currentShareMode = saved;
-    paintModeButton(currentShareMode);
-    try {
-      await saveShareMode(currentShareMode);
-    } catch (_) {}
-  }
-
-  function scheduleLoadShareMode(delay) {
-    if (shareModeLoadTimer) clearTimeout(shareModeLoadTimer);
-    shareModeLoadTimer = setTimeout(() => {
-      shareModeLoadTimer = null;
-      loadShareMode();
-    }, delay);
-  }
-
-  modeBtn.addEventListener("click", async () => {
-    if (modeApplyInFlight) return;
-    modeApplyInFlight = true;
+  async function toggleSharePreview() {
+    if (sharePreviewActionInFlight || modeBtn.disabled || !sharePreviewAvailable) return;
+    const nextEnabled = !sharePreviewEnabled;
+    sharePreviewActionInFlight = true;
+    modeBtn.disabled = true;
     modeBtn.classList.add("is-busy");
-    const previous = currentShareMode;
-    const next = currentShareMode === MODE_VCAM ? MODE_SCREENSHARE : MODE_VCAM;
-    let saved = false;
+    modeBtn.textContent = nextEnabled ? "Enabling..." : "Disabling...";
     try {
-      const result = await saveShareMode(next);
-      saved = true;
-      const savedMode = result && result.settings && result.settings.shareMode;
-      currentShareMode = (savedMode === MODE_VCAM || savedMode === MODE_SCREENSHARE) ? savedMode : next;
-      paintModeButton(currentShareMode);
+      const result = await helperJson("share-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const enabled = !!(result && result.enabled);
+      const available = !(result && result.available === false);
+      renderSharePreview(enabled, available);
       const warnings = Array.isArray(result && result.warnings) ? result.warnings : [];
-      if (warnings.length) {
-        const fallbackText = modeBtn.textContent;
-        flashButton(modeBtn, ("Mode saved; OBS apply warning").slice(0, 42),
-                    "is-flash-error", 3000, fallbackText);
-      }
+      flashButton(modeBtn, !available ? "Preview disabled" : warnings.length ? "Preview warning" : (enabled ? "Preview enabled" : "Preview disabled"),
+                  warnings.length ? "is-flash-error" : "is-flash-success",
+                  warnings.length ? 3000 : 1400,
+                  sharePreviewLabel(enabled, available));
     } catch (e) {
-      currentShareMode = saved ? next : previous;
-      paintModeButton(currentShareMode);
-      const fallbackText = modeBtn.textContent;
-      const prefix = saved ? "Mode saved; restart OBS: " : "Mode save failed: ";
-      flashButton(modeBtn, (prefix + (e.message || e)).slice(0, 42),
-                  "is-flash-error", 3000, fallbackText);
+      flashButton(modeBtn, ("Preview failed: " + (e.message || e)).slice(0, 42),
+                  "is-flash-error", 3000, sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable));
     } finally {
       modeBtn.classList.remove("is-busy");
-      modeApplyInFlight = false;
+      sharePreviewActionInFlight = false;
+      modeBtn.disabled = !sharePreviewAvailable;
     }
-  });
+  }
+
+  renderSharePreview(false);
+  modeBtn.addEventListener("click", toggleSharePreview);
 
   pollStatus().then(schedulePoll);
   scheduleStartupUpdateCheck();
-  // paint the persisted share mode and sync it into obs (obs may have come up with the scene
-  // file default monitor state which can differ from the users last choice).
-  scheduleLoadShareMode(0);
 
   // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
   const authBtn    = document.getElementById("auth-btn");

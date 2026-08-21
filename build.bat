@@ -50,12 +50,19 @@ if exist "dist"              rmdir /S /Q "dist"
 if exist "OBSReplayKit.spec" del   /Q   "OBSReplayKit.spec"
 if exist "OBSReplayKit.exe"  del   /Q   "OBSReplayKit.exe"
 
-rem build the small branded helper used by the obs streamable dock.
+rem build the small branded helper used by the obs replaykit dock.
 echo [3.5/4] Compiling helper launcher into assets\ ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\launcher\build_launcher.ps1"
 if errorlevel 1 goto :launcher_fail
 
+rem builds the native tray plugin (view clips / share preview / restart obs) and bundles it into assets\ itself, same as build_launcher.ps1 already does for the launcher exe above; build.ps1 compiles against whatever obs version is installed and caches its qt6/obs-headers deps under %temp%\replaykit-tray-build (deliberately outside build\, which gets wiped every run), and skips the whole rebuild when the bundled dll is already newer than its source + the installed obs -- requires gh (authenticated) and vs2022/2019 build tools with the c++ workload, see utils\obs-plugins\replaykit-tray\build.ps1 for details.
+echo [3.6/4] Compiling tray plugin into assets\ ...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\obs-plugins\replaykit-tray\build.ps1"
+if errorlevel 1 goto :tray_plugin_fail
+if not exist "%~dp0assets\obs-plugins\replaykit-tray\bin\64bit\replaykit-tray.dll" goto :tray_plugin_fail
+
 rem build the final exe directly into the repo root so no dist folder is left behind.
+rem upx-exclude covers every bundled pe binary pyinstaller would otherwise try to compress -- replaykit-tray.dll needed its own entry becuase upx had silently compressed it (54272 -> 23040 bytes) with no build error, and obs just failed to load the result with no visible error either, since a upx-packed dll cant self-decompress the way a upx-packed standalone exe can. confirmed 2026-08-08.
 echo [4/4] Building OBSReplayKit.exe ...
 echo.
 %PY% -m PyInstaller ^
@@ -72,6 +79,7 @@ echo.
     --collect-submodules obs_replaykit ^
     --uac-admin ^
     --upx-exclude "OBSReplayKit.exe" ^
+    --upx-exclude "replaykit-tray.dll" ^
     %UPX_ARG% ^
     main.py
 if errorlevel 1 goto :build_fail
@@ -136,6 +144,15 @@ exit /b 1
 echo.
 echo Failed to compile utils\launcher\OBSReplayKit.cs (csc.exe error).
 echo Verify .NET Framework 4.x is installed (default on Windows 10/11).
+pause
+endlocal
+exit /b 1
+
+:tray_plugin_fail
+echo.
+echo Failed to build the tray plugin (utils\obs-plugins\replaykit-tray\build.ps1).
+echo Requires: an installed OBS, the GitHub CLI (gh, already authenticated), and
+echo VS2022 or VS2019 Build Tools with the "Desktop development with C++" workload.
 pause
 endlocal
 exit /b 1

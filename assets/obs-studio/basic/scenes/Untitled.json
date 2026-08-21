@@ -148,6 +148,15 @@
                     },
                     {
                         "value": "obs64.exe"
+                    },
+                    {
+                        "value": "obs32.exe"
+                    },
+                    {
+                        "value": "obs.exe"
+                    },
+                    {
+                        "value": "obs-browser-page.exe"
                     }
                 ],
                 "exclude": true
@@ -173,7 +182,7 @@
             },
             "deinterlace_mode": 0,
             "deinterlace_field_order": 0,
-            "monitoring_type": 2,
+            "monitoring_type": 0,
             "private_settings": {}
         },
         {

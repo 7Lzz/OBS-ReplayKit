@@ -1,4 +1,4 @@
-"""Interactive CLI setup menu for OBS ReplayKit."""
+"""interactive CLI setup menu for OBS ReplayKit."""
 
 from __future__ import annotations
 
@@ -28,7 +28,6 @@ from .installer import (
     install_obs_elevation_task,
     install_obs_ffmpeg,
     install_obs_sleep_override,
-    set_monitoring_device_to_obs_audio,
 )
 from .keybind import combo_to_label, parse_combo
 from .obs import cleanup_crash_flags, close_obs, find_obs_exe, launch_obs
@@ -44,7 +43,9 @@ from .prefs import (
 from .recording import PRESETS, get_preset
 from .shaderfilter import install_replaykit_motion_blur_plugin
 from .startup import configure_obs_startup
-from .vbcable import ensure_vbcable, is_vbcable_installed
+from .tray_pin import pin_obs_tray_icon, unpin_obs_tray_icon
+from .tray_plugin import install_replaykit_tray_plugin
+from .vbcable import ensure_vbcable
 from .wincapture import install_win_capture_audio
 from .cleanup import run_cleanup
 
@@ -100,7 +101,8 @@ def configure_console() -> None:
         return
     try:
         os.system("title OBS ReplayKit Setup")
-        os.system("mode con: cols=124 lines=44 >nul")
+        # 54 lines fits the full settings menu without scrolling the title banner off the top
+        os.system("mode con: cols=124 lines=54 >nul")
     except Exception:
         pass
     try:
@@ -117,7 +119,7 @@ def configure_console() -> None:
 
 
 def _try_set_console_font(kernel32, handle) -> None:
-    """Use a modern readable console font when classic conhost allows it."""
+    """use a modern readable console font when classic conhost allows it."""
     try:
         import ctypes
 
@@ -168,11 +170,17 @@ def row(name: str, value: str, note: str = "") -> None:
     width = content_width()
     prefix = f"  {name:<26} "
     line = color(prefix, C.label) + color(value, C.value)
+    if not note:
+        print(line)
+        return
+    # most notes fit right after the value on the same line; only wraps below for the few too long to fit -- used to always wrap below regardless of length, pushing the menu past the consoles line count and scrolling the title banner off the top.
+    if len(prefix) + len(value) + 2 + len(note) <= width:
+        print(line + "  " + color(note, C.dim))
+        return
     print(line)
-    if note:
-        indent = " " * len(prefix)
-        for wrapped in textwrap.wrap(note, width=max(40, width - len(prefix))):
-            print(color(indent + wrapped, C.dim))
+    indent = " " * len(prefix)
+    for wrapped in textwrap.wrap(note, width=max(40, width - len(prefix))):
+        print(color(indent + wrapped, C.dim))
 
 
 def menu_line(key: str, name: str, note: str, key_color: str = C.choice) -> None:
@@ -221,10 +229,6 @@ def gpu_text() -> str:
     return f"{gpu.label} ({gpu.gen_label})"
 
 
-def audio_status() -> str:
-    return "Installed" if is_vbcable_installed() else "Will install on Apply"
-
-
 def overlay_label(prefs: Preferences) -> str:
     if prefs.overlay_style == "input_overlay":
         return "WASD/mouse"
@@ -247,6 +251,14 @@ def recording_notification_label(prefs: Preferences) -> str:
 
 def trim_precise_label(prefs: Preferences) -> str:
     return "Precise" if prefs.trim_precise_default else "Fast"
+
+
+def discord_screenshare_label(prefs: Preferences) -> str:
+    return "On" if prefs.discord_screenshare_enabled else "Off"
+
+
+def sleep_override_label(prefs: Preferences) -> str:
+    return "Allowed" if prefs.allow_sleep_while_active else "Blocked by OBS"
 
 
 def render_menu(prefs: Preferences) -> None:
@@ -281,12 +293,13 @@ def render_menu(prefs: Preferences) -> None:
     row("Clip saved popup", clip_notification_label(prefs), "Show a small desktop popup after saving a clip.")
     row("Recording popups", recording_notification_label(prefs), "Show a small desktop popup when recording starts or stops.")
     row("Trim default", trim_precise_label(prefs), "Default clip trimmer mode.")
-    row("OBS audio device", audio_status())
+    row("Discord screenshare", discord_screenshare_label(prefs), "Installs OBS Stream Audio for Discord Share Preview.")
+    row("Windows sleep", sleep_override_label(prefs), "Let Windows sleep timers run while OBS or Share Preview is active.")
 
     section("Change settings")
     menu_line("1", "Recording quality", "resolution, FPS, and visual quality")
     menu_line("2", "GPU load vs file size", "choose lower GPU use or smaller clips")
-    menu_line("3", "Recording codec", "auto, H.264, HEVC, or AV1")
+    menu_line("3", "Recording codec", "auto, H.264, or HEVC")
     menu_line("4", "Clip length", "how many seconds the hotkey saves")
     menu_line("5", "Save folder", "where recordings and clips go")
     menu_line("6", "Microphone", "system default or a specific device")
@@ -297,6 +310,7 @@ def render_menu(prefs: Preferences) -> None:
     menu_line("11", "Clip saved popup", "show or hide the clip saved popup")
     menu_line("12", "Recording popups", "show or hide recording started/stopped popups")
     menu_line("13", "Trim default", "fast keyframe trim or precise re-encode trim")
+    menu_line("14", "Discord screenshare", "turn Share Preview audio support on or off")
     print()
     menu_line("A", "Apply and launch OBS", "write settings, install selected tools, start OBS", C.good)
     menu_line("R", "Clean reset", "remove ReplayKit OBS config and audio device changes", C.bad)
@@ -577,6 +591,28 @@ def choose_trim_default(prefs: Preferences) -> None:
         pause("Invalid choice. Press Enter...")
 
 
+def choose_discord_screenshare(prefs: Preferences) -> None:
+    clear()
+    section("Discord screenshare")
+    print(color("Choose whether ReplayKit installs and uses OBS Stream Audio for Discord Share Preview.", C.dim))
+    print()
+    option_line("1", "On", "Install the virtual audio cable and enable the Discord Share Preview path.", prefs.discord_screenshare_enabled)
+    option_line("2", "Off", "Skip the virtual audio cable during setup and keep Share Preview disabled.", not prefs.discord_screenshare_enabled)
+    cancel_line()
+    choice = prompt()
+    if choice == "1":
+        prefs.discord_screenshare_enabled = True
+        prefs.save()
+    elif choice == "2":
+        prefs.discord_screenshare_enabled = False
+        prefs.discord_projector_enabled = False
+        prefs.save()
+    elif choice.lower() == "q":
+        return
+    else:
+        pause("Invalid choice. Press Enter...")
+
+
 def clean_reset() -> None:
     clear()
     section("Clean reset")
@@ -701,11 +737,23 @@ def run_apply_flow(prefs: Preferences) -> list[str]:
     add("Back up current OBS settings", "Keeps a restore copy before ReplayKit writes the new setup.", lambda: backup_existing_config(log=progress.log) or True)
     add("Prepare OBS settings folder", "Creates the OBS config folder and clears crash-recovery prompts.", lambda: (OBS_CONFIG.mkdir(parents=True, exist_ok=True), cleanup_crash_flags(log=progress.log), True)[-1])
     add("Build ReplayKit helper", "Makes sure the local Clips and controls helper is ready.", lambda: ensure_launcher_built(log=progress.log))
+    if prefs.discord_screenshare_enabled:
+        add("Install OBS Stream Audio", "Installs and renames VB-Audio Cable for Discord share audio.", lambda: ensure_vbcable(log=progress.log))
+    else:
+        add("Skip OBS Stream Audio", "Discord screenshare support is off, so no virtual audio cable driver is installed.", lambda: True)
     add("Write ReplayKit OBS profile", "Applies your quality, clip, encoder, microphone, and overlay choices.", lambda: install_obs_config(prefs, log=progress.log) > 0)
     add("Enable OBS WebSocket", "Lets the Clips and controls windows talk to OBS locally.", lambda: configure_obs_websocket(log=progress.log))
     add("Install Custom Controls and Clips", "Adds the ReplayKit dock and Clips browser files.", lambda: install_obs_custom_dock(log=progress.log) > 0)
+    add("Install tray plugin", "Adds View Clips, Share Preview, and Restart OBS to the system tray menu.", lambda: install_replaykit_tray_plugin(log=progress.log))
     add("Register launcher permission", "Avoids a UAC prompt every time OBS starts ReplayKit.", lambda: install_obs_elevation_task(log=progress.log))
-    add("Allow monitor sleep", "Keeps clipping running even if the display powers down.", lambda: install_obs_sleep_override(log=progress.log))
+    if prefs.allow_sleep_while_active:
+        add("Allow monitor and PC sleep", "Lets Windows sleep timers run even if OBS, Replay Buffer, or Share Preview is active.", lambda: install_obs_sleep_override(True, log=progress.log))
+    else:
+        add("Restore OBS sleep blocking", "Removes ReplayKit's sleep override so OBS can keep active sessions awake.", lambda: install_obs_sleep_override(False, log=progress.log))
+    if prefs.pin_obs_tray_icon:
+        add("Pin OBS tray icon", "Keeps the OBS icon visible next to the clock instead of hidden behind the overflow arrow.", lambda: pin_obs_tray_icon(log=progress.log) or True)
+    else:
+        add("Skip tray icon pinning", "Leaves the OBS tray icon at Windows' default overflow behavior.", lambda: unpin_obs_tray_icon(log=progress.log) or True)
     add("Install video tools", "Downloads or verifies the trim/compress tools used by Clips.", lambda: install_obs_ffmpeg(log=progress.log))
 
     add(
@@ -725,12 +773,6 @@ def run_apply_flow(prefs: Preferences) -> list[str]:
     )
 
     add("Install desktop audio capture", "Adds clean desktop/game audio capture for OBS.", lambda: install_win_capture_audio(log=progress.log))
-    add(
-        "Install OBS Stream Audio",
-        "Windows may ask to install an audio driver. Click Install if prompted.",
-        lambda: ensure_vbcable(log=progress.log),
-    )
-    add("Select OBS Stream Audio", "Routes OBS monitoring to the ReplayKit audio device.", lambda: set_monitoring_device_to_obs_audio(log=progress.log))
     add("Prepare clip folders", "Creates the recording and clip folders if needed.", lambda: (ensure_recording_dirs(prefs, log=progress.log), True)[-1])
     add("Set Windows startup", "Adds or removes OBS from Windows startup based on your setup choice.", lambda: configure_obs_startup(prefs.obs_startup_enabled, log=progress.log))
     add("Launch OBS", "Starts OBS with the updated ReplayKit setup.", lambda: launch_obs(log=progress.log))
@@ -753,8 +795,11 @@ def apply_settings(prefs: Preferences) -> None:
         return
     print()
     print(color("Setup complete.", C.good))
-    print(color("Discord camera: OBS Virtual Camera", C.value))
-    print(color("Discord audio input: OBS Stream Audio Loopback, if friends should hear OBS audio.", C.dim))
+    if prefs.discord_screenshare_enabled:
+        print(color("Discord share window: OBS ReplayKit Discord Share", C.value))
+        print(color("Select that Windowed Projector in Discord Go Live. ReplayKit keeps it parked automatically.", C.dim))
+    else:
+        print(color("Discord Share Preview is disabled. OBS Stream Audio was not installed.", C.dim))
     if issues:
         print()
         print(color("Some steps reported warnings. Re-run Apply if OBS does not behave as expected.", C.warn))
@@ -793,6 +838,8 @@ def run_cli() -> int:
             choose_recording_notification(prefs)
         elif choice == "13":
             choose_trim_default(prefs)
+        elif choice == "14":
+            choose_discord_screenshare(prefs)
         elif choice == "a":
             apply_settings(prefs)
         elif choice == "r":

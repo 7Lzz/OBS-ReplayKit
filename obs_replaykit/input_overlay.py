@@ -26,7 +26,7 @@ from .config import (
 LogFn = Optional[Callable[[str], None]]
 
 
-# Canonical install paths the official Inno Setup installer writes.
+# canonical install paths the official Inno Setup installer writes.
 _PLUGIN_DLL  = PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "input-overlay.dll"
 _PLUGIN_SDL2 = PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "SDL2.dll"
 
@@ -219,14 +219,14 @@ def install_vcpp_redist(log: LogFn = None) -> bool:
 
 
 def _already_installed() -> Optional[str]:
-    """Description of the installed plugin, or None."""
+    """description of the installed plugin, or None."""
     if _PLUGIN_DLL.is_file() and _PLUGIN_SDL2.is_file():
         return f"installed at {_PLUGIN_DLL}"
     return None
 
 
 def install_input_overlay_plugin(log: LogFn = None) -> bool:
-    """Install input-overlay and verify OBS can load its DLLs."""
+    """install input-overlay and verify OBS can load its DLLs."""
     if not install_vcpp_redist(log=log):
         if log:
             log("input-overlay prerequisite missing; skipping input-overlay install")
@@ -332,7 +332,7 @@ def install_input_overlay_presets(log: LogFn = None) -> bool:
 
 
 def _repair_mouse_overlay_layout(target: Path, log: LogFn = None) -> bool:
-    """Ensure the mouse preset has explicit source dimensions so OBS does not render it as a canvas-sized source."""
+    """ensure the mouse preset has explicit source dimensions so OBS does not render it as a canvas-sized source."""
     layout = target / _MOUSE_LAYOUT_REL
     if not layout.is_file():
         if log:

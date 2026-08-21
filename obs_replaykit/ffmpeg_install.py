@@ -1,4 +1,4 @@
-"""Install ffmpeg.exe + ffprobe.exe into the helper dir."""
+"""install ffmpeg.exe + ffprobe.exe into the helper dir."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ LogFn = Optional[Callable[[str], None]]
 
 
 # next to local_helper_server.ps1 under the consolidated obs-replayKit/ tree. find-toolinclipdirs in 52_compression.ps1 probes $script:helperroot first.
-_HELPER_DIR = OBS_CONFIG / "obs-replayKit" / "scripts" / "streamable"
+_HELPER_DIR = OBS_CONFIG / "obs-replayKit" / "scripts" / "helper"
 _FFMPEG_DST = _HELPER_DIR / "ffmpeg.exe"
 _FFPROBE_DST = _HELPER_DIR / "ffprobe.exe"
 
@@ -94,7 +94,7 @@ def _download_progress_line(total: int, expected_len: int, started_at: float) ->
 
 
 def _download_archive(url: str, log: LogFn = None) -> Path | None:
-    """Stream a ReplayKit-hosted FFmpeg archive with live progress."""
+    """stream a ReplayKit-hosted FFmpeg archive with live progress."""
     ctx = ssl.create_default_context()
     req = urllib.request.Request(
         url,
@@ -250,7 +250,7 @@ def _install_tools(log: LogFn = None) -> bool:
 
 
 def install_ffmpeg(log: LogFn = None) -> bool:
-    """Install ffmpeg.exe + ffprobe.exe next to the helper."""
+    """install ffmpeg.exe + ffprobe.exe next to the helper."""
     if _already_installed():
         _log_existing_tools(log)
         return True

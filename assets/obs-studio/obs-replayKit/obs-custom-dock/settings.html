@@ -28,7 +28,7 @@
   }
   * { box-sizing:border-box; }
   html,body {
-    width:100%; height:100%; min-width:760px; min-height:620px; margin:0; overflow:hidden;
+    width:100%; height:100%; margin:0; overflow:hidden;
     background:var(--window); color:var(--text); font:13px var(--font);
     user-select:none;
   }
@@ -47,8 +47,6 @@
   .shell {
     width:100vw;
     height:100vh;
-    min-width:760px;
-    min-height:620px;
     display:grid;
     grid-template-columns:190px 1fr;
     grid-template-rows:1fr 58px;
@@ -142,7 +140,19 @@
     line-height:1.25;
   }
   .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
+  .field-wrap.is-stacked {
+    flex-direction:column;
+    align-items:stretch;
+  }
   .hint { color:var(--muted); font-size:12px; margin-left:4px; }
+  .form-row.is-disabled .label,
+  .form-row.is-disabled .hint {
+    color:var(--disabled);
+  }
+  .form-row.is-disabled .check-row {
+    color:var(--disabled);
+    cursor:default;
+  }
   .combo {
     position:relative;
     flex:1;
@@ -193,6 +203,15 @@
     background:#1D1F26;
     border-radius:4px;
   }
+  .combo.is-disabled .combo-button {
+    color:var(--disabled);
+    border-color:#353A47;
+    background:#2D313C;
+    cursor:default;
+  }
+  .combo.is-disabled .combo-button::before { background:#353A47; }
+  .combo.is-disabled .combo-arrow { opacity:.65; }
+  .combo.is-disabled .combo-menu { display:none; }
   .combo-label {
     overflow:hidden;
     text-overflow:ellipsis;
@@ -246,6 +265,60 @@
     text-overflow:ellipsis;
   }
   .combo-option.is-selected .option-blurb { color:#d9deff; }
+  .game-rule-actions {
+    width:100%;
+    display:grid;
+    grid-template-columns:minmax(180px,1fr) 28px;
+    gap:6px;
+  }
+  .game-rule-table {
+    width:100%;
+    min-height:30px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    background:#20232B;
+  }
+  .game-rule-empty,
+  .game-rule-row {
+    min-height:30px;
+    display:grid;
+    align-items:center;
+  }
+  .game-rule-empty {
+    padding:0 9px;
+    color:var(--muted);
+  }
+  .game-rule-row {
+    grid-template-columns:minmax(0,1fr) 28px;
+    gap:6px;
+    padding:0 5px 0 9px;
+    border-top:1px solid var(--line);
+  }
+  .game-rule-row:first-child { border-top:0; }
+  .game-rule-main,
+  .game-rule-sub {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .game-rule-sub {
+    color:var(--muted);
+    font-size:12px;
+    margin-top:1px;
+  }
+  .form-row.is-disabled .game-rule-table {
+    border-color:#353A47;
+    background:#1E2129;
+  }
+  .projector-action-row {
+    width:100%;
+    max-width:380px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+  }
+  .projector-action-row .btn { width:100%; }
   .text-input { padding:0 9px; }
   .volume-control {
     width:100%;
@@ -318,6 +391,31 @@
   .volume-slider:focus-visible::-webkit-slider-thumb {
     box-shadow:0 0 0 2px #7f97ff;
   }
+  .color-control {
+    width:100%;
+    display:grid;
+    grid-template-columns:42px minmax(120px, 180px);
+    align-items:center;
+    gap:8px;
+  }
+  .color-picker {
+    width:42px;
+    height:32px;
+    border:1px solid var(--field);
+    border-radius:4px;
+    background:var(--field);
+    padding:3px;
+    cursor:pointer;
+  }
+  .color-picker::-webkit-color-swatch-wrapper { padding:0; }
+  .color-picker::-webkit-color-swatch {
+    border:0;
+    border-radius:2px;
+  }
+  .color-value {
+    width:100%;
+    text-transform:lowercase;
+  }
   .spin {
     position:relative;
     width:100%;
@@ -362,6 +460,7 @@
     position:relative;
     width:14px;
     height:14px;
+    flex:0 0 14px;
     margin:0;
     border:1px solid #8b92a1;
     border-radius:2px;
@@ -461,6 +560,11 @@
     border-color:#5c78df;
   }
   .btn.is-primary:hover { background:var(--selected2); }
+  .btn.is-danger {
+    background:#7f2232;
+    border-color:#a92c42;
+  }
+  .btn.is-danger:hover { background:#963047; }
   .btn:disabled {
     color:#8b91a0;
     opacity:1;
@@ -468,12 +572,64 @@
     background:#272A33;
     border-color:#3C404D;
   }
+  .modal-backdrop {
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(0,0,0,0.42);
+    z-index:20;
+  }
+  .modal-backdrop.is-visible { display:flex; }
+  .modal {
+    width:min(430px, calc(100vw - 48px));
+    background:var(--panel);
+    border:1px solid var(--line2);
+    border-radius:4px;
+    box-shadow:0 16px 42px rgba(0,0,0,0.45);
+    overflow:hidden;
+  }
+  .modal-title {
+    min-height:34px;
+    display:flex;
+    align-items:center;
+    padding:0 10px;
+    font-weight:700;
+    border-bottom:1px solid var(--line);
+    background:#20232b;
+  }
+  .modal-body {
+    padding:13px 12px 12px;
+  }
+  .modal-text {
+    line-height:1.45;
+    margin-bottom:12px;
+    user-select:text;
+  }
+  .confirm-word {
+    font-weight:700;
+    user-select:text;
+  }
+  .copy-confirm-btn {
+    height:24px;
+    min-width:48px;
+    margin-left:7px;
+    padding:0 10px;
+  }
+  .modal-actions {
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    padding:0 12px 12px;
+  }
   .resize-grip {
     position:absolute;
-    right:3px;
-    bottom:5px;
-    width:12px;
-    height:12px;
+    right:2px;
+    bottom:2px;
+    width:18px;
+    height:18px;
     opacity:.95;
     cursor:nwse-resize;
     pointer-events:auto;
@@ -492,7 +648,7 @@
   .resize-grip span:nth-child(5) { right:3px; bottom:3px; }
   .resize-grip span:nth-child(6) { right:0; bottom:6px; }
   @media (max-width:760px) {
-    .shell { min-width:0; grid-template-columns:154px 1fr; }
+    .shell { grid-template-columns:154px 1fr; }
     .form-row { grid-template-columns:130px minmax(180px,1fr); }
     .hotkey-row { grid-template-columns:180px minmax(180px,1fr) auto; }
   }
@@ -511,6 +667,10 @@
     <button class="nav-btn" type="button" data-page="output">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 3.011719 1 c -1.652344 0 -3.011719 1.359375 -3.011719 3.011719 v 4.976562 c 0 1.652344 1.359375 3.011719 3.011719 3.011719 c 0.550781 0 1 -0.449219 1 -1 s -0.449219 -1 -1 -1 c -0.578125 0 -1.011719 -0.433594 -1.011719 -1.011719 v -4.976562 c 0 -0.578125 0.433594 -1.011719 1.011719 -1.011719 h 7.976562 c 0.578125 0 1.011719 0.433594 1.011719 1.011719 v 1.953125 c 0 0.554687 0.449219 1 1 1 s 1 -0.445313 1 -1 v -1.953125 c 0 -1.652344 -1.359375 -3.011719 -3.011719 -3.011719 z m 3.917969 7.011719 c -1.070313 0 -1.929688 0.863281 -1.929688 1.929687 v 3.140625 c 0 1.070313 0.859375 1.929688 1.929688 1.929688 h 4.140624 c 1.070313 0 1.929688 -0.859375 1.929688 -1.929688 v -0.578125 l 1.851562 1.378906 c 0.214844 0.160157 0.5 0.183594 0.738282 0.066407 c 0.242187 -0.121094 0.390625 -0.367188 0.390625 -0.636719 v -3.601562 c 0.003906 -0.269532 -0.148438 -0.515626 -0.390625 -0.636719 c -0.238282 -0.121094 -0.527344 -0.09375 -0.742188 0.066406 l -1.847656 1.371094 v -0.570313 c 0 -1.066406 -0.859375 -1.929687 -1.929688 -1.929687 z m 0 0"/></svg>
       <span>Output</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="screenshare">
+      <svg viewBox="1 1 14 14" aria-hidden="true"><path d="M3.25 2C2.56 2 2 2.56 2 3.25v6.5C2 10.44 2.56 11 3.25 11H7v1.5H4.75a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5H9V11h3.75c.69 0 1.25-.56 1.25-1.25v-6.5C14 2.56 13.44 2 12.75 2h-9.5zM3.5 3.5h9v6h-9v-6zM6.5 4.85v3.3l3.3-1.65-3.3-1.65z"/></svg>
+      <span>Screenshare</span>
     </button>
     <button class="nav-btn" type="button" data-page="audio">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1.007812 c -0.296875 -0.003906 -0.578125 0.125 -0.769531 0.351563 l -3.230469 3.640625 h -1 c -1.09375 0 -2 0.84375 -2 2 v 2 c 0 1.089844 0.910156 2 2 2 h 1 l 3.230469 3.640625 c 0.210937 0.253906 0.492187 0.363281 0.769531 0.359375 z m 6.460938 0.960938 c -0.191407 -0.003906 -0.386719 0.054688 -0.558594 0.167969 c -0.457032 0.3125 -0.578125 0.933593 -0.269532 1.390625 c 1.824219 2.707031 1.824219 6.238281 0 8.945312 c -0.308593 0.457032 -0.1875 1.078125 0.269532 1.390625 c 0.457031 0.308594 1.078125 0.1875 1.390625 -0.269531 c 1.136719 -1.691406 1.707031 -3.640625 1.707031 -5.59375 s -0.570312 -3.902344 -1.707031 -5.59375 c -0.195313 -0.285156 -0.511719 -0.4375 -0.832031 -0.4375 z m -3.421876 2.019531 c -0.222656 -0.007812 -0.453124 0.058594 -0.644531 0.203125 c -0.261719 0.199219 -0.394531 0.5 -0.394531 0.804688 v 0.058594 c 0.011719 0.191406 0.074219 0.375 0.199219 0.535156 c 1.074219 1.429687 1.074219 3.390625 0 4.816406 c -0.125 0.164062 -0.1875 0.347656 -0.199219 0.535156 v 0.0625 c 0 0.304688 0.132812 0.605469 0.394531 0.804688 c 0.441407 0.332031 1.066407 0.242187 1.398438 -0.199219 c 0.804687 -1.066406 1.207031 -2.335937 1.207031 -3.609375 s -0.402344 -2.542969 -1.207031 -3.613281 c -0.183594 -0.246094 -0.464844 -0.382813 -0.753907 -0.398438 z m 0 0"/></svg>
@@ -540,6 +700,34 @@
           <label class="check-row">
             <input type="checkbox" id="obsStartupEnabled">
             <span>Start OBS when Windows starts</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="runObsAsAdmin">
+            <span>Run OBS and ReplayKit as administrator (takes effect on next OBS launch NOT RECOMMENDED)</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="disableObsCloseWarning">
+            <span>Do not warn when closing OBS with active outputs</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="allowSleepWhileActive">
+            <span>Allow monitor and PC sleep while OBS is active</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="pinObsTrayIcon">
+            <span>Keep the OBS tray icon pinned next to the clock</span>
           </label>
         </div>
         <div class="form-row tight">
@@ -594,6 +782,64 @@
           <div class="label">Recording Path</div>
           <div class="field-wrap">
             <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Pictures\Videos">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-screenshare">
+      <div class="box">
+        <div class="box-title">Discord Screenshare</div>
+        <div class="form-row">
+          <div class="label">Capture Source</div>
+          <div class="field-wrap"><div class="combo" id="screenshareCaptureMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="screenshareGameWindowRow">
+          <div class="label">Game Window</div>
+          <div class="field-wrap"><div class="combo" id="screenshareGameWindow" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="screenshareGameOverridesRow">
+          <div class="label">Auto Game List</div>
+          <div class="field-wrap is-stacked">
+            <div class="game-rule-actions">
+              <div class="combo" id="screenshareGameOverridePicker" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+              <button class="icon-btn" type="button" id="addScreenshareGameOverride" title="Add game">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
+              </button>
+            </div>
+            <div class="game-rule-table" id="screenshareGameOverrideList" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="form-row tight" id="screenshareAutoGameKeepFocusedRow">
+          <div></div>
+          <div class="field-wrap"><label class="check-row"><input type="checkbox" id="screenshareAutoGameKeepFocused"><span>Keep Game Focus</span></label></div>
+        </div>
+        <div class="form-row tight" id="screenshareAutoGameKeepFocusedHintRow">
+          <div></div>
+          <div class="hint">Keeps the screenshare locked on the matched game through brief tab-outs (for example to Discord or this Settings window) instead of switching to Desktop Capture.</div>
+        </div>
+        <div class="form-row" id="screenshareSwitchDelayRow">
+          <div class="label">Switch Speed</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="screenshareSwitchDelayValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Capture switch delay in seconds">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="screenshareSwitchDelay" type="range" min="0.05" max="5" step="0.05" aria-label="Capture switch delay slider">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-row tight" id="screenshareSwitchDelayHintRow">
+          <div></div>
+          <div class="hint">How long ReplayKit waits after you tab out of a game or window before switching back to Desktop Capture, in seconds. Lower reacts faster; higher avoids flicker on brief alt-tabs.</div>
+        </div>
+        <div class="form-row">
+          <div class="label">Projector Tools</div>
+          <div class="field-wrap">
+            <div class="projector-action-row">
+              <button class="btn" type="button" id="settingsProjectorInspectBtn">Show Projector</button>
+              <button class="btn" type="button" id="settingsProjectorReparkBtn">Repark</button>
+            </div>
           </div>
         </div>
       </div>
@@ -677,6 +923,57 @@
           <div class="label">Overlay</div>
           <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
+        <div class="form-row">
+          <div class="label">Opacity</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="overlayOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="overlayOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Size</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="overlayScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="overlayScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Hue Shift</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="overlayHueShiftValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="overlayHueShift" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Color Multiply</div>
+          <div class="field-wrap">
+            <div class="color-control">
+              <input class="color-picker" id="overlayColorMultiply" type="color" aria-label="Overlay color multiply">
+              <input class="text-input color-value" id="overlayColorMultiplyValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex">
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Color Add</div>
+          <div class="field-wrap">
+            <div class="color-control">
+              <input class="color-picker" id="overlayColorAdd" type="color" aria-label="Overlay color add">
+              <input class="text-input color-value" id="overlayColorAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex">
+            </div>
+          </div>
+        </div>
       </div>
       <div class="box">
         <div class="box-title">Capture Effects</div>
@@ -711,6 +1008,49 @@
             <span>Enable frame-accurate trim by default</span>
           </label>
         </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="discordScreenshareEnabled">
+            <span>Enable Discord screenshare support</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="hint">Turn this off to skip OBS Stream Audio during setup and keep Share Preview disabled.</div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="debugLoggingEnabled">
+            <span>Enable debug logging</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="hint">Writes helper activity (Share Preview, clips, uploads) to %TEMP%\ReplayKit\logs for troubleshooting. Leave off unless asked to turn it on.</div>
+        </div>
+        <div class="form-row tight" id="autoDeleteLogsOnLaunchRow">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="autoDeleteLogsOnLaunch">
+            <span>Automatically delete logs on next launch</span>
+          </label>
+        </div>
+        <div class="form-row tight" id="autoDeleteLogsOnLaunchHintRow">
+          <div></div>
+          <div class="hint">Clears the logs above at the start of each OBS launch so they do not fill up disk space over time. Recommended to leave on unless you need to keep logs from a previous session.</div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="field-wrap">
+            <button class="btn" type="button" id="openLogFolderBtn">Open log folder</button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="inline-status" id="logFolderStatusLine"></div>
+        </div>
       </div>
       <div class="box">
         <div class="box-title">Updates</div>
@@ -733,6 +1073,26 @@
           <div class="inline-status" id="updateStatusLine"></div>
         </div>
       </div>
+      <div class="box">
+        <div class="box-title">Uninstall</div>
+        <div class="form-row">
+          <div class="label">ReplayKit</div>
+          <div class="field-wrap">
+            <button class="btn is-danger" type="button" id="uninstallReplayKitBtn">Uninstall</button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="uninstallKeepSettings" checked>
+            <span>Keep user settings for next install</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="inline-status" id="uninstallStatusLine"></div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -741,21 +1101,50 @@
     <button class="btn" type="button" id="cancelBtn">Cancel</button>
     <button class="btn" type="button" id="applyBtn" disabled>Apply</button>
   </footer>
+  <div class="modal-backdrop" id="uninstallConfirmModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="uninstallConfirmTitle">
+      <div class="modal-title" id="uninstallConfirmTitle">Confirm uninstall</div>
+      <div class="modal-body">
+        <div class="modal-text">
+          Type <span class="confirm-word">confirm</span><button class="btn copy-confirm-btn" type="button" id="copyUninstallConfirmBtn">Copy</button> to remove ReplayKit from OBS.
+        </div>
+        <input class="text-input" id="uninstallConfirmInput" type="text" autocomplete="off" spellcheck="false" aria-label="Uninstall confirmation">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="uninstallConfirmCancelBtn">Cancel</button>
+        <button class="btn is-danger" type="button" id="uninstallConfirmOkBtn">Uninstall</button>
+      </div>
+    </div>
+  </div>
   <div class="resize-grip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
 </div>
 
 <script>
   (function lockdown() {
-    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
     document.addEventListener("wheel", function (e) {
-      if (e.ctrlKey) e.preventDefault();
-    }, { passive:false });
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive:false, capture:true });
     document.addEventListener("keydown", function (e) {
-      if (e.ctrlKey && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "0" || e.key === "r" || e.key === "R")) {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") {
+        e.preventDefault();
+        return;
+      }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
         e.preventDefault();
       }
-      if (e.key === "F5") e.preventDefault();
-    });
+      if (e.key === "BrowserBack" || e.key === "BrowserForward" || e.code === "BrowserBack" || e.code === "BrowserForward") {
+        e.preventDefault();
+      }
+    }, true);
   })();
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
@@ -764,25 +1153,54 @@
   const state = {};
   let originalState = {};
   let dirty = false;
+  let projectorActionInFlight = false;
 
   const compressionByPreset = {
     performance:"lower_gpu",
     balanced:"balanced",
     quality:"smaller_files",
   };
-  // Encoder/video changes use the restart path. Clip length and motion blur apply through runtime settings.
+  // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings.
   const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
     compressionMode: document.getElementById("compressionMode"),
     codecPreference: document.getElementById("codecPreference"),
+    screenshareCaptureMode: document.getElementById("screenshareCaptureMode"),
+    screenshareGameWindow: document.getElementById("screenshareGameWindow"),
+    screenshareGameWindowRow: document.getElementById("screenshareGameWindowRow"),
+    screenshareGameOverridesRow: document.getElementById("screenshareGameOverridesRow"),
+    screenshareGameOverridePicker: document.getElementById("screenshareGameOverridePicker"),
+    addScreenshareGameOverride: document.getElementById("addScreenshareGameOverride"),
+    screenshareGameOverrideList: document.getElementById("screenshareGameOverrideList"),
+    screenshareAutoGameKeepFocused: document.getElementById("screenshareAutoGameKeepFocused"),
+    screenshareAutoGameKeepFocusedRow: document.getElementById("screenshareAutoGameKeepFocusedRow"),
+    screenshareAutoGameKeepFocusedHintRow: document.getElementById("screenshareAutoGameKeepFocusedHintRow"),
+    screenshareSwitchDelay: document.getElementById("screenshareSwitchDelay"),
+    screenshareSwitchDelayValue: document.getElementById("screenshareSwitchDelayValue"),
+    screenshareSwitchDelayRow: document.getElementById("screenshareSwitchDelayRow"),
+    screenshareSwitchDelayHintRow: document.getElementById("screenshareSwitchDelayHintRow"),
     overlayStyle: document.getElementById("overlayStyle"),
+    overlayOpacity: document.getElementById("overlayOpacity"),
+    overlayOpacityValue: document.getElementById("overlayOpacityValue"),
+    overlayScale: document.getElementById("overlayScale"),
+    overlayScaleValue: document.getElementById("overlayScaleValue"),
+    overlayHueShift: document.getElementById("overlayHueShift"),
+    overlayHueShiftValue: document.getElementById("overlayHueShiftValue"),
+    overlayColorMultiply: document.getElementById("overlayColorMultiply"),
+    overlayColorMultiplyValue: document.getElementById("overlayColorMultiplyValue"),
+    overlayColorAdd: document.getElementById("overlayColorAdd"),
+    overlayColorAddValue: document.getElementById("overlayColorAddValue"),
     replaySeconds: document.getElementById("replaySeconds"),
     clipDir: document.getElementById("clipDir"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
     obsStartupEnabled: document.getElementById("obsStartupEnabled"),
+    runObsAsAdmin: document.getElementById("runObsAsAdmin"),
+    disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
+    allowSleepWhileActive: document.getElementById("allowSleepWhileActive"),
+    pinObsTrayIcon: document.getElementById("pinObsTrayIcon"),
     clipNotificationEnabled: document.getElementById("clipNotificationEnabled"),
     recordingNotificationEnabled: document.getElementById("recordingNotificationEnabled"),
     clipSoundVolume: document.getElementById("clipSoundVolume"),
@@ -793,6 +1211,15 @@
     motionBlurStrength: document.getElementById("motionBlurStrength"),
     motionBlurStrengthValue: document.getElementById("motionBlurStrengthValue"),
     trimPreciseDefault: document.getElementById("trimPreciseDefault"),
+    debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
+    autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
+    autoDeleteLogsOnLaunchRow: document.getElementById("autoDeleteLogsOnLaunchRow"),
+    autoDeleteLogsOnLaunchHintRow: document.getElementById("autoDeleteLogsOnLaunchHintRow"),
+    openLogFolderBtn: document.getElementById("openLogFolderBtn"),
+    logFolderStatusLine: document.getElementById("logFolderStatusLine"),
+    discordScreenshareEnabled: document.getElementById("discordScreenshareEnabled"),
+    settingsProjectorInspectBtn: document.getElementById("settingsProjectorInspectBtn"),
+    settingsProjectorReparkBtn: document.getElementById("settingsProjectorReparkBtn"),
     autoUpdateEnabled: document.getElementById("autoUpdateEnabled"),
     settingsSearch: document.getElementById("settingsSearch"),
     searchEmpty: document.getElementById("searchEmpty"),
@@ -803,9 +1230,24 @@
     checkUpdateBtn: document.getElementById("checkUpdateBtn"),
     installUpdateBtn: document.getElementById("installUpdateBtn"),
     updateStatusLine: document.getElementById("updateStatusLine"),
+    uninstallReplayKitBtn: document.getElementById("uninstallReplayKitBtn"),
+    uninstallKeepSettings: document.getElementById("uninstallKeepSettings"),
+    uninstallStatusLine: document.getElementById("uninstallStatusLine"),
+    uninstallConfirmModal: document.getElementById("uninstallConfirmModal"),
+    uninstallConfirmInput: document.getElementById("uninstallConfirmInput"),
+    copyUninstallConfirmBtn: document.getElementById("copyUninstallConfirmBtn"),
+    uninstallConfirmOkBtn: document.getElementById("uninstallConfirmOkBtn"),
+    uninstallConfirmCancelBtn: document.getElementById("uninstallConfirmCancelBtn"),
     resizeGrip: document.querySelector(".resize-grip"),
   };
   let pendingUpdate = null;
+  let overlayPreviewTimer = 0;
+  let overlayPreviewPromise = null;
+  let overlayPreviewPending = false;
+  let overlayPreviewRevision = 0;
+  const overlayPreviewRevisionBase = Date.now() * 1000;
+  let overlayPreviewTouched = false;
+  let uninstallConfirmResolve = null;
 
   function styleNativeChrome() {
     fetch(HELPER + "/style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(), { cache:"no-store" }).catch(() => {});
@@ -828,6 +1270,12 @@
     els.updateStatusLine.textContent = text || "";
     els.updateStatusLine.classList.toggle("good", kind === "good");
     els.updateStatusLine.classList.toggle("bad", kind === "bad");
+  }
+
+  function setUninstallStatus(text, kind) {
+    els.uninstallStatusLine.textContent = text || "";
+    els.uninstallStatusLine.classList.toggle("good", kind === "good");
+    els.uninstallStatusLine.classList.toggle("bad", kind === "bad");
   }
 
   function searchText(el) {
@@ -933,9 +1381,136 @@
     updateApplyButton();
   }
 
+  function acceptOverlayPreviewSettings(nextSettings, payload) {
+    markDirty();
+  }
+
+  function nextOverlayPreviewPayload() {
+    overlayPreviewRevision += 1;
+    return {
+      overlayOpacity: state.overlayOpacity ?? 100,
+      overlayScale: state.overlayScale ?? 100,
+      overlayHueShift: state.overlayHueShift ?? 0,
+      overlayColorMultiply: state.overlayColorMultiply || "#ffffff",
+      overlayColorAdd: state.overlayColorAdd || "#000000",
+      overlayPreviewRevision: overlayPreviewRevisionBase + overlayPreviewRevision,
+    };
+  }
+
+  async function previewOverlaySettings() {
+    const payload = nextOverlayPreviewPayload();
+    try {
+      const data = await helperJson("settings/overlay-preview", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify(payload),
+      });
+      if (data.skipped) return;
+      acceptOverlayPreviewSettings(data.settings || {}, payload);
+      const warnings = data.warnings || [];
+      if (warnings.length) setStatus(warnings.join(" "), "bad");
+      else setStatus("Overlay preview updated", "");
+    } catch (e) {
+      setStatus("Overlay preview failed: " + (e.message || e), "bad");
+      markDirty();
+    }
+  }
+
+  function startOverlayPreviewLoop() {
+    if (overlayPreviewPromise) return overlayPreviewPromise;
+    overlayPreviewPromise = (async () => {
+      while (overlayPreviewPending) {
+        overlayPreviewPending = false;
+        await previewOverlaySettings();
+      }
+    })().finally(() => {
+      overlayPreviewPromise = null;
+    });
+    return overlayPreviewPromise;
+  }
+
+  function queueOverlayPreview(immediate) {
+    overlayPreviewTouched = true;
+    overlayPreviewPending = true;
+    if (overlayPreviewTimer) clearTimeout(overlayPreviewTimer);
+    if (overlayPreviewPromise) return;
+    if (immediate) {
+      startOverlayPreviewLoop();
+      return;
+    }
+    overlayPreviewTimer = setTimeout(() => {
+      overlayPreviewTimer = 0;
+      startOverlayPreviewLoop();
+    }, 16);
+  }
+
+  async function flushOverlayPreview() {
+    if (overlayPreviewTimer) {
+      clearTimeout(overlayPreviewTimer);
+      overlayPreviewTimer = 0;
+    }
+    if (overlayPreviewPending && !overlayPreviewPromise) startOverlayPreviewLoop();
+    if (overlayPreviewPromise) {
+      try { await overlayPreviewPromise; } catch (e) {}
+    }
+  }
+
+  async function commitOverlayPreview() {
+    if (!overlayPreviewTouched &&
+        !settingValueChanged("overlayOpacity") &&
+        !settingValueChanged("overlayScale") &&
+        !settingValueChanged("overlayHueShift") &&
+        !settingValueChanged("overlayColorMultiply") &&
+        !settingValueChanged("overlayColorAdd")) {
+      return false;
+    }
+    await flushOverlayPreview();
+    const payload = {
+      overlayOpacity: state.overlayOpacity ?? 100,
+      overlayScale: state.overlayScale ?? 100,
+      overlayHueShift: state.overlayHueShift ?? 0,
+      overlayColorMultiply: state.overlayColorMultiply || "#ffffff",
+      overlayColorAdd: state.overlayColorAdd || "#000000",
+    };
+    const data = await helperJson("settings/overlay-preview?mode=commit", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify(payload),
+    });
+    ["overlayOpacity", "overlayScale", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
+      if (!data.settings || !Object.prototype.hasOwnProperty.call(data.settings, key)) return;
+      state[key] = data.settings[key];
+      originalState[key] = data.settings[key];
+    });
+    overlayPreviewTouched = false;
+    markDirty();
+    return true;
+  }
+
+  async function cancelOverlayPreview() {
+    if (overlayPreviewTimer) {
+      clearTimeout(overlayPreviewTimer);
+      overlayPreviewTimer = 0;
+    }
+    if (overlayPreviewPromise) {
+      try { await overlayPreviewPromise; } catch (e) {}
+    }
+    if (!overlayPreviewTouched) return;
+    try {
+      await helperJson("settings/overlay-preview?mode=cancel", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:"{}",
+      });
+    } catch (e) {}
+    overlayPreviewTouched = false;
+  }
+
   function acceptSettings(nextSettings) {
     Object.assign(state, nextSettings || {});
+    state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     originalState = clone(state);
+    overlayPreviewTouched = false;
     dirty = false;
     syncUi();
     dirty = false;
@@ -960,6 +1535,11 @@
     catch { return []; }
   }
 
+  function selectedComboOption(combo) {
+    const value = comboValue(combo);
+    return comboOptions(combo).find((o) => o.value === value) || null;
+  }
+
   function renderCombo(combo) {
     const options = comboOptions(combo);
     const value = comboValue(combo);
@@ -981,6 +1561,19 @@
     setComboValue(combo, comboValue(combo), false);
   }
 
+  function setComboDisabled(combo, disabled) {
+    if (!combo) return;
+    combo.classList.toggle("is-disabled", !!disabled);
+    combo.setAttribute("aria-disabled", disabled ? "true" : "false");
+    combo.tabIndex = disabled ? -1 : 0;
+    const button = combo.querySelector(".combo-button");
+    if (button) button.disabled = !!disabled;
+    if (disabled) {
+      combo.classList.remove("is-open");
+      combo.setAttribute("aria-expanded", "false");
+    }
+  }
+
   function closeCombos(except) {
     document.querySelectorAll(".combo.is-open").forEach((combo) => {
       if (combo !== except) {
@@ -991,6 +1584,7 @@
   }
 
   function openCombo(combo) {
+    if (combo.classList.contains("is-disabled")) return;
     closeCombos(combo);
     combo.classList.add("is-open");
     combo.setAttribute("aria-expanded", "true");
@@ -1154,9 +1748,36 @@
     return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
   }
 
+  function clampOverlayScale(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(50, Math.min(200, n)) : 100;
+  }
+
+  function clampHueShift(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(-180, Math.min(180, n)) : 0;
+  }
+
+  function clampSwitchDelay(value) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? Math.max(0.05, Math.min(5, n)) : 1;
+  }
+
+  function cleanHexColor(value, fallback) {
+    const text = String(value || "").trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(text)) return text;
+    return fallback;
+  }
+
   function clampMotionBlurStrength(value) {
     const n = parseFloat(value);
     return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.075;
+  }
+
+  function setSliderFill(slider, value, min, max) {
+    const span = Math.max(1, max - min);
+    const pct = Math.max(0, Math.min(100, ((value - min) / span) * 100));
+    slider.style.setProperty("--fill", pct + "%");
   }
 
   function syncVolumeControl(slider, input, value) {
@@ -1166,6 +1787,19 @@
     input.value = String(volume);
   }
 
+  function syncIntegerRangeControl(slider, input, value, clampFn, min, max) {
+    const next = clampFn(value);
+    slider.value = String(next);
+    setSliderFill(slider, next, min, max);
+    input.value = String(next);
+  }
+
+  function syncColorControl(picker, input, value, fallback) {
+    const colorValue = cleanHexColor(value, fallback);
+    picker.value = colorValue;
+    input.value = colorValue;
+  }
+
   function syncMotionBlurControl(value) {
     const strength = clampMotionBlurStrength(value);
     els.motionBlurStrength.value = String(strength);
@@ -1173,14 +1807,195 @@
     els.motionBlurStrengthValue.value = strength.toFixed(3);
   }
 
+  function syncSwitchDelayControl(value) {
+    const delay = clampSwitchDelay(value);
+    els.screenshareSwitchDelay.value = String(delay);
+    setSliderFill(els.screenshareSwitchDelay, delay, 0.05, 5);
+    els.screenshareSwitchDelayValue.value = delay.toFixed(2);
+  }
+
+  function cleanGameOverrideText(value, maxLength) {
+    const text = String(value || "").replace(/[\x00-\x1F]/g, " ").trim();
+    return text.length > maxLength ? text.slice(0, maxLength) : text;
+  }
+
+  function decodeObsWindowTokenPart(value) {
+    return String(value || "").replace(/#3A/g, ":").replace(/#22/g, "#");
+  }
+
+  function gameOverridePartsFromToken(token) {
+    const parts = String(token || "").split(":", 3);
+    if (parts.length < 3) return { title:"", className:"", exeName:"" };
+    return {
+      title:decodeObsWindowTokenPart(parts[0]),
+      className:decodeObsWindowTokenPart(parts[1]),
+      exeName:decodeObsWindowTokenPart(parts[2]),
+    };
+  }
+
+  function normalizeScreenshareGameOverride(item) {
+    if (!item) return null;
+    const token = cleanGameOverrideText(item.token || item.value || "", 512);
+    if (!token) return null;
+    const parts = gameOverridePartsFromToken(token);
+    const exeName = cleanGameOverrideText(item.exeName || parts.exeName, 96);
+    if (!exeName) return null;
+    const title = cleanGameOverrideText(item.title || parts.title, 160);
+    const className = cleanGameOverrideText(item.className || parts.className, 120);
+    const fallbackLabel = title ? "[" + exeName + "]: " + title : "[" + exeName + "]";
+    return {
+      token,
+      label:cleanGameOverrideText(item.label || fallbackLabel, 256),
+      exeName,
+      title,
+      className,
+    };
+  }
+
+  function normalizeScreenshareGameOverrides(value) {
+    const seen = new Set();
+    const out = [];
+    (Array.isArray(value) ? value : []).forEach((item) => {
+      const normalized = normalizeScreenshareGameOverride(item);
+      if (!normalized || seen.has(normalized.token)) return;
+      seen.add(normalized.token);
+      if (out.length < 32) out.push(normalized);
+    });
+    return out;
+  }
+
+  function renderScreenshareGameOverrides() {
+    state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
+    if (!state.screenshareGameOverrides.length) {
+      els.screenshareGameOverrideList.innerHTML = '<div class="game-rule-empty">No games added</div>';
+      return;
+    }
+    els.screenshareGameOverrideList.innerHTML = state.screenshareGameOverrides.map((item, index) => {
+      const sub = item.className ? item.className : item.exeName;
+      return '<div class="game-rule-row" data-index="' + index + '">' +
+        '<div><div class="game-rule-main">' + escapeHtml(item.label) + '</div>' +
+        '<div class="game-rule-sub">' + escapeHtml(sub) + '</div></div>' +
+        '<button class="icon-btn game-rule-remove" type="button" title="Remove game" data-index="' + index + '">' +
+        '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 6 2 l -6 6 l 6 6 h 9.035156 c 0.53125 -0.023438 0.964844 -0.492188 0.964844 -1 v -10 c 0 -0.53125 -0.34375 -1 -1.007812 -1 z m 1 3 h 1 h 0.03125 c 0.253906 0.011719 0.511719 0.128906 0.6875 0.3125 l 1.28125 1.28125 l 1.3125 -1.28125 c 0.265625 -0.230469 0.445312 -0.304688 0.6875 -0.3125 h 1 v 1 c 0 0.285156 -0.035156 0.550781 -0.25 0.75 l -1.28125 1.28125 l 1.25 1.25 c 0.1875 0.1875 0.28125 0.453125 0.28125 0.71875 v 1 h -1 c -0.265625 0 -0.53125 -0.09375 -0.71875 -0.28125 l -1.28125 -1.28125 l -1.28125 1.28125 c -0.1875 0.1875 -0.453125 0.28125 -0.71875 0.28125 h -1 v -1 c 0 -0.265625 0.09375 -0.53125 0.28125 -0.71875 l 1.28125 -1.25 l -1.28125 -1.28125 c -0.210938 -0.195312 -0.304688 -0.46875 -0.28125 -0.75 z m 0 0"/></svg>' +
+        '</button></div>';
+    }).join("");
+    els.screenshareGameOverrideList.querySelectorAll(".game-rule-remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.screenshareGameOverrides.splice(parseInt(btn.dataset.index, 10), 1);
+        renderScreenshareGameOverrides();
+        syncScreenshareCaptureFields();
+        markDirty();
+      });
+    });
+  }
+
+  function addScreenshareGameOverride() {
+    const option = selectedComboOption(els.screenshareGameOverridePicker);
+    const item = normalizeScreenshareGameOverride(option || {});
+    if (!item) return;
+    state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
+    if (state.screenshareGameOverrides.some((existing) => existing.token === item.token)) return;
+    state.screenshareGameOverrides.push(item);
+    renderScreenshareGameOverrides();
+    syncScreenshareCaptureFields();
+    markDirty();
+  }
+
+  function syncScreenshareCaptureFields() {
+    const mode = comboValue(els.screenshareCaptureMode);
+    const needsWindow = mode === "game_window";
+    const usesAutoList = mode === "hybrid_auto";
+    setComboDisabled(els.screenshareGameWindow, !needsWindow);
+    els.screenshareGameWindowRow.classList.toggle("is-disabled", !needsWindow);
+    setComboDisabled(els.screenshareGameOverridePicker, !usesAutoList);
+    els.screenshareGameOverridesRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareAutoGameKeepFocusedRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareAutoGameKeepFocusedHintRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareAutoGameKeepFocused.disabled = !usesAutoList;
+    els.screenshareSwitchDelayRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareSwitchDelayHintRow.classList.toggle("is-disabled", !usesAutoList);
+    els.screenshareSwitchDelay.disabled = !usesAutoList;
+    els.screenshareSwitchDelayValue.disabled = !usesAutoList;
+    els.addScreenshareGameOverride.disabled = !usesAutoList || !comboValue(els.screenshareGameOverridePicker);
+    els.screenshareGameOverrideList.querySelectorAll("button").forEach((button) => {
+      button.disabled = !usesAutoList;
+    });
+  }
+
+  function syncProjectorToolButtons() {
+    const supportEnabled = state.discord_screenshare_enabled !== false;
+    // also require share preview on so the projector cant be spawned by accident
+    const previewEnabled = supportEnabled && !!state.discord_projector_enabled;
+    const disabled = projectorActionInFlight || !previewEnabled;
+    els.settingsProjectorInspectBtn.disabled = disabled;
+    els.settingsProjectorReparkBtn.disabled = disabled;
+    els.settingsProjectorInspectBtn.title = previewEnabled
+      ? "Show the OBS projector as a movable test window."
+      : (supportEnabled
+        ? "Enable Share Preview before showing the projector."
+        : "Enable Discord screenshare support before showing the projector.");
+    els.settingsProjectorReparkBtn.title = previewEnabled
+      ? "Park the OBS projector back off screen."
+      : (supportEnabled
+        ? "Enable Share Preview before reparking the projector."
+        : "Enable Discord screenshare support before reparking the projector.");
+  }
+
+  async function runSettingsProjectorAction(btn, path, busyText, successText, fallbackText) {
+    if (projectorActionInFlight || btn.disabled) return;
+    projectorActionInFlight = true;
+    syncProjectorToolButtons();
+    const oldText = btn.textContent;
+    btn.textContent = busyText;
+    setStatus(busyText, "");
+    try {
+      const result = await helperJson(path, { method:"POST" });
+      const warnings = Array.isArray(result && result.warnings) ? result.warnings : [];
+      setStatus(warnings.length ? warnings.join(" ") : successText, warnings.length ? "bad" : "good");
+    } catch (e) {
+      setStatus("Projector failed: " + (e.message || e), "bad");
+    } finally {
+      btn.textContent = fallbackText || oldText;
+      projectorActionInFlight = false;
+      syncProjectorToolButtons();
+    }
+  }
+
+  function syncDebugLoggingFields() {
+    const enabled = els.debugLoggingEnabled.checked;
+    els.autoDeleteLogsOnLaunchRow.classList.toggle("is-disabled", !enabled);
+    els.autoDeleteLogsOnLaunchHintRow.classList.toggle("is-disabled", !enabled);
+    els.autoDeleteLogsOnLaunch.disabled = !enabled;
+  }
+
   function syncUi() {
+    state.shareMode = "projector";
+    state.discord_output_mode = "projector";
+    state.discord_projector_visible_pixels = 1;
+    state.discord_projector_hide_taskbar = true;
     setComboValue(els.recordingPreset, state.recordingPreset || "balanced", false);
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
     setComboValue(els.codecPreference, state.codecPreference || "auto", false);
+    setComboValue(els.screenshareCaptureMode, state.screenshareCaptureMode || "hybrid_auto", false);
+    setComboValue(els.screenshareGameWindow, state.screenshareGameWindow || "", false);
+    renderScreenshareGameOverrides();
+    els.screenshareAutoGameKeepFocused.checked = !!state.screenshareAutoGameKeepFocused;
+    syncSwitchDelayControl(state.screenshareSwitchDelaySeconds ?? 1);
+    syncScreenshareCaptureFields();
+    syncProjectorToolButtons();
     setComboValue(els.overlayStyle, state.overlayStyle || "input_overlay", false);
+    syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, state.overlayOpacity ?? 100, clampVolume, 0, 100);
+    syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, state.overlayScale ?? 100, clampOverlayScale, 50, 200);
+    syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, state.overlayHueShift ?? 0, clampHueShift, -180, 180);
+    syncColorControl(els.overlayColorMultiply, els.overlayColorMultiplyValue, state.overlayColorMultiply || "#ffffff", "#ffffff");
+    syncColorControl(els.overlayColorAdd, els.overlayColorAddValue, state.overlayColorAdd || "#000000", "#000000");
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds || 90);
     els.clipDir.value = state.clipDir || "";
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
+    els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
+    els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
+    els.allowSleepWhileActive.checked = state.allowSleepWhileActive !== false;
+    els.pinObsTrayIcon.checked = state.pinObsTrayIcon !== false;
     els.clipNotificationEnabled.checked = !!state.clipNotificationEnabled;
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 100);
@@ -1188,6 +2003,10 @@
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
+    els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
+    els.autoDeleteLogsOnLaunch.checked = state.autoDeleteLogsOnLaunch !== false;
+    syncDebugLoggingFields();
+    els.discordScreenshareEnabled.checked = state.discord_screenshare_enabled !== false;
     els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
     syncHotkeyFields();
     markDirty();
@@ -1198,11 +2017,29 @@
     state.recordingPreset = comboValue(els.recordingPreset);
     state.compressionMode = comboValue(els.compressionMode);
     state.codecPreference = comboValue(els.codecPreference);
+    state.screenshareCaptureMode = comboValue(els.screenshareCaptureMode) || "hybrid_auto";
+    state.screenshareGameWindow = comboValue(els.screenshareGameWindow) || "";
+    state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
+    state.screenshareAutoGameKeepFocused = !!els.screenshareAutoGameKeepFocused.checked;
+    state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelay.value);
     state.overlayStyle = comboValue(els.overlayStyle);
+    state.overlayOpacity = clampVolume(els.overlayOpacity.value);
+    state.overlayScale = clampOverlayScale(els.overlayScale.value);
+    state.overlayHueShift = clampHueShift(els.overlayHueShift.value);
+    state.overlayColorMultiply = cleanHexColor(els.overlayColorMultiplyValue.value, "#ffffff");
+    state.overlayColorAdd = cleanHexColor(els.overlayColorAddValue.value, "#000000");
+    state.shareMode = "projector";
+    state.discord_output_mode = "projector";
+    state.discord_projector_visible_pixels = 1;
+    state.discord_projector_hide_taskbar = true;
     state.replaySeconds = readReplaySeconds();
     state.clipNotificationSeconds = state.replaySeconds;
     state.clipDir = els.clipDir.value.trim();
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
+    state.runObsAsAdmin = els.runObsAsAdmin.checked;
+    state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
+    state.allowSleepWhileActive = els.allowSleepWhileActive.checked;
+    state.pinObsTrayIcon = els.pinObsTrayIcon.checked;
     state.clipNotificationEnabled = els.clipNotificationEnabled.checked;
     state.recordingNotificationEnabled = els.recordingNotificationEnabled.checked;
     state.clipSoundVolume = clampVolume(els.clipSoundVolume.value);
@@ -1210,6 +2047,10 @@
     state.motionBlurEnabled = els.motionBlurEnabled.checked;
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
+    state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
+    state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
+    state.discord_screenshare_enabled = els.discordScreenshareEnabled.checked;
+    if (!state.discord_screenshare_enabled) state.discord_projector_enabled = false;
     state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
   }
 
@@ -1236,16 +2077,19 @@
   document.querySelectorAll(".combo").forEach((combo) => {
     combo.querySelector(".combo-button").addEventListener("click", (e) => {
       e.stopPropagation();
+      if (combo.classList.contains("is-disabled")) return;
       if (combo.classList.contains("is-open")) closeCombos();
       else openCombo(combo);
     });
     combo.addEventListener("click", (e) => {
+      if (combo.classList.contains("is-disabled")) return;
       const option = e.target.closest(".combo-option");
       if (!option || option.classList.contains("is-disabled")) return;
       setComboValue(combo, option.dataset.value, true);
       closeCombos();
     });
     combo.addEventListener("keydown", (e) => {
+      if (combo.classList.contains("is-disabled")) return;
       const options = comboOptions(combo).filter((o) => !o.disabled);
       if (!options.length) return;
       const current = Math.max(0, options.findIndex((o) => o.value === comboValue(combo)));
@@ -1266,16 +2110,21 @@
   });
   document.addEventListener("click", () => closeCombos());
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.overlayStyle].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
         state.compressionMode = compressionByPreset[state.recordingPreset] || "balanced";
         setComboValue(els.compressionMode, state.compressionMode, false);
       }
+      if (combo === els.screenshareCaptureMode) {
+        syncScreenshareCaptureFields();
+      }
       markDirty();
     });
   });
+  els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
+  els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
 
   [els.replaySeconds, els.clipDir].forEach((input) => {
     input.addEventListener("input", () => { readUi(); markDirty(); });
@@ -1304,6 +2153,63 @@
     });
   });
 
+  [
+    [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampVolume, 0, 100],
+    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, 50, 200],
+    [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, -180, 180],
+  ].forEach(([slider, input, key, clampFn, min, max]) => {
+    slider.addEventListener("input", () => {
+      state[key] = clampFn(slider.value);
+      syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      markDirty();
+      queueOverlayPreview();
+    });
+    input.addEventListener("input", () => {
+      state[key] = clampFn(input.value);
+      slider.value = String(state[key]);
+      setSliderFill(slider, state[key], min, max);
+      markDirty();
+      queueOverlayPreview();
+    });
+    input.addEventListener("change", () => {
+      state[key] = clampFn(input.value);
+      syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      markDirty();
+      queueOverlayPreview();
+    });
+  });
+
+  [
+    [els.overlayColorMultiply, els.overlayColorMultiplyValue, "overlayColorMultiply", "#ffffff"],
+    [els.overlayColorAdd, els.overlayColorAddValue, "overlayColorAdd", "#000000"],
+  ].forEach(([picker, input, key, fallback]) => {
+    const applyPickerColor = () => {
+      state[key] = cleanHexColor(picker.value, fallback);
+      input.value = state[key];
+      markDirty();
+      queueOverlayPreview(true);
+    };
+    const applyTextColor = (syncPicker) => {
+      state[key] = cleanHexColor(input.value, state[key] || fallback);
+      if (syncPicker) syncColorControl(picker, input, state[key], fallback);
+      markDirty();
+      queueOverlayPreview(true);
+    };
+    picker.addEventListener("input", applyPickerColor);
+    picker.addEventListener("change", applyPickerColor);
+    picker.addEventListener("blur", applyPickerColor);
+    input.addEventListener("input", () => {
+      applyTextColor(false);
+    });
+    input.addEventListener("change", () => {
+      state[key] = cleanHexColor(input.value, fallback);
+      syncColorControl(picker, input, state[key], fallback);
+      markDirty();
+      queueOverlayPreview(true);
+    });
+    input.addEventListener("blur", () => applyTextColor(true));
+  });
+
   els.motionBlurStrength.addEventListener("input", () => {
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     syncMotionBlurControl(state.motionBlurStrength);
@@ -1321,9 +2227,28 @@
     markDirty();
   });
 
-  [els.obsStartupEnabled, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.autoUpdateEnabled].forEach((input) => {
+  els.screenshareSwitchDelay.addEventListener("input", () => {
+    state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelay.value);
+    syncSwitchDelayControl(state.screenshareSwitchDelaySeconds);
+    markDirty();
+  });
+  els.screenshareSwitchDelayValue.addEventListener("input", () => {
+    state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelayValue.value);
+    els.screenshareSwitchDelay.value = String(state.screenshareSwitchDelaySeconds);
+    setSliderFill(els.screenshareSwitchDelay, state.screenshareSwitchDelaySeconds, 0.05, 5);
+    markDirty();
+  });
+  els.screenshareSwitchDelayValue.addEventListener("change", () => {
+    state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelayValue.value);
+    syncSwitchDelayControl(state.screenshareSwitchDelaySeconds);
+    markDirty();
+  });
+
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.discordScreenshareEnabled, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => { readUi(); markDirty(); });
   });
+  els.discordScreenshareEnabled.addEventListener("change", syncProjectorToolButtons);
+  els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
   els.settingsSearch.addEventListener("input", applySettingsSearch);
 
   document.querySelectorAll("[data-spin]").forEach((btn) => {
@@ -1395,6 +2320,9 @@
       fillCombo(els.recordingPreset, data.options.recordingPresets || []);
       fillCombo(els.compressionMode, data.options.compressionModes || []);
       fillCombo(els.codecPreference, data.options.codecs || []);
+      fillCombo(els.screenshareCaptureMode, data.options.screenshareCaptureModes || []);
+      fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
+      fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       fillCombo(els.overlayStyle, data.options.overlays || []);
       acceptSettings(data.settings || {});
       setStatus("Settings loaded", "good");
@@ -1405,9 +2333,17 @@
 
   async function saveSettings(closeAfter) {
     readUi();
+    let committedOverlayPreview = false;
+    try {
+      committedOverlayPreview = await commitOverlayPreview();
+    } catch (e) {
+      setStatus("Overlay apply failed: " + (e.message || e), "bad");
+      markDirty();
+      return;
+    }
     if (!dirty) {
       if (closeAfter) closeWindow();
-      else setStatus("No settings changed", "good");
+      else setStatus(committedOverlayPreview ? "Settings applied" : "No settings changed", "good");
       return;
     }
     const restartAfterApply = needsObsRestart();
@@ -1434,11 +2370,18 @@
     }
   }
 
+  async function cancelSettings() {
+    await cancelOverlayPreview();
+    closeWindow();
+  }
+
   async function refreshExternalSettings() {
     if (dirty || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending) return;
     try {
       const data = await helperJson("settings?t=" + Date.now());
       const next = data.settings || {};
+      fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
+      fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       if (JSON.stringify(next) !== JSON.stringify(state)) {
         acceptSettings(next);
       }
@@ -1493,11 +2436,121 @@
     }
   }
 
+  function closeUninstallConfirmModal(result) {
+    if (!uninstallConfirmResolve) return;
+    const resolve = uninstallConfirmResolve;
+    uninstallConfirmResolve = null;
+    els.uninstallConfirmModal.classList.remove("is-visible");
+    els.uninstallConfirmModal.setAttribute("aria-hidden", "true");
+    els.uninstallConfirmInput.value = "";
+    resolve(result);
+  }
+
+  function showUninstallConfirmModal() {
+    if (uninstallConfirmResolve) return Promise.resolve(false);
+    els.uninstallConfirmInput.value = "";
+    els.uninstallConfirmModal.classList.add("is-visible");
+    els.uninstallConfirmModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => els.uninstallConfirmInput.focus(), 0);
+    return new Promise((resolve) => {
+      uninstallConfirmResolve = resolve;
+    });
+  }
+
+  async function copyUninstallConfirmText() {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText("confirm");
+      } else {
+        els.uninstallConfirmInput.value = "confirm";
+        els.uninstallConfirmInput.select();
+        document.execCommand("copy");
+      }
+      els.uninstallConfirmInput.focus();
+    } catch (e) {
+      els.uninstallConfirmInput.value = "confirm";
+      els.uninstallConfirmInput.select();
+      els.uninstallConfirmInput.focus();
+    }
+  }
+
+  async function uninstallReplayKit() {
+    if (dirty) {
+      setUninstallStatus("Apply or cancel settings changes before uninstalling.", "bad");
+      return;
+    }
+    const confirmed = await showUninstallConfirmModal();
+    if (!confirmed) {
+      setUninstallStatus("Uninstall cancelled.", "");
+      return;
+    }
+    els.uninstallReplayKitBtn.disabled = true;
+    els.applyBtn.disabled = true;
+    els.okBtn.disabled = true;
+    setUninstallStatus("Starting uninstall...", "");
+    setStatus("Starting ReplayKit uninstall...", "");
+    try {
+      const data = await helperJson("uninstall", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({
+          confirm:"confirm",
+          keepUserSettings:!!els.uninstallKeepSettings.checked,
+        }),
+      });
+      setUninstallStatus(data.message || "Uninstall started. OBS will close.", "good");
+      setStatus(data.message || "Uninstall started. OBS will close.", "good");
+    } catch (e) {
+      els.uninstallReplayKitBtn.disabled = false;
+      els.okBtn.disabled = false;
+      els.applyBtn.disabled = !dirty;
+      setUninstallStatus("Uninstall failed: " + (e.message || e), "bad");
+      setStatus("Uninstall failed: " + (e.message || e), "bad");
+    }
+  }
+
   els.applyBtn.addEventListener("click", () => saveSettings(false));
   els.okBtn.addEventListener("click", () => saveSettings(true));
-  els.cancelBtn.addEventListener("click", closeWindow);
+  els.cancelBtn.addEventListener("click", () => { cancelSettings(); });
+  els.openLogFolderBtn.addEventListener("click", async () => {
+    els.logFolderStatusLine.textContent = "";
+    els.logFolderStatusLine.classList.remove("good", "bad");
+    try {
+      await helperJson("open-log-folder", { method:"POST" });
+    } catch (e) {
+      els.logFolderStatusLine.textContent = "Could not open the log folder: " + (e.message || e);
+      els.logFolderStatusLine.classList.add("bad");
+    }
+  });
   els.checkUpdateBtn.addEventListener("click", checkForUpdates);
   els.installUpdateBtn.addEventListener("click", installUpdate);
+  els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
+  els.settingsProjectorInspectBtn.addEventListener("click", () => {
+    runSettingsProjectorAction(els.settingsProjectorInspectBtn, "projector-inspect", "Showing projector...", "Projector shown", "Show Projector");
+  });
+  els.settingsProjectorReparkBtn.addEventListener("click", () => {
+    runSettingsProjectorAction(els.settingsProjectorReparkBtn, "projector-repark", "Reparking projector...", "Projector parked", "Repark");
+  });
+  els.uninstallConfirmCancelBtn.addEventListener("click", () => closeUninstallConfirmModal(false));
+  els.copyUninstallConfirmBtn.addEventListener("click", copyUninstallConfirmText);
+  els.uninstallConfirmOkBtn.addEventListener("click", () => {
+    closeUninstallConfirmModal(els.uninstallConfirmInput.value.trim() === "confirm");
+  });
+  els.uninstallConfirmInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      closeUninstallConfirmModal(els.uninstallConfirmInput.value.trim() === "confirm");
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeUninstallConfirmModal(false);
+    }
+  });
+  els.uninstallConfirmModal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeUninstallConfirmModal(false);
+    }
+  });
   window.addEventListener("pagehide", releaseHotkeyCapture);
   window.addEventListener("beforeunload", releaseHotkeyCapture);
   loadSettings();

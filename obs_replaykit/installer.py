@@ -4,42 +4,66 @@ import copy
 import shutil
 import subprocess
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import __version__
-from .audio import find_replaykit_monitoring_endpoint
-from .config import BUNDLE_ROOT, OBS_ASSETS_DIR, OBS_CONFIG, REPLAYKIT_CONFIG, TEXT_EXTS, USERNAME, USERPROFILE
+from .config import (
+    BUNDLE_ROOT,
+    OBS_ASSETS_DIR,
+    OBS_CONFIG,
+    REPLAYKIT_CONFIG,
+    REPLAYKIT_SETUP_EXE,
+    REPLAYKIT_USER_STATE_CACHE,
+    TEXT_EXTS,
+    USERNAME,
+    USERPROFILE,
+)
 from .dock import verify_dock_install
 from .ffmpeg_install import install_ffmpeg as _install_ffmpeg
 from .pathrewrite import rewrite_user_paths
 from .prefs import Preferences
 from .scheduled_task import install_elevation_task as _install_elevation_task
 from .sleep_override import install_sleep_override as _install_sleep_override
+from .sleep_override import remove_sleep_override as _remove_sleep_override
 from .shaderfilter import install_replaykit_motion_blur_plugin
-from .transform import apply_preferences, set_ini_value
-from .vbcable import ensure_vbcable
+from .transform import apply_preferences
 from .websocket import install_websocket_config
 
 LogFn = Optional[Callable[[str], None]]
 
-# Friendly name assigned to the ReplayKit audio render endpoint. Looked up by
-# name because the Windows endpoint GUID changes after driver reinstall.
-OBS_AUDIO_FRIENDLY_NAME = "OBS Stream Audio"
-
 # top-level entries backed up before overwriting. obs-replayKit/ covers the whole replaykit-managed tree (lua scripts, dock html, presets); global.ini is merged not overwritten but cheap to back up anyway.
 _BACKUP_TARGETS = ("basic", "obs-replayKit", "plugin_manager", "plugin_config", "user.ini", "global.ini")
+
+# scene path inside %APPDATA%\obs-studio\ transformed on fresh installs and patched on runtime updates -- when it already exists, the full installer uses that live file as the transform input so user-added filters and source state survive reinstall/repair installs.
+_USER_SCENE_REL = Path("basic/scenes/Untitled.json")
+
+
+def _read_text_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin-1")
+
+
+def _install_text_source(src: Path, rel: Path, dst: Path) -> str:
+    if rel == _USER_SCENE_REL and dst.is_file():
+        try:
+            content = _read_text_file(dst)
+            json.loads(content)
+            return content
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            pass
+    return _read_text_file(src)
 
 
 def _install_file(src: Path, rel: Path, dst: Path, prefs: Preferences) -> None:
     """copy src to dst; text files get rewrite_user_paths + apply_preferences first."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.suffix.lower() in TEXT_EXTS:
-        try:
-            content = src.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            content = src.read_text(encoding="latin-1")
+        content = _install_text_source(src, rel, dst)
         content = rewrite_user_paths(content, USERNAME)
         content = apply_preferences(rel, content, prefs)
         dst.write_text(content, encoding="utf-8")
@@ -48,7 +72,7 @@ def _install_file(src: Path, rel: Path, dst: Path, prefs: Preferences) -> None:
 
 
 def write_replaykit_version(log: LogFn = None) -> Path:
-    """Write the installed ReplayKit runtime version used by the updater."""
+    """write the installed ReplayKit runtime version used by the updater."""
     path = REPLAYKIT_CONFIG / "version.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"version": __version__}, indent=2) + "\n", encoding="utf-8")
@@ -57,12 +81,34 @@ def write_replaykit_version(log: LogFn = None) -> Path:
     return path
 
 
+def cache_setup_executable(log: LogFn = None) -> bool:
+    source = Path(sys.executable).resolve() if getattr(sys, "frozen", False) else BUNDLE_ROOT / "OBSReplayKit.exe"
+    if not source.is_file():
+        if log:
+            log("warn: setup executable was not cached for in-app cleanup")
+        return False
+    target = REPLAYKIT_SETUP_EXE
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.resolve(strict=False) != target.resolve(strict=False):
+            shutil.copy2(source, target)
+        if log:
+            log(f"cached setup executable -> {target}")
+        return True
+    except OSError as exc:
+        if log:
+            log(f"warn: setup executable cache failed: {exc}")
+        return False
+
+
 def install_obs_config(prefs: Preferences, log: LogFn = None) -> int:
     """mirror assets/obs-studio/ into %appdata%/obs-studio/. returns the file count."""
     if not OBS_ASSETS_DIR.is_dir():
         if log:
             log(f"warn: {OBS_ASSETS_DIR} not found - nothing to install")
         return 0
+
+    _migrate_legacy_streamable_state(log=log)
 
     count = 0
     for src in OBS_ASSETS_DIR.rglob("*"):
@@ -75,40 +121,83 @@ def install_obs_config(prefs: Preferences, log: LogFn = None) -> int:
             log(f"-> {rel.as_posix()}")
         count += 1
     write_replaykit_version(log=log)
+    cache_setup_executable(log=log)
     cleanup_replaykit_legacy_files(log=log)
+    restore_replaykit_user_state(log=log)
     return count
 
 
 _RUNTIME_PRESERVE_RELS = {
     Path("obs-replayKit/scripts/replaykit_settings.json"),
+    Path("obs-replayKit/scripts/helper/clips_db.json"),
+    Path("obs-replayKit/scripts/helper/clips_index.json"),
 }
 
 _RUNTIME_DELETE_RELS = {
     Path("obs-replayKit/scripts/replay_buffer/replay_buffer_saved.mp3"),
+    Path("obs-replayKit/scripts/audio/auto_pick_monitor_device.lua"),
+}
+
+_RUNTIME_STATE_RELS = (
+    Path("obs-replayKit/scripts/helper/clips_db.json"),
+    Path("obs-replayKit/scripts/helper/clips_index.json"),
+)
+
+# installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
+_LEGACY_STREAMABLE_DIR_REL = Path("obs-replayKit/scripts/streamable")
+_LEGACY_STREAMABLE_STATE_RELS = {
+    "clips_db.json": Path("obs-replayKit/scripts/helper/clips_db.json"),
+    "clips_index.json": Path("obs-replayKit/scripts/helper/clips_index.json"),
+    "helper_config.json": Path("obs-replayKit/scripts/helper/helper_config.json"),
 }
 
 
-# scene-source patches applied during auto-update so source-property fixes (eg. flipping
-# capture_audio on Game Capture, adjusting monitoring_type) land on existing users without a fresh
-# setup run. each key is a source name as it appears in basic/scenes/Untitled.json; each value is a
-# flat map of dotted-path -> value. only the listed fields are touched; everything else on that
-# source (the users uuid, their volume slider, hotkeys, custom filters, etc.) is left alone. add
-# entries here when shipping a release that needs to change a source property on existing installs.
+def _migrate_legacy_streamable_state(log: LogFn = None) -> None:
+    """one-time migration for installs made before the streamable/ directory was renamed to helper/: carries the live clip db/index/helper-config forward to their new path, then removes the old directory tree. no-ops once the old directory is gone, so its safe to call on every install."""
+    old_dir = OBS_CONFIG / _LEGACY_STREAMABLE_DIR_REL
+    if not old_dir.is_dir():
+        return
+    for name, new_rel in _LEGACY_STREAMABLE_STATE_RELS.items():
+        old_file = old_dir / name
+        new_file = OBS_CONFIG / new_rel
+        if old_file.is_file() and not new_file.exists():
+            try:
+                new_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(old_file, new_file)
+                if log:
+                    log(f"migrated legacy state: {name} -> {new_rel.as_posix()}")
+            except OSError as exc:
+                if log:
+                    log(f"warn: could not migrate legacy {name}: {exc}")
+    try:
+        shutil.rmtree(old_dir)
+        if log:
+            log(f"removed legacy directory: {_LEGACY_STREAMABLE_DIR_REL.as_posix()}")
+    except OSError as exc:
+        if log:
+            log(f"warn: could not remove legacy directory {_LEGACY_STREAMABLE_DIR_REL.as_posix()}: {exc}")
+
+
+# scene-source patches applied during auto-update so property fixes (eg. flipping capture_audio on Game Capture) land on existing users without a fresh setup run -- each key is a source name in Untitled.json, each value a flat dotted-path -> value map, and only the listed fields are touched, everything else on that source is left alone. add entries here when a release needs to change a source property on existing installs.
 _SCENE_SOURCE_PATCHES: dict[str, dict[str, Any]] = {
     "Game Capture": {
         "settings.capture_audio": False,
         "settings.hook_rate": 2,
         "settings.limit_framerate": True,
     },
+    "Audio Input Capture": {
+        "monitoring_type": 0,
+    },
+    "Desktop Audio (excl. Discord)": {
+        "monitoring_type": 0,
+    },
+    "Discord Audio (record only)": {
+        "monitoring_type": 0,
+    },
 }
 
-# scene path inside %APPDATA%\obs-studio\ that gets patched. mirrors what install_obs_config writes
-# on fresh setups.
-_USER_SCENE_REL = Path("basic/scenes/Untitled.json")
-
-
 def cleanup_replaykit_legacy_files(log: LogFn = None) -> int:
-    """Remove ReplayKit-managed files that were renamed or retired."""
+    """remove ReplayKit-managed files that were renamed or retired."""
     removed = 0
     for rel in _RUNTIME_DELETE_RELS:
         target = OBS_CONFIG / rel
@@ -124,8 +213,28 @@ def cleanup_replaykit_legacy_files(log: LogFn = None) -> int:
     return removed
 
 
+def restore_replaykit_user_state(log: LogFn = None) -> int:
+    """restore user-owned clip state after an uninstall/reinstall that kept settings."""
+    restored = 0
+    for rel in _RUNTIME_STATE_RELS:
+        source = REPLAYKIT_USER_STATE_CACHE / rel.name
+        target = OBS_CONFIG / rel
+        if not source.is_file() or target.exists():
+            continue
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            restored += 1
+            if log:
+                log(f"restored state: {rel.as_posix()}")
+        except OSError as exc:
+            if log:
+                log(f"warn: could not restore state {rel.as_posix()}: {exc}")
+    return restored
+
+
 def _set_nested(target: dict[str, Any], dotted: str, value: Any) -> None:
-    """Write value into target at a dotted path, creating intermediate dicts as needed."""
+    """write value into target at a dotted path, creating intermediate dicts as needed."""
     parts = dotted.split(".")
     cursor = target
     for part in parts[:-1]:
@@ -138,13 +247,7 @@ def _set_nested(target: dict[str, Any], dotted: str, value: Any) -> None:
 
 
 def apply_scene_patches(log: LogFn = None) -> int:
-    """Patch known ReplayKit-managed sources in the user's scene file in place.
-
-    Walks _SCENE_SOURCE_PATCHES, finds matching sources by name, and overwrites only the listed
-    fields. Returns the number of sources patched. Safe to call when the file is missing or has no
-    matches -- returns 0 silently. Skips writing if nothing actually changed so we don't bump the
-    mtime when there's no work to do.
-    """
+    """patch known ReplayKit-managed sources in the users scene file in place, walking _SCENE_SOURCE_PATCHES and overwriting only the listed fields; safe when the file is missing or has no matches (returns 0), and skips writing if nothing changed so the mtime doesnt bump for no reason."""
     if not _SCENE_SOURCE_PATCHES:
         return 0
     scene_path = OBS_CONFIG / _USER_SCENE_REL
@@ -188,7 +291,7 @@ def apply_scene_patches(log: LogFn = None) -> int:
 
 
 def _install_runtime_file(src: Path, rel: Path, dst: Path) -> None:
-    """Copy one ReplayKit runtime file for update mode without applying user prefs."""
+    """copy one ReplayKit runtime file for update mode without applying user prefs."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.suffix.lower() in TEXT_EXTS:
         try:
@@ -201,19 +304,7 @@ def _install_runtime_file(src: Path, rel: Path, dst: Path) -> None:
 
 
 def install_replaykit_runtime_update(log: LogFn = None) -> int:
-    """Refresh only ReplayKit-managed runtime files, preserving user OBS config/state.
-
-    Coverage:
-      - All files under obs-replayKit/ get copied/overwritten.
-      - replaykit_settings.json is preserved (user values stick, new defaults auto-populate via
-        Get-DefaultReplayKitSettings on next helper load).
-      - Files in _RUNTIME_DELETE_RELS are removed (rename/retire path).
-      - Source-property fixes in basic/scenes/Untitled.json land via _SCENE_SOURCE_PATCHES so
-        existing users get scene tweaks (capture_audio flips, monitoring_type adjustments, etc.)
-        without re-running the full installer.
-      - Idempotent driver installs (ffmpeg, elevation task) are re-run so newly added or
-        replaced helper-side dependencies show up on existing installs.
-    """
+    """refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies _SCENE_SOURCE_PATCHES to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies."""
     runtime_src = OBS_ASSETS_DIR / "obs-replayKit"
     if not runtime_src.is_dir():
         raise FileNotFoundError(f"ReplayKit runtime assets not found: {runtime_src}")
@@ -234,10 +325,11 @@ def install_replaykit_runtime_update(log: LogFn = None) -> int:
         count += 1
 
     write_replaykit_version(log=log)
+    cache_setup_executable(log=log)
     cleanup_replaykit_legacy_files(log=log)
+    restore_replaykit_user_state(log=log)
 
-    # scene patches and driver re-runs are best-effort. an exception here must not abort the
-    # update -- the runtime files are already on disk and obs will relaunch with them.
+    # scene patches and tool refreshes are best-effort -- an exception here must not abort the update, since the runtime files are already on disk and obs will relaunch with them.
     try:
         patched = apply_scene_patches(log=log)
         if patched and log:
@@ -250,18 +342,13 @@ def install_replaykit_runtime_update(log: LogFn = None) -> int:
         run_update_driver_refresh(log=log)
     except Exception as exc:
         if log:
-            log(f"warn: driver refresh pass failed: {exc}")
+            log(f"warn: tool refresh pass failed: {exc}")
 
     return count
 
 
 def run_update_driver_refresh(log: LogFn = None) -> None:
-    """Re-run idempotent driver/installer functions during an auto-update.
-
-    Each underlying installer short-circuits when its target is already present (ffmpeg checks
-    file hashes; elevation task checks schtasks). New releases can plug in additional driver/
-    plugin installs here and existing users will pick them up on their next auto-update.
-    """
+    """re-run idempotent installer functions during an auto-update; each one short-circuits when its target is already present (ffmpeg checks file hashes, elevation task checks schtasks), so new releases can plug in additional plugin installs here and existing users pick them up next auto-update."""
     try:
         install_obs_ffmpeg(log=log)
     except Exception as exc:
@@ -275,16 +362,32 @@ def run_update_driver_refresh(log: LogFn = None) -> None:
             log(f"warn: OBS Shaderfilter refresh skipped: {exc}")
 
     try:
-        ensure_vbcable(log=log)
-    except Exception as exc:
-        if log:
-            log(f"warn: OBS Stream Audio refresh skipped: {exc}")
-
-    try:
         install_obs_elevation_task(log=log)
     except Exception as exc:
         if log:
             log(f"warn: elevation task refresh skipped: {exc}")
+
+    try:
+        from .prefs import load_prefs
+
+        prefs = load_prefs()
+        install_obs_sleep_override(bool(getattr(prefs, "allow_sleep_while_active", True)), log=log)
+    except Exception as exc:
+        if log:
+            log(f"warn: sleep override refresh skipped: {exc}")
+
+    try:
+        from .prefs import load_prefs
+        from .tray_pin import pin_obs_tray_icon, unpin_obs_tray_icon
+
+        prefs = load_prefs()
+        if bool(getattr(prefs, "pin_obs_tray_icon", True)):
+            pin_obs_tray_icon(log=log)
+        else:
+            unpin_obs_tray_icon(log=log)
+    except Exception as exc:
+        if log:
+            log(f"warn: tray icon pin refresh skipped: {exc}")
 
 
 def backup_existing_config(log: LogFn = None) -> Optional[Path]:
@@ -317,35 +420,6 @@ def backup_existing_config(log: LogFn = None) -> Optional[Path]:
     return backup_dir
 
 
-def set_monitoring_device_to_obs_audio(log: LogFn = None) -> bool:
-    """Point OBS audio monitoring at OBS Stream Audio before the first launch."""
-    device = find_replaykit_monitoring_endpoint()
-    if device is None:
-        if log:
-            log(f"(couldn't find an active '{OBS_AUDIO_FRIENDLY_NAME}' render endpoint - leaving monitoring at Default)")
-        return False
-
-    basic_ini = OBS_CONFIG / "basic" / "profiles" / "Untitled" / "basic.ini"
-    if not basic_ini.is_file():
-        if log:
-            log(f"warn: {basic_ini} not present - skipping monitoring-device patch")
-        return False
-
-    try:
-        text = basic_ini.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        text = basic_ini.read_text(encoding="latin-1")
-
-    text = set_ini_value(text, "Audio", "MonitoringDeviceId",   device.device_id)
-    text = set_ini_value(text, "Audio", "MonitoringDeviceName", device.name)
-    basic_ini.write_text(text, encoding="utf-8")
-
-    if log:
-        log(f"set monitoring device -> {device.name}")
-        log(f"    id: {device.device_id}")
-    return True
-
-
 def ensure_recording_dirs(prefs: Preferences, log: LogFn = None) -> None:
     """make sure the recording output folder exists. ~/videos is also created as the simple-output fallback obs reverts to if a profile is reset."""
     targets = {Path(prefs.recording_path), USERPROFILE / "Videos"}
@@ -375,21 +449,23 @@ def install_obs_ffmpeg(log: LogFn = None) -> bool:
 
 
 def configure_obs_websocket(log: LogFn = None) -> bool:
-    """enable obs-websocket on port 4455 (no auth, loopback) so the save replay dock button can drive obs."""
+    """enable obs-websocket on port 6455 (no auth, loopback) so the save replay dock button can drive obs."""
     return install_websocket_config(log=log)
 
 
-def install_obs_sleep_override(log: LogFn = None) -> bool:
-    """let monitors sleep while obs is open. obs holds a DISPLAY execution-state lock while replay buffer / streams / vcam are running; we suppress just the display lock for obs64.exe and keep SYSTEM/AWAYMODE intact. idempotent; Clean reset removes the entry."""
-    return _install_sleep_override(log=log)
+def install_obs_sleep_override(allow_sleep: bool = True, log: LogFn = None) -> bool:
+    """let Windows monitor/system sleep timers run while OBS is active, or restore OBS defaults."""
+    if allow_sleep:
+        return _install_sleep_override(log=log)
+    return _remove_sleep_override(log=log)
 
 
-_LAUNCHER_REL = Path("obs-studio/obs-replayKit/scripts/streamable/OBSReplayKit.exe")
+_LAUNCHER_REL = Path("obs-studio/obs-replayKit/scripts/helper/OBSReplayKit.exe")
 
 
 def ensure_launcher_built(log: LogFn = None) -> bool:
     """make sure the bundled OBSReplayKit.exe launcher is on disk; compile it from utils/launcher/build_launcher.ps1 if not. returning False is non-fatal -- the lua falls back to plain powershell.exe, just without the obs-replaykit branding in task manager."""
-    launcher_path = OBS_ASSETS_DIR / "obs-replayKit" / "scripts" / "streamable" / "OBSReplayKit.exe"
+    launcher_path = OBS_ASSETS_DIR / "obs-replayKit" / "scripts" / "helper" / "OBSReplayKit.exe"
     if launcher_path.is_file():
         return True
 

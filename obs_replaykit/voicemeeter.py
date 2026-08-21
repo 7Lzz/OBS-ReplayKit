@@ -222,7 +222,7 @@ def _device_names_match(left: str, right: str) -> bool:
 
 
 def _input_device_choices(selected_name: str, devices: dict[str, set[str]]) -> tuple[VoicemeeterDeviceChoice, ...]:
-    """Return verified restore candidates for Voicemeeter's sometimes truncated device name."""
+    """return verified restore candidates for Voicemeeters sometimes truncated device name."""
     name = selected_name.strip()
     if not name:
         return ()
@@ -252,7 +252,7 @@ def _input_device_choices(selected_name: str, devices: dict[str, set[str]]) -> t
 
 
 def snapshot_voicemeeter_inputs(log: LogFn = None) -> VoicemeeterSnapshot | None:
-    """Capture Voicemeeter physical input selections if Voicemeeter is running."""
+    """capture Voicemeeter physical input selections if Voicemeeter is running."""
     dll_path = _voicemeeter_dll()
     if dll_path is None:
         return None
@@ -296,7 +296,7 @@ def snapshot_voicemeeter_inputs(log: LogFn = None) -> VoicemeeterSnapshot | None
 
 
 def restore_voicemeeter_inputs(snapshot: VoicemeeterSnapshot | None, log: LogFn = None) -> bool:
-    """Restore previously captured Voicemeeter hardware inputs and restart its audio engine."""
+    """restore previously captured Voicemeeter hardware inputs and restart its audio engine."""
     if snapshot is None:
         return True
     if not snapshot.dll_path.is_file():

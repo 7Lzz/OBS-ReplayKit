@@ -61,12 +61,36 @@ local SEE_MASK_NOCLOSEPROCESS = 0x00000040
 local DEFAULT_OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
 local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
 
--- name of the task scheduler entry the obs replaykit installer registers. keep in sync with task_name in obs_replaykit/scheduled_task.py. if this constant ever changes both sides have to move at once or the no-uac path silently degrades to shellexecuteex (which still works, but the friends uac popup comes back).
+-- name of the task scheduler entry the obs replaykit installer registers. keep in sync with task_name in obs_replaykit/scheduled_task.py. if this constant ever changes both sides have to move at once or the no-uac path silently degrades to shellexecuteex (which still works, but the familiar uac popup comes back).
 local SCHTASKS_TASK_NAME = "OBSReplayKit-Elevate"
 
 -- handoff file that the lua side fills in with the current obs path + pid right before triggering the scheduled task. wscript cant recieve command-line arguments thru schtasks /run, so this is the only way for the elevated relauncher to know which process to terminate. path matches the one hidden_relauncher.vbs reads.
 local HANDOFF_PATH = (os.getenv("TEMP") or "C:\\Windows\\Temp") ..
-                     "\\obsreplaykit_elevate.txt"
+                     "\\ReplayKit\\scratch\\obsreplaykit_elevate.txt"
+
+-- same cap the other settings readers use; a json bigger than this is corrupt
+local MAX_SETTINGS_BYTES = 65536
+
+local function settings_json_path()
+    local dir = (script_path() or ""):gsub("\\", "/"):gsub("/+$", "")
+    local parent = dir:match("^(.*)/[^/]+$") or dir
+    return parent .. "/replaykit_settings.json"
+end
+
+-- run-as-admin is opt-in thru the replaykit settings ui (general tab). a missing file or key reads as off, so a fresh or corrupt settings file never elevates on its own.
+local function run_as_admin_enabled()
+    local f = io.open(settings_json_path(), "rb")
+    if not f then return false end
+    local text = f:read(MAX_SETTINGS_BYTES + 1)
+    f:close()
+    if not text or #text > MAX_SETTINGS_BYTES then return false end
+    text = text:gsub("^\239\187\191", "")
+    local data = obs.obs_data_create_from_json(text)
+    if data == nil then return false end
+    local enabled = obs.obs_data_get_bool(data, "runObsAsAdmin")
+    obs.obs_data_release(data)
+    return enabled
+end
 
 local function get_current_obs_exe()
     local buf = ffi.new("char[?]", 32768)
@@ -110,6 +134,10 @@ end
 
 -- write the runtime obs path + pid into the handoff file the elevated wscript will read. returns true on success, false otherwise; the caller treats a failed write as "fall back to uac flow".
 local function write_handoff(obs_pid)
+    -- io.open in "w" mode doesnt create missing parent directories, and this can run before anything else has touched %temp%\ReplayKit -- os_mkdir each level explicitly rather than assume its recursive; calling it on an already-existing dir is a harmless no-op.
+    local tempRoot = os.getenv("TEMP") or "C:\\Windows\\Temp"
+    obs.os_mkdir(tempRoot .. "\\ReplayKit")
+    obs.os_mkdir(tempRoot .. "\\ReplayKit\\scratch")
     local f, err = io.open(HANDOFF_PATH, "w")
     if not f then
         print("[ElevateOBS] handoff write failed: " .. tostring(err))
@@ -187,6 +215,11 @@ local function launch_helper_uac(helper_path, obs_pid)
 end
 
 function script_load(settings)
+    if not run_as_admin_enabled() then
+        print("[ElevateOBS] Run-as-admin is disabled in ReplayKit settings - skipping elevation.")
+        return
+    end
+
     local elevated = is_elevated()
     local has_flag = has_required_obs_flag()
 
@@ -230,5 +263,6 @@ Launches an elevated hidden WSH helper from the same folder that:<br>
 - No "OBS already running" popup<br>
 - No safe mode / crash popup<br><br>
 <b>Requires:</b> <code>hidden_relauncher.vbs</code> beside this .lua file.<br><br>
-<b>UAC prompt appears once per launch</b> - click Yes to allow.]]
+Only runs when <b>Run OBS and ReplayKit as administrator</b> is enabled in
+ReplayKit Settings (General tab). Default is off.]]
 end

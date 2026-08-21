@@ -22,7 +22,7 @@ DEFAULT_DEVICE_NAME = "Default (system)"
 
 @dataclass(frozen=True)
 class AudioDevice:
-    """An OBS-format audio endpoint."""
+    """an OBS-format audio endpoint."""
     device_id: str  # obs-format device id ({0.0.1.00000000}.<guid>)
     name: str  # friendly name (e.g. 'microphone (realtek)')
 
@@ -73,7 +73,6 @@ def find_render_endpoint(friendly_name: str) -> Optional[str]:
 
 
 def _list_render_endpoints() -> List[AudioDevice]:
-    """Active render endpoints known to Windows, in OBS id format."""
     devices: List[AudioDevice] = []
     try:
         render = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _RENDER_KEY)
@@ -109,7 +108,7 @@ def _list_render_endpoints() -> List[AudioDevice]:
 
 
 def _replaykit_monitor_rank(name: str) -> Optional[int]:
-    """Rank only the ReplayKit/VB-CABLE render sink; never match normal speakers."""
+    """rank only the ReplayKit/VB-CABLE render sink; never match normal speakers."""
     lower = name.strip().lower()
     if "surround" in lower or "16ch" in lower:
         return None
@@ -123,7 +122,7 @@ def _replaykit_monitor_rank(name: str) -> Optional[int]:
 
 
 def find_replaykit_monitoring_endpoint() -> Optional[AudioDevice]:
-    """Best active render endpoint for OBS monitoring, before or after ReplayKit's VB-CABLE rename."""
+    """best active render endpoint for OBS monitoring, before or after ReplayKits VB-CABLE rename."""
     candidates: List[tuple[int, str, AudioDevice]] = []
     for device in _list_render_endpoints():
         rank = _replaykit_monitor_rank(device.name)
@@ -152,7 +151,6 @@ def list_microphones() -> List[AudioDevice]:
                 break
             i += 1
 
-            # active devices only (low bit set).
             try:
                 with winreg.OpenKey(cap, endpoint) as ep:
                     state, _ = winreg.QueryValueEx(ep, "DeviceState")

@@ -9,6 +9,32 @@
 </head>
 <body style="background:#272A33;color:#FFFFFF">
 <script>
+  (function lockdown() {
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive:false, capture:true });
+    document.addEventListener("keydown", function (e) {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") {
+        e.preventDefault();
+        return;
+      }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+        e.preventDefault();
+      }
+      if (e.key === "BrowserBack" || e.key === "BrowserForward" || e.code === "BrowserBack" || e.code === "BrowserForward") {
+        e.preventDefault();
+      }
+    }, true);
+  })();
   location.replace("controls_app.html");
 </script>
 </body>

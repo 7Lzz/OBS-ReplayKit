@@ -18,7 +18,7 @@ from .recording import get_preset
 # targeted regex over configparser becuase obss basic.ini has formatting we want byte-identical (no spaces around =, blank lines, base64 blobs in geometry=).
 
 def set_ini_value(text: str, section: str, key: str, value: str) -> str:
-    """Public alias for _set_ini_value."""
+    """public alias for _set_ini_value."""
     return _set_ini_value(text, section, key, value)
 
 
@@ -76,9 +76,44 @@ def reset_encoder_cache() -> None:
     _encoder_cache = ()
 
 
+def _even_dimension(value: float) -> int:
+    number = max(2, min(4096, int(round(value))))
+    if number % 2:
+        number -= 1
+    return max(2, number)
+
+
+def _scaled_even_size(source_w: int, source_h: int, max_w: int, max_h: int) -> tuple[int, int]:
+    if source_w < 2 or source_h < 2 or max_w < 2 or max_h < 2:
+        return 1920, 1080
+    scale = min(1.0, max_w / source_w, max_h / source_h)
+    return _even_dimension(source_w * scale), _even_dimension(source_h * scale)
+
+
+def _preset_video_ini(prefs: Preferences) -> dict[str, str]:
+    preset = get_preset(prefs.recording_preset)
+    video = dict(preset.basic_ini.get("Video", {}))
+    primary = primary_display()
+
+    if primary is not None and primary.width >= 320 and primary.height >= 240:
+        target_w = int(video.get("OutputCX", 1920))
+        target_h = int(video.get("OutputCY", 1080))
+        base_w, base_h = _scaled_even_size(primary.width, primary.height, 4096, 4096)
+        output_w, output_h = _scaled_even_size(base_w, base_h, target_w, target_h)
+        video["BaseCX"] = str(base_w)
+        video["BaseCY"] = str(base_h)
+        video["OutputCX"] = str(output_w)
+        video["OutputCY"] = str(output_h)
+
+    video["ScaleType"] = "lanczos"
+    return {key: str(value) for key, value in video.items()}
+
+
 def apply_basic_ini(text: str, prefs: Preferences) -> str:
     preset = get_preset(prefs.recording_preset)
     for section, items in preset.basic_ini.items():
+        if section == "Video":
+            items = _preset_video_ini(prefs)
         for key, value in items.items():
             text = _set_ini_value(text, section, key, value)
 
@@ -104,7 +139,65 @@ def apply_basic_ini(text: str, prefs: Preferences) -> str:
         text = _set_ini_value(text, "Hotkeys", "OBSBasic.StartRecording", recording_hotkey)
         text = _set_ini_value(text, "Hotkeys", "OBSBasic.StopRecording", recording_hotkey)
 
+    monitor = _find_obs_stream_audio_render_endpoint()
+    if monitor is not None:
+        text = _set_ini_value(text, "Audio", "MonitoringDeviceId", monitor[0])
+        text = _set_ini_value(text, "Audio", "MonitoringDeviceName", monitor[1])
+
     return text
+
+
+def _find_obs_stream_audio_render_endpoint() -> Optional[tuple[str, str]]:
+    try:
+        import winreg
+    except ImportError:
+        return None
+
+    root_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+    friendly_key = "{a45c254e-df1c-4efd-8020-67d146a850e0},2"
+    candidates: list[tuple[int, str, str]] = []
+    try:
+        root = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, root_path)
+    except OSError:
+        return None
+
+    with root:
+        index = 0
+        while True:
+            try:
+                guid = winreg.EnumKey(root, index)
+            except OSError:
+                break
+            index += 1
+            try:
+                with winreg.OpenKey(root, guid) as endpoint:
+                    state, _ = winreg.QueryValueEx(endpoint, "DeviceState")
+                if (int(state) & 0x1) == 0:
+                    continue
+                with winreg.OpenKey(root, rf"{guid}\Properties") as props:
+                    name, _ = winreg.QueryValueEx(props, friendly_key)
+            except OSError:
+                continue
+
+            display_name = str(name).strip()
+            canonical = re.sub(r"^\s*\d+\s*-\s*", "", display_name).strip().lower()
+            if re.search(r"surround|16ch|loopback|do not select", canonical):
+                continue
+            rank = 999
+            if canonical == "obs stream audio":
+                rank = 0
+            elif canonical.startswith("obs stream audio"):
+                rank = 1
+            elif canonical.startswith("cable input"):
+                rank = 2
+            if rank == 999:
+                continue
+            candidates.append((rank, display_name, f"{{0.0.0.00000000}}.{guid}"))
+
+    if not candidates:
+        return None
+    rank, display_name, device_id = sorted(candidates, key=lambda item: (item[0], item[1].lower()))[0]
+    return device_id, display_name
 
 
 def apply_record_encoder_json(_text: str, prefs: Preferences) -> str:
@@ -137,7 +230,7 @@ def _extra_browser_docks_value() -> str:
 
 
 def _is_obs_replaykit_dock(item: object) -> bool:
-    """Match the managed OBS ReplayKit dock entry."""
+    """match the managed OBS ReplayKit dock entry."""
     if not isinstance(item, dict):
         return False
     title = str(item.get("title", "")).strip().lower()
@@ -198,8 +291,8 @@ def _read_live_user_ini_value(key: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def apply_user_ini(text: str, _prefs: Preferences) -> str:
-    """Write one canonical Custom Controls dock entry and reset stale dock layout state."""
+def apply_user_ini(text: str, prefs: Preferences) -> str:
+    """write one canonical Custom Controls dock entry and reset stale dock layout state."""
 
     section_re = re.compile(
         r"(\[BasicWindow\][^\[]*?\n)ExtraBrowserDocks=([^\r\n]*)",
@@ -207,17 +300,19 @@ def apply_user_ini(text: str, _prefs: Preferences) -> str:
     )
     m = section_re.search(text)
     if m:
-        # Fold the live ini into the bundle seed so user-added docks are preserved.
+        # fold the live ini into the bundle seed so user-added docks are preserved.
         live_value = _read_live_user_ini_value("ExtraBrowserDocks") or ""
         seed = m.group(2)
         if live_value and live_value != seed:
             seed = _combine_extra_browser_docks(seed, live_value)
         merged = _merge_extra_browser_docks_value(seed)
-        return section_re.sub(
+        text = section_re.sub(
             lambda _m: f"{m.group(1)}ExtraBrowserDocks={merged}", text, count=1
         )
+        return _set_ini_value(text, "General", "ConfirmOnExit", _confirm_on_exit_value(prefs))
 
-    return _set_ini_value(text, "BasicWindow", "ExtraBrowserDocks", _extra_browser_docks_value())
+    text = _set_ini_value(text, "BasicWindow", "ExtraBrowserDocks", _extra_browser_docks_value())
+    return _set_ini_value(text, "General", "ConfirmOnExit", _confirm_on_exit_value(prefs))
 
 
 def _combine_extra_browser_docks(bundle_value: str, live_value: str) -> str:
@@ -249,7 +344,11 @@ _ENFORCED_GLOBAL_INI = (
 )
 
 
-def apply_global_ini(text: str, _prefs: Preferences) -> str:
+def _confirm_on_exit_value(prefs: Preferences) -> str:
+    return "false" if bool(getattr(prefs, "disable_obs_close_warning", True)) else "true"
+
+
+def apply_global_ini(text: str, prefs: Preferences) -> str:
     """merge the bundled global.ini into the users existing file -- preserves installguid, [crashhandler], [locations], input-overlay plugin settings; force-sets browserhwaccel + disableaudioducking."""
     existing_path = OBS_CONFIG / "global.ini"
     if existing_path.is_file():
@@ -262,12 +361,31 @@ def apply_global_ini(text: str, _prefs: Preferences) -> str:
 
     for section, key, value in _ENFORCED_GLOBAL_INI:
         base = _set_ini_value(base, section, key, value)
+    base = _set_ini_value(base, "General", "ConfirmOnExit", _confirm_on_exit_value(prefs))
     return base
 
 
 # scenes json editing
 
 _INPUT_OVERLAY_SOURCE_ID = "input-overlay"
+_INPUT_OVERLAY_GROUP_NAME = "Group"
+_INPUT_OVERLAY_WASD_NAME = "WASD Overlay"
+_INPUT_OVERLAY_MOUSE_NAME = "Mouse Overlay"
+_INPUT_OVERLAY_GROUP_W = 628.0
+_INPUT_OVERLAY_GROUP_H = 292.0
+_INPUT_OVERLAY_MOUSE_OFFSET_X = 431.0
+_INPUT_OVERLAY_WASD_SOURCE_W = 568.0
+_INPUT_OVERLAY_WASD_SOURCE_H = 394.0
+_INPUT_OVERLAY_MOUSE_SOURCE_W = 285.0
+_INPUT_OVERLAY_MOUSE_SOURCE_H = 421.0
+_INPUT_OVERLAY_WASD_SCALE_X = 0.7395833134651184
+_INPUT_OVERLAY_WASD_SCALE_Y = 0.7388888597488403
+_INPUT_OVERLAY_MOUSE_SCALE = 0.6909722089767456
+_INPUT_OVERLAY_POS_REF_H = 1080.0
+_INPUT_OVERLAY_POS_X_AT_REF = 15.0
+_INPUT_OVERLAY_BOTTOM_MARGIN_AT_REF = 16.0
+_OVERLAY_OPACITY_FILTER_NAME = "ReplayKit Overlay Opacity"
+_OVERLAY_OPACITY_FILTER_ID = "color_filter"
 _BONGO_CAT_SOURCE_ID     = "bongobs-cat"
 _BONGO_CAT_SOURCE_NAME   = "Bongo Cat Overlay"
 _BONGO_CAT_SOURCE_UUID   = "c93f3934-0dfd-4f4f-96e4-0abf45423f0f"
@@ -277,11 +395,14 @@ _BONGO_CAT_CANVAS_W      = 1920.0
 _BONGO_CAT_CANVAS_H      = 1080.0
 _BONGO_CAT_POS_REL_X     = -1.7777777777777777
 _BONGO_CAT_POS_REL_Y     = 0.47962962962962963
-_BONGO_CAT_SCALE_X       = 0.3669433891773224
-_BONGO_CAT_SCALE_Y       = 0.3662109375
-_BONGO_CAT_SCALE_REL_X   = 0.26093751192092896
-_BONGO_CAT_SCALE_REL_Y   = 0.2604166567325592
+_BONGO_CAT_SCALE_X       = 0.4892578125
+_BONGO_CAT_SCALE_Y       = 0.48828125
 _BONGO_CAT_ITEM_ID       = 13
+_OVERLAY_OPACITY_FILTER_UUIDS = {
+    _INPUT_OVERLAY_WASD_NAME: "a65fb4f0-a894-463e-9b9b-f0a9d5fb4fa1",
+    _INPUT_OVERLAY_MOUSE_NAME: "c097fe72-641f-4da5-94f6-71f7c6353f9f",
+    _BONGO_CAT_SOURCE_NAME: "4ecb70c4-e8f0-4207-a2cc-0307ff771722",
+}
 _MIC_SOURCE_ID           = "wasapi_input_capture"
 _MONITOR_SOURCE_ID       = "monitor_capture"
 _GROUP_SOURCE_ID         = "group"
@@ -291,12 +412,29 @@ _RETIRED_MOTION_BLUR_FILTER_ID = "obs_composite_blur"
 _GAME_CAPTURE_SOURCE_ID  = "game_capture"
 _GAME_CAPTURE_SOURCE_NAME = "Game Capture"
 _GAME_CAPTURE_HOOK_RATE_FAST = 2
+_WINDOW_CAPTURE_SOURCE_ID = "window_capture"
+_WINDOW_CAPTURE_SOURCE_NAME = "Window Capture"
+_WINDOW_CAPTURE_SOURCE_UUID = "edb2d9d4-7b53-4f3a-a760-61cd03ce9b6c"
+_DESKTOP_AUDIO_SOURCE_NAME = "Desktop Audio (excl. Discord)"
+_DESKTOP_AUDIO_EXCLUDE_PROCESSES = [
+    "Discord.exe",
+    "DiscordSystemHelper.exe",
+    "DiscordCanary.exe",
+    "DiscordPTB.exe",
+    "DiscordDevelopment.exe",
+    "obs64.exe",
+    "obs32.exe",
+    "obs.exe",
+    # obss cef subprocess -- excluded so clip playback audio in the dock isnt captured as desktop audio and monitored back into the discord share, doubling the copy discord already grabs from the same process tree.
+    "obs-browser-page.exe",
+]
 _MOTION_BLUR_SOURCE_UUIDS = {
     "Display Capture": "e371efc8-8c99-44cb-95e7-94381d9c9e41",
     "Game Capture": "26bc5a11-5315-4390-b028-f77667c7fda3",
+    "Window Capture": "9b73d6cb-b65e-44a1-895f-4e2f326a8d77",
 }
 
-# Match an input-overlay preset path and capture the tail so it can be re-rooted.
+# match an input-overlay preset path and capture the tail so it can be re-rooted.
 _INPUT_OVERLAY_PATH_RE = re.compile(
     r"^.*?-presets[\\/](?P<tail>[^\r\n]+)$",
 )
@@ -313,8 +451,8 @@ def _default_clip_dir_norm() -> str:
     return (USERPROFILE / "Pictures" / "Videos").as_posix().lower()
 
 
-def _apply_streamable_settings(settings: dict, prefs: Preferences) -> None:
-    """Inject ReplayKit runtime settings into the managed OBS script entry."""
+def _apply_replaykit_runtime_settings(settings: dict, prefs: Preferences) -> None:
+    """inject ReplayKit runtime settings into the managed OBS script entry."""
     rec_dir_norm = prefs.recording_path.replace("\\", "/").rstrip("/").lower()
     if rec_dir_norm == _default_clip_dir_norm():
         settings["clip_dir"] = ""
@@ -329,7 +467,7 @@ def _apply_streamable_settings(settings: dict, prefs: Preferences) -> None:
 
 
 def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
-    """Write the runtime settings consumed by the OBS dock helper."""
+    """write the runtime settings consumed by the OBS dock helper."""
     rec_dir_norm = prefs.recording_path.replace("\\", "/").rstrip("/").lower()
     clip_dir = "" if rec_dir_norm == _default_clip_dir_norm() else prefs.recording_path.replace("\\", "/")
     return json.dumps({
@@ -341,14 +479,36 @@ def apply_replaykit_settings_json(_text: str, prefs: Preferences) -> str:
         "clipKeybind": prefs.clip_keybind,
         "recordingKeybind": prefs.recording_keybind,
         "overlayStyle": prefs.overlay_style,
+        "overlayOpacity": int(getattr(prefs, "overlay_opacity", 100)),
+        "overlayScale": int(getattr(prefs, "overlay_scale", 100)),
+        "overlayHueShift": float(getattr(prefs, "overlay_hue_shift", 0.0)),
+        "overlayColorMultiply": getattr(prefs, "overlay_color_multiply", "#ffffff"),
+        "overlayColorAdd": getattr(prefs, "overlay_color_add", "#000000"),
         "obsStartupEnabled": bool(prefs.obs_startup_enabled),
+        "disableObsCloseWarning": bool(getattr(prefs, "disable_obs_close_warning", True)),
+        "allowSleepWhileActive": bool(getattr(prefs, "allow_sleep_while_active", True)),
         "clipNotificationEnabled": bool(prefs.clip_notification_enabled),
         "recordingNotificationEnabled": bool(prefs.recording_notification_enabled),
         "clipNotificationSeconds": int(prefs.replay_buffer_seconds),
         "trimPreciseDefault": bool(prefs.trim_precise_default),
+        "debugLoggingEnabled": bool(getattr(prefs, "debug_logging_enabled", False)),
         "clipSoundVolume": int(getattr(prefs, "clip_sound_volume", 100)),
         "recordingSoundVolume": int(getattr(prefs, "recording_sound_volume", 100)),
-        "shareMode": getattr(prefs, "share_mode", "vcam"),
+        "shareMode": getattr(prefs, "share_mode", "projector"),
+        "discord_screenshare_enabled": bool(getattr(prefs, "discord_screenshare_enabled", True)),
+        "discord_output_mode": getattr(prefs, "discord_output_mode", "projector"),
+        "discord_projector_enabled": bool(getattr(prefs, "discord_projector_enabled", True)),
+        "discord_projector_width": int(getattr(prefs, "discord_projector_width", 0)),
+        "discord_projector_height": int(getattr(prefs, "discord_projector_height", 0)),
+        "discord_projector_visible_pixels": int(getattr(prefs, "discord_projector_visible_pixels", 1)),
+        "discord_projector_monitor_index": int(getattr(prefs, "discord_projector_monitor_index", 0)),
+        "discord_projector_edge": getattr(prefs, "discord_projector_edge", "bottom"),
+        "discord_projector_title_hint": getattr(prefs, "discord_projector_title_hint", "OBS ReplayKit Discord Share"),
+        "discord_projector_hide_taskbar": bool(getattr(prefs, "discord_projector_hide_taskbar", True)),
+        "screenshareCaptureMode": getattr(prefs, "screenshare_capture_mode", "hybrid_auto"),
+        "screenshareGameWindow": getattr(prefs, "screenshare_game_window", ""),
+        "screenshareGameOverrides": list(getattr(prefs, "screenshare_game_overrides", [])),
+        "screenshareAutoGameKeepFocused": bool(getattr(prefs, "screenshare_auto_game_keep_focused", False)),
         "motionBlurEnabled": bool(getattr(prefs, "motion_blur_enabled", False)),
         "motionBlurStrength": float(getattr(prefs, "motion_blur_strength", 0.075)),
     }, indent=2)
@@ -367,7 +527,7 @@ def _is_replaykit_entry(entry: dict) -> bool:
 
 
 def _collect_replaykit_settings(scripts: list, prefs: Preferences) -> dict:
-    """Preserve settings from the managed replaykit.lua script entry."""
+    """preserve settings from the managed replaykit.lua script entry."""
     settings: dict = {}
     for entry in scripts:
         if not _is_replaykit_entry(entry):
@@ -376,7 +536,7 @@ def _collect_replaykit_settings(scripts: list, prefs: Preferences) -> dict:
         if not isinstance(entry_settings, dict):
             continue
         settings.update(entry_settings)
-    _apply_streamable_settings(settings, prefs)
+    _apply_replaykit_runtime_settings(settings, prefs)
     return settings
 
 
@@ -422,8 +582,7 @@ def _fit_scene_item_to_canvas(
 
 def _canvas_size(prefs: Preferences) -> tuple:
     """(basecx, basecy) that the selected preset writes into basic.ini."""
-    preset = get_preset(prefs.recording_preset)
-    video  = preset.basic_ini.get("Video", {})
+    video = _preset_video_ini(prefs)
     return int(video.get("BaseCX", 1920)), int(video.get("BaseCY", 1080))
 
 
@@ -640,9 +799,63 @@ def _ensure_bongo_source(sources: list) -> None:
             src["enabled"] = True
             settings = src.setdefault("settings", {})
             for key, value in _new_bongo_source()["settings"].items():
-                settings.setdefault(key, value)
+                settings[key] = value
             return
     sources.append(_new_bongo_source())
+
+
+def _window_capture_input_settings(prefs: Preferences) -> dict:
+    return {
+        "window": getattr(prefs, "screenshare_game_window", ""),
+        "method": 2,
+        "priority": 0,
+        "cursor": True,
+        "client_area": True,
+        "compatibility": False,
+        "force_sdr": False,
+        "capture_audio": False,
+    }
+
+
+def _new_window_capture_source(prefs: Preferences) -> dict:
+    return {
+        "prev_ver": 536936450,
+        "name": _WINDOW_CAPTURE_SOURCE_NAME,
+        "uuid": _WINDOW_CAPTURE_SOURCE_UUID,
+        "id": _WINDOW_CAPTURE_SOURCE_ID,
+        "versioned_id": _WINDOW_CAPTURE_SOURCE_ID,
+        "settings": _window_capture_input_settings(prefs),
+        "mixers": 0,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": True,
+        "muted": False,
+        "push-to-mute": False,
+        "push-to-mute-delay": 0,
+        "push-to-talk": False,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "private_settings": {},
+    }
+
+
+def _ensure_window_capture_source(sources: list, prefs: Preferences) -> None:
+    for src in sources:
+        if src.get("uuid") == _WINDOW_CAPTURE_SOURCE_UUID or src.get("name") == _WINDOW_CAPTURE_SOURCE_NAME:
+            src["name"] = _WINDOW_CAPTURE_SOURCE_NAME
+            src["uuid"] = _WINDOW_CAPTURE_SOURCE_UUID
+            src["id"] = _WINDOW_CAPTURE_SOURCE_ID
+            src["versioned_id"] = _WINDOW_CAPTURE_SOURCE_ID
+            src["enabled"] = True
+            settings = src.setdefault("settings", {})
+            settings.update(_window_capture_input_settings(prefs))
+            return
+    sources.append(_new_window_capture_source(prefs))
 
 
 def _scene_item_ids(items: list) -> set:
@@ -663,6 +876,58 @@ def _next_scene_item_id(items: list) -> int:
     return candidate
 
 
+def _move_scene_item_after(items: list, target_name: str, after_name: str) -> None:
+    target = None
+    for item in items:
+        if item.get("name") == target_name:
+            target = item
+            break
+    if target is None:
+        return
+    items.remove(target)
+    insert_at = 0
+    for idx, item in enumerate(items):
+        if item.get("name") == after_name:
+            insert_at = idx + 1
+            break
+    items.insert(insert_at, target)
+
+
+def _new_capture_scene_item(
+    source_name: str,
+    source_uuid: str,
+    item_id: int,
+    canvas_w: float,
+    canvas_h: float,
+    visible: bool,
+) -> dict:
+    item = {
+        "name": source_name,
+        "source_uuid": source_uuid,
+        "visible": bool(visible),
+        "locked": False,
+        "rot": 0.0,
+        "align": 5,
+        "bounds_type": 0,
+        "bounds_align": 0,
+        "bounds_crop": False,
+        "crop_left": 0,
+        "crop_top": 0,
+        "crop_right": 0,
+        "crop_bottom": 0,
+        "id": item_id,
+        "group_item_backup": False,
+        "scale_filter": "disable",
+        "blend_method": "default",
+        "blend_type": "normal",
+        "show_transition": {"duration": 300},
+        "hide_transition": {"duration": 300},
+        "private_settings": {},
+    }
+    _fit_scene_item_to_canvas(item, canvas_w, canvas_h)
+    return item
+
+
 def _scene_rel_pos(x: float, y: float, canvas_w: float, canvas_h: float) -> dict:
     return {
         "x": (x - canvas_w / 2.0) / (canvas_h / 2.0),
@@ -670,14 +935,292 @@ def _scene_rel_pos(x: float, y: float, canvas_w: float, canvas_h: float) -> dict
     }
 
 
-def _apply_bongo_geometry(item: dict, canvas_w: float, canvas_h: float) -> None:
-    scale_ratio = canvas_h / _BONGO_CAT_CANVAS_H
+def _overlay_scale_factor(prefs: Preferences) -> float:
+    try:
+        scale = int(getattr(prefs, "overlay_scale", 100))
+    except (TypeError, ValueError):
+        scale = 100
+    return max(50, min(200, scale)) / 100.0
+
+
+def _overlay_opacity(prefs: Preferences) -> int:
+    try:
+        opacity = int(getattr(prefs, "overlay_opacity", 100))
+    except (TypeError, ValueError):
+        opacity = 100
+    return max(0, min(100, opacity))
+
+
+def _overlay_hue_shift(prefs: Preferences) -> float:
+    try:
+        hue_shift = float(getattr(prefs, "overlay_hue_shift", 0.0))
+    except (TypeError, ValueError):
+        hue_shift = 0.0
+    return max(-180.0, min(180.0, hue_shift))
+
+
+def _overlay_hex_color(prefs: Preferences, attr: str, default: str) -> str:
+    value = str(getattr(prefs, attr, default) or "").strip().lower()
+    if len(value) == 7 and value[0] == "#" and all(ch in "0123456789abcdef" for ch in value[1:]):
+        return value
+    return default
+
+
+def _overlay_color_value(hex_color: str) -> int:
+    red = int(hex_color[1:3], 16)
+    green = int(hex_color[3:5], 16)
+    blue = int(hex_color[5:7], 16)
+    return red | (green << 8) | (blue << 16)
+
+
+def _has_overlay_color_adjustments(prefs: Preferences) -> bool:
+    return (
+        abs(_overlay_hue_shift(prefs)) >= 0.001
+        or _overlay_hex_color(prefs, "overlay_color_multiply", "#ffffff") != "#ffffff"
+        or _overlay_hex_color(prefs, "overlay_color_add", "#000000") != "#000000"
+    )
+
+
+def _overlay_content_rect(
+    canvas_w: float, canvas_h: float, capture_w: int = 0, capture_h: int = 0
+) -> tuple[float, float, float, float, float]:
+    if canvas_w <= 0.0 or canvas_h <= 0.0:
+        canvas_w, canvas_h = 1920.0, 1080.0
+    source_w = float(capture_w) if capture_w > 0 else canvas_w
+    source_h = float(capture_h) if capture_h > 0 else canvas_h
+    scale = min(canvas_w / source_w, canvas_h / source_h)
+    if scale <= 0.0:
+        scale = 1.0
+    width = source_w * scale
+    height = source_h * scale
+    return (canvas_w - width) / 2.0, (canvas_h - height) / 2.0, width, height, scale
+
+
+def _input_overlay_pos(
+    content: tuple[float, float, float, float, float],
+    source_w: float,
+    source_h: float,
+    scale_x: float,
+    scale_y: float,
+) -> tuple[float, float]:
+    content_x, content_y, _content_w, content_h, _content_scale = content
+    ref_scale = content_h / _INPUT_OVERLAY_POS_REF_H
+    x = content_x + (_INPUT_OVERLAY_POS_X_AT_REF * ref_scale)
+    y = content_y + content_h - (source_h * scale_y) - (_INPUT_OVERLAY_BOTTOM_MARGIN_AT_REF * ref_scale)
+    return max(0.0, x), max(0.0, y)
+
+
+def _bottom_left_corner_overlay_pos(
+    content: tuple[float, float, float, float, float],
+    source_w: float,
+    source_h: float,
+    scale_x: float,
+    scale_y: float,
+) -> tuple[float, float]:
+    content_x, content_y, _content_w, content_h, _content_scale = content
+    x = content_x
+    y = content_y + content_h - (source_h * scale_y)
+    return max(0.0, x), max(0.0, y)
+
+
+def _overlay_opacity_filter_settings(prefs: Preferences, legacy_percent: bool = False) -> dict:
+    opacity = _overlay_opacity(prefs)
+    settings = {
+        "hue_shift": _overlay_hue_shift(prefs),
+    }
+    if legacy_percent:
+        settings["opacity"] = opacity
+        settings["color"] = _overlay_color_value(
+            _overlay_hex_color(prefs, "overlay_color_multiply", "#ffffff")
+        )
+        return settings
+    settings.update({
+        "opacity": max(0.0, min(1.0, opacity / 100.0)),
+        "color_multiply": _overlay_color_value(
+            _overlay_hex_color(prefs, "overlay_color_multiply", "#ffffff")
+        ),
+        "color_add": _overlay_color_value(
+            _overlay_hex_color(prefs, "overlay_color_add", "#000000")
+        ),
+    })
+    return settings
+
+
+def _new_overlay_opacity_filter(source_name: str, prefs: Preferences) -> dict:
+    return {
+        "prev_ver": 536936450,
+        "name": _OVERLAY_OPACITY_FILTER_NAME,
+        "uuid": _OVERLAY_OPACITY_FILTER_UUIDS[source_name],
+        "id": _OVERLAY_OPACITY_FILTER_ID,
+        "versioned_id": "color_filter_v2",
+        "settings": _overlay_opacity_filter_settings(prefs),
+        "mixers": 0,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": True,
+        "muted": False,
+        "push-to-mute": False,
+        "push-to-mute-delay": 0,
+        "push-to-talk": False,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "private_settings": {},
+    }
+
+
+def _apply_overlay_opacity_filter(src: dict, prefs: Preferences) -> None:
+    source_name = str(src.get("name", ""))
+    if source_name not in _OVERLAY_OPACITY_FILTER_UUIDS:
+        return
+    opacity = _overlay_opacity(prefs)
+    has_color_adjustments = _has_overlay_color_adjustments(prefs)
+    managed_uuid = _OVERLAY_OPACITY_FILTER_UUIDS[source_name]
+    filters = src.get("filters")
+    if not isinstance(filters, list):
+        filters = []
+
+    def is_managed_opacity_filter(item: dict) -> bool:
+        return (
+            item.get("name") == _OVERLAY_OPACITY_FILTER_NAME
+            or item.get("uuid") == managed_uuid
+        )
+
+    managed_filter = None
+    kept_filters = []
+    for item in filters:
+        if is_managed_opacity_filter(item):
+            if managed_filter is None:
+                managed_filter = item
+            continue
+        kept_filters.append(item)
+
+    if managed_filter is not None:
+        filter_settings = managed_filter.setdefault("settings", {})
+        versioned_id = str(managed_filter.get("versioned_id", ""))
+        if managed_filter.get("id") == _OVERLAY_OPACITY_FILTER_ID and versioned_id != "color_filter_v2":
+            filter_settings.update(_overlay_opacity_filter_settings(prefs, True))
+        else:
+            filter_settings.update(_overlay_opacity_filter_settings(prefs))
+        managed_filter["enabled"] = True
+        kept_filters.append(managed_filter)
+    elif opacity < 100 or has_color_adjustments:
+        kept_filters.append(_new_overlay_opacity_filter(source_name, prefs))
+
+    if kept_filters:
+        src["filters"] = kept_filters
+    else:
+        src.pop("filters", None)
+
+
+def _remove_overlay_opacity_filter(src: dict) -> None:
+    source_name = str(src.get("name", ""))
+    managed_uuid = _OVERLAY_OPACITY_FILTER_UUIDS.get(source_name)
+    filters = src.get("filters")
+    if not isinstance(filters, list):
+        return
+    filters[:] = [
+        item for item in filters
+        if (
+            item.get("name") != _OVERLAY_OPACITY_FILTER_NAME
+            and (not managed_uuid or item.get("uuid") != managed_uuid)
+        )
+    ]
+    if not filters:
+        src.pop("filters", None)
+
+
+def _input_overlay_group_geometry(
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> tuple[float, float, float]:
+    if content is None:
+        content = _overlay_content_rect(canvas_w, canvas_h)
+    content_h = content[3]
+    scale = (content_h / 1440.0) * _overlay_scale_factor(prefs)
+    x, y = _input_overlay_pos(
+        content, _INPUT_OVERLAY_GROUP_W, _INPUT_OVERLAY_GROUP_H, scale, scale
+    )
+    return x, y, scale
+
+
+def _apply_input_overlay_scene_item_geometry(
+    item: dict,
+    name: str,
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> None:
+    group_x, group_y, group_scale = _input_overlay_group_geometry(canvas_w, canvas_h, prefs, content)
+    if name == _INPUT_OVERLAY_MOUSE_NAME:
+        source_w = _INPUT_OVERLAY_MOUSE_SOURCE_W
+        source_h = _INPUT_OVERLAY_MOUSE_SOURCE_H
+        scale_x = _INPUT_OVERLAY_MOUSE_SCALE * group_scale
+        scale_y = _INPUT_OVERLAY_MOUSE_SCALE * group_scale
+        x = group_x + (_INPUT_OVERLAY_MOUSE_OFFSET_X * group_scale)
+    else:
+        source_w = _INPUT_OVERLAY_WASD_SOURCE_W
+        source_h = _INPUT_OVERLAY_WASD_SOURCE_H
+        scale_x = _INPUT_OVERLAY_WASD_SCALE_X * group_scale
+        scale_y = _INPUT_OVERLAY_WASD_SCALE_Y * group_scale
+        x = group_x
+    y = group_y
+    item["align"] = 5
+    item["pos"] = {"x": x, "y": y}
+    item["pos_rel"] = _scene_rel_pos(x, y, canvas_w, canvas_h)
+    item["scale"] = {"x": scale_x, "y": scale_y}
+    item["scale_rel"] = {"x": scale_x * 1440.0 / canvas_h, "y": scale_y * 1440.0 / canvas_h}
+    item["scale_ref"] = {"x": source_w, "y": source_h}
+    item["bounds"] = {"x": 0.0, "y": 0.0}
+    item["bounds_rel"] = {"x": 0.0, "y": 0.0}
+    item["bounds_type"] = 0
+    item["bounds_align"] = 0
+
+
+def _apply_input_overlay_group_geometry(
+    item: dict,
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> None:
+    x, y, scale = _input_overlay_group_geometry(canvas_w, canvas_h, prefs, content)
+    item["align"] = 5
+    item["pos"] = {"x": x, "y": y}
+    item["pos_rel"] = _scene_rel_pos(x, y, canvas_w, canvas_h)
+    item["scale"] = {"x": scale, "y": scale}
+    scale_rel = _overlay_scale_factor(prefs)
+    item["scale_rel"] = {"x": scale_rel, "y": scale_rel}
+    item["scale_ref"] = {"x": canvas_w, "y": canvas_h}
+    item["bounds"] = {"x": 0.0, "y": 0.0}
+    item["bounds_rel"] = {"x": 0.0, "y": 0.0}
+    item["bounds_type"] = 0
+    item["bounds_align"] = 0
+
+
+def _apply_bongo_geometry(
+    item: dict,
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> None:
+    if content is None:
+        content = _overlay_content_rect(canvas_w, canvas_h)
+    content_h = content[3]
+    scale_ratio = (content_h / _BONGO_CAT_CANVAS_H) * _overlay_scale_factor(prefs)
     scale_x = _BONGO_CAT_SCALE_X * scale_ratio
     scale_y = _BONGO_CAT_SCALE_Y * scale_ratio
-    scale_rel_x = _BONGO_CAT_SCALE_REL_X * scale_ratio
-    scale_rel_y = _BONGO_CAT_SCALE_REL_Y * scale_ratio
-    x = (canvas_w / 2.0) + (_BONGO_CAT_POS_REL_X * canvas_h / 2.0)
-    y = (canvas_h / 2.0) + (_BONGO_CAT_POS_REL_Y * canvas_h / 2.0)
+    scale_rel_x = scale_x * _BONGO_CAT_SOURCE_H / max(1.0, canvas_h)
+    scale_rel_y = scale_y * _BONGO_CAT_SOURCE_H / max(1.0, canvas_h)
+    x, y = _bottom_left_corner_overlay_pos(content, _BONGO_CAT_SOURCE_W, _BONGO_CAT_SOURCE_H, scale_x, scale_y)
     x = 0.0 if abs(x) < 0.001 else x
     y = 0.0 if abs(y) < 0.001 else y
 
@@ -698,7 +1241,7 @@ def _apply_bongo_geometry(item: dict, canvas_w: float, canvas_h: float) -> None:
         "crop_bottom": 0,
         "group_item_backup": False,
         "pos": {"x": x, "y": y},
-        "pos_rel": {"x": _BONGO_CAT_POS_REL_X, "y": _BONGO_CAT_POS_REL_Y},
+        "pos_rel": _scene_rel_pos(x, y, canvas_w, canvas_h),
         "scale": {"x": scale_x, "y": scale_y},
         "scale_rel": {"x": scale_rel_x, "y": scale_rel_y},
         "bounds": {"x": 0.0, "y": 0.0},
@@ -712,32 +1255,65 @@ def _apply_bongo_geometry(item: dict, canvas_w: float, canvas_h: float) -> None:
     })
 
 
-def _new_bongo_scene_item(item_id: int, canvas_w: float, canvas_h: float) -> dict:
+def _new_bongo_scene_item(
+    item_id: int,
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> dict:
     item = {"id": item_id}
-    _apply_bongo_geometry(item, canvas_w, canvas_h)
+    _apply_bongo_geometry(item, canvas_w, canvas_h, prefs, content)
     return item
 
 
-def _ensure_bongo_scene_item(items: list, settings: dict, canvas_w: float, canvas_h: float) -> None:
+def _ensure_bongo_scene_item(
+    items: list,
+    settings: dict,
+    canvas_w: float,
+    canvas_h: float,
+    prefs: Preferences,
+    content: tuple[float, float, float, float, float] | None = None,
+) -> None:
     for item in items:
         if item.get("source_uuid") == _BONGO_CAT_SOURCE_UUID or item.get("name") == _BONGO_CAT_SOURCE_NAME:
-            _apply_bongo_geometry(item, canvas_w, canvas_h)
+            _apply_bongo_geometry(item, canvas_w, canvas_h, prefs, content)
             return
 
-    items.append(_new_bongo_scene_item(_next_scene_item_id(items), canvas_w, canvas_h))
+    items.append(_new_bongo_scene_item(_next_scene_item_id(items), canvas_w, canvas_h, prefs, content))
     try:
         settings["id_counter"] = max(int(settings.get("id_counter", 0)), max(_scene_item_ids(items)))
     except (TypeError, ValueError):
         settings["id_counter"] = max(_scene_item_ids(items))
 
 
-def _apply_game_capture_defaults(source: dict) -> None:
+def _game_capture_input_settings(prefs: Preferences) -> dict:
+    return {
+        "capture_audio": False,
+        "hook_rate": _GAME_CAPTURE_HOOK_RATE_FAST,
+        "limit_framerate": True,
+        "capture_cursor": False,
+        "capture_overlays": False,
+        "anti_cheat_hook": True,
+        "capture_mode": "any_fullscreen",
+        "window": "",
+    }
+
+
+def _apply_game_capture_defaults(source: dict, prefs: Preferences) -> None:
     if source.get("id") != _GAME_CAPTURE_SOURCE_ID and source.get("name") != _GAME_CAPTURE_SOURCE_NAME:
         return
     settings = source.setdefault("settings", {})
-    settings["capture_audio"] = False
-    settings["hook_rate"] = _GAME_CAPTURE_HOOK_RATE_FAST
-    settings["limit_framerate"] = True
+    settings.update(_game_capture_input_settings(prefs))
+
+
+def _apply_desktop_audio_exclusions(source: dict) -> None:
+    if source.get("id") != "audio_capture" or source.get("name") != _DESKTOP_AUDIO_SOURCE_NAME:
+        return
+    settings = source.setdefault("settings", {})
+    settings["mode"] = "session"
+    settings["executable_list"] = [{"value": name} for name in _DESKTOP_AUDIO_EXCLUDE_PROCESSES]
+    settings["exclude"] = True
 
 
 def apply_scenes_json(text: str, prefs: Preferences) -> str:
@@ -767,9 +1343,11 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
         _ensure_bongo_source(sources)
     else:
         _remove_bongo_sources(sources)
+    _ensure_window_capture_source(sources, prefs)
 
     primary_w = primary.width  if primary is not None else 0
     primary_h = primary.height if primary is not None else 0
+    overlay_content = _overlay_content_rect(canvas_w, canvas_h, primary_w, primary_h)
 
     for src in sources:
         sid = src.get("id")
@@ -778,9 +1356,16 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
             src.setdefault("settings", {})["device_id"] = prefs.microphone_device_id
 
         elif sid == _MONITOR_SOURCE_ID and primary is not None:
-            src.setdefault("settings", {})["monitor_id"] = primary.device_id
+            settings = src.setdefault("settings", {})
+            settings["monitor_id"] = primary.device_id
+            settings["capture_cursor"] = False
 
-        _apply_game_capture_defaults(src)
+        _apply_game_capture_defaults(src, prefs)
+        if src.get("name") == _WINDOW_CAPTURE_SOURCE_NAME:
+            src["id"] = _WINDOW_CAPTURE_SOURCE_ID
+            src["versioned_id"] = _WINDOW_CAPTURE_SOURCE_ID
+            src.setdefault("settings", {}).update(_window_capture_input_settings(prefs))
+        _apply_desktop_audio_exclusions(src)
 
         if src.get("name") in _MOTION_BLUR_SOURCE_UUIDS:
             if use_motion_blur:
@@ -791,41 +1376,81 @@ def apply_scenes_json(text: str, prefs: Preferences) -> str:
         if sid == _INPUT_OVERLAY_SOURCE_ID:
             src["enabled"] = use_input_overlay
             _resolve_overlay_paths(src)
+            if use_input_overlay:
+                _apply_overlay_opacity_filter(src, prefs)
+            else:
+                _remove_overlay_opacity_filter(src)
+
+        elif sid == _BONGO_CAT_SOURCE_ID or src.get("name") == _BONGO_CAT_SOURCE_NAME:
+            if use_bongo_cat:
+                _apply_overlay_opacity_filter(src, prefs)
 
         elif sid == "scene":
             settings = src.get("settings", {})
             items = settings.get("items", [])
             kept_items = []
+            mode = getattr(prefs, "screenshare_capture_mode", "hybrid_auto")
+            found_window_capture = False
             for item in items:
                 name = str(item.get("name", ""))
                 # match the overlay scene item by source_uuid so renaming the source doesnt break the toggle.
                 if item.get("source_uuid") in overlay_uuids:
                     if use_input_overlay:
                         item["visible"] = True
+                        _apply_input_overlay_scene_item_geometry(item, name, canvas_w, canvas_h, prefs, overlay_content)
                         kept_items.append(item)
                     continue
                 # group-style structure: hide/show by group name (groups dont expose source_uuid here).
                 if name in overlay_group_names:
                     if use_input_overlay:
                         item["visible"] = True
+                        _apply_input_overlay_group_geometry(item, canvas_w, canvas_h, prefs, overlay_content)
                         kept_items.append(item)
                     continue
                 if item.get("source_uuid") == _BONGO_CAT_SOURCE_UUID or name == _BONGO_CAT_SOURCE_NAME:
                     if use_bongo_cat:
-                        _apply_bongo_geometry(item, canvas_w, canvas_h)
+                        _apply_bongo_geometry(item, canvas_w, canvas_h, prefs, overlay_content)
                         kept_items.append(item)
                     continue
                 if name == "Display Capture":
+                    item["visible"] = mode in ("hybrid_auto", "desktop")
                     _fit_scene_item_to_canvas(
                         item, canvas_w, canvas_h, primary_w, primary_h
                     )
+                elif name == _WINDOW_CAPTURE_SOURCE_NAME:
+                    found_window_capture = True
+                    item["source_uuid"] = _WINDOW_CAPTURE_SOURCE_UUID
+                    item["visible"] = mode == "game_window"
+                    _fit_scene_item_to_canvas(item, canvas_w, canvas_h)
                 elif name == "Game Capture":
+                    item["visible"] = mode == "game_auto"
                     # game capture has no install-time source dims -- bounds-based fit lets obs scale at runtime.
                     _fit_scene_item_to_canvas(item, canvas_w, canvas_h)
                 kept_items.append(item)
 
+            if not found_window_capture:
+                window_item = _new_capture_scene_item(
+                    _WINDOW_CAPTURE_SOURCE_NAME,
+                    _WINDOW_CAPTURE_SOURCE_UUID,
+                    _next_scene_item_id(kept_items),
+                    canvas_w,
+                    canvas_h,
+                    mode == "game_window",
+                )
+                insert_at = 0
+                for idx, item in enumerate(kept_items):
+                    if item.get("name") == "Display Capture":
+                        insert_at = idx + 1
+                        break
+                kept_items.insert(insert_at, window_item)
+                try:
+                    settings["id_counter"] = max(int(settings.get("id_counter", 0)), max(_scene_item_ids(kept_items)))
+                except (TypeError, ValueError):
+                    settings["id_counter"] = max(_scene_item_ids(kept_items))
+            _move_scene_item_after(kept_items, _WINDOW_CAPTURE_SOURCE_NAME, "Display Capture")
+
             if use_bongo_cat:
-                _ensure_bongo_scene_item(kept_items, settings, canvas_w, canvas_h)
+                _ensure_bongo_scene_item(kept_items, settings, canvas_w, canvas_h, prefs, overlay_content)
             settings["items"] = kept_items
 
     modules = data.setdefault("modules", {})

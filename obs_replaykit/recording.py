@@ -30,6 +30,7 @@ PRESETS: Tuple[RecordingPreset, ...] = (
                 "BaseCX":    "1920",  "BaseCY":   "1080",
                 "OutputCX":  "1280",  "OutputCY": "720",
                 "FPSCommon": "30",
+                "ScaleType": "lanczos",
             },
         },
         cqp_target     = 26,
@@ -39,7 +40,7 @@ PRESETS: Tuple[RecordingPreset, ...] = (
     RecordingPreset(
         name        = "balanced",
         label       = "Balanced (recommended)",
-        description = "1080p60, high-quality target - good on most modern PCs.",
+        description = "Native canvas -> 1080p60, high-quality target - good on most modern PCs.",
         basic_ini={
             "Output": {"Mode": "Advanced"},
             "AdvOut": {
@@ -50,6 +51,7 @@ PRESETS: Tuple[RecordingPreset, ...] = (
                 "BaseCX":    "1920",  "BaseCY":   "1080",
                 "OutputCX":  "1920",  "OutputCY": "1080",
                 "FPSCommon": "60",
+                "ScaleType": "lanczos",
             },
         },
         cqp_target     = 22,
@@ -59,7 +61,7 @@ PRESETS: Tuple[RecordingPreset, ...] = (
     RecordingPreset(
         name        = "quality",
         label       = "Quality (high-end PCs)",
-        description = "1440p->1080p60, very high quality target. Best for replay clips.",
+        description = "Native canvas -> 1080p60, very high quality target. Best for replay clips.",
         basic_ini={
             "Output": {"Mode": "Advanced"},
             "AdvOut": {
@@ -70,6 +72,7 @@ PRESETS: Tuple[RecordingPreset, ...] = (
                 "BaseCX":    "2560",  "BaseCY":   "1440",
                 "OutputCX":  "1920",  "OutputCY": "1080",
                 "FPSCommon": "60",
+                "ScaleType": "lanczos",
             },
         },
         cqp_target     = 20,

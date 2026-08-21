@@ -17,12 +17,12 @@ LogFn = Optional[Callable[[str], None]]
 
 
 def _is_installed() -> bool:
-    """True iff the win-capture-audio DLL is installed for OBS."""
+    """true iff the win-capture-audio DLL is installed for OBS."""
     return (PROGRAMFILES_OBS_DIR / WIN_CAPTURE_AUDIO_DLL_REL).is_file()
 
 
 def install_win_capture_audio(log: LogFn = None) -> bool:
-    """Extract the bundled plugin into the OBS install. Idempotent."""
+    """extract the bundled plugin into the OBS install. idempotent."""
     if _is_installed():
         if log:
             log("win-capture-audio plugin already installed")

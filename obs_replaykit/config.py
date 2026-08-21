@@ -12,6 +12,7 @@ from pathlib import Path
 USERNAME    = os.environ.get("USERNAME") or os.environ.get("USER") or "User"
 USERPROFILE = Path(os.environ.get("USERPROFILE") or Path.home())
 APPDATA     = Path(os.environ.get("APPDATA") or USERPROFILE / "AppData" / "Roaming")
+LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA") or USERPROFILE / "AppData" / "Local")
 PROGRAMDATA = Path(os.environ.get("ProgramData", r"C:\ProgramData"))
 
 
@@ -19,8 +20,11 @@ PROGRAMDATA = Path(os.environ.get("ProgramData", r"C:\ProgramData"))
 
 OBS_CONFIG = APPDATA / "obs-studio"
 
-# consolidated runtime root for everything obs replaykit installs (lua scripts, dock html, input-overlay presets). keeps the obs-studio tree easy to reason about and lets cleanup do a single obs-studio wipe. casing matches the project name even though windows fs is case-insensitive -- the on-disk folder records whatever name we create it with.
+# consolidated runtime root for everything obs replaykit installs (lua scripts, dock html, input-overlay presets). keeps the obs-studio tree easy to reason about and lets cleanup remove replaykit-owned config without touching OBS scenes/profiles. casing matches the project name even though windows fs is case-insensitive -- the on-disk folder records whatever name we create it with.
 REPLAYKIT_CONFIG = OBS_CONFIG / "obs-replayKit"
+REPLAYKIT_SETUP_CACHE = LOCALAPPDATA / "OBS ReplayKit"
+REPLAYKIT_SETUP_EXE = REPLAYKIT_SETUP_CACHE / "OBSReplayKitSetup.exe"
+REPLAYKIT_USER_STATE_CACHE = REPLAYKIT_SETUP_CACHE / "state"
 
 # dock html the local helper serves on 127.0.0.1:8767. transform.py builds the file:// url written into user.ini from this path.
 DOCK_TARGET = REPLAYKIT_CONFIG / "obs-custom-dock"
@@ -220,8 +224,7 @@ VCPP_REDIST_DOWNLOAD_URL = "https://aka.ms/vc14/vc_redist.x64.exe"
 VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024
 
 
-# Bundled virtual audio driver. Creates the OBS Stream Audio render endpoint and
-# matching loopback capture endpoint used by Discord.
+# bundled virtual audio driver -- creates the OBS Stream Audio render endpoint and matching loopback capture endpoint used by Discord
 VBCABLE_DRIVER_PACK_NAME = "VBCABLE_Driver_Pack45.zip"
 VBCABLE_SETUP_EXE_NAME   = "VBCABLE_Setup_x64.exe"
 
@@ -237,16 +240,19 @@ INPUT_OVERLAY_TARGET = REPLAYKIT_CONFIG / "input-overlay-presets"
 WIN_CAPTURE_AUDIO_ZIP = ASSETS_DIR / "win-capture-audio.zip"
 WIN_CAPTURE_AUDIO_DLL_REL = "obs-plugins/64bit/win-capture-audio.dll"
 
-# Bongobs/Bango Cat plugin. The archive is distributed as a manual OBS-root
-# extract; installer code strips the top-level folder and writes only safe
-# relative paths into PROGRAMFILES_OBS_DIR.
+# Bongobs/Bango Cat plugin -- the archive is distributed as a manual obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into PROGRAMFILES_OBS_DIR.
 BONGO_CAT_ZIP = ASSETS_DIR / "Bango Cat.zip"
 
 
-# OBS Shaderfilter plugin. ReplayKit uses its bundled motion_blur.shader when
-# the optional motion blur setting is enabled.
+# OBS Shaderfilter plugin -- ReplayKit uses its bundled motion_blur.shader when the optional motion blur setting is enabled.
 SHADERFILTER_ZIP = ASSETS_DIR / "obs-shaderfilter.zip"
 SHADERFILTER_ZIP_SHA256 = "0e75fc5f2523befd9c66c0adb14f9c838cc0cd705b32487e121abb03ad2f2486"
+
+
+# ReplayKits own tray plugin -- unlike the third-party plugins above, this one is ours: compiled from source at release time (build.bat step 3.6) and bundled straight into assets/, not downloaded, and installed under %ProgramData%\obs-studio\plugins\ (obss no-admin plugin search path) rather than the PROGRAMFILES_OBS_DIR/obs-plugins layout the plugins above use.
+REPLAYKIT_TRAY_DLL_BUNDLED = ASSETS_DIR / "obs-plugins" / "replaykit-tray" / "bin" / "64bit" / "replaykit-tray.dll"
+REPLAYKIT_TRAY_PLUGIN_DIR  = PROGRAMDATA / "obs-studio" / "plugins" / "replaykit-tray"
+REPLAYKIT_TRAY_DLL_TARGET  = REPLAYKIT_TRAY_PLUGIN_DIR / "bin" / "64bit" / "replaykit-tray.dll"
 
 
 # file extensions the installer treats as text (rewrite_user_paths + apply_preferences).

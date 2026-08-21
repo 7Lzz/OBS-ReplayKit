@@ -1,4 +1,4 @@
-"""Install the bundled OBS Shaderfilter plugin used by ReplayKit motion blur."""
+"""install the bundled OBS Shaderfilter plugin used by ReplayKit motion blur."""
 
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def _verify_archive(path: Path, log: LogFn = None) -> bool:
 
 
 def install_shaderfilter_plugin(log: LogFn = None) -> bool:
-    """Extract OBS Shaderfilter from the bundled archive into the OBS install root."""
+    """extract OBS Shaderfilter from the bundled archive into the OBS install root."""
     if is_shaderfilter_installed():
         if log:
             log(f"OBS Shaderfilter already installed at {_PLUGIN_DLL}")
@@ -134,7 +134,7 @@ def install_shaderfilter_plugin(log: LogFn = None) -> bool:
 
 
 def remove_composite_blur_plugin(log: LogFn = None) -> bool:
-    """Remove the retired Composite Blur plugin previously used by ReplayKit."""
+    """remove the retired Composite Blur plugin previously used by ReplayKit."""
     ok = True
     for target in _COMPOSITE_BLUR_TARGETS:
         if not target.exists():
@@ -154,7 +154,7 @@ def remove_composite_blur_plugin(log: LogFn = None) -> bool:
 
 
 def install_replaykit_motion_blur_plugin(log: LogFn = None) -> bool:
-    """Install the current motion blur plugin and remove the retired one."""
+    """install the current motion blur plugin and remove the retired one."""
     removed = remove_composite_blur_plugin(log=log)
     installed = install_shaderfilter_plugin(log=log)
     return removed and installed

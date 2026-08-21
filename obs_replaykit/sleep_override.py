@@ -1,4 +1,4 @@
-"""drop the DISPLAY execution-state lock obs holds while recording/streaming, so monitors can sleep with obs open. SYSTEM/AWAYMODE locks stay intact so a live session isnt killed when windows idles the box. uses powercfg /requestsoverride, persisted in HKLM\\SYSTEM\\CCS\\Control\\Power\\PowerRequestOverride."""
+"""drop OBS power requests so Windows idle monitor/system sleep can still run."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Callable, Optional
 LogFn = Optional[Callable[[str], None]]
 
 _OBS_EXE_NAME = "obs64.exe"
-_DISPLAY_FLAG = "DISPLAY"
+_REQUEST_FLAGS = ("DISPLAY", "SYSTEM", "AWAYMODE")
 
 # suppress the powercfg console flash when spawned from a non-console parent (pyinstaller apply exe).
 _CREATE_NO_WINDOW = 0x08000000
@@ -31,32 +31,38 @@ def _run_powercfg(args: list[str], log: LogFn = None) -> Optional[subprocess.Com
         return None
 
 
-def is_sleep_override_installed() -> bool:
-    """True iff a DISPLAY override is already in place for obs64.exe. any subprocess failure -> 'not installed' so the caller errs on the side of re-applying."""
+def _installed_request_flags() -> set[str]:
     result = _run_powercfg(["/requestsoverride"])
     if result is None or result.returncode != 0:
-        return False
-    # powercfg /requestsoverride output: process obs64.exe display ... -- tolerant of whitespace and case.
+        return set()
+    flags: set[str] = set()
     for line in result.stdout.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         if stripped.lower().startswith(_OBS_EXE_NAME.lower()):
-            # match \bDISPLAY\b in the tail so we dont false-negative if someone manually combined display with system.
             tail = stripped[len(_OBS_EXE_NAME):]
-            return bool(re.search(r"\bDISPLAY\b", tail, re.IGNORECASE))
-    return False
+            for flag in _REQUEST_FLAGS:
+                if re.search(rf"\b{re.escape(flag)}\b", tail, re.IGNORECASE):
+                    flags.add(flag)
+    return flags
+
+
+def is_sleep_override_installed() -> bool:
+    """true iff all ReplayKit-managed OBS power request overrides are already in place."""
+    installed = _installed_request_flags()
+    return all(flag in installed for flag in _REQUEST_FLAGS)
 
 
 def install_sleep_override(log: LogFn = None) -> bool:
-    """add the DISPLAY override for obs64.exe. on powercfg failure the rest of apply continues; the user just keeps the old 'monitors stay awake while obs is open' behavior until they re-run apply elevated."""
+    """ignore OBS display/system/awaymode requests so Windows sleep timers still work."""
     if is_sleep_override_installed():
         if log:
-            log(f"sleep override already in place ({_OBS_EXE_NAME} -> {_DISPLAY_FLAG})")
+            log(f"sleep override already in place ({_OBS_EXE_NAME} -> {'/'.join(_REQUEST_FLAGS)})")
         return True
 
     result = _run_powercfg(
-        ["/requestsoverride", "PROCESS", _OBS_EXE_NAME, _DISPLAY_FLAG],
+        ["/requestsoverride", "PROCESS", _OBS_EXE_NAME, *_REQUEST_FLAGS],
         log=log,
     )
     if result is None:
@@ -69,9 +75,8 @@ def install_sleep_override(log: LogFn = None) -> bool:
         return False
 
     if log:
-        log(f"sleep override installed ({_OBS_EXE_NAME} -> {_DISPLAY_FLAG} requests ignored)")
-        log("monitors can now power off while OBS is open; clipping / streams")
-        log("keep running (SYSTEM/AWAYMODE locks left intact).")
+        log(f"sleep override installed ({_OBS_EXE_NAME} -> {'/'.join(_REQUEST_FLAGS)} requests ignored)")
+        log("Windows monitor and PC sleep timers can now run while OBS/ReplayKit is active.")
     return True
 
 

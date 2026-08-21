@@ -1,4 +1,4 @@
-"""Install the Bongobs/Bango Cat OBS plugin from the bundled zip."""
+"""install the Bongobs/Bango Cat OBS plugin from the bundled zip."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def is_bongo_cat_installed() -> bool:
 
 
 def install_bongo_cat_plugin(log: LogFn = None) -> bool:
-    """Extract the Bango Cat archive into the OBS install root."""
+    """extract the Bango Cat archive into the OBS install root."""
     if is_bongo_cat_installed():
         if log:
             log(f"Bongo Cat plugin already installed at {_PLUGIN_DLL}")

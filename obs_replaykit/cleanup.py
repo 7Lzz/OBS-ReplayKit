@@ -1,4 +1,4 @@
-"""In-menu cleanup for OBS ReplayKit installs."""
+"""in-menu cleanup for OBS ReplayKit installs."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Optional
 
-from .config import OBS_CONFIG, PROGRAMDATA, PROGRAMFILES_OBS_DIR
+from .config import OBS_CONFIG, PROGRAMDATA, PROGRAMFILES_OBS_DIR, REPLAYKIT_CONFIG, REPLAYKIT_SETUP_CACHE, REPLAYKIT_TRAY_PLUGIN_DIR, REPLAYKIT_USER_STATE_CACHE
 from .obs import close_obs
 from .scheduled_task import delete_elevation_task
 from .sleep_override import remove_sleep_override
@@ -17,6 +17,11 @@ from .vbcable import uninstall_vbcable
 
 
 LogFn = Optional[Callable[[str], None]]
+
+_REPLAYKIT_RUNTIME_STATE_RELS = (
+    Path("obs-replayKit/scripts/helper/clips_db.json"),
+    Path("obs-replayKit/scripts/helper/clips_index.json"),
+)
 
 
 def _run_hidden(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
@@ -47,7 +52,7 @@ def _current_parent_pid() -> int | None:
 
 
 def stop_obs_and_helpers(log: LogFn = None) -> bool:
-    """Close OBS and ReplayKit helper processes while keeping this setup process alive."""
+    """close OBS and ReplayKit helper processes while keeping this setup process alive."""
     close_obs(log=log)
     keep = {os.getpid()}
     parent = _current_parent_pid()
@@ -89,6 +94,7 @@ def remove_replaykit_plugins(log: LogFn = None) -> bool:
         PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-shaderfilter.dll",
         PROGRAMFILES_OBS_DIR / "obs-plugins" / "64bit" / "obs-shaderfilter.pdb",
         PROGRAMFILES_OBS_DIR / "data" / "obs-plugins" / "obs-shaderfilter",
+        REPLAYKIT_TRAY_PLUGIN_DIR,
     )
     ok = True
     for target in targets:
@@ -138,18 +144,88 @@ if (Test-Path "C:\IddSampleDriver") {
 
 
 def wipe_obs_config(log: LogFn = None) -> bool:
-    if not OBS_CONFIG.exists():
+    if not REPLAYKIT_CONFIG.exists():
         return True
     try:
-        shutil.rmtree(OBS_CONFIG)
+        shutil.rmtree(REPLAYKIT_CONFIG)
         return True
     except OSError as exc:
         if log:
-            log(f"warn: could not wipe {OBS_CONFIG}: {exc}")
+            log(f"warn: could not wipe {REPLAYKIT_CONFIG}: {exc}")
         return False
 
 
-def run_cleanup(progress) -> list[str]:
+def save_user_settings(log: LogFn = None) -> bool:
+    ok = True
+    try:
+        from .prefs import PREFS_FILE, load_prefs
+
+        prefs = load_prefs()
+        prefs.save()
+        if log:
+            log(f"ReplayKit user settings kept -> {PREFS_FILE}")
+    except Exception as exc:
+        ok = False
+        if log:
+            log(f"warn: could not keep ReplayKit user settings: {exc}")
+
+    try:
+        REPLAYKIT_USER_STATE_CACHE.mkdir(parents=True, exist_ok=True)
+        kept = 0
+        for rel in _REPLAYKIT_RUNTIME_STATE_RELS:
+            source = OBS_CONFIG / rel
+            if not source.is_file():
+                continue
+            target = REPLAYKIT_USER_STATE_CACHE / rel.name
+            shutil.copy2(source, target)
+            kept += 1
+        if kept and log:
+            log(f"ReplayKit clip state kept -> {REPLAYKIT_USER_STATE_CACHE}")
+    except OSError as exc:
+        ok = False
+        if log:
+            log(f"warn: could not keep ReplayKit clip state: {exc}")
+    return ok
+
+
+def remove_user_settings(log: LogFn = None) -> bool:
+    try:
+        from .prefs import PREFS_FILE
+    except Exception:
+        PREFS_FILE = None
+
+    targets: list[Path] = []
+    if PREFS_FILE is not None:
+        targets.append(PREFS_FILE)
+    targets.append(REPLAYKIT_SETUP_CACHE / "prefs.json")
+    targets.append(REPLAYKIT_SETUP_CACHE / "clips_state.json")
+
+    ok = True
+    seen: set[str] = set()
+    for target in targets:
+        key = str(target.resolve(strict=False)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if not target.exists():
+            continue
+        try:
+            target.unlink()
+        except OSError as exc:
+            ok = False
+            if log:
+                log(f"warn: could not remove {target}: {exc}")
+    if REPLAYKIT_USER_STATE_CACHE.exists():
+        try:
+            shutil.rmtree(REPLAYKIT_USER_STATE_CACHE)
+        except OSError as exc:
+            ok = False
+            if log:
+                log(f"warn: could not remove {REPLAYKIT_USER_STATE_CACHE}: {exc}")
+    return ok
+
+
+def run_cleanup(progress, keep_user_settings: bool = True) -> list[str]:
     steps: list[tuple[str, str, Callable[[], object]]] = []
 
     def add(title: str, detail: str, action: Callable[[], object]) -> None:
@@ -158,11 +234,15 @@ def run_cleanup(progress) -> list[str]:
     add("Close OBS", "Stops OBS and ReplayKit helpers, but keeps this setup window alive.", lambda: stop_obs_and_helpers(log=progress.log))
     add("Remove launch permission", "Deletes the ReplayKit scheduled task.", lambda: delete_elevation_task(log=progress.log))
     add("Remove Windows startup", "Stops ReplayKit from launching OBS when Windows signs in.", lambda: configure_obs_startup(False, log=progress.log))
-    add("Remove monitor-sleep override", "Restores default Windows display-sleep behavior for OBS.", lambda: remove_sleep_override(log=progress.log))
+    add("Remove Windows sleep override", "Restores default Windows sleep behavior for OBS.", lambda: remove_sleep_override(log=progress.log))
     add("Remove OBS plugins", "Deletes ReplayKit OBS plugins from the OBS install folder.", lambda: remove_replaykit_plugins(log=progress.log))
     add("Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", lambda: uninstall_vbcable(log=progress.log))
     add("Remove virtual display driver", "Deletes the optional virtual display driver if it exists.", lambda: remove_virtual_display_driver(log=progress.log))
-    add("Wipe OBS ReplayKit config", "Deletes the OBS config folder. ReplayKit preferences are kept.", lambda: wipe_obs_config(log=progress.log))
+    if keep_user_settings:
+        add("Keep ReplayKit settings", "Saves current ReplayKit settings for the next install.", lambda: save_user_settings(log=progress.log))
+    else:
+        add("Remove ReplayKit settings", "Deletes saved ReplayKit preferences.", lambda: remove_user_settings(log=progress.log))
+    add("Wipe OBS ReplayKit config", "Deletes ReplayKit's OBS config folder while preserving OBS scenes and profiles.", lambda: wipe_obs_config(log=progress.log))
 
     progress.total_steps = len(steps)
     from .cli import _run_apply_step

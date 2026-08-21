@@ -1,4 +1,4 @@
-"""pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265/av1), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available)."""
+"""pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ class CodecPreference(str, Enum):
     AUTO  = "auto"
     H264  = "h264"
     H265  = "h265"
-    AV1   = "av1"
 
     @classmethod
     def parse(cls, raw: str) -> "CodecPreference":
@@ -29,7 +28,7 @@ class EncoderChoice:
     """resolved encoder selection for this machine."""
     obs_encoder_id: str
     settings:       Dict[str, Any]
-    codec:          str  # "h264" / "h265" / "av1" -- for the menu
+    codec:          str  # "h264" / "h265" -- for the menu
     backend:        str  # "nvenc" / "amf" / "qsv" / "x264"
     label:          str  # short label, e.g. "nvenc hevc (blackwell)"
     description:    str  # one-liner explaining the tradeoff
@@ -44,7 +43,6 @@ class EncoderChoice:
 _NVIDIA_HEVC_OK    = frozenset({NvidiaGen.MAXWELL2.value, NvidiaGen.PASCAL.value,
                                 NvidiaGen.TURING.value, NvidiaGen.AMPERE.value,
                                 NvidiaGen.ADA.value,     NvidiaGen.BLACKWELL.value})
-_NVIDIA_AV1_OK     = frozenset({NvidiaGen.ADA.value, NvidiaGen.BLACKWELL.value})
 # nvenc hevc b-frames: turing+. pascal hevc cant use b-frames.
 _NVIDIA_BF_HEVC_OK = frozenset({NvidiaGen.TURING.value, NvidiaGen.AMPERE.value,
                                 NvidiaGen.ADA.value,    NvidiaGen.BLACKWELL.value})
@@ -55,7 +53,6 @@ _NVIDIA_LOOKAHEAD_OK = frozenset({NvidiaGen.PASCAL.value,  NvidiaGen.TURING.valu
 
 _AMD_HEVC_OK = frozenset({AmdGen.POLARIS.value, AmdGen.VEGA.value, AmdGen.RDNA1.value,
                           AmdGen.RDNA2.value,  AmdGen.RDNA3.value, AmdGen.RDNA4.value})
-_AMD_AV1_OK  = frozenset({AmdGen.RDNA3.value, AmdGen.RDNA4.value})
 # amf hevc b-frames: vega+ (polaris hevc has no b-frame support).
 _AMD_BF_OK   = frozenset({AmdGen.VEGA.value, AmdGen.RDNA1.value,
                           AmdGen.RDNA2.value, AmdGen.RDNA3.value, AmdGen.RDNA4.value})
@@ -63,7 +60,6 @@ _AMD_BF_OK   = frozenset({AmdGen.VEGA.value, AmdGen.RDNA1.value,
 _INTEL_HEVC_OK = frozenset({IntelGen.SKYLAKE.value,   IntelGen.KABY_LAKE.value,
                             IntelGen.ICE_LAKE.value,  IntelGen.TIGER_LAKE.value,
                             IntelGen.ALDER_LAKE.value,IntelGen.ARC.value})
-_INTEL_AV1_OK  = frozenset({IntelGen.ARC.value})
 
 
 # compression-mode effort tables. balanced is the validated default (~10-11% gpu on a 3060 ti at 1080p60 hevc, vs the previous heavyweight config which sat near 30%). lower_gpu trades file size for less encoder work; smaller_files does the opposite. cqp stays the same across modes -- only encoder effort changes, so visual quality is held constant while gpu/filesize move opposite directions.
@@ -148,22 +144,6 @@ def _build_nvenc_hevc(cqp: int, gen: str, mode: str = "balanced") -> Dict[str, A
     return s
 
 
-def _build_nvenc_av1(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, Any]:
-    """nvenc av1 (ada/blackwell). rate-distortion differs from h264/hevc; cqp +4 for comparable quality."""
-    effort = _effort(_NVENC_EFFORT, mode)
-    return {
-        "rate_control": "CQP",
-        "cqp":          cqp + 4,
-        "keyint_sec":   2,
-        "preset":       effort["preset"],
-        "multipass":    effort["multipass"],
-        "tune":         "hq",
-        "profile":      "main",
-        "lookahead":    effort["lookahead"],
-        "bf":           effort["bf"],
-    }
-
-
 def _build_amf_h264(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, Any]:
     """amd amf h.264. filler_data off becuase for recording it just wastes disk."""
     effort = _effort(_AMF_EFFORT, mode)
@@ -193,20 +173,6 @@ def _build_amf_hevc(cqp: int, gen: str, mode: str = "balanced") -> Dict[str, Any
     return s
 
 
-def _build_amf_av1(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, Any]:
-    """amf av1 (rdna3+)."""
-    effort = _effort(_AMF_EFFORT, mode)
-    return {
-        "rate_control":  "CQP",
-        "cqp":           cqp + 4,
-        "keyint_sec":    2,
-        "preset":        effort["preset"],
-        "profile":       "main",
-        "filler_data":   False,
-        "bf":            effort["bf"],
-    }
-
-
 def _build_qsv_h264(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, Any]:
     """quick sync h.264. icq ('intelligent constant quality') is qsvs closest equivalent to nvenc cqp -- bits track perceptual quality, not a hard bitrate."""
     return {
@@ -224,19 +190,6 @@ def _build_qsv_hevc(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, An
     return {
         "rate_control":  "ICQ",
         "icq_quality":   _to_qsv_icq(cqp + 2),
-        "keyint_sec":    2,
-        "target_usage":  _effort(_QSV_EFFORT, mode),
-        "profile":       "main",
-        "async_depth":   4,
-        "low_power":     False,
-    }
-
-
-def _build_qsv_av1(cqp: int, _gen: str, mode: str = "balanced") -> Dict[str, Any]:
-    """intel av1 (arc only)."""
-    return {
-        "rate_control":  "ICQ",
-        "icq_quality":   _to_qsv_icq(cqp + 4),
         "keyint_sec":    2,
         "target_usage":  _effort(_QSV_EFFORT, mode),
         "profile":       "main",
@@ -288,15 +241,6 @@ def _nvenc_candidates(gen: str) -> Dict[str, _Candidate]:
             description    = "NVIDIA hardware HEVC - ~half the file size of H.264 at the same quality.",
             builder        = lambda cqp, mode, g=gen: _build_nvenc_hevc(cqp, g, mode),
         )
-    if gen in _NVIDIA_AV1_OK:
-        av["av1"] = _Candidate(
-            obs_encoder_id = "obs_nvenc_av1_tex",
-            codec          = "av1",
-            backend        = "nvenc",
-            label          = f"NVENC AV1 ({gen.title()})",
-            description    = "NVIDIA hardware AV1 - smallest files; newest playback support only.",
-            builder        = lambda cqp, mode, g=gen: _build_nvenc_av1(cqp, g, mode),
-        )
     return av
 
 
@@ -319,15 +263,6 @@ def _amf_candidates(gen: str) -> Dict[str, _Candidate]:
             description    = "AMD hardware HEVC - significantly smaller files than H.264.",
             builder        = lambda cqp, mode, g=gen: _build_amf_hevc(cqp, g, mode),
         )
-    if gen in _AMD_AV1_OK:
-        av["av1"] = _Candidate(
-            obs_encoder_id = "av1_amf",
-            codec          = "av1",
-            backend        = "amf",
-            label          = f"AMF AV1 ({gen.upper()})",
-            description    = "AMD hardware AV1 - smallest files; needs newer playback.",
-            builder        = lambda cqp, mode, g=gen: _build_amf_av1(cqp, g, mode),
-        )
     return av
 
 
@@ -349,15 +284,6 @@ def _qsv_candidates(gen: str) -> Dict[str, _Candidate]:
             label          = f"Quick Sync HEVC ({gen.replace('_', ' ').title()})",
             description    = "Intel iGPU HEVC - smaller files, low overhead.",
             builder        = lambda cqp, mode, g=gen: _build_qsv_hevc(cqp, g, mode),
-        )
-    if gen in _INTEL_AV1_OK:
-        av["av1"] = _Candidate(
-            obs_encoder_id = "obs_qsv11_av1",
-            codec          = "av1",
-            backend        = "qsv",
-            label          = "Quick Sync AV1 (Arc)",
-            description    = "Intel Arc AV1 - smallest files; needs newer playback.",
-            builder        = lambda cqp, mode, g=gen: _build_qsv_av1(cqp, g, mode),
         )
     return av
 
@@ -392,9 +318,8 @@ def _available_candidates(gpu: Optional[Gpu]) -> Dict[str, _Candidate]:
     return candidates
 
 
-# preferred-codec fallback order. auto deliberately prefers hevc over av1 -- av1 playback support is still uneven.
+# preferred-codec fallback order.
 _FALLBACK_ORDER = {
-    CodecPreference.AV1:  ("av1",  "h265", "h264", "software"),
     CodecPreference.H265: ("h265", "h264", "software"),
     CodecPreference.H264: ("h264", "software"),
     CodecPreference.AUTO: ("h265", "h264", "software"),
@@ -435,13 +360,11 @@ def pick_encoder(gpu: Optional[Gpu],
 
 
 def available_codecs(gpu: Optional[Gpu]) -> Dict[str, str]:
-    """codec slug -> short label for the codecs this gpu can actualy run. used by the cli to hide av1 from someone on a gtx 1080. 'auto' is always included."""
+    """codec slug -> short label for the codecs this gpu can actualy run. 'auto' is always included."""
     cand = _available_candidates(gpu)
     labels = {"auto": "Auto (pick best for this GPU)"}
     if "h264" in cand:
         labels["h264"] = cand["h264"].label
     if "h265" in cand:
         labels["h265"] = cand["h265"].label
-    if "av1" in cand:
-        labels["av1"] = cand["av1"].label
     return labels

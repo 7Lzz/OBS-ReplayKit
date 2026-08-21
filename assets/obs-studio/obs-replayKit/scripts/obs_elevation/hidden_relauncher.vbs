@@ -6,7 +6,7 @@ Set shell = CreateObject("WScript.Shell")
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 
 rem two invocation modes: shellexecuteex fallback (the original flow). the lua passes "<obspath> <pid>" on the command line, the uac prompt fires, and the elevated wscript receives both args directly. scheduled-task flow (the no-uac flow). schtasks /run cant forward arguments to the task action, so the lua writes the pair into %temp%\obsreplaykit_elevate.txt right before calling schtasks. the task action invokes this script with no args, so we look for that handoff file as the fallback. format is two lines, plain ascii: <absolute path to obs64.exe> <integer pid of the running obs to terminate> missing/malformed handoff file falls thru to the hardcoded defaults below, which is intentionally degraded behaviour: we still launch obs, we just cant terminate any specific stale instance first.
-handoffPath = shell.ExpandEnvironmentStrings("%TEMP%") & "\obsreplaykit_elevate.txt"
+handoffPath = shell.ExpandEnvironmentStrings("%TEMP%") & "\ReplayKit\scratch\obsreplaykit_elevate.txt"
 
 If WScript.Arguments.Count >= 1 Then
   obsPath = WScript.Arguments.Item(0)

@@ -1,4 +1,4 @@
-﻿# compile utils\launcher\obsreplaykit.cs into the launcher exe (defualt out: assets\obs-studio\obs-replayKit\scripts\streamable\obsreplaykit.exe). uses csc.exe + system.management.automation.dll that ship with windows 10/11 -- no external dependencies. icon priority: caller -iconpath, then committed utils\icon\obs-replaykit.ico, then regenerated from obs64.exe via extract_obs_icon.ps1.
+﻿# compile utils\launcher\obsreplaykit.cs into the launcher exe (defualt out: assets\obs-studio\obs-replayKit\scripts\helper\obsreplaykit.exe). uses csc.exe + system.management.automation.dll that ship with windows 10/11 -- no external dependencies. icon priority: caller -iconpath, then committed utils\icon\obs-replaykit.ico, then regenerated from obs64.exe via extract_obs_icon.ps1.
 
 [CmdletBinding()]
 param(
@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 # $psscriptroot is sometimes empty during param() defualt evaluation depending on the host; resolve defaults here instead, after the body has started.
 if (-not $OutPath) {
-    $OutPath = Join-Path $PSScriptRoot '..\..\assets\obs-studio\obs-replayKit\scripts\streamable\OBSReplayKit.exe'
+    $OutPath = Join-Path $PSScriptRoot '..\..\assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe'
 }
 
 function Find-CscExe {
@@ -55,6 +55,18 @@ function Invoke-IconExtractor([string]$exePath, [string]$icoOut) {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $extractor `
         -ExePath $exePath -OutPath $icoOut | Out-Null
     return ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $icoOut))
+}
+
+function Test-LauncherOutputCurrent([string]$targetPath, [string[]]$inputPaths) {
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) { return $false }
+    $target = Get-Item -LiteralPath $targetPath
+    foreach ($inputPath in $inputPaths) {
+        if ([string]::IsNullOrWhiteSpace($inputPath)) { continue }
+        if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) { return $false }
+        $inputItem = Get-Item -LiteralPath $inputPath
+        if ($inputItem.LastWriteTimeUtc -gt $target.LastWriteTimeUtc) { return $false }
+    }
+    return $true
 }
 
 $csc = Find-CscExe
@@ -102,6 +114,16 @@ if ($IconPath -and (Test-Path -LiteralPath $IconPath)) {
 $srcPath = Join-Path $PSScriptRoot 'OBSReplayKit.cs'
 if (-not (Test-Path -LiteralPath $srcPath)) {
     throw "Missing source: $srcPath"
+}
+
+$launcherInputs = @($srcPath, $csc, $sma)
+if ($winIcon) { $launcherInputs += $winIcon }
+if (Test-LauncherOutputCurrent $OutPath $launcherInputs) {
+    $built = Get-Item -LiteralPath $OutPath
+    $kb = [int][Math]::Ceiling($built.Length / 1024)
+    Write-Host ''
+    Write-Host ("Current: " + $built.FullName + "  (" + $kb + " KB)")
+    return
 }
 
 $cscArgs = @(
