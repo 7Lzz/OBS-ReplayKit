@@ -245,8 +245,8 @@ public static class ReplayKitNative {
         try {
             using (var p = System.Diagnostics.Process.GetProcessById((int)pid)) {
                 string n = p.ProcessName.ToLowerInvariant();
-                // obs64.exe, obs.exe, obs-browser-page.exe, obs-ffmpeg-mux, crashpad_handler, and other obs-* subprocesses.
-                return n == "obs64" || n == "obs" || n.StartsWith("obs-");
+                // obs64.exe, obs.exe, obs-browser-page.exe, obs-ffmpeg-mux, crashpad_handler, and other obs-* subprocesses -- plus chrome, since the update-prompt/settings/controls popups we spawn ourselves via "chrome --app=" run as a genuine standalone chrome.exe, not a cef popup inside obs64s own process tree. the title match callers already do (exact/prefix against a specific known title) is what actually scopes this, not the process name.
+                return n == "obs64" || n == "obs" || n == "chrome" || n.StartsWith("obs-");
             }
         } catch { return false; }
     }
@@ -518,9 +518,16 @@ public static class ReplayKitNative {
 
     // returns the number of windows whose title matched `needle` and were styled. 0 means we didnt find any -- the caller logs that so a stuck "white title bar" bug is debuggable from the helper log instead of being a silent no-op.
     public static int StyleWindow(string needle, string iconPath, bool taskbar) {
-        Icon icon = null;
+        // iconPath is a standalone .ico, not an exe to pull a resource out of -- ExtractAssociatedIcon only ever returns one low-res frame (the exe's default), where new Icon(path, size) picks the best matching frame out of the full multi-resolution file for each of the two sizes windows actually asks for.
+        Icon smallIcon = null;
+        Icon bigIcon = null;
         int matched = 0;
-        try { if (File.Exists(iconPath)) icon = Icon.ExtractAssociatedIcon(iconPath); } catch {}
+        try {
+            if (File.Exists(iconPath)) {
+                smallIcon = new Icon(iconPath, new Size(16, 16));
+                bigIcon   = new Icon(iconPath, new Size(32, 32));
+            }
+        } catch {}
         EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
             if (!IsWindowVisible(hWnd)) return true;
             uint pid = 0;
@@ -540,9 +547,9 @@ public static class ReplayKitNative {
                 DwmSetWindowAttribute(hWnd, 35, ref caption, 4);
                 DwmSetWindowAttribute(hWnd, 34, ref border,  4);
                 DwmSetWindowAttribute(hWnd, 36, ref white,   4);
-                if (icon != null) {
-                    SendMessage(hWnd, WM_SETICON, IntPtr.Zero,     icon.Handle);
-                    SendMessage(hWnd, WM_SETICON, new IntPtr(1),   icon.Handle);
+                if (smallIcon != null && bigIcon != null) {
+                    SendMessage(hWnd, WM_SETICON, IntPtr.Zero,     smallIcon.Handle);
+                    SendMessage(hWnd, WM_SETICON, new IntPtr(1),   bigIcon.Handle);
                 }
                 if (taskbar) AddTaskbarTab(hWnd);
                 // broadcast theme-changed first so cef refreshes any cached title-bar render state, then re-set dwm attributes (some chromium versions reset them in response to wm_themechanged -- we want our values to be the last write).

@@ -369,7 +369,7 @@ animation:r 0.8s linear infinite}
             $taskbar = $query.ContainsKey('taskbar') -and ([string]$query['taskbar'] -eq '1')
             $matched = -1
             try {
-                $matched = [int][ReplayKitNative]::StyleWindow($title, $script:OBS_EXE, $taskbar)
+                $matched = [int][ReplayKitNative]::StyleWindow($title, $script:OBS_ICON_PATH, $taskbar)
             } catch {
                 Write-Log "/style-window threw: $($_.Exception.Message)"
             }

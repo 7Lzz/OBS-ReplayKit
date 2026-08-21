@@ -293,7 +293,8 @@ function Get-ReplayKitUpdateObsPath {
 
 function Start-ReplayKitUpdater([string]$installerPath, [string]$tempDir) {
     $obsPath = Get-ReplayKitUpdateObsPath
-    $waitPid = if ($script:ParentPid -gt 0) { [int]$script:ParentPid } else { 0 }
+    # wait on this helpers own pid, not obs -- close_obs already confirms obs is dead synchronously before the installer even reaches this wait, but this helper process (which holds the lock on its own exe under scripts/helper/) only exits afterward, asynchronously, once its parent-watchdog notices obs is gone. waiting on obs pid here raced the copy step against that and lost.
+    $waitPid = [int]$PID
     $argList = @('--update', '--cleanup-dir', $tempDir, '--start-delay-ms', '1200')
     if (-not [string]::IsNullOrWhiteSpace($obsPath)) {
         $argList += @('--relaunch-obs', $obsPath)

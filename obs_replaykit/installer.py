@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -59,6 +60,19 @@ def _install_text_source(src: Path, rel: Path, dst: Path) -> str:
     return _read_text_file(src)
 
 
+def _write_with_retry(write_fn: Callable[[], None]) -> None:
+    """retry a write for a few seconds on PermissionError -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller running old code may also be racing this on its own (see 63_update.ps1s wait-pid), so this retry is the backstop that holds regardless of what triggered the update."""
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            write_fn()
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.25)
+
+
 def _install_file(src: Path, rel: Path, dst: Path, prefs: Preferences) -> None:
     """copy src to dst; text files get rewrite_user_paths + apply_preferences first."""
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -66,9 +80,9 @@ def _install_file(src: Path, rel: Path, dst: Path, prefs: Preferences) -> None:
         content = _install_text_source(src, rel, dst)
         content = rewrite_user_paths(content, USERNAME)
         content = apply_preferences(rel, content, prefs)
-        dst.write_text(content, encoding="utf-8")
+        _write_with_retry(lambda: dst.write_text(content, encoding="utf-8"))
     else:
-        shutil.copy2(src, dst)
+        _write_with_retry(lambda: shutil.copy2(src, dst))
 
 
 def write_replaykit_version(log: LogFn = None) -> Path:
