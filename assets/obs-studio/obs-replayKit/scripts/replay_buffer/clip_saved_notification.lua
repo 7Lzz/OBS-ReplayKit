@@ -178,7 +178,7 @@ local function load_runtime_settings()
     if obs.obs_data_has_user_value(data, "clipNotificationSeconds") then
         cfg.seconds = clamp_int(
             obs.obs_data_get_int(data, "clipNotificationSeconds"),
-            1, 600, cfg.seconds
+            1, 1200, cfg.seconds
         )
     end
     obs.obs_data_release(data)
@@ -233,7 +233,7 @@ function script_update(settings)
     cfg.recording_enabled = obs.obs_data_get_bool(settings, "recording_notification_enabled")
     cfg.seconds = clamp_int(
         obs.obs_data_get_int(settings, "clip_notification_seconds"),
-        1, 600, 90
+        1, 1200, 90
     )
     load_runtime_settings()
 end

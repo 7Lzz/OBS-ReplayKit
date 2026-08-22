@@ -1181,6 +1181,8 @@
   })();
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const REPLAY_SECONDS_MIN = 5;
+  const REPLAY_SECONDS_MAX = 1200;
   const DEFAULT_CLIP_KEYBIND = { shift:true, key:"OBS_KEY_BACKSLASH" };
   const DEFAULT_RECORDING_KEYBIND = {};
   const state = {};
@@ -1770,12 +1772,20 @@
   }
 
   function readReplaySeconds() {
-    const n = parseInt(els.replaySeconds.value, 10);
-    return Number.isFinite(n) ? Math.max(5, Math.min(600, n)) : 90;
+    const raw = String(els.replaySeconds.value || "").trim();
+    const parts = raw.match(/^(?:(\d+)\s*m)?\s*(?:(\d+)\s*s?)?$/i);
+    const total = (parts && (parts[1] !== undefined || parts[2] !== undefined))
+      ? (parseInt(parts[1] || "0", 10) * 60) + parseInt(parts[2] || "0", 10)
+      : parseInt(raw, 10);
+    return Number.isFinite(total) ? Math.max(REPLAY_SECONDS_MIN, Math.min(REPLAY_SECONDS_MAX, total)) : 90;
   }
 
   function replaySecondsLabel(value) {
-    return String(value) + " s";
+    const v = Math.max(0, Math.round(value));
+    if (v < 60) return v + "s";
+    const m = Math.floor(v / 60);
+    const s = v % 60;
+    return s === 0 ? (m + "m") : (m + "m " + s + "s");
   }
 
   function clampVolume(value) {
@@ -2279,6 +2289,14 @@
     markDirty();
   });
 
+  els.replaySeconds.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 5 : -5;
+    els.replaySeconds.value = replaySecondsLabel(Math.max(REPLAY_SECONDS_MIN, Math.min(REPLAY_SECONDS_MAX, readReplaySeconds() + step)));
+    readUi();
+    markDirty();
+  }, { passive: false });
+
   [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.discordScreenshareEnabled, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => { readUi(); markDirty(); });
   });
@@ -2289,7 +2307,7 @@
   document.querySelectorAll("[data-spin]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const step = btn.dataset.spin === "up" ? 5 : -5;
-      els.replaySeconds.value = replaySecondsLabel(Math.max(5, Math.min(600, readReplaySeconds() + step)));
+      els.replaySeconds.value = replaySecondsLabel(Math.max(REPLAY_SECONDS_MIN, Math.min(REPLAY_SECONDS_MAX, readReplaySeconds() + step)));
       readUi();
       markDirty();
     });

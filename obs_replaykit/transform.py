@@ -1,6 +1,7 @@
 """splice user prefs into bundled obs config files (basic.ini, recordencoder.json, scenes json, user.ini, global.ini)."""
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Optional
@@ -12,7 +13,7 @@ from .encoder import EncoderChoice, pick_encoder
 from .gpu import primary_gpu
 from .keybind import to_basic_ini_value, to_obs_hotkey_value
 from .prefs import Preferences
-from .recording import get_preset
+from .recording import RecordingPreset, get_preset
 
 
 # targeted regex over configparser becuase obss basic.ini has formatting we want byte-identical (no spaces around =, blank lines, base64 blobs in geometry=).
@@ -109,6 +110,24 @@ def _preset_video_ini(prefs: Preferences) -> dict[str, str]:
     return {key: str(value) for key, value in video.items()}
 
 
+_MIN_RB_SIZE_MB = 32
+
+# realistic peak cqp bitrate per preset tier (mbps) -- a high-motion scene at that resolution/cqp_target, not a padded worst-of-worst-case number. cqp output size is content-driven so this is an estimate, not exact.
+_RB_PEAK_MBPS = {
+    "performance": 8,
+    "balanced":    20,
+    "quality":     32,
+}
+_RB_SAFETY_FACTOR = 1.5  # headroom over the peak estimate, not a second multiplier on top of an already-padded one
+
+
+def _scaled_rb_size_mb(preset: RecordingPreset, prefs: Preferences) -> int:
+    """size the replay-buffer memory cap from an actual bitrate estimate for this preset x the users chosen buffer length, so it tracks ram usage realistically instead of ballooning at long buffer lengths (the old version scaled a flat per-tier constant that was itself padded for safety, which compounded into gb-scale caps most peoples machines dont have)."""
+    peak_mbps = _RB_PEAK_MBPS.get(preset.name, _RB_PEAK_MBPS["balanced"])
+    mb_per_second = peak_mbps * _RB_SAFETY_FACTOR / 8
+    return max(_MIN_RB_SIZE_MB, math.ceil(mb_per_second * prefs.replay_buffer_seconds))
+
+
 def apply_basic_ini(text: str, prefs: Preferences) -> str:
     preset = get_preset(prefs.recording_preset)
     for section, items in preset.basic_ini.items():
@@ -123,7 +142,7 @@ def apply_basic_ini(text: str, prefs: Preferences) -> str:
 
     text = _set_ini_value(text, "AdvOut", "RecRB",     "true")
     text = _set_ini_value(text, "AdvOut", "RecRBTime", str(prefs.replay_buffer_seconds))
-    text = _set_ini_value(text, "AdvOut", "RecRBSize", str(preset.rec_rb_size_mb))
+    text = _set_ini_value(text, "AdvOut", "RecRBSize", str(_scaled_rb_size_mb(preset, prefs)))
 
     # forward slashes -- obs accepts them in ini values and skips escaping.
     rec_path = prefs.recording_path.replace("\\", "/")

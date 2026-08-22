@@ -1,6 +1,6 @@
 param(
     [ValidateSet('clip', 'recording-started', 'recording-stopped')][string]$Kind = 'clip',
-    [ValidateRange(1, 600)][int]$Seconds = 90,
+    [ValidateRange(1, 1200)][int]$Seconds = 90,
     [ValidateRange(500, 10000)][int]$DurationMs = 3200
 )
 

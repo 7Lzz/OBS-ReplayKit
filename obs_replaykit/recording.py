@@ -12,7 +12,6 @@ class RecordingPreset:
     description: str
     basic_ini:   Dict[str, Dict[str, str]]
     cqp_target:  int
-    rec_rb_size_mb: int  # replay-buffer memory budget for this tier
 
 
 PRESETS: Tuple[RecordingPreset, ...] = (
@@ -34,7 +33,6 @@ PRESETS: Tuple[RecordingPreset, ...] = (
             },
         },
         cqp_target     = 26,
-        rec_rb_size_mb = 256,
     ),
 
     RecordingPreset(
@@ -55,7 +53,6 @@ PRESETS: Tuple[RecordingPreset, ...] = (
             },
         },
         cqp_target     = 22,
-        rec_rb_size_mb = 1024,
     ),
 
     RecordingPreset(
@@ -76,7 +73,6 @@ PRESETS: Tuple[RecordingPreset, ...] = (
             },
         },
         cqp_target     = 20,
-        rec_rb_size_mb = 1524,
     ),
 )
 

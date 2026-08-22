@@ -228,7 +228,7 @@ function Normalize-ReplayKitSettings($raw) {
     $compression = Get-EnumSetting $data 'compressionMode' $compressionDefault @('lower_gpu', 'balanced', 'smaller_files')
 
     $clipDir = Resolve-ClipDirSetting ([string]$data.clipDir)
-    $replaySeconds = Get-IntSetting $data 'replaySeconds' $defaults.replaySeconds 5 600
+    $replaySeconds = Get-IntSetting $data 'replaySeconds' $defaults.replaySeconds 5 1200
 
     $shareMode = Get-EnumSetting $data 'shareMode' $defaults.shareMode @('projector', 'share_bridge', 'virtual_camera_legacy', 'vcam', 'screenshare')
     if ($shareMode -ne 'projector') {
@@ -269,7 +269,7 @@ function Normalize-ReplayKitSettings($raw) {
         pinObsTrayIcon           = Get-BoolSetting $data 'pinObsTrayIcon' $defaults.pinObsTrayIcon
         clipNotificationEnabled  = Get-BoolSetting $data 'clipNotificationEnabled' $defaults.clipNotificationEnabled
         recordingNotificationEnabled = Get-BoolSetting $data 'recordingNotificationEnabled' $defaults.recordingNotificationEnabled
-        clipNotificationSeconds  = Get-IntSetting $data 'clipNotificationSeconds' $replaySeconds 1 600
+        clipNotificationSeconds  = Get-IntSetting $data 'clipNotificationSeconds' $replaySeconds 1 1200
         trimPreciseDefault       = Get-BoolSetting $data 'trimPreciseDefault' $defaults.trimPreciseDefault
         debugLoggingEnabled      = Get-BoolSetting $data 'debugLoggingEnabled' $defaults.debugLoggingEnabled
         autoDeleteLogsOnLaunch   = Get-BoolSetting $data 'autoDeleteLogsOnLaunch' $defaults.autoDeleteLogsOnLaunch
@@ -803,7 +803,6 @@ function Get-ReplayKitPresetSpec([string]$name) {
             $videoSpec = Resolve-ReplayKitPresetVideoSpec 1280 720 30 1
             return @{
                 cqp = 26
-                replayBufferMb = 256
                 video = $videoSpec.video
                 profile = $videoSpec.profile
                 source = $videoSpec.source
@@ -813,7 +812,6 @@ function Get-ReplayKitPresetSpec([string]$name) {
             $videoSpec = Resolve-ReplayKitPresetVideoSpec 1920 1080 60 1
             return @{
                 cqp = 20
-                replayBufferMb = 1524
                 video = $videoSpec.video
                 profile = $videoSpec.profile
                 source = $videoSpec.source
@@ -823,13 +821,23 @@ function Get-ReplayKitPresetSpec([string]$name) {
             $videoSpec = Resolve-ReplayKitPresetVideoSpec 1920 1080 60 1
             return @{
                 cqp = 22
-                replayBufferMb = 1024
                 video = $videoSpec.video
                 profile = $videoSpec.profile
                 source = $videoSpec.source
             }
         }
     }
+}
+
+function Get-ReplayKitScaledRbSizeMb([string]$presetName, [int]$replaySeconds) {
+    # realistic peak cqp bitrate per preset tier (mbps), not a padded worst-case number -- mirrors _RB_PEAK_MBPS in obs_replaykit/transform.py (the fresh-install/repair path), keep both in sync if this changes. this is the live-apply path the custom settings dock actually hits, so it needs its own copy of the same formula rather than a static per-tier mb value that ignores replaySeconds.
+    $peakMbps = switch ($presetName) {
+        'performance' { 8 }
+        'quality'     { 32 }
+        default       { 20 }
+    }
+    $mbPerSecond = $peakMbps * 1.5 / 8
+    return [Math]::Max(32, [Math]::Ceiling($mbPerSecond * $replaySeconds))
 }
 
 function Get-ReplayKitNvencEffort([string]$mode) {
@@ -1227,7 +1235,7 @@ function Set-ReplayKitReplayBufferOutputLive([hashtable]$settings, [hashtable]$p
     $clipDir = [string]$settings.clipDir
     if ([string]::IsNullOrWhiteSpace($clipDir)) { $clipDir = Get-DefaultClipDir }
     $outputSettings['max_time_sec'] = [int]$settings.replaySeconds
-    $outputSettings['max_size_mb'] = [int]$preset.replayBufferMb
+    $outputSettings['max_size_mb'] = Get-ReplayKitScaledRbSizeMb ([string]$settings.recordingPreset) ([int]$settings.replaySeconds)
     $outputSettings['directory'] = $clipDir
     $outputSettings['path'] = $clipDir
 
@@ -4654,6 +4662,19 @@ function Sync-HotkeysFromObs([hashtable]$settings) {
     return $settings
 }
 
+function Sync-ReplayBufferSecondsFromObs([hashtable]$settings) {
+    # obs' own settings dialog can edit RecRBTime directly, bypassing replaykit entirely -- without this, the custom settings dock keeps showing (and would re-apply) whatever replaykit last wrote, silently reverting the users obs-side edit on the next apply.
+    $rb = Get-ReplayKitObsProfileParameterValue 'AdvOut' 'RecRBTime'
+    if (-not $rb.ok) { return $settings }
+    $seconds = 0
+    if (-not [int]::TryParse($rb.value, [ref]$seconds)) { return $settings }
+    if ($seconds -le 0 -or $seconds -eq [int]$settings.replaySeconds) { return $settings }
+    $settings.replaySeconds = $seconds
+    $settings.clipNotificationSeconds = $seconds
+    Write-ReplayKitSettings $settings
+    return $settings
+}
+
 function Set-ReplayKitHotkeyCapture([bool]$active) {
     if ($active) {
         # holds the lock across the whole snapshot capture, not just the check -- a lost race here means the second caller sees Active already true and skips capturing, but the FIRST callers capture is what everyone restores to later, so two callers must never both think they need to capture; rare and user-initiated, so the extra hold time is cheap to pay for that guarantee.
@@ -4759,7 +4780,7 @@ function Apply-ReplayKitLiveSettings([hashtable]$settings, [bool]$restartObs = $
     $profileUpdates += @(
         @('AdvOut', 'RecRB', 'true'),
         @('AdvOut', 'RecRBTime', [string][int]$settings.replaySeconds),
-        @('AdvOut', 'RecRBSize', [string][int]$preset.replayBufferMb),
+        @('AdvOut', 'RecRBSize', [string](Get-ReplayKitScaledRbSizeMb ([string]$settings.recordingPreset) ([int]$settings.replaySeconds))),
         @('AdvOut', 'RecEncoder', [string]$encoder.id),
         @('Hotkeys', 'ReplayBuffer', (Convert-ClipKeybindToBasicIni $settings.clipKeybind))
     )
@@ -4875,6 +4896,7 @@ function Get-ReplayKitSettingsPayload {
     Load-Config
     $settings = Read-ReplayKitSettings
     $settings = Sync-HotkeysFromObs $settings
+    $settings = Sync-ReplayBufferSecondsFromObs $settings
     if ([string]::IsNullOrWhiteSpace([string]$settings.clipDir) -and
         -not [string]::IsNullOrWhiteSpace([string]$script:State.Config.clipDir)) {
         $settings.clipDir = Resolve-ClipDirSetting ([string]$script:State.Config.clipDir)
