@@ -17,6 +17,7 @@ def _fallback_exit(rc: int = 0) -> None:
 if os.name != "nt":
     fast_exit = _fallback_exit
     install_console_close_handler = _install_noop_handler
+    hide_console_window = _install_noop_handler
 else:
     import ctypes
     from ctypes import wintypes
@@ -68,6 +69,19 @@ else:
     kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
     kernel32.SetConsoleCtrlHandler.argtypes = [ctypes.c_void_p, wintypes.BOOL]
     kernel32.SetConsoleCtrlHandler.restype = wintypes.BOOL
+    kernel32.GetConsoleWindow.argtypes = []
+    kernel32.GetConsoleWindow.restype = wintypes.HWND
+
+    user32 = ctypes.windll.user32
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    _SW_HIDE = 0
+
+    def hide_console_window() -> None:
+        """hide this processs own console window if it has one. --update mode should never show a window regardless of how it was launched -- the caller is supposed to launch it hidden already, but an old/different caller (e.g. an already-installed version thats not been updated yet) might not, and closing an unexpected console window triggers install_console_close_handlers instant TerminateProcess below with zero trace. this is the second layer that does not depend on the caller getting it right."""
+        hwnd = kernel32.GetConsoleWindow()
+        if hwnd:
+            user32.ShowWindow(hwnd, _SW_HIDE)
 
     def _same_path(left: str, right: str) -> bool:
         try:

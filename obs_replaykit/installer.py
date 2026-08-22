@@ -61,8 +61,8 @@ def _install_text_source(src: Path, rel: Path, dst: Path) -> str:
 
 
 def _write_with_retry(write_fn: Callable[[], None]) -> None:
-    """retry a write for a few seconds on PermissionError -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller running old code may also be racing this on its own (see 63_update.ps1s wait-pid), so this retry is the backstop that holds regardless of what triggered the update."""
-    deadline = time.monotonic() + 5.0
+    """retry a write for a while on PermissionError -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller running old code may also be racing this on its own (see 63_update.ps1s wait-pid), so this retry is the backstop that holds regardless of what triggered the update. normally the old process is gone in well under a second; 20s is padding for a loaded system, not the expected case."""
+    deadline = time.monotonic() + 20.0
     while True:
         try:
             write_fn()

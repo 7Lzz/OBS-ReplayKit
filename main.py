@@ -2,9 +2,11 @@
 
 import sys
 
-from obs_replaykit.fast_exit import fast_exit, install_console_close_handler
+from obs_replaykit.fast_exit import fast_exit, hide_console_window, install_console_close_handler
 
 
+if "--update" in sys.argv:
+    hide_console_window()
 install_console_close_handler()
 
 from obs_replaykit.cli import run_cli

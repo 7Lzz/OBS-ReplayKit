@@ -322,6 +322,8 @@ function Start-ReplayKitUpdater([string]$installerPath, [string]$tempDir) {
     $psi.WorkingDirectory = $tempDir
     $psi.UseShellExecute = $true
     $psi.Verb = 'runas'
+    # createnowindow is ignored under useshellexecute, so windowstyle is the only knob that actually suppresses the consoles window here -- without it the elevated update.exe pops a visible console, and closing that (reasonably, since nothing explains what it is) kills the update mid-copy.
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
     Write-ReplayKitUpdateDebug "Start-ReplayKitUpdater (non-admin, runas): $installerPath"
     $p = [System.Diagnostics.Process]::Start($psi)
     return @{ ok = $true; processId = [int]$p.Id }
