@@ -41,7 +41,31 @@
     grid-template-rows:1fr auto;
     background:var(--window);
     padding:14px;
+    position:relative;
   }
+  .resize-grip {
+    position:absolute;
+    right:2px;
+    bottom:2px;
+    width:18px;
+    height:18px;
+    opacity:.95;
+    cursor:nwse-resize;
+    pointer-events:auto;
+  }
+  .resize-grip span {
+    position:absolute;
+    width:2px;
+    height:2px;
+    background:#ffffff;
+    border-radius:50%;
+  }
+  .resize-grip span:nth-child(1) { right:0; bottom:0; }
+  .resize-grip span:nth-child(2) { right:3px; bottom:0; }
+  .resize-grip span:nth-child(3) { right:6px; bottom:0; }
+  .resize-grip span:nth-child(4) { right:0; bottom:3px; }
+  .resize-grip span:nth-child(5) { right:3px; bottom:3px; }
+  .resize-grip span:nth-child(6) { right:0; bottom:6px; }
   .content {
     background:var(--panel);
     border-radius:4px;
@@ -109,7 +133,8 @@
     background:var(--window);
     border:1px solid var(--field);
     border-radius:3px;
-    max-height:260px;
+    flex:1 1 auto;
+    min-height:80px;
     overflow:auto;
     font-size:12px;
     line-height:1.5;
@@ -217,6 +242,7 @@
     <button class="btn" type="button" id="laterBtn">Later</button>
     <button class="btn primary" type="button" id="downloadBtn" disabled>Download?</button>
   </footer>
+  <div class="resize-grip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
 </div>
 <script>
   (function lockdown() {
@@ -261,6 +287,7 @@
     progressStage: document.getElementById("progressStage"),
     notes: document.getElementById("notes"),
     notesLabel: document.getElementById("notesLabel"),
+    resizeGrip: document.querySelector(".resize-grip"),
   };
   let latest = null;
   let restartWatchTimer = null;
@@ -367,6 +394,9 @@
   }
   styleNativeChrome();
   [400, 900, 1800, 3500].forEach((d) => setTimeout(styleNativeChrome, d));
+
+  // one-shot only, not on the retry schedule above -- chromes own --window-size flag on spawn gets silently ignored whenever chrome already had a running instance, so this corrects it for real once the window exists. deliberately not repeated like styleNativeChrome, so it does not fight a user who drags the resize-grip afterward.
+  fetch(HELPER + "/window/set-size?title=ReplayKit%20Update&w=700&h=580&t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
 
   function setStatus(text, kind) {
     els.status.textContent = text || "";
@@ -524,8 +554,17 @@
     }
   }
 
+  function beginResizeWindow(e) {
+    e.preventDefault();
+    fetch(HELPER + "/window/resize?title=ReplayKit%20Update&t=" + Date.now(), {
+      method:"POST",
+      cache:"no-store",
+    }).catch(() => {});
+  }
+
   els.downloadBtn.addEventListener("click", downloadUpdate);
   els.laterBtn.addEventListener("click", later);
+  els.resizeGrip.addEventListener("pointerdown", beginResizeWindow);
   loadUpdate();
 </script>
 </body>

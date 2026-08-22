@@ -88,8 +88,8 @@ if ($browserPath) {
     try { [void](New-Item -ItemType Directory -Path $profileDir -Force -ErrorAction SilentlyContinue) } catch {}
 
     # center on the primary monitor -- winforms is the cheapest way to get screen bounds from ps; if the load fails (Server Core etc.) we fall back to a sensible fixed offset rather than abort.
-    $winWidth = 560
-    $winHeight = 460
+    $winWidth = 700
+    $winHeight = 580
     $posX = 200
     $posY = 200
     try {

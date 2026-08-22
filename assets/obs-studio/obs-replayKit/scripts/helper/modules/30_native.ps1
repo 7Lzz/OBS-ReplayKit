@@ -87,6 +87,10 @@ public static class ReplayKitNative {
     [DllImport("user32.dll")]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int X, int Y, int cx, int cy, uint uFlags);
+    [DllImport("user32.dll")]
+    static extern int GetSystemMetrics(int nIndex);
+    const int SM_CXSCREEN = 0;
+    const int SM_CYSCREEN = 1;
     [DllImport("user32.dll", EntryPoint="GetWindowLongPtr", SetLastError=true)]
     static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll", EntryPoint="SetWindowLongPtr", SetLastError=true)]
@@ -686,6 +690,17 @@ public static class ReplayKitNative {
         ShowWindow(hwnd, SW_RESTORE);
         SetWindowPos(hwnd, IntPtr.Zero, r.Left, r.Top, w, h, SWP_NOZORDER);
         return true;
+    }
+
+    // forces a size/centered-position on a window we just spawned via "chrome --app=", since chromes own --window-size/--window-position flags are silently ignored whenever chrome already has a running instance for this profile -- the new window just gets whatever size that existing instance feels like giving it instead. calling this once after the page loads (same idea as /style-window) fixes it up for real regardless of what chrome did.
+    public static bool SetWindowSizeCentered(string needle, int width, int height) {
+        IntPtr hwnd = FindObsWindow(needle);
+        if (hwnd == IntPtr.Zero) return false;
+        int screenW = GetSystemMetrics(SM_CXSCREEN);
+        int screenH = GetSystemMetrics(SM_CYSCREEN);
+        int x = Math.Max(0, (screenW - width) / 2);
+        int y = Math.Max(0, (screenH - height) / 2);
+        return SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, SWP_NOZORDER);
     }
 
     // drag-to-resize for the borderless custom-chrome popups (Clips, ReplayKit Settings), which have no native resize border to grab. always moves both width and height off the one drag (see the grip css -- its one hit area, not per-edge zones), clamped to bounds the caller passes in per window. polls the left mouse button on a background thread instead of message-based approaches (eg wm_nclbuttondown) becuase GetAsyncKeyState reads live hardware state directly -- it doesnt care that were a different process than obs, or that our http round trip landed some milliseconds after the real mousedown; it just checks "is the button down right now" on every tick, so a late start still tracks correctly from that point on. throttled to ~66fps (15ms) rather than hammering setwindowpos as fast as possible -- the first version of this polled at 1ms and outran cefs own repaint, leaving a black unpainted strip behind the real content until the drag settled.

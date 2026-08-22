@@ -449,6 +449,8 @@ animation:r 0.8s linear infinite}
                 $minW = 700; $minH = 500; $maxW = 2400; $maxH = 1800
             } elseif ($title -eq 'Clips') {
                 $minW = 850; $minH = 620; $maxW = 2400; $maxH = 1800
+            } elseif ($title -eq 'ReplayKit Update') {
+                $minW = 480; $minH = 400; $maxW = 2400; $maxH = 1800
             } else {
                 Send-Json $stream 400 @{ ok = $false; message = 'Unsupported window title.' }
                 return
@@ -456,6 +458,20 @@ animation:r 0.8s linear infinite}
             $resizing = $false
             try { $resizing = [ReplayKitNative]::BeginResizeWindow($title, $minW, $minH, $maxW, $maxH) } catch {}
             Send-Json $stream 200 @{ ok = $true; resizing = [bool]$resizing }
+            return
+        }
+        '^/window/set-size$' {
+            # one-shot corrective resize for a window we just spawned via "chrome --app=" -- see SetWindowSizeCentereds comment for why the spawn-time --window-size flag alone is not reliable.
+            if ($req.Method -ne 'POST') { Send-Text $stream 405 'Method Not Allowed' 'POST required'; return }
+            $title = if ($query.ContainsKey('title')) { [string]$query['title'] } else { '' }
+            $w = 0; $h = 0
+            if (-not [int]::TryParse([string]$query['w'], [ref]$w) -or -not [int]::TryParse([string]$query['h'], [ref]$h) -or $w -le 0 -or $h -le 0) {
+                Send-Json $stream 400 @{ ok = $false; message = 'Missing or invalid w/h.' }
+                return
+            }
+            $applied = $false
+            try { $applied = [ReplayKitNative]::SetWindowSizeCentered($title, $w, $h) } catch {}
+            Send-Json $stream 200 @{ ok = $true; applied = [bool]$applied }
             return
         }
         '^/open_clips$' {
