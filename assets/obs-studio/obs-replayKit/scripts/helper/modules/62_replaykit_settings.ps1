@@ -2759,8 +2759,16 @@ function Apply-ReplayKitScreenshareCaptureLive([hashtable]$settings, [hashtable]
         return @{ ok = $false; applied = $applied; warnings = @("Screenshare capture was saved, but OBS scene items could not be read: $($itemsResult.message)") }
     }
     $items = $itemsResult.items
-    $display = Find-ReplayKitSceneItem $items 'Display Capture'
-    $game = Find-ReplayKitSceneItem $items 'Game Capture'
+
+    # display capture and game capture used to be looked up only (assuming the bundled scene always has them) -- if either was ever missing (user deleted it by hand, a scene got recreated bare, etc.) this silently left screensharing broken with no way to recover short of a manual re-add. now created if missing, same treatment window capture already gets below. falls back to the plain lookup against the items already fetched above if the ensure call itself fails, matching the old behavior for that edge case.
+    $gameInputSettings = Get-ReplayKitGameCaptureInputSettings $settings
+    $displayEnsure = Ensure-ReplayKitInputSceneItem $sceneName 'Display Capture' 'monitor_capture' @{} $useDesktop
+    if (-not $displayEnsure.ok) { $warnings += "Could not prepare Display Capture: $($displayEnsure.message)" }
+    $display = if ($displayEnsure.ok) { $displayEnsure.item } else { Find-ReplayKitSceneItem $items 'Display Capture' }
+    $gameEnsure = Ensure-ReplayKitInputSceneItem $sceneName 'Game Capture' 'game_capture' $gameInputSettings $useGameCapture
+    if (-not $gameEnsure.ok) { $warnings += "Could not prepare Game Capture: $($gameEnsure.message)" }
+    $game = if ($gameEnsure.ok) { $gameEnsure.item } else { Find-ReplayKitSceneItem $items 'Game Capture' }
+
     $windowSettings = Get-ReplayKitWindowCaptureInputSettings $settings
     $windowEnsure = Ensure-ReplayKitInputSceneItem $sceneName 'Window Capture' 'window_capture' $windowSettings $useWindowCapture
     if (-not $windowEnsure.ok) {
@@ -2780,10 +2788,9 @@ function Apply-ReplayKitScreenshareCaptureLive([hashtable]$settings, [hashtable]
     $cursorResult = Set-ReplayKitDisplayCaptureCursorLive
     if (-not $cursorResult.ok) { $warnings += "Could not enable Display Capture cursor: $($cursorResult.message)" }
 
-    $inputSettings = Get-ReplayKitGameCaptureInputSettings $settings
     $setGame = Invoke-ObsWebSocketRequest 'SetInputSettings' @{
         inputName = 'Game Capture'
-        inputSettings = $inputSettings
+        inputSettings = $gameInputSettings
         overlay = $true
     } 3000
     if (-not $setGame.ok) {

@@ -49,12 +49,22 @@ def _read_text_file(path: Path) -> str:
         return path.read_text(encoding="latin-1")
 
 
+def _looks_like_replaykit_scene(data: object) -> bool:
+    """true if this scene json has replaykits own monitor_capture (display capture) source in it -- a bare scene obs auto-creates on its own first launch is valid json too, but apply_scenes_json only patches sources that already exist (it creates window_capture and the overlays, nothing else), so treating a non-replaykit scene as the reinstall base silently drops display capture, game capture, mic, and desktop audio. monitor_capture id must stay in sync with _MONITOR_SOURCE_ID in transform.py."""
+    if not isinstance(data, dict):
+        return False
+    sources = data.get("sources")
+    if not isinstance(sources, list):
+        return False
+    return any(isinstance(s, dict) and s.get("id") == "monitor_capture" for s in sources)
+
+
 def _install_text_source(src: Path, rel: Path, dst: Path) -> str:
     if rel == _USER_SCENE_REL and dst.is_file():
         try:
             content = _read_text_file(dst)
-            json.loads(content)
-            return content
+            if _looks_like_replaykit_scene(json.loads(content)):
+                return content
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             pass
     return _read_text_file(src)
