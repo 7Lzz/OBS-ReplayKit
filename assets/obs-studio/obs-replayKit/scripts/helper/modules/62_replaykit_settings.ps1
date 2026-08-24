@@ -830,7 +830,7 @@ function Get-ReplayKitPresetSpec([string]$name) {
 }
 
 function Get-ReplayKitScaledRbSizeMb([string]$presetName, [int]$replaySeconds) {
-    # realistic peak cqp bitrate per preset tier (mbps), not a padded worst-case number -- mirrors _RB_PEAK_MBPS in obs_replaykit/transform.py (the fresh-install/repair path), keep both in sync if this changes. this is the live-apply path the custom settings dock actually hits, so it needs its own copy of the same formula rather than a static per-tier mb value that ignores replaySeconds.
+    # realistic peak cqp bitrate per preset tier (mbps), not a padded worst-case number -- mirrors RbPeakMbps/ScaledRbSizeMb in ReplayKitSetup/Transform.cs (the fresh-install/repair path), keep both in sync if this changes. this is the live-apply path the custom settings dock actually hits, so it needs its own copy of the same formula rather than a static per-tier mb value that ignores replaySeconds. verified matching as of the c# port: performance=8, balanced=20, quality=32, safety factor 1.5, floor 32mb.
     $peakMbps = switch ($presetName) {
         'performance' { 8 }
         'quality'     { 32 }

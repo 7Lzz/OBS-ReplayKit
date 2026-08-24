@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ReplayKitSetup</RootNamespace>
+    <AssemblyName>OBSReplayKit</AssemblyName>
+    <Nullable>disable</Nullable>
+    <!-- must stay x64, not AnyCPU: VoiceMeeter.cs loads VoicemeeterRemote64.dll, which a 32-bit process cannot load. -->
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <ApplicationIcon>..\utils\icon\obs-replaykit.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Management" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- merges every referenced dll (Newtonsoft.Json.dll) into OBSReplayKit.exe so the shipped artifact is a single file. the package's own AfterTargets="Build" step handles plain `dotnet build`, but `dotnet publish` recomputes its file list from the project's dependency graph independently of whatever Build already did to bin/, so it re-copies a fresh Newtonsoft.Json.dll into the publish folder regardless; ILRepackPublish below re-merges the actual publish output to fix that. -->
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.34" PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="ILRepackPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
+      <PublishedAssemblies Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
+      <PublishedDllsToRemove Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
+    </ItemGroup>
+    <ILRepack
+        Parallel="true"
+        DebugInfo="false"
+        AllowDuplicateResources="false"
+        InputAssemblies="@(PublishedAssemblies)"
+        TargetKind="SameAsPrimaryAssembly"
+        OutputFile="$(PublishDir)$(TargetName)$(TargetExt)"
+    />
+    <Delete Files="@(PublishedDllsToRemove)" />
+  </Target>
+</Project>

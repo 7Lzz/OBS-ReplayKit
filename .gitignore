@@ -3,7 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# pyinstaller build outputs
+# dotnet build outputs (ReplayKitSetup, the c# port)
+ReplayKitSetup/bin/
+ReplayKitSetup/obj/
+
+# build outputs (build.bat publishes ReplayKitSetup into the repo root as a single merged exe, same spot the old pyinstaller build used)
 build/
 dist/
 /OBSReplayKit.exe
@@ -12,10 +16,14 @@ dist/
 /test_update_mode.bat
 *.spec
 
-# regenerated from obs_replaykit/__init__.py by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches __init__.py
+# private pyinstaller build with a locally-compiled bootloader, see build.bat -- rebuilt once per
+# machine from pypi source, not committed, and never touches the shared global python environment
+/utils/pyinstaller_local/
+
+# regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches VersionInfo.cs
 /assets/obs-studio/obs-replayKit/version.json
 
-# regenerated from obs_replaykit/__init__.py by build_launcher.ps1, see utils/launcher/OBSReplayKit.cs
+# regenerated from ReplayKitSetup/VersionInfo.cs by build_launcher.ps1, see utils/launcher/OBSReplayKit.cs
 /utils/launcher/AssemblyVersion.Generated.cs
 
 # one-off smoke / scratch scripts

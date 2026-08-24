@@ -1,0 +1,578 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace ReplayKitSetup
+{
+    // install bundled obs config into %appdata%/obs-studio/. walks assets/obs-studio/ as a 1:1 mirror, pipes text files thru RewriteUserPaths + ApplyPreferences before writing. ported from obs_replaykit/installer.py.
+    public static class Installer
+    {
+        // top-level entries backed up before overwriting. obs-replayKit/ covers the whole replaykit-managed tree (lua scripts, dock html, presets); global.ini is merged not overwritten but cheap to back up anyway.
+        private static readonly string[] BackupTargets = { "basic", "obs-replayKit", "plugin_manager", "plugin_config", "user.ini", "global.ini" };
+
+        // scene path inside %appdata%\obs-studio\ transformed on fresh installs and patched on runtime updates -- when it already exists, the full installer uses that live file as the transform input so user-added filters and source state survive reinstall/repair installs.
+        private static readonly string UserSceneRel = Path.Combine("basic", "scenes", "Untitled.json");
+
+        private static string ReadTextFile(string path) => Config.ReadTextFileFlexible(path);
+
+        // true if this scene json has replaykits own monitor_capture (display capture) source in it -- a bare scene obs auto-creates on its own first launch is valid json too, but ApplyScenesJson only patches sources that already exist (it creates window_capture and the overlays, nothing else), so treating a non-replaykit scene as the reinstall base silently drops display capture, game capture, mic, and desktop audio. monitor_capture id must stay in sync with transform.py.
+        private static bool LooksLikeReplaykitScene(JToken data)
+        {
+            if (!(data is JObject obj)) return false;
+            if (!(obj["sources"] is JArray sources)) return false;
+            return sources.Any(s => s is JObject so && so.Value<string>("id") == "monitor_capture");
+        }
+
+        private static string InstallTextSource(string src, string rel, string dst)
+        {
+            if (rel == UserSceneRel && File.Exists(dst))
+            {
+                try
+                {
+                    string content = ReadTextFile(dst);
+                    if (LooksLikeReplaykitScene(JToken.Parse(content))) return content;
+                }
+                catch (Exception ex) when (ex is IOException || ex is JsonException)
+                {
+                    // fall through to the bundled default.
+                }
+            }
+            return ReadTextFile(src);
+        }
+
+        // retry a write for a while on a locked file -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller may also be racing this on its own, so this retry is the backstop that holds regardless of what triggered the update. normally the old process is gone in well under a second; 20s is padding for a loaded system, not the expected case.
+        private static void WriteWithRetry(Action writeFn)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(20.0);
+            while (true)
+            {
+                try
+                {
+                    writeFn();
+                    return;
+                }
+                catch (IOException)
+                {
+                    if (DateTime.UtcNow >= deadline) throw;
+                    System.Threading.Thread.Sleep(250);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    if (DateTime.UtcNow >= deadline) throw;
+                    System.Threading.Thread.Sleep(250);
+                }
+            }
+        }
+
+        // copy src to dst; text files get RewriteUserPaths + ApplyPreferences first.
+        private static void InstallFile(string src, string rel, string dst, Preferences prefs)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(dst));
+            if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
+            {
+                string content = InstallTextSource(src, rel, dst);
+                content = PathRewrite.RewriteUserPaths(content, Config.USERNAME);
+                content = Transform.ApplyPreferences(rel, content, prefs);
+                WriteWithRetry(() => File.WriteAllText(dst, content, new System.Text.UTF8Encoding(false)));
+            }
+            else
+            {
+                WriteWithRetry(() => File.Copy(src, dst, true));
+            }
+        }
+
+        // write the installed ReplayKit runtime version used by the updater.
+        public static string WriteReplaykitVersion(Action<string> log = null)
+        {
+            string path = Path.Combine(Config.REPLAYKIT_CONFIG, "version.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, JsonConvert.SerializeObject(new JObject { ["version"] = VersionInfo.Version }, Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+            log?.Invoke($"ReplayKit version -> {VersionInfo.Version}");
+            return path;
+        }
+
+        public static bool CacheSetupExecutable(Action<string> log = null)
+        {
+            string source = Path.Combine(Config.BUNDLE_ROOT, "OBSReplayKit.exe");
+            if (!File.Exists(source))
+            {
+                log?.Invoke("warn: setup executable was not cached for in-app cleanup");
+                return false;
+            }
+            string target = Config.REPLAYKIT_SETUP_EXE;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(source, target, true);
+                }
+                log?.Invoke($"cached setup executable -> {target}");
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                log?.Invoke($"warn: setup executable cache failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        // mirror assets/obs-studio/ into %appdata%/obs-studio/. returns the file count.
+        public static int InstallObsConfig(Preferences prefs, Action<string> log = null)
+        {
+            if (!Directory.Exists(Config.OBS_ASSETS_DIR))
+            {
+                log?.Invoke($"warn: {Config.OBS_ASSETS_DIR} not found - nothing to install");
+                return 0;
+            }
+
+            MigrateLegacyStreamableState(log);
+
+            int count = 0;
+            foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
+            {
+                string rel = src.Substring(Config.OBS_ASSETS_DIR.Length).TrimStart('\\', '/');
+                string dst = Path.Combine(Config.OBS_CONFIG, rel);
+                InstallFile(src, rel, dst, prefs);
+                log?.Invoke("-> " + rel.Replace('\\', '/'));
+                count++;
+            }
+            WriteReplaykitVersion(log);
+            CacheSetupExecutable(log);
+            CleanupReplaykitLegacyFiles(log);
+            RestoreReplaykitUserState(log);
+            return count;
+        }
+
+        private static readonly HashSet<string> RuntimePreserveRels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine("obs-replayKit", "scripts", "replaykit_settings.json"),
+            Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
+            Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
+        };
+
+        private static readonly string[] RuntimeDeleteRels =
+        {
+            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "replay_buffer_saved.mp3"),
+            Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
+        };
+
+        private static readonly string[] RuntimeStateRels =
+        {
+            Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
+            Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
+        };
+
+        // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
+        private static readonly string LegacyStreamableDirRel = Path.Combine("obs-replayKit", "scripts", "streamable");
+        private static readonly Dictionary<string, string> LegacyStreamableStateRels = new Dictionary<string, string>
+        {
+            ["clips_db.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
+            ["clips_index.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
+            ["helper_config.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "helper_config.json"),
+        };
+
+        // one-time migration for installs made before the streamable/ directory was renamed to helper/: carries the live clip db/index/helper-config forward to their new path, then removes the old directory tree. no-ops once the old directory is gone, so its safe to call on every install.
+        private static void MigrateLegacyStreamableState(Action<string> log = null)
+        {
+            string oldDir = Path.Combine(Config.OBS_CONFIG, LegacyStreamableDirRel);
+            if (!Directory.Exists(oldDir)) return;
+
+            foreach (var kv in LegacyStreamableStateRels)
+            {
+                string oldFile = Path.Combine(oldDir, kv.Key);
+                string newFile = Path.Combine(Config.OBS_CONFIG, kv.Value);
+                if (File.Exists(oldFile) && !File.Exists(newFile))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(newFile));
+                        File.Copy(oldFile, newFile, true);
+                        log?.Invoke($"migrated legacy state: {kv.Key} -> {kv.Value.Replace('\\', '/')}");
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        log?.Invoke($"warn: could not migrate legacy {kv.Key}: {ex.Message}");
+                    }
+                }
+            }
+            try
+            {
+                Directory.Delete(oldDir, true);
+                log?.Invoke($"removed legacy directory: {LegacyStreamableDirRel.Replace('\\', '/')}");
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                log?.Invoke($"warn: could not remove legacy directory {LegacyStreamableDirRel.Replace('\\', '/')}: {ex.Message}");
+            }
+        }
+
+        // scene-source patches applied during auto-update so property fixes (eg. flipping capture_audio on Game Capture) land on existing users without a fresh setup run -- each key is a source name in Untitled.json, each value a flat dotted-path -> value map, and only the listed fields are touched, everything else on that source is left alone. add entries here when a release needs to change a source property on existing installs.
+        private static readonly Dictionary<string, Dictionary<string, object>> SceneSourcePatches = new Dictionary<string, Dictionary<string, object>>
+        {
+            ["Game Capture"] = new Dictionary<string, object>
+            {
+                ["settings.capture_audio"] = false,
+                ["settings.hook_rate"] = 2,
+                ["settings.limit_framerate"] = true,
+            },
+            ["Audio Input Capture"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
+            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
+            ["Discord Audio (record only)"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
+        };
+
+        // remove ReplayKit-managed files that were renamed or retired.
+        public static int CleanupReplaykitLegacyFiles(Action<string> log = null)
+        {
+            int removed = 0;
+            foreach (var rel in RuntimeDeleteRels)
+            {
+                string target = Path.Combine(Config.OBS_CONFIG, rel);
+                try
+                {
+                    if (File.Exists(target))
+                    {
+                        File.Delete(target);
+                        removed++;
+                        log?.Invoke("removed legacy: " + rel.Replace('\\', '/'));
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    log?.Invoke($"warn: could not remove legacy {rel.Replace('\\', '/')}: {ex.Message}");
+                }
+            }
+            return removed;
+        }
+
+        // restore user-owned clip state after an uninstall/reinstall that kept settings.
+        public static int RestoreReplaykitUserState(Action<string> log = null)
+        {
+            int restored = 0;
+            foreach (var rel in RuntimeStateRels)
+            {
+                string source = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, Path.GetFileName(rel));
+                string target = Path.Combine(Config.OBS_CONFIG, rel);
+                if (!File.Exists(source) || File.Exists(target)) continue;
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    File.Copy(source, target, true);
+                    restored++;
+                    log?.Invoke("restored state: " + rel.Replace('\\', '/'));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    log?.Invoke($"warn: could not restore state {rel.Replace('\\', '/')}: {ex.Message}");
+                }
+            }
+            return restored;
+        }
+
+        // write value into target at a dotted path, creating intermediate objects as needed.
+        private static void SetNested(JObject target, string dotted, object value)
+        {
+            var parts = dotted.Split('.');
+            JObject cursor = target;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (!(cursor[parts[i]] is JObject next))
+                {
+                    next = new JObject();
+                    cursor[parts[i]] = next;
+                }
+                cursor = next;
+            }
+            cursor[parts[parts.Length - 1]] = JToken.FromObject(value);
+        }
+
+        // patch known ReplayKit-managed sources in the users scene file in place, walking SceneSourcePatches and overwriting only the listed fields; safe when the file is missing or has no matches (returns 0), and skips writing if nothing changed so the mtime doesnt bump for no reason.
+        public static int ApplyScenePatches(Action<string> log = null)
+        {
+            if (SceneSourcePatches.Count == 0) return 0;
+            string scenePath = Path.Combine(Config.OBS_CONFIG, UserSceneRel);
+            if (!File.Exists(scenePath)) return 0;
+
+            JObject data;
+            try
+            {
+                data = JObject.Parse(File.ReadAllText(scenePath, System.Text.Encoding.UTF8));
+            }
+            catch (Exception ex) when (ex is IOException || ex is JsonException)
+            {
+                log?.Invoke($"warn: cannot parse scene file for patches: {ex.Message}");
+                return 0;
+            }
+
+            if (!(data["sources"] is JArray sources)) return 0;
+
+            int patched = 0;
+            foreach (var sourceToken in sources)
+            {
+                if (!(sourceToken is JObject source)) continue;
+                string name = source.Value<string>("name") ?? "";
+                if (!SceneSourcePatches.TryGetValue(name, out var spec)) continue;
+
+                string before = source.ToString(Formatting.None);
+                foreach (var kv in spec) SetNested(source, kv.Key, kv.Value);
+                if (source.ToString(Formatting.None) != before)
+                {
+                    patched++;
+                    log?.Invoke($"scene patch -> {name}: {string.Join(", ", spec.Keys)}");
+                }
+            }
+
+            if (patched > 0)
+            {
+                try
+                {
+                    File.WriteAllText(scenePath, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    log?.Invoke($"warn: scene patch save failed: {ex.Message}");
+                    return 0;
+                }
+            }
+            return patched;
+        }
+
+        // copy one ReplayKit runtime file for update mode without applying user prefs. retries on lock
+        // for the same reason InstallFile does -- this is actually the path WriteWithRetry's own docstring
+        // describes (the outgoing helper.exe from a just-closed OBS can still hold its own file open for a
+        // moment during an update), so it needs the wrapper here at least as much as the full-install path does.
+        private static void InstallRuntimeFile(string src, string dst)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(dst));
+            if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
+            {
+                string content = ReadTextFile(src);
+                string rewritten = PathRewrite.RewriteUserPaths(content, Config.USERNAME);
+                WriteWithRetry(() => File.WriteAllText(dst, rewritten, new System.Text.UTF8Encoding(false)));
+            }
+            else
+            {
+                WriteWithRetry(() => File.Copy(src, dst, true));
+            }
+        }
+
+        // refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies SceneSourcePatches to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies.
+        public static int InstallReplaykitRuntimeUpdate(Action<string> log = null)
+        {
+            string runtimeSrc = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
+            if (!Directory.Exists(runtimeSrc)) throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}");
+
+            int count = 0;
+            foreach (var src in Directory.EnumerateFiles(runtimeSrc, "*", SearchOption.AllDirectories))
+            {
+                string rel = Path.Combine("obs-replayKit", src.Substring(runtimeSrc.Length).TrimStart('\\', '/'));
+                string dst = Path.Combine(Config.OBS_CONFIG, rel);
+                if (RuntimePreserveRels.Contains(rel) && File.Exists(dst))
+                {
+                    log?.Invoke("preserve: " + rel.Replace('\\', '/'));
+                    continue;
+                }
+                InstallRuntimeFile(src, dst);
+                log?.Invoke("-> " + rel.Replace('\\', '/'));
+                count++;
+            }
+
+            WriteReplaykitVersion(log);
+            CacheSetupExecutable(log);
+            CleanupReplaykitLegacyFiles(log);
+            RestoreReplaykitUserState(log);
+
+            // scene patches and tool refreshes are best-effort -- an exception here must not abort the update, since the runtime files are already on disk and obs will relaunch with them.
+            try
+            {
+                int patched = ApplyScenePatches(log);
+                if (patched > 0) log?.Invoke($"scene patches applied: {patched}");
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: scene patch pass failed: {ex.Message}");
+            }
+
+            try
+            {
+                RunUpdateDriverRefresh(log);
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: tool refresh pass failed: {ex.Message}");
+            }
+
+            return count;
+        }
+
+        // re-run idempotent installer functions during an auto-update; each one short-circuits when its target is already present (ffmpeg checks file hashes, elevation task checks schtasks), so new releases can plug in additional plugin installs here and existing users pick them up next auto-update.
+        public static void RunUpdateDriverRefresh(Action<string> log = null)
+        {
+            try { InstallObsFfmpeg(log); }
+            catch (Exception ex) { log?.Invoke($"warn: ffmpeg refresh skipped: {ex.Message}"); }
+
+            try { ShaderFilter.InstallReplaykitMotionBlurPlugin(log); }
+            catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh skipped: {ex.Message}"); }
+
+            try { InstallObsElevationTask(log); }
+            catch (Exception ex) { log?.Invoke($"warn: elevation task refresh skipped: {ex.Message}"); }
+
+            try
+            {
+                var prefs = Prefs.LoadPrefs();
+                InstallObsSleepOverride(prefs.AllowSleepWhileActive, log);
+            }
+            catch (Exception ex) { log?.Invoke($"warn: sleep override refresh skipped: {ex.Message}"); }
+
+            try
+            {
+                var prefs = Prefs.LoadPrefs();
+                if (prefs.PinObsTrayIcon) TrayPin.PinObsTrayIcon(log);
+                else TrayPin.UnpinObsTrayIcon(log);
+            }
+            catch (Exception ex) { log?.Invoke($"warn: tray icon pin refresh skipped: {ex.Message}"); }
+        }
+
+        // copy the users current obs config to obs-studio.bak.<timestamp>. returns the backup path, or null if there was nothing to back up.
+        public static string BackupExistingConfig(Action<string> log = null)
+        {
+            if (!Directory.Exists(Config.OBS_CONFIG)) return null;
+
+            var present = BackupTargets.Select(name => Path.Combine(Config.OBS_CONFIG, name)).Where(p => Directory.Exists(p) || File.Exists(p)).ToList();
+            if (present.Count == 0) return null;
+
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            string backupDir = Path.Combine(Path.GetDirectoryName(Config.OBS_CONFIG), $"obs-studio.bak.{stamp}");
+            Directory.CreateDirectory(backupDir);
+
+            foreach (var src in present)
+            {
+                string dst = Path.Combine(backupDir, Path.GetFileName(src));
+                try
+                {
+                    if (Directory.Exists(src)) CopyDirectory(src, dst);
+                    else File.Copy(src, dst, true);
+                }
+                catch (Exception ex)
+                {
+                    log?.Invoke($"warn: backup of {Path.GetFileName(src)} failed: {ex.Message}");
+                }
+            }
+
+            log?.Invoke($"backed up existing config -> {backupDir}");
+            return backupDir;
+        }
+
+        private static void CopyDirectory(string src, string dst)
+        {
+            Directory.CreateDirectory(dst);
+            foreach (var file in Directory.EnumerateFiles(src, "*", SearchOption.AllDirectories))
+            {
+                string rel = file.Substring(src.Length).TrimStart('\\', '/');
+                string target = Path.Combine(dst, rel);
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                File.Copy(file, target, true);
+            }
+        }
+
+        // make sure the recording output folder exists. ~/videos is also created as the simple-output fallback obs reverts to if a profile is reset.
+        public static void EnsureRecordingDirs(Preferences prefs, Action<string> log = null)
+        {
+            var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { prefs.RecordingPath, Path.Combine(Config.USERPROFILE, "Videos") };
+            foreach (var target in targets)
+            {
+                try
+                {
+                    Directory.CreateDirectory(target);
+                    log?.Invoke("ok: " + target);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    log?.Invoke($"warn: could not create {target}: {ex.Message}");
+                }
+            }
+        }
+
+        // sanity-check the dock html survived the main walker. the walker already mirror-copies it; this just flags missing files loudly.
+        public static int InstallObsCustomDock(Action<string> log = null) => Dock.VerifyDockInstall(log);
+
+        // register the obsreplaykit-elevate scheduled task so the lua elevation script can relaunch obs elevated without a per-launch uac popup. must run AFTER InstallObsConfig copies hidden_relauncher.vbs into place.
+        public static bool InstallObsElevationTask(Action<string> log = null) => ScheduledTask.InstallElevationTask(log);
+
+        // download + drop ffmpeg.exe and ffprobe.exe next to the helper. obs ships only obs-ffmpeg-mux.exe; compress/trim need the full pair. idempotent.
+        public static bool InstallObsFfmpeg(Action<string> log = null) => FfmpegInstall.InstallFfmpeg(log);
+
+        // enable obs-websocket on port 6455 (no auth, loopback) so the save replay dock button can drive obs.
+        public static bool ConfigureObsWebsocket(Action<string> log = null) => WebSocketConfig.InstallWebsocketConfig(log);
+
+        // let windows monitor/system sleep timers run while obs is active, or restore obs defaults.
+        public static bool InstallObsSleepOverride(bool allowSleep = true, Action<string> log = null) =>
+            allowSleep ? SleepOverride.InstallSleepOverride(log) : SleepOverride.RemoveSleepOverride(log);
+
+        private static readonly string LauncherRel = Path.Combine("obs-studio", "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
+
+        // make sure the bundled OBSReplayKit.exe launcher is on disk; compile it from utils/launcher/build_launcher.ps1 if not. returning false is non-fatal -- the lua falls back to plain powershell.exe, just without the obs-replaykit branding in task manager.
+        public static bool EnsureLauncherBuilt(Action<string> log = null)
+        {
+            string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
+            if (File.Exists(launcherPath)) return true;
+
+            string buildScript = Path.Combine(Config.BUNDLE_ROOT, "utils", "launcher", "build_launcher.ps1");
+            if (!File.Exists(buildScript))
+            {
+                log?.Invoke($"warn: launcher missing and build_launcher.ps1 not present at {buildScript} - dock will run as plain powershell.exe");
+                return false;
+            }
+
+            log?.Invoke($"launcher EXE missing; compiling from {Path.GetFileName(buildScript)} ...");
+            int exitCode;
+            string stderr;
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = Win32Args.Build("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", buildScript, "-OutPath", launcherPath),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                };
+                using (var process = Process.Start(psi))
+                {
+                    // read both streams before WaitForExit -- a full stdout/stderr pipe would otherwise block the child forever while we wait.
+                    string stdoutTask = process.StandardOutput.ReadToEnd();
+                    stderr = process.StandardError.ReadToEnd();
+                    if (!process.WaitForExit(60000))
+                    {
+                        try { process.Kill(); } catch (InvalidOperationException) { }
+                        log?.Invoke("warn: launcher compile failed: timed out after 60s");
+                        return false;
+                    }
+                    exitCode = process.ExitCode;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+            {
+                log?.Invoke($"warn: launcher compile failed: {ex.Message}");
+                return false;
+            }
+
+            if (exitCode != 0 || !File.Exists(launcherPath))
+            {
+                string trimmedStderr = stderr.Trim();
+                if (trimmedStderr.Length > 240) trimmedStderr = trimmedStderr.Substring(0, 240);
+                log?.Invoke($"warn: launcher compile exited {exitCode}; stderr: {trimmedStderr}");
+                return false;
+            }
+
+            long sizeKb = Math.Max(1, new FileInfo(launcherPath).Length / 1024);
+            log?.Invoke($"launcher built: {Path.GetFileName(launcherPath)} ({sizeKb} KB)");
+            return true;
+        }
+    }
+}

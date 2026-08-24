@@ -2,99 +2,72 @@
 setlocal
 cd /d "%~dp0"
 
-rem build one standalone obsreplaykit.exe in this folder. uses the active python install and does not create a repo-local venv or tools folder.
+rem build OBSReplayKit.exe (ReplayKitSetup, the c# port) straight into this folder via dotnet publish.
+rem the old pyinstaller-based build (single-file, self-extracting bootloader) is retired -- that
+rem self-extraction pattern was the dominant driver of av false positives across every pyinstaller
+rem variant tried, and no build flag fixed it. a compiled net48 exe has no bootstrap/extract step,
+rem so assets\ ships as a plain sibling folder instead of embedded data.
 
-set "PY="
-where py     >nul 2>nul && set "PY=py"
-if "%PY%"=="" ( where python >nul 2>nul && set "PY=python" )
-if "%PY%"=="" goto :no_python
+where dotnet >nul 2>nul
+if errorlevel 1 goto :no_dotnet
 
-echo Python: %PY%
-echo.
-
-rem pyinstaller must already be installed for the selected python. this keeps the repo build from creating a venv or installing packages behind the scenes.
-echo [1/4] Checking PyInstaller ...
-%PY% -m PyInstaller --version >nul 2>nul
-if errorlevel 1 goto :no_pyinstaller
-
-rem obs_replaykit\__init__.py is the single source of truth for release version.
-echo Syncing bundled ReplayKit version ...
-%PY% -c "import json,pathlib,obs_replaykit; p=pathlib.Path('assets/obs-studio/obs-replayKit/version.json'); p.write_text(json.dumps({'version': obs_replaykit.__version__}, indent=2) + '\n', encoding='utf-8'); print('    ReplayKit version ' + obs_replaykit.__version__)"
+echo [1/5] Syncing bundled ReplayKit version ...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\sync_version.ps1"
 if errorlevel 1 goto :build_fail
 
-rem use upx only when it is already on path. otherwise build without compression instead of downloading tools into the repo.
-echo [2/4] Locating UPX ...
-set "UPX_ARG=--noupx"
-set "UPX_STATUS=disabled"
-where upx >nul 2>nul && goto :upx_on_path
-echo     UPX not found on PATH; building without UPX compression.
-goto :upx_ready
-
-:upx_on_path
-for /f "tokens=*" %%P in ('where upx') do (
-    if not defined UPX_BIN set "UPX_BIN=%%P"
-)
-for /f "tokens=2" %%v in ('upx --version 2^>nul ^| findstr /B /C:"upx "') do (
-    if not defined UPX_VER set "UPX_VER=%%v"
-)
-echo     Found UPX %UPX_VER% on PATH: %UPX_BIN%
-set "UPX_ARG="
-set "UPX_STATUS=enabled (UPX %UPX_VER% from PATH)"
-
-:upx_ready
-
-rem remove old pyinstaller output before rebuilding so the folder only keeps the latest final exe.
-echo [3/4] Cleaning previous build artifacts ...
-if exist "build"             rmdir /S /Q "build"
-if exist "dist"              rmdir /S /Q "dist"
-if exist "OBSReplayKit.spec" del   /Q   "OBSReplayKit.spec"
-if exist "OBSReplayKit.exe"  del   /Q   "OBSReplayKit.exe"
-
 rem build the small branded helper used by the obs replaykit dock.
-echo [3.5/4] Compiling helper launcher into assets\ ...
+echo [2/5] Compiling helper launcher into assets\ ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\launcher\build_launcher.ps1"
 if errorlevel 1 goto :launcher_fail
 
 rem builds the native tray plugin (view clips / share preview / restart obs) and bundles it into assets\ itself, same as build_launcher.ps1 already does for the launcher exe above; build.ps1 compiles against whatever obs version is installed and caches its qt6/obs-headers deps under %temp%\replaykit-tray-build (deliberately outside build\, which gets wiped every run), and skips the whole rebuild when the bundled dll is already newer than its source + the installed obs -- requires gh (authenticated) and vs2022/2019 build tools with the c++ workload, see utils\obs-plugins\replaykit-tray\build.ps1 for details.
-echo [3.6/4] Compiling tray plugin into assets\ ...
+echo [3/5] Compiling tray plugin into assets\ ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\obs-plugins\replaykit-tray\build.ps1"
 if errorlevel 1 goto :tray_plugin_fail
 if not exist "%~dp0assets\obs-plugins\replaykit-tray\bin\64bit\replaykit-tray.dll" goto :tray_plugin_fail
 
-rem build the final exe directly into the repo root so no dist folder is left behind.
-rem upx-exclude covers every bundled pe binary pyinstaller would otherwise try to compress -- replaykit-tray.dll needed its own entry becuase upx had silently compressed it (54272 -> 23040 bytes) with no build error, and obs just failed to load the result with no visible error either, since a upx-packed dll cant self-decompress the way a upx-packed standalone exe can. confirmed 2026-08-08.
-echo [4/4] Building OBSReplayKit.exe ...
+rem remove old output before rebuilding so the folder only keeps the latest final exe.
+echo [4/5] Cleaning previous build artifacts ...
+if exist "ReplayKitSetup\bin"    rmdir /S /Q "ReplayKitSetup\bin"
+if exist "ReplayKitSetup\obj"    rmdir /S /Q "ReplayKitSetup\obj"
+if exist "publish_tmp"           rmdir /S /Q "publish_tmp"
+if exist "OBSReplayKit.exe"      del   /Q   "OBSReplayKit.exe"
+if exist "OBSReplayKit.exe.sha256" del /Q   "OBSReplayKit.exe.sha256"
+rem stale companions from before the exe shipped as a single merged file -- harmless to leave the check in even once every checkout has moved past them.
+if exist "OBSReplayKit.exe.config" del /Q   "OBSReplayKit.exe.config"
+if exist "Newtonsoft.Json.dll"   del   /Q   "Newtonsoft.Json.dll"
+
+rem publish, then merge Newtonsoft.Json.dll straight into the exe (see ILRepackPublish in
+rem ReplayKitSetup.csproj) so the shipped artifact is one file with nothing else alongside it.
+rem the small auto-generated .exe.config (declares the target framework) isnt required at
+rem runtime on any machine with only .net framework 4.8 present, which is every current
+rem windows install, so its dropped too -- confirmed by running without it. no .pdb copied
+rem out either -- debug symbols arent needed by end users and stay in ReplayKitSetup\bin like
+rem any other build byproduct.
+echo [5/5] Building OBSReplayKit.exe ...
 echo.
-%PY% -m PyInstaller ^
-    --noconfirm ^
-    --onefile ^
-    --console ^
-    --log-level WARN ^
-    --name "OBSReplayKit" ^
-    --distpath "%CD%" ^
-    --workpath "%CD%\build" ^
-    --specpath "%CD%" ^
-    --icon "%~dp0utils\icon\obs-replaykit.ico" ^
-    --add-data "assets;assets" ^
-    --collect-submodules obs_replaykit ^
-    --uac-admin ^
-    --upx-exclude "OBSReplayKit.exe" ^
-    --upx-exclude "replaykit-tray.dll" ^
-    %UPX_ARG% ^
-    main.py
+dotnet publish "ReplayKitSetup\ReplayKitSetup.csproj" -c Release -o "publish_tmp" --nologo
 if errorlevel 1 goto :build_fail
 
-rem trim intermediates, leaving only the final exe.
-if exist "build"             rmdir /S /Q "build"
-if exist "dist"              rmdir /S /Q "dist"
-if exist "OBSReplayKit.spec" del   /Q   "OBSReplayKit.spec"
+copy /Y "publish_tmp\OBSReplayKit.exe" "OBSReplayKit.exe" >nul
+if errorlevel 1 goto :build_fail
+rmdir /S /Q "publish_tmp"
 
 set "EXE_PATH=%CD%\OBSReplayKit.exe"
 if not exist "%EXE_PATH%" goto :build_fail
+
+rem the shipped exe is safely copied out to the repo root above, so ReplayKitSetup\bin and \obj
+rem (the compiled intermediates dotnet publish leaves behind, including the pre-merge exe copy
+rem and the debug symbols) are done being useful -- clear them so the folder doesnt accumulate
+rem build byproducts across runs. next build recreates both from scratch either way, since the
+rem cleanup step above already force-cleans them before every build regardless.
+if exist "ReplayKitSetup\bin" rmdir /S /Q "ReplayKitSetup\bin"
+if exist "ReplayKitSetup\obj" rmdir /S /Q "ReplayKitSetup\obj"
+
 echo Generating release hash ...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-FileHash -LiteralPath '%EXE_PATH%' -Algorithm SHA256).Hash + '  OBSReplayKit.exe' | Set-Content -LiteralPath '%EXE_PATH%.sha256' -Encoding ASCII"
 if errorlevel 1 goto :build_fail
-for %%I in ("%EXE_PATH%") do set /a "EXE_MB=%%~zI / 1048576"
+for %%I in ("%EXE_PATH%") do set /a "EXE_KB=%%~zI / 1024"
 for %%I in ("%EXE_PATH%") do set "EXE_BYTES=%%~zI"
 
 echo.
@@ -103,11 +76,11 @@ echo  Build complete.
 echo ============================================================
 echo  Output:  %EXE_PATH%
 echo  Hash:    %EXE_PATH%.sha256
-echo  Size:    ~%EXE_MB% MB  (%EXE_BYTES% bytes)
-echo  UPX:     %UPX_STATUS%
+echo  Size:    ~%EXE_KB% KB  (%EXE_BYTES% bytes)
 echo.
-echo  Note: VC++ redist is not bundled; it downloads from Microsoft only
-echo        when missing. Input-overlay presets are trimmed to WASD/mouse.
+echo  Note: single file, nothing else needs to ship alongside it. VC++ redist
+echo        is not bundled; it downloads from Microsoft only when missing.
+echo        Input-overlay presets are trimmed to WASD/mouse.
 echo ============================================================
 echo.
 pause
@@ -115,19 +88,10 @@ endlocal
 exit /b 0
 
 
-:no_python
+:no_dotnet
 echo.
-echo Python was not found on PATH.
-echo Install Python from https://www.python.org/downloads/ then re-run.
-echo.
-pause
-endlocal
-exit /b 1
-
-:no_pyinstaller
-echo.
-echo PyInstaller is not installed for %PY%.
-echo Install it with: %PY% -m pip install --user pyinstaller
+echo .NET SDK was not found on PATH.
+echo Install it from https://dotnet.microsoft.com/download then re-run.
 echo.
 pause
 endlocal
