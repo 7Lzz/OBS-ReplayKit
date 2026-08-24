@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ReplayKitHelper</RootNamespace>
+    <!-- must stay OBSReplayKit; helper_bootstrap.lua looks for this exact filename next to local_helper_server.ps1 and launches it with -ConfigPath if present, falling back to powershell.exe only when it's missing. matching the name means the lua side needs zero changes. -->
+    <AssemblyName>OBSReplayKit</AssemblyName>
+    <Nullable>disable</Nullable>
+    <!-- runs at whatever privilege obs itself launched at; never elevate. this is also why the http listener is a raw TcpListener, not HttpListener/http.sys, which needs a urlacl reservation or admin rights to bind even loopback-only. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Security" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.34" PrivateAssets="all" />
+  </ItemGroup>
+
+  <Target Name="ILRepackPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
+      <PublishedAssemblies Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
+      <PublishedDllsToRemove Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
+    </ItemGroup>
+    <ILRepack
+        Parallel="true"
+        DebugInfo="false"
+        AllowDuplicateResources="false"
+        InputAssemblies="@(PublishedAssemblies)"
+        TargetKind="SameAsPrimaryAssembly"
+        OutputFile="$(PublishDir)$(TargetName)$(TargetExt)"
+    />
+    <Delete Files="@(PublishedDllsToRemove)" />
+  </Target>
+</Project>

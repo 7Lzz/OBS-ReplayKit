@@ -4,6 +4,7 @@ local obs = obslua
 local ffi_ok, ffi = pcall(require, "ffi")
 
 local REFRESH_SECONDS = 1.0
+local CAPTURE_POLL_SECONDS = 0.05
 local MAX_SETTINGS_BYTES = 65536
 local CLIP_HOTKEY_NAMES = { "ReplayBuffer.Save" }
 local RECORDING_HOTKEY_NAMES = {
@@ -13,6 +14,8 @@ local RECORDING_HOTKEY_NAMES = {
 
 local last_signature = nil
 local refresh_elapsed = 0
+local capture_elapsed = 0
+local capture_active = false
 local native_warned = false
 local missing_warned = {}
 local obsffi = nil
@@ -76,6 +79,10 @@ end
 
 local function runtime_settings_path()
     return join_path(parent_dir(script_path()), "replaykit_settings.json")
+end
+
+local function capture_signal_path()
+    return join_path(parent_dir(script_path()), "hotkey_capture_signal.json")
 end
 
 local function valid_obs_key(key)
@@ -224,7 +231,55 @@ local function refresh_hotkeys(force)
     log(obs.LOG_INFO, "Loaded OBS native hotkeys: " .. signature)
 end
 
+-- written by the c# helper when the settings dock starts/stops capturing a new hotkey combo. fast-polled
+-- (CAPTURE_POLL_SECONDS) separately from the REFRESH_SECONDS saved-settings sync above, since this is the
+-- signal that actually has to beat a users reaction time.
+local function read_capture_signal()
+    local text = read_text(capture_signal_path())
+    if not text or text == "" then return nil end
+    local data = obs.obs_data_create_from_json(text)
+    if data == nil then return nil end
+    local signal = { active = obs.obs_data_get_bool(data, "active") }
+    if not signal.active then
+        signal.clip = read_combo(data, "clipKeybind")
+        signal.recording = read_combo(data, "recordingKeybind")
+    end
+    obs.obs_data_release(data)
+    return signal
+end
+
+local function apply_capture_signal()
+    local signal = read_capture_signal()
+    if not signal then return end
+
+    if signal.active and not capture_active then
+        capture_active = true
+        load_native_hotkeys(CLIP_HOTKEY_NAMES, {}, "clip", "Could not find OBS native clip hotkey to blank for capture.")
+        load_native_hotkeys(RECORDING_HOTKEY_NAMES, {}, "recording", "Could not find OBS native recording hotkeys to blank for capture.")
+        log(obs.LOG_INFO, "Hotkey capture started -- blanked native clip/recording hotkeys live")
+    elseif not signal.active and capture_active then
+        capture_active = false
+        load_native_hotkeys(CLIP_HOTKEY_NAMES, signal.clip, "clip", "Could not find OBS native clip hotkey to restore.")
+        load_native_hotkeys(RECORDING_HOTKEY_NAMES, signal.recording, "recording", "Could not find OBS native recording hotkeys to restore.")
+        log(obs.LOG_INFO, "Hotkey capture ended -- restored native clip/recording hotkeys live")
+        -- matches what the saved-settings poll above would already converge on, so it does not immediately redo the same obs_hotkey_load call a moment later.
+        last_signature = settings_signature(signal)
+    end
+end
+
+-- a signal left at active:true by a crashed prior obs session would otherwise blank the native hotkeys
+-- forever -- obs has no equivalent restart hook to clear this on the way the c# helper does for its own copy,
+-- so a fresh script load always resets it on disk before the fast poll starts trusting it.
+local function write_capture_signal_inactive()
+    local f = io.open(capture_signal_path(), "wb")
+    if not f then return end
+    f:write('{"active":false}')
+    f:close()
+end
+
 function script_load(settings)
+    write_capture_signal_inactive()
+    capture_active = false
     refresh_hotkeys(true)
 end
 
@@ -233,6 +288,12 @@ function script_update(settings)
 end
 
 function script_tick(seconds)
+    capture_elapsed = capture_elapsed + (seconds or 0)
+    if capture_elapsed >= CAPTURE_POLL_SECONDS then
+        capture_elapsed = 0
+        apply_capture_signal()
+    end
+
     refresh_elapsed = refresh_elapsed + (seconds or 0)
     if refresh_elapsed < REFRESH_SECONDS then return end
     refresh_elapsed = 0

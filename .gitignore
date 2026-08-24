@@ -3,13 +3,17 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# dotnet build outputs (ReplayKitSetup, the c# port)
+# dotnet build outputs (ReplayKitSetup and ReplayKitHelper, the c# ports)
 ReplayKitSetup/bin/
 ReplayKitSetup/obj/
+ReplayKitHelper/bin/
+ReplayKitHelper/obj/
 
-# build outputs (build.bat publishes ReplayKitSetup into the repo root as a single merged exe, same spot the old pyinstaller build used)
+# build outputs (build.bat publishes ReplayKitSetup into the repo root as a single merged exe, same spot the old pyinstaller build used; publish_helper_tmp is the equivalent scratch dir for the ReplayKitHelper step, normally self-cleaned but ignored too in case a build fails partway through)
 build/
 dist/
+publish_tmp/
+publish_helper_tmp/
 /OBSReplayKit.exe
 /OBSReplayKit.exe.sha256
 /prefs.json
@@ -23,9 +27,6 @@ dist/
 # regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches VersionInfo.cs
 /assets/obs-studio/obs-replayKit/version.json
 
-# regenerated from ReplayKitSetup/VersionInfo.cs by build_launcher.ps1, see utils/launcher/OBSReplayKit.cs
-/utils/launcher/AssemblyVersion.Generated.cs
-
 # one-off smoke / scratch scripts
 _smoke_test.py
 scratch_*.py
@@ -35,6 +36,7 @@ helper_config.json
 clips_db.json
 auth.jar
 cookies.txt
+hotkey_capture_signal.json
 *.session
 .env
 .env.local

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
@@ -513,66 +512,13 @@ namespace ReplayKitSetup
         public static bool InstallObsSleepOverride(bool allowSleep = true, Action<string> log = null) =>
             allowSleep ? SleepOverride.InstallSleepOverride(log) : SleepOverride.RemoveSleepOverride(log);
 
-        private static readonly string LauncherRel = Path.Combine("obs-studio", "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
-
-        // make sure the bundled OBSReplayKit.exe launcher is on disk; compile it from utils/launcher/build_launcher.ps1 if not. returning false is non-fatal -- the lua falls back to plain powershell.exe, just without the obs-replaykit branding in task manager.
+        // the helper (OBSReplayKit.exe under scripts/helper/) is a full compiled C# app (ReplayKitHelper), built by build.bat straight into assets/ the same way replaykit-tray.dll is a prebuilt native plugin -- there is no lightweight on-the-fly compile step for it the way the old thin PowerShell-hosting launcher had (this one needs the .NET SDK, NuGet restore, and an ILRepack merge, all done at repo build time); this just confirms the bundle actually shipped it, since helper_bootstrap.lua has no fallback if it's missing.
         public static bool EnsureLauncherBuilt(Action<string> log = null)
         {
             string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
             if (File.Exists(launcherPath)) return true;
-
-            string buildScript = Path.Combine(Config.BUNDLE_ROOT, "utils", "launcher", "build_launcher.ps1");
-            if (!File.Exists(buildScript))
-            {
-                log?.Invoke($"warn: launcher missing and build_launcher.ps1 not present at {buildScript} - dock will run as plain powershell.exe");
-                return false;
-            }
-
-            log?.Invoke($"launcher EXE missing; compiling from {Path.GetFileName(buildScript)} ...");
-            int exitCode;
-            string stderr;
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = Win32Args.Build("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", buildScript, "-OutPath", launcherPath),
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                using (var process = Process.Start(psi))
-                {
-                    // read both streams before WaitForExit -- a full stdout/stderr pipe would otherwise block the child forever while we wait.
-                    string stdoutTask = process.StandardOutput.ReadToEnd();
-                    stderr = process.StandardError.ReadToEnd();
-                    if (!process.WaitForExit(60000))
-                    {
-                        try { process.Kill(); } catch (InvalidOperationException) { }
-                        log?.Invoke("warn: launcher compile failed: timed out after 60s");
-                        return false;
-                    }
-                    exitCode = process.ExitCode;
-                }
-            }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
-            {
-                log?.Invoke($"warn: launcher compile failed: {ex.Message}");
-                return false;
-            }
-
-            if (exitCode != 0 || !File.Exists(launcherPath))
-            {
-                string trimmedStderr = stderr.Trim();
-                if (trimmedStderr.Length > 240) trimmedStderr = trimmedStderr.Substring(0, 240);
-                log?.Invoke($"warn: launcher compile exited {exitCode}; stderr: {trimmedStderr}");
-                return false;
-            }
-
-            long sizeKb = Math.Max(1, new FileInfo(launcherPath).Length / 1024);
-            log?.Invoke($"launcher built: {Path.GetFileName(launcherPath)} ({sizeKb} KB)");
-            return true;
+            log?.Invoke($"warn: helper launcher missing at {launcherPath} -- re-run build.bat to regenerate it.");
+            return false;
         }
     }
 }

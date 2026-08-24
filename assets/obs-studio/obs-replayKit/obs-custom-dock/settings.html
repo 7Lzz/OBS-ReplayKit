@@ -1644,10 +1644,16 @@
   let hotkeyCapturePending = null;
   let hotkeyCaptureDesired = false;
   let activeHotkeyField = null;
+  let hotkeyCaptureTimer = null;
+  const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
   };
+
+  function clearHotkeyCaptureTimer() {
+    if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
+  }
 
   function setHotkeyCapture(active, keepalive) {
     hotkeyCaptureDesired = !!active;
@@ -1676,21 +1682,35 @@
     const field = hotkeyFields[fieldName];
     if (!field) return;
     activeHotkeyField = fieldName;
-    field.el.textContent = "Preparing shortcut...";
+    const labelBeforeCapture = comboToLabel(state[fieldName]);
+    field.el.textContent = "Connecting...";
     field.el.classList.add("is-empty");
+    clearHotkeyCaptureTimer();
     setHotkeyCapture(true, false).then((ok) => {
       if (document.activeElement !== field.el || activeHotkeyField !== fieldName) return;
-      if (comboToLabel(state[fieldName])) {
+      // state[fieldName] already held the existing binding before this call even started, so comparing against the pre-capture label (not just checking truthiness) is what tells "a key landed mid-flight" apart from "nothing happened yet, this is still the old value".
+      if (comboToLabel(state[fieldName]) !== labelBeforeCapture) {
         syncHotkeyField(fieldName);
         return;
       }
-      field.el.textContent = ok ? "Press shortcut..." : "Could not pause OBS hotkey";
+      if (!ok) {
+        field.el.textContent = "Could not pause OBS hotkey";
+        field.el.classList.add("is-empty");
+        return;
+      }
+      // ok only comes back true once obs itself has confirmed (via the obs-websocket requestresponse) that both native hotkey bindings are blanked, so this is the first moment its actually true -- showing "Listening..." any earlier would be telling the user its safe to press before it is.
+      field.el.textContent = "Listening...";
       field.el.classList.add("is-empty");
+      hotkeyCaptureTimer = setTimeout(() => {
+        hotkeyCaptureTimer = null;
+        if (activeHotkeyField === fieldName) field.el.blur();
+      }, HOTKEY_CAPTURE_TIMEOUT_MS);
     });
   }
 
   function releaseHotkeyCapture(keepalive) {
     activeHotkeyField = null;
+    clearHotkeyCaptureTimer();
     if (!hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
     return setHotkeyCapture(false, keepalive !== false);
   }
@@ -2333,6 +2353,7 @@
       }
       const obsKey = obsKeyFromEvent(e);
       if (!obsKey) return;
+      clearHotkeyCaptureTimer();
       const combo = { key:obsKey };
       if (e.ctrlKey) combo.control = true;
       if (e.altKey) combo.alt = true;

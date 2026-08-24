@@ -289,11 +289,7 @@ local function helper_config_path()
 end
 
 local function helper_path()
-    return script_dir() .. "local_helper_server.ps1"
-end
-
-local function ps_helper_path()
-    return script_dir() .. "upload_worker.ps1"
+    return script_dir() .. "OBSReplayKit.exe"
 end
 
 local function helper_runtime_dir()
@@ -311,7 +307,6 @@ local function write_helper_config()
     f:write("  \"port\": " .. HTTP_PORT .. ",\n")
     f:write("  \"scriptDir\": " .. json_escape(helper_runtime_dir()) .. ",\n")
     f:write("  \"clipDir\": " .. json_escape(cfg.clip_dir) .. ",\n")
-    f:write("  \"psHelper\": " .. json_escape(ps_helper_path()) .. ",\n")
     f:write("  \"loggingEnabled\": " .. tostring(REPLAYKIT_LOGGING_ENABLED or read_debug_logging_enabled()) .. "\n")
     f:write("}\n")
     f:close()
@@ -351,27 +346,15 @@ local function start_helper()
         helper_started = false
     end
 
+    -- the helper is a full compiled c# app (OBSReplayKit.exe, the ReplayKitHelper project) -- it replaced the PowerShell implementation this bootstrap used to spawn (either directly, or in-process via a thin branded launcher exe hosting System.Management.Automation), so there is no PowerShell fallback left to spawn instead; a missing exe here is a hard install error, re-run the ReplayKit setup/apply flow to restore it.
     local helper = helper_path()
     if not file_exists(helper) then
         log(obs.LOG_ERROR, "Missing helper: " .. helper)
         return false
     end
-    if not file_exists(ps_helper_path()) then
-        log(obs.LOG_ERROR, "Missing upload helper: " .. ps_helper_path())
-        return false
-    end
     if not write_helper_config() then return false end
 
-    -- prefer the branded launcher (obsreplaykit.exe) when its been installed next to the helper script. it hosts windows powershell in-process via system.management.automation, so the helper appears in task manager as "obs replaykit" with the obs icon instead of a generic "windows powershell" entry. falls back to spawning powershell.exe directly when the launcher is absent (e.g. fresh clone before apply, or pre-launcher install).
-    local launcher = script_dir() .. "OBSReplayKit.exe"
-    local cmd
-    if file_exists(launcher) then
-        cmd = win_quote(launcher) ..
-            ' -ConfigPath ' .. win_quote(helper_config_path())
-    else
-        cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ' ..
-            win_quote(helper) .. ' -ConfigPath ' .. win_quote(helper_config_path())
-    end
+    local cmd = win_quote(helper) .. ' -ConfigPath ' .. win_quote(helper_config_path())
     local ok, err = spawn_hidden(cmd)
     if not ok then
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
@@ -402,7 +385,7 @@ local function helper_watchdog()
         helper_started = false
         helper_last_restart_ms = now
         helper_consecutive_fails = 0
-        -- start_helper() just spawns a fresh OBSReplayKit.exe; that processs own startup (90_runtime.ps1) notices the port is taken, posts /shutdown, and force-kills whatever didnt respond, so this actually replaces a wedged helper rather than leaving a second one competing for the port -- gated behind 3 consecutive failures since a losing redundant instance posts that same /shutdown even when the survivor isnt actually dead.
+        -- start_helper() just spawns a fresh OBSReplayKit.exe; that processs own startup notices the port is taken, posts /shutdown, and force-kills whatever didnt respond, so this actually replaces a wedged helper rather than leaving a second one competing for the port -- gated behind 3 consecutive failures since a losing redundant instance posts that same /shutdown even when the survivor isnt actually dead.
         start_helper()
     end
 end

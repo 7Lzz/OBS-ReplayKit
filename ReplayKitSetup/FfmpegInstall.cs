@@ -13,7 +13,7 @@ namespace ReplayKitSetup
     // install ffmpeg.exe + ffprobe.exe into the helper dir. ported from obs_replaykit/ffmpeg_install.py.
     public static class FfmpegInstall
     {
-        // next to local_helper_server.ps1 under the consolidated obs-replayKit/ tree. find-toolinclipdirs in 52_compression.ps1 probes $script:helperroot first.
+        // next to OBSReplayKit.exe (the ReplayKitHelper server) under the consolidated obs-replayKit/ tree; Compression.FindToolInClipDirs probes Constants.HelperRoot first.
         private static readonly string HelperDir = Path.Combine(Config.OBS_CONFIG, "obs-replayKit", "scripts", "helper");
         private static readonly string FfmpegDst = Path.Combine(HelperDir, "ffmpeg.exe");
         private static readonly string FfprobeDst = Path.Combine(HelperDir, "ffprobe.exe");
