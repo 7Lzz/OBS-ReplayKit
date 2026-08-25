@@ -19,6 +19,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QResizeEvent>
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QDesktopServices>
@@ -539,8 +540,10 @@ public:
 		chipLabel->setText(QString::fromStdString(label));
 		// this rows sizeHint just changed (chip went from hidden/empty to a real label or back) -- updateGeometry() is qts actual mechanism for "go re-ask for my size", not a manual setMinimumWidth guess; SizePolicy::Minimum from the constructor is what makes sure that re-asked-for size is never shrunk back below.
 		updateGeometry();
-		// the reported "sometimes doesnt resize, cuts things off" race: this runs after an async fetch, by which point aboutToShow's own PinMenuAboveTaskbar call has usually already happened against the old (narrower) size -- qt does not reliably repropagate a QWidgetAction childs new size up to an already-shown QMenu on its own, so force both explicitly instead of assuming it happens.
 		if (m_menu) {
+			// the reported "first open only, hotkey box overlaps text" bug: qmenu only lays out each actions geometry on first show and caches it after that, so on the very first open the async keybind fetch (this function) lands after that cache is already set and adjustSize() alone does not force a re-measure. a fake resize event is qts own documented way to flip the internal dirty flag that forces that recompute.
+			QResizeEvent fakeResize(QSize(1, 1), m_menu->size());
+			qApp->sendEvent(m_menu, &fakeResize);
 			m_menu->adjustSize();
 			PinMenuAboveTaskbar(m_menu);
 		}

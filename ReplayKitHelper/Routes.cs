@@ -408,6 +408,15 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/uninstall-discord-screenshare")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                try { HttpResponse.SendJson(stream, 200, Uninstall.StartDiscordScreenshareRemoval()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
             if (path == "/update/check")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }

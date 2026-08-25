@@ -206,7 +206,32 @@ namespace ReplayKitSetup
             }
         }
 
-        // parses the subset of argv this app needs for --update/--cleanup mode. returns null if neither flag is present (normal interactive launch).
+        // headless counterpart to Cli.UninstallDiscordScreenshareOnly -- same two steps (close obs, remove the virtual audio cable), reported thru CleanupProgress instead of the interactive console since this runs detached from the settings docks uninstall box.
+        public static int RunUninstallDiscordScreenshareMode(int startDelayMs = 0)
+        {
+            try
+            {
+                Log("discord screenshare removal starting");
+                if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
+                var progress = new CleanupProgress { TotalSteps = 2 };
+                Cli.RunApplyStep(progress, 1, "Close OBS", "Stops OBS and ReplayKit helpers so the audio driver can be removed.", () => Cleanup.StopObsAndHelpers(progress.LogLine));
+                Cli.RunApplyStep(progress, 2, "Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", () => VbCable.UninstallVbcable(progress.LogLine));
+                var prefs = Prefs.LoadPrefs();
+                prefs.DiscordScreenshareEnabled = false;
+                prefs.DiscordProjectorEnabled = false;
+                prefs.Save();
+                if (progress.Issues.Count > 0) Log($"discord screenshare removal complete with {progress.Issues.Count} warning(s)");
+                else Log("discord screenshare removal complete");
+                return 0;
+            }
+            catch (Exception exc)
+            {
+                Log("discord screenshare removal failed: " + exc.Message);
+                return 1;
+            }
+        }
+
+        // parses the subset of argv this app needs for --update/--cleanup/--uninstall-discord-screenshare mode. returns null if none of those flags are present (normal interactive launch).
         public static int? TryRunUpdateFromArgv(string[] argv)
         {
             if (argv.Contains("--cleanup"))
@@ -214,6 +239,11 @@ namespace ReplayKitSetup
                 bool removeUserSettings = argv.Contains("--remove-user-settings");
                 int startDelay = IntArg(argv, "--start-delay-ms", 0);
                 return RunCleanupMode(startDelay, !removeUserSettings);
+            }
+            if (argv.Contains("--uninstall-discord-screenshare"))
+            {
+                int startDelay = IntArg(argv, "--start-delay-ms", 0);
+                return RunUninstallDiscordScreenshareMode(startDelay);
             }
             if (!argv.Contains("--update")) return null;
 

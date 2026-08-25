@@ -1044,17 +1044,6 @@
         <div class="form-row tight">
           <div></div>
           <label class="check-row">
-            <input type="checkbox" id="discordScreenshareEnabled">
-            <span>Enable Discord screenshare support</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="hint">Turn this off to skip OBS Stream Audio during setup and keep Share Preview disabled.</div>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
             <input type="checkbox" id="debugLoggingEnabled">
             <span>Enable debug logging</span>
           </label>
@@ -1125,6 +1114,20 @@
           <div></div>
           <div class="inline-status" id="uninstallStatusLine"></div>
         </div>
+        <div class="form-row">
+          <div class="label">Discord screenshare / Share Preview audio</div>
+          <div class="field-wrap">
+            <button class="btn is-danger" type="button" id="uninstallDiscordScreenshareBtn">Uninstall</button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="hint">Removes the OBS Stream Audio virtual audio driver that Share Preview depends on. Keeps the rest of ReplayKit installed.</div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="inline-status" id="uninstallDiscordScreenshareStatusLine"></div>
+        </div>
       </div>
     </section>
   </main>
@@ -1146,6 +1149,18 @@
       <div class="modal-actions">
         <button class="btn" type="button" id="uninstallConfirmCancelBtn">Cancel</button>
         <button class="btn is-danger" type="button" id="uninstallConfirmOkBtn">Uninstall</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="discordScreenshareConfirmModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="discordScreenshareConfirmTitle">
+      <div class="modal-title" id="discordScreenshareConfirmTitle">Remove Discord screenshare / Share Preview audio?</div>
+      <div class="modal-body">
+        <div class="modal-text">This closes OBS and uninstalls the OBS Stream Audio virtual audio driver. The rest of ReplayKit stays installed.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="discordScreenshareConfirmCancelBtn">Cancel</button>
+        <button class="btn is-danger" type="button" id="discordScreenshareConfirmOkBtn">Uninstall</button>
       </div>
     </div>
   </div>
@@ -1254,7 +1269,6 @@
     autoDeleteLogsOnLaunchHintRow: document.getElementById("autoDeleteLogsOnLaunchHintRow"),
     openLogFolderBtn: document.getElementById("openLogFolderBtn"),
     logFolderStatusLine: document.getElementById("logFolderStatusLine"),
-    discordScreenshareEnabled: document.getElementById("discordScreenshareEnabled"),
     settingsProjectorInspectBtn: document.getElementById("settingsProjectorInspectBtn"),
     settingsProjectorReparkBtn: document.getElementById("settingsProjectorReparkBtn"),
     autoUpdateEnabled: document.getElementById("autoUpdateEnabled"),
@@ -1275,6 +1289,11 @@
     copyUninstallConfirmBtn: document.getElementById("copyUninstallConfirmBtn"),
     uninstallConfirmOkBtn: document.getElementById("uninstallConfirmOkBtn"),
     uninstallConfirmCancelBtn: document.getElementById("uninstallConfirmCancelBtn"),
+    uninstallDiscordScreenshareBtn: document.getElementById("uninstallDiscordScreenshareBtn"),
+    uninstallDiscordScreenshareStatusLine: document.getElementById("uninstallDiscordScreenshareStatusLine"),
+    discordScreenshareConfirmModal: document.getElementById("discordScreenshareConfirmModal"),
+    discordScreenshareConfirmOkBtn: document.getElementById("discordScreenshareConfirmOkBtn"),
+    discordScreenshareConfirmCancelBtn: document.getElementById("discordScreenshareConfirmCancelBtn"),
     resizeGrip: document.querySelector(".resize-grip"),
   };
   let pendingUpdate = null;
@@ -1285,6 +1304,7 @@
   const overlayPreviewRevisionBase = Date.now() * 1000;
   let overlayPreviewTouched = false;
   let uninstallConfirmResolve = null;
+  let discordScreenshareConfirmResolve = null;
 
   function styleNativeChrome() {
     fetch(HELPER + "/style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(), { cache:"no-store" }).catch(() => {});
@@ -1313,6 +1333,12 @@
     els.uninstallStatusLine.textContent = text || "";
     els.uninstallStatusLine.classList.toggle("good", kind === "good");
     els.uninstallStatusLine.classList.toggle("bad", kind === "bad");
+  }
+
+  function setDiscordScreenshareUninstallStatus(text, kind) {
+    els.uninstallDiscordScreenshareStatusLine.textContent = text || "";
+    els.uninstallDiscordScreenshareStatusLine.classList.toggle("good", kind === "good");
+    els.uninstallDiscordScreenshareStatusLine.classList.toggle("bad", kind === "bad");
   }
 
   function searchText(el) {
@@ -1998,12 +2024,12 @@
       ? "Show the OBS projector as a movable test window."
       : (supportEnabled
         ? "Enable Share Preview before showing the projector."
-        : "Enable Discord screenshare support before showing the projector.");
+        : "Discord screenshare support is not available.");
     els.settingsProjectorReparkBtn.title = previewEnabled
       ? "Park the OBS projector back off screen."
       : (supportEnabled
         ? "Enable Share Preview before reparking the projector."
-        : "Enable Discord screenshare support before reparking the projector.");
+        : "Discord screenshare support is not available.");
   }
 
   async function runSettingsProjectorAction(btn, path, busyText, successText, fallbackText) {
@@ -2071,7 +2097,6 @@
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
     els.autoDeleteLogsOnLaunch.checked = state.autoDeleteLogsOnLaunch !== false;
     syncDebugLoggingFields();
-    els.discordScreenshareEnabled.checked = state.discord_screenshare_enabled !== false;
     els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
     syncHotkeyFields();
     markDirty();
@@ -2114,8 +2139,6 @@
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
     state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
-    state.discord_screenshare_enabled = els.discordScreenshareEnabled.checked;
-    if (!state.discord_screenshare_enabled) state.discord_projector_enabled = false;
     state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
   }
 
@@ -2317,10 +2340,9 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.discordScreenshareEnabled, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => { readUi(); markDirty(); });
   });
-  els.discordScreenshareEnabled.addEventListener("change", syncProjectorToolButtons);
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
   els.settingsSearch.addEventListener("input", applySettingsSearch);
 
@@ -2548,6 +2570,52 @@
     }
   }
 
+  function closeDiscordScreenshareConfirmModal(result) {
+    if (!discordScreenshareConfirmResolve) return;
+    const resolve = discordScreenshareConfirmResolve;
+    discordScreenshareConfirmResolve = null;
+    els.discordScreenshareConfirmModal.classList.remove("is-visible");
+    els.discordScreenshareConfirmModal.setAttribute("aria-hidden", "true");
+    resolve(result);
+  }
+
+  function showDiscordScreenshareConfirmModal() {
+    if (discordScreenshareConfirmResolve) return Promise.resolve(false);
+    els.discordScreenshareConfirmModal.classList.add("is-visible");
+    els.discordScreenshareConfirmModal.setAttribute("aria-hidden", "false");
+    return new Promise((resolve) => {
+      discordScreenshareConfirmResolve = resolve;
+    });
+  }
+
+  async function uninstallDiscordScreenshareOnly() {
+    if (dirty) {
+      setDiscordScreenshareUninstallStatus("Apply or cancel settings changes before uninstalling.", "bad");
+      return;
+    }
+    const confirmed = await showDiscordScreenshareConfirmModal();
+    if (!confirmed) {
+      setDiscordScreenshareUninstallStatus("Cancelled.", "");
+      return;
+    }
+    els.uninstallDiscordScreenshareBtn.disabled = true;
+    els.applyBtn.disabled = true;
+    els.okBtn.disabled = true;
+    setDiscordScreenshareUninstallStatus("Starting removal...", "");
+    setStatus("Removing Discord screenshare support...", "");
+    try {
+      const data = await helperJson("uninstall-discord-screenshare", { method:"POST" });
+      setDiscordScreenshareUninstallStatus(data.message || "Removing Discord screenshare support. OBS will close.", "good");
+      setStatus(data.message || "Removing Discord screenshare support. OBS will close.", "good");
+    } catch (e) {
+      els.uninstallDiscordScreenshareBtn.disabled = false;
+      els.okBtn.disabled = false;
+      els.applyBtn.disabled = !dirty;
+      setDiscordScreenshareUninstallStatus("Removal failed: " + (e.message || e), "bad");
+      setStatus("Removal failed: " + (e.message || e), "bad");
+    }
+  }
+
   async function uninstallReplayKit() {
     if (dirty) {
       setUninstallStatus("Apply or cancel settings changes before uninstalling.", "bad");
@@ -2599,6 +2667,15 @@
   els.checkUpdateBtn.addEventListener("click", checkForUpdates);
   els.installUpdateBtn.addEventListener("click", installUpdate);
   els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
+  els.uninstallDiscordScreenshareBtn.addEventListener("click", uninstallDiscordScreenshareOnly);
+  els.discordScreenshareConfirmCancelBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(false));
+  els.discordScreenshareConfirmOkBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(true));
+  els.discordScreenshareConfirmModal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeDiscordScreenshareConfirmModal(false);
+    }
+  });
   els.settingsProjectorInspectBtn.addEventListener("click", () => {
     runSettingsProjectorAction(els.settingsProjectorInspectBtn, "projector-inspect", "Showing projector...", "Projector shown", "Show Projector");
   });

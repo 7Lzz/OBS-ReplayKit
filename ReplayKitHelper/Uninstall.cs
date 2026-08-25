@@ -64,5 +64,41 @@ namespace ReplayKitHelper
             Log.Write("ReplayKit cleanup started elevated as PID " + proc.Id + ".");
             return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = "Uninstall started. OBS will close." };
         }
+
+        // narrower sibling of StartCleanupFromSettings -- removes just the OBS Stream Audio virtual cable instead of the whole ReplayKit install, for the "Uninstall Discord screenshare" button next to the main uninstall.
+        public static JObject StartDiscordScreenshareRemoval()
+        {
+            string cacheDir = Path.GetFullPath(GetSetupCacheDir());
+            string setupExe = Path.GetFullPath(GetSetupExecutable());
+            string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
+            if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Invalid setup executable path.");
+            if (!File.Exists(setupExe))
+                throw new InvalidOperationException("ReplayKit setup executable is missing. Re-run the installer once, then try again.");
+
+            var argList = new List<string> { "--uninstall-discord-screenshare", "--start-delay-ms", "900" };
+
+            if (BrowserCookies.TestIsAdmin())
+            {
+                string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
+                int pid = Native.SpawnDetached(cmdLine, cacheDir);
+                if (pid <= 0) throw new InvalidOperationException("Could not start Discord screenshare removal.");
+                Log.Write("Discord screenshare removal started detached as PID " + pid + ".");
+                return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = "Removing Discord screenshare support. OBS will close." };
+            }
+
+            var psi2 = new ProcessStartInfo
+            {
+                FileName = setupExe,
+                Arguments = ProcessArgs.Join(argList.ToArray()),
+                WorkingDirectory = cacheDir,
+                UseShellExecute = true,
+                Verb = "runas",
+            };
+            var proc2 = Process.Start(psi2);
+            if (proc2 == null) throw new InvalidOperationException("Could not start Discord screenshare removal.");
+            Log.Write("Discord screenshare removal started elevated as PID " + proc2.Id + ".");
+            return new JObject { ["ok"] = true, ["processId"] = proc2.Id, ["message"] = "Removing Discord screenshare support. OBS will close." };
+        }
     }
 }

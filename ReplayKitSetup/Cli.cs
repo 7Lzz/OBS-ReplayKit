@@ -652,9 +652,12 @@ namespace ReplayKitSetup
             Console.WriteLine(Color("This closes OBS, wipes OBS user config, removes ReplayKit OBS plugins,", C.Dim));
             Console.WriteLine(Color("and removes ReplayKit audio device changes.", C.Dim));
             Console.WriteLine();
-            string confirm = Prompt("Press R again to clean reset, or Q to cancel");
+            Console.WriteLine(Color("  D - uninstall just Discord screenshare / Share Preview audio (the OBS Stream", C.Dim));
+            Console.WriteLine(Color("      Audio virtual audio driver), keeping the rest of ReplayKit installed.", C.Dim));
+            string confirm = Prompt("Press R again to clean reset, D for Discord screenshare only, or Q to cancel");
             string key = confirm.ToLowerInvariant();
             if (key == "q") return;
+            if (key == "d") { UninstallDiscordScreenshareOnly(); return; }
             if (key != "r")
             {
                 Pause("Reset cancelled. Press Enter...");
@@ -678,6 +681,36 @@ namespace ReplayKitSetup
             {
                 Console.WriteLine();
                 Console.WriteLine(Color("Some cleanup steps reported warnings. Re-run Clean reset if needed.", C.Warn));
+            }
+            Pause();
+        }
+
+        // standalone counterpart to the "Remove OBS Stream Audio" step inside Cleanup.RunCleanup -- lets a user drop just the virtual audio cable (e.g. it's misbehaving, or they no longer use Discord Share Preview) without wiping the rest of their ReplayKit install and settings.
+        private static void UninstallDiscordScreenshareOnly()
+        {
+            var prefs = Prefs.LoadPrefs();
+            var progress = new InstallProgress(2, " OBS REPLAYKIT SETUP - REMOVING DISCORD SCREENSHARE ");
+            try
+            {
+                Cli.RunApplyStep(progress, 1, "Close OBS", "Stops OBS and ReplayKit helpers so the audio driver can be removed.", () => Cleanup.StopObsAndHelpers(progress.LogLine));
+                Cli.RunApplyStep(progress, 2, "Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", () => VbCable.UninstallVbcable(progress.LogLine));
+            }
+            catch (Exception)
+            {
+                Pause("Removal stopped. Press Enter to return to setup...");
+                return;
+            }
+            prefs.DiscordScreenshareEnabled = false;
+            prefs.DiscordProjectorEnabled = false;
+            prefs.Save();
+            progress.Render(2, "Discord screenshare removed", "The OBS Stream Audio virtual audio driver was uninstalled.", "done");
+            Console.WriteLine();
+            Console.WriteLine(Color("Discord screenshare / Share Preview audio removed.", C.Good));
+            Console.WriteLine(Color("The rest of your ReplayKit install is untouched.", C.Dim));
+            if (progress.Issues.Count > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine(Color("Some steps reported warnings. Re-run if needed.", C.Warn));
             }
             Pause();
         }
