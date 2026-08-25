@@ -15,18 +15,11 @@ echo [1/5] Syncing bundled ReplayKit version ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\sync_version.ps1"
 if errorlevel 1 goto :build_fail
 
-rem build the ReplayKit helper server (Clips browser, dock http api, upload/compress/trim workers) straight into assets\ -- same net48+ILRepack single-file pattern as the setup exe itself (step 5 below), just a different project and a different sibling-file drop location; this replaced a much smaller thin launcher that used to just host PowerShell in-process to run the (now-retired) PS implementation of the same server.
+rem build the ReplayKit helper server (Clips browser, dock http api, upload/compress/trim workers) straight into assets\ -- same net48+ILRepack single-file pattern as the setup exe itself (step 5 below), just a different project and a different sibling-file drop location; this replaced a much smaller thin launcher that used to just host PowerShell in-process to run the (now-retired) PS implementation of the same server. build_helper.ps1 skips the rebuild entirely when the bundled exe is already newer than every source file, same convention as the tray plugin build below.
 echo [2/5] Compiling ReplayKit helper into assets\ ...
-if exist "ReplayKitHelper\bin" rmdir /S /Q "ReplayKitHelper\bin"
-if exist "ReplayKitHelper\obj" rmdir /S /Q "ReplayKitHelper\obj"
-if exist "publish_helper_tmp"  rmdir /S /Q "publish_helper_tmp"
-dotnet publish "ReplayKitHelper\ReplayKitHelper.csproj" -c Release -o "publish_helper_tmp" --nologo
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\build_helper.ps1"
 if errorlevel 1 goto :launcher_fail
-copy /Y "publish_helper_tmp\OBSReplayKit.exe" "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe" >nul
-if errorlevel 1 goto :launcher_fail
-rmdir /S /Q "publish_helper_tmp"
-if exist "ReplayKitHelper\bin" rmdir /S /Q "ReplayKitHelper\bin"
-if exist "ReplayKitHelper\obj" rmdir /S /Q "ReplayKitHelper\obj"
+if not exist "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe" goto :launcher_fail
 
 rem builds the native tray plugin (view clips / share preview / restart obs) and bundles it into assets\ itself, same as the helper build above does for the helper exe; build.ps1 compiles against whatever obs version is installed and caches its qt6/obs-headers deps under %temp%\replaykit-tray-build (deliberately outside build\, which gets wiped every run), and skips the whole rebuild when the bundled dll is already newer than its source + the installed obs -- requires gh (authenticated) and vs2022/2019 build tools with the c++ workload, see utils\obs-plugins\replaykit-tray\build.ps1 for details.
 echo [3/5] Compiling tray plugin into assets\ ...

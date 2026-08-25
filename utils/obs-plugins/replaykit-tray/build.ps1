@@ -2,7 +2,7 @@
 
 param(
     [string]$WorkDir = (Join-Path $env:TEMP "replaykit-tray-build"),
-    # where the built dll ends up; defualt lands it in the bundled assets, same as build_launcher.ps1s $OutPath does for the launcher exe.
+    # where the built dll ends up; defualt lands it in the bundled assets, same as build_helper.ps1s $outPath does for the helper exe.
     [string]$OutPath = '',
     [switch]$InstallAfterBuild
 )
@@ -23,7 +23,7 @@ function Find-VsBuildTools {
     throw "No VS2022/2019 BuildTools MSVC toolset found. Install 'Desktop development with C++' first."
 }
 
-# same shape as build_launcher.ps1s Test-LauncherOutputCurrent -- true only when $targetPath exists and is newer than every input.
+# same shape as build_helper.ps1s Test-HelperOutputCurrent -- true only when $targetPath exists and is newer than every input.
 function Test-TrayPluginOutputCurrent([string]$targetPath, [string[]]$inputPaths) {
     if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) { return $false }
     $target = Get-Item -LiteralPath $targetPath
