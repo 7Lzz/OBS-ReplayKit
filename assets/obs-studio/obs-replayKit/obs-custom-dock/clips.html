@@ -1445,6 +1445,28 @@
   /* trim modal */
   /* width fills as much of the clips window (850-2400px, per the resize bounds in 71_routes.ps1) as it can without letting the 16:9 video wrap push the modal taller than the window -- bounded by whichever of window width or the height-derived-from-16:9 is tighter. floor matches the old fixed width so the window minimum looks unchanged. */
   .trim-modal { width: max(640px, min(90vw, calc((90vh - 300px) * 16 / 9), 1900px)); }
+  /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
+  .trim-processing-modal {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 28px 24px;
+  }
+  .trim-processing-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255,255,255,.18);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: trim-processing-spin .8s linear infinite;
+  }
+  @keyframes trim-processing-spin { to { transform: rotate(360deg); } }
+  .trim-processing-label {
+    color: var(--text_muted);
+    font-size: 13px;
+  }
   .trim-modal .clip-name {
     font-size: 12px;
     color: var(--text_muted);
@@ -1861,6 +1883,14 @@
       <div class="row">
         <button class="btn" type="button" id="compress-mode-cancel">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="trim-processing-veil">
+    <div class="modal trim-processing-modal" id="trim-processing-modal">
+      <div class="trim-processing-spinner"></div>
+      <div class="trim-processing-label">Processing clip&hellip;</div>
+      <button type="button" class="btn" id="trim-processing-cancel">Cancel</button>
     </div>
   </div>
 
@@ -5328,6 +5358,8 @@
 
   // trim modal -- ffmpeg stream-copy via post /trim. dual-handle range: two <input type="range"> elements share the same track. css makes the inputs pointer-events:none and only the thumbs recieve clicks, so the two handles never block each other and the underlying highlight bar reflects the selected window.
   const trimVeil         = document.getElementById("trim-veil");
+  const trimProcessingVeil   = document.getElementById("trim-processing-veil");
+  const trimProcessingCancel = document.getElementById("trim-processing-cancel");
   const trimClipName     = document.getElementById("trim-clip-name");
   const trimVideoWrap    = document.querySelector(".trim-video-wrap");
   const trimVideo        = document.getElementById("trim-video");
@@ -5696,6 +5728,8 @@
 
   function openTrimModal(clip) {
     if (!clip || !clip.name) return;
+    // the real editor stays closed and this stands in for it until onMeta below fires -- popping the actual trim-veil open early would show stale slider positions and an unloaded video (left over from whatever clip was edited last) for a beat before they snap to the right values.
+    trimProcessingVeil.classList.add("is-open");
     // a grid cards hover-preview video is tracked independently of trimVideo and nothing here used to stop it -- if the pointer was still over a card when Edit was clicked, that cards <video> kept streaming right alongside trimVideo, uncoordinated and sometimes hitting the same file; the old single-threaded helper mostly hid this, but the multithreaded one can actually run both requests at once, which was driving the intermittent stuck-preview freeze.
     if (activePreview) {
       abortVideoLoad(activePreview);
@@ -5716,13 +5750,12 @@
     resetTrimSnapPoints();
     applyVolume(trimVideo);
     syncVolumeUi(trimVolumeBtn, trimVolumeSlider);
-    trimVeil.classList.add("is-open");
     syncTrimPlayIcon();
     // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
     trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) +
                     "?v=" + (clip.mtime || Date.now());
     trimVideo.currentTime = 0;
-    const onMeta = () => {
+    const onMeta = async () => {
       const dur = isFinite(trimVideo.duration) ? trimVideo.duration : 0;
       trimStart.min = trimEnd.min = trimSeek.min = "0";
       trimStart.max = trimEnd.max = trimSeek.max = String(dur);
@@ -5731,16 +5764,24 @@
       trimSeek.value  = "0";
       updateTrimUi();
       updateSeekFill();
+      // wait for the keyframe probe to settle too (success or fallback, loadTrimSnapPoints never rejects) before revealing anything -- otherwise the menu pops up correct except for its keyframe marks, which then pop in a moment later on a big clip where the probe takes a while. that is the exact pop-in this screen exists to hide.
       if (!trimPrecise.checked) {
-        loadTrimSnapPoints(clip.name, dur, true, clip.mtime, clip.size);
+        await loadTrimSnapPoints(clip.name, dur, true, clip.mtime, clip.size);
       } else {
         syncTrimSnapMode(false);
       }
+      // the user couldve cancelled (or opened a different clip) while the probe above was in flight -- dont pop the menu open behind them at that point.
+      if (trimSourceClip !== clip) return;
+      trimProcessingVeil.classList.remove("is-open");
+      trimVeil.classList.add("is-open");
+      // the snap marks were already computed above while the trim bar was still display:none (0 width, so pickVisibleTrimSnapMarks drew nothing even though snapping is active) -- now that the bar actually has real layout, redraw them for real.
+      renderTrimSnapMarks();
     };
     trimVideo.addEventListener("loadedmetadata", onMeta, { once: true });
   }
 
   function closeTrimModal() {
+    trimProcessingVeil.classList.remove("is-open");
     trimVeil.classList.remove("is-open");
     trimPreviewActive = false;
     disarmOverwrite();
@@ -5916,10 +5957,17 @@
   });
 
   trimCancel.addEventListener("click", closeTrimModal);
+  trimProcessingCancel.addEventListener("click", closeTrimModal);
   trimVeil.addEventListener("mousedown", (e) => {
     if (e.target === trimVeil) closeTrimModal();
   });
   trimVeil.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeTrimModal(); }
+  });
+  trimProcessingVeil.addEventListener("mousedown", (e) => {
+    if (e.target === trimProcessingVeil) closeTrimModal();
+  });
+  trimProcessingVeil.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); closeTrimModal(); }
   });
 

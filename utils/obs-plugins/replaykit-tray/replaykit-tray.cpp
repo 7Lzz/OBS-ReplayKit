@@ -51,9 +51,14 @@ bool g_settingsCheckInFlight = false;
 // share previews checked state is re-read from the helper every time the menu opens, since obs only builds this menu once
 QPointer<QAction> g_sharePreviewAction;
 
+
 // hidden, not removed, each time the menu opens -- see OnFrontendEvent for why removeAction was the wrong tool here
 QPointer<QAction> g_previewProjectorAction;
 QPointer<QAction> g_programProjectorAction;
+
+// obss own native record/replay-buffer actions, stayed visible and never removed -- renamed and re-triggered in place (see RefreshActionRowText/ToggleRecording/ToggleReplayBuffer) rather than hidden behind a custom widget, since native tray menus render these directly and a custom stand-in could never reliably match that alignment.
+QPointer<QAction> g_nativeRecordAction;
+QPointer<QAction> g_nativeReplayBufferAction;
 
 // menu opens upward from the cursor so restart obs lands right where an accidental double-clicks second click hits -- every action here bails if triggered within kMenuClickDebounceMs of aboutToShow
 constexpr qint64 kMenuClickDebounceMs = 150;
@@ -327,27 +332,6 @@ void ConfirmedExit()
 	std::thread([]() { HttpRequest("POST", "/exit-obs", 8767, nullptr, 5000); }).detach();
 }
 
-// obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox right before each show instead of polling on a timer nobody is watching
-void RefreshDynamicMenuState()
-{
-	if (!g_sharePreviewAction)
-		return;
-	std::thread([]() {
-		std::string getBody = HttpRequest("GET", "/share-preview", 8767, nullptr, 500);
-		bool available = JsonBoolField(getBody, "available", false);
-		bool enabled = JsonBoolField(getBody, "enabled", false);
-		QMetaObject::invokeMethod(
-			qApp,
-			[available, enabled]() {
-				if (!g_sharePreviewAction)
-					return;
-				g_sharePreviewAction->setEnabled(available);
-				g_sharePreviewAction->setChecked(enabled);
-			},
-			Qt::QueuedConnection);
-	}).detach();
-}
-
 // invisible throwaway browser to eat the first-ever cef surfaces one-time cost -- the real clips window paints only a corner and stays white the first time each obs session, and this burns that bad first attempt off-screen instead of chasing the exact cef-internal cause
 bool g_cefPrewarmed = false;
 
@@ -417,18 +401,67 @@ private:
 	QMenu *m_menu;
 };
 
-// pins the menus bottom edge to the taskbar top since windows qt lets popups cover the taskbar instead of avoiding it like gnome/macos do -- y only, x stays wherever windows anchored it. skips the move() entirely when already at the target y -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
+// obss own isEnabled() on sysTrayRecord/sysTrayReplayBuffer cannot be trusted (confirmed via logging: both reported enabled=0 at click time despite obs_frontend_..._active() proving the underlying feature was genuinely toggleable -- obs only calls setEnabled on sysTrayReplayBuffer from inside ResetOutputs, gated on whether the output handler happened to already have a replay buffer object at that exact moment, never re-enabled later, and sysTrayRecord has no setEnabled call anywhere in obs at all), so these drive the toggle directly through the same stable public entry points obs itself and every obs-websocket-style integration use, instead of routing through the actions own (occasionally-lying) enabled/triggered state.
+void ToggleRecording()
+{
+	bool active = obs_frontend_recording_active();
+	blog(LOG_INFO, "[replaykit-tray] ToggleRecording: active=%d -> calling %s", active, active ? "stop" : "start");
+	active ? obs_frontend_recording_stop() : obs_frontend_recording_start();
+}
+
+void ToggleReplayBuffer()
+{
+	bool active = obs_frontend_replay_buffer_active();
+	blog(LOG_INFO, "[replaykit-tray] ToggleReplayBuffer: active=%d -> calling %s", active, active ? "stop" : "start");
+	active ? obs_frontend_replay_buffer_stop() : obs_frontend_replay_buffer_start();
+}
+
+// a QWidgetAction-based custom row (colored keybind badge) was tried here and reverted -- confirmed via qt forum threads that native platform tray menus (which is what these actions render through) do not properly support QWidgetAction at all, which tracks with alignment never converging no matter the margin. plain native QAction text is what actually renders through the same layout pass as every sibling item, guaranteeing correct alignment; the bracketed keybind after the tab is qts own shortcut-hint convention (same mechanism every menus "Ctrl+S" style hint uses), not a real functional shortcut binding.
+void RefreshActionRowText()
+{
+	if (g_nativeRecordAction)
+		g_nativeRecordAction->setText(obs_frontend_recording_active() ? "Stop Recording" : "Start Recording");
+	if (g_nativeReplayBufferAction)
+		g_nativeReplayBufferAction->setText(obs_frontend_replay_buffer_active() ? "Stop Clipping" : "Start Clipping");
+}
+
+// obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox and the record/clipping rename right before each show instead of polling on a timer nobody is watching. keybind text next to the rename (fetched from the helpers /settings) was tried and pulled back out -- it pushed the menu wide enough to run off the right edge of the screen, and the only way to show it any smaller/greyer needs a custom widget, which is the same QWidgetAction approach that turned out not to align with native items at all (see the comment on RefreshActionRowText). revisit that non-native-rendering path later; for now this stays plain rename only.
+void RefreshDynamicMenuState()
+{
+	RefreshActionRowText();
+	if (!g_sharePreviewAction)
+		return;
+	std::thread([]() {
+		std::string getBody = HttpRequest("GET", "/share-preview", 8767, nullptr, 500);
+		bool available = JsonBoolField(getBody, "available", false);
+		bool enabled = JsonBoolField(getBody, "enabled", false);
+		QMetaObject::invokeMethod(
+			qApp,
+			[available, enabled]() {
+				if (!g_sharePreviewAction)
+					return;
+				g_sharePreviewAction->setEnabled(available);
+				g_sharePreviewAction->setChecked(enabled);
+			},
+			Qt::QueuedConnection);
+	}).detach();
+}
+
+// pins the menus bottom edge to the taskbar top since windows qt lets popups cover the taskbar instead of avoiding it like gnome/macos do (y), and separately pulls the right edge back onto the screen if the row width -- wider now that record/clipping show a keybind hint -- would otherwise push it off the right side (x); x is otherwise left wherever windows anchored it, never pushed further right than that. skips the move() entirely when already at the target position -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
 void PinMenuAboveTaskbar(QMenu *menu)
 {
 	QScreen *screen = QGuiApplication::screenAt(menu->pos());
 	if (!screen)
 		return;
-	int taskbarTop = screen->availableGeometry().bottom() + 1;
+	QRect avail = screen->availableGeometry();
+	int taskbarTop = avail.bottom() + 1;
 	int menuHeight = menu->sizeHint().height();
 	int targetY = qMax(0, taskbarTop - menuHeight);
-	if (menu->pos().y() == targetY)
+	int menuWidth = menu->sizeHint().width();
+	int targetX = qMin(menu->pos().x(), qMax(avail.left(), avail.right() + 1 - menuWidth));
+	if (menu->pos().x() == targetX && menu->pos().y() == targetY)
 		return;
-	menu->move(menu->pos().x(), targetY);
+	menu->move(targetX, targetY);
 }
 
 // obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 window enumeration, so the replaykit helper (a separate powershell process with no qt/obs-object access, only raw EnumWindows/GetClassName-style calls) has no way to read it directly -- this plugin does, since it runs inside obss own qt process. publishing the current set of hwnds carrying that property to a file lets the helper check the SAME authoritative signal obs uses internally instead of only inferring "looks like a projector" from window class + ownership heuristics, which turned out to have real false-positive risk (many of obss own dialogs -- NameDialog, the Scripts window, the auto-config wizard, etc. -- are independently-owned top-level windows too, just not projectors).
@@ -567,6 +600,41 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		g_programProjectorAction = projectorSubmenuActions.at(1);
 		g_programProjectorAction->setVisible(false);
 	}
+
+	// obs always builds {Stream, Record, ReplayBuffer, VirtualCam} as one separator-delimited group immediately before Exit (OBSBasic::SystemTrayInit adds them in this fixed order every time), so walking backward from Exit to the next separator finds Record/ReplayBuffer by position -- locale-independent, unlike the text-matching that silently found nothing on non-english obs (see the projector-matching note above). size()==4 is a sanity check, not a guess: if some future obs version changes this layout, skip the customization entirely rather than misattribute the wrong action to record/clipping.
+	QList<QAction *> streamGroup;
+	for (auto it = trayActions.crbegin(); it != trayActions.crend(); ++it) {
+		if (*it == exitAction)
+			continue;
+		if ((*it)->isSeparator()) {
+			if (!streamGroup.isEmpty())
+				break;
+			continue;
+		}
+		streamGroup.prepend(*it);
+	}
+	blog(LOG_INFO, "[replaykit-tray] stream group structural lookup found %d actions (expected 4: Stream, Record, ReplayBuffer, VirtualCam)",
+	     (int)streamGroup.size());
+	if (streamGroup.size() == 4) {
+		g_nativeRecordAction = streamGroup.at(1);
+		g_nativeReplayBufferAction = streamGroup.at(2);
+		blog(LOG_INFO, "[replaykit-tray] record action: text=\"%s\" enabled=%d", g_nativeRecordAction->text().toUtf8().constData(),
+		     g_nativeRecordAction->isEnabled());
+		blog(LOG_INFO, "[replaykit-tray] replay-buffer action: text=\"%s\" enabled=%d",
+		     g_nativeReplayBufferAction->text().toUtf8().constData(), g_nativeReplayBufferAction->isEnabled());
+
+		// force-enabled since isEnabled() cant be trusted (see ToggleRecording/ToggleReplayBuffer above); disconnect(receiver=nullptr) drops obss own RecordActionTriggered/ReplayBufferActionTriggered listener (same qt-documented technique already used for exitAction below) so ours -- which does not depend on that same untrustworthy enabled state -- is the only one left, rather than risking both firing.
+		g_nativeRecordAction->setEnabled(true);
+		QObject::disconnect(g_nativeRecordAction, &QAction::triggered, nullptr, nullptr);
+		QObject::connect(g_nativeRecordAction, &QAction::triggered, trayMenu, []() { ToggleRecording(); });
+
+		g_nativeReplayBufferAction->setEnabled(true);
+		QObject::disconnect(g_nativeReplayBufferAction, &QAction::triggered, nullptr, nullptr);
+		QObject::connect(g_nativeReplayBufferAction, &QAction::triggered, trayMenu, []() { ToggleReplayBuffer(); });
+
+		RefreshActionRowText();
+	}
+
 	// obs wires exit straight to close() with no confirmation, an easy accidental target at the cursors landing spot -- disconnect(receiver=nullptr) drops obss own listener (qts documented way to do so) so we can reconnect our confirm-first version instead of leaving two competing handlers
 	if (exitAction) {
 		QObject::disconnect(exitAction, &QAction::triggered, nullptr, nullptr);
