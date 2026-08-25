@@ -263,7 +263,7 @@
         <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
       </div>
     </div>
-    <button class="btn" id="settings-btn">Custom Settings</button>
+    <button class="btn" id="settings-btn">ReplayKit Settings</button>
   </div>
 
 <script>
@@ -357,7 +357,7 @@
     modeBtn.textContent = sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable);
     modeBtn.disabled = sharePreviewActionInFlight || !sharePreviewAvailable;
     modeBtn.title = !sharePreviewAvailable
-      ? "Discord screenshare support is disabled in Custom Settings > Advanced."
+      ? "Discord screenshare support is disabled in ReplayKit Settings > Advanced."
       : sharePreviewEnabled
       ? "Stop letting Discord or other apps capture your OBS scene (Application screen share)."
       : "Let Discord or other apps capture your OBS scene (use Application screen share).";

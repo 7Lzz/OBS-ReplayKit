@@ -12,6 +12,9 @@
 #include <QString>
 #include <QWidget>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QWidgetAction>
 #include <QPointer>
 #include <QTimer>
 #include <QElapsedTimer>
@@ -24,6 +27,7 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QWindow>
+#include <QCursor>
 #include <QSaveFile>
 #include <QTextStream>
 
@@ -34,6 +38,9 @@
 #include <string>
 #include <cstring>
 #include <thread>
+#include <algorithm>
+#include <unordered_map>
+#include <vector>
 
 OBS_DECLARE_MODULE()
 
@@ -56,7 +63,7 @@ QPointer<QAction> g_sharePreviewAction;
 QPointer<QAction> g_previewProjectorAction;
 QPointer<QAction> g_programProjectorAction;
 
-// obss own native record/replay-buffer actions, stayed visible and never removed -- renamed and re-triggered in place (see RefreshActionRowText/ToggleRecording/ToggleReplayBuffer) rather than hidden behind a custom widget, since native tray menus render these directly and a custom stand-in could never reliably match that alignment.
+// obss own native record/replay-buffer actions -- hidden (not removed) behind TrayActionRow, same as g_previewProjectorAction/g_programProjectorAction above; kept alive only as the structural anchor insertAction positions the custom rows against.
 QPointer<QAction> g_nativeRecordAction;
 QPointer<QAction> g_nativeReplayBufferAction;
 
@@ -163,6 +170,82 @@ bool JsonBoolField(const std::string &body, const char *field, bool defaultValue
 	if (body.find(std::string("\"") + field + "\":false") != std::string::npos)
 		return false;
 	return defaultValue;
+}
+
+// pulls one flat {"key":"OBS_KEY_X","shift":true,...} object out of a larger json blob by field name -- clipKeybind/recordingKeybind never nest anything deeper than string/bool leaves, so a substring search from the fields opening brace to the next closing one is exact, same "no real parser needed for a known shape" approach as JsonBoolField above rather than pulling in a json library for two callers.
+std::string ExtractJsonObjectField(const std::string &body, const char *field)
+{
+	std::string marker = std::string("\"") + field + "\":{";
+	size_t start = body.find(marker);
+	if (start == std::string::npos)
+		return std::string();
+	start += marker.size() - 1;
+	size_t end = body.find('}', start);
+	if (end == std::string::npos)
+		return std::string();
+	return body.substr(start, end - start + 1);
+}
+
+std::string ExtractJsonStringField(const std::string &obj, const char *field)
+{
+	std::string marker = std::string("\"") + field + "\":\"";
+	size_t start = obj.find(marker);
+	if (start == std::string::npos)
+		return std::string();
+	start += marker.size();
+	size_t end = obj.find('"', start);
+	if (end == std::string::npos)
+		return std::string();
+	return obj.substr(start, end - start);
+}
+
+// mirrors keyLabel() in obs-custom-dock/settings.html exactly, so the tray badge reads the same as the settings docks own hotkey field for the same binding.
+std::string KeyLabelFromObsKey(const std::string &obsKey)
+{
+	static const std::unordered_map<std::string, std::string> named = {
+		{"OBS_KEY_BACKSLASH", "\\"}, {"OBS_KEY_SLASH", "/"},        {"OBS_KEY_SPACE", "Space"},
+		{"OBS_KEY_RETURN", "Enter"}, {"OBS_KEY_ESCAPE", "Esc"},      {"OBS_KEY_TAB", "Tab"},
+		{"OBS_KEY_DELETE", "Delete"}, {"OBS_KEY_BACKSPACE", "Backspace"},
+		{"OBS_KEY_UP", "Up"}, {"OBS_KEY_DOWN", "Down"}, {"OBS_KEY_LEFT", "Left"}, {"OBS_KEY_RIGHT", "Right"},
+	};
+	auto found = named.find(obsKey);
+	if (found != named.end())
+		return found->second;
+	const std::string prefix = "OBS_KEY_";
+	if (obsKey.rfind(prefix, 0) == 0) {
+		std::string rest = obsKey.substr(prefix.size());
+		std::replace(rest.begin(), rest.end(), '_', ' ');
+		return rest;
+	}
+	return obsKey;
+}
+
+// same modifier set/order/key-name mapping as comboToLabel() in settings.html, but joined with a bare "+" (no spaces) so the chip stays as compact as possible and never stretches the menu wider than it needs to be.
+std::string KeybindLabelFromSettingsJson(const std::string &settingsBody, const char *field)
+{
+	std::string obj = ExtractJsonObjectField(settingsBody, field);
+	if (obj.empty())
+		return std::string();
+	std::string key = ExtractJsonStringField(obj, "key");
+	if (key.empty())
+		return std::string();
+	std::vector<std::string> parts;
+	if (JsonBoolField(obj, "control", false))
+		parts.push_back("Ctrl");
+	if (JsonBoolField(obj, "alt", false))
+		parts.push_back("Alt");
+	if (JsonBoolField(obj, "shift", false))
+		parts.push_back("Shift");
+	if (JsonBoolField(obj, "command", false))
+		parts.push_back("Win");
+	parts.push_back(KeyLabelFromObsKey(key));
+	std::string label;
+	for (size_t i = 0; i < parts.size(); i++) {
+		if (i)
+			label += "+";
+		label += parts[i];
+	}
+	return label;
 }
 
 // ui-thread only -- builds the actual window once we know theres no existing clips window to reuse and cef is already confirmed started via EnsureCefReadyBlocking
@@ -416,19 +499,111 @@ void ToggleReplayBuffer()
 	active ? obs_frontend_replay_buffer_stop() : obs_frontend_replay_buffer_start();
 }
 
-// a QWidgetAction-based custom row (colored keybind badge) was tried here and reverted -- confirmed via qt forum threads that native platform tray menus (which is what these actions render through) do not properly support QWidgetAction at all, which tracks with alignment never converging no matter the margin. plain native QAction text is what actually renders through the same layout pass as every sibling item, guaranteeing correct alignment; the bracketed keybind after the tab is qts own shortcut-hint convention (same mechanism every menus "Ctrl+S" style hint uses), not a real functional shortcut binding.
+void PinMenuAboveTaskbar(QMenu *menu);
+
+enum class TrayRowKind { Recording, ReplayBuffer };
+
+// custom row (name + a darker rounded keybind chip) for record/clipping -- a first attempt at this was reverted because it never aligned with native items no matter the margin (19/9/2/5/15px all tried), and research confirmed why: this menu used to render through windows own native platform menu bridge, which has no real support for QWidgetAction at all. OnFrontendEvent now clears setContextMenu() and pops this same trayMenu manually instead (see the tray->setContextMenu(nullptr) block), so this widget goes through qts own menu layout/paint path like everything else in it -- alignment is a fresh, real question now, not a fight against a bridge that was never going to cooperate. click handling stays debounced across both plausible delivery paths (the widgets own mouseReleaseEvent and the wrapping actions triggered()) since its still not certain in advance which one fires in a popped-not-native menu either.
+class TrayActionRow : public QWidget {
+public:
+	TrayActionRow(TrayRowKind kind, QMenu *menu, QWidget *parent = nullptr) : QWidget(parent), m_kind(kind), m_menu(menu)
+	{
+		setAttribute(Qt::WA_Hover, true);
+		setCursor(Qt::PointingHandCursor);
+		setStyleSheet("QWidget:hover { background-color: palette(highlight); }");
+		// Minimum (not the QWidget default) means qt treats our sizeHint as a floor it can grow past but never shrink below -- structural insurance against the reported clipping/overlap, instead of only reacting to it after the fact once the chip already got squeezed.
+		setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+		nameLabel = new QLabel(this);
+		chipLabel = new QLabel(this);
+		// as tight as still legible -- reads as a small badge, not a second label competing for space.
+		chipLabel->setStyleSheet("background-color: rgba(0, 0, 0, 70); border-radius: 3px; padding: 0px 4px; font-size: 9px; color: rgba(255, 255, 255, 160);");
+		chipLabel->setVisible(false);
+
+		auto *layout = new QHBoxLayout(this);
+		// bracketed against screenshots: 20px measured left of sibling items, 32px measured right of them -- this is the midpoint, not a computed value.
+		layout->setContentsMargins(26, 5, 10, 5);
+		layout->setSpacing(6);
+		// chip sits right next to the name, not pushed to the far right edge -- the stretch goes after both so any leftover space (e.g. qmenu matching this row to a wider sibling item) ends up as trailing empty space instead of a gap between name and chip.
+		layout->addWidget(nameLabel);
+		layout->addWidget(chipLabel);
+		layout->addStretch();
+	}
+
+	QLabel *nameLabel;
+	QLabel *chipLabel;
+
+	void SetKeybindLabel(const std::string &label)
+	{
+		chipLabel->setVisible(!label.empty());
+		chipLabel->setText(QString::fromStdString(label));
+		// this rows sizeHint just changed (chip went from hidden/empty to a real label or back) -- updateGeometry() is qts actual mechanism for "go re-ask for my size", not a manual setMinimumWidth guess; SizePolicy::Minimum from the constructor is what makes sure that re-asked-for size is never shrunk back below.
+		updateGeometry();
+		// the reported "sometimes doesnt resize, cuts things off" race: this runs after an async fetch, by which point aboutToShow's own PinMenuAboveTaskbar call has usually already happened against the old (narrower) size -- qt does not reliably repropagate a QWidgetAction childs new size up to an already-shown QMenu on its own, so force both explicitly instead of assuming it happens.
+		if (m_menu) {
+			m_menu->adjustSize();
+			PinMenuAboveTaskbar(m_menu);
+		}
+	}
+
+	void ProxyTrigger()
+	{
+		if (m_lastTrigger.isValid() && m_lastTrigger.elapsed() < 250)
+			return;
+		m_lastTrigger.start();
+		if (m_kind == TrayRowKind::Recording)
+			ToggleRecording();
+		else
+			ToggleReplayBuffer();
+		if (m_menu)
+			m_menu->close();
+	}
+
+protected:
+	void mouseReleaseEvent(QMouseEvent *event) override
+	{
+		if (event->button() == Qt::LeftButton)
+			ProxyTrigger();
+		QWidget::mouseReleaseEvent(event);
+	}
+
+private:
+	TrayRowKind m_kind;
+	QMenu *m_menu;
+	QElapsedTimer m_lastTrigger;
+};
+
+QPointer<TrayActionRow> g_recordRow;
+QPointer<TrayActionRow> g_replayBufferRow;
+
 void RefreshActionRowText()
 {
-	if (g_nativeRecordAction)
-		g_nativeRecordAction->setText(obs_frontend_recording_active() ? "Stop Recording" : "Start Recording");
-	if (g_nativeReplayBufferAction)
-		g_nativeReplayBufferAction->setText(obs_frontend_replay_buffer_active() ? "Stop Clipping" : "Start Clipping");
+	if (g_recordRow)
+		g_recordRow->nameLabel->setText(obs_frontend_recording_active() ? "Stop Recording" : "Start Recording");
+	if (g_replayBufferRow)
+		g_replayBufferRow->nameLabel->setText(obs_frontend_replay_buffer_active() ? "Stop Clipping" : "Start Clipping");
 }
 
-// obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox and the record/clipping rename right before each show instead of polling on a timer nobody is watching. keybind text next to the rename (fetched from the helpers /settings) was tried and pulled back out -- it pushed the menu wide enough to run off the right edge of the screen, and the only way to show it any smaller/greyer needs a custom widget, which is the same QWidgetAction approach that turned out not to align with native items at all (see the comment on RefreshActionRowText). revisit that non-native-rendering path later; for now this stays plain rename only.
+// obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox and the record/clipping rows keybind chip right before each show instead of polling on a timer nobody is watching
 void RefreshDynamicMenuState()
 {
 	RefreshActionRowText();
+	if (g_recordRow || g_replayBufferRow) {
+		std::thread([]() {
+			std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 500);
+			std::string clipLabel = KeybindLabelFromSettingsJson(settingsBody, "clipKeybind");
+			std::string recordingLabel = KeybindLabelFromSettingsJson(settingsBody, "recordingKeybind");
+			QMetaObject::invokeMethod(
+				qApp,
+				[clipLabel, recordingLabel]() {
+					if (g_replayBufferRow)
+						g_replayBufferRow->SetKeybindLabel(clipLabel);
+					if (g_recordRow)
+						g_recordRow->SetKeybindLabel(recordingLabel);
+				},
+				Qt::QueuedConnection);
+		}).detach();
+	}
 	if (!g_sharePreviewAction)
 		return;
 	std::thread([]() {
@@ -447,16 +622,16 @@ void RefreshDynamicMenuState()
 	}).detach();
 }
 
-// pins the menus bottom edge to the taskbar top since windows qt lets popups cover the taskbar instead of avoiding it like gnome/macos do (y), and separately pulls the right edge back onto the screen if the row width -- wider now that record/clipping show a keybind hint -- would otherwise push it off the right side (x); x is otherwise left wherever windows anchored it, never pushed further right than that. skips the move() entirely when already at the target position -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
+// only pulls the menu up when it would actually overlap the taskbar (y), or back onto the screen when it would run off the right edge (x) -- this used to pin the bottom edge to the taskbar top unconditionally, which was wrong for a tray icon sitting in the hidden-icons flyout (a separate window that floats well above the taskbar): the menu snapped down to the taskbar instead of staying near the flyout it was actually opened from. checking against the menus own natural popup() position instead of always recomputing from the taskbar makes it adapt to wherever the icon actually is. skips the move() entirely when already at the target position -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
 void PinMenuAboveTaskbar(QMenu *menu)
 {
 	QScreen *screen = QGuiApplication::screenAt(menu->pos());
 	if (!screen)
 		return;
 	QRect avail = screen->availableGeometry();
-	int taskbarTop = avail.bottom() + 1;
 	int menuHeight = menu->sizeHint().height();
-	int targetY = qMax(0, taskbarTop - menuHeight);
+	int naturalY = menu->pos().y();
+	int targetY = (naturalY + menuHeight > avail.bottom() + 1) ? qMax(avail.top(), avail.bottom() + 1 - menuHeight) : naturalY;
 	int menuWidth = menu->sizeHint().width();
 	int targetX = qMin(menu->pos().x(), qMax(avail.left(), avail.right() + 1 - menuWidth));
 	if (menu->pos().x() == targetX && menu->pos().y() == targetY)
@@ -545,6 +720,13 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (!trayMenu)
 		return;
 
+	// obs wires this same trayMenu to the tray icon via setContextMenu(), which on windows hands rendering off to a native platform menu bridge that has no support for QWidgetAction at all (confirmed via research, and by five alignment attempts on a QWidgetAction row never converging) -- clearing that association and popping the same menu manually on a right-click keeps every existing action/signal/submenu intact but renders through qts own (non-native) menu painting, which is what actually supports a custom widget row correctly. obss own activated->IconActivated connection (left-click show/hide) is untouched; this only adds a second listener that acts on Context specifically.
+	tray->setContextMenu(nullptr);
+	QObject::connect(tray, &QSystemTrayIcon::activated, trayMenu, [trayMenu](QSystemTrayIcon::ActivationReason reason) {
+		if (reason == QSystemTrayIcon::Context)
+			trayMenu->popup(QCursor::pos());
+	});
+
 	new TrayMenuGuard(trayMenu);
 
 	// obs builds this menu once in SystemTrayInit() and never rebuilds the top level (only the projector submenus contents refresh per click), so anything hidden below stays hidden without needing to be redone on every open
@@ -556,7 +738,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	QObject::connect(sharePreview, &QAction::triggered, trayMenu, [](bool checked) { ToggleSharePreview(checked); });
 	g_sharePreviewAction = sharePreview;
 
-	QAction *customSettings = new QAction(QObject::tr("Custom Settings"), trayMenu);
+	QAction *customSettings = new QAction(QObject::tr("ReplayKit Settings"), trayMenu);
 	QObject::connect(customSettings, &QAction::triggered, trayMenu, []() { ShowSettings(); });
 
 	QObject::connect(trayMenu, &QMenu::aboutToShow, trayMenu, [trayMenu]() {
@@ -623,14 +805,28 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		blog(LOG_INFO, "[replaykit-tray] replay-buffer action: text=\"%s\" enabled=%d",
 		     g_nativeReplayBufferAction->text().toUtf8().constData(), g_nativeReplayBufferAction->isEnabled());
 
-		// force-enabled since isEnabled() cant be trusted (see ToggleRecording/ToggleReplayBuffer above); disconnect(receiver=nullptr) drops obss own RecordActionTriggered/ReplayBufferActionTriggered listener (same qt-documented technique already used for exitAction below) so ours -- which does not depend on that same untrustworthy enabled state -- is the only one left, rather than risking both firing.
-		g_nativeRecordAction->setEnabled(true);
-		QObject::disconnect(g_nativeRecordAction, &QAction::triggered, nullptr, nullptr);
-		QObject::connect(g_nativeRecordAction, &QAction::triggered, trayMenu, []() { ToggleRecording(); });
+		// hidden, not removed (matches g_previewProjectorAction/g_programProjectorAction above) -- TrayActionRow proxies clicks straight to ToggleRecording/ToggleReplayBuffer (the direct obs_frontend_..._start/stop calls), so the native actions own isEnabled()/triggered() (confirmed untrustworthy earlier) never come into play at all.
+		auto *recordRow = new TrayActionRow(TrayRowKind::Recording, trayMenu);
+		auto *recordRowAction = new QWidgetAction(trayMenu);
+		recordRowAction->setDefaultWidget(recordRow);
+		QObject::connect(recordRowAction, &QAction::triggered, trayMenu, [recordRow]() {
+			if (recordRow)
+				recordRow->ProxyTrigger();
+		});
+		trayMenu->insertAction(g_nativeRecordAction, recordRowAction);
+		g_nativeRecordAction->setVisible(false);
+		g_recordRow = recordRow;
 
-		g_nativeReplayBufferAction->setEnabled(true);
-		QObject::disconnect(g_nativeReplayBufferAction, &QAction::triggered, nullptr, nullptr);
-		QObject::connect(g_nativeReplayBufferAction, &QAction::triggered, trayMenu, []() { ToggleReplayBuffer(); });
+		auto *replayBufferRow = new TrayActionRow(TrayRowKind::ReplayBuffer, trayMenu);
+		auto *replayBufferRowAction = new QWidgetAction(trayMenu);
+		replayBufferRowAction->setDefaultWidget(replayBufferRow);
+		QObject::connect(replayBufferRowAction, &QAction::triggered, trayMenu, [replayBufferRow]() {
+			if (replayBufferRow)
+				replayBufferRow->ProxyTrigger();
+		});
+		trayMenu->insertAction(g_nativeReplayBufferAction, replayBufferRowAction);
+		g_nativeReplayBufferAction->setVisible(false);
+		g_replayBufferRow = replayBufferRow;
 
 		RefreshActionRowText();
 	}
