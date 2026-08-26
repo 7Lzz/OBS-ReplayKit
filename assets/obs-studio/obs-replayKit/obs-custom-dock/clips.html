@@ -5646,8 +5646,9 @@
   // minimum trimmed length the backend will accept.
   const TRIM_MIN_SECONDS = 0.5;
   const TRIM_SNAP_EDGE_GUARD_PX = 10;
-  const TRIM_SNAP_MIN_GAP_PX = 2;
-  const TRIM_SNAP_MAX_MARKS = 420;
+  const TRIM_SNAP_MIN_GAP_PX = 8;
+  const TRIM_SNAP_MAX_MARKS = 96;
+  const TRIM_SNAP_DENSE_HIDE_THRESHOLD = 60;
   // how long trimVideo can go without a timeupdate while it should be playing before we treat it as stuck and reload -- long enough that normal scrub-triggered stalls never trip it, short enough that a genuinely failed chunk does not look like a hang to the user.
   const TRIM_STALL_TIMEOUT_MS = 2500;
   // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
@@ -5726,41 +5727,69 @@
         settled = true;
         if (timer) clearTimeout(timer);
         trimVideo.removeEventListener("seeked", finish);
-        if (requestSeq === trimThumbnailRequestSeq && trimVideo.readyState >= 2) {
-          try {
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(trimVideo, 0, 0, canvas.width, canvas.height);
-          } catch (_) {}
-        }
-        resolve();
+        requestAnimationFrame(() => {
+          let captured = false;
+          if (requestSeq === trimThumbnailRequestSeq && trimVideo.readyState >= 2) {
+            try {
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(trimVideo, 0, 0, canvas.width, canvas.height);
+              captured = true;
+            } catch (_) {}
+          }
+          resolve(captured);
+        });
       };
       trimVideo.addEventListener("seeked", finish, { once: true });
-      timer = setTimeout(finish, 700);
+      // A cold range request for a long local recording can take longer than the old 700ms limit. wait long enough for a decodable frame, then keep a real thumbnail fallback rather than leaving a gray canvas behind.
+      timer = setTimeout(finish, 1500);
       try { trimVideo.currentTime = time; } catch (_) { finish(); }
     });
   }
 
-  async function buildTrimFilmstrip(duration) {
+  async function buildTrimFilmstrip(clip, duration) {
     const requestSeq = ++trimThumbnailRequestSeq;
     clearTrimTimeline();
     renderTrimTimeRuler(duration);
     if (!trimFilmstrip || !(duration > 0)) return;
     const frameCount = 12;
     const canvases = [];
+    const captured = [];
+    const fallbackUrl = clip ? thumbUrlFor(clip) : "";
     const frag = document.createDocumentFragment();
     for (let i = 0; i < frameCount; i++) {
       const canvas = document.createElement("canvas");
       canvas.width = 160;
       canvas.height = 90;
+      if (fallbackUrl) {
+        canvas.style.backgroundImage = 'url("' + fallbackUrl.replace(/"/g, "%22") + '")';
+        canvas.style.backgroundPosition = "center";
+        canvas.style.backgroundSize = "cover";
+      }
       canvases.push(canvas);
+      captured.push(false);
       frag.appendChild(canvas);
     }
     trimFilmstrip.appendChild(frag);
+    let lastGoodCanvas = null;
     for (let i = 0; i < canvases.length; i++) {
       if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
       const progress = canvases.length === 1 ? 0 : i / (canvases.length - 1);
       const time = Math.max(0, Math.min(duration - 0.04, duration * progress));
-      await captureTrimFrame(canvases[i], time, requestSeq);
+      captured[i] = await captureTrimFrame(canvases[i], time, requestSeq);
+      if (captured[i]) lastGoodCanvas = canvases[i];
+      else if (lastGoodCanvas) {
+        const ctx = canvases[i].getContext("2d");
+        ctx.drawImage(lastGoodCanvas, 0, 0, canvases[i].width, canvases[i].height);
+      }
+    }
+    // If the first seek missed but a later one succeeded, backfill the early slots from that real frame. no gray gaps, even on a cold long-clip seek.
+    const firstGoodIndex = captured.indexOf(true);
+    if (firstGoodIndex > 0) {
+      const firstGood = canvases[firstGoodIndex];
+      for (let i = 0; i < firstGoodIndex; i++) {
+        const ctx = canvases[i].getContext("2d");
+        ctx.drawImage(firstGood, 0, 0, canvases[i].width, canvases[i].height);
+      }
     }
     if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
     try { trimVideo.currentTime = 0; } catch (_) {}
@@ -5952,6 +5981,7 @@
   function pickVisibleTrimSnapMarks(width) {
     const drawable = trimSnapPoints.filter((value) => value > 0.001 && value < trimSnapDuration - 0.001);
     if (!drawable.length || width <= 0) return [];
+    // Every keyframe stays visible on short clips. Long clips are downsampled to one mark per readable on-screen slot so the ruler remains a guide instead of turning into a solid blue stripe.
     const maxMarks = Math.max(24, Math.min(TRIM_SNAP_MAX_MARKS, Math.floor(width / TRIM_SNAP_MIN_GAP_PX)));
     const stride = Math.max(1, Math.ceil(drawable.length / maxMarks));
     const marks = [];
@@ -6011,8 +6041,9 @@
   function renderTrimSnapMarks() {
     if (!trimKeyframeMarks || !trimBar) return;
     trimKeyframeMarks.replaceChildren();
-    trimBar.classList.toggle("is-snapping", isTrimSnapActive());
-    if (!isTrimSnapActive()) return;
+    const dense = trimSnapPoints.length > TRIM_SNAP_DENSE_HIDE_THRESHOLD;
+    trimBar.classList.toggle("is-snapping", isTrimSnapActive() && !dense);
+    if (!isTrimSnapActive() || dense) return;
     const width = trimBar.getBoundingClientRect().width || trimBar.clientWidth || 0;
     const drawable = pickVisibleTrimSnapMarks(width);
     const frag = document.createDocumentFragment();
@@ -6251,7 +6282,7 @@
       updateTrimUi();
       updateSeekFill();
       syncTrimTimeDisplay();
-      const filmstripPromise = buildTrimFilmstrip(dur);
+      const filmstripPromise = buildTrimFilmstrip(clip, dur);
       // wait for the keyframe probe to settle too (success or fallback, loadTrimSnapPoints never rejects) before revealing anything -- otherwise the menu pops up correct except for its keyframe marks, which then pop in a moment later on a big clip where the probe takes a while. that is the exact pop-in this screen exists to hide.
       if (!trimPrecise.checked) {
         await loadTrimSnapPoints(clip.name, dur, true, clip.mtime, clip.size);
