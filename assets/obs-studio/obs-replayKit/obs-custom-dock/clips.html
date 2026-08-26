@@ -56,50 +56,87 @@
   .tabs {
     flex: 0 0 auto;
     display: flex;
-    gap: 6px;
-    /* padding-bottom keeps a permanent gap below the tab buttons -- the scroll-areas own padding-top scrolls away with the content, so without this, scrolled cards crowd right up against the tabs. */
-    padding: 10px 14px;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
     background: var(--bg_window);
+    border-bottom: 1px solid var(--grey4);
     overflow-x: auto;
   }
+  .tab-group,
+  .tab-actions {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  .tab-group {
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .tab-actions {
+    gap: 6px;
+    margin-left: auto;
+  }
+  .tab-actions::before {
+    content: "";
+    width: 1px;
+    height: 20px;
+    margin-right: 4px;
+    background: var(--grey4);
+  }
   .tab {
-    height: 28px;
-    padding: 0 12px;
-    border: 1px solid var(--grey4);
-    border-radius: 4px;
-    background: var(--button_bg);
-    color: var(--text);
+    position: relative;
+    height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text_muted);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--font_size);
+    font-weight: 400;
     cursor: pointer;
     white-space: nowrap;
+    transition: background-color 100ms linear, border-color 100ms linear, color 100ms linear;
   }
   .tab:hover {
-    background: var(--button_bg_hover);
-    border-color: var(--button_border_hover);
+    background: transparent;
+    color: var(--text);
   }
   .tab.is-active {
-    background: var(--primary);
-    border-color: var(--primary_light);
+    background: transparent;
+    border-bottom-color: var(--primary_light);
+    color: var(--white1);
   }
   .tab .count {
+    display: inline;
+    min-width: 0;
+    height: auto;
     margin-left: 5px;
-    color: rgba(255, 255, 255, 0.72);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text_muted);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
   }
   .clip-sort-wrap {
-    margin-left: auto;
     position: relative;
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
   }
   .clip-sort-trigger {
-    height: 28px;
-    min-width: 142px;
-    padding: 0 8px;
+    height: 32px;
+    min-width: 108px;
+    padding: 0 10px;
     border: 1px solid var(--grey4);
-    border-radius: 4px;
-    background: var(--button_bg);
+    border-radius: 6px;
+    background: var(--grey6);
     color: var(--text);
     font: inherit;
     font-size: 12px;
@@ -112,8 +149,9 @@
   }
   .clip-sort-trigger:hover,
   .clip-sort-wrap.is-open .clip-sort-trigger {
-    background: var(--button_bg_hover);
-    border-color: var(--button_border_hover);
+    background: var(--grey5);
+    border-color: var(--grey1);
+    color: var(--text);
   }
   .clip-sort-trigger:focus-visible {
     outline: none;
@@ -132,7 +170,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .clip-sort-muted { color: var(--text_muted); }
+  .clip-sort-muted { display: none; }
   .clip-sort-chevron {
     opacity: .8;
     transition: transform .12s ease;
@@ -140,7 +178,7 @@
   .clip-sort-wrap.is-open .clip-sort-chevron { transform: rotate(180deg); }
   .clip-sort-spinner {
     display: none;
-    width: 12px;
+    width: 8px;
     height: 12px;
     border: 2px solid rgba(255,255,255,.22);
     border-top-color: var(--text);
@@ -196,14 +234,14 @@
     opacity: 0;
   }
   .clip-sort-item.is-active .clip-sort-check { opacity: 1; }
-  /* "compress all" action button -- styled distinctly from the filter tabs so users dont read it as a filter. shows a compress icon + label, dims when no compressable clips remain. */
+  /* Compress all is grouped with sorting as a batch action, so the filters stay a single calm segmented control. */
   .tab-action {
-    height: 28px;
+    height: 32px;
     padding: 0 12px;
-    border: 1px solid var(--grey4);
-    border-radius: 4px;
-    background: var(--button_bg);
-    color: var(--text);
+    border: 1px solid var(--primary_light);
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--white1);
     font: inherit;
     font-size: 12px;
     cursor: pointer;
@@ -213,9 +251,10 @@
     gap: 6px;
     flex: 0 0 auto;
   }
+  #compress-all-btn[hidden] { display: none !important; }
   .tab-action:hover {
-    background: var(--button_bg_hover);
-    border-color: var(--button_border_hover);
+    background: var(--primary_light);
+    border-color: var(--primary_light);
   }
   .tab-action:disabled,
   .tab-action.is-disabled {
@@ -708,7 +747,7 @@
     border: 0;
   }
   .settings-menu .menu-header svg {
-    width: 18px;
+    width: 12px;
     height: 18px;
     fill: currentColor;
   }
@@ -944,8 +983,8 @@
   /* the progress bar is the players seek scrubber in fullscreen. place it above the controls row instead of in its own strip at the bottom of the screen -- the youtube look. */
   .preview:fullscreen .progress-bar,
   .preview:-webkit-full-screen .progress-bar {
-    left: 12px;
-    right: 12px;
+    left: 0;
+    right: 0;
     bottom: 51px;
     height: 14px;
     cursor: pointer;
@@ -962,7 +1001,7 @@
     top: 5px;
     height: 4px;
     background: rgba(255, 255, 255, 0.25);
-    border-radius: 2px;
+    border-radius: 0;
     transition: top 80ms linear, height 80ms linear;
   }
   .preview:fullscreen .progress-bar:hover::before,
@@ -975,7 +1014,7 @@
   .preview:fullscreen .progress-fill,
   .preview:-webkit-full-screen .progress-fill {
     background: var(--primary_light);
-    border-radius: 2px;
+    border-radius: 0;
     transition: none;
     position: absolute;  /* anchor the scrub dot to the fills edge */
     left: 0;
@@ -999,7 +1038,7 @@
     height: 4px;
     width: var(--hover-fill, 0%);
     background: rgba(255, 255, 255, 0.35);
-    border-radius: 2px;
+    border-radius: 0;
     pointer-events: none;
     z-index: 1;
     transition: none;
@@ -1444,7 +1483,11 @@
 
   /* trim modal */
   /* width fills as much of the clips window (850-2400px, per the resize bounds in 71_routes.ps1) as it can without letting the 16:9 video wrap push the modal taller than the window -- bounded by whichever of window width or the height-derived-from-16:9 is tighter. floor matches the old fixed width so the window minimum looks unchanged. */
-  .trim-modal { width: max(640px, min(90vw, calc((90vh - 300px) * 16 / 9), 1900px)); }
+  .trim-modal {
+    width: max(640px, min(90vw, calc((90vh - 330px) * 16 / 9), 1900px));
+    background: linear-gradient(180deg, #292c36, var(--grey6) 88px);
+    border-color: rgba(255, 255, 255, .12);
+  }
   /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
   .trim-processing-modal {
     width: 280px;
@@ -1474,6 +1517,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .trim-modal .trim-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .trim-modal .trim-heading h2 { margin: 0; }
+  .trim-modal .trim-heading span {
+    color: var(--text_muted);
+    font-size: 12px;
+  }
+  @media (max-width: 760px) {
+    .trim-modal .trim-heading span { display: none; }
   }
   /* the video sits inside a wrapper so we can absolutely-position a youtube-style seek overlay and a centered play/pause icon over it without affecting layout of the surrounding modal. locked to 16:9 so a non-16:9 clip letterboxes inside a consistent frame instead of resizing the wrap to match its own aspect ratio. */
   .trim-video-wrap {
@@ -1571,6 +1629,108 @@
   }
   .trim-video-wrap:hover .trim-volume-control,
   .trim-video-wrap.is-paused .trim-volume-control { opacity: 1; }
+  /* the editor preview deliberately reuses the clip-card player chrome: one bottom control row, the same circular buttons, the same expanding volume control, and the same blue progress treatment. trim handles live on the separate timeline below, so this player only moves the playhead. */
+  .trim-video-wrap.preview .trim-preview-controls {
+    opacity: 0;
+    pointer-events: none;
+    bottom: 10px;
+  }
+  /* card hover previews intentionally keep their <video> transparent until lazy playback is ready. the editor already owns a loaded video, so it must stay visible at every play state. */
+  .trim-video-wrap.preview video { opacity: 1; }
+  .trim-video-wrap.preview:hover .trim-preview-controls,
+  .trim-video-wrap.preview.is-paused .trim-preview-controls {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .trim-video-wrap .controls-left,
+  .trim-video-wrap .controls-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .trim-video-wrap .play-toggle-btn,
+  .trim-video-wrap .time-display { display: inline-flex; }
+  .trim-video-wrap .trim-playpause-btn {
+    position: static;
+    transform: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .55);
+    color: #fff;
+    opacity: 1;
+  }
+  .trim-video-wrap .trim-playpause-btn:hover { background: rgba(0, 0, 0, .85); }
+  .trim-video-wrap .trim-playpause-btn svg { width: 16px; height: 16px; }
+  .trim-video-wrap .trim-volume-control {
+    position: static;
+    opacity: 1;
+  }
+  .trim-video-wrap .trim-seek-overlay {
+    left: 0;
+    right: 0;
+    bottom: 43px;
+    height: 14px;
+    background: transparent;
+    border-radius: 0;
+    z-index: 4;
+  }
+  .trim-video-wrap .trim-seek-overlay::before {
+    top: 5px;
+    height: 4px;
+    background: rgba(255, 255, 255, .25);
+    border-radius: 0;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover::before,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing::before {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-seek-fill {
+    top: 5px;
+    bottom: auto;
+    height: 4px;
+    border-radius: 0;
+    z-index: 2;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .trim-seek-fill,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .trim-seek-fill {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-progress-hover {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 5px;
+    height: 4px;
+    background: rgba(255, 255, 255, .35);
+    border-radius: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .trim-progress-hover,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .trim-progress-hover {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .progress-hover-time,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .progress-hover-time {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: var(--hover-x, 0px);
+    transform: translateX(-50%);
+    padding: 3px 7px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, .78);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 5;
+  }
   /* danger-tinted "overwrite original" button. the first click "arms" it (turns red + text changes to "click again to confirm"); a second click within 3s actualy fires. avoids the ugly browser confirm() dialog. */
   .btn.danger-action {
     background-color: transparent;
@@ -1590,77 +1750,147 @@
     background-color: #c4324b;
     color: var(--white1);
   }
-  /* dual-handle range built from two overlapping native range controls. uses the same OBS-style range geometry as Settings while keeping independent start/end handles. */
-  .trim-bar {
+  /* Medal-like edit rail: the actual controls remain native ranges for keyboard/accessibility, while the filmstrip makes the cut points readable at a glance. */
+  .trim-timeline {
     position: relative;
-    height: 32px;
-    margin: 16px 0 6px;
+    margin: 12px 0 8px;
+    padding: 33px 0 0;
+    background: transparent;
+    overflow: visible;
   }
-  .trim-bar::before {
-    content: "";
+  .trim-time-ruler {
     position: absolute;
-    z-index: 0;
+    z-index: 5;
     left: 0;
     right: 0;
-    top: 50%;
-    height: 16px;
-    transform: translateY(-50%);
-    background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(151,158,174,.65) calc(25% - .5px), rgba(151,158,174,.65) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(151,158,174,.65) calc(50% - .5px), rgba(151,158,174,.65) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(151,158,174,.65) calc(75% - .5px), rgba(151,158,174,.65) calc(75% + .5px), transparent calc(75% + .5px));
-    background-repeat: no-repeat;
-    background-size: 100% 16px;
-    background-position: center;
+    top: 0;
+    height: 33px;
+    color: rgba(255, 255, 255, .62);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
     pointer-events: none;
+  }
+  .trim-time-mark {
+    position: absolute;
+    top: 1px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .trim-time-mark::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    height: 8px;
+    border-left: 1px solid rgba(255, 255, 255, .42);
+  }
+  .trim-time-mark:first-child { transform: none; }
+  .trim-time-mark:first-child::after { left: 0; }
+  .trim-time-mark:last-child { transform: translateX(-100%); }
+  .trim-time-mark:last-child::after { left: 100%; }
+  .trim-time-minor {
+    position: absolute;
+    top: 24px;
+    width: 1px;
+    height: 4px;
+    background: rgba(255, 255, 255, .24);
+    transform: translateX(-.5px) scaleX(.6);
+  }
+  .trim-filmstrip {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    height: 38px;
+    background: #090a0d;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trim-filmstrip canvas {
+    width: 100%;
+    height: 38px;
+    display: block;
+    border-right: 1px solid rgba(0, 0, 0, .72);
+    background: linear-gradient(135deg, #1d2028, #111319);
+  }
+  .trim-filmstrip canvas:last-child { border-right: 0; }
+  .trim-outside {
+    position: absolute;
+    z-index: 2;
+    top: 33px;
+    bottom: 0;
+    background: rgba(5, 6, 9, .68);
+    pointer-events: none;
+  }
+  .trim-outside-start { left: 0; }
+  .trim-outside-end { right: 0; }
+  /* dual-handle range lives over the previews. its selected span adds the bright, bounded edit state instead of pretending the small slider is the whole workflow. */
+  .trim-bar {
+    position: relative;
+    height: 38px;
+    margin: -38px 0 0;
+    z-index: 4;
+  }
+  .trim-bar::before {
+    display: none;
   }
   .trim-bar-track {
     position: absolute;
     z-index: 1;
-    top: 50%;
+    top: 0;
     left: 0; right: 0;
-    height: 4px;
-    transform: translateY(-50%);
-    background: var(--grey1);
-    border-radius: 2px;
+    bottom: 0;
+    border: 0;
+    border-radius: 4px;
+    pointer-events: none;
   }
   .trim-bar-range {
     position: absolute;
     z-index: 2;
-    top: 50%;
-    height: 4px;
-    transform: translateY(-50%);
-    background: var(--primary_light);
-    border-radius: 2px;
+    top: 0;
+    bottom: 0;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, .95);
+    border-radius: 4px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, .38);
     pointer-events: none;
   }
   .trim-keyframe-marks {
     display: none;
     position: absolute;
-    z-index: 2;
+    z-index: 6;
     left: 0;
     right: 0;
-    top: 50%;
+    top: -11px;
     height: 8px;
-    transform: translateY(-50%);
+    transform: none;
     pointer-events: none;
   }
   .trim-bar.is-snapping .trim-keyframe-marks { display: block; }
   .trim-snap-mark {
     position: absolute;
-    top: 50%;
+    top: 0;
     width: 1px;
-    height: 6px;
-    background: rgba(255,255,255,.42);
-    transform: translate(-.5px, -50%);
+    height: 8px;
+    border-radius: 1px;
+    background: #6f8dff;
+    box-shadow: none;
+    transform: translateX(-50%);
+  }
+  .trim-scrubber {
+    position: absolute;
+    z-index: 4;
+    top: -33px;
+    right: 0;
+    height: 33px;
+    left: 0;
+    cursor: ew-resize;
   }
   .trim-bar input[type=range] {
     position: absolute;
-    z-index: 3;
+    z-index: 5;
     top: 0;
     left: 0;
     width: 100%;
-    height: 32px;
+    height: 38px;
     margin: 0;
     background: transparent;
     -webkit-appearance: none;
@@ -1669,21 +1899,34 @@
   }
   .trim-bar input[type=range]::-webkit-slider-runnable-track {
     background: transparent;
-    height: 32px;
+    height: 38px;
     border: 0;
   }
   .trim-bar input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 21px;
-    height: 10px;
+    width: 12px;
+    height: 38px;
     border: 0;
-    border-radius: 5px;
+    border-radius: 0;
     background: #ffffff;
-    box-shadow: 0 0 0 1px rgba(255,255,255,.2);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
     cursor: pointer;
     pointer-events: auto;
-    margin-top: 11px;
+    margin-top: 0;
+  }
+  /* keep the trim outline thin and continuous across the entire selected clip. each compact white endcap only gets one short center grip stroke, instead of a line that reaches the top and bottom edges. */
+  #trim-start::-webkit-slider-thumb {
+    border-radius: 5px 0 0 5px;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 38'%3E%3Cpath d='M4 14v10' fill='none' stroke='%23252730' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
+  }
+  #trim-end::-webkit-slider-thumb {
+    border-radius: 0 5px 5px 0;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 38'%3E%3Cpath d='M4 14v10' fill='none' stroke='%23252730' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
   }
   .trim-bar input[type=range]:focus-visible::-webkit-slider-thumb {
     box-shadow: 0 0 0 2px #7f97ff;
@@ -1693,22 +1936,50 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    padding: 4px 1px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     font-size: 12px;
     color: var(--text_muted);
-    margin-top: 2px;
+    margin-top: 0;
   }
   .trim-info b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
   .trim-info .preview-btn {
-    background: transparent;
-    border: 1px solid var(--grey4);
-    color: var(--text_muted);
-    border-radius: 3px;
-    padding: 2px 8px;
+    background: rgba(71, 107, 215, .14);
+    border: 1px solid rgba(71, 107, 215, .68);
+    color: #dce5ff;
+    border-radius: 4px;
+    padding: 3px 9px;
     font: inherit;
     font-size: 11px;
     cursor: pointer;
   }
-  .trim-info .preview-btn:hover { color: var(--text); border-color: var(--button_border_hover); }
+  .trim-info .preview-btn:hover { background: rgba(71, 107, 215, .28); border-color: var(--primary_light); }
+  /* current playhead is separate from the cut handles: click or drag anywhere on the frames to move it without changing what will be kept. */
+  .trim-playhead {
+    position: absolute;
+    z-index: 7;
+    top: 22px;
+    bottom: 0;
+    width: 2px;
+    background: var(--primary_light);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .42), 0 0 8px rgba(71, 107, 215, .34);
+    pointer-events: none;
+    transform: translateX(-1px);
+  }
+  .trim-playhead::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px 2px 4px 4px;
+    background: var(--primary_light);
+    transform: none;
+  }
   .trim-mode-row {
     display: flex;
     align-items: center;
@@ -1896,42 +2167,61 @@
 
   <div class="modal-veil" id="trim-veil">
     <div class="modal trim-modal" id="trim-modal">
-      <h2>Edit</h2>
+      <div class="trim-heading"><h2>Edit clip</h2><span>Drag the handles to choose what to keep</span></div>
       <div class="clip-name" id="trim-clip-name"></div>
-      <div class="trim-video-wrap">
+      <div class="trim-video-wrap preview">
         <video id="trim-video" preload="metadata" playsinline
                controlsList="nodownload noplaybackrate noremoteplayback"
                disablePictureInPicture></video>
-        <button class="trim-playpause-btn" id="trim-playpause" type="button"
-                aria-label="Play/Pause">
-          <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
-        </button>
-        <div class="trim-volume-control volume-control">
-          <button class="volume-btn" id="trim-volume-btn" type="button">
-            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm15.59 3L21 14.41 19.59 16 17 13.41 14.41 16 13 14.41 15.59 12 13 9.59 14.41 8.17 17 10.59 19.59 8 21 9.41 18.59 12z"/></svg>
-          </button>
-          <div class="volume-slider-wrap">
-            <input type="range" class="volume-slider" id="trim-volume-slider" min="0" max="100" step="1" value="60">
+        <div class="player-shade"></div>
+        <div class="preview-controls trim-preview-controls">
+          <div class="controls-left">
+            <button class="trim-playpause-btn play-toggle-btn" id="trim-playpause" type="button"
+                    aria-label="Play/Pause">
+              <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
+            </button>
+            <div class="trim-volume-control volume-control">
+              <button class="volume-btn" id="trim-volume-btn" type="button">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm15.59 3L21 14.41 19.59 16 17 13.41 14.41 16 13 14.41 15.59 12 13 9.59 14.41 8.17 17 10.59 19.59 8 21 9.41 18.59 12z"/></svg>
+              </button>
+              <div class="volume-slider-wrap">
+                <input type="range" class="volume-slider" id="trim-volume-slider" min="0" max="100" step="1" value="60">
+              </div>
+            </div>
+            <span class="time-display"><span id="trim-current-time">0:00</span> / <span id="trim-total-time">0:00</span></span>
+          </div>
+          <div class="controls-right">
+            <button class="icon-btn" id="trim-fullscreen" type="button" aria-label="Toggle fullscreen">
+              <svg viewBox="0 0 24 24" id="trim-fullscreen-icon"><path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/></svg>
+            </button>
           </div>
         </div>
-        <div class="trim-seek-overlay">
-          <div class="trim-seek-track"></div>
-          <div class="trim-seek-fill" id="trim-seek-fill"></div>
-          <input type="range" id="trim-seek" min="0" max="100" step="0.01" value="0" aria-label="Seek">
+        <div class="trim-seek-overlay progress-bar">
+          <div class="progress-hover-fill trim-progress-hover" id="trim-progress-hover"></div>
+          <div class="trim-seek-fill progress-fill" id="trim-seek-fill"><div class="progress-scrub-dot"></div></div>
+          <div class="progress-hover-time" id="trim-progress-time"></div>
+          <input type="hidden" id="trim-seek" min="0" max="100" value="0">
         </div>
       </div>
-      <div class="trim-bar">
-        <div class="trim-bar-track"></div>
-        <div class="trim-bar-range" id="trim-range-fill"></div>
-        <div class="trim-keyframe-marks" id="trim-keyframe-marks"></div>
-        <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0">
-        <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100">
+      <div class="trim-timeline" aria-label="Trim timeline">
+        <div class="trim-time-ruler" id="trim-time-ruler" aria-hidden="true"></div>
+        <div class="trim-filmstrip" id="trim-filmstrip" aria-hidden="true"></div>
+        <div class="trim-outside trim-outside-start" id="trim-outside-start"></div>
+        <div class="trim-outside trim-outside-end" id="trim-outside-end"></div>
+        <div class="trim-bar">
+          <div class="trim-bar-track"></div>
+          <div class="trim-bar-range" id="trim-range-fill"></div>
+          <div class="trim-keyframe-marks" id="trim-keyframe-marks"></div>
+          <div class="trim-scrubber" id="trim-scrubber" aria-label="Scrub timeline"></div>
+          <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0" aria-label="Trim start">
+          <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100" aria-label="Trim end">
+        </div>
+        <div class="trim-playhead" id="trim-playhead" aria-hidden="true"></div>
       </div>
       <div class="trim-info">
         <span>Start <b id="trim-start-time">0:00.00</b></span>
         <span>End <b id="trim-end-time">0:00.00</b></span>
         <span>Length <b id="trim-length-time">0:00.00</b></span>
-        <button type="button" class="preview-btn" id="trim-preview">Preview</button>
       </div>
       <label class="trim-mode-row" title="Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles.">
         <input type="checkbox" id="trim-precise">
@@ -1950,11 +2240,13 @@
   </div>
 
   <div class="tabs" id="clip-tabs" role="tablist" aria-label="Clip filters">
-    <button class="tab is-active" type="button" data-filter="all" data-label="All">All</button>
-    <button class="tab" type="button" data-filter="favorites" data-label="Favorites">Favorites</button>
-    <button class="tab" type="button" data-filter="linked" data-label="Linked">Linked</button>
-    <button class="tab" type="button" data-filter="local" data-label="Local">Local</button>
-    <div class="clip-sort-wrap" id="clip-sort">
+    <div class="tab-group">
+      <button class="tab is-active" type="button" data-filter="all" data-label="All">All</button>
+      <button class="tab" type="button" data-filter="favorites" data-label="Favorites">Favorites</button>
+      <button class="tab" type="button" data-filter="linked" data-label="Linked">Linked</button>
+    </div>
+    <div class="tab-actions">
+      <div class="clip-sort-wrap" id="clip-sort">
       <button class="clip-sort-trigger" type="button" id="clip-sort-button"
               aria-haspopup="menu" aria-expanded="false" title="Sort clips">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/></svg>
@@ -1982,12 +2274,13 @@
           <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Biggest</span>
         </button>
       </div>
+      </div>
+      <button class="tab-action" type="button" id="compress-all-btn" hidden
+              title="Fast-compress every clip that isn't already compressed.">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/></svg>
+        <span id="compress-all-label">Compress All</span>
+      </button>
     </div>
-    <button class="tab-action" type="button" id="compress-all-btn"
-            title="Fast-compress every clip that isn't already compressed.">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/></svg>
-      <span id="compress-all-label">Compress All</span>
-    </button>
   </div>
 
   <div class="scroll-area">
@@ -4459,62 +4752,16 @@
     }
   });
 
-  // when any clip enters fullscreen, ask the helper to maximize this browser popups host window via win32. on exit, restore the saved size only if the host is still maximized. if the user drags or unmaximizes the Clips host while fullscreened, that manual placement must win. cef in obs exposes no js api to resize its own host, so the helper does the heavy lifting via showwindow. we coalesce per-element fullscreenchange events: the dock binds a listener per preview card, and document.fullscreenelement is the single source of truth for "is anything fullscreen right now" -- track our last-known state so duplicate events dont double-fire the http call. the win32 call is deferred two animation frames after the fullscreenchange event to avoid racing cefs fullscreen animation.
+  // fullscreen is owned by CEF's browser fullscreen API. do not maximize the native Clips popup here: a maximized host keeps the custom title bar/taskbar and is not a real player fullscreen.
   let lastFsActive = false;
-  let pendingWindowOp = 0;
   function handleHostFullscreenChange() {
     const fsActive = !!(document.fullscreenElement || document.webkitFullscreenElement);
     if (fsActive === lastFsActive) return;
     lastFsActive = fsActive;
-    const route = fsActive ? "/window/maximize" : "/window/restore";
-    const transitionSeq = beginFullscreenHostTransition();
-    deferVirtualRenderUntilFullscreenSettles(true);
-
-    // cancel any in-flight stagger from a previous (very fast) toggle so we dont fire both calls in the wrong order.
-    if (pendingWindowOp) clearTimeout(pendingWindowOp);
-    // setTimeout, not requestAnimationFrame: rAF only fires while the page is actively painting frames, so if rendering stalls right as fullscreen is entered (host briefly loses focus or gets occluded) the queued rAFs just sit there and the maximize call never goes out until some later burst of activity forces a frame through. every other deferred step in this same transition already uses setTimeout for the same reason; this one was the odd case still on rAF. 32ms ~= two frames at 60fps, matching the original delays intent without depending on a frame actually being painted to fire.
-    pendingWindowOp = setTimeout(() => {
-      pendingWindowOp = 0;
-      let settled = false;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        finishFullscreenHostTransition(transitionSeq);
-      };
-      const safety = setTimeout(finish, 1200);
-
-      if (!fsActive) {
-        // restoreObsWindow (helper-side) deletes its saved-rect entry the instant it finds one, before even checking whether the window is still zoomed -- retrying this call would silently burn that entry on the first attempt and then fail every retry after, ending up worse than leaving it alone. maximize has no such one-shot state to lose, so only that direction gets the retry treatment below.
-        fetch(HELPER + route + "?title=Clips&t=" + Date.now(), { method: "POST", cache: "no-store" })
-          .catch(() => {})
-          .then(() => {
-            clearTimeout(safety);
-            finish();
-          });
-        return;
-      }
-
-      // maximizeObsWindow can report {maximized:false} if findObsWindow misses the host on this one attempt -- confirmed for real, reproduced against a window that was definitely open and titled "Clips" moments after a fullscreen toggle. the previous fire-and-forget fetch never even looked at the response, so a single missed attempt left the host stuck at its pre-fullscreen size until something unrelated forced a retry-shaped code path elsewhere. retrying a few times a beat apart instead of just once fixes that without needing to pin down exactly why any single attempt can miss.
-      let attemptsLeft = 4;
-      function attemptMaximize() {
-        fetch(HELPER + "/window/maximize?title=Clips&t=" + Date.now(), { method: "POST", cache: "no-store" })
-          .then((res) => res.json())
-          .then((json) => {
-            if ((!json || !json.maximized) && attemptsLeft > 0) {
-              attemptsLeft--;
-              setTimeout(attemptMaximize, 150);
-              return;
-            }
-            clearTimeout(safety);
-            finish();
-          })
-          .catch(() => {
-            clearTimeout(safety);
-            finish();
-          });
-      }
-      attemptMaximize();
-    }, 32);
+    updateFullscreenBodyState();
+    // CEF's Fullscreen API only expands inside its popup. mirror YouTube's element fullscreen with a borderless monitor-sized host so the player actually occupies the selected screen instead of a maximized framed window.
+    const route = fsActive ? "/window/fullscreen" : "/window/fullscreen/restore";
+    fetch(HELPER + route + "?title=Clips&t=" + Date.now(), { method: "POST", cache: "no-store" }).catch(() => {});
   }
   document.addEventListener("fullscreenchange", handleHostFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
@@ -5369,13 +5616,25 @@
   const trimEnd          = document.getElementById("trim-end");
   const trimSeek         = document.getElementById("trim-seek");
   const trimSeekFill     = document.getElementById("trim-seek-fill");
+  const trimProgressBar  = document.querySelector(".trim-seek-overlay");
+  const trimProgressHover = document.getElementById("trim-progress-hover");
+  const trimProgressTime = document.getElementById("trim-progress-time");
   const trimRangeFill    = document.getElementById("trim-range-fill");
+  const trimFilmstrip    = document.getElementById("trim-filmstrip");
+  const trimTimeRuler    = document.getElementById("trim-time-ruler");
+  const trimOutsideStart = document.getElementById("trim-outside-start");
+  const trimOutsideEnd   = document.getElementById("trim-outside-end");
+  const trimScrubber     = document.getElementById("trim-scrubber");
+  const trimPlayhead     = document.getElementById("trim-playhead");
   const trimBar          = document.querySelector(".trim-bar");
   const trimKeyframeMarks = document.getElementById("trim-keyframe-marks");
   const trimStartTime    = document.getElementById("trim-start-time");
   const trimEndTime      = document.getElementById("trim-end-time");
   const trimLengthTime   = document.getElementById("trim-length-time");
-  const trimPreview      = document.getElementById("trim-preview");
+  const trimCurrentTime  = document.getElementById("trim-current-time");
+  const trimTotalTime    = document.getElementById("trim-total-time");
+  const trimFullscreen   = document.getElementById("trim-fullscreen");
+  const trimFullscreenIcon = document.getElementById("trim-fullscreen-icon");
   const trimCancel       = document.getElementById("trim-cancel");
   const trimSave         = document.getElementById("trim-save");
   const trimOverwrite    = document.getElementById("trim-overwrite");
@@ -5386,11 +5645,9 @@
 
   // minimum trimmed length the backend will accept.
   const TRIM_MIN_SECONDS = 0.5;
-  const TRIM_FIXED_TICK_PCTS = [0.25, 0.5, 0.75];
-  const TRIM_SNAP_FIXED_GUARD_PX = 5;
   const TRIM_SNAP_EDGE_GUARD_PX = 10;
-  const TRIM_SNAP_MIN_GAP_PX = 6;
-  const TRIM_SNAP_MAX_MARKS = 260;
+  const TRIM_SNAP_MIN_GAP_PX = 2;
+  const TRIM_SNAP_MAX_MARKS = 420;
   // how long trimVideo can go without a timeupdate while it should be playing before we treat it as stuck and reload -- long enough that normal scrub-triggered stalls never trip it, short enough that a genuinely failed chunk does not look like a hang to the user.
   const TRIM_STALL_TIMEOUT_MS = 2500;
   // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
@@ -5400,6 +5657,9 @@
   let trimSnapDuration = 0;
   let trimSnapRequestSeq = 0;
   let trimSnapSkipped = false;
+  let trimThumbnailRequestSeq = 0;
+  let trimTimelineScrubbing = false;
+  let trimPlayerScrubbing = false;
   // last time trimVideo actually advanced while it should have been playing -- a range request that fails mid-scrub doesnt reliably fire a JS-visible error on an already-loading video, it just stops advancing and sits on its last decoded frame since <video> never retries a failed range request on its own, so its watched on a timer below rather than off network events.
   let trimLastProgressAt = 0;
   let trimStallRecovering = false;
@@ -5412,6 +5672,98 @@
     // m:ss.cc -- centiseconds give the user a sense of precision without overwhelming the display.
     const ss = seconds.toFixed(2).padStart(5, "0");
     return minutes + ":" + ss;
+  }
+
+  function fmtTimelineTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    const minutes = Math.floor(s / 60);
+    const seconds = Math.floor(s - minutes * 60);
+    return minutes + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function clearTrimTimeline() {
+    if (trimFilmstrip) trimFilmstrip.replaceChildren();
+    if (trimTimeRuler) trimTimeRuler.replaceChildren();
+    if (trimOutsideStart) trimOutsideStart.style.width = "0%";
+    if (trimOutsideEnd) trimOutsideEnd.style.width = "0%";
+    if (trimPlayhead) trimPlayhead.style.left = "0%";
+  }
+
+  function renderTrimTimeRuler(duration) {
+    if (!trimTimeRuler) return;
+    trimTimeRuler.replaceChildren();
+    if (!(duration > 0)) return;
+    // the ruler is laid out across the clip itself, not in absolute whole-second space. that keeps the final label pinned to the exact right edge even when a replay ends at 10.63s instead of a tidy ten seconds.
+    const majorSegments = Math.max(1, Math.min(10, Math.floor(duration)));
+    const minorPerSegment = 8;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i <= majorSegments; i++) {
+      const value = (duration * i) / majorSegments;
+      const mark = document.createElement("span");
+      mark.className = "trim-time-mark";
+      mark.style.left = ((i / majorSegments) * 100).toFixed(3) + "%";
+      mark.textContent = fmtTimelineTime(value);
+      frag.appendChild(mark);
+    }
+    const minorCount = majorSegments * minorPerSegment;
+    for (let i = 1; i < minorCount; i++) {
+      if (i % minorPerSegment === 0) continue;
+      const tick = document.createElement("span");
+      tick.className = "trim-time-minor";
+      tick.style.left = ((i / minorCount) * 100).toFixed(3) + "%";
+      frag.appendChild(tick);
+    }
+    trimTimeRuler.appendChild(frag);
+  }
+
+  // Capture the same source video into small canvases instead of requesting a second set of video streams. the helper limits simultaneous file previews, and keeping this on trimVideo lets the editor stay responsive on a large clip folder.
+  function captureTrimFrame(canvas, time, requestSeq) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = 0;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        trimVideo.removeEventListener("seeked", finish);
+        if (requestSeq === trimThumbnailRequestSeq && trimVideo.readyState >= 2) {
+          try {
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(trimVideo, 0, 0, canvas.width, canvas.height);
+          } catch (_) {}
+        }
+        resolve();
+      };
+      trimVideo.addEventListener("seeked", finish, { once: true });
+      timer = setTimeout(finish, 700);
+      try { trimVideo.currentTime = time; } catch (_) { finish(); }
+    });
+  }
+
+  async function buildTrimFilmstrip(duration) {
+    const requestSeq = ++trimThumbnailRequestSeq;
+    clearTrimTimeline();
+    renderTrimTimeRuler(duration);
+    if (!trimFilmstrip || !(duration > 0)) return;
+    const frameCount = 12;
+    const canvases = [];
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < frameCount; i++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = 90;
+      canvases.push(canvas);
+      frag.appendChild(canvas);
+    }
+    trimFilmstrip.appendChild(frag);
+    for (let i = 0; i < canvases.length; i++) {
+      if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
+      const progress = canvases.length === 1 ? 0 : i / (canvases.length - 1);
+      const time = Math.max(0, Math.min(duration - 0.04, duration * progress));
+      await captureTrimFrame(canvases[i], time, requestSeq);
+    }
+    if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
+    try { trimVideo.currentTime = 0; } catch (_) {}
   }
 
   function trimDuration() {
@@ -5452,6 +5804,107 @@
     if (span <= 0) { trimSeekFill.style.width = "0%"; return; }
     const value = Math.max(min, Math.min(max, Number(trimSeek.value) || min));
     trimSeekFill.style.width = (((value - min) / span) * 100) + "%";
+  }
+
+  // exact same progress-bar interaction as clip cards, but it moves the editor playhead instead of a hover-preview loop. the hidden input keeps the existing trim playback and keyboard code using one source of truth without putting a permanent native thumb on screen.
+  function scrubTrimPlayer(clientX) {
+    if (!trimProgressBar) return;
+    const rect = trimProgressBar.getBoundingClientRect();
+    const duration = Math.max(0, Number(trimVideo.duration) || Number(trimSeek.max) || 0);
+    if (!(duration > 0) || rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = ratio * duration;
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(time, false);
+    trimSeek.value = String(time);
+    updateSeekFill();
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
+  }
+
+  function updateTrimProgressHover(clientX) {
+    if (!trimProgressBar) return;
+    const rect = trimProgressBar.getBoundingClientRect();
+    const xPx = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const ratio = rect.width > 0 ? xPx / rect.width : 0;
+    trimProgressBar.style.setProperty("--hover-x", xPx + "px");
+    if (trimProgressHover) trimProgressHover.style.width = (ratio * 100) + "%";
+    if (trimProgressTime) {
+      const duration = Math.max(0, Number(trimVideo.duration) || Number(trimSeek.max) || 0);
+      trimProgressTime.textContent = formatDuration(ratio * duration);
+    }
+  }
+
+  if (trimProgressBar) {
+    trimProgressBar.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      trimPlayerScrubbing = true;
+      trimProgressBar.classList.add("is-scrubbing");
+      try { trimProgressBar.setPointerCapture(e.pointerId); } catch (_) {}
+      scrubTrimPlayer(e.clientX);
+      updateTrimProgressHover(e.clientX);
+    });
+    trimProgressBar.addEventListener("pointermove", (e) => {
+      if (trimPlayerScrubbing) scrubTrimPlayer(e.clientX);
+      updateTrimProgressHover(e.clientX);
+    });
+    trimProgressBar.addEventListener("pointerleave", () => {
+      if (trimProgressHover && !trimPlayerScrubbing) trimProgressHover.style.width = "0%";
+    });
+    const stopTrimPlayerScrub = (e) => {
+      trimPlayerScrubbing = false;
+      trimProgressBar.classList.remove("is-scrubbing");
+      try { trimProgressBar.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    trimProgressBar.addEventListener("pointerup", stopTrimPlayerScrub);
+    trimProgressBar.addEventListener("pointercancel", stopTrimPlayerScrub);
+  }
+
+  function updateTrimPlayhead() {
+    if (!trimPlayhead) return;
+    const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
+    const value = Math.max(0, Math.min(max, Number(trimSeek.value) || 0));
+    const ratio = max > 0 ? value / max : 0;
+    trimPlayhead.style.left = (ratio * 100) + "%";
+    trimPlayhead.dataset.time = fmtTimelineTime(value);
+    trimPlayhead.classList.toggle("is-at-start", ratio < 0.035);
+    trimPlayhead.classList.toggle("is-at-end", ratio > 0.965);
+  }
+
+  // keep the playhead independent from the cut handles. the timeline is a normal editor scrub surface: click or drag the frames to inspect a moment, then only move a handle when that is the edit you intend.
+  function scrubTrimTimeline(clientX) {
+    if (!trimFilmstrip) return;
+    const rect = trimFilmstrip.getBoundingClientRect();
+    const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
+    if (!(max > 0) || rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = ratio * max;
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(time, false);
+    trimSeek.value = String(time);
+    updateSeekFill();
+    updateTrimPlayhead();
+  }
+
+  if (trimScrubber) {
+    trimScrubber.addEventListener("pointerdown", (e) => {
+      if (!trimSourceClip) return;
+      e.preventDefault();
+      trimTimelineScrubbing = true;
+      try { trimScrubber.setPointerCapture(e.pointerId); } catch (_) {}
+      scrubTrimTimeline(e.clientX);
+    });
+    trimScrubber.addEventListener("pointermove", (e) => {
+      if (trimTimelineScrubbing) scrubTrimTimeline(e.clientX);
+    });
+    const stopTimelineScrub = (e) => {
+      trimTimelineScrubbing = false;
+      try { trimScrubber.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    trimScrubber.addEventListener("pointerup", stopTimelineScrub);
+    trimScrubber.addEventListener("pointercancel", stopTimelineScrub);
   }
 
   function resetTrimSnapPoints() {
@@ -5496,22 +5949,16 @@
     return String(clipName || "") + "\n" + String(mtime || "") + "\n" + String(size || "");
   }
 
-  function isProtectedSnapMarkPx(px, width) {
-    if (px < TRIM_SNAP_EDGE_GUARD_PX || px > width - TRIM_SNAP_EDGE_GUARD_PX) return true;
-    return TRIM_FIXED_TICK_PCTS.some((pct) => Math.abs(px - (width * pct)) < TRIM_SNAP_FIXED_GUARD_PX);
-  }
-
   function pickVisibleTrimSnapMarks(width) {
     const drawable = trimSnapPoints.filter((value) => value > 0.001 && value < trimSnapDuration - 0.001);
     if (!drawable.length || width <= 0) return [];
-    const maxMarks = Math.max(12, Math.min(TRIM_SNAP_MAX_MARKS, Math.floor(width / TRIM_SNAP_MIN_GAP_PX)));
+    const maxMarks = Math.max(24, Math.min(TRIM_SNAP_MAX_MARKS, Math.floor(width / TRIM_SNAP_MIN_GAP_PX)));
     const stride = Math.max(1, Math.ceil(drawable.length / maxMarks));
     const marks = [];
     let lastPx = -Infinity;
     for (let i = 0; i < drawable.length; i += stride) {
       const value = drawable[i];
       const px = (value / trimSnapDuration) * width;
-      if (isProtectedSnapMarkPx(px, width)) continue;
       if (px - lastPx < TRIM_SNAP_MIN_GAP_PX) continue;
       marks.push(value);
       lastPx = px;
@@ -5604,6 +6051,21 @@
     return trimSnapPoints[snapIndexAtOrAfter(value)];
   }
 
+  function trimSnapAtOrAfterVisible(value) {
+    if (!isTrimSnapActive()) return value;
+    const first = snapIndexAtOrAfter(value);
+    const width = trimBar.getBoundingClientRect().width || trimBar.clientWidth || 0;
+    if (width <= 0) return trimSnapPoints[first];
+    for (let index = first; index < trimSnapPoints.length - 1; index++) {
+      const px = (trimSnapPoints[index] / trimSnapDuration) * width;
+      // do not lock a handle to a keyframe the user cannot actually see because it sits beneath the endcap.
+      if (px >= TRIM_SNAP_EDGE_GUARD_PX && px <= width - TRIM_SNAP_EDGE_GUARD_PX) {
+        return trimSnapPoints[index];
+      }
+    }
+    return trimSnapPoints[first];
+  }
+
   function trimSnapAtOrBefore(value) {
     if (!isTrimSnapActive()) return value;
     const next = snapIndexAtOrAfter(value);
@@ -5628,7 +6090,8 @@
         s = trimSnapAtOrBefore(e - TRIM_MIN_SECONDS);
       }
     } else if (activeHandle === "start") {
-      s = nearestTrimSnap(s);
+      // when the start handle leaves zero, use the first keyframe the user can see instead of repeatedly resolving back to a hidden edge keyframe. this keeps fast trims keyframe-safe without making the first drag look stuck.
+      s = s > 0.001 ? trimSnapAtOrAfterVisible(s) : 0;
       if (e - s < TRIM_MIN_SECONDS) {
         e = trimSnapAtOrAfter(s + TRIM_MIN_SECONDS);
       }
@@ -5697,13 +6160,18 @@
     trimSeek.min = "0";
     trimSeek.max = String(max);
     trimSeek.value = String(clampVideoTime(trimSeek.value));
+    updateTrimPlayhead();
     if (max > 0) {
       const sPct = (s / max) * 100;
       const ePct = (e / max) * 100;
       trimRangeFill.style.left  = sPct + "%";
       trimRangeFill.style.width = Math.max(0, ePct - sPct) + "%";
+      if (trimOutsideStart) trimOutsideStart.style.width = sPct + "%";
+      if (trimOutsideEnd) trimOutsideEnd.style.width = Math.max(0, 100 - ePct) + "%";
     } else {
       trimRangeFill.style.width = "0%";
+      if (trimOutsideStart) trimOutsideStart.style.width = "0%";
+      if (trimOutsideEnd) trimOutsideEnd.style.width = "0%";
     }
     const valid = (e - s) >= TRIM_MIN_SECONDS;
     trimSave.disabled = !valid;
@@ -5714,6 +6182,22 @@
     const paused = trimVideo.paused || trimVideo.ended;
     trimPlayPauseIcn.innerHTML = paused ? ICON.PLAY : ICON.PAUSE;
     trimVideoWrap.classList.toggle("is-paused", paused);
+  }
+
+  function syncTrimTimeDisplay() {
+    const duration = Number(trimVideo.duration) || Number(trimSeek.max) || 0;
+    if (trimTotalTime) trimTotalTime.textContent = formatDuration(duration);
+    if (trimCurrentTime) trimCurrentTime.textContent = formatDuration(trimVideo.currentTime || 0);
+  }
+
+  function isTrimFullscreen() {
+    return document.fullscreenElement === trimVideoWrap ||
+           document.webkitFullscreenElement === trimVideoWrap;
+  }
+
+  function syncTrimFullscreenIcon() {
+    if (!trimFullscreenIcon) return;
+    trimFullscreenIcon.innerHTML = isTrimFullscreen() ? ICON.FULLSCREEN_EXIT : ICON.FULLSCREEN;
   }
 
   // overwrite needs two clicks within 3s to fire -- first click "arms" the button (red fill + "click again to confirm"). avoids the browser-dock confirm() dialog while still preventing one-click destructive operations.
@@ -5751,6 +6235,8 @@
     applyVolume(trimVideo);
     syncVolumeUi(trimVolumeBtn, trimVolumeSlider);
     syncTrimPlayIcon();
+    syncTrimTimeDisplay();
+    syncTrimFullscreenIcon();
     // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
     trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) +
                     "?v=" + (clip.mtime || Date.now());
@@ -5764,14 +6250,19 @@
       trimSeek.value  = "0";
       updateTrimUi();
       updateSeekFill();
+      syncTrimTimeDisplay();
+      const filmstripPromise = buildTrimFilmstrip(dur);
       // wait for the keyframe probe to settle too (success or fallback, loadTrimSnapPoints never rejects) before revealing anything -- otherwise the menu pops up correct except for its keyframe marks, which then pop in a moment later on a big clip where the probe takes a while. that is the exact pop-in this screen exists to hide.
       if (!trimPrecise.checked) {
         await loadTrimSnapPoints(clip.name, dur, true, clip.mtime, clip.size);
       } else {
         syncTrimSnapMode(false);
       }
+      await filmstripPromise;
       // the user couldve cancelled (or opened a different clip) while the probe above was in flight -- dont pop the menu open behind them at that point.
       if (trimSourceClip !== clip) return;
+      trimSeek.value = "0";
+      updateSeekFill();
       trimProcessingVeil.classList.remove("is-open");
       trimVeil.classList.add("is-open");
       // the snap marks were already computed above while the trim bar was still display:none (0 width, so pickVisibleTrimSnapMarks drew nothing even though snapping is active) -- now that the bar actually has real layout, redraw them for real.
@@ -5784,6 +6275,9 @@
     trimProcessingVeil.classList.remove("is-open");
     trimVeil.classList.remove("is-open");
     trimPreviewActive = false;
+    trimTimelineScrubbing = false;
+    trimPlayerScrubbing = false;
+    if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
     disarmOverwrite();
     try { trimVideo.pause(); } catch {}
     // release the streaming connection back to the helper -- otherwise the /file slot stays occupied (helper caps concurrent previews).
@@ -5791,7 +6285,9 @@
     try { trimVideo.load(); } catch {}
     trimSourceClip = null;
     trimSnapRequestSeq++;
+    trimThumbnailRequestSeq++;
     resetTrimSnapPoints();
+    clearTrimTimeline();
   }
 
   function clampHandles(activeWasStart) {
@@ -5852,6 +6348,7 @@
     try { trimVideo.pause(); } catch {}
     previewSeek(Number(trimSeek.value), false);
     updateSeekFill();
+    updateTrimPlayhead();
   });
   trimSeek.addEventListener("change", () => {
     trimVideo.currentTime = clampVideoTime(trimSeek.value);
@@ -5867,12 +6364,8 @@
     }
     trimSeek.value = String(clampVideoTime(trimVideo.currentTime));
     updateSeekFill();
-  });
-
-  trimPreview.addEventListener("click", () => {
-    trimVideo.currentTime = Number(trimStart.value);
-    trimPreviewActive = true;
-    trimVideo.play().catch(() => { trimPreviewActive = false; });
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
   });
 
   // click the centered play/pause button or the video itself to toggle playback (youtube convention). pause/play events keep the icon and wrappers .is-paused class in sync.
@@ -5894,6 +6387,30 @@
   trimVideo.addEventListener("play",  syncTrimPlayIcon);
   trimVideo.addEventListener("pause", syncTrimPlayIcon);
   trimVideo.addEventListener("ended", syncTrimPlayIcon);
+  trimVideo.addEventListener("loadedmetadata", syncTrimTimeDisplay);
+  document.addEventListener("fullscreenchange", syncTrimFullscreenIcon);
+  document.addEventListener("webkitfullscreenchange", syncTrimFullscreenIcon);
+  const blockTrimFullscreenDblclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  };
+  trimVideo.addEventListener("dblclick", blockTrimFullscreenDblclick, true);
+  trimVideoWrap.addEventListener("dblclick", blockTrimFullscreenDblclick, true);
+  if (trimFullscreen) {
+    trimFullscreen.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isTrimFullscreen()) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        return;
+      }
+      // keep this synchronous with the button gesture; delaying it behind playback leaves CEF treating it as a stale request and it falls back to host-window maximize.
+      if (trimVideoWrap.requestFullscreen) trimVideoWrap.requestFullscreen().catch(() => {});
+      else if (trimVideoWrap.webkitRequestFullscreen) trimVideoWrap.webkitRequestFullscreen();
+      try { trimFullscreen.blur(); } catch {}
+    });
+  }
 
   // recovers a preview stuck on a frame because the range request it was waiting on failed and nothing retried it -- reloads at the same position instead of leaving the user stuck until they close and reopen the whole modal. guarded by trimStallRecovering so an error event and the watchdog below cant both fire a recovery for the same stall.
   function recoverStalledTrimPreview() {

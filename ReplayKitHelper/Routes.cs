@@ -612,6 +612,24 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/window/fullscreen")
+            {
+                string title = Q("title", "Clips");
+                bool fullscreen = false;
+                try { fullscreen = Native.EnterObsWindowFullscreen(title); } catch { }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["fullscreen"] = fullscreen });
+                return false;
+            }
+
+            if (path == "/window/fullscreen/restore")
+            {
+                string title = Q("title", "Clips");
+                bool restored = false;
+                try { restored = Native.ExitObsWindowFullscreen(title); } catch { }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
+                return false;
+            }
+
             if (path == "/window/restore")
             {
                 // counterpart to /window/maximize: restore the saved rect only if the Clips host is still maximized. if the user dragged or unmaximized it while fullscreened, their manual placement wins.

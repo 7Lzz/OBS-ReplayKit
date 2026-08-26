@@ -22,6 +22,14 @@ namespace ReplayKitHelper
         public struct POINT { public int X, Y; }
 
         [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor, rcWork;
+            public uint dwFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         private struct STARTUPINFOW
         {
             public int cb;
@@ -96,6 +104,8 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
         [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint dwFlags);
+        [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
         // dwmapi
         [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int attrValue, int attrSize);
@@ -126,13 +136,15 @@ namespace ReplayKitHelper
         private const int BORDER_COLOR = 0x004D403C;
         private const int TEXT_COLOR = 0x00FFFFFF;
         private const int SM_CXSCREEN = 0, SM_CYSCREEN = 1;
-        private const int GWL_EXSTYLE = -20, GWLP_HWNDPARENT = -8, GCLP_HBRBACKGROUND = -10;
+        private const int GWL_STYLE = -16, GWL_EXSTYLE = -20, GWLP_HWNDPARENT = -8, GCLP_HBRBACKGROUND = -10;
         private const int WS_EX_APPWINDOW = 0x00040000, WS_EX_TOOLWINDOW = 0x00000080;
+        private const long WS_CAPTION = 0x00C00000L, WS_THICKFRAME = 0x00040000L, WS_MINIMIZEBOX = 0x00020000L, WS_MAXIMIZEBOX = 0x00010000L, WS_SYSMENU = 0x00080000L;
         private const uint RDW_INVALIDATE = 0x0001, RDW_UPDATENOW = 0x0100, RDW_FRAME = 0x0400, RDW_NOCHILDREN = 0x0040;
         private const uint WM_SETICON = 0x0080, WM_NCACTIVATE = 0x0086, WM_THEMECHANGED = 0x031A, WM_CLOSE = 0x0010;
         private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020, SWP_SHOWWINDOW = 0x0040;
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+        private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
         private const int VK_LBUTTON = 0x01;
         private const int SW_HIDE = 0, SW_RESTORE = 9, SW_MAXIMIZE = 3;
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -436,6 +448,14 @@ namespace ReplayKitHelper
 
         private static readonly Dictionary<long, RECT> SavedRects = new Dictionary<long, RECT>();
         private static readonly object SavedRectsLock = new object();
+        private sealed class FullscreenWindowState
+        {
+            public RECT Rect;
+            public IntPtr Style, ExStyle;
+            public bool WasMaximized;
+        }
+        private static readonly Dictionary<long, FullscreenWindowState> FullscreenWindows = new Dictionary<long, FullscreenWindowState>();
+        private static readonly object FullscreenWindowsLock = new object();
 
         public static bool MaximizeObsWindow(string needle)
         {
@@ -466,6 +486,60 @@ namespace ReplayKitHelper
                 SetWindowPos(hWnd, IntPtr.Zero, rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top, SWP_NOZORDER | SWP_NOACTIVATE);
             }
             return true;
+        }
+
+        // borderless monitor-sized mode for CEF popups. ShowWindow(SW_MAXIMIZE) leaves the caption/taskbar visible, so player fullscreen uses this instead and restores the exact original frame/rect afterward.
+        public static bool EnterObsWindowFullscreen(string needle)
+        {
+            var hWnd = FindObsWindow(needle);
+            if (hWnd == IntPtr.Zero || !GetWindowRect(hWnd, out RECT rect)) return false;
+            var monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero) return false;
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (!GetMonitorInfo(monitor, ref info)) return false;
+            lock (FullscreenWindowsLock)
+            {
+                long key = hWnd.ToInt64();
+                if (!FullscreenWindows.ContainsKey(key))
+                {
+                    FullscreenWindows[key] = new FullscreenWindowState
+                    {
+                        Rect = rect,
+                        Style = GetWindowLongPtr64(hWnd, GWL_STYLE),
+                        ExStyle = GetWindowLongPtr64(hWnd, GWL_EXSTYLE),
+                        WasMaximized = IsZoomed(hWnd)
+                    };
+                }
+            }
+            long style = GetWindowLongPtr64(hWnd, GWL_STYLE).ToInt64();
+            style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+            SetWindowLongPtr64(hWnd, GWL_STYLE, new IntPtr(style));
+            return SetWindowPos(hWnd, IntPtr.Zero, info.rcMonitor.Left, info.rcMonitor.Top,
+                info.rcMonitor.Right - info.rcMonitor.Left, info.rcMonitor.Bottom - info.rcMonitor.Top,
+                SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+        }
+
+        public static bool ExitObsWindowFullscreen(string needle)
+        {
+            var hWnd = FindObsWindow(needle);
+            if (hWnd == IntPtr.Zero) return false;
+            FullscreenWindowState state;
+            lock (FullscreenWindowsLock)
+            {
+                long key = hWnd.ToInt64();
+                if (!FullscreenWindows.TryGetValue(key, out state)) return false;
+                FullscreenWindows.Remove(key);
+            }
+            SetWindowLongPtr64(hWnd, GWL_STYLE, state.Style);
+            SetWindowLongPtr64(hWnd, GWL_EXSTYLE, state.ExStyle);
+            if (state.WasMaximized)
+            {
+                ShowWindow(hWnd, SW_MAXIMIZE);
+                return true;
+            }
+            return SetWindowPos(hWnd, IntPtr.Zero, state.Rect.Left, state.Rect.Top,
+                state.Rect.Right - state.Rect.Left, state.Rect.Bottom - state.Rect.Top,
+                SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
         }
 
         public static bool SetWindowSizeCentered(string needle, int width, int height)
