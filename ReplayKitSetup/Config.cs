@@ -115,9 +115,9 @@ namespace ReplayKitSetup
             BONGO_CAT_ZIP = Path.Combine(ASSETS_DIR, "Bango Cat.zip");
             SHADERFILTER_ZIP = Path.Combine(ASSETS_DIR, "obs-shaderfilter.zip");
 
-            REPLAYKIT_TRAY_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit-tray", "bin", "64bit", "replaykit-tray.dll");
-            REPLAYKIT_TRAY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit-tray");
-            REPLAYKIT_TRAY_DLL_TARGET = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");
+            REPLAYKIT_TRAY_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
+            REPLAYKIT_TRAY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
+            REPLAYKIT_TRAY_DLL_TARGET = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
         }
 
         private static bool IsValidObsExe(string path)

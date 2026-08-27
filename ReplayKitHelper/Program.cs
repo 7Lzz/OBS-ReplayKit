@@ -25,12 +25,44 @@ namespace ReplayKitHelper
 
         private static Mutex _singletonMutex;
         private static TcpListener _listener;
+        private static readonly object CrashLogLock = new object();
 
         private static int Main(string[] args)
         {
+            InstallCrashReporter();
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
             return RunServer(args);
+        }
+
+        private static void InstallCrashReporter()
+        {
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+                WriteCrashReport("helper_unhandled_exception", e.ExceptionObject, e.IsTerminating);
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                WriteCrashReport("helper_unobserved_task_exception", e.Exception, false);
+                e.SetObserved();
+            };
+        }
+
+        private static void WriteCrashReport(string kind, object exception, bool terminating)
+        {
+            try
+            {
+                string root = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                if (string.IsNullOrWhiteSpace(root)) return;
+                string directory = Path.Combine(root, "obs-studio", "crashes", "replaykit");
+                Directory.CreateDirectory(directory);
+                string path = Path.Combine(directory, "replaykit-helper.log");
+                string message = exception == null ? "(no exception object)" : exception.ToString();
+                lock (CrashLogLock)
+                {
+                    File.AppendAllText(path, "[" + DateTime.UtcNow.ToString("o") + "] kind=" + kind +
+                        " terminating=" + terminating + Environment.NewLine + message + Environment.NewLine);
+                }
+            }
+            catch { }
         }
 
         private static string GetNamedArg(string[] args, string name)

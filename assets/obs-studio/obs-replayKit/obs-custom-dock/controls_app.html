@@ -459,22 +459,6 @@
     }, POLL_IDLE_MS);
   }
 
-  function styleClipsTaskbarWindow() {
-    fetch(HELPER_HTTP_URL + "style-window?title=Clips&taskbar=1&t=" + Date.now(),
-          { cache: "no-store" }).catch(() => {});
-  }
-
-  // server-side foreground-raise. browser window.focus() is unreliable inside cef -- the helpers /focus-window route uses win32 setforegroundwindow + attachthreadinput which always works.
-  // resolves true if an existing clips window was found and focused -- either one this dock itself opened in a since-reloaded session, or the replaykit tray icons own "view clips" item, which opens a real top-level obs window rather than a window.open() popup; native title search finds either case, since both are real top-level windows owned by the obs process.
-  function focusClipsWindowNative() {
-    return fetch(HELPER_HTTP_URL + "focus-window?title=Clips&t=" + Date.now(), { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => !!(data && data.focused))
-      .catch(() => false);
-  }
-
-  // hold a reference to the popup so subsequent clicks can refocus it instead of re-navigating window.open() against the same name (which would reload the page and lose scroll position, active filter, fullscreen state, etc.). if the reference is gone (dock reloaded since the popup was opened), the native focus call still raises the window -- the helper finds it by title.
-  let clipsWindow = null;
   let settingsWindow = null;
   let updateWindow = null;
 
@@ -576,29 +560,9 @@
     });
   });
 
-  viewClipsBtn.addEventListener("click", async () => {
-    if (clipsWindow && !clipsWindow.closed) {
-      // belt-and-suspenders: try the js focus (cheap, sometimes works), but the native call is the one that actualy brings the window to front from inside an obs dock.
-      try { clipsWindow.focus(); } catch (_) {}
-      focusClipsWindowNative();
-      return;
-    }
-    // this docks own clipsWindow reference is empty, but a clips window may already be open from elsewhere -- check native first so we reuse it instead of opening a second window on top of it, since window.open()s own name-based reuse only ever sees windows opened by a prior window.open() call in this exact dock session.
-    if (await focusClipsWindowNative()) return;
-    clipsWindow = window.open(
-      HELPER_HTTP_URL + "clips-view",
-      "replaykit_clips",
-      "popup=yes,width=1100,height=720"
-    );
-    if (!clipsWindow) {
-      // window.open returned null -- popup blocked or the named window already exists in a state we cant get a handle to (happens after the dock reloads). ask the helper to raise any existing clips window by title; only fall thru to navigating the dock itself if that fails too.
-      focusClipsWindowNative();
-      return;
-    }
-    try { clipsWindow.focus(); } catch (_) {}
-    [80, 250, 750, 1500, 3000].forEach((delay) => {
-      setTimeout(styleClipsTaskbarWindow, delay);
-    });
+  viewClipsBtn.addEventListener("click", () => {
+    // the tray plugin owns the reusable Clips host; sending the same command here keeps the dock button and tray row on one open/focus/reset path.
+    helperJson("open-clips-window", { method:"POST" }).catch(() => {});
   });
 
   saveReplayBtn.addEventListener("click", async () => {

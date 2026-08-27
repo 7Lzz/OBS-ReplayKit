@@ -21,11 +21,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\build_helper.ps1
 if errorlevel 1 goto :launcher_fail
 if not exist "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe" goto :launcher_fail
 
-rem builds the native tray plugin (view clips / share preview / restart obs) and bundles it into assets\ itself, same as the helper build above does for the helper exe; build.ps1 compiles against whatever obs version is installed and caches its qt6/obs-headers deps under %temp%\replaykit-tray-build (deliberately outside build\, which gets wiped every run), and skips the whole rebuild when the bundled dll is already newer than its source + the installed obs -- requires gh (authenticated) and vs2022/2019 build tools with the c++ workload, see utils\obs-plugins\replaykit-tray\build.ps1 for details.
+rem builds the ReplayKit plugin (clips / share preview / restart obs) and bundles it into assets\ itself, same as the helper build above does for the helper exe; build.ps1 compiles against whatever obs version is installed and caches its qt6/obs-headers deps under %temp%\replaykit-tray-build (deliberately outside build\, which gets wiped every run), and skips the whole rebuild when the bundled dll is already newer than its source + the installed obs -- requires gh (authenticated) and vs2022/2019 build tools with the c++ workload, see utils\obs-plugins\replaykit-tray\build.ps1 for details.
 echo [3/5] Compiling tray plugin into assets\ ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\obs-plugins\replaykit-tray\build.ps1"
 if errorlevel 1 goto :tray_plugin_fail
-if not exist "%~dp0assets\obs-plugins\replaykit-tray\bin\64bit\replaykit-tray.dll" goto :tray_plugin_fail
+if not exist "%~dp0assets\obs-plugins\replaykit\bin\64bit\replaykit.dll" goto :tray_plugin_fail
 
 rem remove old output before rebuilding so the folder only keeps the latest final exe.
 echo [4/5] Cleaning previous build artifacts ...

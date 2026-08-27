@@ -680,6 +680,15 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/open-clips-window")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                AppConfig.WriteUtf8(Path.Combine(Constants.SCRATCH_DIR, "open_clips.command"), Guid.NewGuid().ToString("N"));
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
             if (path == "/status") { HttpResponse.SendJson(stream, 200, UploadState.GetUploadStatusSnapshot()); return false; }
 
             if (path == "/clips/state")

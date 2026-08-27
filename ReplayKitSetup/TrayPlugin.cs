@@ -3,10 +3,10 @@ using System.IO;
 
 namespace ReplayKitSetup
 {
-    // installs the bundled replaykit-tray plugin (view clips / share preview / restart obs tray items) -- unlike the other obs plugins here, this one is first-party: compiled from source at release time and bundled straight into assets/, nothing to download or extract. ported from obs_replaykit/tray_plugin.py.
+    // installs the bundled ReplayKit plugin (clips / share preview / restart obs tray items) -- unlike the other obs plugins here, this one is first-party: compiled from source at release time and bundled straight into assets/, nothing to download or extract. ported from obs_replaykit/tray_plugin.py.
     public static class TrayPlugin
     {
-        // copy the bundled replaykit-tray.dll into obss no-admin plugin search path; assumes obs is already closed (the apply flow closes it first), since the dll would otherwise be locked, same as updating any other loaded plugin.
+        // copy the bundled replaykit.dll into obss no-admin plugin search path; assumes obs is already closed (the apply flow closes it first), since the dll would otherwise be locked, same as updating any other loaded plugin.
         public static bool InstallReplaykitTrayPlugin(Action<string> log = null)
         {
             if (!File.Exists(Config.REPLAYKIT_TRAY_DLL_BUNDLED))

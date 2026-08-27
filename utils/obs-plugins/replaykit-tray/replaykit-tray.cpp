@@ -32,6 +32,7 @@
 #include <QWindow>
 #include <QCursor>
 #include <QSaveFile>
+#include <QFile>
 #include <QTextStream>
 
 #include "browser-panel.hpp"
@@ -41,6 +42,7 @@
 #include <string>
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include <thread>
 #include <algorithm>
 #include <unordered_map>
@@ -62,8 +64,14 @@ constexpr int kOpenClipsHotkeyId = 0x524B;
 bool g_openClipsHotkeyRegistered = false;
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
 QPointer<QTimer> g_openClipsHotkeyTimer;
+QPointer<QTimer> g_openClipsCommandTimer;
 std::string g_openClipsHotkeyBinding;
 bool g_openClipsHotkeyRequestInFlight = false;
+std::string g_openClipsCommandToken;
+HMODULE g_replayKitModule = nullptr;
+HANDLE g_nativeCrashLog = INVALID_HANDLE_VALUE;
+PVOID g_nativeCrashHandler = nullptr;
+volatile LONG g_nativeCrashWriting = 0;
 // ui-thread only flag guarding against a second click opening a redundant window while the first ones background check is still talking to the helper
 bool g_clipsCheckInFlight = false;
 bool g_settingsCheckInFlight = false;
@@ -387,6 +395,72 @@ void ShowClips()
 	}).detach();
 }
 
+bool IsReplayKitFault(DWORD code)
+{
+	return code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_ARRAY_BOUNDS_EXCEEDED ||
+		code == EXCEPTION_ILLEGAL_INSTRUCTION || code == EXCEPTION_IN_PAGE_ERROR ||
+		code == EXCEPTION_NONCONTINUABLE_EXCEPTION || code == EXCEPTION_STACK_OVERFLOW;
+}
+
+LONG CALLBACK RecordReplayKitException(EXCEPTION_POINTERS *exception)
+{
+	if (!exception || !exception->ExceptionRecord || !g_replayKitModule || !IsReplayKitFault(exception->ExceptionRecord->ExceptionCode))
+		return EXCEPTION_CONTINUE_SEARCH;
+	MEMORY_BASIC_INFORMATION memory = {};
+	if (!VirtualQuery(exception->ExceptionRecord->ExceptionAddress, &memory, sizeof(memory)) || memory.AllocationBase != g_replayKitModule)
+		return EXCEPTION_CONTINUE_SEARCH;
+	if (InterlockedCompareExchange(&g_nativeCrashWriting, 1, 0) != 0)
+		return EXCEPTION_CONTINUE_SEARCH;
+	if (g_nativeCrashLog != INVALID_HANDLE_VALUE) {
+		char line[256];
+		int length = snprintf(line, sizeof(line),
+			"{\"kind\":\"first_chance_replaykit_fault\",\"code\":\"0x%08lX\",\"address\":\"%p\",\"threadId\":%lu}\r\n",
+			(unsigned long)exception->ExceptionRecord->ExceptionCode, exception->ExceptionRecord->ExceptionAddress,
+			(unsigned long)GetCurrentThreadId());
+		if (length > 0) {
+			DWORD written = 0;
+			WriteFile(g_nativeCrashLog, line, (DWORD)length, &written, nullptr);
+		}
+	}
+	InterlockedExchange(&g_nativeCrashWriting, 0);
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void StartReplayKitCrashReporter()
+{
+	wchar_t appData[MAX_PATH] = {};
+	if (!GetEnvironmentVariableW(L"APPDATA", appData, MAX_PATH))
+		return;
+	std::wstring obsDirectory = std::wstring(appData) + L"\\obs-studio";
+	std::wstring crashesDirectory = obsDirectory + L"\\crashes";
+	std::wstring directory = crashesDirectory + L"\\replaykit";
+	CreateDirectoryW(obsDirectory.c_str(), nullptr);
+	CreateDirectoryW(crashesDirectory.c_str(), nullptr);
+	if (!CreateDirectoryW(directory.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
+		return;
+	std::wstring path = directory + L"\\replaykit-native.jsonl";
+	g_nativeCrashLog = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+		nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)&StartReplayKitCrashReporter, &g_replayKitModule);
+	g_nativeCrashHandler = AddVectoredExceptionHandler(1, RecordReplayKitException);
+	if (g_nativeCrashLog == INVALID_HANDLE_VALUE || !g_nativeCrashHandler)
+		blog(LOG_WARNING, "[replaykit] crash reporter could not start");
+	else
+		blog(LOG_INFO, "[replaykit] crash reporter active: %ls", path.c_str());
+}
+
+void StopReplayKitCrashReporter()
+{
+	if (g_nativeCrashHandler) {
+		RemoveVectoredExceptionHandler(g_nativeCrashHandler);
+		g_nativeCrashHandler = nullptr;
+	}
+	if (g_nativeCrashLog != INVALID_HANDLE_VALUE) {
+		CloseHandle(g_nativeCrashLog);
+		g_nativeCrashLog = INVALID_HANDLE_VALUE;
+	}
+}
+
 void ToggleClips()
 {
 	if (g_clipsWindow) {
@@ -487,6 +561,20 @@ void LoadOpenClipsHotkey()
 			RegisterOpenClipsHotkey(settingsBody);
 		}, Qt::QueuedConnection);
 	}).detach();
+}
+
+QString ProjectorHandoffDir();
+
+void PollOpenClipsCommand()
+{
+	QFile commandFile(ProjectorHandoffDir() + "/open_clips.command");
+	if (!commandFile.open(QIODevice::ReadOnly | QIODevice::Text))
+		return;
+	std::string token = commandFile.readAll().trimmed().toStdString();
+	if (token.empty() || token == g_openClipsCommandToken)
+		return;
+	g_openClipsCommandToken = token;
+	ShowClips();
 }
 
 // posts to the same /share-preview route the dock uses so the projector/audio-monitoring logic stays in one place -- fire and forget, since aboutToShow re-reads the real state next open so a failed toggle just looks unchanged
@@ -838,6 +926,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 			g_projectorPublishTimer->stop();
 		if (g_openClipsHotkeyTimer)
 			g_openClipsHotkeyTimer->stop();
+		if (g_openClipsCommandTimer)
+			g_openClipsCommandTimer->stop();
 		CloseCefWidgetsBeforeShutdown();
 		return;
 	}
@@ -848,9 +938,15 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	PrewarmCefBrowser();
 	PublishMainWindow();
 	g_openClipsHotkeyTimer = new QTimer(qApp);
-	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() { LoadOpenClipsHotkey(); });
+	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() {
+		LoadOpenClipsHotkey();
+		PollOpenClipsCommand();
+	});
 	g_openClipsHotkeyTimer->start(1000);
 	LoadOpenClipsHotkey();
+	g_openClipsCommandTimer = new QTimer(qApp);
+	QObject::connect(g_openClipsCommandTimer, &QTimer::timeout, qApp, []() { PollOpenClipsCommand(); });
+	g_openClipsCommandTimer->start(100);
 
 	// 250ms matches the replaykit helpers own poll cadence when its waiting for a projector to appear -- no benefit publishing faster than the one consumer of this file actually checks it.
 	g_projectorPublishTimer = new QTimer(qApp);
@@ -1002,6 +1098,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
+	StartReplayKitCrashReporter();
 	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
 	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
@@ -1010,8 +1107,11 @@ bool obs_module_load(void)
 
 void obs_module_unload(void)
 {
+	StopReplayKitCrashReporter();
 	if (g_openClipsHotkeyTimer)
 		g_openClipsHotkeyTimer->stop();
+	if (g_openClipsCommandTimer)
+		g_openClipsCommandTimer->stop();
 	if (g_openClipsHotkeyRegistered)
 		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
 	if (g_openClipsHotkeyFilter) {

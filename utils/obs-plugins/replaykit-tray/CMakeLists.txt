@@ -26,5 +26,5 @@ target_link_libraries(replaykit-tray PRIVATE
 
 set_target_properties(replaykit-tray PROPERTIES
     PREFIX ""
-    OUTPUT_NAME "replaykit-tray"
+    OUTPUT_NAME "replaykit"
 )

@@ -7,7 +7,7 @@ $csproj = Join-Path $projectDir "ReplayKitHelper.csproj"
 $outPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe"
 $publishTmp = Join-Path $repoRoot "publish_helper_tmp"
 
-# same shape as replaykit-tray\build.ps1s Test-TrayPluginOutputCurrent -- true only when $targetPath exists and is newer than every input.
+# same shape as the native plugin build script's Test-TrayPluginOutputCurrent -- true only when $targetPath exists and is newer than every input.
 function Test-HelperOutputCurrent([string]$targetPath, [string[]]$inputPaths) {
     if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) { return $false }
     $target = Get-Item -LiteralPath $targetPath

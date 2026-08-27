@@ -1,4 +1,4 @@
-# builds replaykit-tray.dll against whatever obs version is actually installed (no bundled sdk) by matching the obs-deps qt6 abi via CMakePresets.json, sparse-checking-out libobs/frontend/api headers at that obs-studio tag, downloading the matching prebuilt qt6 package, generating obs.lib/obs-frontend-api.lib import libs from the installed dlls via dumpbin, and building with cmake/ninja from vs2022/2019 build tools -- produces build/replaykit-tray.dll, copy to C:\ProgramData\obs-studio\plugins\replaykit-tray\bin\64bit\replaykit-tray.dll (no admin needed, obs scans that path itself).
+# builds replaykit.dll against whatever obs version is actually installed (no bundled sdk) by matching the obs-deps qt6 abi via CMakePresets.json, sparse-checking-out libobs/frontend/api headers at that obs-studio tag, downloading the matching prebuilt qt6 package, generating obs.lib/obs-frontend-api.lib import libs from the installed dlls via dumpbin, and building with cmake/ninja from vs2022/2019 build tools -- produces build/replaykit.dll, copy to C:\ProgramData\obs-studio\plugins\replaykit-tray\bin\64bit\replaykit.dll (no admin needed, obs scans that path itself).
 
 param(
     [string]$WorkDir = (Join-Path $env:TEMP "replaykit-tray-build"),
@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not $OutPath) {
-    $OutPath = Join-Path $PSScriptRoot '..\..\..\assets\obs-plugins\replaykit-tray\bin\64bit\replaykit-tray.dll'
+    $OutPath = Join-Path $PSScriptRoot '..\..\..\assets\obs-plugins\replaykit\bin\64bit\replaykit.dll'
 }
 
 function Find-VsBuildTools {
@@ -55,7 +55,7 @@ if (Test-TrayPluginOutputCurrent $OutPath $buildInputs) {
     Write-Output ""
     Write-Output ("Current: " + $built.FullName + "  (" + $kb + " KB)")
     if ($InstallAfterBuild) {
-        $dest = "C:\ProgramData\obs-studio\plugins\replaykit-tray\bin\64bit\replaykit-tray.dll"
+        $dest = "C:\ProgramData\obs-studio\plugins\replaykit\bin\64bit\replaykit.dll"
         New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
         Copy-Item -Path $OutPath -Destination $dest -Force
         Write-Output "installed -> $dest (restart OBS to load it)"
@@ -171,7 +171,7 @@ try {
     Pop-Location
 }
 
-$builtDll = Join-Path $buildDir "replaykit-tray.dll"
+$builtDll = Join-Path $buildDir "replaykit.dll"
 Write-Output "BUILD OK -> $builtDll"
 
 New-Item -ItemType Directory -Force -Path (Split-Path $OutPath) | Out-Null
@@ -179,7 +179,7 @@ Copy-Item -Path $builtDll -Destination $OutPath -Force
 Write-Output "bundled -> $OutPath"
 
 if ($InstallAfterBuild) {
-    $dest = "C:\ProgramData\obs-studio\plugins\replaykit-tray\bin\64bit\replaykit-tray.dll"
+    $dest = "C:\ProgramData\obs-studio\plugins\replaykit\bin\64bit\replaykit.dll"
     New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
     Copy-Item -Path $builtDll -Destination $dest -Force
     Write-Output "installed -> $dest (restart OBS to load it)"
