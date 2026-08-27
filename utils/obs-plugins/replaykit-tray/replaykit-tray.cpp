@@ -55,6 +55,7 @@ namespace {
 QCef *g_cef = nullptr;
 bool g_cefInitTried = false;
 QPointer<QWidget> g_clipsWindow;
+QPointer<QCefWidget> g_clipsBrowser;
 QPointer<QWidget> g_settingsWindow;
 QPointer<QWidget> g_prewarmWindow;
 constexpr int kOpenClipsHotkeyId = 0x524B;
@@ -292,6 +293,7 @@ void CreateClipsWindow()
 	// nullptr cookie manager shares the same cef storage as every other obs-browser dock, keeping streamable sign-in and favorites consistent with the docked clips ui
 	QCefWidget *browser = g_cef->create_widget(win, "http://127.0.0.1:8767/clips-view", nullptr);
 	layout->addWidget(browser);
+	g_clipsBrowser = browser;
 
 	win->show();
 	win->raise();
@@ -359,6 +361,8 @@ void ShowClips()
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
 	if (g_clipsWindow) {
+		if (!g_clipsWindow->isVisible() && g_clipsBrowser)
+			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
 		g_clipsWindow->show();
 		g_clipsWindow->raise();
 		g_clipsWindow->activateWindow();
@@ -390,6 +394,8 @@ void ToggleClips()
 			g_clipsWindow->hide();
 			return;
 		}
+		if (g_clipsBrowser)
+			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
 		g_clipsWindow->show();
 		g_clipsWindow->raise();
 		g_clipsWindow->activateWindow();

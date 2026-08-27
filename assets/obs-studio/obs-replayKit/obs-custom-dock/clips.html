@@ -5647,15 +5647,13 @@
     activeFilter = "all";
     updateTabs(loadedClips);
 
-    if (activeSort !== "newest") {
-      activeSort = "newest";
-      clipsPageVersion = "";
-      clipsTotal = 0;
-      clipsNextOffset = 0;
-      clipsLoadingMore = false;
-      favoriteResolveKey = "";
-      scheduleFavoriteResolve(0);
-    }
+    activeSort = "newest";
+    clipsPageVersion = "";
+    clipsTotal = 0;
+    clipsNextOffset = 0;
+    clipsLoadingMore = false;
+    favoriteResolveKey = "";
+    scheduleFavoriteResolve(0);
     updateClipSortControl();
 
     didInitialClipRender = false;
