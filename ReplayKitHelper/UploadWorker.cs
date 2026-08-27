@@ -95,7 +95,7 @@ namespace ReplayKitHelper
             }
         }
 
-        public static UploadOutcome Run(string requestId, string clipPath, string authJar, bool requireAuth, int progressBase, int progressSpan)
+        public static UploadOutcome Run(string requestId, string clipPath, string authJar, bool requireAuth, int progressBase, int progressSpan, bool quiet = false)
         {
             string tempPrefix = Path.Combine(Constants.SCRATCH_DIR, "streamable_" + requestId);
             string jar = tempPrefix + ".cookies.txt";
@@ -243,9 +243,12 @@ namespace ReplayKitHelper
                 Log.Write("DONE: " + finalUrl, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "done", "done", 100, url: finalUrl);
 
-                // push to clipboard so the link can be pasted anywhere immediately without looking at the dock. wrapped seperately (unlike the ps original) so a clipboard hiccup -- another app briefly holding an exclusive lock, a real and observed windows quirk -- cant flip an already-successful upload into a reported failure.
-                try { System.Windows.Forms.Clipboard.SetText(finalUrl); }
-                catch (Exception ex) { Log.Write("clipboard copy failed (non-fatal): " + ex.Message, "upload", requestId); }
+                // push to clipboard so the link can be pasted anywhere immediately without looking at the dock. runs on a one-shot STA thread (via StaRunner) since this worker is an MTA thread-pool task and Clipboard is an OLE call. wrapped seperately (unlike the ps original) so a clipboard hiccup -- another app briefly holding an exclusive lock, a real and observed windows quirk -- cant flip an already-successful upload into a reported failure. skipped for quiet (bulk) uploads: N copies in a row just leave the last one, useless.
+                if (!quiet)
+                {
+                    try { StaRunner.Run(() => System.Windows.Forms.Clipboard.SetText(finalUrl)); }
+                    catch (Exception ex) { Log.Write("clipboard copy failed (non-fatal): " + ex.Message, "upload", requestId); }
+                }
 
                 return new UploadOutcome { Ok = true, Url = finalUrl };
             }

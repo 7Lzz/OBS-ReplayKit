@@ -381,7 +381,7 @@ namespace ReplayKitHelper
             };
         }
 
-        // puts the clips file path onto the windows clipboard as CF_HDROP so it can be pasted as an actual file into discord / explorer / etc -- not the files bytes, the file reference (same thing ctrl+c on a file in explorer produces). requires sta threading -- connection-handling threads must run sta for exactly this reason (see Runtime.cs).
+        // puts the clips file path onto the windows clipboard as CF_HDROP so it can be pasted as an actual file into discord / explorer / etc -- not the files bytes, the file reference (same thing ctrl+c on a file in explorer produces). the OLE call must run STA; connections are handled on MTA thread-pool threads now, so hop to a one-shot STA thread via StaRunner.
         public static TrimResult SetFileClipboard(string sourceName)
         {
             var source = Clips.GetSafeClipPath(sourceName);
@@ -390,7 +390,7 @@ namespace ReplayKitHelper
             {
                 var col = new System.Collections.Specialized.StringCollection();
                 col.Add(source.Full);
-                System.Windows.Forms.Clipboard.SetFileDropList(col);
+                StaRunner.Run(() => System.Windows.Forms.Clipboard.SetFileDropList(col));
                 return new TrimResult { Ok = true, Name = source.Name };
             }
             catch (Exception ex)

@@ -61,7 +61,7 @@
     padding: 9px 14px;
     background: var(--bg_window);
     border-bottom: 1px solid var(--grey4);
-    overflow-x: auto;
+    overflow: visible;
   }
   .tab-group,
   .tab-actions {
@@ -75,17 +75,12 @@
     border: 0;
     border-radius: 0;
     background: transparent;
+    transition: transform 140ms ease;
   }
+  body.is-selection-mode .tab-group { transform: translateX(2px); }
   .tab-actions {
     gap: 6px;
     margin-left: auto;
-  }
-  .tab-actions::before {
-    content: "";
-    width: 1px;
-    height: 20px;
-    margin-right: 4px;
-    background: var(--grey4);
   }
   .tab {
     position: relative;
@@ -129,6 +124,13 @@
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
+  }
+  .clip-sort-wrap::before {
+    content: "";
+    width: 1px;
+    height: 20px;
+    margin-right: 8px;
+    background: var(--grey4);
   }
   .clip-sort-trigger {
     height: 32px;
@@ -252,6 +254,110 @@
     flex: 0 0 auto;
   }
   #compress-all-btn[hidden] { display: none !important; }
+  .bulk-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    animation: bulk-actions-in 140ms ease-out;
+  }
+  .bulk-actions[hidden] { display: none !important; }
+  .bulk-actions::after {
+    content: "";
+    width: 1px;
+    height: 20px;
+    margin-left: 7px;
+    background: var(--grey4);
+  }
+  .bulk-summary {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 78px;
+    margin-left: 3px;
+    font-size: 11px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  .bulk-summary[hidden] { display: none !important; }
+  .bulk-summary-count { color: var(--white1); }
+  .bulk-summary-size { margin-top: 2px; color: var(--text_muted); font-variant-numeric: tabular-nums; }
+  @keyframes bulk-actions-in {
+    from { opacity: 0; transform: translateX(-4px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .bulk-count {
+    padding: 0 5px;
+    color: var(--text_muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .bulk-icon-btn {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--white1);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bulk-icon-btn:hover { background: var(--grey5); color: var(--text); }
+  .bulk-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+  .bulk-icon-btn.bulk-delete { color: #ff7188; }
+  .bulk-icon-btn.bulk-delete:hover { color: #ff9aaa; background: rgba(227, 59, 87, .15); }
+  .bulk-icon-btn.bulk-delete.is-armed { color: #fff; background: var(--red); }
+  .bulk-icon-btn:disabled { opacity: .5; cursor: progress; pointer-events: none; }
+  /* upload button doubles as Stop while the queue drains -- keep it lit and clickable so the tooltip progress reads and a second click halts scheduling. */
+  #bulk-upload.is-running { color: #fff; background: var(--primary); }
+  #bulk-upload.is-running:hover { background: var(--primary_light); }
+  /* the bulk toolbar tooltip is a single js-positioned element (see showBulkTip) -- these buttons hug the window's left edge so a css-only tooltip either clips or has to be left-anchored off-center. js clamps the box into the viewport and slides the arrow to keep it pointing at the button. */
+  #bulk-tip {
+    position: fixed;
+    z-index: 300;
+    padding: 5px 8px;
+    border-radius: 3px;
+    background: #08090c;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .42);
+    transition: opacity 100ms linear;
+  }
+  #bulk-tip.is-shown { opacity: 1; }
+  #bulk-tip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: var(--tip-arrow, 50%);
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: #08090c;
+  }
+  .bulk-clear {
+    height: 30px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--white1);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .bulk-clear:hover { color: var(--white1); background: var(--grey5); }
+  .bulk-clear:disabled { opacity: .5; cursor: progress; pointer-events: none; }
+  /* transient "stop the whole upload run" button, sits next to Clear while the queue drains. */
+  .bulk-stop { color: #ff8a9b; font-variant-numeric: tabular-nums; }
+  .bulk-stop:hover { color: #ffb3bf; background: rgba(227, 59, 87, .15); }
+  .bulk-stop[hidden] { display: none !important; }
   .tab-action:hover {
     background: var(--primary_light);
     border-color: var(--primary_light);
@@ -413,6 +519,7 @@
     object-fit: cover;
     display: block;
     background: #000;
+    border-radius: 5px 5px 0 0;
   }
   .preview video {
     position: absolute;
@@ -424,6 +531,7 @@
     background: #000;
     opacity: 0;
     transition: opacity 80ms linear;
+    border-radius: 5px 5px 0 0;
   }
   /* the fullscreen target is the .preview container now (not the <video> itself), so the browser doesnt fire its built-in dblclick=exit-fullscreen shortcut. we size the container to 100%/100% and let the video letterbox-fit inside it. */
   .preview:fullscreen,
@@ -441,6 +549,7 @@
     object-fit: contain;
     background: #000;
     opacity: 1;
+    border-radius: 0;
   }
   .preview.is-playing.is-video-ready video {
     opacity: 1;
@@ -511,8 +620,8 @@
   .icon-btn svg  { width: 16px; height: 16px; fill: currentColor; display: block; }
   .favorite-btn {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 3px;
+    right: 3px;
     z-index: 5;
     width: 32px;
     height: 32px;
@@ -536,6 +645,46 @@
     fill: currentColor;
     display: block;
   }
+  /* multi-select lives on the opposite corner from Favorite: a quiet empty circle becomes a checked blue control, then the toolbar exposes the bulk operations. */
+  .select-clip-btn {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    z-index: 5;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .select-clip-btn:hover { background: transparent; }
+  .select-clip-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.35; }
+  .select-clip-btn .select-check { display: none; fill: none; }
+  .select-clip-btn,
+  .favorite-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms linear, background-color 80ms linear;
+  }
+  .card:hover .select-clip-btn,
+  .card:hover .favorite-btn,
+  .card.is-selected .select-clip-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .card.is-selected { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, .45); }
+  .card.is-selected .select-clip-btn { background: transparent; color: #1d1f26; }
+  .card.is-selected .select-clip-btn .select-ring { display: block; fill: #fff; stroke: #fff; }
+  .card.is-selected .select-clip-btn .select-check { display: block; stroke: #1d1f26; stroke-width: 1.55; }
+  body.is-selection-mode .card:not(.is-selected) { opacity: .58; }
+  body.is-selection-mode .card:not(.is-selected):hover { opacity: .78; }
+  body.is-selection-mode .card { cursor: pointer; }
 
   /* volume "pill": icon and slider live inside one rounded container that expands on hover. no gap, no absolute positioning, no dead zone -- moving the cursor from the icon to the slider keeps the pill hovered the whole way. */
   .volume-control {
@@ -1352,14 +1501,21 @@
     border-color: var(--primary_light);
   }
   .btn.primary:hover { background-color: var(--primary_light); }
-  /* in-card progress button used during compress / upload. a real .progress-fill child holds the blue fill instead of a ::before pseudo -- when renderactions updates the button in-place, the fill element persists across renders so its `width` transition actualy animates instead of snapping. pointer-events:none on the fill so cancel-click still hits the button. */
+  /* in-card progress readout shown during compress / upload. its a plain div, not a button -- only the trailing X (.progress-cancel) is clickable, so the bar no longer swallows clicks or flips the whole control to a red Cancel the instant the pointer touches it. a real .progress-fill child holds the blue fill, kept out of pointer-events so the X stays hittable. */
   .btn.is-progress {
     position: relative;
     overflow: hidden;
+    padding: 0 30px 0 12px;
     background-color: var(--button_bg);
     border-color: var(--primary_light);
     color: var(--text);
-    cursor: pointer;
+    cursor: default;
+  }
+  /* the div still matches .btn:hover/.btn:active -- pin the resting look so hovering the bar doesnt shift it. */
+  .btn.is-progress:hover,
+  .btn.is-progress:active {
+    background-color: var(--button_bg);
+    border-color: var(--primary_light);
   }
   .btn.is-progress .progress-fill {
     position: absolute;
@@ -1370,40 +1526,30 @@
     pointer-events: none;
     z-index: 0;
   }
-  .btn.is-progress > svg,
-  .btn.is-progress > .btn-label,
-  .btn.is-progress > .cancel-label {
+  .btn.is-progress > .btn-icon,
+  .btn.is-progress > .btn-label {
     position: relative;
     z-index: 1;
   }
-  /* cancel icon shares the same 14x14 sizing as the link icon -- without this itd render at the defualt unsized-svg dimensions (huge) and dominate the button. fill:currentcolor lets it inherit the hover text color so a single rule covers both states. */
-  .btn.is-progress > .cancel-icon {
-    position: relative;
-    z-index: 1;
-    width: 14px;
-    height: 14px;
-    margin-right: 6px;
-    fill: currentColor;
-    flex-shrink: 0;
-  }
-  /* defualt state: progress label + link icon visible, cancel pair hidden. */
-  .btn.is-progress > .cancel-icon,
-  .btn.is-progress > .cancel-label { display: none; }
-  .btn.is-progress {
-    transition: background-color 80ms ease-out, border-color 80ms ease-out;
-  }
-  /* hover state: solid obs red, white text, cancel pair shown. we also paint the progress-fill the same red so it visually disappears into the background instead of leaving a darker stripe on the left edge of the button. */
-  .btn.is-progress:hover {
-    background-color: var(--red);
-    border-color: var(--red);
-    color: #FFFFFF;
+  /* the sole click target: a slim divider-split X hugging the right edge, reddening on its own hover only. */
+  .btn.is-progress > .progress-cancel {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+    border: 0;
+    border-left: 1px solid var(--button_border);
+    background: transparent;
+    color: var(--text_muted);
     cursor: pointer;
+    transition: background-color 80ms ease-out, color 80ms ease-out;
   }
-  .btn.is-progress:hover .progress-fill { background: var(--red); }
-  .btn.is-progress:hover > .btn-icon,
-  .btn.is-progress:hover > .btn-label { display: none; }
-  .btn.is-progress:hover > .cancel-icon { display: inline-block; }
-  .btn.is-progress:hover > .cancel-label { display: inline; }
+  .btn.is-progress > .progress-cancel:hover { background: var(--red); color: #FFFFFF; }
+  .btn.is-progress > .progress-cancel svg { width: 13px; height: 13px; fill: currentColor; }
   .toast {
     position: fixed;
     right: 14px;
@@ -2240,12 +2386,29 @@
   </div>
 
   <div class="tabs" id="clip-tabs" role="tablist" aria-label="Clip filters">
+    <div class="bulk-actions" id="bulk-actions" hidden>
+      <button class="bulk-icon-btn" type="button" id="bulk-upload" data-tooltip="Upload" aria-label="Upload selected clips">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 18.25H14.99C14.58 18.25 14.24 17.91 14.24 17.5C14.24 17.09 14.58 16.75 14.99 16.75H16.5C19.12 16.75 21.25 14.62 21.25 12C21.25 9.38 19.12 7.25 16.5 7.25H15C14.59 7.25 14.25 6.91 14.25 6.5C14.25 6.09 14.58 5.75 15 5.75H16.5C19.95 5.75 22.75 8.55 22.75 12C22.75 15.45 19.95 18.25 16.5 18.25Z"/><path d="M9 18.25H7.5C4.05 18.25 1.25 15.45 1.25 12C1.25 8.55 4.05 5.75 7.5 5.75H9C9.41 5.75 9.75 6.09 9.75 6.5C9.75 6.91 9.41 7.25 9 7.25H7.5C4.88 7.25 2.75 9.38 2.75 12C2.75 14.62 4.88 16.75 7.5 16.75H9C9.41 16.75 9.75 17.09 9.75 17.5C9.75 17.91 9.41 18.25 9 18.25Z"/><path d="M16 12.75H8C7.59 12.75 7.25 12.41 7.25 12C7.25 11.59 7.59 11.25 8 11.25H16C16.41 11.25 16.75 11.59 16.75 12C16.75 12.41 16.41 12.75 16 12.75Z"/></svg>
+      </button>
+      <button class="bulk-icon-btn" type="button" id="bulk-compress" data-tooltip="Compress" aria-label="Compress selected clips">
+        <svg viewBox="0 0 24 24" id="bulk-compress-icon" aria-hidden="true"></svg>
+      </button>
+      <button class="bulk-icon-btn bulk-delete" type="button" id="bulk-delete" data-tooltip="Delete" aria-label="Delete selected clips">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.60033 7.51634C4.30034 7.51634 4.10035 7.82671 4.10035 8.13707L5.50031 21.069C5.6003 21.5863 6.10029 22.0001 6.60027 22.0001H17.3C17.8999 22.0001 18.3999 21.5863 18.3999 21.069L19.9999 8.13707C19.9999 7.82671 19.7999 7.51634 19.4999 7.51634H4.60033ZM8.40022 20.2414C8.00023 20.2414 7.60024 19.931 7.50025 19.5172L6.70027 10.62C6.70027 10.2062 7.00026 9.79236 7.50025 9.79236C7.90023 9.79236 8.30022 10.1027 8.40022 10.5165L9.2002 19.4137C9.1002 19.8275 8.80021 20.1379 8.40022 20.2414ZM12.9001 19.4137C12.9001 19.8275 12.5001 20.2414 12.1001 20.2414C11.7001 20.2414 11.3001 19.931 11.3001 19.4137V10.5165C11.3001 10.1027 11.7001 9.6889 12.1001 9.6889C12.5001 9.6889 12.9001 9.99927 12.9001 10.5165V19.4137ZM16.6 19.5172C16.6 19.931 16.2 20.2414 15.7 20.2414C15.3 20.2414 14.9 19.8275 15 19.4137L15.9 10.5165C15.9 10.1027 16.3 9.79236 16.8 9.79236C17.2 9.79236 17.5999 10.2062 17.4999 10.62L16.6 19.5172Z"/><path d="M19.9995 4.06911C19.9995 3.75874 19.6995 3.44838 19.3995 3.44838H14.6997L14.1997 2.41382C14.0997 2.31037 14.0997 2.20691 13.9997 2.10346C13.7997 2 13.6997 2 13.5997 2H10.3998C10.2998 2 10.0998 2 9.99982 2.10346C9.89982 2.20691 9.79983 2.31037 9.79983 2.41382L9.19984 3.44838H4.59998C4.29999 3.44838 4 3.75874 4 4.06911V4.89675C4 5.20712 4.29999 5.51748 4.59998 5.51748H19.3995C19.6995 5.51748 19.9995 5.20712 19.9995 4.89675V4.06911Z"/></svg>
+      </button>
+    </div>
     <div class="tab-group">
       <button class="tab is-active" type="button" data-filter="all" data-label="All">All</button>
       <button class="tab" type="button" data-filter="favorites" data-label="Favorites">Favorites</button>
       <button class="tab" type="button" data-filter="linked" data-label="Linked">Linked</button>
     </div>
     <div class="tab-actions">
+      <div class="bulk-summary" id="bulk-summary" hidden>
+        <span class="bulk-summary-count" id="bulk-count">0 selected</span>
+        <span class="bulk-summary-size" id="bulk-size"></span>
+      </div>
+      <button class="bulk-clear" type="button" id="bulk-clear" hidden>Clear</button>
+      <button class="bulk-clear bulk-stop" type="button" id="bulk-upload-stop" hidden>Stop uploads</button>
       <div class="clip-sort-wrap" id="clip-sort">
       <button class="clip-sort-trigger" type="button" id="clip-sort-button"
               aria-haspopup="menu" aria-expanded="false" title="Sort clips">
@@ -2365,7 +2528,9 @@
   const STREAMABLE_PROCESSING_TIMEOUT_SEC = 30 * 60;
   const VIDEO_SEEK_STEP_SECONDS = 5;
   const PENDING_LINK_CREATION_MS = 20 * 60 * 1000;
-  const replayKitSettings = { trimPreciseDefault: false };
+  // after a cancel the helper can still report the old job as active (or as error=Cancelled) for a poll or two -- ignore that jobs status this long so the instant card repaint isnt undone.
+  const CANCEL_GRACE_MS = 8000;
+  const replayKitSettings = { trimPreciseDefault: false, showCodecTags: false };
 
   async function loadReplayKitSettings() {
     try {
@@ -2373,6 +2538,11 @@
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok && data.settings) {
         replayKitSettings.trimPreciseDefault = !!data.settings.trimPreciseDefault;
+        const showCodecTags = !!data.settings.showCodecTags;
+        if (showCodecTags !== replayKitSettings.showCodecTags) {
+          replayKitSettings.showCodecTags = showCodecTags;
+          if (loadedClips.length) renderLoadedClips(loadedClips);
+        }
       }
     } catch (_) {}
   }
@@ -2382,20 +2552,22 @@
   // material-style icon svg path data. inlined so we dont pay a round-trip per card. each card duplicates the markup, but each <svg> is ~80 bytes -- not worth a sprite sheet.
   const ICON = {
     // material volume_off, but with the x subpath shifted right by 2 units so it clears the speaker cone (which ends at x=12) with a visible gap instead of biting into it.
-    VOL_MUTED:  '<path d="M3 9v6h4l5 5V4L7 9H3zm15.59 3L21 14.41 19.59 16 17 13.41 14.41 16 13 14.41 15.59 12 13 9.59 14.41 8.17 17 10.59 19.59 8 21 9.41 18.59 12z"/>',
-    VOL_ON:     '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>',
+    VOL_MUTED:  '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M22.0001 10.41L20.5901 9.00002L18.4601 11.12L16.3401 9.00002L14.9301 10.41L17.0501 12.54L14.9301 14.66L16.3401 16.07L18.4601 13.95L20.5901 16.07L22.0001 14.66L19.8801 12.54L22.0001 10.41Z"/>',
+    VOL_LOW:    '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75z"/>',
+    VOL_MID:    '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75zM18.75 8C18.3358 8 18 8.3358 18 8.75v6.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-6.5c0-.4142-.3358-.75-.75-.75z"/>',
+    VOL_ON:     '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75zM18.75 8C18.3358 8 18 8.3358 18 8.75v6.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-6.5c0-.4142-.3358-.75-.75-.75zM21.75 6.5C21.3358 6.5 21 6.8358 21 7.25v9.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-9.5c0-.4142-.3358-.75-.75-.75z"/>',
     FULLSCREEN: '<path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/>',
     MORE:       '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
     EDIT:       '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
-    LINK:       '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>',
-    TRASH:      '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"/>',
+    LINK:       '<path d="M16.5 18.25H14.99C14.58 18.25 14.24 17.91 14.24 17.5C14.24 17.09 14.58 16.75 14.99 16.75H16.5C19.12 16.75 21.25 14.62 21.25 12C21.25 9.38 19.12 7.25 16.5 7.25H15C14.59 7.25 14.25 6.91 14.25 6.5C14.25 6.09 14.58 5.75 15 5.75H16.5C19.95 5.75 22.75 8.55 22.75 12C22.75 15.45 19.95 18.25 16.5 18.25Z"/><path d="M9 18.25H7.5C4.05 18.25 1.25 15.45 1.25 12C1.25 8.55 4.05 5.75 7.5 5.75H9C9.41 5.75 9.75 6.09 9.75 6.5C9.75 6.91 9.41 7.25 9 7.25H7.5C4.88 7.25 2.75 9.38 2.75 12C2.75 14.62 4.88 16.75 7.5 16.75H9C9.41 16.75 9.75 17.09 9.75 17.5C9.75 17.91 9.41 18.25 9 18.25Z"/><path d="M16 12.75H8C7.59 12.75 7.25 12.41 7.25 12C7.25 11.59 7.59 11.25 8 11.25H16C16.41 11.25 16.75 11.59 16.75 12C16.75 12.41 16.41 12.75 16 12.75Z"/>',
+    TRASH:      '<path d="M4.60033 7.51634C4.30034 7.51634 4.10035 7.82671 4.10035 8.13707L5.50031 21.069C5.6003 21.5863 6.10029 22.0001 6.60027 22.0001H17.3C17.8999 22.0001 18.3999 21.5863 18.3999 21.069L19.9999 8.13707C19.9999 7.82671 19.7999 7.51634 19.4999 7.51634H4.60033ZM8.40022 20.2414C8.00023 20.2414 7.60024 19.931 7.50025 19.5172L6.70027 10.62C6.70027 10.2062 7.00026 9.79236 7.50025 9.79236C7.90023 9.79236 8.30022 10.1027 8.40022 10.5165L9.2002 19.4137C9.1002 19.8275 8.80021 20.1379 8.40022 20.2414ZM12.9001 19.4137C12.9001 19.8275 12.5001 20.2414 12.1001 20.2414C11.7001 20.2414 11.3001 19.931 11.3001 19.4137V10.5165C11.3001 10.1027 11.7001 9.6889 12.1001 9.6889C12.5001 9.6889 12.9001 9.99927 12.9001 10.5165V19.4137ZM16.6 19.5172C16.6 19.931 16.2 20.2414 15.7 20.2414C15.3 20.2414 14.9 19.8275 15 19.4137L15.9 10.5165C15.9 10.1027 16.3 9.79236 16.8 9.79236C17.2 9.79236 17.5999 10.2062 17.4999 10.62L16.6 19.5172Z" fill="currentColor"/><path d="M19.9995 4.06911C19.9995 3.75874 19.6995 3.44838 19.3995 3.44838H14.6997L14.1997 2.41382C14.0997 2.31037 14.0997 2.20691 13.9997 2.10346C13.7997 2 13.6997 2 13.5997 2H10.3998C10.2998 2 10.0998 2 9.99982 2.10346C9.89982 2.20691 9.79983 2.31037 9.79983 2.41382L9.19984 3.44838H4.59998C4.29999 3.44838 4 3.75874 4 4.06911V4.89675C4 5.20712 4.29999 5.51748 4.59998 5.51748H19.3995C19.6995 5.51748 19.9995 5.20712 19.9995 4.89675V4.06911Z" fill="currentColor"/>',
     STAR:       '<path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>',
     STAR_BORDER:'<path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/>',
     // four-square grid glyph -- also doubles as the "all clips" section heading icon (the all tabs favorites split and the local tab both use it).
     GRID:       '<path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/>',
     CONTENT_CUT:'<path d="M9.64 7.64c.23-.5.36-1.05.36-1.64 0-2.21-1.79-4-4-4S2 3.79 2 6s1.79 4 4 4c.59 0 1.14-.13 1.64-.36L10 12l-2.36 2.36C7.14 14.13 6.59 14 6 14c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4c0-.59-.13-1.14-.36-1.64L12 14l7 7h3v-1L9.64 7.64zM6 8c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm0 12c-1.1 0-2-.89-2-2s.9-2 2-2 2 .89 2 2-.9 2-2 2zm6-7.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5.5.22.5.5-.22.5-.5.5zM19 3l-6 6 2 2 7-7V3z"/>',
     CONTENT_COPY:'<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>',
-    COMPRESS:   '<path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/>',
+    COMPRESS:   '<g clip-rule="evenodd" fill="currentColor" fill-rule="evenodd"><path d="m5.43355 3.75c-.16937 0-.32204.1826-.25937.37816.5888 1.83726 1.57597 5.28517 1.57597 7.87184 0 2.5867-.98717 6.0346-1.57597 7.8718-.06267.1956.09.3782.25937.3782h13.13315c.1694 0 .3221-.1826.2594-.3782-.5888-1.8372-1.576-5.2851-1.576-7.8718 0-2.58666.9872-6.03455 1.576-7.87182.0627-.19558-.09-.37818-.2594-.37818zm-1.68781.83594c-.36187-1.12916.46605-2.33594 1.68781-2.33594h13.13315c1.2218 0 2.0497 1.20678 1.6879 2.33592-.5923 1.84814-1.5045 5.09015-1.5045 7.41408 0 2.3239.9122 5.5659 1.5045 7.4141.3618 1.1291-.4661 2.3359-1.6879 2.3359h-13.13315c-1.22176 0-2.04968-1.2068-1.68781-2.3359.59228-1.8482 1.50441-5.0902 1.50441-7.4141 0-2.32393-.91213-5.56592-1.50441-7.41406z"/><path d="m1.55004 6.90001c.33138-.24852.80148-.18137 1.05.15.47782.63709.75443 1.52164.91773 2.37088.16706.86881.23221 1.79251.23221 2.57911s-.06515 1.7104-.23221 2.5791c-.1633.8493-.43991 1.7338-.91773 2.3709-.24852.3314-.71862.3985-1.05.15-.33137-.2485-.39852-.7186-.15-1.05.27219-.3629.49555-.9784.64472-1.7541.14541-.7562.20522-1.5825.20522-2.2959s-.05981-1.5396-.20522-2.29586c-.14917-.77576-.37253-1.39122-.64472-1.75413-.24852-.33137-.18137-.80147.15-1.05z"/><path d="m8.25 7.75c0-.41421.33579-.75.75-.75h6c.4142 0 .75.33579.75.75s-.3358.75-.75.75h-6c-.41421 0-.75-.33579-.75-.75z"/><path d="m8.25 12c0-.4142.33579-.75.75-.75h6c.4142 0 .75.3358.75.75s-.3358.75-.75.75h-6c-.41421 0-.75-.3358-.75-.75z"/><path d="m8.25 16c0-.4142.33579-.75.75-.75h2c.4142 0 .75.3358.75.75s-.3358.75-.75.75h-2c-.41421 0-.75-.3358-.75-.75z"/><path d="m22.45 6.90001c.3313.24853.3985.71863.15 1.05-.2722.36291-.4956.97837-.6448 1.75413-.1454.75626-.2052 1.58246-.2052 2.29586 0 1.4123.2343 2.7917.9208 4.1646.1852.3705.035.821-.3354 1.0062-.3705.1853-.821.0351-1.0063-.3354-.8135-1.6271-1.0791-3.2476-1.0791-4.8354 0-.7866.0652-1.7103.2322-2.57911.1633-.84924.4399-1.73379.9178-2.37088.2485-.33137.7186-.39852 1.05-.15z"/></g>',
     PLAY:       '<path d="M8 5v14l11-7z"/>',
     PAUSE:      '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>',
     CLOSE:      '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
@@ -2405,6 +2577,14 @@
     SETTINGS:   '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
   };
 
+  // Keep the supplied Medal speaker shape, but draw the loudness levels as speaker waves rather than meter bars.
+  ICON.VOL_LOW = ICON.VOL_LOW.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
+  ICON.VOL_MID = ICON.VOL_MID.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
+  ICON.VOL_ON = ICON.VOL_ON.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10M20.5 4.5a10.5 10.5 0 0 1 0 15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
+
+  const bulkCompressIcon = document.getElementById("bulk-compress-icon");
+  if (bulkCompressIcon) bulkCompressIcon.innerHTML = ICON.COMPRESS;
+
   // volume state is global so its "sticky" across cards -- youtube-like ux. defualt muted (autoplay wont work otherwise on hover).
   const VolumeState = { muted: true, volume: 0.6 };
   function applyVolume(video) {
@@ -2413,7 +2593,11 @@
   }
   // paint the icon + slider on one card to reflect volumestate.
   function syncVolumeUi(btn, slider) {
-    if (btn)    btn.innerHTML = `<svg viewBox="0 0 24 24">${VolumeState.muted ? ICON.VOL_MUTED : ICON.VOL_ON}</svg>`;
+    const icon = VolumeState.muted || VolumeState.volume <= 0
+      ? ICON.VOL_MUTED
+      : VolumeState.volume < 0.4 ? ICON.VOL_LOW
+      : VolumeState.volume >= 0.85 ? ICON.VOL_ON : ICON.VOL_MID;
+    if (btn)    btn.innerHTML = `<svg viewBox="0 0 24 24">${icon}</svg>`;
     if (slider) slider.value  = Math.round(VolumeState.volume * 100);
   }
   // broadcast: rewrite every cards volume ui + push the new volume to the currently-playing preview (if any). this is what makes the "global volume" ux work -- toggle mute on one card and every other card shows the unmuted icon too.
@@ -2478,6 +2662,7 @@
   };
   const CLIP_STATE_URL = HELPER + "/clips/state";
   const localState = new Map();
+  const selectedClipNames = new Set();
   let favoriteNames = loadFavoriteNames();
   let resolvedFavoriteClips = [];
   let favoriteResolveKey = "";
@@ -2500,6 +2685,25 @@
   const pendingLinkCreations = new Map();
   const seenUploadErrors = new Set();
   const seenUploadCompletions = new Set();
+  // clips accepted into the bulk-upload pipeline but not yet handed to the helper -- drives the "Queued" card label while runSelectedUploads waits out the concurrency cap.
+  const bulkUploadQueued = new Set();
+  // clips this bulk run handed to the helper that are still uploading -- keeps the "Stop uploads" button alive past the scheduling phase so one click can cancel the whole batch.
+  const bulkUploadInFlight = new Set();
+  // clipName -> ms timestamp of a just-issued cancel. syncUploadJobState ignores that clips job status until CANCEL_GRACE_MS passes so the optimistic repaint holds.
+  const cancelledUploads = new Map();
+  // clipName -> the in-flight /cancel-upload fetch. a new upload for that clip waits on it first, otherwise the helper still sees the old job active and rejects the retry as busy.
+  const inFlightCancels = new Map();
+  // per-clip re-entrancy guard + debounce so spam-clicking Create Link / the cancel X cant interleave their async steps or act on a click that landed on a freshly-swapped button.
+  const linkTransitionBusy = new Set();
+  const lastLinkOpAt = new Map();
+  const LINK_OP_COOLDOWN_MS = 300;
+  function linkOpAllowed(name) {
+    if (!name || linkTransitionBusy.has(name)) return false;
+    const last = lastLinkOpAt.get(name) || 0;
+    if (Date.now() - last < LINK_OP_COOLDOWN_MS) return false;
+    lastLinkOpAt.set(name, Date.now());
+    return true;
+  }
   let didInitialClipRender = false;
   let clipsPageVersion = "";
   let clipsTotal = 0;
@@ -3564,8 +3768,23 @@
     const newErrors = [];
     const completed = [];
     let active = false;
+    // drop grace entries whose job has already vanished from the status feed.
+    if (cancelledUploads.size) {
+      const now = Date.now();
+      for (const [name, ts] of Array.from(cancelledUploads)) {
+        if (now - ts > CANCEL_GRACE_MS) cancelledUploads.delete(name);
+      }
+    }
     for (const job of jobs) {
       const st = job.state || "";
+      // just-cancelled clip: skip its still-active job, and pre-mark its error=Cancelled as seen so poll() doesnt raise an "Upload failed" toast.
+      const cancelledAt = cancelledUploads.get(job.clipName);
+      if (cancelledAt !== undefined && Date.now() - cancelledAt <= CANCEL_GRACE_MS) {
+        if (job.active) continue;
+        cancelledUploads.delete(job.clipName);
+        seenUploadErrors.add(job.requestId || job.clipName);
+        continue;
+      }
       const pending = pendingLinkCreations.get(job.clipName);
       const matchesPendingRequest = pending &&
         (!pending.requestId || !job.requestId || pending.requestId === job.requestId);
@@ -3623,25 +3842,56 @@
     return true;
   }
 
-  async function cancelActiveUpload(filename, requestId) {
+  async function cancelActiveUpload(filename, requestId, suppressToast) {
+    // dont let a cancel interleave with an in-flight Create Link / another cancel for the same clip -- their async steps corrupt each others state.
+    if (filename && linkTransitionBusy.has(filename)) return;
+    if (filename) { linkTransitionBusy.add(filename); bulkUploadInFlight.delete(filename); }
     try {
-      const qs = new URLSearchParams({ t: String(Date.now()) });
-      if (filename) qs.set("file", filename);
-      if (requestId) qs.set("requestId", requestId);
-      await fetch(HELPER + "/cancel-upload?" + qs.toString(), { method: "POST", cache: "no-store" });
-    } catch {}
-    showToast("Upload cancelled", "info");
-    scheduleToastHide(2500);
-    if (filename) localState.delete(filename);
-    else localState.clear();
-    if (filename) pendingLinkCreations.delete(filename);
-    else pendingLinkCreations.clear();
-    anyUploading = localState.size > 0;
-    scheduleNextPoll(POLL_FAST_MS);
+      // repaint the card before the helper round-trip. drop every local trace of the job and null out the last status snapshot so renderActions cant re-derive "uploading" from stale data; the grace window in syncUploadJobState covers the poll or two before the helper catches up.
+      if (filename) {
+        cancelledUploads.set(filename, Date.now());
+        localState.delete(filename);
+        pendingLinkCreations.delete(filename);
+        bulkUploadQueued.delete(filename);
+        lastUploadJobsByName.delete(filename);
+        if (lastUploadStatus && lastUploadStatus.clipName === filename) lastUploadStatus = null;
+        anyUploading = localState.size > 0;
+        rerenderCard(filename);
+      } else {
+        localState.clear();
+        pendingLinkCreations.clear();
+        bulkUploadQueued.clear();
+        lastUploadJobsByName.clear();
+        lastUploadStatus = null;
+        anyUploading = false;
+      }
+      if (!suppressToast) {
+        showToast("Upload cancelled", "info");
+        scheduleToastHide(2500);
+      }
+      // build with encodeURIComponent, NOT URLSearchParams -- the latter encodes spaces as "+", which the helper's Uri.UnescapeDataString leaves as literal "+", so a clip name with spaces (every replay clip) never matched the running job and the cancel silently no-op'd.
+      let url = HELPER + "/cancel-upload?t=" + Date.now();
+      if (filename) url += "&file=" + encodeURIComponent(filename);
+      if (requestId) url += "&requestId=" + encodeURIComponent(requestId);
+      const req = fetch(url, { method: "POST", cache: "no-store" }).catch(() => {});
+      if (filename) inFlightCancels.set(filename, req);
+      try {
+        await req;
+      } finally {
+        if (filename && inFlightCancels.get(filename) === req) inFlightCancels.delete(filename);
+      }
+      scheduleNextPoll(POLL_FAST_MS);
+    } finally {
+      if (filename) linkTransitionBusy.delete(filename);
+    }
   }
 
-  async function triggerUpload(filename) {
-    const url = HELPER + "/upload?file=" + encodeURIComponent(filename) + "&t=" + Date.now();
+  async function triggerUpload(filename, quiet) {
+    // if this clip was just cancelled, let the /cancel-upload request land first -- otherwise the helper still sees the old job active and rejects this as busy.
+    const priorCancel = inFlightCancels.get(filename);
+    if (priorCancel) { try { await priorCancel; } catch {} }
+    // quiet=1 for bulk uploads: helper skips the per-clip windows balloon + clipboard write.
+    const url = HELPER + "/upload?file=" + encodeURIComponent(filename) + (quiet ? "&quiet=1" : "") + "&t=" + Date.now();
     const res = await fetch(url, { method: "POST", cache: "no-store" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -3652,6 +3902,8 @@
         err.sizeMb = Number(data.sizeMb) || 0;
         err.capMb  = Number(data.capMb)  || 0;
       }
+      // helper returns busy=true (409) at the concurrency cap. the bulk queue backs off and retries instead of failing the clip.
+      if (data.busy) err.busy = true;
       throw err;
     }
     return data;
@@ -3720,6 +3972,58 @@
     btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
   }
 
+  function syncClipSelection(card, name) {
+    if (!card || !name) return;
+    const selected = selectedClipNames.has(name);
+    card.classList.toggle("is-selected", selected);
+    const btn = card.querySelector(".select-clip-btn");
+    if (!btn) return;
+    btn.title = selected ? "Deselect clip" : "Select clip";
+    btn.setAttribute("aria-label", btn.title);
+    btn.setAttribute("aria-pressed", selected ? "true" : "false");
+  }
+
+  function refreshBulkSelectionUi() {
+    const bulkActions = document.getElementById("bulk-actions");
+    const bulkSummary = document.getElementById("bulk-summary");
+    const bulkCount = document.getElementById("bulk-count");
+    const bulkSize = document.getElementById("bulk-size");
+    const count = selectedClipNames.size;
+    if (bulkActions) bulkActions.hidden = count === 0;
+    if (bulkSummary) bulkSummary.hidden = count === 0;
+    if (bulkClearBtn) bulkClearBtn.hidden = count === 0;
+    let totalBytes = 0;
+    selectedClipNames.forEach((name) => {
+      const clip = lastClipsByName.get(name) || loadedClips.find((item) => item && item.name === name);
+      totalBytes += Math.max(0, Number(clip && clip.size) || 0);
+    });
+    if (bulkCount) bulkCount.textContent = count + " clip" + (count === 1 ? "" : "s") + " selected";
+    if (bulkSize) bulkSize.textContent = formatSize(totalBytes);
+    document.body.classList.toggle("is-selection-mode", count > 0);
+    if (count > 0 && activePreview && !isVideoFullscreen(activePreview)) {
+      const preview = activePreview;
+      activePreview = null;
+      abortVideoLoad(preview);
+    }
+    document.querySelectorAll(".card[data-name]").forEach((card) => syncClipSelection(card, card.dataset.name));
+    if (typeof syncBulkUploadButtons === "function") syncBulkUploadButtons();
+    if (typeof compressAllRunning !== "undefined" && !compressAllRunning) setCompressAllButton("idle");
+  }
+
+  function toggleClipSelection(name) {
+    if (!name) return;
+    if (selectedClipNames.has(name)) selectedClipNames.delete(name);
+    else selectedClipNames.add(name);
+    resetBulkDeleteButton();
+    refreshBulkSelectionUi();
+  }
+
+  function clearClipSelection() {
+    selectedClipNames.clear();
+    resetBulkDeleteButton();
+    refreshBulkSelectionUi();
+  }
+
   function currentClipForCard(card) {
     const name = card && card.dataset ? card.dataset.name : "";
     if (!name) return null;
@@ -3754,7 +4058,7 @@
 
   function buildCard(clip) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
     card.dataset.name = clip.name;
     card.dataset.clipSig = clipSignature(clip);
     // cache-bust the file url with size + mtime so an overwritten clip (trim-overwrite, compress-overwrite) is fetched fresh instead of cefs stale-cached bytes. mtime alone isnt enough: the compress worker deliberately restores the source mtime so clips dont jump to the top of the list, but the file content and size both change. with v=<size>-<mtime>, any of those three changing (rename, trim, compress) yields a fresh url and a clean fetch.
@@ -3764,13 +4068,19 @@
     const thumbUrl   = thumbUrlFor(clip);
     const nameEsc    = escapeHtml(displayClipName(clip.name));
     // hevc still tagged hev1 hasnt been through the auto-fix yet and may not play on an iphone -- every other codec/tag combo is just informational, so only that one gets the warning tint.
-    const codecReady   = !!clip.codec;
+    const codecReady   = replayKitSettings.showCodecTags && !!clip.codec;
     const codecUnfixed = clip.codec === "hevc" && !!clip.tag && clip.tag !== "hvc1";
     const codecLabel   = codecReady ? escapeHtml(String(clip.codec).toUpperCase()) : "";
 
     card.innerHTML = `
       <div class="preview">
         <img class="thumb" src="${EMPTY_THUMB}" data-src="${thumbUrl}" loading="lazy" decoding="async" alt="">
+        <button class="select-clip-btn" type="button" title="Select clip" aria-label="Select clip" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="select-ring" cx="12" cy="12" r="8"></circle>
+            <path class="select-check" d="m7.5 12 3 3 6-6"></path>
+          </svg>
+        </button>
         <button class="favorite-btn" type="button" title="Favorite clip" aria-label="Favorite clip">
           <svg viewBox="0 0 24 24">${isFavorite(clip.name) ? ICON.STAR : ICON.STAR_BORDER}</svg>
         </button>
@@ -3902,6 +4212,7 @@
     const volumeSlider = card.querySelector(".volume-slider");
     const fullscreenBtn= card.querySelector(".fullscreen-btn");
     const favoriteBtn  = card.querySelector(".favorite-btn");
+    const selectBtn    = card.querySelector(".select-clip-btn");
     const editBtn      = card.querySelector(".edit-btn");
     const menuBtn      = card.querySelector(".menu-btn");
     const menuDropdown = card.querySelector(".menu-dropdown");
@@ -3921,6 +4232,20 @@
         renderLoadedClips(loadedClips);
       }
     });
+    selectBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleClipSelection(card.dataset.name);
+    });
+    // once the first circle is selected, cards themselves become the selection target. interactive child controls still keep their normal behavior -- .btn covers the in-card progress readout, which is a <div> not a <button> so it wouldnt match the bare button selector.
+    card.addEventListener("click", (e) => {
+      if (!document.body.classList.contains("is-selection-mode")) return;
+      if (e.target.closest && e.target.closest("button, input, a, .btn, .actions, .menu-dropdown, .settings-menu")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      toggleClipSelection(card.dataset.name);
+    }, true);
 
     // preview playback
     function markPreviewVideoReady() {
@@ -4046,6 +4371,7 @@
 
     // bound on the whole card, not just .preview, so hovering the name/info row below the thumbnail also starts playback -- matches the .card:hover css that already fades the play-overlay/controls/badges for the whole card, not just the thumbnail box.
     card.addEventListener("mouseenter", () => {
+      if (document.body.classList.contains("is-selection-mode")) return;
       // dont disturb the currently-fullscreened video.
       if (document.fullscreenElement || document.webkitFullscreenElement) return;
       scheduleHoverPreview();
@@ -4406,9 +4732,8 @@
       startRename(card);
     });
 
-    // 3-dot menu
-    menuBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
+    // the same menu is available from the visible 3-dot button or a right-click anywhere on the clip.
+    function toggleCardMenu() {
       resetAllArmedDeleteButtons();
       document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
         if (d !== menuDropdown) {
@@ -4419,6 +4744,16 @@
       });
       menuDropdown.classList.toggle("is-open");
       card.classList.toggle("menu-open", menuDropdown.classList.contains("is-open"));
+    }
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleCardMenu();
+    });
+    card.addEventListener("contextmenu", (e) => {
+      if (e.target.closest && e.target.closest("input, .volume-slider-wrap")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleCardMenu();
     });
     openFolderEl.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -4504,12 +4839,14 @@
         abortVideoLoad(video);
       }
       localState.delete(filename);
+      selectedClipNames.delete(filename);
       setFavorite(filename, false);
       lastClipsByName.delete(filename);
       loadedClips = loadedClips.filter((clip) => clip.name !== filename);
       clipsTotal = Math.max(0, clipsTotal - 1);
       clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
       renderLoadedClips(loadedClips);
+      refreshBulkSelectionUi();
       showToast("Deleted " + escapeHtml(displayClipName(filename)), "info");
       scheduleToastHide(1800);
       scheduleNextPoll(250);
@@ -4771,7 +5108,9 @@
     const meta = card.querySelector(".meta");
     const status = lastUploadJobsByName.get(clip.name)
       || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
-    const state = status && status.active && (status.state === "compressing" || status.state === "uploading")
+    // within the cancel grace window keep the card idle even if a stale status snapshot still reports the job active.
+    const cancelPending = cancelledUploads.has(clip.name);
+    const state = !cancelPending && status && status.active && (status.state === "compressing" || status.state === "uploading")
       ? status.state
       : (localState.get(clip.name) || "idle");
     const uploadPct = status && Number(status.percent) ? Number(status.percent) : 0;
@@ -4859,21 +5198,29 @@
         meta.appendChild(span);
       }
     } else if (state === "compressing" || state === "uploading") {
-      // reuse the existing progress button if one already exists -- the .progress-fill element needs to persist across re-renders so its width transition animates between polls instead of snapping each time renderactions runs.
+      // rebuilt each poll (actions was cleared above). the progress readout is inert; the trailing X is the only cancel target, so aiming at the bar no longer turns the whole thing red.
       let btn = actions.querySelector(".btn.is-progress");
       if (!btn) {
         actions.innerHTML = "";
-        btn = document.createElement("button");
+        btn = document.createElement("div");
         btn.className = "btn is-progress";
-        btn.title = "Click to cancel";
-        // two icon+label pairs in the same button. css swaps them on hover so the user sees the upload/compress progress at rest and a pastel-red "cancel" affordance the moment they aim at it -- click handler is unchanged either way.
         btn.innerHTML =
           '<span class="progress-fill"></span>' +
           '<svg class="btn-icon" viewBox="0 0 24 24">' + ICON.LINK + '</svg>' +
           '<span class="btn-label"></span>' +
-          '<svg class="cancel-icon" viewBox="0 0 24 24">' + ICON.CLOSE + '</svg>' +
-          '<span class="cancel-label">Cancel</span>';
-        btn.addEventListener("click", () => cancelActiveUpload(clip.name, status && status.requestId));
+          '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel">' +
+          '<svg viewBox="0 0 24 24">' + ICON.CLOSE + '</svg></button>';
+        // resolve the clip + its live job at click time from the card -- a recycled card node can outlive the clip this listener was built for.
+        const xBtn = btn.querySelector(".progress-cancel");
+        xBtn.addEventListener("click", () => {
+          const host = btn.closest(".card");
+          const name = (host && host.dataset.name) || "";
+          if (!linkOpAllowed(name)) return;
+          xBtn.disabled = true;
+          bulkUploadQueued.delete(name);
+          const job = lastUploadJobsByName.get(name);
+          cancelActiveUpload(name, (job && job.requestId) || "");
+        });
         actions.appendChild(btn);
       }
       let labelText;
@@ -4881,6 +5228,8 @@
         labelText = "Finalizing...";
       } else if (uploadPct >= 1) {
         labelText = uploadPct + "%";
+      } else if (bulkUploadQueued.has(clip.name)) {
+        labelText = "Queued...";
       } else {
         labelText = (state === "compressing" ? "Compressing..." : "Uploading...");
       }
@@ -4896,41 +5245,66 @@
   }
 
   async function onCreateLink(filename, btn) {
+    // spam guard: bail if an op for this clip is mid-flight or one just ran. covers a click that landed on this button right after a swap.
+    if (!linkOpAllowed(filename)) return;
+    linkTransitionBusy.add(filename);
     btn.disabled = true;
     btn.classList.add("is-busy");
     // the button now has an <svg> + <span class="btn-label"> inside, so we swap only the label text -- otherwise textcontent would also wipe out the link icon.
     const label = btn.querySelector(".btn-label") || btn;
     label.textContent = "Sending...";
     const pending = { requestId: "", startedAt: Date.now() };
+    // a fresh Create Link overrides any pending cancel grace for this clip.
+    cancelledUploads.delete(filename);
     pendingLinkCreations.set(filename, pending);
     localState.set(filename, "uploading");
     anyUploading = true;
     rerenderCard(filename);
+    let attempts = 0;
     try {
-      const upload = await triggerUpload(filename);
-      pending.requestId = String((upload && upload.requestId) || "");
-      scheduleNextPoll(POLL_FAST_MS);
-      rerenderCard(filename);
-    } catch (e) {
-      pendingLinkCreations.delete(filename);
-      localState.delete(filename);
-      anyUploading = localState.size > 0;
-      btn.classList.remove("is-busy");
-      btn.disabled = false;
-      label.textContent = "Create Link";
-      rerenderCard(filename);
-      // if the helper said "too big", offer the temp-compress path instead of a generic error toast. otherwise fall thru to the toast like before.
-      if (e && e.tooBig) {
-        openCompressModal(filename, e.sizeMb || 0, e.capMb || 0);
-      } else {
-        showToast("Couldn't create link: " + (e.message || "Unknown error"));
-        scheduleToastHide(TOAST_ERROR_MS);
+      while (true) {
+        try {
+          const upload = await triggerUpload(filename);
+          pending.requestId = String((upload && upload.requestId) || "");
+          scheduleNextPoll(POLL_FAST_MS);
+          rerenderCard(filename);
+          return;
+        } catch (e) {
+          // transient cap contention (a just-finished cancel, another upload wrapping up) -- keep the card on "uploading" and retry a couple times before surfacing anything.
+          if (e && e.busy && attempts < 2) {
+            attempts++;
+            await new Promise((r) => setTimeout(r, 500));
+            continue;
+          }
+          pendingLinkCreations.delete(filename);
+          localState.delete(filename);
+          anyUploading = localState.size > 0;
+          btn.classList.remove("is-busy");
+          btn.disabled = false;
+          label.textContent = "Create Link";
+          rerenderCard(filename);
+          // "too big" -> offer the temp-compress path; "busy" -> the cap is full, say so plainly instead of a scary error; otherwise the generic toast.
+          if (e && e.tooBig) {
+            openCompressModal(filename, e.sizeMb || 0, e.capMb || 0);
+          } else if (e && e.busy) {
+            showToast("Upload queue is full. Try that clip again in a moment.", "bad");
+            scheduleToastHide(TOAST_ERROR_MS);
+          } else {
+            showToast("Couldn't create link: " + (e.message || "Unknown error"));
+            scheduleToastHide(TOAST_ERROR_MS);
+          }
+          return;
+        }
       }
+    } finally {
+      linkTransitionBusy.delete(filename);
     }
   }
 
   function rerenderCard(filename) {
-    const clip = lastClipsByName.get(filename);
+    // lastClipsByName briefly shrinks to page 0 right after a clip-db version change; fall back to loadedClips (the full on-screen list) so an instant repaint after Create Link / cancel never no-ops.
+    const clip = lastClipsByName.get(filename)
+      || loadedClips.find((c) => c && c.name === filename);
     if (!clip) return;
     const selector = '.card[data-name="' + CSS.escape(filename) + '"]';
     const card = gridEl.querySelector(selector) || favoritesGridEl.querySelector(selector);
@@ -4963,13 +5337,14 @@
       // the codec badge is otherwise baked into buildCards innerHTML once and never revisited -- a card built before clip_index_worker finishes probing a brand-new file would keep an empty badge forever even once later polls carry the real codec, since clipSig already covers clip.codec/clip.tag and gets us into this block.
       const codecEl = card.querySelector(".codec-badge");
       if (codecEl) {
-        const codecReady = !!clip.codec;
+        const codecReady = replayKitSettings.showCodecTags && !!clip.codec;
         const codecUnfixed = clip.codec === "hevc" && !!clip.tag && clip.tag !== "hvc1";
         codecEl.className = "codec-badge" + (codecReady ? " is-ready" : "") + (codecUnfixed ? " is-unfixed" : "");
         codecEl.textContent = codecReady ? String(clip.codec).toUpperCase() : "";
       }
     }
     syncFavoriteButton(card, clip.name);
+    syncClipSelection(card, clip.name);
     const ageEl = card.querySelector(".age");
     if (ageEl) {
       ageEl.dataset.mtime = String(clip.mtime);
@@ -5120,6 +5495,14 @@
         localState.delete(name);
       }
       anyUploading = jobSync.active;
+      // drop bulk-batch clips that have finished (or errored) so the "Stop uploads" button hides once the batch is done.
+      if (bulkUploadInFlight.size) {
+        for (const name of Array.from(bulkUploadInFlight)) {
+          const s = localState.get(name);
+          if (s !== "uploading" && s !== "compressing") bulkUploadInFlight.delete(name);
+        }
+        syncBulkUploadButtons();
+      }
       if (uploadError) {
         showToast("Upload failed: " + uploadError);
         scheduleToastHide(TOAST_ERROR_MS);
@@ -5238,8 +5621,54 @@
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 
+  // the clips window is hidden (not destroyed) on close now, so its js state survives a close/reopen. put every session-only bit back to a fresh-window default when it's shown again. deliberately leaves alone: in-flight upload/compress tracking (bulkUpload*, localState, pendingLinkCreations -- real helper work) and favorites (persisted).
+  function resetClipsWindowState() {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
+
+    const renameInput = document.querySelector(".name-edit-input");
+    if (renameInput) renameInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    closeAllMenus();
+    resetAllArmedDeleteButtons();
+    if (typeof closeClipSortMenu === "function") closeClipSortMenu();
+    document.querySelectorAll(".settings-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
+    if (typeof closeTrimModal === "function") closeTrimModal();
+    document.querySelectorAll(".modal-veil.is-open").forEach((v) => v.classList.remove("is-open"));
+
+    if (activePreview) { try { abortVideoLoad(activePreview); } catch {} activePreview = null; }
+
+    if (selectedClipNames.size) {
+      selectedClipNames.clear();
+      resetBulkDeleteButton();
+      refreshBulkSelectionUi();
+    }
+
+    activeFilter = "all";
+    updateTabs(loadedClips);
+
+    if (activeSort !== "newest") {
+      activeSort = "newest";
+      clipsPageVersion = "";
+      clipsTotal = 0;
+      clipsNextOffset = 0;
+      clipsLoadingMore = false;
+      favoriteResolveKey = "";
+      scheduleFavoriteResolve(0);
+    }
+    updateClipSortControl();
+
+    didInitialClipRender = false;
+    scrollAreaEl.scrollTop = 0;
+    resetVirtualWindow();
+    renderLoadedClips(loadedClips);
+  }
+  window.__replaykitResetClips = resetClipsWindowState;
+
+  let wasHiddenSinceShown = false;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
+      wasHiddenSinceShown = true;
       if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
       // dont tear down a fullscreened preview when the popup is backgrounded (alt-tab, system notification, etc). aborting clears the <video>s src, which forces an exit from fullscreen -- and the user is presumably still actively watching it.
       const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
@@ -5248,9 +5677,22 @@
         activePreview = null;
       }
     } else {
+      if (wasHiddenSinceShown) {
+        wasHiddenSinceShown = false;
+        resetClipsWindowState();
+      }
       poll();
       queueVirtualRender(true);
     }
+  });
+
+  // fallback for CEF hosts where hide()/show() lands as a window focus change rather than a visibilitychange -- only fires the reset if we already saw a hidden state, so an ordinary alt-tab back never triggers it.
+  window.addEventListener("focus", () => {
+    if (!wasHiddenSinceShown || document.hidden) return;
+    wasHiddenSinceShown = false;
+    resetClipsWindowState();
+    poll();
+    queueVirtualRender(true);
   });
 
   setInterval(() => {
@@ -5307,6 +5749,7 @@
       if (!res.ok || !data.ok) {
         throw new Error(data.message || ("HTTP " + res.status));
       }
+      cancelledUploads.delete(file);
       localState.set(file, "compressing");
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
@@ -5401,6 +5844,7 @@
         }
         throw new Error(data.message || ("HTTP " + res.status));
       }
+      cancelledUploads.delete(file);
       localState.set(file, "compressing");
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
@@ -5439,10 +5883,16 @@
   const compressAllBody       = document.getElementById("compress-all-body");
   const compressAllGo         = document.getElementById("compress-all-go");
   const compressAllCancel     = document.getElementById("compress-all-cancel");
+  const bulkUploadBtn         = document.getElementById("bulk-upload");
+  const bulkUploadStopBtn     = document.getElementById("bulk-upload-stop");
+  const bulkCompressBtn       = document.getElementById("bulk-compress");
+  const bulkDeleteBtn         = document.getElementById("bulk-delete");
+  const bulkClearBtn          = document.getElementById("bulk-clear");
 
   // mutated by the queue runner. when true, the button label flips to "stop (x/y)" and clicking it stops scheduling new jobs. in-flight ffmpeg encodes continue -- we dont kill them mid-run becuase the servers atomic-replace is what makes that safe.
   let compressAllRunning = false;
   let compressAllAbort   = false;
+  let pendingBulkCompressQueue = null;
 
   function compressAllCandidates() {
     // walk the full known clips list. skip anything already marked fast or slow (the rules say re-fast is a no-op, and slow is already maximally compressed), and anything currently mid-job so we dont pile on top of a manual operation.
@@ -5455,6 +5905,210 @@
       list.push(clip.name);
     }
     return list;
+  }
+
+  function selectedCompressCandidates() {
+    return Array.from(selectedClipNames).filter((name) => {
+      const clip = lastClipsByName.get(name) || loadedClips.find((item) => item && item.name === name);
+      if (!clip || clip.cmp_mode === "fast" || clip.cmp_mode === "slow") return false;
+      const state = localState.get(name);
+      return state !== "compressing" && state !== "uploading";
+    });
+  }
+
+  function selectedUploadCandidates() {
+    return Array.from(selectedClipNames).filter((name) => {
+      const clip = lastClipsByName.get(name) || loadedClips.find((item) => item && item.name === name);
+      if (!clip || clip.streamable_url) return false;
+      const state = localState.get(name);
+      return state !== "compressing" && state !== "uploading";
+    });
+  }
+
+  let bulkUploadRunning = false;
+  let bulkUploadAbort = false;
+  let bulkUploadProgress = { done: 0, total: 0 };
+
+  // single source of truth for BOTH the upload icon (#bulk-upload) and the "Stop uploads" text button. stop mode = scheduling (bulkUploadRunning) OR clips this batch handed to the helper are still uploading (bulkUploadInFlight). in stop mode both buttons stay live so either one cancels the whole batch; outside it the icon is the normal Upload trigger.
+  // verbose form for the icon's floating tooltip (no width limit).
+  function bulkStopLabel() {
+    if (bulkUploadAbort) return "Stopping...";
+    const up = bulkUploadInFlight.size;
+    const queued = bulkUploadQueued.size;
+    if (bulkUploadRunning || queued > 0) {
+      return queued > 0
+        ? "Stop — " + up + " uploading, " + queued + " queued"
+        : "Stop uploads (" + up + ")";
+    }
+    return "Cancel " + up + " upload" + (up === 1 ? "" : "s");
+  }
+  // terse form for the #bulk-upload-stop text button, which shares the toolbar row with Clear + Sort.
+  function bulkStopLabelShort() {
+    if (bulkUploadAbort) return "Stopping...";
+    const up = bulkUploadInFlight.size;
+    const queued = bulkUploadQueued.size;
+    if (queued > 0) return "Stop (" + queued + " queued)";
+    if (bulkUploadRunning) return "Stop uploads";
+    return "Cancel " + up + " upload" + (up === 1 ? "" : "s");
+  }
+  function syncBulkUploadButtons() {
+    const stopMode = bulkUploadRunning || bulkUploadInFlight.size > 0;
+    if (bulkUploadStopBtn) {
+      bulkUploadStopBtn.hidden = !stopMode;
+      if (stopMode) {
+        bulkUploadStopBtn.disabled = bulkUploadAbort;
+        bulkUploadStopBtn.textContent = bulkStopLabelShort();
+      }
+    }
+    if (!bulkUploadBtn) return;
+    bulkUploadBtn.classList.toggle("is-running", stopMode);
+    let tip, aria;
+    if (stopMode) {
+      bulkUploadBtn.disabled = bulkUploadAbort;
+      tip = bulkStopLabel();
+      aria = tip;
+    } else {
+      const uploadable = selectedUploadCandidates().length;
+      bulkUploadBtn.disabled = selectedClipNames.size > 0 && uploadable === 0;
+      tip = uploadable ? "Upload" : "No selected clips need uploading";
+      aria = uploadable ? "Upload selected clips" : tip;
+    }
+    bulkUploadBtn.dataset.tooltip = tip;
+    bulkUploadBtn.setAttribute("aria-label", aria);
+  }
+
+  // thin wrapper kept for the existing runSelectedUploads call sites -- records progress then defers to the shared sync.
+  function updateBulkUploadButton(mode, done, total) {
+    if (mode === "running") bulkUploadProgress = { done: done || 0, total: total || 0 };
+    syncBulkUploadButtons();
+  }
+
+  // abort scheduling + cancel every upload this batch already handed to the helper (quiet, one summary toast). shared by the icon (in stop mode) and the text button.
+  function stopBulkUploads() {
+    if (!bulkUploadRunning && bulkUploadInFlight.size === 0) return;
+    bulkUploadAbort = true;
+    syncBulkUploadButtons();
+    const inflight = Array.from(bulkUploadInFlight);
+    bulkUploadInFlight.clear();
+    inflight.forEach((name) => {
+      // pass the requestId so the helper matches the job directly rather than by clip name.
+      const job = lastUploadJobsByName.get(name);
+      const pend = pendingLinkCreations.get(name);
+      cancelActiveUpload(name, (job && job.requestId) || (pend && pend.requestId) || "", true);
+    });
+    if (inflight.length) {
+      showToast("Cancelled " + inflight.length + " upload" + (inflight.length === 1 ? "" : "s") + ".", "info");
+      scheduleToastHide(2500);
+    }
+    if (!bulkUploadRunning) bulkUploadAbort = false;
+    syncBulkUploadButtons();
+  }
+
+  // drains the bulk upload selection through the helpers concurrency limiter one accepted job at a time. the helper only runs MAX_CONCURRENT_VIDEO_JOBS at once and returns busy=true past that, so rather than firing every /upload back to back and marking the rejected ones failed, we keep each clip on its card as "Queued" and retry it until a slot frees -- a clip only counts as failed on a real error. bulkUploadAbort (the button doubles as Stop) halts scheduling; clips already handed to the helper keep going and can be cancelled from their own card.
+  async function runSelectedUploads(names) {
+    if (bulkUploadRunning) return;
+    const list = names.slice();
+    const total = list.length;
+    let started = 0;
+    let done = 0;
+    const failed = [];
+
+    bulkUploadRunning = true;
+    bulkUploadAbort = false;
+    bulkUploadQueued.clear();
+    // lock selection-clear for the run, same as deleteSelectedClips -- clearing hides the whole bulk bar and with it the Stop button.
+    if (bulkClearBtn) bulkClearBtn.disabled = true;
+    // show every clip as queued up front so the selection visibly becomes a pipeline instead of a stall.
+    for (const name of list) {
+      cancelledUploads.delete(name);
+      bulkUploadQueued.add(name);
+      if (!hasPendingLinkCreation(name)) pendingLinkCreations.set(name, { requestId: "", startedAt: Date.now() });
+      localState.set(name, "uploading");
+      rerenderCard(name);
+    }
+    anyUploading = true;
+    updateBulkUploadButton("running", done, total);
+
+    for (const name of list) {
+      if (bulkUploadAbort) break;
+      done++;
+      // cancelled from its own card while waiting, or linked in the meantime -- nothing to hand off.
+      if (!bulkUploadQueued.has(name)) { updateBulkUploadButton("running", done, total); continue; }
+      const clip = lastClipsByName.get(name);
+      if (clip && clip.streamable_url) {
+        bulkUploadQueued.delete(name);
+        pendingLinkCreations.delete(name);
+        localState.delete(name);
+        updateBulkUploadButton("running", done, total);
+        continue;
+      }
+
+      const pending = pendingLinkCreations.get(name) || { requestId: "", startedAt: Date.now() };
+      pendingLinkCreations.set(name, pending);
+      let handedOff = false;
+      let attempts = 0;
+      while (!handedOff && !bulkUploadAbort && bulkUploadQueued.has(name)) {
+        try {
+          const upload = await triggerUpload(name, true);
+          pending.requestId = String((upload && upload.requestId) || "");
+          started++;
+          handedOff = true;
+          bulkUploadInFlight.add(name);
+        } catch (e) {
+          if (e && e.busy) {
+            // at the cap -- hold the card and back off before retrying this same clip.
+            attempts++;
+            await new Promise((r) => setTimeout(r, Math.min(4000, 700 + attempts * 300)));
+          } else {
+            pendingLinkCreations.delete(name);
+            localState.delete(name);
+            failed.push(name);
+            handedOff = true;
+          }
+        }
+      }
+      bulkUploadQueued.delete(name);
+      if (!handedOff) {
+        // fell out on abort/cancel before the helper took it -- roll the card back to Create Link.
+        pendingLinkCreations.delete(name);
+        localState.delete(name);
+      }
+      rerenderCard(name);
+      updateBulkUploadButton("running", done, total);
+    }
+
+    const aborted = bulkUploadAbort;
+    if (aborted) {
+      // clips still only queued (never handed to the helper) go back to Create Link.
+      for (const name of Array.from(bulkUploadQueued)) {
+        pendingLinkCreations.delete(name);
+        localState.delete(name);
+        rerenderCard(name);
+      }
+      // and cancel anything that slipped through to the helper between the Stop click and the loop breaking (the click handler cleared the set, so this catches late additions).
+      for (const name of Array.from(bulkUploadInFlight)) {
+        const job = lastUploadJobsByName.get(name);
+        const pend = pendingLinkCreations.get(name);
+        cancelActiveUpload(name, (job && job.requestId) || (pend && pend.requestId) || "", true);
+      }
+      bulkUploadInFlight.clear();
+    }
+    bulkUploadQueued.clear();
+    bulkUploadRunning = false;
+    bulkUploadAbort = false;
+    anyUploading = localState.size > 0;
+    if (bulkClearBtn) bulkClearBtn.disabled = false;
+    updateBulkUploadButton("idle");
+    scheduleNextPoll(POLL_FAST_MS);
+    refreshBulkSelectionUi();
+    if (started) {
+      showToast("Upload: queued " + started + " selected clip" + (started === 1 ? "" : "s") + (aborted ? " before stopping." : "."), "info");
+      scheduleToastHide(3500);
+    }
+    if (failed.length) {
+      showToast("Upload: " + failed.length + " selected clip" + (failed.length === 1 ? " couldn't" : "s couldn't") + " be queued. Retry the clip" + (failed.length === 1 ? "" : "s") + ".", "bad");
+      scheduleToastHide(TOAST_ERROR_MS);
+    }
   }
 
   function setCompressAllButton(state, info) {
@@ -5472,6 +6126,19 @@
       compressAllLabelEl.textContent = "Compress All";
       compressAllBtn.title = "Fast-compress every clip that isn't already compressed.";
     }
+    if (!bulkCompressBtn) return;
+    if (state === "running" && info) {
+      bulkCompressBtn.classList.add("is-running");
+      bulkCompressBtn.dataset.tooltip = "Stop compression queue (" + info.done + " / " + info.total + ")";
+      bulkCompressBtn.setAttribute("aria-label", bulkCompressBtn.dataset.tooltip);
+      bulkCompressBtn.disabled = false;
+    } else {
+      const available = selectedCompressCandidates().length;
+      bulkCompressBtn.classList.remove("is-running");
+      bulkCompressBtn.dataset.tooltip = available ? "Compress" : "No selected clips can be compressed";
+      bulkCompressBtn.setAttribute("aria-label", bulkCompressBtn.dataset.tooltip);
+      bulkCompressBtn.disabled = selectedClipNames.size > 0 && available === 0;
+    }
   }
 
   function refreshCompressAllButton() {
@@ -5485,6 +6152,7 @@
   }
 
   function openCompressAllModal() {
+    pendingBulkCompressQueue = null;
     const candidates = compressAllCandidates();
     const total = allClips.length;
     const skipped = total - candidates.length;
@@ -5498,15 +6166,34 @@
       + "<p>Each clip's original file will be replaced. "
         + "Only Fast mode runs in bulk &mdash; for Smaller, use a clip's "
         + "3-dot menu individually.</p>";
+    compressAllGo.textContent = "Compress all";
     compressAllGo.disabled = (candidates.length === 0);
     compressAllVeil.classList.add("is-open");
   }
   function closeCompressAllModal() {
     compressAllVeil.classList.remove("is-open");
+    pendingBulkCompressQueue = null;
+    compressAllGo.textContent = "Compress all";
+  }
+
+  function openSelectedCompressModal() {
+    const candidates = selectedCompressCandidates();
+    if (!candidates.length) return;
+    pendingBulkCompressQueue = candidates.slice();
+    const skipped = selectedClipNames.size - candidates.length;
+    compressAllBody.innerHTML =
+      "<p>Fast-compress <b>" + candidates.length + "</b> selected clip" + (candidates.length === 1 ? "" : "s") + ".</p>"
+      + (skipped > 0
+          ? "<p><b>" + skipped + "</b> selected clip" + (skipped === 1 ? " was" : "s were") + " skipped because it is already compressed or busy.</p>"
+          : "")
+      + "<p>Each source clip is replaced with a smaller fast-compressed version. Clips are queued through ReplayKit's existing limiter, so they do not all encode at once.</p>";
+    compressAllGo.textContent = "Compress selected";
+    compressAllGo.disabled = false;
+    compressAllVeil.classList.add("is-open");
   }
 
   // worker that drains the queue. we fire one request, wait for the response, then immediately fire the next. the servers get-uploadjobstartdecision returns busy=true when at the cap, so we back off briefly and retry the same clip. cpu-low bursts above the steady-state cap happen server-side -- we dont need to mirror the logic here, just keep firing.
-  async function runCompressAll(queue) {
+  async function runCompressAll(queue, operationLabel) {
     compressAllRunning = true;
     compressAllAbort = false;
     const total = queue.length;
@@ -5525,6 +6212,7 @@
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.ok) {
             started = true;
+            cancelledUploads.delete(name);
             localState.set(name, "compressing");
             anyUploading = true;
             scheduleNextPoll(POLL_FAST_MS);
@@ -5557,7 +6245,7 @@
     compressAllAbort = false;
     refreshCompressAllButton();
     if (done > 0) {
-      showToast("Compress All: scheduled " + done + " clip"
+      showToast((operationLabel || "Compress All") + ": scheduled " + done + " clip"
         + (done === 1 ? "" : "s") + " for compression.", "info");
       scheduleToastHide(4000);
     }
@@ -5589,17 +6277,182 @@
     if (e.key === "Escape") { e.preventDefault(); closeCompressAllModal(); }
   });
   compressAllGo.addEventListener("click", () => {
-    const queue = compressAllCandidates();
+    const queue = pendingBulkCompressQueue ? pendingBulkCompressQueue.slice() : compressAllCandidates();
+    const label = pendingBulkCompressQueue ? "Compress selected" : "Compress All";
     closeCompressAllModal();
     if (queue.length === 0) return;
-    runCompressAll(queue);
+    runCompressAll(queue, label);
   });
+
+  let bulkDeleteArmed = false;
+  let bulkDeleteArmTimer = 0;
+  function resetBulkDeleteButton() {
+    bulkDeleteArmed = false;
+    if (bulkDeleteArmTimer) { clearTimeout(bulkDeleteArmTimer); bulkDeleteArmTimer = 0; }
+    if (!bulkDeleteBtn) return;
+    bulkDeleteBtn.classList.remove("is-armed");
+    bulkDeleteBtn.dataset.tooltip = "Delete";
+    bulkDeleteBtn.setAttribute("aria-label", "Delete selected clips");
+  }
+
+  async function deleteSelectedClips() {
+    const names = Array.from(selectedClipNames);
+    if (!names.length) return;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
+    if (bulkClearBtn) bulkClearBtn.disabled = true;
+    const deleted = [];
+    const failed = [];
+    for (let i = 0; i < names.length; i++) {
+      if (bulkDeleteBtn) {
+        bulkDeleteBtn.dataset.tooltip = "Deleting " + (i + 1) + " / " + names.length;
+        bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
+      }
+      try {
+        const res = await fetch(HELPER + "/delete?file=" + encodeURIComponent(names[i]), {
+          method: "POST", cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.message || "Delete failed");
+        deleted.push(names[i]);
+      } catch (_) {
+        failed.push(names[i]);
+      }
+    }
+    const deletedSet = new Set(deleted);
+    deleted.forEach((name) => {
+      selectedClipNames.delete(name);
+      localState.delete(name);
+      setFavorite(name, false);
+      lastClipsByName.delete(name);
+    });
+    if (deletedSet.size) {
+      allClips = allClips.filter((clip) => !deletedSet.has(clip.name));
+      loadedClips = loadedClips.filter((clip) => !deletedSet.has(clip.name));
+      resolvedFavoriteClips = resolvedFavoriteClips.filter((clip) => !deletedSet.has(clip.name));
+      clipsTotal = Math.max(0, clipsTotal - deletedSet.size);
+      clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
+      renderLoadedClips(loadedClips);
+      scheduleNextPoll(50);
+    }
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = false;
+    if (bulkClearBtn) bulkClearBtn.disabled = false;
+    resetBulkDeleteButton();
+    refreshBulkSelectionUi();
+    if (deleted.length) {
+      showToast("Deleted " + deleted.length + " selected clip" + (deleted.length === 1 ? "" : "s") + ".", "info");
+      scheduleToastHide(3000);
+    }
+    if (failed.length) {
+      showToast(failed.length + " clip" + (failed.length === 1 ? "" : "s") + " could not be deleted.");
+      scheduleToastHide(TOAST_ERROR_MS);
+    }
+  }
+
+  if (bulkCompressBtn) {
+    bulkCompressBtn.addEventListener("click", () => {
+      if (compressAllRunning) {
+        compressAllAbort = true;
+        return;
+      }
+      const queue = selectedCompressCandidates();
+      if (!queue.length) return;
+      openSelectedCompressModal();
+    });
+  }
+  if (bulkUploadBtn) {
+    bulkUploadBtn.addEventListener("click", () => {
+      // in stop mode (scheduling, or the batch still uploading) the icon cancels the whole batch, same as the text button.
+      if (bulkUploadRunning || bulkUploadInFlight.size > 0) {
+        stopBulkUploads();
+        return;
+      }
+      const queue = selectedUploadCandidates();
+      if (!queue.length) return;
+      runSelectedUploads(queue);
+    });
+  }
+  if (bulkUploadStopBtn) {
+    bulkUploadStopBtn.addEventListener("click", () => {
+      if (bulkUploadStopBtn.hidden || bulkUploadStopBtn.disabled) return;
+      stopBulkUploads();
+    });
+  }
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener("click", () => {
+      if (!selectedClipNames.size) return;
+      if (!bulkDeleteArmed) {
+        bulkDeleteArmed = true;
+        bulkDeleteBtn.classList.add("is-armed");
+        bulkDeleteBtn.dataset.tooltip = "Confirm delete (" + selectedClipNames.size + ")";
+        bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
+        bulkDeleteArmTimer = setTimeout(resetBulkDeleteButton, 3000);
+        return;
+      }
+      resetBulkDeleteButton();
+      deleteSelectedClips();
+    });
+  }
+  if (bulkClearBtn) bulkClearBtn.addEventListener("click", clearClipSelection);
+
+  // bulk toolbar tooltip: one shared element, positioned by js so it clamps into the viewport (these buttons hug the window's left edge) with the arrow sliding to keep pointing at the button. replaces the css ::before/::after that could only ever be centered or left-anchored.
+  const bulkTip = document.createElement("div");
+  bulkTip.id = "bulk-tip";
+  bulkTip.setAttribute("role", "tooltip");
+  document.body.appendChild(bulkTip);
+  let bulkTipBtn = null;
+  function positionBulkTip() {
+    if (!bulkTipBtn) return;
+    const b = bulkTipBtn.getBoundingClientRect();
+    const tw = bulkTip.offsetWidth;
+    const th = bulkTip.offsetHeight;
+    const edge = 6;   // min gap from any window edge
+    const gap = 8;    // vertical gap between button and tip
+    const center = b.left + b.width / 2;
+    let left = Math.max(edge, Math.min(center - tw / 2, window.innerWidth - tw - edge));
+    let top = Math.max(edge, Math.min(b.bottom + gap, window.innerHeight - th - edge));
+    bulkTip.style.left = Math.round(left) + "px";
+    bulkTip.style.top = Math.round(top) + "px";
+    // arrow rides the button center, clamped so it stays on the tip body.
+    const arrow = Math.max(10, Math.min(center - left, tw - 10));
+    bulkTip.style.setProperty("--tip-arrow", Math.round(arrow) + "px");
+  }
+  function showBulkTip(btn) {
+    if (!btn || !btn.dataset.tooltip || btn.disabled) return;
+    bulkTipBtn = btn;
+    bulkTip.textContent = btn.dataset.tooltip;
+    bulkTip.classList.add("is-shown");
+    positionBulkTip();
+  }
+  function hideBulkTip() {
+    bulkTipBtn = null;
+    bulkTip.classList.remove("is-shown");
+  }
+  // these buttons rewrite data-tooltip in place (Upload -> "Stop uploads (3 / 8)" -> "Cancel 5 uploads") -- update the visible tip instead of making the user re-hover. only bail if the button actually left the layout.
+  const bulkTipObserver = new MutationObserver(() => {
+    if (!bulkTipBtn) return;
+    if (bulkTipBtn.offsetParent === null || !bulkTipBtn.dataset.tooltip) { hideBulkTip(); return; }
+    bulkTip.textContent = bulkTipBtn.dataset.tooltip;
+    positionBulkTip();
+  });
+  document.querySelectorAll(".bulk-icon-btn[data-tooltip]").forEach((btn) => {
+    btn.addEventListener("mouseenter", () => showBulkTip(btn));
+    btn.addEventListener("mouseleave", hideBulkTip);
+    bulkTipObserver.observe(btn, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
+  });
+  // hide on any click EXCEPT one on the tipped button itself -- clicking it is about to change its tooltip, and the observer will swap the text live.
+  document.addEventListener("mousedown", (e) => {
+    if (bulkTipBtn && bulkTipBtn.contains(e.target)) return;
+    hideBulkTip();
+  }, true);
+  window.addEventListener("resize", positionBulkTip);
+  window.addEventListener("scroll", hideBulkTip, true);
 
   // keep the buttons enabled/disabled state in sync with the current clip list every render.
   const _origRender = render;
   render = function (clips) {
     const r = _origRender.apply(this, arguments);
     refreshCompressAllButton();
+    refreshBulkSelectionUi();
     return r;
   };
 

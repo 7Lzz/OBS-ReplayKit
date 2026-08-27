@@ -34,9 +34,13 @@ namespace ReplayKitHelper
                 ["compressionMode"] = "balanced",
                 ["codecPreference"] = "auto",
                 ["replaySeconds"] = 90,
+                ["fps"] = 60,
+                ["fpsNumerator"] = 60,
+                ["fpsDenominator"] = 1,
                 ["clipDir"] = "",
                 ["clipKeybind"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" },
                 ["recordingKeybind"] = new JObject(),
+                ["openClipsKeybind"] = new JObject(),
                 ["overlayStyle"] = "input_overlay",
                 ["overlayOpacity"] = 100,
                 ["overlayScale"] = 100,
@@ -52,6 +56,7 @@ namespace ReplayKitHelper
                 ["recordingNotificationEnabled"] = true,
                 ["clipNotificationSeconds"] = 90,
                 ["trimPreciseDefault"] = false,
+                ["showCodecTags"] = false,
                 ["debugLoggingEnabled"] = false,
                 ["autoDeleteLogsOnLaunch"] = true,
                 ["autoUpdateEnabled"] = true,
@@ -182,6 +187,9 @@ namespace ReplayKitHelper
         private static JObject NormalizeRecordingKeybind(JToken value) =>
             NormalizeHotkeyCombo(value, new JObject(), "recording keybind");
 
+        private static JObject NormalizeOpenClipsKeybind(JToken value) =>
+            NormalizeHotkeyCombo(value, new JObject(), "open clips keybind");
+
         private static JArray NormalizeScreenshareGameOverrides(JToken value)
         {
             if (value == null || value.Type == JTokenType.Null) return new JArray();
@@ -258,9 +266,14 @@ namespace ReplayKitHelper
                 ["compressionMode"] = compression,
                 ["codecPreference"] = codecPreference,
                 ["replaySeconds"] = replaySeconds,
+                // Older builds allowed a single FPS value above the current 240 cap; clamp that legacy value during migration so it cannot block the settings page from loading.
+                ["fps"] = Math.Min(240, GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000)),
+                ["fpsNumerator"] = Math.Min(240, GetIntSetting(data, "fpsNumerator", GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000), 1, 1000)),
+                ["fpsDenominator"] = GetIntSetting(data, "fpsDenominator", defaults["fpsDenominator"].Value<int>(), 1, 1000),
                 ["clipDir"] = clipDir,
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
+                ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), new[] { "input_overlay", "bongo_cat", "off" }),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
@@ -276,6 +289,7 @@ namespace ReplayKitHelper
                 ["recordingNotificationEnabled"] = GetBoolSetting(data, "recordingNotificationEnabled", defaults["recordingNotificationEnabled"].Value<bool>()),
                 ["clipNotificationSeconds"] = GetIntSetting(data, "clipNotificationSeconds", replaySeconds, 1, 1200),
                 ["trimPreciseDefault"] = GetBoolSetting(data, "trimPreciseDefault", defaults["trimPreciseDefault"].Value<bool>()),
+                ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
                 ["debugLoggingEnabled"] = GetBoolSetting(data, "debugLoggingEnabled", defaults["debugLoggingEnabled"].Value<bool>()),
                 ["autoDeleteLogsOnLaunch"] = GetBoolSetting(data, "autoDeleteLogsOnLaunch", defaults["autoDeleteLogsOnLaunch"].Value<bool>()),
                 ["autoUpdateEnabled"] = GetBoolSetting(data, "autoUpdateEnabled", defaults["autoUpdateEnabled"].Value<bool>()),
@@ -457,6 +471,23 @@ namespace ReplayKitHelper
         }
 
         private static ObsWebSocketResult SetVideoSettingsLive(JObject preset) => ObsWebSocket.InvokeRequest("SetVideoSettings", preset["video"], 5000);
+
+        private static void SetFractionalFpsProfile(JObject preset, List<string> warnings)
+        {
+            int numerator = preset["video"]?["fpsNumerator"]?.Value<int>() ?? 0;
+            int denominator = preset["video"]?["fpsDenominator"]?.Value<int>() ?? 0;
+            if (numerator < 1 || denominator < 1) {
+                warnings.Add("OBS video settings were applied, but the fractional FPS value was invalid.");
+                return;
+            }
+            foreach (var update in new[] {
+                new[] { "FPSType", "2" }, new[] { "FPSNum", numerator.ToString() },
+                new[] { "FPSDen", denominator.ToString() },
+            }) {
+                var result = SetObsProfileParameterSafe("Video", update[0], update[1]);
+                if (!result.Ok) warnings.Add("OBS did not accept Video." + update[0] + ": " + result.Message);
+            }
+        }
 
         private static ObsWebSocketResult SetReplayBufferOutputLive(JObject settings, JObject preset)
         {
@@ -2610,25 +2641,31 @@ namespace ReplayKitHelper
                     new JArray("Video", "BaseCY", baseSize["height"].Value<int>().ToString()),
                     new JArray("Video", "OutputCX", output["width"].Value<int>().ToString()),
                     new JArray("Video", "OutputCY", output["height"].Value<int>().ToString()),
-                    new JArray("Video", "FPSCommon", fpsNumerator.ToString()),
+                    new JArray("Video", "FPSType", "2"),
+                    new JArray("Video", "FPSNum", fpsNumerator.ToString()),
+                    new JArray("Video", "FPSDen", fpsDenominator.ToString()),
                     new JArray("Video", "ScaleType", "lanczos")
                 ),
                 ["source"] = new JObject { ["width"] = sourceWidth, ["height"] = sourceHeight },
             };
         }
 
-        private static JObject GetPresetSpec(string name)
+        private static JObject GetPresetSpec(string name, int fpsNumerator, int fpsDenominator)
         {
             JObject videoSpec;
             int cqp;
             switch (name)
             {
-                case "performance": videoSpec = ResolvePresetVideoSpec(1280, 720, 30, 1); cqp = 26; break;
-                case "quality": videoSpec = ResolvePresetVideoSpec(1920, 1080, 60, 1); cqp = 20; break;
-                default: videoSpec = ResolvePresetVideoSpec(1920, 1080, 60, 1); cqp = 22; break;
+                case "performance": videoSpec = ResolvePresetVideoSpec(1280, 720, fpsNumerator, fpsDenominator); cqp = 26; break;
+                case "quality": videoSpec = ResolvePresetVideoSpec(1920, 1080, fpsNumerator, fpsDenominator); cqp = 20; break;
+                default: videoSpec = ResolvePresetVideoSpec(1920, 1080, fpsNumerator, fpsDenominator); cqp = 22; break;
             }
             return new JObject { ["cqp"] = cqp, ["video"] = videoSpec["video"], ["profile"] = videoSpec["profile"], ["source"] = videoSpec["source"] };
         }
+
+        private static JObject GetPresetSpec(string name, JObject settings) => GetPresetSpec(name,
+            settings?["fpsNumerator"]?.Value<int>() ?? settings?["fps"]?.Value<int>() ?? 60,
+            settings?["fpsDenominator"]?.Value<int>() ?? 1);
 
         // vendor/generation candidate table, effort tuning, and cqp->icq/crf conversion live in Encoder.PickEncoder
         // (copied from ReplayKitSetup/Encoder.cs -- see its header comment) so both agree on the same tuning
@@ -2981,7 +3018,7 @@ namespace ReplayKitHelper
             if (itemsResult["ok"]?.Value<bool>() != true)
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay size was saved, but OBS scene items could not be read: " + itemsResult["message"]) };
 
-            var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "");
+            var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
             double scaleRatio = nextScale / previousScale;
             var items = itemsResult["items"] as JArray;
             foreach (var name in GetOverlayScaleSceneItemNames(items, settings["overlayStyle"]?.Value<string>() ?? ""))
@@ -3059,7 +3096,7 @@ namespace ReplayKitHelper
                 var state = new JObject
                 {
                     ["settings"] = baselineSettings,
-                    ["preset"] = GetPresetSpec(baselineSettings["recordingPreset"]?.Value<string>() ?? ""),
+                    ["preset"] = GetPresetSpec(baselineSettings["recordingPreset"]?.Value<string>() ?? "", baselineSettings),
                     ["sceneName"] = "",
                     ["transforms"] = new JObject(),
                     ["opacityFilters"] = new JArray(),
@@ -3139,7 +3176,7 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(preview["sceneName"]?.Value<string>()))
                 return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
             double scaleRatio = nextScale / baseScale;
-            var preset = preview["preset"] as JObject ?? GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "");
+            var preset = preview["preset"] as JObject ?? GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
             var transforms = preview["transforms"] as JObject ?? new JObject();
             foreach (var prop in transforms.Properties().ToList())
             {
@@ -3363,7 +3400,11 @@ namespace ReplayKitHelper
                 if (applyVideoSettings)
                 {
                     var video = SetVideoSettingsLive(preset);
-                    if (video.Ok) applied.Add("OBS video format");
+                    if (video.Ok)
+                    {
+                        SetFractionalFpsProfile(preset, warnings);
+                        applied.Add("OBS video format");
+                    }
                     else warnings.Add("OBS video settings were saved, but live apply failed: " + video.Message);
                 }
 
@@ -4111,7 +4152,7 @@ namespace ReplayKitHelper
         {
             var warnings = new List<string>();
             var applied = new List<string>();
-            var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "");
+            var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
             var encoder = GetEncoderSpec(settings, preset);
             string encoderWarning = encoder["warning"]?.Value<string>();
             if (!string.IsNullOrEmpty(encoderWarning)) warnings.Add(encoderWarning);
@@ -4298,15 +4339,19 @@ namespace ReplayKitHelper
 
         private static bool TestRestartRequired(JObject previous, JObject settings)
         {
-            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference" })
+            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator" })
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
             return previous["overlayStyle"]?.ToString() != settings["overlayStyle"]?.ToString();
         }
 
-        private static bool TestRuntimeVideoSettingsChanged(JObject previous, JObject settings) =>
-            previous["recordingPreset"]?.ToString() != settings["recordingPreset"]?.ToString();
+        private static bool TestRuntimeVideoSettingsChanged(JObject previous, JObject settings)
+        {
+            return previous["recordingPreset"]?.ToString() != settings["recordingPreset"]?.ToString() ||
+                previous["fpsNumerator"]?.ToString() != settings["fpsNumerator"]?.ToString() ||
+                previous["fpsDenominator"]?.ToString() != settings["fpsDenominator"]?.ToString();
+        }
 
         private static bool TestReplayBufferOutputChanged(JObject previous, JObject settings)
         {
@@ -4461,7 +4506,7 @@ namespace ReplayKitHelper
             if (TestScreenshareCaptureOnlyRequest(incoming))
             {
                 WriteSettings(settings);
-                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "");
+                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
                 var live = ApplyScreenshareCaptureLive(settings, preset);
                 return new JObject
                 {
@@ -4527,7 +4572,7 @@ namespace ReplayKitHelper
             }
             if (TestOnlyScreenshareCaptureChanged(previous, settings))
             {
-                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "");
+                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
                 var live = ApplyScreenshareCaptureLive(settings, preset);
                 return new JObject
                 {

@@ -20,7 +20,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["required"] = true, ["path"] = authJar };
         }
 
-        public static JObject StartStreamableUpload(Clips.SafeClipPath selected, string uploadPath = "", string displayName = "")
+        public static JObject StartStreamableUpload(Clips.SafeClipPath selected, string uploadPath = "", string displayName = "", bool quiet = false)
         {
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
@@ -79,14 +79,14 @@ namespace ReplayKitHelper
 
             Log.Write("Start-StreamableUpload spawning in-process upload task", "upload", requestId);
 
-            var task = Task.Run(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100));
-            task.ContinueWith(t => HandleUploadCompletion(t, requestId, clipName));
+            var task = Task.Run(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet));
+            task.ContinueWith(t => HandleUploadCompletion(t, requestId, clipName, quiet));
 
             return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
         }
 
         // runs once an upload task finishes -- whether it was a plain upload or the tail of a compress-then-upload chain (Compression.StartCompressedStreamableUpload calls this too, since the ps original routed both thru this same Start-UploadResultWatcher). on success, records the clips_db entry (url + initial "still processing" transcode state), shows a toast, and starts the background transcode poller; on failure or cancellation, resolves the job to error/idle. mirrors Start-UploadResultWatcher, minus the process-wait + status-file read (UploadWorker.Run reports thru UploadState.SetUploadState directly and returns its outcome, so theres nothing left to poll for).
-        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName)
+        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, bool quiet = false)
         {
             bool workerThrew = task.IsFaulted;
             string workerThrewMessage = workerThrew ? (task.Exception?.InnerException?.Message ?? task.Exception?.Message) : null;
@@ -128,7 +128,8 @@ namespace ReplayKitHelper
 
             UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100, tempPath: "");
 
-            ShowUploadToast(result);
+            // quiet = part of a bulk selection; the dock shows per-card "Copy Link" + a summary toast, so skip the windows balloon.
+            if (!quiet) ShowUploadToast(result);
 
             if (!string.IsNullOrEmpty(shortcode)) StartTranscodePoll(shortcode, clipName);
         }

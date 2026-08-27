@@ -788,7 +788,8 @@ namespace ReplayKitHelper
                 if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
                 try
                 {
-                    var result = Upload.StartStreamableUpload(selected);
+                    // bulk uploads pass quiet=1 -- one balloon toast + one clipboard write per clip is noise when a whole selection goes at once.
+                    var result = Upload.StartStreamableUpload(selected, quiet: QFlag("quiet"));
                     Log.Write("/upload(" + selected.Name + ") -> " + result.ToString(Newtonsoft.Json.Formatting.None));
                     int code = result["ok"]?.Value<bool>() == true ? 200 : result["busy"]?.Value<bool>() == true ? 409 : 400;
                     HttpResponse.SendJson(stream, code, result);

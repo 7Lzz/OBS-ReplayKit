@@ -811,6 +811,13 @@
           </div>
         </div>
         <div class="form-row">
+          <div class="label">Frame Rate</div>
+          <div class="field-wrap is-stacked">
+            <input class="text-input" id="fps" type="number" min="1" max="240" step="1" inputmode="numeric" autocomplete="off" aria-describedby="fpsWarning">
+            <div class="hint" id="fpsWarning" hidden>Above 60 FPS uses more disk space and GPU resources.</div>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="label">Recording Path</div>
           <div class="field-wrap">
             <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Pictures\Videos">
@@ -921,9 +928,6 @@
             <button class="icon-btn" type="button" id="addHotkey" title="One ReplayKit hotkey is supported" disabled>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
             </button>
-            <button class="icon-btn" type="button" id="trashHotkey" title="Clear hotkey">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5.984375 0.00390625 l -1 0.99609375 l -3 0.003906 s -1 0 -1 1 l 0.015625 0.996094 h 15 l -0.015625 -0.996094 c 0 -1 -1 -1 -1 -1 l -3 -0.003906 l -1 -0.99609375 z m -3.984375 3.99609375 v 9 c 0 3 3 3 3 3 h 7 c 3 0 3 -3 3 -3 v -9 h -2 v 9 c 0 1 -1 1 -1 1 h -7 s -1 0 -1 -1 v -9 z m 4 1 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 0 0"/></svg>
-            </button>
           </div>
         </div>
         <div class="hotkey-section">Recording</div>
@@ -940,8 +944,21 @@
             <button class="icon-btn" type="button" id="addRecordingHotkey" title="One ReplayKit recording hotkey is supported" disabled>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
             </button>
-            <button class="icon-btn" type="button" id="trashRecordingHotkey" title="Clear hotkey">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5.984375 0.00390625 l -1 0.99609375 l -3 0.003906 s -1 0 -1 1 l 0.015625 0.996094 h 15 l -0.015625 -0.996094 c 0 -1 -1 -1 -1 -1 l -3 -0.003906 l -1 -0.99609375 z m -3.984375 3.99609375 v 9 c 0 3 3 3 3 3 h 7 c 3 0 3 -3 3 -3 v -9 h -2 v 9 c 0 1 -1 1 -1 1 h -7 s -1 0 -1 -1 v -9 z m 4 1 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 2 0 v 7 h 1 v -7 z m 0 0"/></svg>
+          </div>
+        </div>
+        <div class="hotkey-section">Clips</div>
+        <div class="hotkey-row" data-hotkey-name="Open Clips">
+          <div class="label">Open Clips</div>
+          <div class="hotkey-input" id="openClipsKeybind" tabindex="0" role="textbox" aria-label="Open clips hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" id="resetOpenClipsHotkey" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="clearOpenClipsHotkey" title="Clear hotkey">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 6 2 l -6 6 l 6 6 h 9.035156 c 0.53125 -0.023438 0.964844 -0.492188 0.964844 -1 v -10 c 0 -0.53125 -0.34375 -1 -1.007812 -1 z m 1 3 h 1 h 0.03125 c 0.253906 0.011719 0.511719 0.128906 0.6875 0.3125 l 1.28125 1.28125 l 1.3125 -1.28125 c 0.265625 -0.230469 0.445312 -0.304688 0.6875 -0.3125 h 1 v 1 c 0 0.285156 -0.035156 0.550781 -0.25 0.75 l -1.28125 1.28125 l 1.25 1.25 c 0.1875 0.1875 0.28125 0.453125 0.28125 0.71875 v 1 h -1 c -0.265625 0 -0.53125 -0.09375 -0.71875 -0.28125 l -1.28125 -1.28125 l -1.28125 1.28125 c -0.1875 0.1875 -0.453125 0.28125 -0.71875 0.28125 h-1 v-1 c0-0.265625 0.09375-0.53125 0.28125-0.71875l1.28125-1.25-1.28125-1.28125c-0.210938-0.195312-0.304688-0.46875-0.28125-0.75z m0 0"/></svg>
+            </button>
+            <button class="icon-btn" type="button" id="addOpenClipsHotkey" title="One ReplayKit clips hotkey is supported" disabled>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 7 1 v 6 h -6 v 2 h 6 v 6 h 2 v -6 h 6 v -2 h -6 v -6 z m 0 0"/></svg>
             </button>
           </div>
         </div>
@@ -1038,6 +1055,13 @@
           <label class="check-row">
             <input type="checkbox" id="trimPreciseDefault">
             <span>Enable frame-accurate trim by default</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="showCodecTags">
+            <span>Show codec tags on clips</span>
           </label>
         </div>
         <div class="form-row tight">
@@ -1197,6 +1221,8 @@
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
   const REPLAY_SECONDS_MIN = 5;
   const REPLAY_SECONDS_MAX = 1200;
+  const FPS_MIN = 1;
+  const FPS_MAX = 240;
   const DEFAULT_CLIP_KEYBIND = { shift:true, key:"OBS_KEY_BACKSLASH" };
   const DEFAULT_RECORDING_KEYBIND = {};
   const state = {};
@@ -1210,7 +1236,7 @@
     quality:"smaller_files",
   };
   // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference"]);
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
@@ -1244,9 +1270,12 @@
     overlayColorAdd: document.getElementById("overlayColorAdd"),
     overlayColorAddValue: document.getElementById("overlayColorAddValue"),
     replaySeconds: document.getElementById("replaySeconds"),
+    fps: document.getElementById("fps"),
+    fpsWarning: document.getElementById("fpsWarning"),
     clipDir: document.getElementById("clipDir"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
+    openClipsKeybind: document.getElementById("openClipsKeybind"),
     obsStartupEnabled: document.getElementById("obsStartupEnabled"),
     runObsAsAdmin: document.getElementById("runObsAsAdmin"),
     disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
@@ -1262,6 +1291,7 @@
     motionBlurStrength: document.getElementById("motionBlurStrength"),
     motionBlurStrengthValue: document.getElementById("motionBlurStrengthValue"),
     trimPreciseDefault: document.getElementById("trimPreciseDefault"),
+    showCodecTags: document.getElementById("showCodecTags"),
     debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
     autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
     autoDeleteLogsOnLaunchRow: document.getElementById("autoDeleteLogsOnLaunchRow"),
@@ -1674,6 +1704,7 @@
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
+    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:{} },
   };
 
   function clearHotkeyCaptureTimer() {
@@ -2058,6 +2089,18 @@
     els.autoDeleteLogsOnLaunch.disabled = !enabled;
   }
 
+  function clampFps(value) {
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n)) return 60;
+    return Math.max(FPS_MIN, Math.min(FPS_MAX, n));
+  }
+
+  function syncFpsControl(value) {
+    const fps = clampFps(value);
+    els.fps.value = String(fps);
+    els.fpsWarning.hidden = fps <= 60;
+  }
+
   function syncUi() {
     state.shareMode = "projector";
     state.discord_output_mode = "projector";
@@ -2080,6 +2123,7 @@
     syncColorControl(els.overlayColorMultiply, els.overlayColorMultiplyValue, state.overlayColorMultiply || "#ffffff", "#ffffff");
     syncColorControl(els.overlayColorAdd, els.overlayColorAddValue, state.overlayColorAdd || "#000000", "#000000");
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds || 90);
+    syncFpsControl(state.fpsNumerator ?? state.fps ?? 60);
     els.clipDir.value = state.clipDir || "";
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
@@ -2093,6 +2137,7 @@
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
+    els.showCodecTags.checked = !!state.showCodecTags;
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
     els.autoDeleteLogsOnLaunch.checked = state.autoDeleteLogsOnLaunch !== false;
     syncDebugLoggingFields();
@@ -2122,6 +2167,9 @@
     state.discord_projector_visible_pixels = 1;
     state.discord_projector_hide_taskbar = true;
     state.replaySeconds = readReplaySeconds();
+    state.fpsNumerator = clampFps(els.fps.value);
+    state.fpsDenominator = 1;
+    state.fps = state.fpsNumerator;
     state.clipNotificationSeconds = state.replaySeconds;
     state.clipDir = els.clipDir.value.trim();
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
@@ -2136,6 +2184,7 @@
     state.motionBlurEnabled = els.motionBlurEnabled.checked;
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
+    state.showCodecTags = els.showCodecTags.checked;
     state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
     state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
@@ -2213,7 +2262,7 @@
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
 
-  [els.replaySeconds, els.clipDir].forEach((input) => {
+  [els.replaySeconds, els.fps, els.clipDir].forEach((input) => {
     input.addEventListener("input", () => { readUi(); markDirty(); });
     input.addEventListener("change", () => { readUi(); syncUi(); });
   });
@@ -2339,7 +2388,15 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+  els.fps.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 1 : -1;
+    syncFpsControl(Number(els.fps.value) + step);
+    readUi();
+    markDirty();
+  }, { passive: false });
+
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => { readUi(); markDirty(); });
   });
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
@@ -2401,10 +2458,10 @@
   Object.keys(hotkeyFields).forEach(attachHotkeyField);
   document.getElementById("resetHotkey").addEventListener("click", () => resetHotkey("clipKeybind"));
   document.getElementById("clearHotkey").addEventListener("click", () => clearHotkey("clipKeybind"));
-  document.getElementById("trashHotkey").addEventListener("click", () => clearHotkey("clipKeybind"));
   document.getElementById("resetRecordingHotkey").addEventListener("click", () => resetHotkey("recordingKeybind"));
   document.getElementById("clearRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
-  document.getElementById("trashRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
+  document.getElementById("resetOpenClipsHotkey").addEventListener("click", () => resetHotkey("openClipsKeybind"));
+  document.getElementById("clearOpenClipsHotkey").addEventListener("click", () => clearHotkey("openClipsKeybind"));
   els.resizeGrip.addEventListener("pointerdown", beginResizeWindow);
 
   async function loadSettings() {

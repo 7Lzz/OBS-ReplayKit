@@ -4,6 +4,7 @@
 #include <obs-frontend-api.h>
 
 #include <QCoreApplication>
+#include <QAbstractNativeEventFilter>
 #include <QMenu>
 #include <QAction>
 #include <QSystemTrayIcon>
@@ -19,6 +20,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QEvent>
+#include <QCloseEvent>
 #include <QResizeEvent>
 #include <QMouseEvent>
 #include <QMessageBox>
@@ -38,10 +40,13 @@
 #include <ws2tcpip.h>
 #include <string>
 #include <cstring>
+#include <cstdlib>
 #include <thread>
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
+
+#include <windows.h>
 
 OBS_DECLARE_MODULE()
 
@@ -52,6 +57,12 @@ bool g_cefInitTried = false;
 QPointer<QWidget> g_clipsWindow;
 QPointer<QWidget> g_settingsWindow;
 QPointer<QWidget> g_prewarmWindow;
+constexpr int kOpenClipsHotkeyId = 0x524B;
+bool g_openClipsHotkeyRegistered = false;
+QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
+QPointer<QTimer> g_openClipsHotkeyTimer;
+std::string g_openClipsHotkeyBinding;
+bool g_openClipsHotkeyRequestInFlight = false;
 // ui-thread only flag guarding against a second click opening a redundant window while the first ones background check is still talking to the helper
 bool g_clipsCheckInFlight = false;
 bool g_settingsCheckInFlight = false;
@@ -249,6 +260,17 @@ std::string KeybindLabelFromSettingsJson(const std::string &settingsBody, const 
 	return label;
 }
 
+// CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore
+// that event after hiding the window so the browser stays usable when a hotkey reopens Clips immediately afterward.
+class ClipsWindow : public QWidget {
+protected:
+	void closeEvent(QCloseEvent *event) override
+	{
+		hide();
+		event->ignore();
+	}
+};
+
 // ui-thread only -- builds the actual window once we know theres no existing clips window to reuse and cef is already confirmed started via EnsureCefReadyBlocking
 void CreateClipsWindow()
 {
@@ -257,8 +279,10 @@ void CreateClipsWindow()
 		return;
 	}
 
-	QWidget *win = new QWidget(nullptr);
-	win->setAttribute(Qt::WA_DeleteOnClose);
+	QWidget *win = new ClipsWindow();
+	// Closing Clips only hides it. Keeping its CEF host alive avoids a deferred-delete race when a hotkey reopens it
+	// immediately after close, which could otherwise create a blank window or call Qt through a stale widget pointer.
+	win->setAttribute(Qt::WA_DeleteOnClose, false);
 	win->setWindowTitle("Clips");
 	win->resize(1280, 800);
 	win->setMinimumSize(850, 620);
@@ -356,6 +380,106 @@ void ShowClips()
 					CreateClipsWindow();
 			},
 			Qt::QueuedConnection);
+	}).detach();
+}
+
+void ToggleClips()
+{
+	if (g_clipsWindow) {
+		if (g_clipsWindow->isVisible()) {
+			g_clipsWindow->hide();
+			return;
+		}
+		g_clipsWindow->show();
+		g_clipsWindow->raise();
+		g_clipsWindow->activateWindow();
+		return;
+	}
+	ShowClips();
+}
+
+UINT OpenClipsVirtualKey(const std::string &obsKey)
+{
+	if (obsKey.size() == 9 && obsKey.rfind("OBS_KEY_", 0) == 0) {
+		char key = obsKey[8];
+		if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9'))
+			return (UINT)key;
+	}
+	if (obsKey.rfind("OBS_KEY_F", 0) == 0) {
+		int functionKey = std::atoi(obsKey.c_str() + 9);
+		if (functionKey >= 1 && functionKey <= 24)
+			return VK_F1 + functionKey - 1;
+	}
+
+	static const std::unordered_map<std::string, UINT> keys = {
+		{"OBS_KEY_BACKSLASH", VK_OEM_5}, {"OBS_KEY_SLASH", VK_OEM_2}, {"OBS_KEY_SPACE", VK_SPACE},
+		{"OBS_KEY_RETURN", VK_RETURN}, {"OBS_KEY_ESCAPE", VK_ESCAPE}, {"OBS_KEY_TAB", VK_TAB},
+		{"OBS_KEY_DELETE", VK_DELETE}, {"OBS_KEY_BACKSPACE", VK_BACK}, {"OBS_KEY_UP", VK_UP},
+		{"OBS_KEY_DOWN", VK_DOWN}, {"OBS_KEY_LEFT", VK_LEFT}, {"OBS_KEY_RIGHT", VK_RIGHT},
+		{"OBS_KEY_MINUS", VK_OEM_MINUS}, {"OBS_KEY_EQUAL", VK_OEM_PLUS}, {"OBS_KEY_BRACKETLEFT", VK_OEM_4},
+		{"OBS_KEY_BRACKETRIGHT", VK_OEM_6}, {"OBS_KEY_SEMICOLON", VK_OEM_1}, {"OBS_KEY_APOSTROPHE", VK_OEM_7},
+		{"OBS_KEY_COMMA", VK_OEM_COMMA}, {"OBS_KEY_PERIOD", VK_OEM_PERIOD}, {"OBS_KEY_QUOTELEFT", VK_OEM_3},
+	};
+	auto found = keys.find(obsKey);
+	return found == keys.end() ? 0 : found->second;
+}
+
+void RegisterOpenClipsHotkey(const std::string &settingsBody)
+{
+	std::string binding = ExtractJsonObjectField(settingsBody, "openClipsKeybind");
+	if (binding.empty() || binding == g_openClipsHotkeyBinding)
+		return;
+	g_openClipsHotkeyBinding = binding;
+
+	if (g_openClipsHotkeyRegistered) {
+		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
+		g_openClipsHotkeyRegistered = false;
+	}
+
+	std::string keyName = ExtractJsonStringField(binding, "key");
+	if (keyName.empty())
+		return;
+	UINT key = OpenClipsVirtualKey(keyName);
+	if (key == 0) {
+		blog(LOG_WARNING, "[replaykit-tray] Open Clips hotkey uses an unsupported key");
+		return;
+	}
+	UINT modifiers = MOD_NOREPEAT;
+	if (JsonBoolField(binding, "control", false)) modifiers |= MOD_CONTROL;
+	if (JsonBoolField(binding, "alt", false)) modifiers |= MOD_ALT;
+	if (JsonBoolField(binding, "shift", false)) modifiers |= MOD_SHIFT;
+	if (JsonBoolField(binding, "command", false)) modifiers |= MOD_WIN;
+	if (!RegisterHotKey(nullptr, kOpenClipsHotkeyId, modifiers, key)) {
+		blog(LOG_WARNING, "[replaykit-tray] Could not register Open Clips hotkey (error=%lu)", GetLastError());
+		return;
+	}
+	g_openClipsHotkeyRegistered = true;
+	blog(LOG_INFO, "[replaykit-tray] Open Clips hotkey registered");
+}
+
+class OpenClipsHotkeyFilter : public QAbstractNativeEventFilter {
+public:
+	bool nativeEventFilter(const QByteArray &, void *message, qintptr *) override
+	{
+		MSG *msg = static_cast<MSG *>(message);
+		if (!msg || msg->message != WM_HOTKEY || msg->wParam != kOpenClipsHotkeyId)
+			return false;
+		ToggleClips();
+		return true;
+	}
+};
+
+void LoadOpenClipsHotkey()
+{
+	if (g_openClipsHotkeyRequestInFlight)
+		return;
+	g_openClipsHotkeyRequestInFlight = true;
+	std::thread([]() {
+		std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 3000);
+		QMetaObject::invokeMethod(qApp, [settingsBody]() {
+			g_openClipsHotkeyRequestInFlight = false;
+			RegisterOpenClipsHotkey(settingsBody);
+		}, Qt::QueuedConnection);
 	}).detach();
 }
 
@@ -502,7 +626,7 @@ void ToggleReplayBuffer()
 
 void PinMenuAboveTaskbar(QMenu *menu);
 
-enum class TrayRowKind { Recording, ReplayBuffer };
+enum class TrayRowKind { Clips, Recording, ReplayBuffer };
 
 // custom row (name + a darker rounded keybind chip) for record/clipping -- a first attempt at this was reverted because it never aligned with native items no matter the margin (19/9/2/5/15px all tried), and research confirmed why: this menu used to render through windows own native platform menu bridge, which has no real support for QWidgetAction at all. OnFrontendEvent now clears setContextMenu() and pops this same trayMenu manually instead (see the tray->setContextMenu(nullptr) block), so this widget goes through qts own menu layout/paint path like everything else in it -- alignment is a fresh, real question now, not a fight against a bridge that was never going to cooperate. click handling stays debounced across both plausible delivery paths (the widgets own mouseReleaseEvent and the wrapping actions triggered()) since its still not certain in advance which one fires in a popped-not-native menu either.
 class TrayActionRow : public QWidget {
@@ -554,7 +678,9 @@ public:
 		if (m_lastTrigger.isValid() && m_lastTrigger.elapsed() < 250)
 			return;
 		m_lastTrigger.start();
-		if (m_kind == TrayRowKind::Recording)
+		if (m_kind == TrayRowKind::Clips)
+			ShowClips();
+		else if (m_kind == TrayRowKind::Recording)
 			ToggleRecording();
 		else
 			ToggleReplayBuffer();
@@ -578,6 +704,7 @@ private:
 
 QPointer<TrayActionRow> g_recordRow;
 QPointer<TrayActionRow> g_replayBufferRow;
+QPointer<TrayActionRow> g_clipsRow;
 
 void RefreshActionRowText()
 {
@@ -591,14 +718,17 @@ void RefreshActionRowText()
 void RefreshDynamicMenuState()
 {
 	RefreshActionRowText();
-	if (g_recordRow || g_replayBufferRow) {
+	if (g_clipsRow || g_recordRow || g_replayBufferRow) {
 		std::thread([]() {
 			std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 500);
+			std::string clipsLabel = KeybindLabelFromSettingsJson(settingsBody, "openClipsKeybind");
 			std::string clipLabel = KeybindLabelFromSettingsJson(settingsBody, "clipKeybind");
 			std::string recordingLabel = KeybindLabelFromSettingsJson(settingsBody, "recordingKeybind");
 			QMetaObject::invokeMethod(
 				qApp,
-				[clipLabel, recordingLabel]() {
+				[clipsLabel, clipLabel, recordingLabel]() {
+					if (g_clipsRow)
+						g_clipsRow->SetKeybindLabel(clipsLabel);
 					if (g_replayBufferRow)
 						g_replayBufferRow->SetKeybindLabel(clipLabel);
 					if (g_recordRow)
@@ -700,6 +830,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
 		if (g_projectorPublishTimer)
 			g_projectorPublishTimer->stop();
+		if (g_openClipsHotkeyTimer)
+			g_openClipsHotkeyTimer->stop();
 		CloseCefWidgetsBeforeShutdown();
 		return;
 	}
@@ -709,6 +841,10 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 	PrewarmCefBrowser();
 	PublishMainWindow();
+	g_openClipsHotkeyTimer = new QTimer(qApp);
+	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() { LoadOpenClipsHotkey(); });
+	g_openClipsHotkeyTimer->start(1000);
+	LoadOpenClipsHotkey();
 
 	// 250ms matches the replaykit helpers own poll cadence when its waiting for a projector to appear -- no benefit publishing faster than the one consumer of this file actually checks it.
 	g_projectorPublishTimer = new QTimer(qApp);
@@ -733,8 +869,16 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	new TrayMenuGuard(trayMenu);
 
 	// obs builds this menu once in SystemTrayInit() and never rebuilds the top level (only the projector submenus contents refresh per click), so anything hidden below stays hidden without needing to be redone on every open
-	QAction *viewClips = new QAction(QObject::tr("View Clips"), trayMenu);
-	QObject::connect(viewClips, &QAction::triggered, trayMenu, []() { ShowClips(); });
+	// View Clips uses the same custom row as recording/clipping so its current ReplayKit binding is visible in the tray.
+	auto *clipsRow = new TrayActionRow(TrayRowKind::Clips, trayMenu);
+	auto *clipsRowAction = new QWidgetAction(trayMenu);
+	clipsRowAction->setDefaultWidget(clipsRow);
+	QObject::connect(clipsRowAction, &QAction::triggered, trayMenu, [clipsRow]() {
+		if (clipsRow)
+			clipsRow->ProxyTrigger();
+	});
+	clipsRow->nameLabel->setText(QObject::tr("View Clips"));
+	g_clipsRow = clipsRow;
 
 	QAction *sharePreview = new QAction(QObject::tr("Share Preview"), trayMenu);
 	sharePreview->setCheckable(true);
@@ -759,7 +903,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	// lands right after "hide", before obss first separator, so it reads as part of the window-visibility group instead of mixed into streaming/recording actions
 	QList<QAction *> actions = trayMenu->actions();
 	QAction *before = actions.size() > 1 ? actions.at(1) : nullptr;
-	trayMenu->insertAction(before, viewClips);
+	trayMenu->insertAction(before, clipsRowAction);
 	trayMenu->insertAction(before, sharePreview);
 	trayMenu->insertAction(before, customSettings);
 
@@ -852,8 +996,21 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
+	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
+	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
 	return true;
 }
 
-void obs_module_unload(void) {}
+void obs_module_unload(void)
+{
+	if (g_openClipsHotkeyTimer)
+		g_openClipsHotkeyTimer->stop();
+	if (g_openClipsHotkeyRegistered)
+		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
+	if (g_openClipsHotkeyFilter) {
+		qApp->removeNativeEventFilter(g_openClipsHotkeyFilter);
+		delete g_openClipsHotkeyFilter;
+		g_openClipsHotkeyFilter = nullptr;
+	}
+}
