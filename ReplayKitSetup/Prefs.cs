@@ -106,8 +106,8 @@ namespace ReplayKitSetup
         public const bool DEFAULT_CLIP_NOTIFICATION = true;
         public const bool DEFAULT_RECORDING_NOTIFICATION = true;
         public const bool DEFAULT_TRIM_PRECISE = false;
-        public const int DEFAULT_CLIP_SOUND_VOLUME = 100;
-        public const int DEFAULT_RECORDING_SOUND_VOLUME = 100;
+        public const int DEFAULT_CLIP_SOUND_VOLUME = 25;
+        public const int DEFAULT_RECORDING_SOUND_VOLUME = 25;
         public const string DEFAULT_SHARE_MODE = "projector";
         public static readonly string[] ALLOWED_SHARE_MODES = { "projector", "virtual_camera_legacy", "vcam", "screenshare" };
         public const bool DEFAULT_DISCORD_SCREENSHARE_ENABLED = true;

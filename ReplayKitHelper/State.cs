@@ -258,6 +258,19 @@ namespace ReplayKitHelper
         // null means "no open attempt pending"; non-null (even an empty list) is the hwnd snapshot taken before the current pending OpenVideoMixProjector call, reused across retries so a slow-to-appear window isnt wrongly read as pre-existing.
         public List<long> ReplaykitDiscordProjectorPendingBaseline;
 
+        // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs
+        // cycle. concurrent obs_reset_video calls deadlock obs's video graph -- 2026-08-28 a user hard-froze obs by
+        // rapidly re-applying the downscale resolution.
+        public readonly object VideoApplyLock = new object();
+        public DateTime LastVideoApplyDoneUtc = DateTime.MinValue;
+
+        // -- IpcLock -- streamed in from the native plugin (replaykit.cpp) over the OBSReplayKitIpc named pipe, replacing the old scratch-file handoff.
+        public readonly object IpcLock = new object();
+        public bool IpcClientConnected;
+        public long ObsMainWindowHwnd;           // 0 until the plugin sends MAINWIN
+        public List<long> ProjectorHwnds;        // null = pipe down / no snapshot yet; non-null (even empty) = authoritative
+        public DateTime ProjectorHwndsAtUtc;
+
         // -- ObsWebSocketLock --
         public readonly object ObsWebSocketLock = new object();
         public ClientWebSocket ObsWebSocket;

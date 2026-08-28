@@ -337,31 +337,17 @@ namespace ReplayKitHelper
             return hwnd;
         }
 
-        private static readonly string ProjectorHandoffPath = Path.Combine(Constants.SCRATCH_DIR, "obsreplaykit_projector_windows.txt");
         private const int ProjectorHandoffMaxAgeSeconds = 2;
 
-        // reads the plugins (replaykit.cpp) published list of hwnds obs itself has marked with isOBSProjectorWindow -- the actual authoritative signal obs uses internally, republished every 250ms via an atomic write so this never sees a half-written file. returns null (not an empty list) when the file is missing or older than a couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the tray plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back accordingly -- an empty list here would silently collapse those two very different situations into one.
+        // the plugin (replaykit.cpp) streams the hwnds obs itself marked with isOBSProjectorWindow over the OBSReplayKitIpc pipe every 250ms -- the actual authoritative signal obs uses internally. PipeClient caches the latest snapshot in Server.State. returns null (not an empty list) when the pipe isnt connected or no snapshot has landed in the last couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back to the window-heuristic scan -- an empty list here would silently collapse those two very different situations into one.
         private static List<long> GetProjectorHwndsFromTrayPlugin()
         {
-            FileInfo info;
-            try
+            lock (Server.State.IpcLock)
             {
-                info = new FileInfo(ProjectorHandoffPath);
-                if (!info.Exists) return null;
+                if (!Server.State.IpcClientConnected || Server.State.ProjectorHwnds == null) return null;
+                if ((DateTime.UtcNow - Server.State.ProjectorHwndsAtUtc).TotalSeconds > ProjectorHandoffMaxAgeSeconds) return null;
+                return new List<long>(Server.State.ProjectorHwnds);
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
-            if ((DateTime.UtcNow - info.LastWriteTimeUtc).TotalSeconds > ProjectorHandoffMaxAgeSeconds) return null;
-
-            var hwnds = new List<long>();
-            try
-            {
-                foreach (var line in File.ReadAllLines(ProjectorHandoffPath))
-                {
-                    if (long.TryParse(line.Trim(), out long n) && n != 0) hwnds.Add(n);
-                }
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
-            return hwnds;
         }
 
         // the tray-plugin signal above is authoritative when available -- prefer it. FindAllObsWindows (window class + no-owner heuristic) is the fallback for an older bundle without the tray plugin update, or the brief window before the tray plugins first publish after obs startup.

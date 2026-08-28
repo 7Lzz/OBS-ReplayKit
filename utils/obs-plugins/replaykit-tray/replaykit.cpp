@@ -31,11 +31,8 @@
 #include <QScreen>
 #include <QWindow>
 #include <QCursor>
-#include <QSaveFile>
-#include <QFile>
-#include <QFileInfo>
-#include <QDateTime>
-#include <QTextStream>
+#include <QSettings>
+#include <QMoveEvent>
 
 #include "browser-panel.hpp"
 
@@ -46,6 +43,9 @@
 #include <cstdlib>
 #include <cstdio>
 #include <thread>
+#include <atomic>
+#include <mutex>
+#include <chrono>
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
@@ -66,17 +66,31 @@ constexpr int kOpenClipsHotkeyId = 0x524B;
 bool g_openClipsHotkeyRegistered = false;
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
 QPointer<QTimer> g_openClipsHotkeyTimer;
-QPointer<QTimer> g_openClipsCommandTimer;
 std::string g_openClipsHotkeyBinding;
 bool g_openClipsHotkeyRequestInFlight = false;
-std::string g_openClipsCommandToken;
 
 // close-to-tray: when true, the OBS window's X hides to tray instead of quitting. polled from /settings on
-// the same 1s timer as the open-clips hotkey. real quits/restarts (tray Exit, restart routes) drop the
-// obs-allow-close marker just before posting WM_CLOSE so the filter lets those through untouched.
+// the same 1s timer as the open-clips hotkey. real quits/restarts (tray Exit, restart routes) send ALLOWCLOSE
+// over the ipc pipe just before posting WM_CLOSE so the filter lets those through untouched.
 bool g_closeToTray = true;
 QPointer<QWidget> g_mainWindow;
 QPointer<QObject> g_mainWindowCloseFilter;
+
+// ipc pipe: this plugin is the server, the helper connects as a client and reconnects on its own -- replaces the
+// old scratch-file handoff. the gui thread fills g_mainWinValue / g_projectorCsv; the pipe thread forwards those
+// to the helper and applies inbound OPENCLIPS / ALLOWCLOSE.
+constexpr const wchar_t *kIpcPipeName = L"\\\\.\\pipe\\OBSReplayKitIpc";
+std::thread g_pipeThread;
+std::atomic<bool> g_pipeStop{false};
+std::atomic<quintptr> g_mainWinValue{0};
+std::atomic<unsigned long long> g_allowCloseUntilMs{0};
+std::atomic<bool> g_pipeSendAllowCloseAck{false};
+std::mutex g_projectorCsvMutex;
+std::string g_projectorCsv;
+bool g_projectorCsvReady = false;
+// GetTickCount64() of the last PublishProjectorWindows run -- the pipe thread stops forwarding PROJECTORS if this
+// goes stale (obs gui thread stalled), so the helper ages its snapshot out and falls back, same as the old file mtime.
+unsigned long long g_projectorCsvAtMs = 0;
 HMODULE g_replayKitModule = nullptr;
 HANDLE g_nativeCrashLog = INVALID_HANDLE_VALUE;
 PVOID g_nativeCrashHandler = nullptr;
@@ -278,14 +292,84 @@ std::string KeybindLabelFromSettingsJson(const std::string &settingsBody, const 
 	return label;
 }
 
+// remembers the OBS main window + Clips window position/size across sessions, since obs's own geometry save is
+// unreliable here (force-kill restarts skip it, and .NET's window heuristics can grab the wrong window). one ini
+// in the replaykit config dir; Qt's saveGeometry/restoreGeometry handle dpi, maximized state, and multi-monitor,
+// and restoreGeometry refuses a rect that would land fully off-screen.
+QString WindowStateIniPath()
+{
+	QString dir = qEnvironmentVariable("APPDATA") + "/obs-studio/obs-replayKit";
+	QDir().mkpath(dir);
+	return dir + "/window_state.ini";
+}
+
+void SaveWindowGeometry(const QString &key, QWidget *w)
+{
+	if (!w)
+		return;
+	QSettings s(WindowStateIniPath(), QSettings::IniFormat);
+	s.setValue(key, w->saveGeometry());
+}
+
+void RestoreWindowGeometry(const QString &key, QWidget *w)
+{
+	if (!w)
+		return;
+	QSettings s(WindowStateIniPath(), QSettings::IniFormat);
+	QByteArray geo = s.value(key).toByteArray();
+	if (!geo.isEmpty())
+		w->restoreGeometry(geo);
+}
+
+QPointer<QTimer> g_clipsGeoSaveTimer;
+QPointer<QTimer> g_obsGeoSaveTimer;
+
+// coalesce the flood of move/resize events into one write a little after motion stops.
+void ScheduleClipsGeometrySave()
+{
+	if (!g_clipsWindow)
+		return;
+	if (!g_clipsGeoSaveTimer) {
+		g_clipsGeoSaveTimer = new QTimer(qApp);
+		g_clipsGeoSaveTimer->setSingleShot(true);
+		QObject::connect(g_clipsGeoSaveTimer, &QTimer::timeout, qApp,
+				 []() { SaveWindowGeometry("clipsWindow", g_clipsWindow); });
+	}
+	g_clipsGeoSaveTimer->start(400);
+}
+
+void ScheduleObsMainGeometrySave()
+{
+	if (!g_mainWindow)
+		return;
+	if (!g_obsGeoSaveTimer) {
+		g_obsGeoSaveTimer = new QTimer(qApp);
+		g_obsGeoSaveTimer->setSingleShot(true);
+		QObject::connect(g_obsGeoSaveTimer, &QTimer::timeout, qApp,
+				 []() { SaveWindowGeometry("obsMainWindow", g_mainWindow); });
+	}
+	g_obsGeoSaveTimer->start(600);
+}
+
 // CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore
 // that event after hiding the window so the browser stays usable when a hotkey reopens Clips immediately afterward.
 class ClipsWindow : public QWidget {
 protected:
 	void closeEvent(QCloseEvent *event) override
 	{
+		SaveWindowGeometry("clipsWindow", this);
 		hide();
 		event->ignore();
+	}
+	void moveEvent(QMoveEvent *event) override
+	{
+		QWidget::moveEvent(event);
+		ScheduleClipsGeometrySave();
+	}
+	void resizeEvent(QResizeEvent *event) override
+	{
+		QWidget::resizeEvent(event);
+		ScheduleClipsGeometrySave();
 	}
 };
 
@@ -311,11 +395,14 @@ void CreateClipsWindow()
 	QCefWidget *browser = g_cef->create_widget(win, "http://127.0.0.1:8767/clips-view", nullptr);
 	layout->addWidget(browser);
 	g_clipsBrowser = browser;
+	g_clipsWindow = win;
+
+	// restore the remembered position/size before the first show so it doesnt flash at the default spot.
+	RestoreWindowGeometry("clipsWindow", win);
 
 	win->show();
 	win->raise();
 	win->activateWindow();
-	g_clipsWindow = win;
 }
 
 // same shape as CreateClipsWindow -- title matches settings.htmls <title> and the /close-window whitelist, size matches the controls_app.html popup so it looks the same either way its opened
@@ -474,6 +561,7 @@ void ToggleClips()
 {
 	if (g_clipsWindow) {
 		if (g_clipsWindow->isVisible()) {
+			SaveWindowGeometry("clipsWindow", g_clipsWindow);
 			g_clipsWindow->hide();
 			return;
 		}
@@ -571,25 +659,6 @@ void LoadOpenClipsHotkey()
 			RegisterOpenClipsHotkey(settingsBody);
 		}, Qt::QueuedConnection);
 	}).detach();
-}
-
-QString ProjectorHandoffDir();
-
-// seedOnly on the first call (at FINISHED_LOADING): the command file survives an obs restart, so a token left
-// over from a previous session must be adopted silently -- otherwise every fresh obs launch would re-open the
-// clips window for a "View Clips" click that already happened in the last session.
-void PollOpenClipsCommand(bool seedOnly = false)
-{
-	QFile commandFile(ProjectorHandoffDir() + "/open_clips.command");
-	if (!commandFile.open(QIODevice::ReadOnly | QIODevice::Text))
-		return;
-	std::string token = commandFile.readAll().trimmed().toStdString();
-	if (token.empty() || token == g_openClipsCommandToken)
-		return;
-	g_openClipsCommandToken = token;
-	if (seedOnly)
-		return;
-	ShowClips();
 }
 
 // posts to the same /share-preview route the dock uses so the projector/audio-monitoring logic stays in one place -- fire and forget, since aboutToShow re-reads the real state next open so a failed toggle just looks unchanged
@@ -881,42 +950,19 @@ void PinMenuAboveTaskbar(QMenu *menu)
 	menu->move(targetX, targetY);
 }
 
-// obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 window enumeration, so the replaykit helper (a separate powershell process with no qt/obs-object access, only raw EnumWindows/GetClassName-style calls) has no way to read it directly -- this plugin does, since it runs inside obss own qt process. publishing the current set of hwnds carrying that property to a file lets the helper check the SAME authoritative signal obs uses internally instead of only inferring "looks like a projector" from window class + ownership heuristics, which turned out to have real false-positive risk (many of obss own dialogs -- NameDialog, the Scripts window, the auto-config wizard, etc. -- are independently-owned top-level windows too, just not projectors).
-QString ProjectorHandoffDir()
-{
-	return qEnvironmentVariable("TEMP") + "/ReplayKit/scratch";
-}
-
-QString ProjectorHandoffPath()
-{
-	return ProjectorHandoffDir() + "/obsreplaykit_projector_windows.txt";
-}
-
-QString MainWindowHandoffPath()
-{
-	return ProjectorHandoffDir() + "/obsreplaykit_main_window.txt";
-}
-
-// obs_frontend_get_main_window() is the only language-neutral way to identify obss real main window -- its title is a localized template ("<version> - profile: ... - scenes: ...") with no fixed substring a non-english build still renders, which is what broke the helpers old title-matching close. published once, not on the projector timer, since the handle never changes for the life of the process.
+// obs_frontend_get_main_window() is the only language-neutral way to identify obss real main window -- its title is a localized template ("<version> - profile: ... - scenes: ...") with no fixed substring a non-english build still renders, which is what broke the helpers old title-matching close. captured once, not on the projector timer, since the handle never changes for the life of the process; the pipe thread sends it to the helper on each (re)connect.
 void PublishMainWindow()
 {
 	QWidget *mainWindow = (QWidget *)obs_frontend_get_main_window();
 	if (!mainWindow)
 		return;
-
-	QDir().mkpath(ProjectorHandoffDir());
-	QSaveFile file(MainWindowHandoffPath());
-	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
-		return;
-	QTextStream out(&file);
-	out << QString::number((quintptr)mainWindow->winId());
-	file.commit();
+	g_mainWinValue.store((quintptr)mainWindow->winId());
 }
 
 // turns the OBS main window's close (X) into hide-to-tray while g_closeToTray is on. narrowly scoped to the
-// one QWidget (an app-wide filter caused a confirmed 2026-08-10 crash catching cef events mid-teardown). the
-// obs-allow-close marker, dropped by the helpers restart/exit routes right before they post WM_CLOSE, is the
-// escape hatch that keeps real quits + replaykit restarts working (obs still gets to save its geometry).
+// one QWidget (an app-wide filter caused a confirmed 2026-08-10 crash catching cef events mid-teardown). an
+// ALLOWCLOSE over the ipc pipe from the helpers restart/exit routes, right before they post WM_CLOSE, opens a
+// 60s window where the next close passes through so real quits + replaykit restarts still save geometry.
 class MainWindowCloseFilter : public QObject {
 public:
 	explicit MainWindowCloseFilter(QWidget *mw) : QObject(mw), m_mw(mw) {}
@@ -924,17 +970,26 @@ public:
 protected:
 	bool eventFilter(QObject *watched, QEvent *event) override
 	{
-		if (watched != m_mw || event->type() != QEvent::Close || !g_closeToTray)
+		if (watched != m_mw)
 			return false;
 
-		QFileInfo allow(ProjectorHandoffDir() + "/obs-allow-close");
-		if (allow.exists() && allow.lastModified().secsTo(QDateTime::currentDateTime()) < 60)
+		const QEvent::Type type = event->type();
+		if (type == QEvent::Move || type == QEvent::Resize) {
+			ScheduleObsMainGeometrySave();
+			return false; // observe only, never consume
+		}
+		if (type != QEvent::Close || !g_closeToTray)
+			return false;
+
+		if (GetTickCount64() < g_allowCloseUntilMs.load())
 			return false; // a real restart/exit is in progress -- let obs close and save geometry
 
 		QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
 		if (!tray || !tray->isVisible())
 			return false; // nothing to minimize into -- fall back to a normal close
 
+		// EXIT wont fire on a hide-to-tray, so capture position now.
+		SaveWindowGeometry("obsMainWindow", m_mw);
 		event->ignore();
 		if (m_mw)
 			m_mw->hide();
@@ -952,17 +1007,26 @@ void InstallMainWindowCloseFilter()
 	QWidget *mw = (QWidget *)obs_frontend_get_main_window();
 	if (!mw)
 		return;
-	// clear any obs-allow-close left behind by a previous session's restart so it can never leak into this one.
-	QFile::remove(ProjectorHandoffDir() + "/obs-allow-close");
+	// drop any ALLOWCLOSE window carried over from a previous session's restart so it can never leak into this one.
+	g_allowCloseUntilMs.store(0);
 	g_mainWindow = mw;
 	auto *filter = new MainWindowCloseFilter(mw);
 	mw->installEventFilter(filter);
 	g_mainWindowCloseFilter = filter;
+
+	// put the window back where it was last session. once here (obs has finished its own layout) and again shortly
+	// after, since qts platform code can still be repositioning the main window right after FINISHED_LOADING.
+	RestoreWindowGeometry("obsMainWindow", mw);
+	QTimer::singleShot(400, qApp, []() {
+		RestoreWindowGeometry("obsMainWindow", g_mainWindow);
+		// capture a baseline even if the user never moves the window this session.
+		ScheduleObsMainGeometrySave();
+	});
 }
 
 QTimer *g_projectorPublishTimer = nullptr;
 
-// QSaveFile writes to a temp file and atomically renames it into place on commit(), so a reader on the other process never sees a half-written file -- plain QFile writing in place could get caught mid-write by the helpers poll.
+// obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 enumeration, so the helper (a separate process with no qt/obs-object access) cant read it directly -- this plugin can, since it runs inside obss own qt process. this refreshes the hwnd list the pipe thread streams to the helper so it can check the SAME authoritative signal obs uses internally instead of inferring "looks like a projector" from window class + ownership heuristics, which had real false-positive risk (NameDialog, the Scripts window, the auto-config wizard are independently-owned top-level windows too). must run on the gui thread for topLevelWindows()/winId().
 void PublishProjectorWindows()
 {
 	QStringList hwnds;
@@ -970,15 +1034,136 @@ void PublishProjectorWindows()
 		if (w && w->property("isOBSProjectorWindow").toBool())
 			hwnds << QString::number((quintptr)w->winId());
 	}
+	std::string csv = hwnds.join(',').toStdString();
+	{
+		std::lock_guard<std::mutex> lock(g_projectorCsvMutex);
+		g_projectorCsv = csv;
+		g_projectorCsvReady = true;
+		g_projectorCsvAtMs = GetTickCount64();
+	}
+}
 
-	QDir().mkpath(ProjectorHandoffDir());
-	QSaveFile file(ProjectorHandoffPath());
-	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
-		return;
-	QTextStream out(&file);
-	for (const QString &h : hwnds)
-		out << h << '\n';
-	file.commit();
+// writes one newline-terminated line to the connected helper. false on any write failure so the caller drops the
+// connection and waits for a reconnect.
+bool PipeWriteLine(HANDLE pipe, const std::string &line)
+{
+	std::string framed = line;
+	framed.push_back('\n');
+	const char *p = framed.data();
+	size_t left = framed.size();
+	while (left > 0) {
+		DWORD written = 0;
+		if (!WriteFile(pipe, p, (DWORD)left, &written, nullptr) || written == 0)
+			return false;
+		p += written;
+		left -= written;
+	}
+	return true;
+}
+
+void PipeDispatchLine(const std::string &line)
+{
+	if (line == "OPENCLIPS") {
+		QMetaObject::invokeMethod(qApp, []() { ShowClips(); }, Qt::QueuedConnection);
+	} else if (line == "ALLOWCLOSE") {
+		// a real restart/exit is coming -- let the next WM_CLOSE through the close-to-tray filter for 60s, and
+		// ack so the helper knows the filter saw it before it posts the close.
+		g_allowCloseUntilMs.store(GetTickCount64() + 60000);
+		g_pipeSendAllowCloseAck.store(true);
+	}
+}
+
+// serves one connected helper until it disconnects or the plugin shuts down. non-blocking: PeekNamedPipe drains
+// inbound, small WriteFiles push outbound, a 40ms sleep paces the loop. MAINWIN goes once per connection,
+// PROJECTORS about every 250ms (the cadence the old file write used).
+void PipeServeClient(HANDLE pipe)
+{
+	bool mainWinSent = false;
+	auto lastProjectors = std::chrono::steady_clock::now() - std::chrono::milliseconds(250);
+	std::string inbound;
+
+	while (!g_pipeStop.load()) {
+		quintptr mw = g_mainWinValue.load();
+		if (!mainWinSent && mw != 0) {
+			if (!PipeWriteLine(pipe, "MAINWIN " + std::to_string((unsigned long long)mw)))
+				return;
+			mainWinSent = true;
+		}
+		if (g_pipeSendAllowCloseAck.exchange(false)) {
+			if (!PipeWriteLine(pipe, "ALLOWCLOSE_ACK"))
+				return;
+		}
+		auto now = std::chrono::steady_clock::now();
+		if (now - lastProjectors >= std::chrono::milliseconds(250)) {
+			lastProjectors = now;
+			std::string csv;
+			bool fresh;
+			{
+				std::lock_guard<std::mutex> lock(g_projectorCsvMutex);
+				csv = g_projectorCsv;
+				fresh = g_projectorCsvReady && GetTickCount64() - g_projectorCsvAtMs <= 2000;
+			}
+			if (fresh && !PipeWriteLine(pipe, "PROJECTORS " + csv))
+				return;
+		}
+
+		DWORD avail = 0;
+		if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &avail, nullptr))
+			return; // broken pipe
+		while (avail > 0) {
+			char buf[1024];
+			DWORD want = avail < sizeof(buf) ? avail : (DWORD)sizeof(buf);
+			DWORD got = 0;
+			if (!ReadFile(pipe, buf, want, &got, nullptr) || got == 0)
+				return;
+			inbound.append(buf, got);
+			avail -= got;
+		}
+		size_t nl;
+		while ((nl = inbound.find('\n')) != std::string::npos) {
+			std::string one = inbound.substr(0, nl);
+			if (!one.empty() && one.back() == '\r')
+				one.pop_back();
+			inbound.erase(0, nl + 1);
+			PipeDispatchLine(one);
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(40));
+	}
+}
+
+// the pipe server: one instance, recreated after every client disconnect so a helper hot-swap just reconnects.
+void PipeServerThread()
+{
+	while (!g_pipeStop.load()) {
+		HANDLE pipe = CreateNamedPipeW(kIpcPipeName, PIPE_ACCESS_DUPLEX,
+					       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 64 * 1024, 64 * 1024,
+					       0, nullptr);
+		if (pipe == INVALID_HANDLE_VALUE) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			continue;
+		}
+
+		BOOL connected = ConnectNamedPipe(pipe, nullptr);
+		if (!connected && GetLastError() == ERROR_PIPE_CONNECTED)
+			connected = TRUE;
+		// obs_module_unload pokes the pipe with a throwaway client to break this wait on shutdown.
+		if (g_pipeStop.load()) {
+			DisconnectNamedPipe(pipe);
+			CloseHandle(pipe);
+			break;
+		}
+		if (!connected) {
+			CloseHandle(pipe);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			continue;
+		}
+
+		PipeServeClient(pipe);
+
+		DisconnectNamedPipe(pipe);
+		CloseHandle(pipe);
+	}
 }
 
 void OnFrontendEvent(enum obs_frontend_event event, void *)
@@ -988,8 +1173,15 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 			g_projectorPublishTimer->stop();
 		if (g_openClipsHotkeyTimer)
 			g_openClipsHotkeyTimer->stop();
-		if (g_openClipsCommandTimer)
-			g_openClipsCommandTimer->stop();
+		if (g_clipsGeoSaveTimer)
+			g_clipsGeoSaveTimer->stop();
+		if (g_obsGeoSaveTimer)
+			g_obsGeoSaveTimer->stop();
+		// final geometry capture while the windows are still up and positioned (CloseCefWidgets deletes Clips next).
+		if (g_clipsWindow)
+			SaveWindowGeometry("clipsWindow", g_clipsWindow);
+		if (g_mainWindow)
+			SaveWindowGeometry("obsMainWindow", g_mainWindow);
 		CloseCefWidgetsBeforeShutdown();
 		return;
 	}
@@ -1000,20 +1192,12 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	PrewarmCefBrowser();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
-	// adopt any leftover open_clips.command token now so the 100ms poll below only reacts to a click made in THIS session.
-	PollOpenClipsCommand(true);
 	g_openClipsHotkeyTimer = new QTimer(qApp);
-	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() {
-		LoadOpenClipsHotkey();
-		PollOpenClipsCommand();
-	});
+	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() { LoadOpenClipsHotkey(); });
 	g_openClipsHotkeyTimer->start(1000);
 	LoadOpenClipsHotkey();
-	g_openClipsCommandTimer = new QTimer(qApp);
-	QObject::connect(g_openClipsCommandTimer, &QTimer::timeout, qApp, []() { PollOpenClipsCommand(); });
-	g_openClipsCommandTimer->start(100);
 
-	// 250ms matches the replaykit helpers own poll cadence when its waiting for a projector to appear -- no benefit publishing faster than the one consumer of this file actually checks it.
+	// 250ms matches the helpers own poll cadence when its waiting for a projector to appear -- the pipe thread forwards this snapshot to the helper at the same rate.
 	g_projectorPublishTimer = new QTimer(qApp);
 	QObject::connect(g_projectorPublishTimer, &QTimer::timeout, qApp, []() { PublishProjectorWindows(); });
 	g_projectorPublishTimer->start(250);
@@ -1167,16 +1351,22 @@ bool obs_module_load(void)
 	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
 	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
 	obs_frontend_add_event_callback(OnFrontendEvent, nullptr);
+	g_pipeThread = std::thread(PipeServerThread);
 	return true;
 }
 
 void obs_module_unload(void)
 {
 	StopReplayKitCrashReporter();
+	g_pipeStop.store(true);
+	// wake a PipeServerThread blocked in ConnectNamedPipe so it can see the stop flag and exit.
+	HANDLE poke = CreateFileW(kIpcPipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+	if (poke != INVALID_HANDLE_VALUE)
+		CloseHandle(poke);
+	if (g_pipeThread.joinable())
+		g_pipeThread.join();
 	if (g_openClipsHotkeyTimer)
 		g_openClipsHotkeyTimer->stop();
-	if (g_openClipsCommandTimer)
-		g_openClipsCommandTimer->stop();
 	if (g_openClipsHotkeyRegistered)
 		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
 	if (g_openClipsHotkeyFilter) {

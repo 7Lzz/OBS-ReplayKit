@@ -26,7 +26,8 @@ namespace ReplayKitHelper
 
         public static CompressOverwriteResult Run(
             string requestId, string ffmpeg, string sourcePath, string tempPath,
-            double durationSec, string mode, long preBytes, JObject caps, string fastEncoder, string smallerEncoder)
+            double durationSec, string mode, long preBytes, JObject caps, string fastEncoder, string smallerEncoder,
+            int scaleHeight = 0)
         {
             int cpuCount = caps?["cpuCount"]?.Value<int>() ?? Environment.ProcessorCount;
             // half-cores per encode for sw codecs. two parallel libx265 jobs split the cpu cleanly with this -- one job grabbing every core context-switches itself silly when a second job lands.
@@ -57,6 +58,9 @@ namespace ReplayKitHelper
 
             // build encoder-specific argv. goals: fast mode -> shortest wall time, ok quality. gpu encoders win here becuase they barely touch the cpu (so games keep running fine) and ffmpeg sustains 5-10x realtime on them. smaller mode -> smallest file at watch-anywhere quality. cpu sw encoders win here -- libx265 is ~2-3x more bit-efficient than nvenc/amf/qsv at matched perceptual quality. qp / crf targets are picked one or two notches below the obs source, so the output is guaranteed to be a step worse perceptually and a noticeable step smaller in size -- the size guard further down verifies that and reverts the replace if the output is somehow not smaller.
             var commonHead = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-i", sourcePath };
+            // optional resolution reduction folded into the same encode. -2 keeps aspect + even width; min(ih,H) never upscales, so this is a no-op if the source is already at/below the target.
+            if (scaleHeight > 0)
+                commonHead.AddRange(new[] { "-vf", "scale=-2:min(ih\\," + scaleHeight + ")" });
             var commonTail = new List<string> { "-c:a", "aac", "-b:a", "96k", "-metadata", "comment=" + comment, "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", tempPath };
             List<string> argv;
             switch (pickedEncoder)

@@ -275,15 +275,12 @@ namespace ReplayKitHelper
             return closed;
         }
 
-        // reads the hwnd published by the native plugin (replaykit.cpp, out of scope here) at %temp%\replaykit\scratch\obsreplaykit_main_window.txt -- window-title matching alone cant reliably identify obs's own main window vs a projector, so the tray plugin (which has an authoritative Qt-side isOBSProjectorWindow check) publishes it directly.
+        // the plugin (replaykit.cpp, out of scope here) hands obs's real main-window hwnd over the OBSReplayKitIpc pipe; PipeClient caches it in Server.State. window-title matching alone cant tell obs's own main window from a projector, so the plugin -- which has the authoritative Qt-side isOBSProjectorWindow check -- sends it directly. returns false (caller force-kills) if the pipe never delivered one.
         public static bool CloseObsMainWindow(uint requireOwnerPid)
         {
-            string sentinel = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch", "obsreplaykit_main_window.txt");
-            if (!File.Exists(sentinel)) return false;
-            string raw;
-            try { raw = File.ReadAllText(sentinel).Trim(); }
-            catch (IOException) { return false; }
-            if (!long.TryParse(raw, out long hwndVal) || hwndVal == 0) return false;
+            long hwndVal;
+            lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
+            if (hwndVal == 0) return false;
             IntPtr hWnd = new IntPtr(hwndVal);
             if (!IsWindow(hWnd)) return false;
             if (requireOwnerPid != 0)

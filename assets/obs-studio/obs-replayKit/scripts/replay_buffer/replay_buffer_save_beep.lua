@@ -23,8 +23,8 @@ local MCI_MPEG_EXTS = {
 local active_audio_file = ""
 local active_recording_start_audio_file = ""
 local active_recording_stop_audio_file = ""
-local active_clip_sound_volume = 100
-local active_recording_sound_volume = 100
+local active_clip_sound_volume = 25
+local active_recording_sound_volume = 25
 
 local function log(level, message)
     obs.script_log(level, "[ClipSound] " .. tostring(message))

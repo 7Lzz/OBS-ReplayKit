@@ -58,8 +58,8 @@ namespace ReplayKitHelper
         private static void StopObsForRestart(string reason)
         {
             Thread.Sleep(300);
-            // tell the tray plugin's close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it would swallow the close and obs would never get to save its geometry before the force-kill below.
-            try { AppConfig.WriteUtf8(Path.Combine(Constants.SCRATCH_DIR, "obs-allow-close"), DateTime.UtcNow.ToString("O")); } catch { }
+            // tell the plugin's close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it swallows the close and obs never gets to save its geometry before the force-kill below. wait for the plugin to ack so the close can't beat the message; proceed anyway if it doesn't (older bundle without the pipe -- same as before this signal existed).
+            try { if (!PipeClient.SendAllowCloseAndWait(1000)) Log.Write(reason + ": close-to-tray plugin did not ack ALLOWCLOSE; proceeding."); } catch { }
             var procs = GetProcessesByNames("obs64", "obs32", "obs", "obs-browser-page");
             foreach (var p in procs)
             {
@@ -686,7 +686,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
-                AppConfig.WriteUtf8(Path.Combine(Constants.SCRATCH_DIR, "open_clips.command"), Guid.NewGuid().ToString("N"));
+                PipeClient.SendOpenClips();
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }
@@ -1012,6 +1012,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string file = Q("file");
                 string mode = Q("mode", "smaller");
+                int.TryParse(Q("scaleHeight"), out int scaleHeight);
                 // compress-history rules (enforced server-side as defense in depth; the dock ui also disables the relevant card): clip already marked slow (libx265 medium) -> reject entirely, its the best mode and re-running anything would just degrade quality without size gain. clip already marked fast (libx264 fast) + fast again requested -> reject, re-fast-compressing produces no meaningful gain. re-running with smaller is allowed (fast -> slow is a valid upgrade path).
                 var checkSel = Clips.GetSafeClipPath(file);
                 if (checkSel != null && File.Exists(checkSel.Full))
@@ -1033,8 +1034,8 @@ namespace ReplayKitHelper
                 if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
                 try
                 {
-                    var result = CompressOverwrite.StartCompressOverwriteFile(selected, mode);
-                    Log.Write("/compress-overwrite(" + selected.Name + ", mode=" + mode + ") -> " + result.ToString(Newtonsoft.Json.Formatting.None));
+                    var result = CompressOverwrite.StartCompressOverwriteFile(selected, mode, scaleHeight);
+                    Log.Write("/compress-overwrite(" + selected.Name + ", mode=" + mode + ", scaleHeight=" + scaleHeight + ") -> " + result.ToString(Newtonsoft.Json.Formatting.None));
                     int code = result["ok"]?.Value<bool>() == true ? 200 : result["busy"]?.Value<bool>() == true ? 409 : 400;
                     HttpResponse.SendJson(stream, code, result);
                 }

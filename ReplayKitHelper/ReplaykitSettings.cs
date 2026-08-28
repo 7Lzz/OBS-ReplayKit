@@ -37,6 +37,10 @@ namespace ReplayKitHelper
                 ["fps"] = 60,
                 ["fpsNumerator"] = 60,
                 ["fpsDenominator"] = 1,
+                // recording output resolution: "native" = encode at the canvas (monitor) size, no downscale; "downscale" = scale the output down to downscaleHeight using downscaleFilter. default is canvas-aware -- native at/below 1080p, downscale-to-1080 above. the performance preset always caps at 720 regardless.
+                ["recordingScaleMode"] = DefaultRecordingScaleMode(),
+                ["downscaleHeight"] = 1080,
+                ["downscaleFilter"] = "lanczos",
                 ["clipDir"] = "",
                 ["clipKeybind"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" },
                 ["recordingKeybind"] = new JObject(),
@@ -63,8 +67,8 @@ namespace ReplayKitHelper
                 ["autoDeleteLogsOnLaunch"] = true,
                 ["autoUpdateEnabled"] = true,
                 ["lastUpdatePromptVersion"] = "",
-                ["clipSoundVolume"] = 100,
-                ["recordingSoundVolume"] = 100,
+                ["clipSoundVolume"] = 25,
+                ["recordingSoundVolume"] = 25,
                 ["motionBlurEnabled"] = false,
                 ["motionBlurStrength"] = 0.075,
                 // legacy shareMode is kept only so older settings files dont break parsing; discord output uses the obs windowed projector directly.
@@ -272,6 +276,9 @@ namespace ReplayKitHelper
                 ["fps"] = Math.Min(240, GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000)),
                 ["fpsNumerator"] = Math.Min(240, GetIntSetting(data, "fpsNumerator", GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000), 1, 1000)),
                 ["fpsDenominator"] = GetIntSetting(data, "fpsDenominator", defaults["fpsDenominator"].Value<int>(), 1, 1000),
+                ["recordingScaleMode"] = GetEnumSetting(data, "recordingScaleMode", defaults["recordingScaleMode"].Value<string>(), new[] { "native", "downscale" }),
+                ["downscaleHeight"] = GetIntSetting(data, "downscaleHeight", defaults["downscaleHeight"].Value<int>(), 240, 4320),
+                ["downscaleFilter"] = GetEnumSetting(data, "downscaleFilter", defaults["downscaleFilter"].Value<string>(), new[] { "bilinear", "area", "bicubic", "lanczos" }),
                 ["clipDir"] = clipDir,
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
@@ -2605,6 +2612,43 @@ namespace ReplayKitHelper
             return new JObject { ["width"] = GetEvenDimension(sourceWidth * scale), ["height"] = GetEvenDimension(sourceHeight * scale) };
         }
 
+        // canvas-aware default for recordingScaleMode: monitors above 1080p downscale to 1080 by default, 1080p and
+        // below record native (nothing to downscale). only used when the settings file has no explicit value.
+        private static string DefaultRecordingScaleMode()
+        {
+            try
+            {
+                var mon = GetPrimaryMonitorCanvasSize();
+                if (mon["ok"]?.Value<bool>() == true && mon["height"].Value<int>() > 1080) return "downscale";
+            }
+            catch (Exception ex) { Log.Write("DefaultRecordingScaleMode: " + ex.Message); }
+            return "native";
+        }
+
+        // OBS-style "Output (Scaled) Resolution" list derived from the real canvas -- same scale-factor steps OBS's
+        // own Video settings use, so a 1440p canvas yields 2560x1440 / 2048x1152 / 1920x1080 / ... and a 4K canvas
+        // yields its own set. value passed back is the height; ResolvePresetVideoSpec keeps the canvas aspect.
+        private static JArray BuildDownscaleResolutionList()
+        {
+            var mon = GetPrimaryMonitorCanvasSize();
+            var baseSize = GetScaledEvenSize(
+                mon["ok"]?.Value<bool>() == true ? mon["width"].Value<int>() : 1920,
+                mon["ok"]?.Value<bool>() == true ? mon["height"].Value<int>() : 1080, 4096, 4096);
+            int bw = baseSize["width"].Value<int>(), bh = baseSize["height"].Value<int>();
+            // exact same scale steps + rounding OBS's Video settings use: width truncated to a multiple of 4, height to a multiple of 2.
+            double[] scales = { 1.0, 1.25, 1.0 / 0.75, 1.5, 1.0 / 0.6, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0 };
+            var list = new JArray();
+            var seen = new HashSet<int>();
+            foreach (var s in scales)
+            {
+                int cw = (int)(bw / s) & ~3;
+                int ch = (int)(bh / s) & ~1;
+                if (ch < 240 || !seen.Add(ch)) continue;
+                list.Add(new JObject { ["label"] = cw + "x" + ch, ["height"] = ch });
+            }
+            return list;
+        }
+
         private static JObject GetPrimaryMonitorCanvasSize()
         {
             try
@@ -2620,13 +2664,15 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = false, ["width"] = 1920, ["height"] = 1080 };
         }
 
-        private static JObject ResolvePresetVideoSpec(int targetWidth, int targetHeight, int fpsNumerator, int fpsDenominator)
+        // outputHeightCap of 8192 means "never downscale" (output == base); a real value scales the output down to that
+        // height, aspect preserved from the canvas. scaleType is the OBS downscale filter, ignored by OBS when base==output.
+        private static JObject ResolvePresetVideoSpec(int outputHeightCap, string scaleType, int fpsNumerator, int fpsDenominator)
         {
             var monitor = GetPrimaryMonitorCanvasSize();
             int sourceWidth = monitor["ok"]?.Value<bool>() == true ? monitor["width"].Value<int>() : 1920;
             int sourceHeight = monitor["ok"]?.Value<bool>() == true ? monitor["height"].Value<int>() : 1080;
             var baseSize = GetScaledEvenSize(sourceWidth, sourceHeight, 4096, 4096);
-            var output = GetScaledEvenSize(baseSize["width"].Value<int>(), baseSize["height"].Value<int>(), targetWidth, targetHeight);
+            var output = GetScaledEvenSize(baseSize["width"].Value<int>(), baseSize["height"].Value<int>(), 8192, outputHeightCap);
 
             return new JObject
             {
@@ -2647,28 +2693,35 @@ namespace ReplayKitHelper
                     new JArray("Video", "FPSType", "2"),
                     new JArray("Video", "FPSNum", fpsNumerator.ToString()),
                     new JArray("Video", "FPSDen", fpsDenominator.ToString()),
-                    new JArray("Video", "ScaleType", "lanczos")
+                    new JArray("Video", "ScaleType", string.IsNullOrEmpty(scaleType) ? "lanczos" : scaleType)
                 ),
                 ["source"] = new JObject { ["width"] = sourceWidth, ["height"] = sourceHeight },
             };
         }
 
-        private static JObject GetPresetSpec(string name, int fpsNumerator, int fpsDenominator)
+        private static JObject GetPresetSpec(string name, int fpsNumerator, int fpsDenominator, string scaleMode, int downscaleHeight, string downscaleFilter)
         {
-            JObject videoSpec;
+            // performance stays capped low no matter the global scale mode -- the preset exists to keep load and file size down.
+            // balanced/quality honor recordingScaleMode: native = no downscale (cap 8192), downscale = cap at downscaleHeight.
+            int cap = name == "performance" ? 720 : (scaleMode == "downscale" ? downscaleHeight : 8192);
+            string scaleType = string.IsNullOrEmpty(downscaleFilter) ? "lanczos" : downscaleFilter;
             int cqp;
             switch (name)
             {
-                case "performance": videoSpec = ResolvePresetVideoSpec(1280, 720, fpsNumerator, fpsDenominator); cqp = 26; break;
-                case "quality": videoSpec = ResolvePresetVideoSpec(1920, 1080, fpsNumerator, fpsDenominator); cqp = 20; break;
-                default: videoSpec = ResolvePresetVideoSpec(1920, 1080, fpsNumerator, fpsDenominator); cqp = 22; break;
+                case "performance": cqp = 26; break;
+                case "quality": cqp = 20; break;
+                default: cqp = 22; break;
             }
+            var videoSpec = ResolvePresetVideoSpec(cap, scaleType, fpsNumerator, fpsDenominator);
             return new JObject { ["cqp"] = cqp, ["video"] = videoSpec["video"], ["profile"] = videoSpec["profile"], ["source"] = videoSpec["source"] };
         }
 
         private static JObject GetPresetSpec(string name, JObject settings) => GetPresetSpec(name,
             settings?["fpsNumerator"]?.Value<int>() ?? settings?["fps"]?.Value<int>() ?? 60,
-            settings?["fpsDenominator"]?.Value<int>() ?? 1);
+            settings?["fpsDenominator"]?.Value<int>() ?? 1,
+            settings?["recordingScaleMode"]?.Value<string>() ?? "native",
+            settings?["downscaleHeight"]?.Value<int>() ?? 1080,
+            settings?["downscaleFilter"]?.Value<string>() ?? "lanczos");
 
         // vendor/generation candidate table, effort tuning, and cqp->icq/crf conversion live in Encoder.PickEncoder
         // (copied from ReplayKitSetup/Encoder.cs -- see its header comment) so both agree on the same tuning
@@ -3371,7 +3424,27 @@ namespace ReplayKitHelper
 
         private static JObject NewInactiveOutputState() => new JObject { ["ok"] = true, ["wasActive"] = false };
 
+        // serialize the whole stop-outputs -> SetVideoSettings (obs_reset_video) -> restart-outputs cycle. two of
+        // these overlapping deadlock obs's video graph (2026-08-28: a user hard-froze obs by rapidly re-applying the
+        // downscale resolution), and even sequential ones need a beat for the render/graphics threads to re-settle.
         private static JObject ApplyRuntimeOutputsLive(JObject settings, JObject preset, bool restartObs, bool applyVideoSettings = true, bool applyReplayBufferOutput = true)
+        {
+            lock (Server.State.VideoApplyLock)
+            {
+                double sinceLastMs = (DateTime.UtcNow - Server.State.LastVideoApplyDoneUtc).TotalMilliseconds;
+                if (sinceLastMs < 2500) Thread.Sleep((int)Math.Max(0, 2500 - sinceLastMs));
+                try
+                {
+                    return ApplyRuntimeOutputsLiveInner(settings, preset, restartObs, applyVideoSettings, applyReplayBufferOutput);
+                }
+                finally
+                {
+                    Server.State.LastVideoApplyDoneUtc = DateTime.UtcNow;
+                }
+            }
+        }
+
+        private static JObject ApplyRuntimeOutputsLiveInner(JObject settings, JObject preset, bool restartObs, bool applyVideoSettings = true, bool applyReplayBufferOutput = true)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -4314,6 +4387,17 @@ namespace ReplayKitHelper
                         new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Largest files, broadest playback support." },
                         new JObject { ["value"] = "h265", ["label"] = "HEVC", ["blurb"] = "Smaller files on modern GPUs." }
                     ),
+                    ["recordingScaleModes"] = new JArray(
+                        new JObject { ["value"] = "native", ["label"] = "Native", ["blurb"] = "Record at your monitor's full resolution. Sharpest image, but more GPU load and bigger files." },
+                        new JObject { ["value"] = "downscale", ["label"] = "Downscale", ["blurb"] = "Shrink the recording to the size below. Lighter on the GPU and smaller files, slightly softer." }
+                    ),
+                    ["downscaleResolutions"] = BuildDownscaleResolutionList(),
+                    ["downscaleFilters"] = new JArray(
+                        new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = "Sharpest, 36-sample. Default." },
+                        new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = "16-sample, slightly softer than Lanczos." },
+                        new JObject { ["value"] = "area", ["label"] = "Area", ["blurb"] = "Clean average, no sharpening pass." },
+                        new JObject { ["value"] = "bilinear", ["label"] = "Bilinear", ["blurb"] = "Fastest, softest." }
+                    ),
                     ["overlays"] = new JArray(
                         new JObject { ["value"] = "input_overlay", ["label"] = "WASD / mouse", ["blurb"] = "Simple keyboard and mouse overlay." },
                         new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
@@ -4342,7 +4426,10 @@ namespace ReplayKitHelper
 
         private static bool TestRestartRequired(JObject previous, JObject settings)
         {
-            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator" })
+            // recordingScaleMode + downscaleHeight apply live (stop outputs -> SetVideoSettings -> restart outputs, see
+            // ApplyRuntimeOutputsLive). downscaleFilter still needs a restart -- obs only re-reads Video/ScaleType from
+            // the profile ini on load, SetVideoSettings has no scale-type parameter.
+            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator", "downscaleFilter" })
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
@@ -4353,7 +4440,10 @@ namespace ReplayKitHelper
         {
             return previous["recordingPreset"]?.ToString() != settings["recordingPreset"]?.ToString() ||
                 previous["fpsNumerator"]?.ToString() != settings["fpsNumerator"]?.ToString() ||
-                previous["fpsDenominator"]?.ToString() != settings["fpsDenominator"]?.ToString();
+                previous["fpsDenominator"]?.ToString() != settings["fpsDenominator"]?.ToString() ||
+                previous["recordingScaleMode"]?.ToString() != settings["recordingScaleMode"]?.ToString() ||
+                previous["downscaleHeight"]?.ToString() != settings["downscaleHeight"]?.ToString() ||
+                previous["downscaleFilter"]?.ToString() != settings["downscaleFilter"]?.ToString();
         }
 
         private static bool TestReplayBufferOutputChanged(JObject previous, JObject settings)

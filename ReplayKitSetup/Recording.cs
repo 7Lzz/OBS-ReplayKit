@@ -64,13 +64,14 @@ namespace ReplayKitSetup
             new RecordingPreset(
                 name: "quality",
                 label: "Quality (high-end PCs)",
-                description: "Native canvas -> 1080p60, very high quality target. Best for replay clips.",
+                description: "Very high quality target. Best for replay clips.",
                 basicIni: new Dictionary<string, Dictionary<string, string>>
                 {
                     ["Output"] = new Dictionary<string, string> { ["Mode"] = "Advanced" },
                     ["AdvOut"] = new Dictionary<string, string> { ["RecType"] = "Standard", ["RecTracks"] = "1" },
                     ["Video"] = new Dictionary<string, string>
                     {
+                        // seed only -- the helper recomputes base/output from the real monitor + recordingScaleMode (native below 1080p, downscale above) on first apply.
                         ["BaseCX"] = "2560", ["BaseCY"] = "1440",
                         ["OutputCX"] = "1920", ["OutputCY"] = "1080",
                         ["FPSCommon"] = "60",

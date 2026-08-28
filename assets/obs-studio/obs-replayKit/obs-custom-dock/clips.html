@@ -2349,6 +2349,65 @@
   .compress-mode-modal.is-locked .compress-mode-list,
   .compress-mode-modal.is-locked .compress-mode-warning { display: none; }
   .compress-mode-modal.is-locked .compress-mode-locked { display: block; }
+  /* optional resolution reduction, folded into the same encode. persisted per clips window (localStorage), not a ReplayKit setting. */
+  .compress-downsample-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .compress-downsample-row input[type=checkbox] {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    margin: 0;
+    border: 1px solid var(--grey1);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .compress-downsample-row input[type=checkbox]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 14px 14px;
+  }
+  .compress-downsample-row input[type=checkbox]:focus-visible {
+    border-color: var(--primary_light);
+  }
+  .compress-downsample-row[hidden] { display: none !important; }
+  .compress-downsample-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .compress-downsample-detail[hidden] { display: none !important; }
+  .compress-downsample-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--grey7);
+    border: 1px solid var(--grey4);
+    border-radius: 6px;
+    color: var(--text);
+    font: inherit;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+  .compress-downsample-select:hover { border-color: var(--button_border_hover); }
+  .compress-downsample-note {
+    font-size: 11.5px;
+    color: var(--text_muted);
+    line-height: 1.4;
+  }
+  .compress-mode-modal.is-locked .compress-downsample-row,
+  .compress-mode-modal.is-locked .compress-downsample-detail { display: none; }
 
   /* --- shared press/hover feedback -------------------------------------------------
      one motion language for every clickable control: standalone buttons grow a hair
@@ -2506,6 +2565,14 @@
           <span class="blurb">Slower re-encode for a smaller file. Roughly 30-50% smaller than Fast; takes 2-4&times; longer.</span>
           <span class="reason">Already at maximum compression.</span>
         </button>
+      </div>
+      <label class="compress-downsample-row" id="compress-downsample-row" hidden>
+        <input type="checkbox" id="compress-downsample-toggle">
+        <span>Also lower the resolution</span>
+      </label>
+      <div class="compress-downsample-detail" id="compress-downsample-detail" hidden>
+        <select class="compress-downsample-select" id="compress-downsample-select"></select>
+        <span class="compress-downsample-note">Shrinks the clip to this size before compressing &mdash; smaller file, but the lost detail can&rsquo;t be brought back.</span>
       </div>
       <div class="row">
         <button class="btn" type="button" id="compress-mode-cancel">Cancel</button>
@@ -2903,6 +2970,7 @@
   let lastClipsByName = new Map();
   let pollTimer = null;
   let pollInFlight = false;
+  let lastPollAt = 0;
   let anyUploading = false;
   let activePreview = null;
   let lastUploadStatus = null;
@@ -5726,6 +5794,7 @@
 
   async function poll() {
     if (document.hidden) return;
+    lastPollAt = Date.now();
     if (isClipRenameActive()) {
       scheduleNextPoll(POLL_IDLE_MS);
       return;
@@ -6030,6 +6099,13 @@
     });
   }, 60 * 1000);
 
+  // poll-loop watchdog. CEF hosts don't reliably deliver visibilitychange on the window's own hide()/show(), so
+  // the loop can stall after the popup is backgrounded (e.g. during a helper restart) and never re-arm -- leaving
+  // a stuck "Helper offline". if we're visible and haven't polled in a while, kick it.
+  setInterval(() => {
+    if (!document.hidden && !pollInFlight && Date.now() - lastPollAt > 6000) poll();
+  }, 3000);
+
   // "clip too big -> compress temp copy and upload" flow. when /upload returns toobig=true (helper rejected becuase the clip exceeds the current auth states size cap), we surface a confirmation modal. accepting posts /compress to the helper, which creates a temp compressed mp4, uploads that temp file, and records the streamable link against the original clip name.
   const compressVeil   = document.getElementById("compress-veil");
   const compressBody   = document.getElementById("compress-body");
@@ -6092,6 +6168,51 @@
   const compressModeClipName = document.getElementById("compress-mode-clip-name");
   const compressModeCards    = compressModeVeil.querySelectorAll(".compress-mode-card");
 
+  // optional resolution reduction folded into compress-overwrite. state lives in localStorage -- it's a clips-window
+  // setting, not a ReplayKit setting.
+  const compressDsRow      = document.getElementById("compress-downsample-row");
+  const compressDsToggle   = document.getElementById("compress-downsample-toggle");
+  const compressDsDetail   = document.getElementById("compress-downsample-detail");
+  const compressDsSelect   = document.getElementById("compress-downsample-select");
+  const COMPRESS_DS_ON_KEY = "replaykit_compress_downsample_on";
+  const COMPRESS_DS_H_KEY  = "replaykit_compress_downsample_height";
+  // common share/export heights; the modal only offers the ones below the clip's own height.
+  const COMPRESS_DS_LADDER = [1440, 1080, 900, 720, 540, 480, 360];
+
+  function readCompressDsPrefs() {
+    let on = false, height = 0;
+    try { on = localStorage.getItem(COMPRESS_DS_ON_KEY) === "1"; } catch (_) {}
+    try { height = parseInt(localStorage.getItem(COMPRESS_DS_H_KEY) || "0", 10) || 0; } catch (_) {}
+    return { on, height };
+  }
+  function writeCompressDsPrefs() {
+    try { localStorage.setItem(COMPRESS_DS_ON_KEY, compressDsToggle.checked ? "1" : "0"); } catch (_) {}
+    try { localStorage.setItem(COMPRESS_DS_H_KEY, compressDsSelect.value || "0"); } catch (_) {}
+  }
+  function syncCompressDsDetail() {
+    compressDsDetail.hidden = !compressDsToggle.checked || compressDsRow.hidden;
+  }
+  // fills the select from the clip's own resolution. returns false (and the caller hides the whole section) when
+  // the resolution is unknown or already at/below the smallest rung.
+  function buildCompressDsOptions(srcW, srcH) {
+    compressDsSelect.innerHTML = "";
+    const heights = COMPRESS_DS_LADDER.filter((h) => h < srcH);
+    if (!heights.length) return false;
+    for (const h of heights) {
+      const w = srcW && srcH ? Math.round((srcW * h / srcH) / 2) * 2 : 0;
+      const opt = document.createElement("option");
+      opt.value = String(h);
+      opt.textContent = w ? (w + " × " + h) : (h + "p");
+      compressDsSelect.appendChild(opt);
+    }
+    return true;
+  }
+  function currentCompressScaleHeight() {
+    if (compressDsRow.hidden || !compressDsToggle.checked) return 0;
+    const h = parseInt(compressDsSelect.value || "0", 10);
+    return h > 0 ? h : 0;
+  }
+
   let pendingCompressOverwriteFile = null;
 
   // apply the compress-history rules to the modal: clip already at slow -> lock the modal entirely, show the "already at max compression" banner, no cards clickable. clip already at fast -> fast card disabled, smaller still availible (fast -> slow upgrade path). unmarked -> both cards availible (defualt). the rules are also enforced server-side; this is the ux layer so the user never has to click into an error to discover them.
@@ -6128,13 +6249,26 @@
 
     // look up the clips hidden compress marker (mirrored by the helper from the mp4s comment atom). cards / banner are tuned accordingly before the modal becomes visible.
     let existingMode = "";
-    if (filename) {
-      const clip = lastClipsByName.get(filename);
-      if (clip && (clip.cmp_mode === "fast" || clip.cmp_mode === "slow")) {
-        existingMode = clip.cmp_mode;
-      }
+    const clip = filename ? lastClipsByName.get(filename) : null;
+    if (clip && (clip.cmp_mode === "fast" || clip.cmp_mode === "slow")) {
+      existingMode = clip.cmp_mode;
     }
     const result = applyCompressModeRules(existingMode);
+
+    // downsample section: build the ladder from this clip's own resolution; hide the whole option if we don't
+    // know it (unindexed) or it's already at/below the smallest rung.
+    const srcW = clip && clip.width > 0 ? clip.width : 0;
+    const srcH = clip && clip.height > 0 ? clip.height : 0;
+    const dsAvailable = srcH > 0 && buildCompressDsOptions(srcW, srcH);
+    compressDsRow.hidden = !dsAvailable;
+    if (dsAvailable) {
+      const prefs = readCompressDsPrefs();
+      compressDsToggle.checked = prefs.on;
+      const opts = Array.from(compressDsSelect.options).map((o) => o.value);
+      if (prefs.height && opts.includes(String(prefs.height))) compressDsSelect.value = String(prefs.height);
+      else compressDsSelect.value = opts.includes("1080") ? "1080" : opts[0];
+    }
+    syncCompressDsDetail();
 
     compressModeVeil.classList.add("is-open");
     // focus the first enabled card so enter commits to a valid option and the user can navigate with arrow keys / tab. if everything is locked, focus cancel.
@@ -6151,11 +6285,13 @@
   }
 
   // centralised so we dont drift between the modal cards and any other caller that might want to start an overwrite-compress. the server enforces the same compress-history rules as the modal; alreadycompressed comes back as 409 with a message we surface verbatim so the user sees the same wording either way.
-  async function startCompressOverwrite(file, mode) {
+  async function startCompressOverwrite(file, mode, scaleHeight) {
     if (!file) return;
+    scaleHeight = scaleHeight > 0 ? scaleHeight : 0;
     try {
       const res = await fetch(HELPER + "/compress-overwrite?file=" + encodeURIComponent(file)
                               + "&mode=" + encodeURIComponent(mode)
+                              + (scaleHeight > 0 ? "&scaleHeight=" + scaleHeight : "")
                               + "&t=" + Date.now(),
                               { method: "POST", cache: "no-store" });
       const data = await res.json().catch(() => ({}));
@@ -6172,7 +6308,8 @@
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
-      const label = mode === "fast" ? "Compressing (fast)" : "Compressing (smaller)";
+      let label = mode === "fast" ? "Compressing (fast)" : "Compressing (smaller)";
+      if (scaleHeight > 0) label += " -> " + scaleHeight + "p";
       showToast(label + " - " + escapeHtml(file), "info");
       scheduleToastHide(3000);
     } catch (err) {
@@ -6187,10 +6324,13 @@
       if (card.classList.contains("is-disabled")) return;
       const file = pendingCompressOverwriteFile;
       const mode = card.dataset.mode || "smaller";
+      const scaleHeight = currentCompressScaleHeight();
       closeCompressModePicker();
-      startCompressOverwrite(file, mode);
+      startCompressOverwrite(file, mode, scaleHeight);
     });
   });
+  compressDsToggle.addEventListener("change", () => { syncCompressDsDetail(); writeCompressDsPrefs(); });
+  compressDsSelect.addEventListener("change", writeCompressDsPrefs);
   compressModeCancel.addEventListener("click", closeCompressModePicker);
   compressModeVeil.addEventListener("mousedown", (e) => {
     if (e.target === compressModeVeil) closeCompressModePicker();

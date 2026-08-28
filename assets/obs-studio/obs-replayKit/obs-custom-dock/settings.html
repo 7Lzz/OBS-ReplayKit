@@ -45,13 +45,14 @@
   *::-webkit-scrollbar-track { background:transparent; }
   *::-webkit-scrollbar-corner { background:transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color:var(--field);
+    background-color:var(--button-hover);
     border-radius:7px;
     border:4px solid transparent;
     background-clip:padding-box;
     min-height:30px;
   }
   *::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
+  *::-webkit-scrollbar-thumb:active { background-color:#6b7387; }
   .shell {
     width:100vw;
     height:100vh;
@@ -166,6 +167,8 @@
     min-height:42px;
     padding:3px 8px;
   }
+  /* the [hidden] attribute otherwise loses to .form-row's display:grid (same specificity, author sheet wins). */
+  .form-row[hidden] { display:none; }
   .form-row.tight { min-height:30px; }
   .label {
     justify-self:end;
@@ -178,11 +181,15 @@
     flex-direction:column;
     align-items:stretch;
   }
+  /* a stacked field-wrap (input + hint under it) grows the row -- pin the label to the input's row, not the cell's center, so it stays aligned when the hint appears. inputs are 32px tall. */
+  .form-row:has(> .field-wrap.is-stacked) { align-items:start; }
+  .form-row:has(> .field-wrap.is-stacked) > .label { line-height:32px; }
   .hint { color:var(--muted); font-size:12px; margin-left:4px; }
   .form-row.is-disabled .label,
   .form-row.is-disabled .hint {
     color:var(--disabled);
   }
+  .text-input:disabled { color:var(--disabled); background:var(--field2); cursor:default; }
   .form-row.is-disabled .check-row {
     color:var(--disabled);
     cursor:default;
@@ -274,7 +281,7 @@
     transition:max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
   .combo.is-open .combo-menu {
-    max-height:214px;
+    max-height:300px;
     overflow:auto;
     padding:3px;
     opacity:1;
@@ -282,6 +289,13 @@
     pointer-events:auto;
     transform:translateY(0);
     transition:max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* "Custom" sits above the generated resolutions, set off by a divider. */
+  .combo.sep-after-first .combo-option:first-child {
+    border-bottom:1px solid var(--line2);
+    border-radius:0;
+    margin-bottom:3px;
+    padding-bottom:3px;
   }
   /* options fade + rise in with a short stagger. */
   .combo.is-open .combo-option { animation:rk-option-in 200ms var(--ease_smooth) backwards; }
@@ -866,6 +880,25 @@
           <div class="field-wrap"><div class="combo" id="codecPreference" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
         <div class="form-row">
+          <div class="label">Recording Resolution</div>
+          <div class="field-wrap"><div class="combo" id="recordingScaleMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="downscaleTargetRow">
+          <div class="label">Downscale To</div>
+          <div class="field-wrap"><div class="combo sep-after-first" id="downscaleTarget" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="downscaleCustomRow" hidden>
+          <div class="label">Custom Height</div>
+          <div class="field-wrap is-stacked">
+            <input class="text-input" id="downscaleHeight" type="number" min="240" max="4320" step="1" inputmode="numeric" autocomplete="off">
+            <div class="hint">Output height in pixels. Width follows the canvas aspect ratio.</div>
+          </div>
+        </div>
+        <div class="form-row" id="downscaleFilterRow">
+          <div class="label">Downscale Filter</div>
+          <div class="field-wrap"><div class="combo" id="downscaleFilter" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
           <div class="label">Clip Length</div>
           <div class="field-wrap">
             <div class="spin">
@@ -1307,12 +1340,20 @@
     quality:"smaller_files",
   };
   // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator"]);
+  // recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
     compressionMode: document.getElementById("compressionMode"),
     codecPreference: document.getElementById("codecPreference"),
+    recordingScaleMode: document.getElementById("recordingScaleMode"),
+    downscaleTarget: document.getElementById("downscaleTarget"),
+    downscaleTargetRow: document.getElementById("downscaleTargetRow"),
+    downscaleHeight: document.getElementById("downscaleHeight"),
+    downscaleCustomRow: document.getElementById("downscaleCustomRow"),
+    downscaleFilter: document.getElementById("downscaleFilter"),
+    downscaleFilterRow: document.getElementById("downscaleFilterRow"),
     screenshareCaptureMode: document.getElementById("screenshareCaptureMode"),
     screenshareGameWindow: document.getElementById("screenshareGameWindow"),
     screenshareGameWindowRow: document.getElementById("screenshareGameWindowRow"),
@@ -1533,11 +1574,16 @@
     return settingValueChanged("overlayStyle") || Array.from(restartSettingKeys).some(settingValueChanged);
   }
 
+  // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live
+  // (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can
+  // deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
+  let applyInFlight = false;
+
   function updateApplyButton() {
     const restart = dirty && needsObsRestart();
     els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
     els.applyBtn.classList.toggle("is-primary", restart);
-    els.applyBtn.disabled = !dirty;
+    els.applyBtn.disabled = !dirty || applyInFlight;
   }
 
   function markDirty() {
@@ -1709,7 +1755,14 @@
     const value = comboValue(combo);
     const option = options.find((o) => o.value === value) || options[0] || { label:"" };
     combo.querySelector(".combo-label").textContent = option.label || "";
-    combo.querySelector(".combo-menu").innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
+    // rebuild the option list only when it actually changed. re-setting innerHTML recreates every .combo-option,
+    // which restarts the rk-option-in entrance animation -- refreshExternalSettings re-fills combos every 2s, so an
+    // open menu would visibly re-animate on a loop. value + options json fully determines the rendered markup.
+    const menu = combo.querySelector(".combo-menu");
+    const sig = value + "|" + (combo.dataset.options || "");
+    if (menu.dataset.sig === sig) return;
+    menu.dataset.sig = sig;
+    menu.innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
   }
 
   function setComboValue(combo, value, notify) {
@@ -2167,6 +2220,26 @@
     return Math.max(FPS_MIN, Math.min(FPS_MAX, n));
   }
 
+  function clampDownscaleHeight(value) {
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n)) return 1080;
+    return Math.max(240, Math.min(4320, n));
+  }
+
+  // downscale target + filter stay visible but grey out on Native; the custom-height row only shows when the
+  // target dropdown is on "Custom" AND we're downscaling.
+  function syncDownscaleFields() {
+    const on = comboValue(els.recordingScaleMode) === "downscale";
+    const custom = comboValue(els.downscaleTarget) === "custom";
+    els.downscaleTargetRow.classList.toggle("is-disabled", !on);
+    els.downscaleFilterRow.classList.toggle("is-disabled", !on);
+    els.downscaleCustomRow.classList.toggle("is-disabled", !on);
+    setComboDisabled(els.downscaleTarget, !on);
+    setComboDisabled(els.downscaleFilter, !on);
+    els.downscaleCustomRow.hidden = !(on && custom);
+    els.downscaleHeight.disabled = !on;
+  }
+
   function syncFpsControl(value) {
     const fps = clampFps(value);
     els.fps.value = String(fps);
@@ -2181,6 +2254,18 @@
     setComboValue(els.recordingPreset, state.recordingPreset || "balanced", false);
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
     setComboValue(els.codecPreference, state.codecPreference || "auto", false);
+    setComboValue(els.recordingScaleMode, state.recordingScaleMode || "native", false);
+    setComboValue(els.downscaleFilter, state.downscaleFilter || "lanczos", false);
+    {
+      // match the stored height to a standard step (tolerating small OBS-rounding / monitor-mismatch drift, ~1%);
+      // only fall back to "Custom" for a genuinely off-list value.
+      const h = clampDownscaleHeight(state.downscaleHeight ?? 1080);
+      const steps = comboOptions(els.downscaleTarget).filter((o) => o.value !== "custom");
+      const near = steps.find((o) => Math.abs(Number(o.value) - h) <= Math.max(2, h * 0.01));
+      setComboValue(els.downscaleTarget, near ? near.value : "custom", false);
+      els.downscaleHeight.value = near ? near.value : String(h);
+    }
+    syncDownscaleFields();
     setComboValue(els.screenshareCaptureMode, state.screenshareCaptureMode || "hybrid_auto", false);
     setComboValue(els.screenshareGameWindow, state.screenshareGameWindow || "", false);
     renderScreenshareGameOverrides();
@@ -2205,8 +2290,8 @@
     els.pinObsTrayIcon.checked = state.pinObsTrayIcon !== false;
     els.clipNotificationEnabled.checked = !!state.clipNotificationEnabled;
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
-    syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 100);
-    syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 100);
+    syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 25);
+    syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 25);
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
@@ -2224,6 +2309,14 @@
     state.recordingPreset = comboValue(els.recordingPreset);
     state.compressionMode = comboValue(els.compressionMode);
     state.codecPreference = comboValue(els.codecPreference);
+    state.recordingScaleMode = comboValue(els.recordingScaleMode) || "native";
+    state.downscaleFilter = comboValue(els.downscaleFilter) || "lanczos";
+    {
+      const target = comboValue(els.downscaleTarget);
+      state.downscaleHeight = target === "custom" || !target
+        ? clampDownscaleHeight(els.downscaleHeight.value)
+        : clampDownscaleHeight(target);
+    }
     state.screenshareCaptureMode = comboValue(els.screenshareCaptureMode) || "hybrid_auto";
     state.screenshareGameWindow = comboValue(els.screenshareGameWindow) || "";
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
@@ -2320,12 +2413,15 @@
   });
   document.addEventListener("click", () => closeCombos());
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
         state.compressionMode = compressionByPreset[state.recordingPreset] || "balanced";
         setComboValue(els.compressionMode, state.compressionMode, false);
+      }
+      if (combo === els.recordingScaleMode || combo === els.downscaleTarget) {
+        syncDownscaleFields();
       }
       if (combo === els.screenshareCaptureMode) {
         syncScreenshareCaptureFields();
@@ -2336,7 +2432,7 @@
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
 
-  [els.replaySeconds, els.fps, els.clipDir].forEach((input) => {
+  [els.replaySeconds, els.fps, els.downscaleHeight, els.clipDir].forEach((input) => {
     input.addEventListener("input", () => { readUi(); markDirty(); });
     input.addEventListener("change", () => { readUi(); syncUi(); });
   });
@@ -2470,6 +2566,16 @@
     markDirty();
   }, { passive: false });
 
+  // scroll-to-adjust without needing to click into it first, matching the frame-rate + clip-length fields.
+  els.downscaleHeight.addEventListener("wheel", (e) => {
+    if (els.downscaleHeight.disabled) return;
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 10 : -10;
+    els.downscaleHeight.value = String(clampDownscaleHeight(Number(els.downscaleHeight.value) + step));
+    readUi();
+    markDirty();
+  }, { passive: false });
+
   [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
@@ -2558,6 +2664,12 @@
       fillCombo(els.recordingPreset, data.options.recordingPresets || []);
       fillCombo(els.compressionMode, data.options.compressionModes || []);
       fillCombo(els.codecPreference, data.options.codecs || []);
+      fillCombo(els.recordingScaleMode, data.options.recordingScaleModes || []);
+      fillCombo(els.downscaleTarget, [
+        { value: "custom", label: "Custom…" },
+        ...((data.options.downscaleResolutions || []).map((r) => ({ value: String(r.height), label: r.label }))),
+      ]);
+      fillCombo(els.downscaleFilter, data.options.downscaleFilters || []);
       fillCombo(els.screenshareCaptureMode, data.options.screenshareCaptureModes || []);
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
@@ -2570,6 +2682,20 @@
   }
 
   async function saveSettings(closeAfter) {
+    if (applyInFlight) return;
+    applyInFlight = true;
+    els.applyBtn.disabled = true;
+    els.okBtn.disabled = true;
+    try {
+      await runSaveSettings(closeAfter);
+    } finally {
+      applyInFlight = false;
+      els.okBtn.disabled = false;
+      updateApplyButton();
+    }
+  }
+
+  async function runSaveSettings(closeAfter) {
     readUi();
     let committedOverlayPreview = false;
     try {
@@ -2585,8 +2711,6 @@
       return;
     }
     const restartAfterApply = needsObsRestart();
-    els.applyBtn.disabled = true;
-    els.okBtn.disabled = true;
     setStatus(restartAfterApply ? "Applying settings and restarting OBS..." : "Applying settings...", "");
     try {
       await releaseHotkeyCapture(false);
@@ -2603,8 +2727,6 @@
     } catch (e) {
       setStatus("Apply failed: " + (e.message || e), "bad");
       markDirty();
-    } finally {
-      els.okBtn.disabled = false;
     }
   }
 
@@ -2613,10 +2735,20 @@
     closeWindow();
   }
 
+  // true while the user is mid-interaction -- the 2s external poll must not overwrite state then.
+  function externalRefreshBusy() {
+    return dirty || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending || !!document.querySelector(".combo.is-open");
+  }
+
+  let _externalRefreshInFlight = false;
   async function refreshExternalSettings() {
-    if (dirty || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending) return;
+    if (_externalRefreshInFlight || externalRefreshBusy()) return;
+    _externalRefreshInFlight = true;
     try {
       const data = await helperJson("settings?t=" + Date.now());
+      // re-check: the user may have opened a dropdown or started editing during the fetch. clobbering their
+      // in-progress choice here is the "select native, it jumps back to downscale" race.
+      if (externalRefreshBusy()) return;
       const next = data.settings || {};
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
@@ -2624,6 +2756,7 @@
         acceptSettings(next);
       }
     } catch (e) {}
+    finally { _externalRefreshInFlight = false; }
   }
 
   async function checkForUpdates() {

@@ -8,12 +8,13 @@ namespace ReplayKitHelper
     // dispatches a local compress-overwrite job (CompressOverwriteWorker) and reacts once it finishes -- the "watcher" from the ps original, now a plain Task continuation instead of a second [powershell] runspace blocked on EndInvoke. ported from obs_replaykit helper modules/42_compress_overwrite.ps1s Start-CompressOverwriteFile / Start-CompressOverwriteResultWatcher.
     internal static class CompressOverwrite
     {
-        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller")
+        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0)
         {
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "smaller";
             if (mode != "fast" && mode != "smaller") mode = "smaller";
+            if (scaleHeight < 120 || scaleHeight > 4320) scaleHeight = 0;
 
             if (selected == null || !File.Exists(selected.Full))
                 return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
@@ -43,14 +44,15 @@ namespace ReplayKitHelper
                 startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "compressing",
                 percent: 1, kind: "compress-overwrite", cancelRequested: false, tempPath: tempPath);
 
-            Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration, "compress", requestId);
+            Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration + " scaleHeight=" + scaleHeight, "compress", requestId);
 
             string fastEncoder = caps["fastEncoder"]?.Value<string>();
             string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
             string sourceFull = selected.Full;
             string selectedName = selected.Name;
+            int scale = scaleHeight;
 
-            var task = Task.Run(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder));
+            var task = Task.Run(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale));
             task.ContinueWith(t => OnCompressOverwriteComplete(t, requestId, tempPath));
 
             return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId };
