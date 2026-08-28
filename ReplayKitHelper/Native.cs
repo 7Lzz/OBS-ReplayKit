@@ -275,7 +275,7 @@ namespace ReplayKitHelper
             return closed;
         }
 
-        // reads the hwnd published by the native tray plugin (replaykit-tray.cpp, out of scope here) at %temp%\replaykit\scratch\obsreplaykit_main_window.txt -- window-title matching alone cant reliably identify obs's own main window vs a projector, so the tray plugin (which has an authoritative Qt-side isOBSProjectorWindow check) publishes it directly.
+        // reads the hwnd published by the native plugin (replaykit.cpp, out of scope here) at %temp%\replaykit\scratch\obsreplaykit_main_window.txt -- window-title matching alone cant reliably identify obs's own main window vs a projector, so the tray plugin (which has an authoritative Qt-side isOBSProjectorWindow check) publishes it directly.
         public static bool CloseObsMainWindow(uint requireOwnerPid)
         {
             string sentinel = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch", "obsreplaykit_main_window.txt");

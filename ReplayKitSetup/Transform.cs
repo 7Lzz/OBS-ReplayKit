@@ -498,6 +498,7 @@ namespace ReplayKitSetup
                 ["overlayColorAdd"] = prefs.OverlayColorAdd,
                 ["obsStartupEnabled"] = prefs.ObsStartupEnabled,
                 ["disableObsCloseWarning"] = prefs.DisableObsCloseWarning,
+                ["closeToTray"] = prefs.CloseToTray,
                 ["allowSleepWhileActive"] = prefs.AllowSleepWhileActive,
                 ["clipNotificationEnabled"] = prefs.ClipNotificationEnabled,
                 ["recordingNotificationEnabled"] = prefs.RecordingNotificationEnabled,

@@ -1,4 +1,4 @@
-# builds replaykit.dll against whatever obs version is actually installed (no bundled sdk) by matching the obs-deps qt6 abi via CMakePresets.json, sparse-checking-out libobs/frontend/api headers at that obs-studio tag, downloading the matching prebuilt qt6 package, generating obs.lib/obs-frontend-api.lib import libs from the installed dlls via dumpbin, and building with cmake/ninja from vs2022/2019 build tools -- produces build/replaykit.dll, copy to C:\ProgramData\obs-studio\plugins\replaykit-tray\bin\64bit\replaykit.dll (no admin needed, obs scans that path itself).
+# builds replaykit.dll (from replaykit.cpp) against whatever obs version is actually installed (no bundled sdk) by matching the obs-deps qt6 abi via CMakePresets.json, sparse-checking-out libobs/frontend/api headers at that obs-studio tag, downloading the matching prebuilt qt6 package, generating obs.lib/obs-frontend-api.lib import libs from the installed dlls via dumpbin, and building with cmake/ninja from vs2022/2019 build tools -- produces build/replaykit.dll, copy to C:\ProgramData\obs-studio\plugins\replaykit\bin\64bit\replaykit.dll (no admin needed, obs scans that path itself).
 
 param(
     [string]$WorkDir = (Join-Path $env:TEMP "replaykit-tray-build"),
@@ -43,7 +43,7 @@ Write-Output "detected OBS version: $obsVersion"
 
 # skip the whole rebuild (qt6 download, header checkout, import-lib generation, cmake/ninja) when the bundled dll is already newer than every source input and the installed obs itself -- obs64.exe is in the list becuase a different obs version needs different headers/qt6/import-libs even if none of this plugins own files changed.
 $buildInputs = @(
-    (Join-Path $PSScriptRoot "replaykit-tray.cpp"),
+    (Join-Path $PSScriptRoot "replaykit.cpp"),
     (Join-Path $PSScriptRoot "CMakeLists.txt"),
     (Join-Path $PSScriptRoot "browser-panel.hpp"),
     $obsExe,

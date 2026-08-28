@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
-add_library(replaykit-tray MODULE replaykit-tray.cpp)
+add_library(replaykit-tray MODULE replaykit.cpp)
 
 target_include_directories(replaykit-tray PRIVATE
     "${OBS_HEADERS_DIR}/libobs"

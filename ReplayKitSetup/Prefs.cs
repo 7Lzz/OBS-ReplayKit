@@ -27,6 +27,7 @@ namespace ReplayKitSetup
         [JsonProperty("compression_mode")] public string CompressionMode { get; set; } = Prefs.DEFAULT_COMPRESSION_MODE;
         [JsonProperty("obs_startup_enabled")] public bool ObsStartupEnabled { get; set; } = Prefs.DEFAULT_OBS_STARTUP;
         [JsonProperty("disable_obs_close_warning")] public bool DisableObsCloseWarning { get; set; } = Prefs.DEFAULT_DISABLE_OBS_CLOSE_WARNING;
+        [JsonProperty("close_to_tray")] public bool CloseToTray { get; set; } = Prefs.DEFAULT_CLOSE_TO_TRAY;
         [JsonProperty("allow_sleep_while_active")] public bool AllowSleepWhileActive { get; set; } = Prefs.DEFAULT_ALLOW_SLEEP_WHILE_ACTIVE;
         [JsonProperty("pin_obs_tray_icon")] public bool PinObsTrayIcon { get; set; } = Prefs.DEFAULT_PIN_OBS_TRAY_ICON;
         [JsonProperty("clip_notification_enabled")] public bool ClipNotificationEnabled { get; set; } = Prefs.DEFAULT_CLIP_NOTIFICATION;
@@ -78,8 +79,9 @@ namespace ReplayKitSetup
 
         // defaults match the bundled config so an unconfigured run produces the same install the previous version did.
         public const string DEFAULT_RECORDING_PRESET = "balanced";
-        public const bool DEFAULT_INPUT_OVERLAY = true;
-        public const string DEFAULT_OVERLAY_STYLE = "input_overlay";
+        // overlay ships off -- the input-overlay + bongo cat plugins still install so Settings can switch to either, the scene just starts clean.
+        public const bool DEFAULT_INPUT_OVERLAY = false;
+        public const string DEFAULT_OVERLAY_STYLE = "off";
         public static readonly string[] ALLOWED_OVERLAY_STYLES = { "input_overlay", "bongo_cat", "off" };
         public const int DEFAULT_OVERLAY_OPACITY = 100;
         public const int DEFAULT_OVERLAY_SCALE = 100;
@@ -97,6 +99,7 @@ namespace ReplayKitSetup
         public const int REPLAY_BUFFER_MAX = 1200;
         public const bool DEFAULT_OBS_STARTUP = true;
         public const bool DEFAULT_DISABLE_OBS_CLOSE_WARNING = true;
+        public const bool DEFAULT_CLOSE_TO_TRAY = true;
         public const bool DEFAULT_ALLOW_SLEEP_WHILE_ACTIVE = true;
         public const bool DEFAULT_PIN_OBS_TRAY_ICON = true;
         public const bool DEFAULT_DEBUG_LOGGING_ENABLED = false;
@@ -287,6 +290,7 @@ namespace ReplayKitSetup
             ["overlayColorAdd"] = "overlay_color_add",
             ["obsStartupEnabled"] = "obs_startup_enabled",
             ["disableObsCloseWarning"] = "disable_obs_close_warning",
+            ["closeToTray"] = "close_to_tray",
             ["allowSleepWhileActive"] = "allow_sleep_while_active",
             ["pinObsTrayIcon"] = "pin_obs_tray_icon",
             ["clipNotificationEnabled"] = "clip_notification_enabled",
@@ -449,6 +453,7 @@ namespace ReplayKitSetup
                 CompressionMode = compressionMode,
                 ObsStartupEnabled = CoerceBool(Get("obs_startup_enabled"), DEFAULT_OBS_STARTUP),
                 DisableObsCloseWarning = CoerceBool(Get("disable_obs_close_warning"), DEFAULT_DISABLE_OBS_CLOSE_WARNING),
+                CloseToTray = CoerceBool(Get("close_to_tray"), DEFAULT_CLOSE_TO_TRAY),
                 AllowSleepWhileActive = CoerceBool(Get("allow_sleep_while_active"), DEFAULT_ALLOW_SLEEP_WHILE_ACTIVE),
                 PinObsTrayIcon = CoerceBool(Get("pin_obs_tray_icon"), DEFAULT_PIN_OBS_TRAY_ICON),
                 ClipNotificationEnabled = CoerceBool(Get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),

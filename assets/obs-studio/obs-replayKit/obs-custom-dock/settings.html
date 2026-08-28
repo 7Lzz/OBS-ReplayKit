@@ -25,6 +25,13 @@
     --button:#3C404D;
     --button-hover:#464B59;
     --font:"Segoe UI",system-ui,sans-serif;
+    /* shared motion language -- kept in step with clips.html / controls_app.html. */
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --anim_press:130ms;
+    --anim_menu:200ms;
+    --hover_grow:1.03;
+    --press_shrink:.96;
   }
   * { box-sizing:border-box; }
   html,body {
@@ -214,7 +221,8 @@
     justify-content:center;
     pointer-events:none;
   }
-  .combo-arrow svg { width:16px; height:16px; fill:currentColor; }
+  .combo-arrow svg { width:16px; height:16px; fill:currentColor; transition:transform var(--anim_menu) var(--ease_smooth); }
+  .combo.is-open .combo-arrow svg { transform:rotate(180deg); }
   .combo-button::before {
     content:"";
     position:absolute;
@@ -245,21 +253,43 @@
     white-space:nowrap;
   }
   .combo-menu {
-    display:none;
     position:absolute;
     z-index:20;
     top:34px;
     left:0;
     right:0;
-    max-height:214px;
-    overflow:auto;
+    /* slides open from zero height and back. max-height:0 + overflow:hidden means a closed menu adds no height to .main, so a combo in the last row cant summon a phantom scrollbar. */
+    max-height:0;
+    overflow:hidden;
     background:#272A33;
     border:1px solid var(--line);
     border-radius:4px;
-    padding:3px;
+    padding:0 3px;
     box-shadow:0 10px 24px rgba(0,0,0,.28);
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translateY(-6px);
+    transform-origin:top center;
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
-  .combo.is-open .combo-menu { display:block; }
+  .combo.is-open .combo-menu {
+    max-height:214px;
+    overflow:auto;
+    padding:3px;
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:translateY(0);
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* options fade + rise in with a short stagger. */
+  .combo.is-open .combo-option { animation:rk-option-in 200ms var(--ease_smooth) backwards; }
+  .combo.is-open .combo-option:nth-child(2) { animation-delay:26ms; }
+  .combo.is-open .combo-option:nth-child(3) { animation-delay:48ms; }
+  .combo.is-open .combo-option:nth-child(4) { animation-delay:68ms; }
+  .combo.is-open .combo-option:nth-child(n+5) { animation-delay:84ms; }
+  @keyframes rk-option-in { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
   .combo-option {
     min-height:28px;
     display:flex;
@@ -678,6 +708,40 @@
     .form-row { grid-template-columns:130px minmax(180px,1fr); }
     .hotkey-row { grid-template-columns:180px minmax(180px,1fr) auto; }
   }
+
+  /* --- shared press/hover feedback ---------------------------------------------
+     same motion language as the rest of the dock: footer/action buttons grow on
+     hover and dip on press; sidebar rows slide instead of scaling. */
+  .btn,
+  .icon-btn,
+  .copy-confirm-btn,
+  .sidebar-github {
+    transition:transform var(--anim_press) var(--ease_pop), background-color 90ms linear, border-color 90ms linear, color 90ms linear;
+  }
+  .btn:hover,
+  .icon-btn:hover,
+  .copy-confirm-btn:hover,
+  .sidebar-github:hover { transform:scale(var(--hover_grow)); }
+  .btn:active,
+  .icon-btn:active,
+  .copy-confirm-btn:active,
+  .sidebar-github:active { transform:scale(var(--press_shrink)); }
+  .btn:disabled,
+  .icon-btn:disabled { transform:none; }
+  .nav-btn {
+    transition:transform var(--anim_press) var(--ease_pop), background-color 90ms linear, border-color 90ms linear;
+  }
+  .nav-btn:hover { transform:translateX(3px); }
+  .nav-btn:active { transform:translateX(3px) scale(var(--press_shrink)); }
+  .spin-btn { transition:background-color 90ms linear; }
+
+  /* modal + section-switch settle in rather than snapping. */
+  @keyframes rk-veil-in { from { opacity:0; } to { opacity:1; } }
+  @keyframes rk-modal-in { from { opacity:0; transform:translateY(10px) scale(.965); } to { opacity:1; transform:none; } }
+  @keyframes rk-page-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+  .modal-backdrop.is-visible { animation:rk-veil-in 130ms ease both; }
+  .modal-backdrop.is-visible .modal { animation:rk-modal-in 190ms var(--ease_smooth) both; }
+  .page.is-active { animation:rk-page-in 190ms var(--ease_smooth) both; }
 </style>
 </head>
 <body>
@@ -746,6 +810,13 @@
           <label class="check-row">
             <input type="checkbox" id="disableObsCloseWarning">
             <span>Do not warn when closing OBS with active outputs</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="closeToTray">
+            <span>Closing the OBS window minimizes it to the tray instead of quitting</span>
           </label>
         </div>
         <div class="form-row tight">
@@ -1279,6 +1350,7 @@
     obsStartupEnabled: document.getElementById("obsStartupEnabled"),
     runObsAsAdmin: document.getElementById("runObsAsAdmin"),
     disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
+    closeToTray: document.getElementById("closeToTray"),
     allowSleepWhileActive: document.getElementById("allowSleepWhileActive"),
     pinObsTrayIcon: document.getElementById("pinObsTrayIcon"),
     clipNotificationEnabled: document.getElementById("clipNotificationEnabled"),
@@ -2128,6 +2200,7 @@
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
+    els.closeToTray.checked = state.closeToTray !== false;
     els.allowSleepWhileActive.checked = state.allowSleepWhileActive !== false;
     els.pinObsTrayIcon.checked = state.pinObsTrayIcon !== false;
     els.clipNotificationEnabled.checked = !!state.clipNotificationEnabled;
@@ -2175,6 +2248,7 @@
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
+    state.closeToTray = els.closeToTray.checked;
     state.allowSleepWhileActive = els.allowSleepWhileActive.checked;
     state.pinObsTrayIcon = els.pinObsTrayIcon.checked;
     state.clipNotificationEnabled = els.clipNotificationEnabled.checked;
@@ -2396,8 +2470,20 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
-    input.addEventListener("change", () => { readUi(); markDirty(); });
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+    input.addEventListener("change", () => {
+      readUi();
+      markDirty();
+      // confirm bounce on tick, via the web animations api so it only ever fires on a real user toggle -- syncUi() setting .checked programmatically never dispatches change.
+      if (input.checked && input.animate) {
+        try {
+          input.animate(
+            [{ transform: "scale(.72)" }, { transform: "scale(1.14)", offset: 0.55 }, { transform: "scale(1)" }],
+            { duration: 200, easing: "cubic-bezier(.2, .7, .3, 1)" }
+          );
+        } catch (_) {}
+      }
+    });
   });
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
   els.settingsSearch.addEventListener("input", applySettingsSearch);

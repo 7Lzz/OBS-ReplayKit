@@ -36,6 +36,13 @@
     --button_border_hover: var(--grey1);
     --primary: var(--blue3);
     --primary_light: var(--blue2);
+    /* shared motion language. ease_pop is a light overshoot for taps/pops; ease_smooth is a long decelerating ease-out for panels that should glide into place and settle. */
+    --ease_pop: cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth: cubic-bezier(.16, 1, .3, 1);
+    --anim_press: 130ms;
+    --anim_menu: 200ms;
+    --hover_grow: 1.03;
+    --press_shrink: .96;
   }
 
   * { box-sizing: border-box; }
@@ -70,6 +77,7 @@
     flex: 0 0 auto;
   }
   .tab-group {
+    position: relative;
     gap: 0;
     padding: 0;
     border: 0;
@@ -78,6 +86,19 @@
     transition: transform 140ms ease;
   }
   body.is-selection-mode .tab-group { transform: translateX(2px); }
+  /* one shared underbar that glides between tabs instead of the accent hopping from border to border. js sets --tab-ul-x / --tab-ul-w from the active tab's box; width 0 until the first measurement so it doesnt flash at the left edge on load. */
+  .tab-underline {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    width: var(--tab-ul-w, 0px);
+    border-radius: 1px;
+    background: var(--primary_light);
+    transform: translateX(var(--tab-ul-x, 0px));
+    transition: transform 260ms var(--ease_smooth), width 260ms var(--ease_smooth);
+    pointer-events: none;
+  }
   .tab-actions {
     gap: 6px;
     margin-left: auto;
@@ -104,7 +125,6 @@
   }
   .tab.is-active {
     background: transparent;
-    border-bottom-color: var(--primary_light);
     color: var(--white1);
   }
   .tab .count {
@@ -175,7 +195,7 @@
   .clip-sort-muted { display: none; }
   .clip-sort-chevron {
     opacity: .8;
-    transition: transform .12s ease;
+    transition: transform var(--anim_menu) var(--ease_smooth);
   }
   .clip-sort-wrap.is-open .clip-sort-chevron { transform: rotate(180deg); }
   .clip-sort-spinner {
@@ -204,9 +224,29 @@
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.48);
     overflow-y: auto;
     z-index: 10000;
-    display: none;
+    /* stays in the dom both ways so it can glide. closed: faded, lifted up a touch, shrunk from the top edge, and inert. open: eases down into place. visibility flips only after the close settles so it cant be tabbed or hit while hidden. transform + opacity are gpu-composited, which is what actually makes this read as smooth rather than snappy. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-10px) scale(.96);
+    transform-origin: top center;
+    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
-  .clip-sort-wrap.is-open .clip-sort-menu { display: block; }
+  .clip-sort-wrap.is-open .clip-sort-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* menu rows fade + rise in with a short stagger as the panel opens. */
+  /* backwards fill (not both) so the row does not keep the animation's held transform afterwards -- that would out-rank and kill the :hover translateX nudge. */
+  .clip-sort-wrap.is-open .clip-sort-item { animation: rk-menu-item 220ms var(--ease_smooth) backwards; }
+  .clip-sort-wrap.is-open .clip-sort-item:nth-child(2) { animation-delay: 30ms; }
+  .clip-sort-wrap.is-open .clip-sort-item:nth-child(3) { animation-delay: 55ms; }
+  .clip-sort-wrap.is-open .clip-sort-item:nth-child(4) { animation-delay: 78ms; }
+  .clip-sort-wrap.is-open .clip-sort-item:nth-child(5) { animation-delay: 98ms; }
+  .clip-sort-wrap.is-open .clip-sort-item:nth-child(n+6) { animation-delay: 115ms; }
   .clip-sort-item {
     width: 100%;
     height: 30px;
@@ -258,7 +298,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    animation: bulk-actions-in 140ms ease-out;
+    animation: bulk-actions-in 220ms var(--ease_smooth) both;
   }
   .bulk-actions[hidden] { display: none !important; }
   .bulk-actions::after {
@@ -282,7 +322,7 @@
   .bulk-summary-count { color: var(--white1); }
   .bulk-summary-size { margin-top: 2px; color: var(--text_muted); font-variant-numeric: tabular-nums; }
   @keyframes bulk-actions-in {
-    from { opacity: 0; transform: translateX(-4px); }
+    from { opacity: 0; transform: translateX(-8px); }
     to { opacity: 1; transform: translateX(0); }
   }
   .bulk-count {
@@ -452,7 +492,7 @@
     color: var(--text);
     margin: 4px 4px 10px 4px;
   }
-  .section-heading.is-shown { display: flex; }
+  .section-heading.is-shown { display: flex; animation: rk-menu-item 240ms var(--ease_smooth) backwards; }
   .section-heading svg { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink: 0; }
   /* divider above "all clips" so the favorites-vs-rest boundary reads clearly even with both headings now sharing the same bold white style. same border colour as every other hairline in this file (inputs, cards, toasts) for consistency. */
   .section-heading-rest {
@@ -492,7 +532,9 @@
     overflow: visible;
     display: flex;
     flex-direction: column;
-    transition: border-color 80ms linear;
+    /* hover lift uses `translate` (the individual property, integer px, vertical only) so it composes with the translate3d that positions virtualized cards and can never drift a card sideways. the thumbnail does the "grow" instead -- it scales inside .previews overflow:clip so the card box, and the progress bar glued to its bottom edge, never move relative to each other. `transform` itself stays untransitioned so a recycled card snaps to its new slot. */
+    translate: 0 0;
+    transition: translate 160ms var(--ease_smooth), box-shadow 200ms var(--ease_smooth), border-color 100ms linear, opacity 150ms linear;
     overflow-anchor: none;
     /* keep card layout isolated without content-visibility. OBS CEF can flicker grid children after maximize/restore when content-visibility:auto is combined with virtualized rows and lazy media. */
     contain: layout style;
@@ -500,6 +542,12 @@
   .card.menu-open { z-index: 20; }
   .card:hover {
     border-color: var(--grey1);
+    translate: 0 -3px;
+    box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5);
+  }
+  /* a hovered card that is also selected keeps the white ring and gains the same lift. */
+  .card.is-selected:hover {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 12px 28px -8px rgba(0, 0, 0, 0.5);
   }
   .preview {
     position: relative;
@@ -511,6 +559,15 @@
     border-radius: 5px 5px 0 0;
     cursor: pointer;
   }
+  /* groups the thumb + video into one layer under the overlay controls. */
+  .preview-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 5px 5px 0 0;
+  }
+  .preview:fullscreen .preview-media,
+  .preview:-webkit-full-screen .preview-media { border-radius: 0; }
   .preview .thumb {
     position: absolute;
     inset: 0;
@@ -554,37 +611,17 @@
   .preview.is-playing.is-video-ready video {
     opacity: 1;
   }
+  /* resting cards just get a light dim so the thumbnail reads as "not playing" -- no play glyph. it lifts on hover. */
   .preview .play-overlay {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(0, 0, 0, 0.28);
     opacity: 1;
-    transition: opacity 120ms linear;
+    transition: opacity 160ms linear;
     pointer-events: none;
   }
-  .card:hover .preview .play-overlay { opacity: 0; }
-  .preview .play-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .preview .play-icon::after {
-    content: "";
-    display: block;
-    width: 0;
-    height: 0;
-    border-left: 12px solid rgba(255, 255, 255, 0.9);
-    border-top: 8px solid transparent;
-    border-bottom: 8px solid transparent;
-    margin-left: 3px;
-  }
+  .card:hover .preview .play-overlay,
+  .preview.is-playing .play-overlay { opacity: 0; }
 
   /* preview controls (volume + fullscreen, bottom of preview) - float over the video, fade in on card hover so resting cards look clean. the two halves (left = volume, right = fullscreen) sit above the progress bar. */
   .preview-controls {
@@ -665,7 +702,17 @@
   }
   .select-clip-btn:hover { background: transparent; }
   .select-clip-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.35; }
-  .select-clip-btn .select-check { display: none; fill: none; }
+  /* transparent-white (not `none`) so the fill can animate to solid when the card is ticked. */
+  .select-clip-btn .select-ring { fill: rgba(255, 255, 255, 0); transition: fill 140ms linear, stroke 140ms linear; }
+  /* the check just fades + eases up to full size when a card is ticked -- no overshoot/bounce. */
+  .select-clip-btn .select-check {
+    fill: none;
+    opacity: 0;
+    scale: 0.7;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: opacity 110ms ease, scale 150ms var(--ease_smooth);
+  }
   .select-clip-btn,
   .favorite-btn {
     opacity: 0;
@@ -681,7 +728,7 @@
   .card.is-selected { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, .45); }
   .card.is-selected .select-clip-btn { background: transparent; color: #1d1f26; }
   .card.is-selected .select-clip-btn .select-ring { display: block; fill: #fff; stroke: #fff; }
-  .card.is-selected .select-clip-btn .select-check { display: block; stroke: #1d1f26; stroke-width: 1.55; }
+  .card.is-selected .select-clip-btn .select-check { stroke: #1d1f26; stroke-width: 1.55; opacity: 1; scale: 1; }
   body.is-selection-mode .card:not(.is-selected) { opacity: .58; }
   body.is-selection-mode .card:not(.is-selected):hover { opacity: .78; }
   body.is-selection-mode .card { cursor: pointer; }
@@ -696,7 +743,7 @@
     background: rgba(0, 0, 0, 0.55);
     border-radius: 14px;
     overflow: hidden;
-    transition: width 140ms ease, background-color 80ms linear;
+    transition: width 200ms var(--ease_smooth), background-color 80ms linear;
   }
   .volume-control:hover {
     width: 124px;
@@ -715,6 +762,23 @@
     padding: 0;
   }
   .volume-btn svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  /* youtube-style speaker waves: every arc + the mute X live in the svg at once, hidden by default. the
+     button's data-level (set by syncVolumeUi) reveals just as many as the current volume warrants, and each
+     one eases in/out from the speaker edge on its own -- so 24%->50% grows only the 2nd arc, 50%->24% retracts
+     only the 2nd arc, etc. no re-render, no restaged animation. */
+  .volume-btn .vol-wave,
+  .volume-btn .vol-x {
+    transform-box: fill-box;
+    opacity: 0;
+    scale: 0.3;
+    transition: opacity 170ms ease, scale 260ms var(--ease_smooth);
+  }
+  .volume-btn .vol-wave { transform-origin: left center; }
+  .volume-btn .vol-x { transform-origin: center; }
+  .volume-btn:not([data-level="1"]):not([data-level="2"]):not([data-level="3"]) .vol-x { opacity: 1; scale: 1; }
+  .volume-btn:is([data-level="1"], [data-level="2"], [data-level="3"]) .vol-wave-1,
+  .volume-btn:is([data-level="2"], [data-level="3"]) .vol-wave-2,
+  .volume-btn[data-level="3"] .vol-wave-3 { opacity: 1; scale: 1; }
   .volume-slider-wrap {
     flex: 1 1 auto;
     display: flex;
@@ -880,9 +944,21 @@
     box-shadow: none;
     color: rgb(238, 238, 238);
     z-index: 10;
-    display: none;
+    /* sits above the gear, so it grows up out of its bottom edge and eases back down to close -- mirror of the menus that drop. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(10px) scale(.96);
+    transform-origin: bottom center;
+    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
-  .settings-wrap.is-open .settings-menu { display: block; }
+  .settings-wrap.is-open .settings-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
   /* header: gear glyph + "playback speed" label. no divider line -- youtube uses generous whitespace instead. */
   .settings-menu .menu-header {
     display: flex;
@@ -1022,8 +1098,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 72px;
-    height: 72px;
+    width: 46px;
+    height: 46px;
     transform: translate(-50%, -50%);
     background: rgba(0, 0, 0, 0.55);
     border-radius: 50%;
@@ -1035,7 +1111,12 @@
     opacity: 0;
     transition: opacity 350ms ease-out, transform 350ms ease-out;
   }
-  .center-pulse svg { width: 36px; height: 36px; fill: #FFFFFF; }
+  .center-pulse svg { width: 22px; height: 22px; fill: #FFFFFF; }
+  /* the dock preview is small, so the flash matches the old resting play button; give it room in fullscreen. */
+  .preview:fullscreen .center-pulse,
+  .preview:-webkit-full-screen .center-pulse { width: 76px; height: 76px; }
+  .preview:fullscreen .center-pulse svg,
+  .preview:-webkit-full-screen .center-pulse svg { width: 38px; height: 38px; }
   .center-pulse.is-flashing {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1.15);
@@ -1332,12 +1413,16 @@
     overflow: hidden;
     white-space: nowrap;
     box-sizing: border-box;
-    transition: width 140ms ease, color 80ms linear, background-color 80ms linear;
+    transition: width 140ms ease, color 80ms linear, background-color 80ms linear, transform var(--anim_press) var(--ease_pop);
   }
+  /* same hover-grow / press-shrink as every other button. transform composes with the armed-state width animation without disturbing it; the armed (confirm) state opts back out below. */
   .icon-mini-btn.delete-btn:hover {
     color: #ff6b82;
     background: rgba(227, 59, 87, 0.16);
+    transform: scale(var(--hover_grow));
   }
+  .icon-mini-btn.delete-btn:active { transform: scale(var(--press_shrink)); }
+  .icon-mini-btn.delete-btn.is-armed { transform: none; }
   .icon-mini-btn.delete-btn svg {
     transition: width 140ms ease, opacity 80ms linear;
   }
@@ -1382,9 +1467,25 @@
     padding: 4px 0;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
     z-index: 100;
-    display: none;
+    /* same glide as the sort menu -- kept in the dom, faded + lifted + shrunk from its top edge while closed, eased down into place on open. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-10px) scale(.96);
+    transform-origin: top right;
+    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
-  .menu-dropdown.is-open { display: block; }
+  .menu-dropdown.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  .menu-dropdown.is-open .menu-item { animation: rk-menu-item 220ms var(--ease_smooth) backwards; }
+  .menu-dropdown.is-open .menu-item:nth-child(2) { animation-delay: 32ms; }
+  .menu-dropdown.is-open .menu-item:nth-child(3) { animation-delay: 60ms; }
+  .menu-dropdown.is-open .menu-item:nth-child(4) { animation-delay: 84ms; }
   .menu-item {
     display: flex;
     align-items: center;
@@ -2248,6 +2349,115 @@
   .compress-mode-modal.is-locked .compress-mode-list,
   .compress-mode-modal.is-locked .compress-mode-warning { display: none; }
   .compress-mode-modal.is-locked .compress-mode-locked { display: block; }
+
+  /* --- shared press/hover feedback -------------------------------------------------
+     one motion language for every clickable control: standalone buttons grow a hair
+     on hover and dip on press; list rows nudge sideways instead (a full-width row
+     that scaled would spill past the menu edge). durations/curve come from the
+     :root motion tokens so the whole dock stays in step. bespoke motions that
+     already own an element (delete-btn armed width, volume pill width, tab-group
+     shift, center-pulse) are deliberately left out of these selector lists. */
+  .btn,
+  .tab,
+  .tab-action,
+  .clip-sort-trigger,
+  .bulk-icon-btn,
+  .bulk-clear,
+  .icon-btn,
+  .favorite-btn,
+  .select-clip-btn,
+  .play-toggle-btn,
+  .volume-btn,
+  .settings-btn,
+  .speed-step-btn,
+  .speed-pill,
+  .compress-mode-card,
+  .trim-info .preview-btn,
+  .icon-mini-btn:not(.delete-btn) {
+    transition: transform var(--anim_press) var(--ease_pop),
+                background-color 90ms linear, border-color 90ms linear, color 90ms linear,
+                opacity 120ms linear;
+  }
+  .btn:hover,
+  .tab:hover,
+  .tab-action:hover,
+  .clip-sort-trigger:hover,
+  .bulk-icon-btn:hover,
+  .bulk-clear:hover,
+  .icon-btn:hover,
+  .favorite-btn:hover,
+  .select-clip-btn:hover,
+  .play-toggle-btn:hover,
+  .volume-btn:hover,
+  .settings-btn:hover,
+  .speed-step-btn:hover,
+  .speed-pill:hover,
+  .compress-mode-card:hover,
+  .trim-info .preview-btn:hover,
+  .icon-mini-btn:not(.delete-btn):hover {
+    transform: scale(var(--hover_grow));
+  }
+  .btn:active,
+  .tab:active,
+  .tab-action:active,
+  .clip-sort-trigger:active,
+  .bulk-icon-btn:active,
+  .bulk-clear:active,
+  .icon-btn:active,
+  .favorite-btn:active,
+  .select-clip-btn:active,
+  .play-toggle-btn:active,
+  .volume-btn:active,
+  .settings-btn:active,
+  .speed-step-btn:active,
+  .speed-pill:active,
+  .compress-mode-card:active,
+  .trim-info .preview-btn:active,
+  .icon-mini-btn:not(.delete-btn):active {
+    transform: scale(var(--press_shrink));
+  }
+  /* menu rows: slide, dont scale. */
+  .menu-item,
+  .clip-sort-item {
+    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear, color 90ms linear;
+  }
+  .menu-item:hover,
+  .clip-sort-item:hover { transform: translateX(3px); }
+  .menu-item:active,
+  .clip-sort-item:active { transform: translateX(3px) scale(var(--press_shrink)); }
+  /* controls that are mid-operation or locked shouldnt react to the pointer. ordered
+     after the hover/active rules above so the equal-specificity opt-out wins. */
+  .btn:disabled,
+  .btn.is-busy,
+  .btn.is-progress,
+  .btn.is-flashing,
+  .tab-action:disabled,
+  .tab-action.is-disabled,
+  .tab-action.is-running,
+  .bulk-icon-btn:disabled,
+  .bulk-clear:disabled,
+  .btn.danger-action.is-armed,
+  .compress-mode-card.is-disabled {
+    transform: none;
+  }
+
+  /* custom bulk-toolbar tooltip: grows in from just under the button instead of a flat fade. */
+  #bulk-tip {
+    transform: translateY(3px) scale(.96);
+    transform-origin: top center;
+    transition: opacity 100ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  #bulk-tip.is-shown { transform: translateY(0) scale(1); }
+
+  /* modals + toast: settle in rather than snapping. the veil fades, the panel rises into it. */
+  @keyframes rk-veil-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rk-modal-in { from { opacity: 0; transform: translateY(10px) scale(.965); } to { opacity: 1; transform: none; } }
+  @keyframes rk-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  /* per-row fade + rise for menus that open -- staggered via nth-child delays at each menu. */
+  @keyframes rk-menu-item { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .modal-veil.is-open { animation: rk-veil-in 130ms ease both; }
+  .modal-veil.is-open .modal { animation: rk-modal-in 190ms var(--ease_pop) both; }
+  .toast.is-shown { animation: rk-toast-in 160ms var(--ease_pop) both; }
 </style>
 </head>
 <body>
@@ -2327,9 +2537,8 @@
               <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
             </button>
             <div class="trim-volume-control volume-control">
-              <button class="volume-btn" id="trim-volume-btn" type="button">
-                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm15.59 3L21 14.41 19.59 16 17 13.41 14.41 16 13 14.41 15.59 12 13 9.59 14.41 8.17 17 10.59 19.59 8 21 9.41 18.59 12z"/></svg>
-              </button>
+              <!-- syncVolumeUi swaps this for the shared VOLUME_ICON (speaker + wave arcs + mute X) on first sync, well before the edit modal is opened. -->
+              <button class="volume-btn" id="trim-volume-btn" type="button" data-level="0"></button>
               <div class="volume-slider-wrap">
                 <input type="range" class="volume-slider" id="trim-volume-slider" min="0" max="100" step="1" value="60">
               </div>
@@ -2401,6 +2610,7 @@
       <button class="tab is-active" type="button" data-filter="all" data-label="All">All</button>
       <button class="tab" type="button" data-filter="favorites" data-label="Favorites">Favorites</button>
       <button class="tab" type="button" data-filter="linked" data-label="Linked">Linked</button>
+      <span class="tab-underline" aria-hidden="true"></span>
     </div>
     <div class="tab-actions">
       <div class="bulk-summary" id="bulk-summary" hidden>
@@ -2551,11 +2761,8 @@
 
   // material-style icon svg path data. inlined so we dont pay a round-trip per card. each card duplicates the markup, but each <svg> is ~80 bytes -- not worth a sprite sheet.
   const ICON = {
-    // material volume_off, but with the x subpath shifted right by 2 units so it clears the speaker cone (which ends at x=12) with a visible gap instead of biting into it.
+    // material volume_off (speaker cone + shifted x). split into speaker(2 paths) + x(1) below to assemble VOLUME_ICON.
     VOL_MUTED:  '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M22.0001 10.41L20.5901 9.00002L18.4601 11.12L16.3401 9.00002L14.9301 10.41L17.0501 12.54L14.9301 14.66L16.3401 16.07L18.4601 13.95L20.5901 16.07L22.0001 14.66L19.8801 12.54L22.0001 10.41Z"/>',
-    VOL_LOW:    '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75z"/>',
-    VOL_MID:    '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75zM18.75 8C18.3358 8 18 8.3358 18 8.75v6.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-6.5c0-.4142-.3358-.75-.75-.75z"/>',
-    VOL_ON:     '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M15.75 9.5C15.3358 9.5 15 9.8358 15 10.25v3.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-3.5c0-.4142-.3358-.75-.75-.75zM18.75 8C18.3358 8 18 8.3358 18 8.75v6.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-6.5c0-.4142-.3358-.75-.75-.75zM21.75 6.5C21.3358 6.5 21 6.8358 21 7.25v9.5c0 .4142.3358.75.75.75s.75-.3358.75-.75v-9.5c0-.4142-.3358-.75-.75-.75z"/>',
     FULLSCREEN: '<path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/>',
     MORE:       '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
     EDIT:       '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
@@ -2577,10 +2784,19 @@
     SETTINGS:   '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
   };
 
-  // Keep the supplied Medal speaker shape, but draw the loudness levels as speaker waves rather than meter bars.
-  ICON.VOL_LOW = ICON.VOL_LOW.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
-  ICON.VOL_MID = ICON.VOL_MID.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
-  ICON.VOL_ON = ICON.VOL_ON.replace(/<path d="M15\.75[^"]+"\/>$/, '<path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10M20.5 4.5a10.5 10.5 0 0 1 0 15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"/>');
+  // one static volume icon: the fixed speaker body plus every wave arc and the mute X, all present at once.
+  // syncVolumeUi never rebuilds it -- it just sets data-level on the button and css fades/scales the individual
+  // arcs (or the X) in and out, so raising 24%->50% animates only the 2nd wave appearing, not a full redraw.
+  const _volMuteParts = ICON.VOL_MUTED.match(/<path[^>]*\/>/g) || [];
+  const VOL_SPEAKER = (_volMuteParts[0] || "") + (_volMuteParts[1] || "");
+  const VOL_X = (_volMuteParts[2] || "").replace("<path ", '<path class="vol-x" ');
+  const VOL_WAVE_ATTRS = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"';
+  const VOLUME_ICON =
+    '<svg viewBox="0 0 24 24">' + VOL_SPEAKER +
+    '<path class="vol-wave vol-wave-1" d="M15.5 9.5a3.5 3.5 0 0 1 0 5" ' + VOL_WAVE_ATTRS + '/>' +
+    '<path class="vol-wave vol-wave-2" d="M18 7a7 7 0 0 1 0 10" ' + VOL_WAVE_ATTRS + '/>' +
+    '<path class="vol-wave vol-wave-3" d="M20.5 4.5a10.5 10.5 0 0 1 0 15" ' + VOL_WAVE_ATTRS + '/>' +
+    VOL_X + '</svg>';
 
   const bulkCompressIcon = document.getElementById("bulk-compress-icon");
   if (bulkCompressIcon) bulkCompressIcon.innerHTML = ICON.COMPRESS;
@@ -2591,14 +2807,21 @@
     video.muted  = VolumeState.muted;
     video.volume = VolumeState.volume;
   }
-  // paint the icon + slider on one card to reflect volumestate.
+  // 0 = muted (show the X), 1/2/3 = that many speaker waves. matches the old <0.4 / <0.85 thresholds.
+  function volumeLevel() {
+    if (VolumeState.muted || VolumeState.volume <= 0) return 0;
+    if (VolumeState.volume < 0.4) return 1;
+    if (VolumeState.volume >= 0.85) return 3;
+    return 2;
+  }
+  // paint the icon + slider on one card to reflect volumestate. the svg is built once, then only
+  // data-level changes -- css transitions each wave (or the X) in/out on its own, no full redraw.
   function syncVolumeUi(btn, slider) {
-    const icon = VolumeState.muted || VolumeState.volume <= 0
-      ? ICON.VOL_MUTED
-      : VolumeState.volume < 0.4 ? ICON.VOL_LOW
-      : VolumeState.volume >= 0.85 ? ICON.VOL_ON : ICON.VOL_MID;
-    if (btn)    btn.innerHTML = `<svg viewBox="0 0 24 24">${icon}</svg>`;
-    if (slider) slider.value  = Math.round(VolumeState.volume * 100);
+    if (btn) {
+      if (!btn.querySelector(".vol-wave-1")) btn.innerHTML = VOLUME_ICON;
+      btn.dataset.level = String(volumeLevel());
+    }
+    if (slider) slider.value = Math.round(VolumeState.volume * 100);
   }
   // broadcast: rewrite every cards volume ui + push the new volume to the currently-playing preview (if any). this is what makes the "global volume" ux work -- toggle mute on one card and every other card shows the unmuted icon too.
   function notifyVolumeSync() {
@@ -2643,6 +2866,8 @@
   const toastEl = document.getElementById("toast");
   const resizeGripEl = document.querySelector(".resize-grip");
   const tabBtns = Array.from(document.querySelectorAll(".tab[data-filter]"));
+  const tabGroupEl = document.querySelector(".tab-group");
+  const tabUnderlineEl = document.querySelector(".tab-underline");
   const sortWrap = document.getElementById("clip-sort");
   const sortButton = document.getElementById("clip-sort-button");
   const sortMenu = document.getElementById("clip-sort-menu");
@@ -2727,6 +2952,8 @@
   let fullscreenHostTransition = false;
   let fullscreenHostTransitionSeq = 0;
   let fullscreenHostTransitionTimer = 0;
+  // scroll offset captured the instant a clip goes fullscreen, before the helper resizes the host window to monitor size. the resize shrinks maxScrollTop, chromium clamps scrollTop down to fit, and rendervirtualwindow would otherwise bake that clamped value in permanently -- so we stash the real offset here and put it back once the window is restored.
+  let fullscreenSavedScrollTop = null;
   let deferredFullscreenRender = false;
   let deferredFullscreenRenderForce = false;
   let pendingLoadedRenderAfterFullscreen = false;
@@ -3175,6 +3402,19 @@
       btn.innerHTML = escapeHtml(btn.dataset.label || key)
         + '<span class="count">' + (counts[key] || 0) + '</span>';
     }
+    // counts change the tab widths, so re-measure the underbar every time the labels are rewritten.
+    positionTabUnderline();
+  }
+
+  function positionTabUnderline() {
+    if (!tabGroupEl || !tabUnderlineEl) return;
+    const active = tabGroupEl.querySelector(".tab.is-active");
+    if (!active || !active.offsetWidth) {
+      tabUnderlineEl.style.setProperty("--tab-ul-w", "0px");
+      return;
+    }
+    tabUnderlineEl.style.setProperty("--tab-ul-x", active.offsetLeft + "px");
+    tabUnderlineEl.style.setProperty("--tab-ul-w", active.offsetWidth + "px");
   }
 
   function clipMatchesFilter(clip) {
@@ -3498,7 +3738,7 @@
     }, delay);
   }
 
-  function finishFullscreenHostTransition(seq) {
+  function finishFullscreenHostTransition(seq, restoreScroll) {
     if (seq !== fullscreenHostTransitionSeq) return;
     if (fullscreenHostTransitionTimer) clearTimeout(fullscreenHostTransitionTimer);
     fullscreenHostTransitionTimer = setTimeout(() => {
@@ -3510,6 +3750,24 @@
         });
       }
       updateFullscreenBodyState();
+      // window is back to its normal size now, so clientHeight (and therefore maxScrollTop) is trustworthy again -- put the pre-fullscreen offset back, render at that position, then re-assert once more in case the render nudged it.
+      if (restoreScroll && fullscreenSavedScrollTop != null) {
+        const applyScroll = () => {
+          if (fullscreenSavedScrollTop == null) return;   // a window reset cleared it out from under us
+          const maxScrollTop = Math.max(0, scrollAreaEl.scrollHeight - scrollAreaEl.clientHeight);
+          scrollAreaEl.scrollTop = Math.min(fullscreenSavedScrollTop, maxScrollTop);
+        };
+        requestAnimationFrame(() => {
+          applyScroll();
+          queueVirtualRender(true);
+          requestAnimationFrame(() => {
+            applyScroll();
+            fullscreenSavedScrollTop = null;
+          });
+        });
+      } else {
+        fullscreenSavedScrollTop = null;
+      }
       flushDeferredFullscreenRender(0);
     }, 180);
   }
@@ -3564,7 +3822,8 @@
       return;
     }
 
-    const previousScrollTop = scrollAreaEl.scrollTop;
+    // during a pending post-fullscreen restore, aim at the offset captured before the host window grew, not the value chromium clamped down while it was monitor-sized.
+    const previousScrollTop = fullscreenSavedScrollTop != null ? fullscreenSavedScrollTop : scrollAreaEl.scrollTop;
     const layout = computeVirtualLayout();
     const columns = layout.columns;
     const cardWidth = layout.cardWidth;
@@ -4074,7 +4333,14 @@
 
     card.innerHTML = `
       <div class="preview">
-        <img class="thumb" src="${EMPTY_THUMB}" data-src="${thumbUrl}" loading="lazy" decoding="async" alt="">
+        <!-- thumb + video share an overflow:hidden wrapper so the hover zoom is clipped to the frame (the .preview box itself keeps an overflow-clip-margin for the scrub dot, which would otherwise let the zoom spill past the rounded corners). -->
+        <div class="preview-media">
+          <img class="thumb" src="${EMPTY_THUMB}" data-src="${thumbUrl}" loading="lazy" decoding="async" alt="">
+          <!-- Chromes fullscreen 3-dot "more options" menu only appears when at least one item is enabled, so disabling every possible entry (nodownload, noplaybackrate, noremoteplayback, disablePictureInPicture) makes the button itself disappear; we deliberately do not add 'nofullscreen' since that hides the separate fullscreen toggle button, not the 3-dot menu. -->
+          <video preload="none" muted loop playsinline
+                 controlsList="nodownload noplaybackrate noremoteplayback"
+                 disablePictureInPicture></video>
+        </div>
         <button class="select-clip-btn" type="button" title="Select clip" aria-label="Select clip" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle class="select-ring" cx="12" cy="12" r="8"></circle>
@@ -4084,11 +4350,7 @@
         <button class="favorite-btn" type="button" title="Favorite clip" aria-label="Favorite clip">
           <svg viewBox="0 0 24 24">${isFavorite(clip.name) ? ICON.STAR : ICON.STAR_BORDER}</svg>
         </button>
-        <!-- Chromes fullscreen 3-dot "more options" menu only appears when at least one item is enabled, so disabling every possible entry (nodownload, noplaybackrate, noremoteplayback, disablePictureInPicture) makes the button itself disappear; we deliberately do not add 'nofullscreen' since that hides the separate fullscreen toggle button, not the 3-dot menu. -->
-        <video preload="none" muted loop playsinline
-               controlsList="nodownload noplaybackrate noremoteplayback"
-               disablePictureInPicture></video>
-        <div class="play-overlay"><div class="play-icon"></div></div>
+        <div class="play-overlay"></div>
         <!-- YouTube-style flash: pops up in the center for ~500ms every time the user toggles play/pause via click or space, then fades out; js picks which icon to show. -->
         <div class="center-pulse">
           <svg viewBox="0 0 24 24" class="cp-play">${ICON.PLAY}</svg>
@@ -4102,9 +4364,7 @@
               <svg viewBox="0 0 24 24" class="pt-pause" style="display:none">${ICON.PAUSE}</svg>
             </button>
             <div class="volume-control">
-              <button class="volume-btn" type="button">
-                <svg viewBox="0 0 24 24">${ICON.VOL_MUTED}</svg>
-              </button>
+              <button class="volume-btn" type="button" data-level="0">${VOLUME_ICON}</button>
               <div class="volume-slider-wrap">
                 <input type="range" class="volume-slider" min="0" max="100" step="1" value="60">
               </div>
@@ -4226,6 +4486,16 @@
       const next = !isFavorite(name);
       setFavorite(name, next);
       syncFavoriteButton(card, name);
+      // little celebratory bounce when a clip is starred; a plain quick squish when it is un-starred.
+      if (favoriteBtn.animate) {
+        try {
+          favoriteBtn.animate(
+            next ? [{ scale: "0.6" }, { scale: "1.25", offset: 0.45 }, { scale: "1" }]
+                 : [{ scale: "0.8" }, { scale: "1" }],
+            { duration: next ? 280 : 150, easing: "cubic-bezier(.2, .7, .3, 1)" }
+          );
+        } catch (_) {}
+      }
       updateTabs(loadedClips);
       // re-render when the toggle changes which section the card belongs to: on the favorites filter an unfavorite removes the card from view; on the all filter any toggle moves the card between the favorites sub-section and the main list.
       if ((activeFilter === "favorites" && !next) || activeFilter === "all") {
@@ -4873,6 +5143,8 @@
     const titleRow = card.querySelector(".title-row");
     const nameSpan = card.querySelector(".name");
     if (!nameSpan) return;
+    // the pencil + the trailing action cluster get shoved sideways when the name swaps to a full-width input; FLIP them so they glide instead of jumping.
+    const flipTargets = [card.querySelector(".edit-btn"), card.querySelector(".title-actions")];
 
     // extension lives in its own static chip, not the input -- theres nothing to select past the basename, so it cant be typed over or dragged away by accident.
     const dot = currentName.lastIndexOf(".");
@@ -4892,16 +5164,21 @@
       extSpan.textContent = ext;
     }
 
-    titleRow.replaceChild(input, nameSpan);
-    if (extSpan) titleRow.insertBefore(extSpan, input.nextSibling);
+    rkFlip(flipTargets, () => {
+      titleRow.replaceChild(input, nameSpan);
+      if (extSpan) titleRow.insertBefore(extSpan, input.nextSibling);
+    });
+    try { input.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" }); } catch (_) {}
     input.focus();
     input.select();
 
     let settled = false;
     function swapBackToNameSpan() {
-      if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
-      else titleRow.insertBefore(nameSpan, titleRow.firstChild);
-      if (extSpan && extSpan.parentNode) extSpan.parentNode.removeChild(extSpan);
+      rkFlip(flipTargets, () => {
+        if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
+        else titleRow.insertBefore(nameSpan, titleRow.firstChild);
+        if (extSpan && extSpan.parentNode) extSpan.parentNode.removeChild(extSpan);
+      });
     }
     function restore() {
       if (settled) return;
@@ -5096,9 +5373,14 @@
     if (fsActive === lastFsActive) return;
     lastFsActive = fsActive;
     updateFullscreenBodyState();
+    // keep the host-transition guard raised from enter all the way through the exit resize so renders + the scroll poller stay suppressed the whole time the native window is a non-standard size. document.fullscreenElement covers the in-fullscreen stretch; the guard flag covers the gap after fullscreen ends but before the window has shrunk back. on entry, stash the real scroll offset first -- the window is still its normal size here, the last chance to read it before chromium clamps it once the window grows.
+    if (fsActive) fullscreenSavedScrollTop = scrollAreaEl.scrollTop;
+    const seq = beginFullscreenHostTransition();
     // CEF's Fullscreen API only expands inside its popup. mirror YouTube's element fullscreen with a borderless monitor-sized host so the player actually occupies the selected screen instead of a maximized framed window.
     const route = fsActive ? "/window/fullscreen" : "/window/fullscreen/restore";
-    fetch(HELPER + route + "?title=Clips&t=" + Date.now(), { method: "POST", cache: "no-store" }).catch(() => {});
+    const fetchDone = fetch(HELPER + route + "?title=Clips&t=" + Date.now(), { method: "POST", cache: "no-store" }).catch(() => {});
+    // only settle the guard on the way out -- on the way in we want it to stay up until the matching exit fires. exit gets the scroll restore.
+    if (!fsActive) fetchDone.finally(() => finishFullscreenHostTransition(seq, true));
   }
   document.addEventListener("fullscreenchange", handleHostFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
@@ -5540,6 +5822,42 @@
     pollTimer = setTimeout(poll, delay);
   }
 
+  // fade + short rise on the grid when its contents are swapped wholesale (tab switch, sort change).
+  // opacity + transform only -- neither affects scrollTop / clientHeight / element height, which are the
+  // measurements rendervirtualwindow relies on, so the render underneath stays correct.
+  function flashGridSwap() {
+    if (!scrollAreaEl.animate) return;
+    try {
+      scrollAreaEl.animate(
+        [{ opacity: 0.25, transform: "translateY(7px)" }, { opacity: 1, transform: "translateY(0)" }],
+        { duration: 220, easing: "cubic-bezier(.16, 1, .3, 1)" }
+      );
+    } catch (_) {}
+  }
+
+  // FLIP: run `mutate` (a dom change that reflows the row), then slide the given elements from where
+  // they were to where they landed. uses the web animations api so it leaves no inline styles behind
+  // and reverts cleanly to whatever css says afterwards.
+  function rkFlip(els, mutate) {
+    const list = (els || []).filter(Boolean);
+    if (!list.length || !list[0].animate) { mutate(); return; }
+    const before = list.map((el) => el.getBoundingClientRect());
+    mutate();
+    for (let i = 0; i < list.length; i++) {
+      const a = before[i];
+      const b = list[i].getBoundingClientRect();
+      const dx = a.left - b.left;
+      const dy = a.top - b.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      try {
+        list[i].animate(
+          [{ transform: "translate(" + dx + "px, " + dy + "px)" }, { transform: "translate(0, 0)" }],
+          { duration: 240, easing: "cubic-bezier(.16, 1, .3, 1)" }
+        );
+      } catch (_) {}
+    }
+  }
+
   tabBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const next = btn.dataset.filter || "all";
@@ -5548,8 +5866,12 @@
       scrollAreaEl.scrollTop = 0;
       resetVirtualWindow();
       renderLoadedClips(loadedClips);
+      positionTabUnderline();
+      flashGridSwap();
     });
   });
+  requestAnimationFrame(positionTabUnderline);
+  window.addEventListener("resize", positionTabUnderline);
 
   updateClipSortControl();
   if (sortButton && sortWrap) {
@@ -5574,6 +5896,7 @@
         setClipSortLoading(true);
         scrollAreaEl.scrollTop = 0;
         updateClipSortControl();
+        flashGridSwap();
         scheduleNextPoll(0);
       });
     });
@@ -5625,6 +5948,8 @@
   function resetClipsWindowState() {
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
+    // a fresh-window reset owns the scroll position (it forces it to 0 below); drop any pending post-fullscreen restore so it cant fire late and yank the list back to where fullscreen was entered.
+    fullscreenSavedScrollTop = null;
 
     const renameInput = document.querySelector(".name-edit-input");
     if (renameInput) renameInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

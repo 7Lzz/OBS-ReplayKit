@@ -340,7 +340,7 @@ namespace ReplayKitHelper
         private static readonly string ProjectorHandoffPath = Path.Combine(Constants.SCRATCH_DIR, "obsreplaykit_projector_windows.txt");
         private const int ProjectorHandoffMaxAgeSeconds = 2;
 
-        // reads the tray plugins (replaykit-tray.cpp) published list of hwnds obs itself has marked with isOBSProjectorWindow -- the actual authoritative signal obs uses internally, republished every 250ms via an atomic write so this never sees a half-written file. returns null (not an empty list) when the file is missing or older than a couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the tray plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back accordingly -- an empty list here would silently collapse those two very different situations into one.
+        // reads the plugins (replaykit.cpp) published list of hwnds obs itself has marked with isOBSProjectorWindow -- the actual authoritative signal obs uses internally, republished every 250ms via an atomic write so this never sees a half-written file. returns null (not an empty list) when the file is missing or older than a couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the tray plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back accordingly -- an empty list here would silently collapse those two very different situations into one.
         private static List<long> GetProjectorHwndsFromTrayPlugin()
         {
             FileInfo info;

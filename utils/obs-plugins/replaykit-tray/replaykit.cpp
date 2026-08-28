@@ -33,6 +33,8 @@
 #include <QCursor>
 #include <QSaveFile>
 #include <QFile>
+#include <QFileInfo>
+#include <QDateTime>
 #include <QTextStream>
 
 #include "browser-panel.hpp"
@@ -68,6 +70,13 @@ QPointer<QTimer> g_openClipsCommandTimer;
 std::string g_openClipsHotkeyBinding;
 bool g_openClipsHotkeyRequestInFlight = false;
 std::string g_openClipsCommandToken;
+
+// close-to-tray: when true, the OBS window's X hides to tray instead of quitting. polled from /settings on
+// the same 1s timer as the open-clips hotkey. real quits/restarts (tray Exit, restart routes) drop the
+// obs-allow-close marker just before posting WM_CLOSE so the filter lets those through untouched.
+bool g_closeToTray = true;
+QPointer<QWidget> g_mainWindow;
+QPointer<QObject> g_mainWindowCloseFilter;
 HMODULE g_replayKitModule = nullptr;
 HANDLE g_nativeCrashLog = INVALID_HANDLE_VALUE;
 PVOID g_nativeCrashHandler = nullptr;
@@ -558,6 +567,7 @@ void LoadOpenClipsHotkey()
 		std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 3000);
 		QMetaObject::invokeMethod(qApp, [settingsBody]() {
 			g_openClipsHotkeyRequestInFlight = false;
+			g_closeToTray = JsonBoolField(settingsBody, "closeToTray", true);
 			RegisterOpenClipsHotkey(settingsBody);
 		}, Qt::QueuedConnection);
 	}).detach();
@@ -565,7 +575,10 @@ void LoadOpenClipsHotkey()
 
 QString ProjectorHandoffDir();
 
-void PollOpenClipsCommand()
+// seedOnly on the first call (at FINISHED_LOADING): the command file survives an obs restart, so a token left
+// over from a previous session must be adopted silently -- otherwise every fresh obs launch would re-open the
+// clips window for a "View Clips" click that already happened in the last session.
+void PollOpenClipsCommand(bool seedOnly = false)
 {
 	QFile commandFile(ProjectorHandoffDir() + "/open_clips.command");
 	if (!commandFile.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -574,6 +587,8 @@ void PollOpenClipsCommand()
 	if (token.empty() || token == g_openClipsCommandToken)
 		return;
 	g_openClipsCommandToken = token;
+	if (seedOnly)
+		return;
 	ShowClips();
 }
 
@@ -898,6 +913,53 @@ void PublishMainWindow()
 	file.commit();
 }
 
+// turns the OBS main window's close (X) into hide-to-tray while g_closeToTray is on. narrowly scoped to the
+// one QWidget (an app-wide filter caused a confirmed 2026-08-10 crash catching cef events mid-teardown). the
+// obs-allow-close marker, dropped by the helpers restart/exit routes right before they post WM_CLOSE, is the
+// escape hatch that keeps real quits + replaykit restarts working (obs still gets to save its geometry).
+class MainWindowCloseFilter : public QObject {
+public:
+	explicit MainWindowCloseFilter(QWidget *mw) : QObject(mw), m_mw(mw) {}
+
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override
+	{
+		if (watched != m_mw || event->type() != QEvent::Close || !g_closeToTray)
+			return false;
+
+		QFileInfo allow(ProjectorHandoffDir() + "/obs-allow-close");
+		if (allow.exists() && allow.lastModified().secsTo(QDateTime::currentDateTime()) < 60)
+			return false; // a real restart/exit is in progress -- let obs close and save geometry
+
+		QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
+		if (!tray || !tray->isVisible())
+			return false; // nothing to minimize into -- fall back to a normal close
+
+		event->ignore();
+		if (m_mw)
+			m_mw->hide();
+		return true;
+	}
+
+private:
+	QWidget *m_mw;
+};
+
+void InstallMainWindowCloseFilter()
+{
+	if (g_mainWindowCloseFilter)
+		return;
+	QWidget *mw = (QWidget *)obs_frontend_get_main_window();
+	if (!mw)
+		return;
+	// clear any obs-allow-close left behind by a previous session's restart so it can never leak into this one.
+	QFile::remove(ProjectorHandoffDir() + "/obs-allow-close");
+	g_mainWindow = mw;
+	auto *filter = new MainWindowCloseFilter(mw);
+	mw->installEventFilter(filter);
+	g_mainWindowCloseFilter = filter;
+}
+
 QTimer *g_projectorPublishTimer = nullptr;
 
 // QSaveFile writes to a temp file and atomically renames it into place on commit(), so a reader on the other process never sees a half-written file -- plain QFile writing in place could get caught mid-write by the helpers poll.
@@ -937,6 +999,9 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 	PrewarmCefBrowser();
 	PublishMainWindow();
+	InstallMainWindowCloseFilter();
+	// adopt any leftover open_clips.command token now so the 100ms poll below only reacts to a click made in THIS session.
+	PollOpenClipsCommand(true);
 	g_openClipsHotkeyTimer = new QTimer(qApp);
 	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() {
 		LoadOpenClipsHotkey();
@@ -1119,4 +1184,7 @@ void obs_module_unload(void)
 		delete g_openClipsHotkeyFilter;
 		g_openClipsHotkeyFilter = nullptr;
 	}
+	// the filter is parented to the main window, so it is already gone if the window was destroyed first; guard with the QPointer and only detach when both still exist.
+	if (g_mainWindow && g_mainWindowCloseFilter)
+		g_mainWindow->removeEventFilter(g_mainWindowCloseFilter);
 }

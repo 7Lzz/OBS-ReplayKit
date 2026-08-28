@@ -58,6 +58,8 @@ namespace ReplayKitHelper
         private static void StopObsForRestart(string reason)
         {
             Thread.Sleep(300);
+            // tell the tray plugin's close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it would swallow the close and obs would never get to save its geometry before the force-kill below.
+            try { AppConfig.WriteUtf8(Path.Combine(Constants.SCRATCH_DIR, "obs-allow-close"), DateTime.UtcNow.ToString("O")); } catch { }
             var procs = GetProcessesByNames("obs64", "obs32", "obs", "obs-browser-page");
             foreach (var p in procs)
             {
@@ -646,7 +648,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string title = Q("title");
                 int minW, minH, maxW = 2400, maxH = 1800;
-                // kept in sync with the native QWidget::setMinimumSize() calls in replaykit-tray.cpp's CreateSettingsWindow/CreateClipsWindow -- this custom corner-grip resize used to enforce different bounds than obs's own native edge/corner resize on the same windows, so the two disagreed about how small each window could get depending on which resize handle you used.
+                // kept in sync with the native QWidget::setMinimumSize() calls in replaykit.cpp's CreateSettingsWindow/CreateClipsWindow -- this custom corner-grip resize used to enforce different bounds than obs's own native edge/corner resize on the same windows, so the two disagreed about how small each window could get depending on which resize handle you used.
                 if (title == "ReplayKit Settings") { minW = 700; minH = 500; }
                 else if (title == "Clips") { minW = 850; minH = 620; }
                 else if (title == "ReplayKit Update") { minW = 480; minH = 400; }

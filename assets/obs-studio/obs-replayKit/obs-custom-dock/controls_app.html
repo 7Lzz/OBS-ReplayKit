@@ -41,6 +41,13 @@
     --primary_light: var(--blue2);
     --input_bg: var(--grey8);
     --input_border: var(--grey4);
+    /* shared motion language -- kept in step with clips.html / settings.html. */
+    --ease_pop: cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth: cubic-bezier(.16, 1, .3, 1);
+    --anim_press: 130ms;
+    --anim_menu: 200ms;
+    --hover_grow: 1.03;
+    --press_shrink: .96;
   }
 
   * { box-sizing: border-box; }
@@ -105,18 +112,23 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: background-color 60ms linear, border-color 60ms linear;
+    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear, border-color 90ms linear;
   }
   .btn:hover {
     background-color: var(--button_bg_hover);
     border-color: var(--button_border_hover);
+    transform: scale(var(--hover_grow));
   }
   .btn:focus-visible { border-color: var(--button_border_hover); }
-  .btn:active { background-color: var(--button_bg_down); }
+  .btn:active { background-color: var(--button_bg_down); transform: scale(var(--press_shrink)); }
   .btn:disabled {
     opacity: 0.65;
     cursor: progress;
+    transform: none;
   }
+  .btn.is-disconnected,
+  .btn.is-busy,
+  .btn.is-signing-in { transform: none; }
   .btn.is-disconnected {
     opacity: 0.45;
     cursor: not-allowed;
@@ -197,10 +209,27 @@
     background: var(--grey6);
     border: 1px solid var(--grey4);
     border-radius: var(--border_radius);
-    padding: 4px 0;
-    display: none;
+    /* collapses to a clipped zero-height box instead of display:none so it can slide open and shut. overflow:hidden + max-height:0 also means a closed menu adds no height to #controlsFrame, so it never forces the scrollbar the up/down flip is there to avoid. openMenu() still measures offsetHeight correctly -- max-height caps height, it doesnt force it. */
+    max-height: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-5px) scale(.98);
+    transform-origin: top center;
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
-  .auth-menu.is-open { display: block; }
+  .auth-menu.is-open {
+    max-height: 240px;
+    padding: 4px 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  .auth-menu.is-up { transform-origin: bottom center; }
   .auth-menu.is-down {
     top: calc(100% + 3px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
@@ -242,8 +271,20 @@
     cursor: pointer;
     color: var(--text);
     user-select: none;
+    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear;
   }
-  .auth-menu .item:hover { background: var(--button_bg_hover); }
+  .auth-menu .item:hover { background: var(--button_bg_hover); transform: translateX(3px); }
+  .auth-menu .item:active { transform: translateX(3px) scale(var(--press_shrink)); }
+
+  /* one-time cascade as the dock view loads. backwards fill so the rows sit hidden through their
+     stagger delay, then settle -- and dont keep a transform that would fight the :hover pop. */
+  @keyframes rk-dock-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  #controlsFrame > * { animation: rk-dock-in 300ms var(--ease_smooth) backwards; }
+  #controlsFrame > *:nth-child(2) { animation-delay: 35ms; }
+  #controlsFrame > *:nth-child(3) { animation-delay: 70ms; }
+  #controlsFrame > *:nth-child(4) { animation-delay: 105ms; }
+  #controlsFrame > *:nth-child(5) { animation-delay: 140ms; }
+  #controlsFrame > *:nth-child(6) { animation-delay: 175ms; }
 </style>
 </head>
 <body style="background:#272A33;color:#FFFFFF">
@@ -683,13 +724,13 @@
   }
   fetchMe();
 
-  // open downward when theres room below the auth button inside the dock; otherwise flip upward so the menu doesnt force a scrollbar. we add is-down before measuring so offsetheight reflects the real rendered height, then swap to is-up if it wont fit. both class changes happen in the same tick so the browser never paints the intermediate state.
+  // open downward when theres room below the auth button inside the dock; otherwise flip upward so the menu doesnt force a scrollbar. we add is-down before measuring, then swap to is-up if it wont fit. both class changes happen in the same tick so the browser never paints the intermediate state. scrollHeight (not offsetHeight) is read on purpose -- the menu now slides open from max-height:0, and scrollHeight reports the full content height regardless of where that animation currently sits, where offsetHeight would read ~0 on the first frame.
   const authWrap = document.getElementById("auth-wrap");
   const controlsFrame = document.getElementById("controlsFrame");
   function openMenu() {
     authMenu.classList.remove("is-up");
     authMenu.classList.add("is-down", "is-open");
-    const menuH = authMenu.offsetHeight;
+    const menuH = authMenu.scrollHeight;
     const spaceBelow =
       controlsFrame.getBoundingClientRect().bottom -
       authWrap.getBoundingClientRect().bottom;
