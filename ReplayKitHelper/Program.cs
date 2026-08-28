@@ -26,6 +26,7 @@ namespace ReplayKitHelper
         private static Mutex _singletonMutex;
         private static TcpListener _listener;
         private static readonly object CrashLogLock = new object();
+        private static Timer _crashSentinelTimer;
 
         private static int Main(string[] args)
         {
@@ -144,6 +145,7 @@ namespace ReplayKitHelper
 
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
+            try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
 
             RunAcceptLoop();
 
@@ -323,6 +325,25 @@ namespace ReplayKitHelper
             }
         }
 
+        // true unless the user has explicitly turned the setting off -- read fresh so a toggle takes effect within one sweep interval, no restart. fail-safe to true (suppress) if the settings file is momentarily unreadable.
+        private static bool CrashPopupSuppressed()
+        {
+            try { return ReplaykitSettings.ReadSettings()["disableObsCrashPopup"]?.Value<bool>() ?? true; }
+            catch { return true; }
+        }
+
+        // obs's "did not properly shut down" prompt fires from a leftover .sentinel\run_* before any module or this helper loads, so the current launch cant be caught -- but sweeping the file while we run means a hard crash / power loss leaves nothing behind and the NEXT launch is clean. obs writes its sentinel once at startup and never recreates it, so the 30s repeat is just insurance for a helper that started before obs wrote the file.
+        private static void StartCrashSentinelSweep()
+        {
+            try { if (CrashPopupSuppressed()) ClearObsCrashSentinel(); }
+            catch (Exception ex) { Log.Write("ClearObsCrashSentinel(startup): " + ex.Message); }
+            _crashSentinelTimer = new Timer(_ =>
+            {
+                try { if (CrashPopupSuppressed()) ClearObsCrashSentinel(); }
+                catch (Exception ex) { Log.Write("ClearObsCrashSentinel(sweep): " + ex.Message); }
+            }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+
         // obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes every lingering
         // one during its own shutdown handler on a clean exit -- a killed/crashed obs never reaches that code, so
         // the leftover file is what makes the next launch show the "crash detected" prompt. clearing it ourselves
@@ -458,7 +479,7 @@ namespace ReplayKitHelper
             try { PipeClient.Stop(); } catch { }
             try { AppConfig.StopClipFolderWatcher(); } catch (Exception ex) { Log.Write("StopClipFolderWatcher: " + ex.Message); }
             try { _listener?.Stop(); } catch (SocketException) { }
-            if (ParentWatchdog.ParentDied)
+            if (ParentWatchdog.ParentDied && CrashPopupSuppressed())
             {
                 try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
             }

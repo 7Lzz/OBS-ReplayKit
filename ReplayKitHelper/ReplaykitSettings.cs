@@ -54,6 +54,8 @@ namespace ReplayKitHelper
                 ["obsStartupEnabled"] = true,
                 ["runObsAsAdmin"] = false,
                 ["disableObsCloseWarning"] = true,
+                // helper keeps obs's .sentinel\run_* swept while it runs so a crash / power loss cant leave the "did not properly shut down" prompt behind for the next launch. off = hand crash detection back to obs.
+                ["disableObsCrashPopup"] = true,
                 // when on, the tray plugin turns the OBS window's X into "minimize to tray" -- real quits still go through the tray Exit / restart routes.
                 ["closeToTray"] = true,
                 ["allowSleepWhileActive"] = true,
@@ -292,6 +294,7 @@ namespace ReplayKitHelper
                 ["obsStartupEnabled"] = GetBoolSetting(data, "obsStartupEnabled", defaults["obsStartupEnabled"].Value<bool>()),
                 ["runObsAsAdmin"] = GetBoolSetting(data, "runObsAsAdmin", defaults["runObsAsAdmin"].Value<bool>()),
                 ["disableObsCloseWarning"] = GetBoolSetting(data, "disableObsCloseWarning", defaults["disableObsCloseWarning"].Value<bool>()),
+                ["disableObsCrashPopup"] = GetBoolSetting(data, "disableObsCrashPopup", defaults["disableObsCrashPopup"].Value<bool>()),
                 ["closeToTray"] = GetBoolSetting(data, "closeToTray", defaults["closeToTray"].Value<bool>()),
                 ["allowSleepWhileActive"] = GetBoolSetting(data, "allowSleepWhileActive", defaults["allowSleepWhileActive"].Value<bool>()),
                 ["pinObsTrayIcon"] = GetBoolSetting(data, "pinObsTrayIcon", defaults["pinObsTrayIcon"].Value<bool>()),

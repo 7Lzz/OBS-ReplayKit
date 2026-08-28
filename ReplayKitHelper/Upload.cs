@@ -79,7 +79,13 @@ namespace ReplayKitHelper
 
             Log.Write("Start-StreamableUpload spawning in-process upload task", "upload", requestId);
 
-            var task = Task.Run(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet));
+            // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that
+            // lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say)
+            // 70% could still finish the S3 upload + trigger the transcode.
+            var cts = new CancellationTokenSource();
+            UploadState.SetUploadState(requestId: requestId, cts: cts);
+
+            var task = Task.Run(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet, cts.Token));
             task.ContinueWith(t => HandleUploadCompletion(t, requestId, clipName, quiet));
 
             return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };

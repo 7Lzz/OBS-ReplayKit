@@ -829,6 +829,13 @@
         <div class="form-row tight">
           <div></div>
           <label class="check-row">
+            <input type="checkbox" id="disableObsCrashPopup">
+            <span>Disable the OBS "crash detected / safe mode" popup after an unclean shutdown</span>
+          </label>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
             <input type="checkbox" id="closeToTray">
             <span>Closing the OBS window minimizes it to the tray instead of quitting</span>
           </label>
@@ -1391,6 +1398,7 @@
     obsStartupEnabled: document.getElementById("obsStartupEnabled"),
     runObsAsAdmin: document.getElementById("runObsAsAdmin"),
     disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
+    disableObsCrashPopup: document.getElementById("disableObsCrashPopup"),
     closeToTray: document.getElementById("closeToTray"),
     allowSleepWhileActive: document.getElementById("allowSleepWhileActive"),
     pinObsTrayIcon: document.getElementById("pinObsTrayIcon"),
@@ -2285,6 +2293,7 @@
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
+    els.disableObsCrashPopup.checked = state.disableObsCrashPopup !== false;
     els.closeToTray.checked = state.closeToTray !== false;
     els.allowSleepWhileActive.checked = state.allowSleepWhileActive !== false;
     els.pinObsTrayIcon.checked = state.pinObsTrayIcon !== false;
@@ -2341,6 +2350,7 @@
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
+    state.disableObsCrashPopup = els.disableObsCrashPopup.checked;
     state.closeToTray = els.closeToTray.checked;
     state.allowSleepWhileActive = els.allowSleepWhileActive.checked;
     state.pinObsTrayIcon = els.pinObsTrayIcon.checked;
@@ -2576,7 +2586,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();

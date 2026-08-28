@@ -36,6 +36,7 @@
     --button_border_hover: var(--grey1);
     --primary: var(--blue3);
     --primary_light: var(--blue2);
+    --link_accent: #4D96EE;
     /* shared motion language. ease_pop is a light overshoot for taps/pops; ease_smooth is a long decelerating ease-out for panels that should glide into place and settle. */
     --ease_pop: cubic-bezier(.2, .7, .3, 1);
     --ease_smooth: cubic-bezier(.16, 1, .3, 1);
@@ -145,114 +146,130 @@
     align-items: center;
     flex: 0 0 auto;
   }
-  .clip-sort-wrap::before {
-    content: "";
-    width: 1px;
-    height: 20px;
-    margin-right: 8px;
-    background: var(--grey4);
-  }
+  /* trigger = sorting glyph + a chevron that flips on open. no "Sort: Newest" text, no resting box -- just the glyph, a faint surface on hover. when the menu is open it takes on the menu's surface and squares its bottom edge so the panel below reads as one connected shape. */
   .clip-sort-trigger {
     height: 32px;
-    min-width: 108px;
-    padding: 0 10px;
-    border: 1px solid var(--grey4);
+    padding: 0 6px;
+    border: 1px solid transparent;
     border-radius: 6px;
-    background: var(--grey6);
+    background: transparent;
     color: var(--text);
-    font: inherit;
-    font-size: 12px;
     cursor: pointer;
-    white-space: nowrap;
     display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 7px;
+    justify-content: center;
+    gap: 3px;
+    transition: background-color 90ms linear, border-color 90ms linear;
   }
-  .clip-sort-trigger:hover,
+  .clip-sort-trigger:hover { background: var(--grey5); }
   .clip-sort-wrap.is-open .clip-sort-trigger {
-    background: var(--grey5);
-    border-color: var(--grey1);
+    background: #2b303b;
+    border-color: #41495a;
+    border-bottom-color: transparent;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
     color: var(--text);
+    transform: none;
+    /* sit above the fixed menu (z 10000) so the trigger's border-less bottom overlaps and hides the menu's top border across the trigger's width -- that's what makes the seam disappear. */
+    position: relative;
+    z-index: 10001;
   }
   .clip-sort-trigger:focus-visible {
     outline: none;
     border-color: var(--primary_light);
   }
-  .clip-sort-trigger svg {
-    width: 14px;
-    height: 14px;
-    fill: currentColor;
-    flex: 0 0 14px;
-  }
-  .clip-sort-text {
-    flex: 1 1 auto;
-    min-width: 0;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .clip-sort-muted { display: none; }
+  .clip-sort-trigger svg { fill: currentColor; }
+  .clip-sort-icon { width: 16px; height: 16px; flex: 0 0 16px; }
   .clip-sort-chevron {
-    opacity: .8;
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+    opacity: .65;
     transition: transform var(--anim_menu) var(--ease_smooth);
   }
   .clip-sort-wrap.is-open .clip-sort-chevron { transform: rotate(180deg); }
+  .clip-sort-wrap.is-loading .clip-sort-icon,
+  .clip-sort-wrap.is-loading .clip-sort-chevron { display: none; }
   .clip-sort-spinner {
     display: none;
-    width: 8px;
-    height: 12px;
+    width: 13px;
+    height: 13px;
     border: 2px solid rgba(255,255,255,.22);
     border-top-color: var(--text);
     border-radius: 50%;
-    flex: 0 0 12px;
     animation: clip-sort-spin .8s linear infinite;
   }
   .clip-sort-wrap.is-loading .clip-sort-spinner { display: inline-block; }
-  .clip-sort-wrap.is-loading .clip-sort-chevron { display: none; }
   @keyframes clip-sort-spin { to { transform: rotate(360deg); } }
+  .clip-search {
+    width: 160px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px;
+    border-bottom: 1px solid var(--grey3);
+    color: var(--text_muted);
+    transition: border-color 100ms linear, color 100ms linear;
+  }
+  .clip-search:focus-within { border-bottom-color: var(--primary_light); color: var(--text); }
+  .clip-search svg { width: 14px; height: 14px; fill: currentColor; flex: 0 0 14px; }
+  .clip-search-input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+  }
+  .clip-search-input::placeholder { color: var(--text_muted); opacity: 1; }
+  /* panel surface, border + row hover are copied from .menu-dropdown (the card right-click menu) so the two menus read identically. no shadow. anchored `position:absolute` to .clip-sort-wrap with `right:0` so the layout engine keeps the panel's right edge pixel-flush with the trigger's -- no js placement math to drift sub-pixel. `top:calc(100% - 1px)` laps the trigger's bottom border; the open trigger (z 10001) paints over that overlap so the seam vanishes. */
   .clip-sort-menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    min-width: 178px;
-    max-height: 240px;
-    background: var(--grey6);
-    border: 1px solid var(--grey4);
-    border-radius: 6px;
-    padding: 4px;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.48);
+    position: absolute;
+    top: calc(100% - 1px);
+    right: 0;
+    left: auto;
+    min-width: 194px;
+    max-height: 320px;
+    background: #2b303b;
+    border: 1px solid #41495a;
+    border-radius: 4px;
+    border-top-right-radius: 0;
+    padding: 4px 0;
+    box-shadow: none;
     overflow-y: auto;
     z-index: 10000;
-    /* stays in the dom both ways so it can glide. closed: faded, lifted up a touch, shrunk from the top edge, and inert. open: eases down into place. visibility flips only after the close settles so it cant be tabbed or hit while hidden. transform + opacity are gpu-composited, which is what actually makes this read as smooth rather than snappy. */
+    /* stays in the dom both ways. closed: clipped to nothing from its top edge + faded + inert. open: the clip window drops open so the panel unrolls out of the trigger. visibility flips only after the close settles so it cant be tabbed or hit while hidden. */
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transform: translateY(-10px) scale(.96);
-    transform-origin: top center;
-    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+    clip-path: inset(0 0 100% 0);
+    transition: opacity 120ms ease, clip-path 190ms var(--ease_smooth), visibility 0s linear 190ms;
   }
   .clip-sort-wrap.is-open .clip-sort-menu {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translateY(0) scale(1);
-    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+    clip-path: inset(0 0 0 0);
+    transition: opacity 90ms ease, clip-path 190ms var(--ease_smooth);
   }
-  /* menu rows fade + rise in with a short stagger as the panel opens. */
-  /* backwards fill (not both) so the row does not keep the animation's held transform afterwards -- that would out-rank and kill the :hover translateX nudge. */
-  .clip-sort-wrap.is-open .clip-sort-item { animation: rk-menu-item 220ms var(--ease_smooth) backwards; }
-  .clip-sort-wrap.is-open .clip-sort-item:nth-child(2) { animation-delay: 30ms; }
-  .clip-sort-wrap.is-open .clip-sort-item:nth-child(3) { animation-delay: 55ms; }
-  .clip-sort-wrap.is-open .clip-sort-item:nth-child(4) { animation-delay: 78ms; }
-  .clip-sort-wrap.is-open .clip-sort-item:nth-child(5) { animation-delay: 98ms; }
-  .clip-sort-wrap.is-open .clip-sort-item:nth-child(n+6) { animation-delay: 115ms; }
+  .clip-sort-heading {
+    padding: 6px 14px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    color: var(--text_muted);
+    user-select: none;
+  }
+  /* no per-row stagger -- the panel just glides, same as the card right-click menu. */
   .clip-sort-item {
     width: 100%;
-    height: 30px;
-    padding: 0 9px;
+    padding: 7px 14px;
     border: 0;
-    border-radius: 4px;
+    border-radius: 0;
     background: transparent;
     color: var(--text);
     font: inherit;
@@ -260,22 +277,44 @@
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     text-align: left;
+    white-space: nowrap;
   }
   .clip-sort-item:hover { background: var(--button_bg_hover); }
-  .clip-sort-item.is-active {
-    background: rgba(71, 107, 215, .24);
-    color: var(--white1);
-  }
+  .clip-sort-label { flex: 1 1 auto; }
+  /* the already-selected sort gets the same blue wash the app uses elsewhere for a selected row, plus the check. */
+  .clip-sort-item.is-active { background: rgba(71, 107, 215, .22); }
+  .clip-sort-item.is-active:hover { background: rgba(71, 107, 215, .3); }
   .clip-sort-check {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     fill: currentColor;
-    flex: 0 0 14px;
+    flex: 0 0 15px;
+    margin-left: auto;
     opacity: 0;
   }
   .clip-sort-item.is-active .clip-sort-check { opacity: 1; }
+  /* Length / File size: a row that discloses two sub-options instead of being a sort itself. */
+  .clip-sort-caret {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+    flex: 0 0 13px;
+    margin-left: auto;
+    opacity: .5;
+    transition: transform var(--anim_menu) var(--ease_smooth);
+  }
+  .clip-sort-grouprow[aria-expanded="true"] .clip-sort-caret { transform: rotate(180deg); }
+  .clip-sort-sub {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 120ms ease;
+  }
+  .clip-sort-group.is-expanded .clip-sort-sub { max-height: 84px; opacity: 1; }
+  .clip-sort-subitem { padding-left: 28px; }
+  .clip-sort-subitem .clip-sort-label { font-size: 11.5px; }
   /* Compress all is grouped with sorting as a batch action, so the filters stay a single calm segmented control. */
   .tab-action {
     height: 32px;
@@ -445,6 +484,40 @@
   body.is-clip-fullscreen .scroll-area {
     overflow: hidden;
   }
+  /* theater mode keeps the player inside the Clips window, but promotes the selected card into a wide stage below the tabs. */
+  body.is-clip-theater .section-heading,
+  body.is-clip-theater #empty,
+  body.is-clip-theater #toast,
+  body.is-clip-theater #grid .card:not(.is-theater-card),
+  body.is-clip-theater #favorites-grid .card:not(.is-theater-card) {
+    visibility: hidden;
+  }
+  body.is-clip-theater .scroll-area { overflow: hidden; }
+  body.is-clip-theater #grid { contain: none; }
+  .card.is-theater-card {
+    position: fixed !important;
+    z-index: 40;
+    inset: 58px 14px 14px;
+    width: auto !important;
+    height: auto !important;
+    transform: none !important;
+    translate: 0 0;
+    contain: none;
+  }
+  .card.is-theater-card .preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    aspect-ratio: auto;
+    border-radius: 5px 5px 0 0;
+  }
+  .card.is-theater-card .preview-media,
+  .card.is-theater-card .preview video {
+    border-radius: 5px 5px 0 0;
+  }
+  .card.is-theater-card .preview video {
+    object-fit: contain;
+    opacity: 1;
+  }
   /* obs yami-style pill scrollbar. the thumb is rendered narrower than the track by giving it a transparent border + padding-box background-clip -- the same trick obs itself uses to get the "floating capsule" look instead of the defualt windows full-width scrollbar. applied with the universal selector so dropdowns and any other scrollables match. */
   *::-webkit-scrollbar         { width: 14px; height: 14px; background: transparent; }
   *::-webkit-scrollbar-track   { background: transparent; }
@@ -542,12 +615,12 @@
   .card.menu-open { z-index: 20; }
   .card:hover {
     border-color: var(--grey1);
-    translate: 0 -3px;
-    box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5);
+    translate: 0 -2px;
+    box-shadow: 0 5px 14px -8px rgba(0, 0, 0, 0.4);
   }
   /* a hovered card that is also selected keeps the white ring and gains the same lift. */
   .card.is-selected:hover {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 12px 28px -8px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 5px 14px -8px rgba(0, 0, 0, 0.4);
   }
   .preview {
     position: relative;
@@ -589,6 +662,7 @@
     opacity: 0;
     transition: opacity 80ms linear;
     border-radius: 5px 5px 0 0;
+    will-change: transform;
   }
   /* the fullscreen target is the .preview container now (not the <video> itself), so the browser doesnt fire its built-in dblclick=exit-fullscreen shortcut. we size the container to 100%/100% and let the video letterbox-fit inside it. */
   .preview:fullscreen,
@@ -608,6 +682,8 @@
     opacity: 1;
     border-radius: 0;
   }
+  .preview:fullscreen .theater-btn,
+  .preview:-webkit-full-screen .theater-btn { display: none; }
   .preview.is-playing.is-video-ready video {
     opacity: 1;
   }
@@ -1454,15 +1530,16 @@
     transform: translateX(0);
   }
 
-  /* dropdown for the 3-dot menu. positioned beneath its trigger, only visible when .is-open. closes on outside click (wired in js). */
-  .menu-container { position: relative; flex-shrink: 0; }
+  /* dropdown for the card actions. pointer placement is calculated in JS for both a three-dot click and a card right-click. */
+  .menu-container { position: static; flex-shrink: 0; }
   .menu-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    min-width: 160px;
-    background: var(--grey6);
-    border: 1px solid var(--grey4);
+    top: var(--menu-top, 0px);
+    left: var(--menu-left, 0px);
+    right: auto;
+    min-width: 190px;
+    background: #2b303b;
+    border: 1px solid #41495a;
     border-radius: 4px;
     padding: 4px 0;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
@@ -1472,7 +1549,7 @@
     visibility: hidden;
     pointer-events: none;
     transform: translateY(-10px) scale(.96);
-    transform-origin: top right;
+    transform-origin: top left;
     transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
   }
   .menu-dropdown.is-open {
@@ -1482,14 +1559,10 @@
     transform: translateY(0) scale(1);
     transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
   }
-  .menu-dropdown.is-open .menu-item { animation: rk-menu-item 220ms var(--ease_smooth) backwards; }
-  .menu-dropdown.is-open .menu-item:nth-child(2) { animation-delay: 32ms; }
-  .menu-dropdown.is-open .menu-item:nth-child(3) { animation-delay: 60ms; }
-  .menu-dropdown.is-open .menu-item:nth-child(4) { animation-delay: 84ms; }
   .menu-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 7px 14px;
     font-size: 12px;
     color: var(--text);
@@ -1504,6 +1577,21 @@
     flex-shrink: 0;
   }
   .menu-item:hover { background: var(--button_bg_hover); }
+  .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
+  /* Create Link / Copy Link: keep the row text white like every other row, only the icon carries the blue accent. */
+  .menu-item.link-menu-item .menu-item-icon { color: var(--link_accent); }
+  .menu-item.link-menu-item:hover { background: rgba(77, 150, 238, .13); }
+  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: #f5c518; }
+  .menu-item .menu-item-icon { margin-left: auto; }
+  .menu-separator {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--grey4);
+  }
+  .menu-item.delete-menu-item { color: var(--red); }
+  .menu-item.delete-menu-item:hover { background: rgba(227, 59, 87, 0.16); color: #ff6b82; }
+  .menu-item.delete-menu-item.is-armed,
+  .menu-item.delete-menu-item.is-armed:hover { background: var(--red); color: #fff; }
 
   /* link icon inside action buttons */
   .btn .btn-icon {
@@ -1558,9 +1646,38 @@
   }
   .meta .link-status.is-expiring { color: var(--amber); }
   .actions {
-    padding: 4px 10px 10px;
+    min-height: 40px;
+    padding: 0 10px;
     display: flex;
     gap: 6px;
+    background: #373c49;
+    border-top: 0;
+    border-radius: 0 0 5px 5px;
+  }
+  .actions .action-link-btn {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    height: 40px;
+    padding: 0 2px;
+    border-color: transparent;
+    background: transparent;
+  }
+  .actions .action-link-btn:hover,
+  .actions .action-link-btn.is-flashing {
+    background: transparent;
+    border-color: transparent;
+    color: var(--link_accent);
+  }
+  .actions .action-link-btn,
+  .actions .action-link-btn:hover,
+  .actions .action-link-btn:active {
+    transform: none !important;
+    scale: 1 !important;
+    transition: color 80ms linear;
+  }
+  .actions.is-progress {
+    padding: 0;
+    background: #373c49;
   }
   .btn {
     display: inline-flex;
@@ -1602,55 +1719,79 @@
     border-color: var(--primary_light);
   }
   .btn.primary:hover { background-color: var(--primary_light); }
-  /* in-card progress readout shown during compress / upload. its a plain div, not a button -- only the trailing X (.progress-cancel) is clickable, so the bar no longer swallows clicks or flips the whole control to a red Cancel the instant the pointer touches it. a real .progress-fill child holds the blue fill, kept out of pointer-events so the X stays hittable. */
+  /* in-card progress readout shown during compress / upload. its a plain div, not a button -- only the trailing X (.progress-cancel) is clickable, so the bar no longer swallows clicks or flips the whole control to a red Cancel the instant the pointer touches it. a real .progress-fill child holds the blue fill, kept out of pointer-events so the X stays hittable. no text -- the bar itself is the readout. */
   .btn.is-progress {
     position: relative;
     overflow: hidden;
+    min-width: 0;
+    height: 38px;
     padding: 0 30px 0 12px;
-    background-color: var(--button_bg);
-    border-color: var(--primary_light);
-    color: var(--text);
+    background-color: transparent;
+    border-color: transparent;
+    border-radius: 0 0 5px 5px;
     cursor: default;
   }
   /* the div still matches .btn:hover/.btn:active -- pin the resting look so hovering the bar doesnt shift it. */
   .btn.is-progress:hover,
   .btn.is-progress:active {
-    background-color: var(--button_bg);
-    border-color: var(--primary_light);
+    background-color: transparent;
+    border-color: transparent;
   }
+  .btn.is-progress .progress-track {
+    position: absolute;
+    left: 12px;
+    right: 34px;
+    top: 50%;
+    height: 6px;
+    transform: translateY(-50%);
+    border-radius: 3px;
+    background: #464c5c;
+    overflow: hidden;
+  }
+  /* width is driven frame-by-frame from updateDisplayProgress -- no css width transition, it only fought the raf and added ~600ms of lag. */
   .btn.is-progress .progress-fill {
     position: absolute;
     left: 0; top: 0; bottom: 0;
     width: 0;
-    background: var(--primary);
-    transition: width 600ms linear, background-color 60ms linear;
+    background: var(--link_accent);
+    border-radius: inherit;
+    transition: background-color 60ms linear;
     pointer-events: none;
     z-index: 0;
   }
+  /* finalizing: bytes are all sent; the bar holds at 99 while the quick transcode-trigger call finishes. a faint sheen keeps it from reading as stalled -- no text, no jump to 100. */
+  .btn.is-progress.is-finalizing .progress-fill {
+    background-image: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .22) 50%, transparent 80%);
+    background-size: 220% 100%;
+    animation: progress-sheen 1s linear infinite;
+  }
+  @keyframes progress-sheen { from { background-position: 140% 0; } to { background-position: -60% 0; } }
   .btn.is-progress > .btn-icon,
   .btn.is-progress > .btn-label {
-    position: relative;
-    z-index: 1;
+    display: none;
   }
-  /* the sole click target: a slim divider-split X hugging the right edge, reddening on its own hover only. */
+  /* The cancel target keeps a comfortable hit area while only its close icon is visible. */
   .btn.is-progress > .progress-cancel {
     position: absolute;
-    right: 0; top: 0; bottom: 0;
+    right: 8px;
+    top: 50%;
     z-index: 2;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
+    width: 22px;
+    height: 22px;
     padding: 0;
     border: 0;
-    border-left: 1px solid var(--button_border);
+    border-radius: 4px;
     background: transparent;
-    color: var(--text_muted);
+    color: #fff;
     cursor: pointer;
-    transition: background-color 80ms ease-out, color 80ms ease-out;
+    transform: translateY(-50%);
+    transition: color 80ms ease-out;
   }
-  .btn.is-progress > .progress-cancel:hover { background: var(--red); color: #FFFFFF; }
-  .btn.is-progress > .progress-cancel svg { width: 13px; height: 13px; fill: currentColor; }
+  .btn.is-progress > .progress-cancel:hover { background: transparent; color: var(--red); }
+  .btn.is-progress > .progress-cancel svg { width: 10px; height: 10px; fill: currentColor; }
   .toast {
     position: fixed;
     right: 14px;
@@ -1794,6 +1935,7 @@
     object-fit: contain;
     background: #000;
     display: block;
+    will-change: transform;
   }
   /* centered play/pause button -- visible on hover, fades out so the user can see the underlying frame while scrubbing. */
   .trim-playpause-btn {
@@ -2475,15 +2617,11 @@
   .icon-mini-btn:not(.delete-btn):active {
     transform: scale(var(--press_shrink));
   }
-  /* menu rows: slide, dont scale. */
+  /* both menus animate their row surface only -- no sideways slide -- so the sort menu matches the card right-click menu. */
   .menu-item,
   .clip-sort-item {
-    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear, color 90ms linear;
+    transition: background-color 90ms linear, color 90ms linear;
   }
-  .menu-item:hover,
-  .clip-sort-item:hover { transform: translateX(3px); }
-  .menu-item:active,
-  .clip-sort-item:active { transform: translateX(3px) scale(var(--press_shrink)); }
   /* controls that are mid-operation or locked shouldnt react to the pointer. ordered
      after the hover/active rules above so the equal-specificity opt-out wins. */
   .btn:disabled,
@@ -2688,34 +2826,52 @@
       <button class="bulk-clear bulk-stop" type="button" id="bulk-upload-stop" hidden>Stop uploads</button>
       <div class="clip-sort-wrap" id="clip-sort">
       <button class="clip-sort-trigger" type="button" id="clip-sort-button"
-              aria-haspopup="menu" aria-expanded="false" title="Sort clips">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/></svg>
-        <span class="clip-sort-text"><span class="clip-sort-muted">Sort:</span> <span id="clip-sort-value">Newest</span></span>
-        <span class="clip-sort-spinner" aria-hidden="true"></span>
+              aria-haspopup="menu" aria-expanded="false" aria-label="Sort by" data-tooltip="Sort by">
+        <svg class="clip-sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.59934 2.30001L9.89679 5.90001C10.1964 6.4 9.7969 7 9.29745 7H8.2V17.0001H9.29745C9.79689 17.0001 10.1964 17.6001 9.89679 18.1L7.59934 21.7C7.29967 22.1001 6.70033 22.1001 6.40067 21.7L4.10322 18.1C3.80356 17.6001 4.20311 17.0001 4.70256 17.0001H5.8V7H4.70256C4.20311 7 3.80356 6.4 4.10322 5.90001L6.40067 2.30001C6.70033 1.9 7.29967 1.9 7.59934 2.30001ZM12.5 6.3C11.8373 6.3 11.3 6.83725 11.3 7.5C11.3 8.16274 11.8373 8.7 12.5 8.7H20.5C21.1628 8.7 21.7 8.16274 21.7 7.5C21.7 6.83725 21.1628 6.3 20.5 6.3H12.5ZM11.3 12C11.3 11.3373 11.8373 10.8 12.5 10.8H17C17.6628 10.8 18.2 11.3373 18.2 12C18.2 12.6628 17.6628 13.2 17 13.2H12.5C11.8373 13.2 11.3 12.6628 11.3 12ZM12.5 14.8C11.8373 14.8 11.3 15.3372 11.3 16C11.3 16.6627 11.8373 17.2 12.5 17.2H15C15.6627 17.2 16.2 16.6627 16.2 16C16.2 15.3372 15.6627 14.8 15 14.8H12.5Z" fill="currentColor"/></svg>
         <svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        <span class="clip-sort-spinner" aria-hidden="true"></span>
       </button>
       <div class="clip-sort-menu" id="clip-sort-menu" role="menu" aria-label="Sort clips">
+        <div class="clip-sort-heading">Sort by</div>
         <button class="clip-sort-item" type="button" data-sort="newest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Newest</span>
+          <span class="clip-sort-label">Newest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
         </button>
         <button class="clip-sort-item" type="button" data-sort="oldest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Oldest</span>
+          <span class="clip-sort-label">Oldest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
         </button>
-        <button class="clip-sort-item" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Shortest</span>
-        </button>
-        <button class="clip-sort-item" type="button" data-sort="longest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Longest</span>
-        </button>
-        <button class="clip-sort-item" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Smallest</span>
-        </button>
-        <button class="clip-sort-item" type="button" data-sort="biggest" role="menuitemradio" aria-checked="false">
-          <svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Biggest</span>
-        </button>
-      </div>
-      </div>
-      <button class="tab-action" type="button" id="compress-all-btn" hidden
+        <div class="clip-sort-group" data-group="length">
+          <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
+            <span class="clip-sort-label">Length</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </button>
+          <div class="clip-sort-sub" role="group">
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="longest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Longest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="clip-sort-group" data-group="filesize">
+          <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
+            <span class="clip-sort-label">File size</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </button>
+          <div class="clip-sort-sub" role="group">
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="biggest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Biggest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+       </div>
+       </div>
+       <label class="clip-search" for="clip-search-input">
+         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.85547 0.854492C14.8259 0.854621 18.8555 4.88498 18.8555 9.85547C18.8554 12.0437 18.0729 14.0485 16.7744 15.6084L22.5625 21.3965C22.8842 21.7183 22.8843 22.2407 22.5625 22.5625C22.2407 22.8842 21.7183 22.8842 21.3965 22.5625L15.6084 16.7744C14.0485 18.0728 12.0437 18.8554 9.85547 18.8555C4.88506 18.8555 0.85573 14.8258 0.855469 9.85547C0.855469 4.8849 4.8849 0.854492 9.85547 0.854492ZM9.85547 2.50195C5.79439 2.50195 2.50195 5.79439 2.50195 9.85547C2.50221 13.9163 5.79455 17.208 9.85547 17.208C13.9163 17.2079 17.2077 13.9162 17.208 9.85547C17.208 5.79447 13.9165 2.50208 9.85547 2.50195Z"/></svg>
+         <input class="clip-search-input" id="clip-search-input" type="text" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search clips">
+       </label>
+       <button class="tab-action" type="button" id="compress-all-btn" hidden
               title="Fast-compress every clip that isn't already compressed.">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/></svg>
         <span id="compress-all-label">Compress All</span>
@@ -2799,6 +2955,7 @@
     ? location.origin
     : "http://127.0.0.1:8767";
   const POLL_FAST_MS = 2500;
+  const POLL_UPLOAD_MS = 250;
   const POLL_IDLE_MS = 1000;
   const CLIPS_FORCE_REFRESH_EVERY = 4;
   const TWO_DAYS_SEC = 2 * 24 * 60 * 60;
@@ -2831,6 +2988,8 @@
     // material volume_off (speaker cone + shifted x). split into speaker(2 paths) + x(1) below to assemble VOLUME_ICON.
     VOL_MUTED:  '<path d="M3 9.00162H5V15.0016H3C2.73478 15.0016 2.48043 14.8963 2.29289 14.7087C2.10536 14.5212 2 14.2668 2 14.0016V10.0016C2 9.7364 2.10536 9.48205 2.29289 9.29451C2.48043 9.10697 2.73478 9.00162 3 9.00162Z"/><path d="M6.49992 15.0016L11.3599 18.7716C11.5061 18.8933 11.6839 18.9709 11.8725 18.9951C12.0611 19.0193 12.2528 18.9893 12.4249 18.9084C12.5971 18.8276 12.7426 18.6994 12.8445 18.5388C12.9463 18.3781 13.0002 18.1918 12.9999 18.0016V6.00163C13.0002 5.81144 12.9463 5.62511 12.8445 5.4645C12.7426 5.30388 12.5971 5.17564 12.4249 5.09481C12.2528 5.01398 12.0611 4.98392 11.8725 5.00815C11.6839 5.03239 11.5061 5.10991 11.3599 5.23163L6.49992 9.00163V15.0016Z"/><path d="M22.0001 10.41L20.5901 9.00002L18.4601 11.12L16.3401 9.00002L14.9301 10.41L17.0501 12.54L14.9301 14.66L16.3401 16.07L18.4601 13.95L20.5901 16.07L22.0001 14.66L19.8801 12.54L22.0001 10.41Z"/>',
     FULLSCREEN: '<path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/>',
+    THEATER: '<path d="M21.20 3.01L21 3H3L2.79 3.01C2.30 3.06 1.84 3.29 1.51 3.65C1.18 4.02 .99 4.50 1 5V19L1.01 19.20C1.05 19.66 1.26 20.08 1.58 20.41C1.91 20.73 2.33 20.94 2.79 20.99L3 21H21L21.20 20.98C21.66 20.94 22.08 20.73 22.41 20.41C22.73 20.08 22.94 19.66 22.99 19.20L23 19V5C23.00 4.50 22.81 4.02 22.48 3.65C22.15 3.29 21.69 3.06 21.20 3.01ZM3 15V5H21V15H3ZM7.87 6.72L7.79 6.79L4.58 10L7.79 13.20C7.88 13.30 7.99 13.37 8.11 13.43C8.23 13.48 8.37 13.51 8.50 13.51C8.63 13.51 8.76 13.48 8.89 13.43C9.01 13.38 9.12 13.31 9.21 13.21C9.31 13.12 9.38 13.01 9.43 12.89C9.48 12.76 9.51 12.63 9.51 12.50C9.51 12.37 9.48 12.23 9.43 12.11C9.37 11.99 9.30 11.88 9.20 11.79L7.41 10L9.20 8.20L9.27 8.13C9.42 7.93 9.50 7.69 9.48 7.45C9.47 7.20 9.36 6.97 9.19 6.80C9.02 6.63 8.79 6.52 8.54 6.51C8.30 6.49 8.06 6.57 7.87 6.72ZM14.79 6.79C14.60 6.98 14.50 7.23 14.50 7.5C14.50 7.76 14.60 8.01 14.79 8.20L16.58 10L14.79 11.79L14.72 11.86C14.57 12.06 14.49 12.30 14.50 12.54C14.51 12.79 14.62 13.02 14.79 13.20C14.97 13.37 15.20 13.48 15.45 13.49C15.69 13.50 15.93 13.42 16.13 13.27L16.20 13.20L19.41 10L16.20 6.79C16.01 6.60 15.76 6.50 15.5 6.50C15.23 6.50 14.98 6.60 14.79 6.79ZM3 19V17H21V19H3Z"/>',
+    THEATER_EXIT: '<path d="M21.20 3.01L21 3H3L2.79 3.01C2.30 3.06 1.84 3.29 1.51 3.65C1.18 4.02 .99 4.50 1 5V19L1.01 19.20C1.05 19.66 1.26 20.08 1.58 20.41C1.91 20.73 2.33 20.94 2.79 20.99L3 21H21L21.20 20.98C21.66 20.94 22.08 20.73 22.41 20.41C22.73 20.08 22.94 19.66 22.99 19.20L23 19V5C23.00 4.50 22.81 4.02 22.48 3.65C22.15 3.29 21.69 3.06 21.20 3.01ZM3 15V5H21V15H3ZM16.87 6.72H16.86L16.79 6.79L13.58 10L16.79 13.20C16.88 13.30 16.99 13.37 17.11 13.43C17.23 13.48 17.37 13.51 17.50 13.51C17.63 13.51 17.76 13.48 17.89 13.43C18.01 13.38 18.12 13.31 18.21 13.21C18.31 13.12 18.38 13.01 18.43 12.89C18.48 12.76 18.51 12.63 18.51 12.50C18.51 12.37 18.48 12.23 18.43 12.11C18.37 11.99 18.30 11.88 18.20 11.79L16.41 10L18.20 8.20L18.27 8.13C18.42 7.93 18.50 7.69 18.49 7.45C18.47 7.20 18.37 6.97 18.20 6.79C18.02 6.62 17.79 6.52 17.55 6.50C17.30 6.49 17.06 6.57 16.87 6.72ZM5.79 6.79C5.60 6.98 5.50 7.23 5.50 7.5C5.50 7.76 5.60 8.01 5.79 8.20L7.58 10L5.79 11.79L5.72 11.86C5.57 12.06 5.49 12.30 5.50 12.54C5.51 12.79 5.62 13.02 5.79 13.20C5.97 13.37 6.20 13.48 6.45 13.49C6.69 13.50 6.93 13.42 7.13 13.27L7.20 13.20L10.41 10L7.20 6.79C7.01 6.60 6.76 6.50 6.5 6.50C6.23 6.50 5.98 6.60 5.79 6.79ZM3 19V17H21V19H3Z"/>',
     MORE:       '<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
     EDIT:       '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
     LINK:       '<path d="M16.5 18.25H14.99C14.58 18.25 14.24 17.91 14.24 17.5C14.24 17.09 14.58 16.75 14.99 16.75H16.5C19.12 16.75 21.25 14.62 21.25 12C21.25 9.38 19.12 7.25 16.5 7.25H15C14.59 7.25 14.25 6.91 14.25 6.5C14.25 6.09 14.58 5.75 15 5.75H16.5C19.95 5.75 22.75 8.55 22.75 12C22.75 15.45 19.95 18.25 16.5 18.25Z"/><path d="M9 18.25H7.5C4.05 18.25 1.25 15.45 1.25 12C1.25 8.55 4.05 5.75 7.5 5.75H9C9.41 5.75 9.75 6.09 9.75 6.5C9.75 6.91 9.41 7.25 9 7.25H7.5C4.88 7.25 2.75 9.38 2.75 12C2.75 14.62 4.88 16.75 7.5 16.75H9C9.41 16.75 9.75 17.09 9.75 17.5C9.75 17.91 9.41 18.25 9 18.25Z"/><path d="M16 12.75H8C7.59 12.75 7.25 12.41 7.25 12C7.25 11.59 7.59 11.25 8 11.25H16C16.41 11.25 16.75 11.59 16.75 12C16.75 12.41 16.41 12.75 16 12.75Z"/>',
@@ -2850,6 +3009,10 @@
     // material "settings" gear. opens the playback-speed popup.
     SETTINGS:   '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
   };
+
+  const COPY_ICON = '<path fill-rule="evenodd" clip-rule="evenodd" d="M12.8467 1.25488C14.9604 1.36181 16.6416 3.10976 16.6416 5.25V7.40039H18.792L18.9971 7.40527C21.1107 7.5122 22.7919 9.26026 22.792 11.4004V18.792L22.7861 18.9971C22.6826 21.0427 21.0427 22.6826 18.9971 22.7861L18.792 22.792H11.4004L11.1943 22.7861C9.14912 22.6822 7.50874 21.0424 7.40527 18.9971L7.40039 18.792V16.6416H5.25L5.04395 16.6357C2.99861 16.5319 1.35836 14.8921 1.25488 12.8467L1.25 12.6416V5.25C1.25 3.04086 3.04086 1.25 5.25 1.25H12.6416L12.8467 1.25488ZM11.4004 8.90039C10.0199 8.90052 8.90052 10.0199 8.90039 11.4004V18.792C8.90059 20.1725 10.0199 21.2919 11.4004 21.292H18.792C20.1724 21.2918 21.2918 20.1724 21.292 18.792V11.4004C21.2919 10.0199 20.1725 8.90059 18.792 8.90039H11.4004ZM5.25 2.75C3.86929 2.75 2.75 3.86929 2.75 5.25V12.6416C2.7502 14.0221 3.86941 15.1416 5.25 15.1416H7.40039V11.4004C7.40052 9.19145 9.19145 7.40052 11.4004 7.40039H15.1416V5.25C15.1416 3.86941 14.0221 2.7502 12.6416 2.75H5.25Z"/>';
+
+  const CANCEL_ICON = '<path d="m30.391 318.583c-7.86.457-15.59-2.156-21.56-7.288-11.774-11.844-11.774-30.973 0-42.817l257.812-257.813c12.246-11.459 31.462-10.822 42.921 1.424 10.362 11.074 10.966 28.095 1.414 39.875l-259.331 259.331c-5.893 5.058-13.499 7.666-21.256 7.288z"/><path d="m287.9 318.583c-7.966-.034-15.601-3.196-21.257-8.806l-257.813-257.814c-10.908-12.738-9.425-31.908 3.313-42.817 11.369-9.736 28.136-9.736 39.504 0l259.331 257.813c12.243 11.462 12.876 30.679 1.414 42.922-.456.487-.927.958-1.414 1.414-6.35 5.522-14.707 8.161-23.078 7.288z"/>';
 
   // one static volume icon: the fixed speaker body plus every wave arc and the mute X, all present at once.
   // syncVolumeUi never rebuilds it -- it just sets data-level on the button and css fades/scales the individual
@@ -2938,8 +3101,8 @@
   const sortWrap = document.getElementById("clip-sort");
   const sortButton = document.getElementById("clip-sort-button");
   const sortMenu = document.getElementById("clip-sort-menu");
-  const sortValueEl = document.getElementById("clip-sort-value");
   const sortOptionBtns = Array.from(document.querySelectorAll(".clip-sort-item[data-sort]"));
+  const clipSearchInput = document.getElementById("clip-search-input");
 
   const FAVORITES_STORAGE_KEY = "replaykit.favoriteClips.v1";
   const LEGACY_FAVORITES_STORAGE_KEY = "streamable.favoriteClips.v1";
@@ -2952,6 +3115,11 @@
     smallest: "Smallest",
     biggest: "Biggest",
   };
+  // sort values that live under a collapsible row in the menu -- the row shows "Length: Shortest" etc. when one is active.
+  const CLIP_SORT_GROUPS = {
+    length: { base: "Length", members: ["shortest", "longest"] },
+    filesize: { base: "File size", members: ["smallest", "biggest"] },
+  };
   const CLIP_STATE_URL = HELPER + "/clips/state";
   const localState = new Map();
   const selectedClipNames = new Set();
@@ -2962,6 +3130,7 @@
   let favoriteResolveInFlight = false;
   let favoriteResolveTimer = 0;
   let activeFilter = "all";
+  let clipSearchQuery = "";
   // never persisted (session-only, unlike favorites) -- always starts fresh at newest so a closed-and-reopened clips window or an obs restart never comes back to whatever sort was last picked.
   let activeSort = "newest";
   let loadedClips = [];
@@ -2984,6 +3153,8 @@
   const bulkUploadInFlight = new Set();
   // clipName -> ms timestamp of a just-issued cancel. syncUploadJobState ignores that clips job status until CANCEL_GRACE_MS passes so the optimistic repaint holds.
   const cancelledUploads = new Map();
+  // clipName -> a display-only progress value. It eases between helper reports so the bar does not jump at the poll cadence.
+  const progressVisuals = new Map();
   // clipName -> the in-flight /cancel-upload fetch. a new upload for that clip waits on it first, otherwise the helper still sees the old job active and rejects the retry as busy.
   const inFlightCancels = new Map();
   // per-clip re-entrancy guard + debounce so spam-clicking Create Link / the cancel X cant interleave their async steps or act on a click that landed on a freshly-swapped button.
@@ -3025,6 +3196,9 @@
   let deferredFullscreenRender = false;
   let deferredFullscreenRenderForce = false;
   let pendingLoadedRenderAfterFullscreen = false;
+  let theaterPreview = null;
+  let pendingRenderOnTheaterExit = false;
+  let pendingLoadedRenderAfterTheater = false;
   let pendingLoadedRenderAfterRename = false;
   const GRID_MIN_COL_WIDTH = 260;
   const GRID_GAP = 14;
@@ -3420,16 +3594,36 @@
   }
 
   function updateClipSortControl() {
-    if (sortValueEl) sortValueEl.textContent = clipSortLabel(activeSort);
     if (sortButton) {
       sortButton.setAttribute("aria-expanded", sortWrap && sortWrap.classList.contains("is-open") ? "true" : "false");
-      sortButton.title = clipSortPreparing ? "Sorting clips..." : "Sort clips";
     }
     for (const btn of sortOptionBtns) {
       const isActive = btn.dataset.sort === activeSort;
       btn.classList.toggle("is-active", isActive);
       btn.setAttribute("aria-checked", isActive ? "true" : "false");
     }
+    if (sortMenu) {
+      for (const key of Object.keys(CLIP_SORT_GROUPS)) {
+        const g = CLIP_SORT_GROUPS[key];
+        const groupEl = sortMenu.querySelector('.clip-sort-group[data-group="' + key + '"]');
+        if (!groupEl) continue;
+        const labelEl = groupEl.querySelector(".clip-sort-grouprow .clip-sort-label");
+        const activeMember = g.members.indexOf(activeSort) >= 0 ? activeSort : "";
+        groupEl.classList.toggle("has-active", !!activeMember);
+        if (labelEl) labelEl.textContent = activeMember ? (g.base + ": " + clipSortLabel(activeMember)) : g.base;
+      }
+    }
+  }
+
+  function setClipSortGroupsExpanded() {
+    if (!sortMenu) return;
+    // on open, disclose only the group that owns the current sort
+    sortMenu.querySelectorAll(".clip-sort-group").forEach((g) => {
+      const on = g.classList.contains("has-active");
+      g.classList.toggle("is-expanded", on);
+      const row = g.querySelector(".clip-sort-grouprow");
+      if (row) row.setAttribute("aria-expanded", on ? "true" : "false");
+    });
   }
 
   function closeClipSortMenu() {
@@ -3438,22 +3632,12 @@
     updateClipSortControl();
   }
 
-  function placeClipSortMenu() {
-    if (!sortButton || !sortMenu || !sortWrap.classList.contains("is-open")) return;
-    const rect = sortButton.getBoundingClientRect();
-    const width = Math.max(178, sortMenu.offsetWidth || 178);
-    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width));
-    const top = Math.max(8, Math.min(window.innerHeight - 48, rect.bottom + 5));
-    sortMenu.style.left = left + "px";
-    sortMenu.style.top = top + "px";
-  }
-
   function openClipSortMenu() {
     if (!sortWrap) return;
+    hideBulkTip();
     sortWrap.classList.add("is-open");
     updateClipSortControl();
-    placeClipSortMenu();
-    requestAnimationFrame(placeClipSortMenu);
+    setClipSortGroupsExpanded();
   }
 
   function updateTabs(source) {
@@ -3493,10 +3677,15 @@
   }
 
   function applyClipFilter(clips) {
-    return (Array.isArray(clips) ? clips : []).filter(clipMatchesFilter);
+    const query = clipSearchQuery.trim().toLocaleLowerCase();
+    return (Array.isArray(clips) ? clips : []).filter((clip) => {
+      if (!clipMatchesFilter(clip)) return false;
+      return !query || displayClipName(clip.name || "").toLocaleLowerCase().includes(query);
+    });
   }
 
   function emptyMessageForFilter() {
+    if (clipSearchQuery.trim()) return "No clips match your search.";
     if (activeFilter === "favorites") return "No favorite clips yet.";
     if (activeFilter === "linked") return "No linked clips yet.";
     if (activeFilter === "local") return "No local-only clips.";
@@ -3513,6 +3702,10 @@
     if (isFullscreenOrHostTransition()) {
       pendingLoadedRenderAfterFullscreen = true;
       deferVirtualRenderUntilFullscreenSettles(true);
+      return;
+    }
+    if (theaterPreview) {
+      pendingLoadedRenderAfterTheater = true;
       return;
     }
     ensureFavoriteResolve();
@@ -3712,10 +3905,10 @@
 
   function clearTransientCardState(card) {
     if (!card) return;
-    card.classList.remove("menu-open");
     const menu = card.querySelector(".menu-dropdown");
-    if (menu) menu.classList.remove("is-open");
-    resetDeleteButton(card.querySelector(".delete-btn"));
+    if (menu) closeCardMenu(menu);
+    else card.classList.remove("menu-open");
+    resetDeleteButton(card.querySelector(".delete-menu-item"));
     const preview = card.querySelector(".preview");
     if (preview) preview.classList.remove("is-playing", "is-video-ready", "is-idle");
     const progress = card.querySelector(".progress-fill");
@@ -3728,6 +3921,7 @@
     const video = card.querySelector("video");
     if (video) {
       if (activePreview === video) activePreview = null;
+      resetVideoZoom(video);
       abortVideoLoad(video);
     }
   }
@@ -3771,6 +3965,56 @@
 
   function updateFullscreenBodyState() {
     document.body.classList.toggle("is-clip-fullscreen", isFullscreenOrHostTransition());
+  }
+
+  function isTheaterPreview(preview) {
+    return !!preview && theaterPreview === preview;
+  }
+
+  function syncTheaterButton(preview) {
+    if (!preview) return;
+    const button = preview.querySelector(".theater-btn");
+    if (!button) return;
+    const active = isTheaterPreview(preview);
+    const enterIcon = button.querySelector(".theater-enter-icon");
+    const exitIcon = button.querySelector(".theater-exit-icon");
+    button.title = active ? "Exit theater mode" : "Theater mode";
+    button.setAttribute("aria-label", button.title);
+    if (enterIcon) enterIcon.style.display = active ? "none" : "";
+    if (exitIcon) exitIcon.style.display = active ? "" : "none";
+  }
+
+  function enterTheaterMode(preview) {
+    if (!preview || isTheaterPreview(preview)) return !!preview;
+    if (theaterPreview) exitTheaterMode();
+    const card = preview.closest(".card");
+    if (!card) return false;
+    theaterPreview = preview;
+    card.classList.add("is-theater-card");
+    preview.classList.remove("is-idle");
+    document.body.classList.add("is-clip-theater");
+    syncTheaterButton(preview);
+    return true;
+  }
+
+  function exitTheaterMode() {
+    const preview = theaterPreview;
+    if (!preview) return false;
+    theaterPreview = null;
+    const card = preview.closest(".card");
+    if (card) card.classList.remove("is-theater-card");
+    preview.classList.remove("is-idle");
+    document.body.classList.remove("is-clip-theater");
+    resetVideoZoom(preview.querySelector("video"));
+    syncTheaterButton(preview);
+    if (pendingLoadedRenderAfterTheater) {
+      pendingLoadedRenderAfterTheater = false;
+      renderLoadedClips(loadedClips);
+    } else if (pendingRenderOnTheaterExit) {
+      pendingRenderOnTheaterExit = false;
+      queueVirtualRender(true);
+    }
+    return true;
   }
 
   function beginFullscreenHostTransition() {
@@ -3882,6 +4126,10 @@
       return;
     }
     if (document.hidden || !allClips.length) return;
+    if (theaterPreview) {
+      pendingRenderOnTheaterExit = true;
+      return;
+    }
 
     // if a card inside the grid is currently fullscreened, skip the render entirely -- removing or recycling the fullscreen element forces an immediate fullscreen exit in Chromium/CEF.
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
@@ -3967,6 +4215,10 @@
   function queueVirtualRender(force) {
     if (fullscreenHostTransition) {
       deferVirtualRenderUntilFullscreenSettles(force);
+      return;
+    }
+    if (theaterPreview) {
+      pendingRenderOnTheaterExit = true;
       return;
     }
     if (force) {
@@ -4170,13 +4422,13 @@
   }
 
   async function cancelActiveUpload(filename, requestId, suppressToast) {
-    // dont let a cancel interleave with an in-flight Create Link / another cancel for the same clip -- their async steps corrupt each others state.
-    if (filename && linkTransitionBusy.has(filename)) return;
+    // Cancellation always wins, including while Create Link is still waiting for /upload to return its request ID.
     if (filename) { linkTransitionBusy.add(filename); bulkUploadInFlight.delete(filename); }
     try {
       // repaint the card before the helper round-trip. drop every local trace of the job and null out the last status snapshot so renderActions cant re-derive "uploading" from stale data; the grace window in syncUploadJobState covers the poll or two before the helper catches up.
       if (filename) {
         cancelledUploads.set(filename, Date.now());
+        progressVisuals.delete(filename);
         localState.delete(filename);
         pendingLinkCreations.delete(filename);
         bulkUploadQueued.delete(filename);
@@ -4259,6 +4511,70 @@
     return !!(fsEl && video && (fsEl === video || (fsEl.contains && fsEl.contains(video))));
   }
 
+  const VIDEO_ZOOM_MAX = 4;
+  const VIDEO_ZOOM_STEP = 1.12;
+
+  function resetVideoZoom(video) {
+    if (!video) return;
+    if (typeof video._resetZoom === "function") {
+      video._resetZoom();
+      return;
+    }
+    video.style.removeProperty("transform");
+    video.style.removeProperty("transform-origin");
+    video.removeAttribute("data-zoom");
+  }
+
+  function enableCursorZoom(container, video, canZoom) {
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+
+    function applyZoom() {
+      const zoomed = scale > 1.001;
+      video.style.transformOrigin = "0 0";
+      video.style.transform = zoomed
+        ? "translate(" + panX + "px, " + panY + "px) scale(" + scale + ")"
+        : "";
+      if (zoomed) video.dataset.zoom = Math.round(scale * 100) + "%";
+      else video.removeAttribute("data-zoom");
+    }
+
+    function reset() {
+      scale = 1;
+      panX = 0;
+      panY = 0;
+      video.style.removeProperty("transform");
+      video.style.removeProperty("transform-origin");
+      video.removeAttribute("data-zoom");
+    }
+
+    video._resetZoom = reset;
+    container.addEventListener("wheel", (e) => {
+      if (!canZoom() || !Number.isFinite(e.deltaY) || e.deltaY === 0) return;
+      if (e.target.closest && e.target.closest("button, input, select, .progress-bar, .settings-menu")) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const nextScale = Math.max(
+        1,
+        Math.min(VIDEO_ZOOM_MAX, scale * Math.pow(VIDEO_ZOOM_STEP, -e.deltaY / 100))
+      );
+      const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+      const sourceX = (x - panX) / scale;
+      const sourceY = (y - panY) / scale;
+      scale = nextScale;
+      panX = x - sourceX * scale;
+      panY = y - sourceY * scale;
+      panX = Math.max(rect.width - rect.width * scale, Math.min(0, panX));
+      panY = Math.max(rect.height - rect.height * scale, Math.min(0, panY));
+      applyZoom();
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+  }
+
   function clearHoverPreviewTimer(video) {
     if (!video) return;
     if (video._hoverPreviewTimer) {
@@ -4283,7 +4599,7 @@
   }
 
   function stopActivePreviewForScroll() {
-    if (!activePreview || isVideoFullscreen(activePreview)) return;
+    if (!activePreview || isVideoFullscreen(activePreview) || isTheaterPreview(activePreview.closest(".preview"))) return;
     const video = activePreview;
     activePreview = null;
     abortVideoLoad(video);
@@ -4291,12 +4607,22 @@
 
   function syncFavoriteButton(card, name) {
     const btn = card.querySelector(".favorite-btn");
-    if (!btn) return;
     const fav = isFavorite(name);
-    btn.classList.toggle("is-favorite", fav);
-    btn.title = fav ? "Remove favorite" : "Favorite clip";
-    btn.setAttribute("aria-label", btn.title);
-    btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
+    if (btn) {
+      btn.classList.toggle("is-favorite", fav);
+      btn.title = fav ? "Remove favorite" : "Favorite clip";
+      btn.setAttribute("aria-label", btn.title);
+      btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
+    }
+    const menuItem = card.querySelector(".favorite-menu-item");
+    if (!menuItem) return;
+    const label = menuItem.querySelector(".menu-item-label");
+    const icon = menuItem.querySelector("svg");
+    menuItem.classList.toggle("is-favorite", fav);
+    menuItem.title = fav ? "Remove favorite" : "Favorite";
+    menuItem.setAttribute("aria-label", menuItem.title);
+    if (label) label.textContent = fav ? "Remove favorite" : "Favorite";
+    if (icon) icon.innerHTML = fav ? ICON.STAR : ICON.STAR_BORDER;
   }
 
   function syncClipSelection(card, name) {
@@ -4304,10 +4630,17 @@
     const selected = selectedClipNames.has(name);
     card.classList.toggle("is-selected", selected);
     const btn = card.querySelector(".select-clip-btn");
-    if (!btn) return;
-    btn.title = selected ? "Deselect clip" : "Select clip";
-    btn.setAttribute("aria-label", btn.title);
-    btn.setAttribute("aria-pressed", selected ? "true" : "false");
+    if (btn) {
+      btn.title = selected ? "Deselect clip" : "Select clip";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", selected ? "true" : "false");
+    }
+    const menuItem = card.querySelector(".select-menu-item");
+    if (!menuItem) return;
+    const label = menuItem.querySelector(".menu-item-label");
+    menuItem.title = selected ? "Deselect clip" : "Select clip";
+    menuItem.setAttribute("aria-label", menuItem.title);
+    if (label) label.textContent = selected ? "Deselect" : "Select";
   }
 
   function refreshBulkSelectionUi() {
@@ -4366,6 +4699,8 @@
     btn.classList.remove("is-armed");
     btn.title = "Delete clip";
     btn.setAttribute("aria-label", "Delete clip");
+    const label = btn.querySelector(".menu-item-label");
+    if (label) label.textContent = "Delete";
   }
 
   function resetAllArmedDeleteButtons(exceptBtn) {
@@ -4380,6 +4715,8 @@
     btn.classList.add("is-armed");
     btn.title = "Click again to delete";
     btn.setAttribute("aria-label", "Click again to delete");
+    const label = btn.querySelector(".menu-item-label");
+    if (label) label.textContent = "Delete?";
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
@@ -4471,8 +4808,12 @@
                   <button class="speed-pill" data-speed="10">10.0</button>
                 </div>
               </div>
-            </div>
-            <button class="icon-btn fullscreen-btn" type="button" aria-label="Toggle fullscreen">
+              </div>
+              <button class="icon-btn theater-btn" type="button" title="Theater mode" aria-label="Theater mode">
+                <svg viewBox="0 0 24 24" class="theater-enter-icon">${ICON.THEATER}</svg>
+                <svg viewBox="0 0 24 24" class="theater-exit-icon" style="display:none">${ICON.THEATER_EXIT}</svg>
+              </button>
+              <button class="icon-btn fullscreen-btn" type="button" aria-label="Toggle fullscreen">
               <!-- viewBox matches YouTubes ytp-fullscreen-button SVG exactly (24x24); the enter path is copied verbatim from YouTubes production player chrome, and the exit path is Material Symbols close_fullscreen, the matching inward-arrow companion. -->
               <svg viewBox="0 0 24 24" class="fs-enter-icon">${ICON.FULLSCREEN}</svg>
               <svg viewBox="0 0 24 24" class="fs-exit-icon" style="display:none">${ICON.FULLSCREEN_EXIT}</svg>
@@ -4507,18 +4848,43 @@
                 <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
               </button>
               <div class="menu-dropdown">
-                <div class="menu-item open-folder-item">Open file location</div>
+                <div class="menu-item link-menu-item">
+                  <span class="menu-item-label">Create Link</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.LINK}</svg>
+                </div>
+                <div class="menu-separator"></div>
+                <div class="menu-item favorite-menu-item">
+                  <span class="menu-item-label">Favorite</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.STAR_BORDER}</svg>
+                </div>
+                <div class="menu-item select-menu-item">
+                  <span class="menu-item-label">Select</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.GRID}</svg>
+                </div>
+                <div class="menu-separator"></div>
+                <div class="menu-item rename-menu-item">
+                  <span>Edit name</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
+                </div>
                 <div class="menu-item trim-clip-item">
-                  <svg viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
-                  <span>Edit</span>
+                  <span>Edit clip</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
                 </div>
                 <div class="menu-item clipboard-clip-item">
-                  <svg viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
                   <span>Copy to clipboard</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
                 </div>
                 <div class="menu-item compress-clip-item">
-                  <svg viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
                   <span>Compress&hellip;</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
+                </div>
+                <div class="menu-item open-folder-item">
+                  <span>Open file location</span>
+                </div>
+                <div class="menu-separator"></div>
+                <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" title="Delete clip" aria-label="Delete clip">
+                  <span class="menu-item-label">Delete</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
                 </div>
               </div>
             </div>
@@ -4538,14 +4904,22 @@
     const progressFill = card.querySelector(".progress-fill");
     const volumeBtn    = card.querySelector(".volume-btn");
     const volumeSlider = card.querySelector(".volume-slider");
+    const theaterBtn   = card.querySelector(".theater-btn");
     const fullscreenBtn= card.querySelector(".fullscreen-btn");
     const favoriteBtn  = card.querySelector(".favorite-btn");
     const selectBtn    = card.querySelector(".select-clip-btn");
     const editBtn      = card.querySelector(".edit-btn");
     const menuBtn      = card.querySelector(".menu-btn");
     const menuDropdown = card.querySelector(".menu-dropdown");
+    const linkMenuItem = card.querySelector(".link-menu-item");
+    const favoriteMenuItem = card.querySelector(".favorite-menu-item");
+    const selectMenuItem = card.querySelector(".select-menu-item");
+    const renameMenuItem = card.querySelector(".rename-menu-item");
+    const deleteMenuItem = card.querySelector(".delete-menu-item");
     const openFolderEl = card.querySelector(".open-folder-item");
     const deleteClipEl = card.querySelector(".delete-btn");
+
+    enableCursorZoom(preview, video, () => isVideoFullscreen(video) || isTheaterPreview(preview));
 
     favoriteBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -4683,7 +5057,7 @@
 
     function startHoverPreview(seq) {
       // dont disturb the currently-fullscreened video.
-      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      if (document.fullscreenElement || document.webkitFullscreenElement || theaterPreview) return;
       if (seq !== video._hoverPreviewSeq || !card.matches(":hover")) return;
       const now = performance.now ? performance.now() : Date.now();
       if (now - lastScrollActivityAt < SCROLL_PREVIEW_SETTLE_MS) {
@@ -4711,13 +5085,14 @@
     card.addEventListener("mouseenter", () => {
       if (document.body.classList.contains("is-selection-mode")) return;
       // dont disturb the currently-fullscreened video.
-      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      if (document.fullscreenElement || document.webkitFullscreenElement || theaterPreview) return;
       scheduleHoverPreview();
     });
     card.addEventListener("mouseleave", () => {
       // skip teardown while the preview (or its video) is the fullscreen element -- entering fullscreen takes .preview out of the cards normal flow (a viewport-filling fixed element), which shrinks the card down to just .body and makes the browser think the cursor left it; without this check wed abort the video and the user would see a frozen first frame the instant fullscreen opens.
       const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
       if (fsEl === preview || fsEl === video) return;
+      if (isTheaterPreview(preview)) return;
       // skip teardown mid-drag on the scrubber too -- dragging the thin bar naturally drifts the cursor off it (and sometimes off the card entirely) while the user is focused on left-right movement, not pixel-perfect vertical alignment; pointer capture keeps the actual seek going regardless of where the cursor physically is, but a teardown here would still rip out the video mid-drag. endScrub (bound to pointerup/pointercancel) is what actually ends the drag.
       if (scrubbing) return;
       clearHoverPreviewTimer(video);
@@ -4824,6 +5199,7 @@
       else {
         preview.classList.remove("is-idle");
         if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+        if (!isTheaterPreview(preview)) resetVideoZoom(video);
       }
       // swap the fullscreen toggle icon so it always shows the action itll perform next (youtube convention): the "exit" brackets when were in fullscreen, the "enter" brackets when were out. same listener fires for both directions.
       const enterIcon = fullscreenBtn.querySelector(".fs-enter-icon");
@@ -5027,6 +5403,32 @@
       notifyVolumeSync();
     });
 
+    syncTheaterButton(preview);
+    theaterBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isTheaterPreview(preview)) {
+        exitTheaterMode();
+        try { theaterBtn.blur(); } catch {}
+        return;
+      }
+      clearHoverPreviewTimer(video);
+      if (activePreview && activePreview !== video) abortVideoLoad(activePreview);
+      activePreview = video;
+      applyVolume(video);
+      preview.classList.add("is-playing");
+      if (video.readyState >= 2) preview.classList.add("is-video-ready");
+      else preview.classList.remove("is-video-ready");
+      if (!enterTheaterMode(preview)) return;
+      if (card.dataset.previewUrl && video.getAttribute("src") !== card.dataset.previewUrl) {
+        preview.classList.remove("is-video-ready");
+        video.src = card.dataset.previewUrl;
+      }
+      const tryPlay = () => video.play().catch(() => {});
+      tryPlay();
+      video.addEventListener("loadeddata", tryPlay, { once: true });
+      try { theaterBtn.blur(); } catch {}
+    });
+
     // fullscreen requestfullscreen() must run synchronously inside the user-gesture event handler. if we wait for play() to resolve before calling it (the obvious shape: "load, play, then go fullscreen"), the gesture is "stale" by the time we get there and the browser silently rejects the request -- which is why the previous version refused to fullscreen until the clip had already started playing. instead: request fullscreen now, kick off loading + play in parallel, and let the video pop into the fullscreened element once its first frame is ready.
     fullscreenBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -5039,6 +5441,8 @@
         try { fullscreenBtn.blur(); } catch {}
         return;
       }
+
+      if (isTheaterPreview(preview)) exitTheaterMode();
 
       clearHoverPreviewTimer(video);
       if (activePreview && activePreview !== video) abortVideoLoad(activePreview);
@@ -5069,65 +5473,100 @@
       e.stopPropagation();
       startRename(card);
     });
+    favoriteMenuItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCardMenu(menuDropdown);
+      favoriteBtn.click();
+    });
+    selectMenuItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCardMenu(menuDropdown);
+      selectBtn.click();
+    });
+    renameMenuItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCardMenu(menuDropdown);
+      editBtn.click();
+    });
+    linkMenuItem.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const actionButton = card.querySelector(".actions .action-link-btn");
+      if (!actionButton || actionButton.disabled) return;
+      closeCardMenu(menuDropdown);
+      actionButton.click();
+    });
 
-    // the same menu is available from the visible 3-dot button or a right-click anywhere on the clip.
-    function toggleCardMenu() {
+    // The same menu is available from the visible 3-dot button or a right-click anywhere on the clip. Its top-left corner follows the pointer, then clamps to the viewport so every item stays reachable.
+    function openCardMenuAtPointer(e) {
       resetAllArmedDeleteButtons();
       document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
         if (d !== menuDropdown) {
-          d.classList.remove("is-open");
-          const openCard = d.closest(".card");
-          if (openCard) openCard.classList.remove("menu-open");
+          closeCardMenu(d);
         }
       });
-      menuDropdown.classList.toggle("is-open");
-      card.classList.toggle("menu-open", menuDropdown.classList.contains("is-open"));
+      const rect = card.getBoundingClientRect();
+      const width = menuDropdown.offsetWidth || 190;
+      const height = menuDropdown.offsetHeight || 280;
+      const minLeft = 8 - rect.left;
+      const maxLeft = window.innerWidth - width - 8 - rect.left;
+      const minTop = 8 - rect.top;
+      const maxTop = window.innerHeight - height - 8 - rect.top;
+      const left = Math.max(minLeft, Math.min(maxLeft, e.clientX - rect.left));
+      const top = Math.max(minTop, Math.min(maxTop, e.clientY - rect.top));
+      menuDropdown.style.setProperty("--menu-left", left + "px");
+      menuDropdown.style.setProperty("--menu-top", top + "px");
+      menuDropdown.classList.add("is-open");
+      card.classList.add("menu-open");
     }
     menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      toggleCardMenu();
+      openCardMenuAtPointer(e);
     });
     card.addEventListener("contextmenu", (e) => {
       if (e.target.closest && e.target.closest("input, .volume-slider-wrap")) return;
       e.preventDefault();
       e.stopPropagation();
-      toggleCardMenu();
+      openCardMenuAtPointer(e);
     });
     openFolderEl.addEventListener("click", async (e) => {
       e.stopPropagation();
-      menuDropdown.classList.remove("is-open");
-      card.classList.remove("menu-open");
+      closeCardMenu(menuDropdown);
       try {
         await fetch(HELPER + "/open-folder?file=" + encodeURIComponent(card.dataset.name), {
           method: "POST", cache: "no-store",
         });
       } catch {}
     });
-    // two-click delete confirmation on the trash icon, no browser confirm() dialog. first click arms the icon for 3 seconds; second click within that window actualy deletes. click anywhere else / wait it out cancels with no destructive action.
-    deleteClipEl.addEventListener("click", (e) => {
+    // Both delete entry points use the same two-click confirmation. The menu keeps its first-click state visible, while the card button uses its compact inline confirmation.
+    function handleDeleteAction(e, trigger) {
       e.preventDefault();
       e.stopPropagation();
-      closeAllMenus();
-      resetAllArmedDeleteButtons(deleteClipEl);
-      if (!deleteClipEl.classList.contains("is-armed")) {
-        // 3 s arm window. long enough for a confident user to commit, short enough that a forgotten arm doesnt lie in wait.
-        armDeleteButton(deleteClipEl);
+      const inMenu = trigger === deleteMenuItem;
+      resetAllArmedDeleteButtons(trigger);
+      if (!trigger.classList.contains("is-armed")) {
+        if (!inMenu) closeAllMenus();
+        armDeleteButton(trigger);
+        if (inMenu) {
+          menuDropdown.classList.add("is-open");
+          card.classList.add("menu-open");
+        }
         return;
       }
-      resetDeleteButton(deleteClipEl);
+      resetDeleteButton(trigger);
+      closeCardMenu(menuDropdown);
       deleteClip(card);
-    });
+    }
+    deleteMenuItem.addEventListener("click", (e) => handleDeleteAction(e, deleteMenuItem));
+    deleteClipEl.addEventListener("click", (e) => handleDeleteAction(e, deleteClipEl));
     card.querySelector(".trim-clip-item").addEventListener("click", (e) => {
       e.stopPropagation();
-      menuDropdown.classList.remove("is-open");
-      card.classList.remove("menu-open");
+      closeCardMenu(menuDropdown);
       const currentClip = currentClipForCard(card);
       if (currentClip) openTrimModal(currentClip);
     });
     card.querySelector(".clipboard-clip-item").addEventListener("click", async (e) => {
       e.stopPropagation();
-      menuDropdown.classList.remove("is-open");
-      card.classList.remove("menu-open");
+      closeCardMenu(menuDropdown);
       const currentClip = currentClipForCard(card);
       if (!currentClip) return;
       // clipboard puts the file on the windows clipboard as cf_hdrop, same as ctrl+c on the file in explorer. the user can then paste into discord / slack / explorer / etc.
@@ -5147,8 +5586,7 @@
     card.querySelectorAll(".compress-clip-item").forEach((item) => {
       item.addEventListener("click", (e) => {
         e.stopPropagation();
-        menuDropdown.classList.remove("is-open");
-        card.classList.remove("menu-open");
+        closeCardMenu(menuDropdown);
         const currentClip = currentClipForCard(card);
         if (currentClip) openCompressModePicker(currentClip.name);
       });
@@ -5294,11 +5732,20 @@
   }
 
   // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
+  function closeCardMenu(menu) {
+    if (!menu) return;
+    menu.classList.remove("is-open");
+    const card = menu.closest(".card");
+    if (!card) return;
+    if (menu._closeTimer) clearTimeout(menu._closeTimer);
+    menu._closeTimer = setTimeout(() => {
+      if (!menu.classList.contains("is-open")) card.classList.remove("menu-open");
+    }, 180);
+  }
+
   function closeAllMenus() {
     document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
-      d.classList.remove("is-open");
-      const card = d.closest(".card");
-      if (card) card.classList.remove("menu-open");
+      closeCardMenu(d);
     });
   }
   document.addEventListener("mousedown", (e) => {
@@ -5340,6 +5787,7 @@
       preview = _lastHoveredCard.querySelector(".preview");
     }
     if (!preview) return false;
+    if (isTheaterPreview(preview)) exitTheaterMode();
     if (preview.requestFullscreen)            preview.requestFullscreen().catch(() => {});
     else if (preview.webkitRequestFullscreen) preview.webkitRequestFullscreen();
     const card = preview.closest && preview.closest(".card");
@@ -5365,6 +5813,11 @@
 
   document.addEventListener("keydown", (e) => {
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+    if (e.key === "Escape" && !fsEl && exitTheaterMode()) {
+      e.preventDefault();
+      return;
+    }
 
     // f = toggle fullscreen, whether or not were currently in it. outside fullscreen we promote the active / hovered card. inside we just exit. skip when focus is in an editable surface so the letter f still types in inline rename fields / search boxes.
     if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -5453,6 +5906,52 @@
   document.addEventListener("fullscreenchange", handleHostFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
 
+  function updateDisplayProgress(name, fill, reportedPercent) {
+    const reported = Math.max(0, Math.min(100, Number(reportedPercent) || 0));
+    let v = progressVisuals.get(name);
+    if (!v) {
+      v = { displayed: 0, target: 0, vel: 0, fill: null, raf: 0, lastT: 0 };
+      progressVisuals.set(name, v);
+    }
+    // monotonic: the fill only ever moves toward the newest real percentage, never back
+    if (reported > v.target) v.target = reported;
+    v.fill = fill;
+    fill.style.width = v.displayed.toFixed(3) + "%";
+    if (v.raf) return;
+    v.lastT = 0;
+    // critically-damped follow (unity-style SmoothDamp): the fill carries a velocity, so a coarse jump in the reported percent (curl reports ~1/s in big steps) bends its path instead of restarting an ease -- kills the stop-and-go at each reported point. smoothTime ~= how long to close most of a gap; the bar trails real progress by a hair and is always moving.
+    const smoothTime = 0.6;
+    const step = (now) => {
+      if (progressVisuals.get(name) !== v || !v.fill) { v.raf = 0; return; }
+      const dt = v.lastT ? Math.min(0.05, (now - v.lastT) / 1000) : 0.016;
+      v.lastT = now;
+      const omega = 2 / smoothTime;
+      const x = omega * dt;
+      const expf = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+      const change = v.displayed - v.target;
+      const temp = (v.vel + omega * change) * dt;
+      v.vel = (v.vel - omega * temp) * expf;
+      let out = v.target + (change + temp) * expf;
+      if (out > v.target) { out = v.target; v.vel = 0; }
+      v.displayed = out;
+      v.fill.style.width = v.displayed.toFixed(3) + "%";
+      if (v.target - v.displayed > 0.08 || v.vel > 0.4) {
+        v.raf = requestAnimationFrame(step);
+      } else {
+        v.displayed = v.target;
+        v.fill.style.width = v.displayed.toFixed(3) + "%";
+        v.raf = 0;
+      }
+    };
+    v.raf = requestAnimationFrame(step);
+  }
+
+  // the helper holds percent at 99 and moves phase to "finalizing"/"copying link" once the byte transfer is done -- the quick transcode-trigger call runs silently under a faint sheen, no jump to 100 and no text.
+  function uploadPhaseIsFinalizing(job) {
+    const p = job && job.phase ? job.phase : "";
+    return p === "finalizing" || p === "copying link";
+  }
+
   function renderActions(card, clip, force) {
     const actions = card.querySelector(".actions");
     const meta = card.querySelector(".meta");
@@ -5475,27 +5974,51 @@
     const processing = clip.ready === false && !failed && !timedOut;
     const transPct   = Number(clip.transcode_percent) || 0;
     const stillTicking = (state === "compressing" || state === "uploading");
+    const finalizing = stillTicking && uploadPhaseIsFinalizing(status);
     const actionSig = [
       state,
       clip.streamable_url || "",
       clip.uploaded_at || 0,
       clip.retention_days || 0,
       uploadPct,
+      (status && status.phase) || "",
       processing ? 1 : 0,
       failed ? 1 : 0,
       timedOut ? 1 : 0,
       transPct,
     ].join("|");
-    // always re-render while an operation is active so the eta ticks forward between percent changes (otherwise the button text freezes whenever ffmpeg holds at the same integer percent for multiple polls).
-    if (!force && !stillTicking && card.dataset.actionSig === actionSig) return;
+    // while an upload/compress is running and its bar already exists, nudge the fill in place -- rebuilding actions.innerHTML every poll (below) tears down the cancel X, dropping its :hover state and re-binding its listener each tick so it flashes under the pointer.
+    if (stillTicking) {
+      const bar = actions.querySelector(".btn.is-progress");
+      if (bar) {
+        card.dataset.actionSig = actionSig;
+        bar.classList.toggle("is-finalizing", finalizing);
+        updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), uploadPct);
+        return;
+      }
+    }
+    if (!force && card.dataset.actionSig === actionSig) return;
     card.dataset.actionSig = actionSig;
     meta.querySelectorAll(".link-status, .link-status-dot").forEach(n => n.remove());
     actions.innerHTML = "";
+    actions.classList.toggle("is-progress", state === "compressing" || state === "uploading");
+    if (state !== "compressing" && state !== "uploading") progressVisuals.delete(clip.name);
+    const linkMenuItem = card.querySelector(".link-menu-item");
+    if (linkMenuItem) {
+      const label = linkMenuItem.querySelector(".menu-item-label");
+      const icon = linkMenuItem.querySelector(".menu-item-icon");
+      const busy = !clip.streamable_url && stillTicking;
+      linkMenuItem.classList.toggle("is-disabled", busy);
+      linkMenuItem.title = clip.streamable_url ? "Copy Link" : (busy ? "Creating link" : "Create Link");
+      linkMenuItem.setAttribute("aria-label", linkMenuItem.title);
+      if (label) label.textContent = linkMenuItem.title;
+      if (icon) icon.innerHTML = clip.streamable_url ? COPY_ICON : ICON.LINK;
+    }
 
     if (clip.streamable_url) {
       const btn = document.createElement("button");
-      btn.className = "btn primary";
-      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Copy Link</span>`;
+      btn.className = "btn action-link-btn";
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${COPY_ICON}</svg><span class="btn-label">Copy Link</span>`;
       btn.dataset.url = clip.streamable_url;
       btn.addEventListener("click", async () => {
         const ok = await copyText(btn.dataset.url);
@@ -5503,7 +6026,7 @@
         const label = btn.querySelector(".btn-label");
         const orig  = label.textContent;
         btn.classList.add("is-flashing");
-        label.textContent = "Copied!";
+        label.textContent = "Link Copied";
         setTimeout(() => {
           btn.classList.remove("is-flashing");
           label.textContent = orig;
@@ -5548,24 +6071,22 @@
         meta.appendChild(span);
       }
     } else if (state === "compressing" || state === "uploading") {
-      // rebuilt each poll (actions was cleared above). the progress readout is inert; the trailing X is the only cancel target, so aiming at the bar no longer turns the whole thing red.
+      // only built when the bar isnt already there (fresh card or a state flip into uploading) -- the fast path above keeps an existing bar alive across polls so the cancel X doesnt flash. the trailing X is the only cancel target, so aiming at the bar no longer turns the whole thing red.
       let btn = actions.querySelector(".btn.is-progress");
       if (!btn) {
         actions.innerHTML = "";
         btn = document.createElement("div");
         btn.className = "btn is-progress";
         btn.innerHTML =
-          '<span class="progress-fill"></span>' +
-          '<svg class="btn-icon" viewBox="0 0 24 24">' + ICON.LINK + '</svg>' +
-          '<span class="btn-label"></span>' +
+          '<span class="progress-track"><span class="progress-fill"></span></span>' +
           '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel">' +
-          '<svg viewBox="0 0 24 24">' + ICON.CLOSE + '</svg></button>';
+          '<svg viewBox="0 0 320.591 320.591" aria-hidden="true">' + CANCEL_ICON + '</svg></button>';
         // resolve the clip + its live job at click time from the card -- a recycled card node can outlive the clip this listener was built for.
         const xBtn = btn.querySelector(".progress-cancel");
         xBtn.addEventListener("click", () => {
           const host = btn.closest(".card");
           const name = (host && host.dataset.name) || "";
-          if (!linkOpAllowed(name)) return;
+          if (!name) return;
           xBtn.disabled = true;
           bulkUploadQueued.delete(name);
           const job = lastUploadJobsByName.get(name);
@@ -5573,21 +6094,11 @@
         });
         actions.appendChild(btn);
       }
-      let labelText;
-      if (uploadPct >= 100) {
-        labelText = "Finalizing...";
-      } else if (uploadPct >= 1) {
-        labelText = uploadPct + "%";
-      } else if (bulkUploadQueued.has(clip.name)) {
-        labelText = "Queued...";
-      } else {
-        labelText = (state === "compressing" ? "Compressing..." : "Uploading...");
-      }
-      btn.querySelector(".progress-fill").style.width = uploadPct + "%";
-      btn.querySelector(".btn-label").textContent = labelText;
+      btn.classList.toggle("is-finalizing", finalizing);
+      updateDisplayProgress(clip.name, btn.querySelector(".progress-fill"), uploadPct);
     } else {
       const btn = document.createElement("button");
-      btn.className = "btn primary";
+      btn.className = "btn action-link-btn";
       btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Create Link</span>`;
       btn.addEventListener("click", () => onCreateLink(clip.name, btn));
       actions.appendChild(btn);
@@ -5616,7 +6127,13 @@
         try {
           const upload = await triggerUpload(filename);
           pending.requestId = String((upload && upload.requestId) || "");
-          scheduleNextPoll(POLL_FAST_MS);
+          // Cancel can land before /upload has created a job. Once the response gives us its request ID, issue a
+          // second cancel against that exact job so a late upload response can never revive the clip.
+          if (cancelledUploads.has(filename)) {
+            await cancelActiveUpload(filename, pending.requestId, true);
+            return;
+          }
+          scheduleNextPoll(POLL_UPLOAD_MS);
           rerenderCard(filename);
           return;
         } catch (e) {
@@ -5625,6 +6142,13 @@
             attempts++;
             await new Promise((r) => setTimeout(r, 500));
             continue;
+          }
+          if (cancelledUploads.has(filename)) {
+            pendingLinkCreations.delete(filename);
+            localState.delete(filename);
+            anyUploading = localState.size > 0;
+            rerenderCard(filename);
+            return;
           }
           pendingLinkCreations.delete(filename);
           localState.delete(filename);
@@ -5711,7 +6235,7 @@
     // on the "all" tab, split favorites into their own sub-section above the main grid. the favorites are rendered as a plain (non-virtualized) grid -- a user typically has at most a few dozen favorites, well below the count where virtualization matters. the main grid still virtualizes the rest of the clips, so its existing math is unchanged: it just operates on the non-favorites array. on any other filter the favorites section is hidden and the main grid renders the full filtered list as before.
     const allFilterActive = (activeFilter === "all");
     if (allFilterActive) ensureFavoriteResolve();
-    const favClips = allFilterActive ? favoriteClipsForRender(clips) : [];
+    const favClips = allFilterActive ? applyClipFilter(favoriteClipsForRender(loadedClips)) : [];
     const favClipNames = new Set(favClips.map(c => c.name));
     const restClips = allFilterActive ? clips.filter(c => !favClipNames.has(c.name)) : clips;
     const showFavSection = allFilterActive && favClips.length > 0;
@@ -5881,7 +6405,9 @@
       showToast("Helper offline");
     } finally {
       pollInFlight = false;
-      scheduleNextPoll(anyUploading ? POLL_FAST_MS : POLL_IDLE_MS);
+      const hasActiveStreamableUpload = Array.from(lastUploadJobsByName.values()).some((job) =>
+        job && job.active && job.state === "uploading");
+      scheduleNextPoll(hasActiveStreamableUpload ? POLL_UPLOAD_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
     }
   }
 
@@ -5943,6 +6469,14 @@
   window.addEventListener("resize", positionTabUnderline);
 
   updateClipSortControl();
+  if (clipSearchInput) {
+    clipSearchInput.addEventListener("input", () => {
+      clipSearchQuery = clipSearchInput.value || "";
+      scrollAreaEl.scrollTop = 0;
+      resetVirtualWindow();
+      renderLoadedClips(loadedClips);
+    });
+  }
   if (sortButton && sortWrap) {
     sortButton.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -5969,12 +6503,32 @@
         scheduleNextPoll(0);
       });
     });
+    if (sortMenu) {
+      sortMenu.querySelectorAll(".clip-sort-grouprow").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const g = row.closest(".clip-sort-group");
+          if (!g) return;
+          const willExpand = !g.classList.contains("is-expanded");
+          if (willExpand) {
+            // accordion -- opening one group collapses the other so the menu stays short
+            sortMenu.querySelectorAll(".clip-sort-group.is-expanded").forEach((other) => {
+              if (other === g) return;
+              other.classList.remove("is-expanded");
+              const orow = other.querySelector(".clip-sort-grouprow");
+              if (orow) orow.setAttribute("aria-expanded", "false");
+            });
+          }
+          g.classList.toggle("is-expanded", willExpand);
+          row.setAttribute("aria-expanded", willExpand ? "true" : "false");
+        });
+      });
+    }
     document.addEventListener("click", (e) => {
       if (!sortWrap.classList.contains("is-open")) return;
       if (e.target.closest && e.target.closest("#clip-sort")) return;
       closeClipSortMenu();
     });
-    window.addEventListener("resize", placeClipSortMenu);
   }
 
   scrollAreaEl.addEventListener("scroll", () => {
@@ -6019,6 +6573,8 @@
     if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
     // a fresh-window reset owns the scroll position (it forces it to 0 below); drop any pending post-fullscreen restore so it cant fire late and yank the list back to where fullscreen was entered.
     fullscreenSavedScrollTop = null;
+    // theater mode is a session-only view state (body.is-clip-theater + is-theater-card) -- a hidden-then-reshown window must land back on the plain grid. no-ops if we werent in theater.
+    exitTheaterMode();
 
     const renameInput = document.querySelector(".name-edit-input");
     if (renameInput) renameInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -6881,6 +7437,8 @@
   }
   function showBulkTip(btn) {
     if (!btn || !btn.dataset.tooltip || btn.disabled) return;
+    // the sort trigger shares this tooltip -- suppress it while its own menu is open
+    if (btn === sortButton && sortWrap && sortWrap.classList.contains("is-open")) return;
     bulkTipBtn = btn;
     bulkTip.textContent = btn.dataset.tooltip;
     bulkTip.classList.add("is-shown");
@@ -6897,7 +7455,7 @@
     bulkTip.textContent = bulkTipBtn.dataset.tooltip;
     positionBulkTip();
   });
-  document.querySelectorAll(".bulk-icon-btn[data-tooltip]").forEach((btn) => {
+  document.querySelectorAll(".bulk-icon-btn[data-tooltip], .clip-sort-trigger[data-tooltip]").forEach((btn) => {
     btn.addEventListener("mouseenter", () => showBulkTip(btn));
     btn.addEventListener("mouseleave", hideBulkTip);
     bulkTipObserver.observe(btn, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
@@ -6958,6 +7516,8 @@
   const trimRemoveAudio  = document.getElementById("trim-remove-audio");
   const trimVolumeBtn    = document.getElementById("trim-volume-btn");
   const trimVolumeSlider = document.getElementById("trim-volume-slider");
+
+  enableCursorZoom(trimVideoWrap, trimVideo, () => !!trimSourceClip);
 
   // minimum trimmed length the backend will accept.
   const TRIM_MIN_SECONDS = 0.5;
@@ -7567,6 +8127,7 @@
       activePreview = null;
     }
     trimSourceClip = clip;
+    resetVideoZoom(trimVideo);
     trimClipName.textContent = clip.name;
     trimSave.disabled = true;
     trimSave.textContent = "Save copy";
@@ -7627,6 +8188,7 @@
     if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
     disarmOverwrite();
     try { trimVideo.pause(); } catch {}
+    resetVideoZoom(trimVideo);
     // release the streaming connection back to the helper -- otherwise the /file slot stays occupied (helper caps concurrent previews).
     trimVideo.removeAttribute("src");
     try { trimVideo.load(); } catch {}
