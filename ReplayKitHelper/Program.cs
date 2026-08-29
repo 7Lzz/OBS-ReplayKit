@@ -145,6 +145,7 @@ namespace ReplayKitHelper
 
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
+            try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
 
             RunAcceptLoop();
@@ -447,6 +448,27 @@ namespace ReplayKitHelper
             }
         }
 
+        // move any <name>.json.replaykit-pending staged by SetOverlaySceneFile onto the real scene collection. only safe once obs is gone (its own exit-save would clobber it otherwise) -- callers must run this post-exit, pre-relaunch.
+        private static void ApplyPendingOverlayScene()
+        {
+            string scenesDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
+            if (!Directory.Exists(scenesDir)) return;
+            foreach (var staged in Directory.GetFiles(scenesDir, "*.json.replaykit-pending"))
+            {
+                string target = staged.Substring(0, staged.Length - ".replaykit-pending".Length);
+                try
+                {
+                    if (File.Exists(target)) File.Delete(target);
+                    File.Move(staged, target);
+                    Log.Write("ApplyPendingOverlayScene: applied " + Path.GetFileName(target));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("ApplyPendingOverlayScene: could not apply " + Path.GetFileName(target) + ": " + ex.Message);
+                }
+            }
+        }
+
         // restart broker: if /restart-obs-clean was the reason we are exiting, relaunch obs now that the
         // streamable cookies are gone. we are admin (restart-obs-clean requires it), so the new obs inherits our
         // admin token with no further uac prompt.
@@ -454,6 +476,8 @@ namespace ReplayKitHelper
         {
             // same leftover-sentinel problem ClearObsCrashSentinel exists for -- we are about to relaunch right after our own force-kill, which skips obs's graceful-shutdown cleanup same as any other force-kill.
             try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
+            // legacy-fallback twin of the move in restart_obs.ps1 -- apply a staged overlay scene edit now that obs is gone.
+            try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
 
             Log.Write("RestartAfterClean: launching " + obsPath);
             try

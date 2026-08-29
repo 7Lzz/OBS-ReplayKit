@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -48,6 +49,7 @@ namespace ReplayKitHelper
                 ["overlayStyle"] = "off",
                 ["overlayOpacity"] = 100,
                 ["overlayScale"] = 100,
+                ["overlayFlipH"] = false,
                 ["overlayHueShift"] = 0,
                 ["overlayColorMultiply"] = "#ffffff",
                 ["overlayColorAdd"] = "#000000",
@@ -288,6 +290,7 @@ namespace ReplayKitHelper
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), new[] { "input_overlay", "bongo_cat", "off" }),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
+                ["overlayFlipH"] = GetBoolSetting(data, "overlayFlipH", defaults["overlayFlipH"].Value<bool>()),
                 ["overlayHueShift"] = GetFloatSetting(data, "overlayHueShift", defaults["overlayHueShift"].Value<double>(), -180.0, 180.0),
                 ["overlayColorMultiply"] = GetHexColorSetting(data, "overlayColorMultiply", defaults["overlayColorMultiply"].Value<string>()),
                 ["overlayColorAdd"] = GetHexColorSetting(data, "overlayColorAdd", defaults["overlayColorAdd"].Value<string>()),
@@ -871,36 +874,53 @@ namespace ReplayKitHelper
             return new JObject { ["x"] = x, ["y"] = y };
         }
 
+        private static bool OverlayFlipHorizontal(JObject settings) => settings?["overlayFlipH"]?.Value<bool>() ?? false;
+
+        // horizontal mirror: negate scaleX and shift positionX right by the rendered width so the item stays in the
+        // same on-screen box (every overlay item is top-left aligned). sourceWidth is the item's unscaled px width.
+        private static void ApplyOverlayFlipH(JObject transform, double sourceWidth, JObject settings)
+        {
+            if (!OverlayFlipHorizontal(settings)) return;
+            double sx = transform["scaleX"]?.Value<double>() ?? 1.0;
+            transform["positionX"] = (transform["positionX"]?.Value<double>() ?? 0.0) + sourceWidth * Math.Abs(sx);
+            transform["scaleX"] = -sx;
+        }
+
         private static JObject InputOverlayGroupTransform(JObject preset, JObject settings = null)
         {
             var content = OverlayContentRect(preset);
             double scale = content["height"].Value<double>() / 1440.0 * OverlayScaleFactor(settings);
             var pos = InputOverlayPos(preset, 628.0, 292.0, scale, scale);
-            return new JObject
+            var transform = new JObject
             {
                 ["positionX"] = pos["x"].Value<double>(), ["positionY"] = pos["y"].Value<double>(), ["scaleX"] = scale, ["scaleY"] = scale,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
+            ApplyOverlayFlipH(transform, 628.0, settings);
+            return transform;
         }
 
         private static JObject InputOverlayTransform(string name, JObject preset, JObject settings = null)
         {
             var content = OverlayContentRect(preset);
             double scale = content["height"].Value<double>() / 1440.0 * OverlayScaleFactor(settings);
-            var group = InputOverlayGroupTransform(preset, settings);
+            // un-flipped group base -- these transforms feed the WASD/Mouse group_item_backup items, which don't
+            // render; the visible mirror comes from InputOverlayGroupTransform on the Group scene item.
+            var pos = InputOverlayPos(preset, 628.0, 292.0, scale, scale);
+            double groupX = pos["x"].Value<double>(), groupY = pos["y"].Value<double>();
             if (name == "Mouse Overlay")
             {
                 return new JObject
                 {
-                    ["positionX"] = group["positionX"].Value<double>() + 431.0 * group["scaleX"].Value<double>(),
-                    ["positionY"] = group["positionY"].Value<double>(),
+                    ["positionX"] = groupX + 431.0 * scale,
+                    ["positionY"] = groupY,
                     ["scaleX"] = 0.6909722089767456 * scale, ["scaleY"] = 0.6909722089767456 * scale,
                     ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
                 };
             }
             return new JObject
             {
-                ["positionX"] = group["positionX"].Value<double>(), ["positionY"] = group["positionY"].Value<double>(),
+                ["positionX"] = groupX, ["positionY"] = groupY,
                 ["scaleX"] = 0.7395833134651184 * scale, ["scaleY"] = 0.7388888597488403 * scale,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
@@ -913,11 +933,13 @@ namespace ReplayKitHelper
             double scaleX = 0.4892578125 * ratio;
             double scaleY = 0.48828125 * ratio;
             var pos = BottomLeftCornerOverlayPos(preset, 1280.0, 768.0, scaleX, scaleY);
-            return new JObject
+            var transform = new JObject
             {
                 ["positionX"] = pos["x"].Value<double>(), ["positionY"] = pos["y"].Value<double>(), ["scaleX"] = scaleX, ["scaleY"] = scaleY,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
+            ApplyOverlayFlipH(transform, 1280.0, settings);
+            return transform;
         }
 
         private static JObject MainCaptureTransform(string name, JObject preset)
@@ -1225,7 +1247,7 @@ namespace ReplayKitHelper
             double canvasW = preset["video"]?["baseWidth"]?.Value<double>() ?? 0.0;
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
             var transform = InputOverlayGroupTransform(preset, settings);
-            double ratio = transform["scaleX"].Value<double>();
+            double scaleX = transform["scaleX"].Value<double>(), scaleY = transform["scaleY"].Value<double>();
             double x = transform["positionX"].Value<double>(), y = transform["positionY"].Value<double>();
             SetSceneItemBaseJson(item, "Group", visible);
             item["source_uuid"] = groupUuid;
@@ -1233,9 +1255,9 @@ namespace ReplayKitHelper
             item["group_item_backup"] = false;
             item["pos"] = new JObject { ["x"] = x, ["y"] = y };
             item["pos_rel"] = new JObject { ["x"] = (x - canvasW / 2.0) / (canvasH / 2.0), ["y"] = (y - canvasH / 2.0) / (canvasH / 2.0) };
-            item["scale"] = new JObject { ["x"] = ratio, ["y"] = ratio };
+            item["scale"] = new JObject { ["x"] = scaleX, ["y"] = scaleY };
             double scaleRel = OverlayScaleFactor(settings);
-            item["scale_rel"] = new JObject { ["x"] = scaleRel, ["y"] = scaleRel };
+            item["scale_rel"] = new JObject { ["x"] = OverlayFlipHorizontal(settings) ? -scaleRel : scaleRel, ["y"] = scaleRel };
             item["show_transition"] = NewJsonTransition(0);
             item["hide_transition"] = NewJsonTransition(0);
             item["private_settings"] = new JObject { ["collapsed"] = false };
@@ -1962,9 +1984,11 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(File.ReadAllText(path));
                 var sources = data["sources"] as JArray;
                 if (sources == null) throw new InvalidOperationException("OBS scene collection has no sources list.");
-                data["sources"] = sources;
+                // do NOT self-assign data["sources"] / data["groups"] here -- in the bundled Newtonsoft that detaches
+                // the array from `data`, so every edit below lands on an orphan and the file is written from the
+                // untouched original (symptom: "switched overlay, scene still shows the old one"). they are
+                // re-attached once, right before serialize.
                 var groups = data["groups"] as JArray ?? new JArray();
-                data["groups"] = groups;
 
                 string overlayStyle = settings["overlayStyle"]?.Value<string>() ?? "";
                 bool useInputOverlay = overlayStyle == "input_overlay";
@@ -2098,7 +2122,7 @@ namespace ReplayKitHelper
                     if (sceneSettings == null) continue;
                     var items = sceneSettings["items"] as JArray;
                     if (items == null) continue;
-                    sceneSettings["items"] = items;
+                    // same detach hazard as data["sources"] above -- mutate `items` in place, re-attach below.
                     if (!useInputOverlay)
                     {
                         RemoveJsonListWhere(items, item =>
@@ -2205,9 +2229,19 @@ namespace ReplayKitHelper
                             sceneSettings["id_counter"] = GetNextJsonSceneItemId(items);
                         }
                     }
+                    sceneSettings["items"] = items;
                 }
 
-                AppConfig.WriteUtf8(path, data.ToString(Formatting.None));
+                data["sources"] = sources;
+                data["groups"] = groups;
+                string json = data.ToString(Formatting.None);
+                AppConfig.WriteUtf8(path, json);
+                // the restart flow gracefully closes OBS so it can save window geometry -- but that exit-save also
+                // writes OBS's stale in-memory scene collection back over the edit just made here. stage a copy with
+                // a non-.json extension (OBS's scene scan ignores it); restart_obs.ps1 / ApplyPendingOverlayScene
+                // move it onto the real file after OBS is fully gone, right before the relaunch.
+                try { AppConfig.WriteUtf8(path + ".replaykit-pending", json); }
+                catch (Exception ex) { Log.Write("SetOverlaySceneFile: could not stage pending scene: " + ex.Message); }
                 return new JObject { ["ok"] = true, ["path"] = path };
             }
             catch (Exception ex)
@@ -3091,6 +3125,54 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
+        // horizontal mirror of a scene-item transform, in place: negate scaleX and shift positionX by the SIGNED rendered width so the on-screen box is unchanged and the shift is its own inverse (flipping on then off lands back exactly). overlay items are align-top-left.
+        private static JObject MirrorTransformInPlace(JObject current, string overlayStyle)
+        {
+            double px = GetDoubleValue(current, "positionX", 0.0);
+            double sx = GetDoubleValue(current, "scaleX", 1.0);
+            double renderedW = Math.Abs(GetDoubleValue(current, "width", 0.0));
+            if (renderedW <= 0.0) renderedW = Math.Abs(GetDoubleValue(current, "sourceWidth", 0.0) * sx);
+            if (renderedW <= 0.0) renderedW = (overlayStyle == "bongo_cat" ? 1280.0 : 628.0) * Math.Abs(sx);
+            double dir = sx < 0.0 ? -1.0 : 1.0;
+            return new JObject
+            {
+                ["positionX"] = px + renderedW * dir,
+                ["positionY"] = GetDoubleValue(current, "positionY", 0.0),
+                ["scaleX"] = -sx,
+                ["scaleY"] = GetDoubleValue(current, "scaleY", 1.0),
+            };
+        }
+
+        // toggle the horizontal flip live by mirroring the overlay's CURRENT scene-item transform in place -- never
+        // repositions to the canonical corner, so a user who dragged the overlay somewhere keeps it there. Group for
+        // input_overlay (WASD/Mouse ride along inside it), Bongo Cat Overlay for bongo.
+        private static JObject ApplyOverlayFlipLive(JObject previous, JObject settings)
+        {
+            var warnings = new List<string>();
+            var applied = new List<string>();
+            if ((previous?["overlayFlipH"]?.Value<bool>() ?? false) == (settings?["overlayFlipH"]?.Value<bool>() ?? false))
+                return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+
+            var scene = GetSceneName();
+            if (scene["ok"]?.Value<bool>() != true)
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but OBS scene lookup failed: " + scene["message"]) };
+            string sceneName = scene["name"]?.Value<string>();
+            var items = GetSceneItems(sceneName)["items"] as JArray;
+            string style = settings["overlayStyle"]?.Value<string>() ?? "";
+            string itemName = style == "bongo_cat" ? "Bongo Cat Overlay" : style == "input_overlay" ? "Group" : null;
+            if (itemName == null) return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+            var item = FindSceneItem(items, itemName);
+            if (item == null) return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+
+            var cur = GetSceneItemTransformLive(sceneName, item);
+            if (cur["ok"]?.Value<bool>() != true || cur["transform"] == null || cur["transform"].Type == JTokenType.Null)
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but " + itemName + "'s current position could not be read: " + cur["message"]) };
+            var r = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style));
+            if (r["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
+            else warnings.Add("Could not flip " + itemName + ": " + r["message"]);
+            return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
         private static JObject ApplyOverlayOpacityForStyleLive(JObject settings)
         {
             var warnings = new List<string>();
@@ -3115,6 +3197,12 @@ namespace ReplayKitHelper
                 applied.AddRange((scale["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((scale["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }
+            if ((previous["overlayFlipH"]?.Value<bool>() ?? false) != (settings["overlayFlipH"]?.Value<bool>() ?? false))
+            {
+                var flip = ApplyOverlayFlipLive(previous, settings);
+                applied.AddRange((flip["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((flip["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
             bool colorChanged = previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                 previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
@@ -3134,6 +3222,15 @@ namespace ReplayKitHelper
 
         private static bool TestOverlayColorRequest(JObject incoming) =>
             incoming != null && (incoming["overlayOpacity"] != null || incoming["overlayHueShift"] != null || incoming["overlayColorMultiply"] != null || incoming["overlayColorAdd"] != null);
+
+        // the in-memory preview snapshot mirrored to disk, so a session that dies mid-preview (obs crash / end-task before commit or cancel) can still be reverted on the next helper start instead of leaking the un-applied geometry into obss saved scene.
+        private static string OverlayPreviewBaselinePath => Path.Combine(Constants.SCRATCH_DIR, "overlay_preview_baseline.json");
+
+        private static void TryDeleteOverlayPreviewBaseline()
+        {
+            try { File.Delete(OverlayPreviewBaselinePath); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+        }
 
         // holds OverlayPreviewLock across the whole capture, including the obs-websocket round trips, not just
         // the null-check -- this only runs once per preview session, and a lost race here would mean two callers
@@ -3203,6 +3300,8 @@ namespace ReplayKitHelper
                 state["opacityFilters"] = opacityFilters;
 
                 Server.State.ReplaykitOverlayPreviewState = state;
+                try { AppConfig.WriteUtf8(OverlayPreviewBaselinePath, state.ToString(Formatting.None)); }
+                catch (Exception ex) { Log.Write("GetOverlayPreviewState: could not persist baseline: " + ex.Message); }
                 return state;
             }
         }
@@ -3210,6 +3309,7 @@ namespace ReplayKitHelper
         private static void ClearOverlayPreviewState()
         {
             lock (Server.State.OverlayPreviewLock) { Server.State.ReplaykitOverlayPreviewState = null; }
+            TryDeleteOverlayPreviewBaseline();
         }
 
         private static long? GetOverlayPreviewRevision(JObject incoming)
@@ -3225,25 +3325,85 @@ namespace ReplayKitHelper
             return revision;
         }
 
-        private static JObject ApplyOverlayScalePreviewLive(JObject preview, JObject settings)
+        // live preview for the two geometry knobs. size is snapshot-relative (`scaleTouched` latch -> every tick
+        // re-asserts scale(baseline)*ratio so a drag back to 100 restores, without compounding). flip mirrors the
+        // item's CURRENT transform in place, only on a state transition (`mirrorApplied` tracks whether our preview
+        // has the item mirrored) -- so it never yanks a user-repositioned overlay back to the canonical corner, and
+        // the signed shift in MirrorTransformInPlace makes on->off land back exactly. size runs first so flip mirrors
+        // the resized transform.
+        private static JObject ApplyOverlayGeometryPreviewLive(JObject preview, JObject settings)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
-            double baseScale = OverlayScaleFactor(preview["settings"] as JObject);
+            var previewSettings = preview["settings"] as JObject;
+            string sceneName = preview["sceneName"]?.Value<string>();
+            var transforms = preview["transforms"] as JObject ?? new JObject();
+            if (string.IsNullOrWhiteSpace(sceneName))
+                return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+
+            bool scaleChanged = previewSettings["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>();
+            bool scaleTouched = preview["scaleTouched"]?.Value<bool>() ?? false;
+            if (scaleChanged) { preview["scaleTouched"] = true; scaleTouched = true; }
+
+            bool wantMirror = (previewSettings["overlayFlipH"]?.Value<bool>() ?? false) != (settings["overlayFlipH"]?.Value<bool>() ?? false);
+            bool mirrorApplied = preview["mirrorApplied"]?.Value<bool>() ?? false;
+            bool flipTransition = wantMirror != mirrorApplied;
+
+            if (!scaleTouched && !flipTransition)
+                return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+
+            double baseScale = OverlayScaleFactor(previewSettings);
             double nextScale = OverlayScaleFactor(settings);
             if (baseScale <= 0.0) baseScale = 1.0;
-            if (string.IsNullOrWhiteSpace(preview["sceneName"]?.Value<string>()))
-                return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
             double scaleRatio = nextScale / baseScale;
             var preset = preview["preset"] as JObject ?? GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
-            var transforms = preview["transforms"] as JObject ?? new JObject();
-            foreach (var prop in transforms.Properties().ToList())
+            string style = settings["overlayStyle"]?.Value<string>() ?? "";
+
+            // size: snapshot-relative, over whatever items the snapshot captured
+            if (scaleTouched)
             {
-                var entry = (JObject)prop.Value;
-                var transform = GetScaledTransformFromCurrent(entry["transform"], scaleRatio, preset);
-                var r = SetSceneItemTransform(preview["sceneName"]?.Value<string>(), entry["item"] as JObject, transform);
-                if (r["ok"]?.Value<bool>() == true) applied.Add(prop.Name + " size");
-                else warnings.Add("Could not preview resize " + prop.Name + ": " + r["message"]);
+                foreach (var prop in transforms.Properties().ToList())
+                {
+                    var entry = (JObject)prop.Value;
+                    var scaled = GetScaledTransformFromCurrent(entry["transform"], scaleRatio, preset);
+                    if (mirrorApplied) // keep the current mirror while resizing; the flip step below toggles it if needed
+                    {
+                        double sw = GetDoubleValue(entry["transform"], "sourceWidth", 0.0);
+                        if (sw <= 0.0) sw = style == "bongo_cat" ? 1280.0 : 628.0;
+                        double sx = scaled["scaleX"].Value<double>();
+                        scaled["positionX"] = scaled["positionX"].Value<double>() + sw * sx;
+                        scaled["scaleX"] = -sx;
+                    }
+                    var rs = SetSceneItemTransform(sceneName, entry["item"] as JObject, scaled);
+                    if (rs["ok"]?.Value<bool>() == true) { if (!flipTransition) applied.Add(prop.Name + " size"); }
+                    else warnings.Add("Could not preview " + prop.Name + " size: " + rs["message"]);
+                }
+            }
+
+            // flip: mirror the flip target's CURRENT transform in place -- looked up by style, independent of the
+            // snapshot's transforms map (which can miss the item), so it never repositions to the canonical corner
+            if (flipTransition)
+            {
+                string itemName = style == "bongo_cat" ? "Bongo Cat Overlay" : style == "input_overlay" ? "Group" : null;
+                var item = itemName == null ? null : ((transforms[itemName] as JObject)?["item"] as JObject ?? FindSceneItem(GetSceneItems(sceneName)["items"] as JArray, itemName));
+                if (item != null)
+                {
+                    var cur = GetSceneItemTransformLive(sceneName, item);
+                    if (cur["ok"]?.Value<bool>() == true && cur["transform"] != null && cur["transform"].Type != JTokenType.Null)
+                    {
+                        // make sure the un-mirrored transform is the snapshot's revert target (adopt a manual reposition since the snapshot; add the entry if the initial capture missed it) so cancel un-flips cleanly.
+                        if (!mirrorApplied && !scaleTouched)
+                        {
+                            if (transforms[itemName] is JObject snapEntry) snapEntry["transform"] = cur["transform"];
+                            else transforms[itemName] = new JObject { ["item"] = item, ["transform"] = cur["transform"] };
+                        }
+                        var rf = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style));
+                        if (rf["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
+                        else warnings.Add("Could not preview " + itemName + " flip: " + rf["message"]);
+                    }
+                    else warnings.Add("Could not read " + itemName + " to flip: " + cur["message"]);
+                }
+                preview["mirrorApplied"] = wantMirror;
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -3336,7 +3496,7 @@ namespace ReplayKitHelper
             var incoming = JObject.Parse(body);
             long? previewRevision = GetOverlayPreviewRevision(incoming);
             if (incoming.Count < 1) throw new InvalidOperationException("Missing overlay preview setting.");
-            var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
+            var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
             foreach (var prop in incoming.Properties())
             {
                 if (!allowedKeys.Contains(prop.Name)) throw new InvalidOperationException("Unknown overlay preview setting: " + prop.Name);
@@ -3373,12 +3533,9 @@ namespace ReplayKitHelper
                 WriteSettings(settingsJ);
                 var warnings = new List<string>();
                 var applied = new List<string>();
-                if (previewSettings["overlayScale"]?.Value<int>() != settingsJ["overlayScale"]?.Value<int>())
-                {
-                    var scale = ApplyOverlayScalePreviewLive(preview, settingsJ);
-                    applied.AddRange((scale["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                    warnings.AddRange((scale["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                }
+                var geometryCommit = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
+                applied.AddRange((geometryCommit["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((geometryCommit["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 bool colorChangedCommit = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
                     previewSettings["overlayHueShift"]?.Value<double>() != settingsJ["overlayHueShift"]?.Value<double>() ||
                     previewSettings["overlayColorMultiply"]?.Value<string>() != settingsJ["overlayColorMultiply"]?.Value<string>() ||
@@ -3399,12 +3556,9 @@ namespace ReplayKitHelper
 
             var previewWarnings = new List<string>();
             var previewApplied = new List<string>();
-            if (previewSettings["overlayScale"]?.Value<int>() != settingsJ["overlayScale"]?.Value<int>())
-            {
-                var scale = ApplyOverlayScalePreviewLive(preview, settingsJ);
-                previewApplied.AddRange((scale["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                previewWarnings.AddRange((scale["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            }
+            var geometryPreview = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
+            previewApplied.AddRange((geometryPreview["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            previewWarnings.AddRange((geometryPreview["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             bool colorChanged = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
                 previewSettings["overlayHueShift"]?.Value<double>() != settingsJ["overlayHueShift"]?.Value<double>() ||
                 previewSettings["overlayColorMultiply"]?.Value<string>() != settingsJ["overlayColorMultiply"]?.Value<string>() ||
@@ -3421,6 +3575,47 @@ namespace ReplayKitHelper
                 ["ok"] = true, ["settings"] = settingsJ, ["applied"] = new JArray(previewApplied), ["warnings"] = new JArray(previewWarnings),
                 ["restartRequired"] = false, ["restartReason"] = "",
             };
+        }
+
+        // consumes a persisted preview baseline left by a session that died before commit or cancel -- once obs is answering again, push the pre-preview transforms + opacity filters back so an un-applied live preview cant survive into obss saved scene. runs before the http accept loop, so nothing can be mid-preview yet.
+        public static void RevertAbandonedOverlayPreviewAtStartup()
+        {
+            if (!File.Exists(OverlayPreviewBaselinePath)) return;
+
+            string raw;
+            try { raw = File.ReadAllText(OverlayPreviewBaselinePath); }
+            catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: cannot read baseline, leaving it: " + ex.Message); return; }
+
+            // delete the file before acting on it -- if we cant delete it we must NOT run the revert, otherwise a
+            // baseline that keeps coming back (locked/read-only scratch dir) would re-stomp the users applied
+            // overlay on every single launch. strictly one shot.
+            try { File.Delete(OverlayPreviewBaselinePath); }
+            catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: baseline undeletable, skipping revert: " + ex.Message); return; }
+
+            JObject baseline;
+            try { baseline = JObject.Parse(raw); }
+            catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: unparseable baseline discarded: " + ex.Message); return; }
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    for (int i = 0; i < 30; i++)
+                    {
+                        // a real preview session started while we were waiting -- it owns the overlay now, dont clobber it with a stale baseline.
+                        if (Server.State.ReplaykitOverlayPreviewState != null) return;
+                        if (GetSceneName()["ok"]?.Value<bool>() == true)
+                        {
+                            var live = RestoreOverlayPreviewLive(baseline);
+                            Log.Write("RevertAbandonedOverlayPreview: " + string.Join(", ", (live["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>()));
+                            return;
+                        }
+                        Thread.Sleep(2000);
+                    }
+                    Log.Write("RevertAbandonedOverlayPreview: OBS not reachable in time; abandoned-preview revert skipped.");
+                }
+                catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: " + ex.Message); }
+            });
         }
 
         // -- runtime output stop/apply/restart orchestration + projector audio-monitoring toggle --
@@ -4512,7 +4707,7 @@ namespace ReplayKitHelper
 
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
         {
-            var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
+            var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
             foreach (var prop in GetDefaultSettings().Properties())
             {
                 if (skip.Contains(prop.Name)) continue;
@@ -4520,6 +4715,7 @@ namespace ReplayKitHelper
             }
             return previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
+                previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                 previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
                 previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();
@@ -4682,6 +4878,7 @@ namespace ReplayKitHelper
             bool overlayGeometryChanged = previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||
                 previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
+                previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                 previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
                 previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();

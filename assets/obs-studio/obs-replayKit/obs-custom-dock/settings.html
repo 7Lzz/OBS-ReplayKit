@@ -600,6 +600,12 @@
     cursor:default;
   }
   .icon-btn svg { width:16px; height:16px; fill:currentColor; }
+  /* per-field "reset to default" button -- let the control give up room for it. dimmed while the value is already default. */
+  .field-wrap:has(> .field-reset) > .volume-control,
+  .field-wrap:has(> .field-reset) > .color-control { width:auto; flex:1; }
+  .field-reset { flex:none; }
+  .field-reset.is-default { opacity:.4; }
+  .field-reset.is-default:hover { opacity:1; }
   .inline-status {
     color:var(--muted);
     font-size:12px;
@@ -942,7 +948,9 @@
         <div class="box-title">Discord Screenshare</div>
         <div class="form-row">
           <div class="label">Capture Source</div>
-          <div class="field-wrap"><div class="combo" id="screenshareCaptureMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+          <div class="field-wrap"><div class="combo" id="screenshareCaptureMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div><button class="icon-btn field-reset" type="button" id="resetScreenshareCaptureMode" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button></div>
         </div>
         <div class="form-row" id="screenshareGameWindowRow">
           <div class="label">Game Window</div>
@@ -977,6 +985,9 @@
                 <input class="volume-slider" id="screenshareSwitchDelay" type="range" min="0.05" max="5" step="0.05" aria-label="Capture switch delay slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetScreenshareSwitchDelay" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row tight" id="screenshareSwitchDelayHintRow">
@@ -1007,6 +1018,9 @@
                 <input class="volume-slider" id="clipSoundVolume" type="range" min="0" max="100" step="1" aria-label="Clipping sound volume slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetClipSoundVolume" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row">
@@ -1018,6 +1032,9 @@
                 <input class="volume-slider" id="recordingSoundVolume" type="range" min="0" max="100" step="1" aria-label="Recording sound volume slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetRecordingSoundVolume" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1083,6 +1100,13 @@
           <div class="label">Overlay</div>
           <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.996094 5 l -5.996094 6 l -6.003906 -6 z m 0 0"/></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="overlayFlipH">
+            <span>Flip horizontally</span>
+          </label>
+        </div>
         <div class="form-row">
           <div class="label">Opacity</div>
           <div class="field-wrap">
@@ -1092,6 +1116,9 @@
                 <input class="volume-slider" id="overlayOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayOpacity" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row">
@@ -1103,6 +1130,9 @@
                 <input class="volume-slider" id="overlayScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayScale" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row">
@@ -1114,6 +1144,9 @@
                 <input class="volume-slider" id="overlayHueShift" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayHueShift" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row">
@@ -1123,6 +1156,9 @@
               <input class="color-picker" id="overlayColorMultiply" type="color" aria-label="Overlay color multiply">
               <input class="text-input color-value" id="overlayColorMultiplyValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex">
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayColorMultiply" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
         <div class="form-row">
@@ -1132,6 +1168,9 @@
               <input class="color-picker" id="overlayColorAdd" type="color" aria-label="Overlay color add">
               <input class="text-input color-value" id="overlayColorAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex">
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayColorAdd" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1153,6 +1192,9 @@
                 <input class="volume-slider" id="motionBlurStrength" type="range" min="0" max="1" step="0.001" aria-label="Motion blur strength slider">
               </div>
             </div>
+            <button class="icon-btn field-reset" type="button" id="resetMotionBlurStrength" title="Reset to default">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 5 2 c -0.265625 0 -0.519531 0.105469 -0.707031 0.292969 l -4 4 c -0.3906252 0.390625 -0.3906252 1.023437 0 1.414062 l 4 4 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 s 0.390625 -1.023437 0 -1.414062 l -2.292969 -2.292969 h 8.585938 c 1.117188 0 2 0.882812 2 2 s -0.882812 2 -2 2 c -0.550781 0 -1 0.449219 -1 1 s 0.449219 1 1 1 c 2.199219 0 4 -1.800781 4 -4 s -1.800781 -4 -4 -4 h -8.585938 l 2.292969 -2.292969 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1336,6 +1378,16 @@
   const FPS_MAX = 240;
   const DEFAULT_CLIP_KEYBIND = { shift:true, key:"OBS_KEY_BACKSLASH" };
   const DEFAULT_RECORDING_KEYBIND = {};
+  const DEFAULT_OVERLAY_OPACITY = 100;
+  const DEFAULT_OVERLAY_SCALE = 100;
+  const DEFAULT_OVERLAY_HUE_SHIFT = 0;
+  const DEFAULT_OVERLAY_COLOR_MULTIPLY = "#ffffff";
+  const DEFAULT_OVERLAY_COLOR_ADD = "#000000";
+  const DEFAULT_MOTION_BLUR_STRENGTH = 0.075;
+  const DEFAULT_SCREENSHARE_SWITCH_DELAY = 1;
+  const DEFAULT_SCREENSHARE_CAPTURE_MODE = "hybrid_auto";
+  const DEFAULT_CLIP_SOUND_VOLUME = 25;
+  const DEFAULT_RECORDING_SOUND_VOLUME = 25;
   const state = {};
   let originalState = {};
   let dirty = false;
@@ -1382,6 +1434,7 @@
     overlayOpacityValue: document.getElementById("overlayOpacityValue"),
     overlayScale: document.getElementById("overlayScale"),
     overlayScaleValue: document.getElementById("overlayScaleValue"),
+    overlayFlipH: document.getElementById("overlayFlipH"),
     overlayHueShift: document.getElementById("overlayHueShift"),
     overlayHueShiftValue: document.getElementById("overlayHueShiftValue"),
     overlayColorMultiply: document.getElementById("overlayColorMultiply"),
@@ -1608,6 +1661,7 @@
     return {
       overlayOpacity: state.overlayOpacity ?? 100,
       overlayScale: state.overlayScale ?? 100,
+      overlayFlipH: !!state.overlayFlipH,
       overlayHueShift: state.overlayHueShift ?? 0,
       overlayColorMultiply: state.overlayColorMultiply || "#ffffff",
       overlayColorAdd: state.overlayColorAdd || "#000000",
@@ -1677,6 +1731,7 @@
     if (!overlayPreviewTouched &&
         !settingValueChanged("overlayOpacity") &&
         !settingValueChanged("overlayScale") &&
+        !settingValueChanged("overlayFlipH") &&
         !settingValueChanged("overlayHueShift") &&
         !settingValueChanged("overlayColorMultiply") &&
         !settingValueChanged("overlayColorAdd")) {
@@ -1686,6 +1741,7 @@
     const payload = {
       overlayOpacity: state.overlayOpacity ?? 100,
       overlayScale: state.overlayScale ?? 100,
+      overlayFlipH: !!state.overlayFlipH,
       overlayHueShift: state.overlayHueShift ?? 0,
       overlayColorMultiply: state.overlayColorMultiply || "#ffffff",
       overlayColorAdd: state.overlayColorAdd || "#000000",
@@ -1695,7 +1751,7 @@
       headers:{ "Content-Type":"application/json" },
       body:JSON.stringify(payload),
     });
-    ["overlayOpacity", "overlayScale", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
+    ["overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
       if (!data.settings || !Object.prototype.hasOwnProperty.call(data.settings, key)) return;
       state[key] = data.settings[key];
       originalState[key] = data.settings[key];
@@ -2170,6 +2226,7 @@
     els.screenshareSwitchDelayHintRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareSwitchDelay.disabled = !usesAutoList;
     els.screenshareSwitchDelayValue.disabled = !usesAutoList;
+    if (fieldResetBtns.screenshareSwitchDelaySeconds) fieldResetBtns.screenshareSwitchDelaySeconds.disabled = !usesAutoList;
     els.addScreenshareGameOverride.disabled = !usesAutoList || !comboValue(els.screenshareGameOverridePicker);
     els.screenshareGameOverrideList.querySelectorAll("button").forEach((button) => {
       button.disabled = !usesAutoList;
@@ -2275,18 +2332,26 @@
     }
     syncDownscaleFields();
     setComboValue(els.screenshareCaptureMode, state.screenshareCaptureMode || "hybrid_auto", false);
+    refreshFieldResetState("screenshareCaptureMode", DEFAULT_SCREENSHARE_CAPTURE_MODE);
     setComboValue(els.screenshareGameWindow, state.screenshareGameWindow || "", false);
     renderScreenshareGameOverrides();
     els.screenshareAutoGameKeepFocused.checked = !!state.screenshareAutoGameKeepFocused;
     syncSwitchDelayControl(state.screenshareSwitchDelaySeconds ?? 1);
+    refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
     syncScreenshareCaptureFields();
     syncProjectorToolButtons();
     setComboValue(els.overlayStyle, state.overlayStyle || "input_overlay", false);
     syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, state.overlayOpacity ?? 100, clampVolume, 0, 100);
     syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, state.overlayScale ?? 100, clampOverlayScale, 50, 200);
+    els.overlayFlipH.checked = !!state.overlayFlipH;
     syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, state.overlayHueShift ?? 0, clampHueShift, -180, 180);
+    refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
+    refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
+    refreshFieldResetState("overlayHueShift", DEFAULT_OVERLAY_HUE_SHIFT);
     syncColorControl(els.overlayColorMultiply, els.overlayColorMultiplyValue, state.overlayColorMultiply || "#ffffff", "#ffffff");
     syncColorControl(els.overlayColorAdd, els.overlayColorAddValue, state.overlayColorAdd || "#000000", "#000000");
+    refreshFieldResetState("overlayColorMultiply", DEFAULT_OVERLAY_COLOR_MULTIPLY);
+    refreshFieldResetState("overlayColorAdd", DEFAULT_OVERLAY_COLOR_ADD);
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds || 90);
     syncFpsControl(state.fpsNumerator ?? state.fps ?? 60);
     els.clipDir.value = state.clipDir || "";
@@ -2301,8 +2366,11 @@
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 25);
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 25);
+    refreshFieldResetState("clipSoundVolume", DEFAULT_CLIP_SOUND_VOLUME);
+    refreshFieldResetState("recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME);
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
+    refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
     els.showCodecTags.checked = !!state.showCodecTags;
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
@@ -2334,6 +2402,7 @@
     state.overlayStyle = comboValue(els.overlayStyle);
     state.overlayOpacity = clampVolume(els.overlayOpacity.value);
     state.overlayScale = clampOverlayScale(els.overlayScale.value);
+    state.overlayFlipH = els.overlayFlipH.checked;
     state.overlayHueShift = clampHueShift(els.overlayHueShift.value);
     state.overlayColorMultiply = cleanHexColor(els.overlayColorMultiplyValue.value, "#ffffff");
     state.overlayColorAdd = cleanHexColor(els.overlayColorAddValue.value, "#000000");
@@ -2423,6 +2492,16 @@
   });
   document.addEventListener("click", () => closeCombos());
 
+  // per-field "reset to default" buttons -- shared across the overlay, capture-effects, screenshare and sound sliders/combos.
+  const fieldResetBtns = {};
+  function fieldAtDefault(key, def) {
+    return typeof def === "number" ? Number(state[key]) === def : String(state[key]) === String(def);
+  }
+  function refreshFieldResetState(key, def) {
+    const btn = fieldResetBtns[key];
+    if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
+  }
+
   [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
@@ -2435,12 +2514,22 @@
       }
       if (combo === els.screenshareCaptureMode) {
         syncScreenshareCaptureFields();
+        refreshFieldResetState("screenshareCaptureMode", DEFAULT_SCREENSHARE_CAPTURE_MODE);
       }
       markDirty();
     });
   });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
+  {
+    // Capture Source dropdown reset -- setComboValue(..., true) fires combochange, which readUi()s the new value into state and re-syncs the dependent rows.
+    const resetBtn = document.getElementById("resetScreenshareCaptureMode");
+    fieldResetBtns.screenshareCaptureMode = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault("screenshareCaptureMode", DEFAULT_SCREENSHARE_CAPTURE_MODE)) return;
+      setComboValue(els.screenshareCaptureMode, DEFAULT_SCREENSHARE_CAPTURE_MODE, true);
+    });
+  }
 
   [els.replaySeconds, els.fps, els.downscaleHeight, els.clipDir].forEach((input) => {
     input.addEventListener("input", () => { readUi(); markDirty(); });
@@ -2448,35 +2537,48 @@
   });
 
   [
-    [els.clipSoundVolume, els.clipSoundVolumeValue, "clipSoundVolume"],
-    [els.recordingSoundVolume, els.recordingSoundVolumeValue, "recordingSoundVolume"],
-  ].forEach(([slider, input, key]) => {
+    [els.clipSoundVolume, els.clipSoundVolumeValue, "clipSoundVolume", DEFAULT_CLIP_SOUND_VOLUME, "resetClipSoundVolume"],
+    [els.recordingSoundVolume, els.recordingSoundVolumeValue, "recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME, "resetRecordingSoundVolume"],
+  ].forEach(([slider, input, key, def, resetId]) => {
     slider.addEventListener("input", () => {
       state[key] = clampVolume(slider.value);
       syncVolumeControl(slider, input, state[key]);
+      refreshFieldResetState(key, def);
       markDirty();
     });
     input.addEventListener("input", () => {
       state[key] = clampVolume(input.value);
       slider.value = String(state[key]);
       slider.style.setProperty("--fill", state[key] + "%");
+      refreshFieldResetState(key, def);
       markDirty();
     });
     input.addEventListener("change", () => {
       state[key] = clampVolume(input.value);
       syncVolumeControl(slider, input, state[key]);
+      refreshFieldResetState(key, def);
+      markDirty();
+    });
+    const resetBtn = document.getElementById(resetId);
+    fieldResetBtns[key] = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault(key, def)) return;
+      state[key] = def;
+      syncVolumeControl(slider, input, def);
+      refreshFieldResetState(key, def);
       markDirty();
     });
   });
 
   [
-    [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampVolume, 0, 100],
-    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, 50, 200],
-    [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, -180, 180],
-  ].forEach(([slider, input, key, clampFn, min, max]) => {
+    [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampVolume, 0, 100, DEFAULT_OVERLAY_OPACITY, "resetOverlayOpacity"],
+    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, 50, 200, DEFAULT_OVERLAY_SCALE, "resetOverlayScale"],
+    [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, -180, 180, DEFAULT_OVERLAY_HUE_SHIFT, "resetOverlayHueShift"],
+  ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
     slider.addEventListener("input", () => {
       state[key] = clampFn(slider.value);
       syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview();
     });
@@ -2484,30 +2586,44 @@
       state[key] = clampFn(input.value);
       slider.value = String(state[key]);
       setSliderFill(slider, state[key], min, max);
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview();
     });
     input.addEventListener("change", () => {
       state[key] = clampFn(input.value);
       syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      refreshFieldResetState(key, def);
+      markDirty();
+      queueOverlayPreview();
+    });
+    const resetBtn = document.getElementById(resetId);
+    fieldResetBtns[key] = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault(key, def)) return;
+      state[key] = def;
+      syncIntegerRangeControl(slider, input, def, clampFn, min, max);
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview();
     });
   });
 
   [
-    [els.overlayColorMultiply, els.overlayColorMultiplyValue, "overlayColorMultiply", "#ffffff"],
-    [els.overlayColorAdd, els.overlayColorAddValue, "overlayColorAdd", "#000000"],
-  ].forEach(([picker, input, key, fallback]) => {
+    [els.overlayColorMultiply, els.overlayColorMultiplyValue, "overlayColorMultiply", "#ffffff", DEFAULT_OVERLAY_COLOR_MULTIPLY, "resetOverlayColorMultiply"],
+    [els.overlayColorAdd, els.overlayColorAddValue, "overlayColorAdd", "#000000", DEFAULT_OVERLAY_COLOR_ADD, "resetOverlayColorAdd"],
+  ].forEach(([picker, input, key, fallback, def, resetId]) => {
     const applyPickerColor = () => {
       state[key] = cleanHexColor(picker.value, fallback);
       input.value = state[key];
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview(true);
     };
     const applyTextColor = (syncPicker) => {
       state[key] = cleanHexColor(input.value, state[key] || fallback);
       if (syncPicker) syncColorControl(picker, input, state[key], fallback);
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview(true);
     };
@@ -2520,45 +2636,85 @@
     input.addEventListener("change", () => {
       state[key] = cleanHexColor(input.value, fallback);
       syncColorControl(picker, input, state[key], fallback);
+      refreshFieldResetState(key, def);
       markDirty();
       queueOverlayPreview(true);
     });
     input.addEventListener("blur", () => applyTextColor(true));
+    const resetBtn = document.getElementById(resetId);
+    fieldResetBtns[key] = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault(key, def)) return;
+      state[key] = def;
+      syncColorControl(picker, input, def, fallback);
+      refreshFieldResetState(key, def);
+      markDirty();
+      queueOverlayPreview(true);
+    });
   });
 
   els.motionBlurStrength.addEventListener("input", () => {
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     syncMotionBlurControl(state.motionBlurStrength);
+    refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
     markDirty();
   });
   els.motionBlurStrengthValue.addEventListener("input", () => {
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrengthValue.value);
     els.motionBlurStrength.value = String(state.motionBlurStrength);
     els.motionBlurStrength.style.setProperty("--fill", (state.motionBlurStrength * 100) + "%");
+    refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
     markDirty();
   });
   els.motionBlurStrengthValue.addEventListener("change", () => {
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrengthValue.value);
     syncMotionBlurControl(state.motionBlurStrength);
+    refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
     markDirty();
   });
+  {
+    const resetBtn = document.getElementById("resetMotionBlurStrength");
+    fieldResetBtns.motionBlurStrength = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH)) return;
+      state.motionBlurStrength = DEFAULT_MOTION_BLUR_STRENGTH;
+      syncMotionBlurControl(state.motionBlurStrength);
+      refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
+      markDirty();
+    });
+  }
 
   els.screenshareSwitchDelay.addEventListener("input", () => {
     state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelay.value);
     syncSwitchDelayControl(state.screenshareSwitchDelaySeconds);
+    refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
     markDirty();
   });
   els.screenshareSwitchDelayValue.addEventListener("input", () => {
     state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelayValue.value);
     els.screenshareSwitchDelay.value = String(state.screenshareSwitchDelaySeconds);
     setSliderFill(els.screenshareSwitchDelay, state.screenshareSwitchDelaySeconds, 0.05, 5);
+    refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
     markDirty();
   });
   els.screenshareSwitchDelayValue.addEventListener("change", () => {
     state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelayValue.value);
     syncSwitchDelayControl(state.screenshareSwitchDelaySeconds);
+    refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
     markDirty();
   });
+  {
+    const resetBtn = document.getElementById("resetScreenshareSwitchDelay");
+    fieldResetBtns.screenshareSwitchDelaySeconds = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (els.screenshareSwitchDelay.disabled) return;
+      if (fieldAtDefault("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY)) return;
+      state.screenshareSwitchDelaySeconds = DEFAULT_SCREENSHARE_SWITCH_DELAY;
+      syncSwitchDelayControl(state.screenshareSwitchDelaySeconds);
+      refreshFieldResetState("screenshareSwitchDelaySeconds", DEFAULT_SCREENSHARE_SWITCH_DELAY);
+      markDirty();
+    });
+  }
 
   els.replaySeconds.addEventListener("wheel", (e) => {
     e.preventDefault();
@@ -2586,7 +2742,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.overlayFlipH, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -2602,6 +2758,8 @@
     });
   });
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
+  // flip is a live overlay preview, not a save-on-apply toggle -- ride the same preview/commit/cancel path the sliders use so it shows instantly and reverts if the user closes or cancels without applying. runs after the generic checkbox handler above, so readUi() has already put the new value in state.
+  els.overlayFlipH.addEventListener("change", () => queueOverlayPreview(true));
   els.settingsSearch.addEventListener("input", applySettingsSearch);
 
   document.querySelectorAll("[data-spin]").forEach((btn) => {
@@ -2989,6 +3147,11 @@
   });
   window.addEventListener("pagehide", releaseHotkeyCapture);
   window.addEventListener("beforeunload", releaseHotkeyCapture);
+  // closing the dock (not via Cancel or Apply) with a live overlay preview still uncommitted must revert it -- sendBeacon so the request survives the page going away. the helper-side startup revert is the backstop for a hard crash where this never fires.
+  window.addEventListener("pagehide", () => {
+    if (!overlayPreviewTouched) return;
+    try { navigator.sendBeacon(HELPER + "/settings/overlay-preview?mode=cancel", new Blob(["{}"], { type:"application/json" })); } catch (_) {}
+  });
   loadSettings();
   setInterval(refreshExternalSettings, 2000);
 

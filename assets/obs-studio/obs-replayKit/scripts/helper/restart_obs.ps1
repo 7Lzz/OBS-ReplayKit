@@ -31,6 +31,16 @@ if (Test-Path -LiteralPath $sentinelDir) {
         }
 }
 
+# overlay-style change: the helper wrote the new scene collection to <name>.json.replaykit-pending because a restart-triggered graceful close makes obs save its old in-memory scene over the real file. obs is confirmed gone now, so move the staged copy into place before the fresh obs reads it.
+$scenesDir = Join-Path $env:APPDATA 'obs-studio\basic\scenes'
+if (Test-Path -LiteralPath $scenesDir) {
+    Get-ChildItem -LiteralPath $scenesDir -Filter '*.json.replaykit-pending' -Force -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $target = $_.FullName.Substring(0, $_.FullName.Length - '.replaykit-pending'.Length)
+            try { Move-Item -LiteralPath $_.FullName -Destination $target -Force -ErrorAction Stop } catch {}
+        }
+}
+
 if (-not (Test-Path -LiteralPath $ObsPath)) { exit 1 }
 
 $workDir = [System.IO.Path]::GetDirectoryName($ObsPath)
