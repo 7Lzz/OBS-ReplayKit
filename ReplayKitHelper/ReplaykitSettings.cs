@@ -4729,9 +4729,7 @@ namespace ReplayKitHelper
         // the cheapest live-apply path that actually covers what changed instead of always running the full
         // ApplyLiveSettings orchestrator.
 
-        // resolved theme colours for the tray menu's custom keybind rows -- text is the normal (at-rest) label
-        // colour (a widget stylesheet on the row otherwise breaks the label's inherited menu colour), accentLight
-        // + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected.
+        // resolved theme colours for the tray menu's custom keybind rows -- text is the normal (at-rest) label colour (a widget stylesheet on the row otherwise breaks the label's inherited menu colour), accentLight + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected
         private static JObject ThemeMenuColors(JObject settings)
         {
             try

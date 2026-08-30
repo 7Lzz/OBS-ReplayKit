@@ -3016,8 +3016,7 @@
   loadReplayKitSettings();
   window.addEventListener("focus", loadReplayKitSettings);
 
-  // material-style icon svg path data. inlined so we dont pay a round-trip per card. each card duplicates the markup, but each <svg> is ~80 bytes -- not worth a sprite sheet.
-  // icon markup ships as files under assets/obs-studio/obs-replayKit/icons/dock/ and arrives as window.RK_ICONS (helper InjectDockIcons). ICON.* stays the inner markup so `<svg viewBox="0 0 24 24">${ICON.X}</svg>` call sites and the VOLUME_ICON assembly below are unchanged.
+  // material-style icon path data. ships as .svg files under assets/obs-studio/obs-replayKit/icons/ and arrives as window.RK_ICONS (helper InjectDockIcons); ICON.* holds the inner markup so `<svg viewBox="0 0 24 24">${ICON.X}</svg>` call sites and the VOLUME_ICON assembly below are unchanged
   const _RKI = window.RK_ICONS || {};
   const _svgInner = (s) => (s || "").replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
   const ICON = {
@@ -3152,6 +3151,16 @@
   };
   const CLIP_STATE_URL = HELPER + "/clips/state";
   const localState = new Map();
+  // name -> Date.now() when a UI action set localState optimistically, before the helper job it starts shows in /status -- the reconcile reap loops honour this so a poll landing in that gap cant flash the card back to "Create Link" before the job appears; covers Create Link, bulk upload and every compress path, and self-heals once the grace window passes
+  const optimisticStateAt = new Map();
+  const OPTIMISTIC_STATE_GRACE_MS = 10000;
+  function markLocalState(name, st) {
+    localState.set(name, st);
+    optimisticStateAt.set(name, Date.now());
+  }
+  function optimisticStateFresh(name) {
+    return localState.has(name) && Date.now() - (optimisticStateAt.get(name) || 0) < OPTIMISTIC_STATE_GRACE_MS;
+  }
   const selectedClipNames = new Set();
   let favoriteNames = loadFavoriteNames();
   let resolvedFavoriteClips = [];
@@ -4420,9 +4429,11 @@
     }
     lastUploadJobsByName = byName;
     for (const [name, st] of Array.from(localState)) {
-      if ((st === "uploading" || st === "compressing") && !byName.has(name)) {
-        localState.delete(name);
-      }
+      if ((st !== "uploading" && st !== "compressing") || byName.has(name)) continue;
+      // a UI action just set this optimistically and the helper job isnt in /status yet -- dont reap it (would flash the card back to "Create Link" for a poll).
+      if (optimisticStateFresh(name)) continue;
+      optimisticStateAt.delete(name);
+      localState.delete(name);
     }
     return { active, jobs, newErrors, completed };
   }
@@ -6148,7 +6159,7 @@
     // a fresh Create Link overrides any pending cancel grace for this clip.
     cancelledUploads.delete(filename);
     pendingLinkCreations.set(filename, pending);
-    localState.set(filename, "uploading");
+    markLocalState(filename, "uploading");
     anyUploading = true;
     rerenderCard(filename);
     let attempts = 0;
@@ -6396,7 +6407,10 @@
           localState.set(name, "uploading");
           continue;
         }
+        // a compress/upload the user just kicked off whose job isnt in /status yet -- keep it a poll longer (self-heals via optimisticStateFresh's grace window).
+        if (optimisticStateFresh(name)) continue;
         // helper isnt running this clips operation. drop the stale pending flag so finished compress-overwrite jobs return the button to "create link" after /clips sees the new mtime/size.
+        optimisticStateAt.delete(name);
         localState.delete(name);
       }
       anyUploading = jobSync.active;
@@ -6735,7 +6749,7 @@
         throw new Error(data.message || ("HTTP " + res.status));
       }
       cancelledUploads.delete(file);
-      localState.set(file, "compressing");
+      markLocalState(file, "compressing");
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
@@ -6890,7 +6904,7 @@
         throw new Error(data.message || ("HTTP " + res.status));
       }
       cancelledUploads.delete(file);
-      localState.set(file, "compressing");
+      markLocalState(file, "compressing");
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
@@ -7072,7 +7086,7 @@
       cancelledUploads.delete(name);
       bulkUploadQueued.add(name);
       if (!hasPendingLinkCreation(name)) pendingLinkCreations.set(name, { requestId: "", startedAt: Date.now() });
-      localState.set(name, "uploading");
+      markLocalState(name, "uploading");
       rerenderCard(name);
     }
     anyUploading = true;
@@ -7262,7 +7276,7 @@
           if (res.ok && data.ok) {
             started = true;
             cancelledUploads.delete(name);
-            localState.set(name, "compressing");
+            markLocalState(name, "compressing");
             anyUploading = true;
             scheduleNextPoll(POLL_FAST_MS);
             rerenderCard(name);

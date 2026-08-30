@@ -59,8 +59,7 @@ namespace ReplayKitHelper
             ["obs-black"] = new Tokens { Bg = "#0A0B0F", Panel = "#16181E", Field = "#22242C", Field2 = "#1E2028", Border = "#282A33", BorderStrong = "#3C3F49", Text = "#FFFFFF", Muted = "#9597A1", Disabled = "#696B75", Accent = "#284CB8", Accent2 = "#476BD7", Danger = "#E33B57", Success = "#37D247", Warning = "#E2A33B", Dark = true },
             // shadcn "zinc" dark scale + medal brand-primary lime, pulled from %LOCALAPPDATA%\Medal\app-*\resources\app\renderer.min.css (--background/--card/--muted oklch -> hex, --color-brand-primary-400 = #BFF83E). the older #E94F56 coral is medal's secondary, not the ui accent.
             ["medal"] = new Tokens { Bg = "#09090B", Panel = "#18181B", Field = "#232327", Field2 = "#1C1C1F", Border = "#27272A", BorderStrong = "#3F3F46", Text = "#FAFAFA", Muted = "#A1A1AA", Disabled = "#71717A", Accent = "#BFF83E", Accent2 = "#CFFF53", Danger = "#EB4D55", Success = "#01D28E", Warning = "#FFCA49", Dark = true },
-            // discord dark, verified against themeandcolor.com's token dump: bg tertiary/secondary/floating,
-            // text-normal #DBDEE1 (not the brighter header #F2F3F5), brand #5865F2, brand-hover family for accent2.
+            // discord dark, verified against themeandcolor.com's token dump: bg tertiary/secondary/floating, text-normal #DBDEE1 (not the brighter header #F2F3F5), brand #5865F2, brand-hover family for accent2
             ["discord"] = new Tokens { Bg = "#1E1F22", Panel = "#2B2D31", Field = "#383A40", Field2 = "#313338", Border = "#3F4147", BorderStrong = "#4E5058", Text = "#DBDEE1", Muted = "#B5BAC1", Disabled = "#80848E", Accent = "#5865F2", Accent2 = "#7984F5", Danger = "#F23F43", Success = "#23A559", Warning = "#F0B232", Dark = true },
             ["light"] = new Tokens { Bg = "#F2F3F5", Panel = "#FFFFFF", Field = "#E9EBEF", Field2 = "#DFE2E7", Border = "#CDD0D6", BorderStrong = "#B4B8C0", Text = "#1A1D24", Muted = "#5C6270", Disabled = "#9AA0AC", Accent = "#2F6FE8", Accent2 = "#5590F5", Danger = "#E23B2E", Success = "#1E8A3C", Warning = "#C05A0B", Dark = false },
         };
@@ -355,9 +354,7 @@ namespace ReplayKitHelper
             V("--yellow1", Shift(t.Warning, 0.12));
             V("--yellow2", t.Warning);
             sb.Append("}\n");
-            // selected rows / tabs / menu items fill with --primary and keep white --text on top (Yami.obt
-            // QListView::item:selected etc). a light accent like medal's lime makes that unreadable, so when
-            // OnColor wants dark ink, pin those selected states to it. blue-accent presets skip this untouched.
+            // selected rows / tabs / menu items fill with --primary and keep white --text on top (Yami.obt QListView::item:selected etc) -- a light accent like medal's lime makes that unreadable, so when OnColor wants dark ink pin those selected states to it; blue-accent presets skip this untouched
             string onAccent = OnColor(t.Accent);
             if (!string.Equals(onAccent, "#FFFFFF", StringComparison.OrdinalIgnoreCase))
             {

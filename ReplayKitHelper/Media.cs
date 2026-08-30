@@ -48,8 +48,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // the two fallback images live as files under icons/fallback/ -- that copy is the source of truth. the
-        // inline string is only a net for a broken deploy where the file is missing; not a silent behaviour change.
+        // the two fallback images live as files under icons/fallback/ -- that copy is the source of truth; the inline string is only a net for a broken deploy where the file is missing, not a silent behaviour change
         private static byte[] FallbackSvg(string name, string inlineNet)
         {
             try
@@ -69,8 +68,7 @@ namespace ReplayKitHelper
             "  <path d=\"M229 110v50l43-25z\" fill=\"#969696\"/>\n" +
             "</svg>\n");
 
-        // net for the degenerate case where BOTH the real .ico and icons/fallback/obs-icon.svg are gone -- a plain
-        // dark tile with a ring, deliberately minimal (the real OBS mark is the .svg file).
+        // net for the degenerate case where BOTH the real .ico and icons/fallback/obs-icon.svg are gone -- a plain dark tile with a ring, deliberately minimal (the real OBS mark is the .svg file)
         public static byte[] GetObsIconSvg() => FallbackSvg("obs-icon.svg",
             "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">\n" +
             "  <rect width=\"64\" height=\"64\" rx=\"12\" fill=\"#111217\"/>\n" +

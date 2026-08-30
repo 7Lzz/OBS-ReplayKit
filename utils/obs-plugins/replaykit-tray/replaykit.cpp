@@ -871,17 +871,13 @@ public:
 	void SetAction(QWidgetAction *a) { m_action = a; }
 	QWidgetAction *action() const { return m_action; }
 
-	// store the resolved theme colours and paint the rest state. everything is a DIRECT stylesheet on the row /
-	// the label -- no descendant selectors, no dynamic properties, no QMenu::hovered (that reports the wrong
-	// action for a QWidgetAction row -- the highlight sticks on the plain item next to it). the row's own
-	// HoverEnter/HoverLeave (from WA_Hover, the same events that power :hover) drive SetHovered().
+	// store the resolved theme colours and paint the rest state -- everything is a DIRECT stylesheet on the row / the label (no descendant selectors, no dynamic properties, no QMenu::hovered, which reports the wrong action for a QWidgetAction row so the highlight sticks on the plain item next to it); the row's own HoverEnter/HoverLeave, from WA_Hover, the same events that power :hover, drive SetHovered()
 	void ApplyThemeColors(const QString &accent, const QString &accentLight, const QString &onAccent, const QString &text)
 	{
 		Q_UNUSED(accent);
 		m_fill = accentLight.isEmpty() ? QStringLiteral("palette(highlight)") : accentLight;
 		m_inkActive = onAccent.isEmpty() ? QStringLiteral("palette(highlighted-text)") : onAccent;
-		// hardcoded white, not palette(window-text): obs themes via qss, not qpalette, so the palette role is often
-		// qt-default black. only the value for the sub-100ms before the first /settings fetch lands anyway.
+		// hardcoded white, not palette(window-text): obs themes via qss not qpalette, so the palette role is often qt-default black -- and this is only the value for the sub-100ms before the first /settings fetch lands anyway
 		m_inkRest = text.isEmpty() ? QStringLiteral("#FFFFFF") : text;
 		SetHovered(m_hovered);
 	}
@@ -932,9 +928,7 @@ protected:
 		QWidget::mouseReleaseEvent(event);
 	}
 
-	// HoverEnter/HoverLeave come from WA_Hover and pair up reliably (QEvent::Enter/Leave did not -- Leave never
-	// arrived, so an earlier version stuck dark). on enter we also make this the menu's active action so the
-	// plain item the mouse came from drops its native selection highlight instead of staying stuck lit.
+	// HoverEnter/HoverLeave come from WA_Hover and pair up reliably (QEvent::Enter/Leave did not -- Leave never arrived, so an earlier version stuck dark); on enter we also make this the menu's active action so the plain item the mouse came from drops its native selection highlight instead of staying stuck lit
 	bool event(QEvent *e) override
 	{
 		if (e->type() == QEvent::HoverEnter) {
@@ -1648,8 +1642,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		QTimer::singleShot(50, trayMenu, [trayMenu]() { PinMenuAboveTaskbar(trayMenu); });
 	});
 
-	// the rows drive their own hover look off HoverEnter/HoverLeave. this only guarantees they end up un-hovered
-	// once the menu closes, in case a HoverLeave was missed on the way out.
+	// the rows drive their own hover look off HoverEnter/HoverLeave; this only guarantees they end up un-hovered once the menu closes, in case a HoverLeave was missed on the way out
 	QObject::connect(trayMenu, &QMenu::aboutToHide, trayMenu, []() {
 		if (g_clipsRow) g_clipsRow->SetHovered(false);
 		if (g_recordRow) g_recordRow->SetHovered(false);

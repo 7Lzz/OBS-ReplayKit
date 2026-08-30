@@ -114,10 +114,7 @@ namespace ReplayKitHelper
         private static string _dockIconStamp;
         private static string _dockIconTag;
 
-        // splice the dock icon set in as window.RK_ICONS before </head>, same shape as InjectThemeStyle. the icons
-        // live as .svg files organised in subfolders of icons/ (player/, action/, nav/, ...); the dock html pulls
-        // their inner markup from this map, keyed by "<folder>/<name>" (see the ICON block in clips.html and the
-        // svg[data-i] init in settings.html). rebuilt only when a file mtime changes. icons/user/ holds .ico only.
+        // splice the dock icon set in as window.RK_ICONS before </head>, same shape as InjectThemeStyle -- icons live as .svg files in subfolders of icons/ (player/, action/, nav/, ...) and the dock html pulls their inner markup from this map keyed by "<folder>/<name>" (see the ICON block in clips.html and the svg[data-i] init in settings.html); rebuilt only when a file mtime changes; icons/user/ holds .ico only
         private static string DockIconTag()
         {
             string dir = Constants.APP_ICONS_DIR;
