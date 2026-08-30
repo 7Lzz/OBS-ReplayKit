@@ -411,6 +411,38 @@ namespace ReplayKitHelper
             return matched;
         }
 
+        // the streamable/google sign-in popups are real cef window.open popups -- obs-browser never wires their page favicon to the hwnd, so they get the bare app icon and default light chrome. the dock polls /signin-windows-status every ~1s for the whole flow; style each distinct popup title once as it appears (dedup by title, not per-poll) so the repaint sequence in StyleWindow doesnt flicker the title bar on every tick. the icon + dwm caption colour persist on the hwnd across the in-page navigations, so one pass per title is enough.
+        private static readonly HashSet<string> _signInStyledTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public static void StyleSignInWindows(string iconPath)
+        {
+            List<string> pending = null;
+            foreach (var hWnd in EnumerateTopLevelWindows())
+            {
+                if (!IsWindowVisible(hWnd)) continue;
+                GetWindowThreadProcessId(hWnd, out uint ownerPid);
+                if (!IsObsFamilyProcess(ownerPid)) continue;
+                string title = GetTitle(hWnd);
+                if (string.IsNullOrEmpty(title)) continue;
+                if (title.IndexOf("streamable", StringComparison.OrdinalIgnoreCase) < 0
+                    && title.IndexOf("accounts.google.com", StringComparison.OrdinalIgnoreCase) < 0
+                    && title.IndexOf("Google Accounts", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                lock (_signInStyledTitles)
+                {
+                    if (!_signInStyledTitles.Add(title)) continue;
+                }
+                (pending ?? (pending = new List<string>())).Add(title);
+            }
+            if (pending == null) return;
+            foreach (var t in pending) StyleWindow(t, iconPath, true);
+        }
+
+        // clear the per-title dedup so the next sign-in attempt restyles from scratch. called when the dock tears the flow down.
+        public static void ResetSignInWindowStyleCache()
+        {
+            lock (_signInStyledTitles) _signInStyledTitles.Clear();
+        }
+
         // -- live app-icon swap (Appearance tab) -- WM_SETICON on obs's real main window (taskbar button + title bar)
         // and replaykit's own helper-hosted windows. no restart, no admin: a window message in-session, same
         // approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the tray plugin.

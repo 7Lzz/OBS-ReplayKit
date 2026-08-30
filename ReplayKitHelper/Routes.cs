@@ -617,6 +617,15 @@ namespace ReplayKitHelper
                     jsonArr = Native.ListSignInWindows(ownerPid, false, overlayGoogle);
                 }
                 catch (Exception ex) { Log.Write("/signin-windows-status: " + ex.Message); }
+                // give the sign-in popups our icon + themed title bar -- obs-browser doesnt icon its own window.open popups. dedup is title-keyed inside StyleSignInWindows so this poll-driven call only paints when a new page title shows up.
+                try
+                {
+                    string iconPath = Constants.OBS_ICON_PATH;
+                    string resolved = ReplaykitSettings.ResolveAppIconPath(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
+                    if (!string.IsNullOrEmpty(resolved)) iconPath = resolved;
+                    Native.StyleSignInWindows(iconPath);
+                }
+                catch (Exception ex) { Log.Write("/signin-windows-status style: " + ex.Message); }
                 var h = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "application/json" });
                 HttpResponse.SendBytes(stream, 200, "OK", h, Encoding.UTF8.GetBytes(jsonArr));
                 return false;
@@ -633,6 +642,7 @@ namespace ReplayKitHelper
                 try
                 {
                     n = Native.CloseWindowsByTitle(titles, ownerPid);
+                    Native.ResetSignInWindowStyleCache(); // next attempt restyles from scratch
                     Log.Write("/close-signin-windows: closed " + n + " window(s) under OBS pid=" + ownerPid);
                 }
                 catch (Exception ex) { Log.Write("/close-signin-windows: " + ex.Message); }
@@ -640,33 +650,21 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/sign-in-loader")
+            // same-origin splash the streamable sign-in popup navigates to (see the file for why); served through ServeHtml so it picks up the active theme + a real Content-Type instead of about:blank + document.write
+            if (path == "/sign-in-loader") { HttpResponse.ServeHtml(stream, "sign-in-loader.html"); return false; }
+
+            // static .svg files under icons/ -- one subfolder deep max, no traversal. used by the dock CSS (mask/background) where window.RK_ICONS (js-only) does not reach.
+            var iconFile = Regex.Match(path, @"^/icons/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+\.svg)$");
+            if (iconFile.Success)
             {
-                // same-origin loading page that the dock's popup navigates to instead of about:blank + document.write. removing the document.write step dodges a cef bug where the popup window's document isnt yet writable at the time window.open returns -- the popup just sits on about:blank forever. by having the helper serve this page directly, the popup gets a proper navigation from the start and paints reliably. the meta-refresh then takes it to streamable.com once the spinner has had a moment to show.
-                var h = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
-                long cb = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                string body = "<!doctype html><html><head>\n" +
-                    "<meta charset=\"utf-8\">\n" +
-                    "<meta http-equiv=\"refresh\" content=\"0.4;url=https://streamable.com/login?_cb=" + cb + "\">\n" +
-                    "<title>Signing in to Streamable</title>\n" +
-                    "<style>\n" +
-                    "html,body{margin:0;height:100%;background:#1D1F26;\n" +
-                    "color:#FFFFFF;font:13px \"Segoe UI\",system-ui,sans-serif}\n" +
-                    ".wrap{display:flex;flex-direction:column;align-items:center;\n" +
-                    "justify-content:center;height:100%;gap:18px}\n" +
-                    ".spinner{width:34px;height:34px;border-radius:50%;\n" +
-                    "border:3px solid #3C404D;border-top-color:#476BD7;\n" +
-                    "animation:r 0.8s linear infinite}\n" +
-                    "@keyframes r{to{transform:rotate(360deg)}}\n" +
-                    ".label{color:#FFFFFF;font-size:14px;font-weight:500}\n" +
-                    ".sub{color:#969696;font-size:12px}\n" +
-                    "</style></head><body>\n" +
-                    "<div class=\"wrap\">\n" +
-                    "<div class=\"spinner\"></div>\n" +
-                    "<div class=\"label\">Opening Streamable&hellip;</div>\n" +
-                    "<div class=\"sub\">Sign in with Google, Facebook, or email</div>\n" +
-                    "</div></body></html>";
-                HttpResponse.SendBytes(stream, 200, "OK", h, Encoding.UTF8.GetBytes(body));
+                string full = Path.GetFullPath(Path.Combine(Constants.APP_ICONS_DIR, iconFile.Groups[1].Value));
+                string root = Path.GetFullPath(Constants.APP_ICONS_DIR) + Path.DirectorySeparatorChar;
+                if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full))
+                {
+                    var hi = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" });
+                    HttpResponse.SendBytes(stream, 200, "OK", hi, File.ReadAllBytes(full));
+                }
+                else HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false });
                 return false;
             }
 

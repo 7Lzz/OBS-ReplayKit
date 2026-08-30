@@ -133,6 +133,7 @@ namespace ReplayKitHelper
                 {
                     string key = f.Substring(dir.Length).TrimStart('\\', '/').Replace('\\', '/');
                     if (key.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) key = key.Substring(0, key.Length - 4);
+                    if (key.StartsWith("ui/", StringComparison.Ordinal)) continue; // css-only masks, served by /icons/, no js consumer
                     map[key] = File.ReadAllText(f).Trim();
                 }
                 // escape < > so nothing in an svg can break out of the <script> block or be read as a tag
@@ -147,9 +148,11 @@ namespace ReplayKitHelper
         {
             try
             {
+                string s = System.Text.Encoding.UTF8.GetString(html);
+                // only pages that actually read the map (clips.html, settings.html) -- skips update_prompt / sign-in-loader
+                if (s.IndexOf("RK_ICONS", StringComparison.Ordinal) < 0 && s.IndexOf("data-i=", StringComparison.Ordinal) < 0) return html;
                 string tag = DockIconTag();
                 if (string.IsNullOrEmpty(tag)) return html;
-                string s = System.Text.Encoding.UTF8.GetString(html);
                 int i = s.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
                 if (i < 0) return html;
                 return new UTF8Encoding(false).GetBytes(s.Substring(0, i) + tag + s.Substring(i));

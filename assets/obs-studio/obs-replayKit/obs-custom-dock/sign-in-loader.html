@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- same-origin splash the streamable sign-in popup navigates to instead of about:blank + document.write (cef leaves the popup document unwritable when window.open returns, so it sat on about:blank forever). the helper serves this directly so the popup gets a real navigation from the start; the script below bounces to streamable once the spinner has shown briefly. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Signing in to Streamable</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico?v=2" />
+<style>
+  /* base is obs-default dark; the helper's injected rk-theme block overrides bg/color/color-scheme (with !important) for any non-default theme, so a light theme flips this page too */
+  html { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--window, #1D1F26); color: var(--text, #FFFFFF); font: 13px "Segoe UI", system-ui, sans-serif; }
+  .wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 18px; }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line, #3C404D); border-top-color: var(--selected2, #476BD7); animation: r 0.8s linear infinite; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .label { color: var(--text, #FFFFFF); font-size: 14px; font-weight: 500; }
+  .sub { color: var(--muted, #969696); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="spinner"></div>
+  <div class="label">Opening Streamable&hellip;</div>
+  <div class="sub">Sign in with Google, Facebook, or email</div>
+</div>
+<script>setTimeout(function () { location.replace("https://streamable.com/login?_cb=" + Date.now()); }, 400);</script>
+</body>
+</html>
