@@ -17,6 +17,136 @@ namespace ReplayKitHelper
     // request dispatcher. ported from obs_replaykit helper modules/71_routes.ps1.
     internal static class Routes
     {
+        private static readonly string[] AppIconExtensions = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
+
+        // "40-a1b2c3d4.ico" -> "40" -- drop the source-hash suffix ImportCustomIcon appends so the grid shows a clean label.
+        private static string UserIconLabel(string fileName) =>
+            Regex.Replace(Path.GetFileNameWithoutExtension(fileName), "-[0-9a-f]{8}$", "");
+
+        private sealed class OwnerWindow : System.Windows.Forms.IWin32Window
+        {
+            public OwnerWindow(IntPtr h) { Handle = h; }
+            public IntPtr Handle { get; }
+        }
+
+        // blocking modal picker on a one-shot STA thread (winforms dialogs need STA + a pump). parents to the ReplayKit Settings popup if it's open. "" on cancel/error.
+        private static string PickPath(bool folder, string filter, string initial)
+        {
+            string result = "";
+            var t = new Thread(() =>
+            {
+                try
+                {
+                    IntPtr ownerHwnd = Native.FindReplayKitSettingsWindow();
+                    if (folder)
+                    {
+                        result = PickFolderModern(ownerHwnd, initial);
+                    }
+                    else
+                    {
+                        System.Windows.Forms.IWin32Window owner = ownerHwnd == IntPtr.Zero ? null : new OwnerWindow(ownerHwnd);
+                        using (var d = new System.Windows.Forms.OpenFileDialog { Filter = filter, CheckFileExists = true, Title = "Choose an icon image" })
+                        {
+                            if (!string.IsNullOrEmpty(initial) && File.Exists(initial)) d.FileName = initial;
+                            if (d.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK) result = d.FileName;
+                        }
+                    }
+                }
+                catch (Exception ex) { Log.Write("PickPath: " + ex.Message); }
+            });
+            t.SetApartmentState(ApartmentState.STA);
+            t.IsBackground = true;
+            t.Start();
+            t.Join(180000);
+            return result;
+        }
+
+        // modern folder picker -- IFileOpenDialog with FOS_PICKFOLDERS, the same Explorer-style chrome as the icon
+        // file picker. the net48 WinForms FolderBrowserDialog is the legacy tree-view control. STA-only; the caller
+        // already runs this on a one-shot STA thread. "" on cancel or any failure.
+        private static string PickFolderModern(IntPtr owner, string initial)
+        {
+            IFileOpenDialog dlg = null;
+            try
+            {
+                dlg = (IFileOpenDialog)new FileOpenDialogClass();
+                dlg.GetOptions(out uint opts);
+                dlg.SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+                dlg.SetTitle("Choose the recordings folder");
+                if (!string.IsNullOrEmpty(initial) && Directory.Exists(initial) &&
+                    SHCreateItemFromParsingName(initial, IntPtr.Zero, typeof(IShellItem).GUID, out IShellItem seed) == 0 && seed != null)
+                {
+                    try { dlg.SetFolder(seed); } finally { Marshal.ReleaseComObject(seed); }
+                }
+                if (dlg.Show(owner) != 0) return ""; // ERROR_CANCELLED or any hr -- treat as cancel
+                dlg.GetResult(out IShellItem item);
+                try
+                {
+                    item.GetDisplayName(SIGDN_FILESYSPATH, out IntPtr pth);
+                    string s = Marshal.PtrToStringUni(pth);
+                    Marshal.FreeCoTaskMem(pth);
+                    return s ?? "";
+                }
+                finally { Marshal.ReleaseComObject(item); }
+            }
+            catch (Exception ex) { Log.Write("PickFolderModern: " + ex.Message); return ""; }
+            finally { if (dlg != null) Marshal.ReleaseComObject(dlg); }
+        }
+
+        private const uint FOS_PICKFOLDERS = 0x20;
+        private const uint FOS_FORCEFILESYSTEM = 0x40;
+        private const uint FOS_NOCHANGEDIR = 0x8;
+        private const uint FOS_PATHMUSTEXIST = 0x800;
+        private const uint SIGDN_FILESYSPATH = 0x80058000;
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern int SHCreateItemFromParsingName(string path, IntPtr pbc,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IShellItem ppv);
+
+        [ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")]
+        private class FileOpenDialogClass { }
+
+        [ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IFileOpenDialog
+        {
+            [PreserveSig] int Show(IntPtr parent);
+            void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+            void SetFileTypeIndex(uint iFileType);
+            void GetFileTypeIndex(out uint piFileType);
+            void Advise(IntPtr pfde, out uint pdwCookie);
+            void Unadvise(uint dwCookie);
+            void SetOptions(uint fos);
+            void GetOptions(out uint pfos);
+            void SetDefaultFolder(IShellItem psi);
+            void SetFolder(IShellItem psi);
+            void GetFolder(out IShellItem ppsi);
+            void GetCurrentSelection(out IShellItem ppsi);
+            void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+            void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
+            void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+            void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string pszText);
+            void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+            void GetResult(out IShellItem ppsi);
+            void AddPlace(IShellItem psi, int fdap);
+            void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+            void Close(int hr);
+            void SetClientGuid(ref Guid guid);
+            void ClearClientData();
+            void SetFilter(IntPtr pFilter);
+            void GetResults(out IntPtr ppenum);
+            void GetSelectedItems(out IntPtr ppsai);
+        }
+
+        [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IShellItem
+        {
+            void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+            void GetParent(out IShellItem ppsi);
+            void GetDisplayName(uint sigdnName, out IntPtr ppszName);
+            void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+            void Compare(IShellItem psi, uint hint, out int piOrder);
+        }
+
         private static Process[] GetProcessesByNames(params string[] names)
         {
             var list = new List<Process>();
@@ -569,11 +699,136 @@ namespace ReplayKitHelper
                 string title = Q("title", "Clips");
                 bool taskbar = QFlag("taskbar");
                 int matched = -1;
-                try { matched = Native.StyleWindow(title, Constants.OBS_ICON_PATH, taskbar); }
+                // the tray plugin owns the icon (title bar + win11 taskbar button) for its own Clips / ReplayKit
+                // Settings windows -- style their chrome here but leave the icon to the plugin.
+                bool pluginOwnsIcon = title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
+                    title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase);
+                string iconPath = pluginOwnsIcon ? "" : Constants.OBS_ICON_PATH;
+                if (!pluginOwnsIcon)
+                {
+                    try
+                    {
+                        string resolved = ReplaykitSettings.ResolveAppIconPath(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
+                        if (!string.IsNullOrEmpty(resolved)) iconPath = resolved;
+                    }
+                    catch (Exception ex) { Log.Write("/style-window icon resolve: " + ex.Message); }
+                }
+                try { matched = Native.StyleWindow(title, iconPath, taskbar); }
                 catch (Exception ex) { Log.Write("/style-window threw: " + ex.Message); }
                 // logging only on misses keeps the log readable; success is the defualt, silent path.
                 if (matched <= 0) Log.Write("/style-window title=" + title + " : 0 matching OBS-family windows found");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["matched"] = matched });
+                return false;
+            }
+
+            if (path == "/appearance/icons")
+            {
+                // the Appearance tab's picker grid: "Default" + bundled icons/ presets + the user's saved custom picks (user/, deletable).
+                var icons = new JArray { new JObject { ["id"] = "default", ["label"] = "Default" } };
+                try
+                {
+                    if (Directory.Exists(Constants.APP_ICONS_DIR))
+                    {
+                        var files = Directory.GetFiles(Constants.APP_ICONS_DIR);
+                        Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                        foreach (var f in files)
+                        {
+                            if (Array.IndexOf(AppIconExtensions, Path.GetExtension(f).ToLowerInvariant()) < 0) continue;
+                            string name = Path.GetFileName(f);
+                            icons.Add(new JObject { ["id"] = name, ["label"] = Path.GetFileNameWithoutExtension(name), ["url"] = "/appearance/icon?file=" + Uri.EscapeDataString(name) });
+                        }
+                    }
+                    if (Directory.Exists(Constants.USER_ICONS_DIR))
+                    {
+                        var ufiles = Directory.GetFiles(Constants.USER_ICONS_DIR, "*.ico");
+                        Array.Sort(ufiles, StringComparer.OrdinalIgnoreCase);
+                        foreach (var f in ufiles)
+                        {
+                            string name = Path.GetFileName(f);
+                            icons.Add(new JObject
+                            {
+                                ["id"] = "user/" + name,
+                                ["label"] = UserIconLabel(name),
+                                ["url"] = "/appearance/icon?file=" + Uri.EscapeDataString("user/" + name),
+                                ["deletable"] = true,
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex) { Log.Write("/appearance/icons: " + ex.Message); }
+                var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                HttpResponse.SendJson(stream, 200, new JObject
+                {
+                    ["ok"] = true, ["icons"] = icons,
+                    ["selected"] = s["appIcon"]?.Value<string>() ?? "default",
+                    ["customPath"] = s["appIconCustomPath"]?.Value<string>() ?? "",
+                });
+                return false;
+            }
+
+            if (path == "/appearance/icon")
+            {
+                string raw = Q("file", "");
+                bool isUser = raw.StartsWith("user/", StringComparison.Ordinal);
+                string file = Path.GetFileName(raw);
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                string dir = isUser ? Constants.USER_ICONS_DIR : Constants.APP_ICONS_DIR;
+                string full = string.IsNullOrEmpty(file) ? null : Path.Combine(dir, file);
+                if (full != null && Array.IndexOf(AppIconExtensions, ext) >= 0 && File.Exists(full))
+                {
+                    try
+                    {
+                        string ctype = ext == ".ico" ? "image/x-icon" : ext == ".png" ? "image/png" : ext == ".bmp" ? "image/bmp" : "image/jpeg";
+                        var h = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = ctype });
+                        HttpResponse.SendBytes(stream, 200, "OK", h, File.ReadAllBytes(full));
+                        return false;
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("/appearance/icon read: " + ex.Message); }
+                }
+                HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false });
+                return false;
+            }
+
+            if (path == "/appearance/delete-icon")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string raw = Q("file", "");
+                if (!raw.StartsWith("user/", StringComparison.Ordinal))
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only saved custom icons can be removed." });
+                    return false;
+                }
+                string file = Path.GetFileName(raw);
+                string full = Path.Combine(Constants.USER_ICONS_DIR, file);
+                bool wasSelected = false;
+                string selected = "default";
+                try
+                {
+                    var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                    selected = s["appIcon"]?.Value<string>() ?? "default";
+                    wasSelected = selected == "user/" + file;
+                    if (File.Exists(full)) File.Delete(full);
+                    if (wasSelected)
+                    {
+                        ReplaykitSettings.SetAppIconAndApply("default");
+                        selected = "default";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("/appearance/delete-icon: " + ex.Message);
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message });
+                    return false;
+                }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["wasSelected"] = wasSelected, ["selected"] = selected });
+                return false;
+            }
+
+            if (path == "/browse-file" || path == "/browse-folder")
+            {
+                bool folder = path == "/browse-folder";
+                string picked = PickPath(folder, Q("filter", "Images (*.ico;*.png;*.jpg;*.bmp)|*.ico;*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*"), Q("initial", ""));
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = !string.IsNullOrEmpty(picked), ["path"] = picked });
                 return false;
             }
 

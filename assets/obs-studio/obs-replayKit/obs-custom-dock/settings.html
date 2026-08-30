@@ -606,6 +606,38 @@
   .field-reset { flex:none; }
   .field-reset.is-default { opacity:.4; }
   .field-reset.is-default:hover { opacity:1; }
+  /* "browse…" button next to a path text field -- opens a native file/folder picker */
+  .field-wrap:has(> .field-browse) > .text-input { width:auto; flex:1 1 0; min-width:0; }
+  .field-browse { flex:none; }
+  /* Appearance tab app-icon picker */
+  .icon-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .icon-tile {
+    position:relative;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    width:78px; padding:9px 4px 7px;
+    background:var(--field-dark); border:1px solid var(--line); border-radius:7px;
+    color:var(--text); cursor:pointer; font-size:11px; line-height:1;
+    transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
+  }
+  .icon-tile:hover { background:var(--button-hover); }
+  .icon-tile.is-selected { border-color:#5B7BFF; background:var(--selected); }
+  .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
+  .icon-tile img { object-fit:contain; image-rendering:auto; }
+  .icon-tile .icon-tile-swatch {
+    display:flex; align-items:center; justify-content:center;
+    background:var(--field); border-radius:6px; color:var(--muted); font-size:9px; text-align:center;
+  }
+  .icon-tile-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .icon-tile-del {
+    position:absolute; top:3px; right:3px;
+    display:flex; align-items:center; justify-content:center;
+    width:16px; height:16px; padding:0; border:0; border-radius:4px;
+    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
+    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
+  }
+  .icon-tile:hover .icon-tile-del, .icon-tile-del:focus-visible { opacity:1; }
+  .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
+  .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
   .inline-status {
     color:var(--muted);
     font-size:12px;
@@ -794,6 +826,10 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 2.984375 1.003906 c -1.664063 0 -3 1.339844 -3 3 v 7 c 0 1.664063 1.335937 3 3 3 h 10 c 1.660156 0 3 -1.335937 3 -3 v -7 c 0 -1.660156 -1.339844 -3 -3 -3 z m 0 2 h 10 c 0.550781 0 1 0.445313 1 1 v 7 c 0 0.554688 -0.449219 1 -1 1 h -10 c -0.554687 0 -1 -0.445312 -1 -1 v -7 c 0 -0.554687 0.445313 -1 1 -1 z m 0 0"/><path d="m 7.984375 16.003906 c 3 0 4 -1 4 -1 h -8 s 1 1 4 1 z m 0 0"/></svg>
       <span>Overlay</span>
     </button>
+    <button class="nav-btn" type="button" data-page="appearance">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 8 1 c -3.867188 0 -7 3.132812 -7 7 c 0 3.867188 3.132812 7 7 7 c 0.640625 0 1.15625 -0.523438 1.15625 -1.164062 c 0 -0.300782 -0.117188 -0.570313 -0.304688 -0.773438 c -0.183593 -0.203125 -0.296874 -0.46875 -0.296874 -0.765625 c 0 -0.640625 0.515624 -1.15625 1.15625 -1.15625 h 1.363281 c 2.191407 0 3.972656 -1.78125 3.972656 -3.976563 c 0 -3.464843 -3.132812 -6.164062 -7.046875 -6.164062 z m -3.5 7 c -0.550781 0 -1 -0.449219 -1 -1 s 0.449219 -1 1 -1 s 1 0.449219 1 1 s -0.449219 1 -1 1 z m 2 -3 c -0.550781 0 -1 -0.449219 -1 -1 s 0.449219 -1 1 -1 s 1 0.449219 1 1 s -0.449219 1 -1 1 z m 4 0 c -0.550781 0 -1 -0.449219 -1 -1 s 0.449219 -1 1 -1 s 1 0.449219 1 1 s -0.449219 1 -1 1 z m 2 3 c -0.550781 0 -1 -0.449219 -1 -1 s 0.449219 -1 1 -1 s 1 0.449219 1 1 s -0.449219 1 -1 1 z m 0 0"/></svg>
+      <span>Appearance</span>
+    </button>
     <button class="nav-btn" type="button" data-page="advanced">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 13.855469 0 l -1.539063 1.4375 c -0.453125 0.421875 -0.53125 1.148438 -0.269531 1.707031 l -5.886719 5.996094 c -0.011718 0 -0.019531 0 -0.03125 0 c -0.257812 -0.128906 -0.550781 -0.183594 -0.839844 -0.148437 c -0.328124 0.046874 -0.632812 0.199218 -0.867187 0.441406 l -3.945313 3.996094 c -0.3906245 0.375 -0.5468745 0.933593 -0.4062495 1.457031 c 0.1406255 0.523437 0.5546875 0.929687 1.0820315 1.058593 c 0.527344 0.132813 1.082031 -0.03125 1.453125 -0.425781 l 3.945312 -3.996093 c 0.472657 -0.453126 0.59375 -1.15625 0.296875 -1.738282 l 5.890625 -5.964844 c 0.558594 0.25 1.273438 0.148438 1.707031 -0.289062 l 1.414063 -1.5625 z m -10.308594 0.0898438 c -0.398437 0 -0.785156 0.0937502 -1.140625 0.2187502 l 1.882812 1.878906 c 0.390626 0.382812 0.390626 1 0 1.386719 l -0.710937 0.707031 c -0.386719 0.386719 -1 0.386719 -1.390625 0 l -1.882812 -1.878906 c -0.125 0.355468 -0.2187505 0.742187 -0.2187505 1.140625 c 0 1.90625 1.5507815 3.453125 3.4609375 3.453125 c 0.402344 0 0.789063 -0.09375 1.144531 -0.21875 l 1.175782 1.171875 h 0.058593 l 2.070313 -2.0625 l -1.203125 -1.203125 c 0.125 -0.359375 0.214843 -0.742188 0.214843 -1.140625 c 0 -1.90625 -1.546874 -3.4531252 -3.460937 -3.4531252 z m 6.550781 7.8906252 l -2.070312 2.066406 c 0.011718 0.027344 0.023437 0.058594 0.03125 0.089844 l 1.144531 1.140625 c -0.125 0.355468 -0.21875 0.742187 -0.21875 1.140625 c 0 1.902343 1.550781 3.449219 3.460937 3.449219 c 0.433594 0 0.855469 -0.101563 1.238282 -0.246094 l -2.007813 -2 c -0.386719 -0.386719 -0.386719 -1.035156 0 -1.417969 l 0.679688 -0.679687 c 0.195312 -0.191407 0.457031 -0.308594 0.710937 -0.308594 s 0.515625 0.117187 0.710938 0.308594 l 1.945312 1.941406 c 0.105469 -0.328125 0.183594 -0.683594 0.183594 -1.046875 c 0 -1.90625 -1.546875 -3.453125 -3.460938 -3.453125 c -0.398437 0 -0.785156 0.09375 -1.140624 0.21875 z m 0 0"/></svg>
       <span>Advanced</span>
@@ -938,6 +974,9 @@
           <div class="label">Recording Path</div>
           <div class="field-wrap">
             <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Pictures\Videos">
+            <button class="icon-btn field-browse" type="button" id="browseClipDir" title="Choose folder">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 2 3 c -1.101562 0 -2 0.898438 -2 2 v 6 c 0 1.101562 0.898438 2 2 2 h 12 c 1.101562 0 2 -0.898438 2 -2 v -5 c 0 -1.101562 -0.898438 -2 -2 -2 h -5.4375 l -1.28125 -1.28125 c -0.375 -0.375 -0.882812 -0.585938 -1.414062 -0.585938 h -1.867188 z m 0 0"/></svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1306,6 +1345,38 @@
         </div>
       </div>
     </section>
+
+    <section class="page" id="page-appearance">
+      <div class="box">
+        <div class="box-title">App Icon</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="hint">Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly &mdash; no restart, no admin. "Default" restores OBS's own icon. Drop more <code>.ico</code>/<code>.png</code> files into <code>obs-replayKit\icons\</code> to add presets.</div>
+        </div>
+        <div class="form-row">
+          <div class="label">Icon</div>
+          <div class="field-wrap is-stacked">
+            <div class="icon-grid" id="appIconGrid"></div>
+          </div>
+        </div>
+        <div class="form-row" id="appIconCustomRow" hidden>
+          <div class="label">Custom file</div>
+          <div class="field-wrap">
+            <input class="text-input" id="appIconCustomPath" type="text" spellcheck="false" placeholder="C:\path\to\icon.ico  (.ico, .png, .jpg, .bmp)">
+            <button class="icon-btn field-browse" type="button" id="browseAppIcon" title="Choose image">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m 2 3 c -1.101562 0 -2 0.898438 -2 2 v 6 c 0 1.101562 0.898438 2 2 2 h 12 c 1.101562 0 2 -0.898438 2 -2 v -5 c 0 -1.101562 -0.898438 -2 -2 -2 h -5.4375 l -1.28125 -1.28125 c -0.375 -0.375 -0.882812 -0.585938 -1.414062 -0.585938 h -1.867188 z m 0 0"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="appIconRecordingDot">
+            <span>Show a red recording dot on a custom icon while recording</span>
+          </label>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
@@ -1445,6 +1516,12 @@
     fps: document.getElementById("fps"),
     fpsWarning: document.getElementById("fpsWarning"),
     clipDir: document.getElementById("clipDir"),
+    browseClipDir: document.getElementById("browseClipDir"),
+    browseAppIcon: document.getElementById("browseAppIcon"),
+    appIconGrid: document.getElementById("appIconGrid"),
+    appIconCustomRow: document.getElementById("appIconCustomRow"),
+    appIconCustomPath: document.getElementById("appIconCustomPath"),
+    appIconRecordingDot: document.getElementById("appIconRecordingDot"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
     openClipsKeybind: document.getElementById("openClipsKeybind"),
@@ -2355,6 +2432,9 @@
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds || 90);
     syncFpsControl(state.fpsNumerator ?? state.fps ?? 60);
     els.clipDir.value = state.clipDir || "";
+    els.appIconCustomPath.value = state.appIconCustomPath || "";
+    els.appIconRecordingDot.checked = state.appIconRecordingDot !== false;
+    paintAppIconSelection();
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
@@ -2415,7 +2495,10 @@
     state.fpsDenominator = 1;
     state.fps = state.fpsNumerator;
     state.clipNotificationSeconds = state.replaySeconds;
-    state.clipDir = els.clipDir.value.trim();
+    state.clipDir = unquote(els.clipDir.value);
+    state.appIconCustomPath = unquote(els.appIconCustomPath.value);
+    state.appIconRecordingDot = els.appIconRecordingDot.checked;
+    if (state.appIcon === "custom" && !state.appIconCustomPath) state.appIcon = "default";
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
@@ -2742,7 +2825,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.overlayFlipH, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.overlayFlipH, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -2888,6 +2971,8 @@
         body:JSON.stringify(state),
       });
       acceptSettings(data.settings || {});
+      // a "custom" pick gets filed as a saved preset server-side -- reflect the new tile + selection
+      renderAppIconGrid();
       const warnings = data.warnings || [];
       if (warnings.length) setStatus(warnings.join(" "), "bad");
       else setStatus(restartAfterApply ? "Settings saved. OBS is restarting..." : "Settings applied", "good");
@@ -3152,6 +3237,95 @@
     if (!overlayPreviewTouched) return;
     try { navigator.sendBeacon(HELPER + "/settings/overlay-preview?mode=cancel", new Blob(["{}"], { type:"application/json" })); } catch (_) {}
   });
+
+  // -- Appearance tab: app-icon picker -- applies on Apply through the normal save flow (state.appIcon / state.appIconCustomPath)
+  function paintAppIconSelection() {
+    const sel = state.appIcon || "default";
+    els.appIconGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
+    els.appIconCustomRow.hidden = sel !== "custom";
+  }
+  function selectAppIcon(id) {
+    state.appIcon = id;
+    paintAppIconSelection();
+    if (id === "custom") els.appIconCustomPath.focus();
+    markDirty();
+  }
+  const APPICON_X_SVG = '<svg viewBox="0 0 320.591 320.591" aria-hidden="true"><path d="m30.391 318.583c-7.86.457-15.59-2.156-21.56-7.288-11.774-11.844-11.774-30.973 0-42.817l257.812-257.813c12.246-11.459 31.462-10.822 42.921 1.424 10.362 11.074 10.966 28.095 1.414 39.875l-259.331 259.331c-5.893 5.058-13.499 7.666-21.256 7.288z"/><path d="m287.9 318.583c-7.966-.034-15.601-3.196-21.257-8.806l-257.813-257.814c-10.908-12.738-9.425-31.908 3.313-42.817 11.369-9.736 28.136-9.736 39.504 0l259.331 257.813c12.243 11.462 12.876 30.679 1.414 42.922-.456.487-.927.958-1.414 1.414-6.35 5.522-14.707 8.161-23.078 7.288z"/></svg>';
+  function appIconTile(id, label, url, glyph, deletable) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "icon-tile";
+    tile.dataset.id = id;
+    let swatch;
+    if (url) { swatch = document.createElement("img"); swatch.src = HELPER + url; swatch.alt = ""; }
+    else { swatch = document.createElement("span"); swatch.className = "icon-tile-swatch"; swatch.textContent = glyph || ""; }
+    const lab = document.createElement("span");
+    lab.className = "icon-tile-label";
+    lab.textContent = label;
+    tile.append(swatch, lab);
+    tile.addEventListener("click", () => selectAppIcon(id));
+    if (deletable) {
+      const del = document.createElement("span");
+      del.className = "icon-tile-del";
+      del.setAttribute("role", "button");
+      del.setAttribute("aria-label", "Remove " + label);
+      del.title = "Remove";
+      del.innerHTML = APPICON_X_SVG;
+      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserIcon(id); });
+      tile.appendChild(del);
+    }
+    return tile;
+  }
+  async function deleteUserIcon(id) {
+    let data;
+    try { data = await helperJson("appearance/delete-icon?file=" + encodeURIComponent(id), { method: "POST" }); }
+    catch (e) { setStatus("Could not remove icon", "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove icon", "bad"); return; }
+    if (state.appIcon === id) {
+      state.appIcon = "default";
+      if (originalState) originalState.appIcon = "default";
+    }
+    await renderAppIconGrid();
+  }
+  async function renderAppIconGrid() {
+    let data;
+    try { data = await helperJson("appearance/icons"); } catch (e) { return; }
+    els.appIconGrid.innerHTML = "";
+    for (const ic of (data.icons || []))
+      els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
+    els.appIconGrid.appendChild(appIconTile("custom", "Custom…", "", "＋", false));
+    paintAppIconSelection();
+  }
+  renderAppIconGrid();
+  els.appIconCustomPath.addEventListener("input", () => {
+    state.appIconCustomPath = unquote(els.appIconCustomPath.value);
+    if (state.appIconCustomPath && state.appIcon !== "custom") { state.appIcon = "custom"; paintAppIconSelection(); }
+    markDirty();
+  });
+
+  function unquote(s) {
+    s = String(s || "").trim();
+    return s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"' ? s.slice(1, -1).trim() : s;
+  }
+  async function browsePathHelper(route, initial) {
+    try {
+      const data = await helperJson(route + "?initial=" + encodeURIComponent(initial || "") + "&t=" + Date.now());
+      return data && data.ok ? data.path : "";
+    } catch (e) { return ""; }
+  }
+  els.browseClipDir.addEventListener("click", async () => {
+    els.browseClipDir.disabled = true;
+    const p = await browsePathHelper("browse-folder", els.clipDir.value.trim());
+    els.browseClipDir.disabled = false;
+    if (p) { els.clipDir.value = p; els.clipDir.dispatchEvent(new Event("change")); }
+  });
+  els.browseAppIcon.addEventListener("click", async () => {
+    els.browseAppIcon.disabled = true;
+    const p = await browsePathHelper("browse-file", els.appIconCustomPath.value.trim());
+    els.browseAppIcon.disabled = false;
+    if (p) { els.appIconCustomPath.value = p; els.appIconCustomPath.dispatchEvent(new Event("input")); }
+  });
+
   loadSettings();
   setInterval(refreshExternalSettings, 2000);
 

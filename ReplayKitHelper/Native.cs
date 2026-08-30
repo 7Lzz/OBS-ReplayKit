@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -343,6 +344,8 @@ namespace ReplayKitHelper
         private static string JsonEscape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
 
         // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cef's non-client repaint race. returns match count.
+        private static IntPtr _styleOwnedSmall, _styleOwnedBig;
+
         public static int StyleWindow(string needle, string iconPath, bool taskbar)
         {
             int matched = 0;
@@ -351,10 +354,15 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    using (var ico = new Icon(iconPath, 16, 16)) hIcon16 = ico.Handle;
-                    using (var ico = new Icon(iconPath, 32, 32)) hIcon32 = ico.Handle;
+                    // WM_SETICON does not copy -- own a stable copy that outlives this Icon, and free the previous pair.
+                    using (var ico = new Icon(iconPath, 16, 16)) hIcon16 = CopyIcon(ico.Handle);
+                    using (var ico = new Icon(iconPath, 32, 32)) hIcon32 = CopyIcon(ico.Handle);
+                    IntPtr oldS = _styleOwnedSmall, oldB = _styleOwnedBig;
+                    _styleOwnedSmall = hIcon16; _styleOwnedBig = hIcon32;
+                    if (oldS != IntPtr.Zero && oldS != hIcon16 && oldS != hIcon32) DestroyIcon(oldS);
+                    if (oldB != IntPtr.Zero && oldB != hIcon16 && oldB != hIcon32 && oldB != oldS) DestroyIcon(oldB);
                 }
-                catch (Exception ex) when (ex is IOException || ex is ArgumentException) { }
+                catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is OutOfMemoryException) { }
             }
 
             foreach (var hWnd in EnumerateTopLevelWindows())
@@ -390,6 +398,225 @@ namespace ReplayKitHelper
                 matched++;
             }
             return matched;
+        }
+
+        // -- live app-icon swap (Appearance tab) -- WM_SETICON on obs's real main window (taskbar button + title bar)
+        // and replaykit's own helper-hosted windows. no restart, no admin: a window message in-session, same
+        // approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the tray plugin.
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMs, out IntPtr result);
+        [DllImport("user32.dll")] private static extern IntPtr CopyIcon(IntPtr hIcon);
+        [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr hIcon);
+        private const uint WM_GETICON = 0x007F;
+        private const uint SMTO_ABORTIFHUNG = 0x0002;
+
+        private static readonly object IconGate = new object();
+        private static bool _obsIconCaptured;
+        private static IntPtr _obsOrigSmall, _obsOrigBig;
+        private static IntPtr _obsOwnedSmall, _obsOwnedBig;
+        private static IntPtr _rkOwnedSmall, _rkOwnedBig;
+
+        // writes srcPath (png/jpg/bmp/ico) as a multi-resolution .ico so every downstream consumer -- LoadIconPair,
+        // StyleWindow, the dock favicon -- which all go through System.Drawing.Icon and only read .ico, can use it.
+        // 16..64 as 32bpp BMP frames, 128/256 as PNG frames (the modern .ico layout GDI+ reads fine on vista+).
+        public static void ConvertImageToIco(string srcPath, string destPath)
+        {
+            int[] sizes = { 16, 24, 32, 48, 64, 128, 256 };
+            var frames = new List<byte[]>();
+            using (var src = Image.FromFile(srcPath))
+            {
+                foreach (int sz in sizes)
+                {
+                    using (var bmp = new Bitmap(sz, sz, PixelFormat.Format32bppArgb))
+                    {
+                        using (var g = Graphics.FromImage(bmp))
+                        {
+                            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                            g.SmoothingMode = SmoothingMode.HighQuality;
+                            g.Clear(Color.Transparent);
+                            g.DrawImage(src, new Rectangle(0, 0, sz, sz));
+                        }
+                        if (sz >= 128)
+                        {
+                            using (var ms = new MemoryStream()) { bmp.Save(ms, ImageFormat.Png); frames.Add(ms.ToArray()); }
+                        }
+                        else
+                        {
+                            frames.Add(IcoBmpFrame(bmp));
+                        }
+                    }
+                }
+            }
+
+            using (var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write))
+            using (var bw = new BinaryWriter(fs))
+            {
+                bw.Write((ushort)0);              // reserved
+                bw.Write((ushort)1);              // type: icon
+                bw.Write((ushort)sizes.Length);
+                int offset = 6 + 16 * sizes.Length;
+                for (int i = 0; i < sizes.Length; i++)
+                {
+                    int sz = sizes[i];
+                    bw.Write((byte)(sz >= 256 ? 0 : sz));
+                    bw.Write((byte)(sz >= 256 ? 0 : sz));
+                    bw.Write((byte)0);           // palette count
+                    bw.Write((byte)0);           // reserved
+                    bw.Write((ushort)1);         // planes
+                    bw.Write((ushort)32);        // bpp
+                    bw.Write((uint)frames[i].Length);
+                    bw.Write((uint)offset);
+                    offset += frames[i].Length;
+                }
+                foreach (var f in frames) bw.Write(f);
+            }
+        }
+
+        // one BMP-DIB icon frame: BITMAPINFOHEADER with doubled height, bottom-up BGRA pixels, then an all-zero AND mask (the 32bpp alpha carries transparency).
+        private static byte[] IcoBmpFrame(Bitmap bmp)
+        {
+            int w = bmp.Width, h = bmp.Height;
+            byte[] pixels = new byte[w * h * 4];
+            var bits = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                for (int y = 0; y < h; y++)
+                    Marshal.Copy(bits.Scan0 + y * bits.Stride, pixels, (h - 1 - y) * w * 4, w * 4);
+            }
+            finally { bmp.UnlockBits(bits); }
+
+            byte[] mask = new byte[((w + 31) / 32) * 4 * h]; // zero == opaque
+            using (var ms = new MemoryStream())
+            using (var bw = new BinaryWriter(ms))
+            {
+                bw.Write((uint)40);              // biSize
+                bw.Write(w);                     // biWidth
+                bw.Write(h * 2);                 // biHeight (colour + mask)
+                bw.Write((ushort)1);             // biPlanes
+                bw.Write((ushort)32);            // biBitCount
+                bw.Write((uint)0);               // BI_RGB
+                bw.Write((uint)(w * h * 4));     // biSizeImage
+                bw.Write(0); bw.Write(0);        // pixels-per-metre
+                bw.Write((uint)0); bw.Write((uint)0); // palette
+                bw.Write(pixels);
+                bw.Write(mask);
+                return ms.ToArray();
+            }
+        }
+
+        // owns a stable 16px + 32px HICON pair for iconPath. returns false (and frees anything half-created) if the file cant be read.
+        private static bool LoadIconPair(string iconPath, out IntPtr small, out IntPtr big)
+        {
+            small = IntPtr.Zero; big = IntPtr.Zero;
+            if (string.IsNullOrEmpty(iconPath) || !File.Exists(iconPath)) return false;
+            try
+            {
+                using (var s = new Icon(iconPath, 16, 16)) small = CopyIcon(s.Handle);
+                using (var b = new Icon(iconPath, 32, 32)) big = CopyIcon(b.Handle);
+            }
+            catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is OutOfMemoryException)
+            {
+                if (small != IntPtr.Zero) { DestroyIcon(small); small = IntPtr.Zero; }
+                if (big != IntPtr.Zero) { DestroyIcon(big); big = IntPtr.Zero; }
+                return false;
+            }
+            return small != IntPtr.Zero || big != IntPtr.Zero;
+        }
+
+        private static void SendIcons(IntPtr hWnd, IntPtr small, IntPtr big)
+        {
+            if (small != IntPtr.Zero) SendMessageTimeout(hWnd, WM_SETICON, new IntPtr(0), small, SMTO_ABORTIFHUNG, 1500, out _);
+            if (big != IntPtr.Zero) SendMessageTimeout(hWnd, WM_SETICON, new IntPtr(1), big, SMTO_ABORTIFHUNG, 1500, out _);
+        }
+
+        // iconPath "" -> restore whatever obs shipped with (captured the first time we touch it).
+        public static void SetObsWindowIcon(IntPtr obsMainHwnd, string iconPath)
+        {
+            if (obsMainHwnd == IntPtr.Zero || !IsWindow(obsMainHwnd)) return;
+            lock (IconGate)
+            {
+                if (!_obsIconCaptured)
+                {
+                    _obsOrigSmall = SendMessage(obsMainHwnd, WM_GETICON, new IntPtr(0), IntPtr.Zero);
+                    _obsOrigBig = SendMessage(obsMainHwnd, WM_GETICON, new IntPtr(1), IntPtr.Zero);
+                    _obsIconCaptured = true;
+                }
+
+                bool custom = LoadIconPair(iconPath, out IntPtr small, out IntPtr big);
+                if (custom)
+                    SendIcons(obsMainHwnd, small == IntPtr.Zero ? big : small, big == IntPtr.Zero ? small : big);
+                else
+                    SendIcons(obsMainHwnd, _obsOrigSmall, _obsOrigBig);
+
+                IntPtr oldS = _obsOwnedSmall, oldB = _obsOwnedBig;
+                _obsOwnedSmall = custom ? small : IntPtr.Zero;
+                _obsOwnedBig = custom ? big : IntPtr.Zero;
+                if (oldS != IntPtr.Zero && oldS != small && oldS != big) DestroyIcon(oldS);
+                if (oldB != IntPtr.Zero && oldB != small && oldB != big && oldB != oldS) DestroyIcon(oldB);
+                if (!custom)
+                {
+                    if (small != IntPtr.Zero) DestroyIcon(small);
+                    if (big != IntPtr.Zero) DestroyIcon(big);
+                }
+            }
+        }
+
+        // hwnd of the open "ReplayKit Settings" popup, or Zero -- used to parent the browse dialogs so they're modal over it.
+        public static IntPtr FindReplayKitSettingsWindow()
+        {
+            foreach (var hWnd in EnumerateTopLevelWindows())
+            {
+                if (!IsWindowVisible(hWnd)) continue;
+                GetWindowThreadProcessId(hWnd, out uint ownerPid);
+                if (!IsObsFamilyProcess(ownerPid)) continue;
+                if (GetTitle(hWnd).IndexOf("ReplayKit Settings", StringComparison.OrdinalIgnoreCase) >= 0) return hWnd;
+            }
+            return IntPtr.Zero;
+        }
+
+        // replaykit-owned popups the TRAY PLUGIN does not manage itself -- i.e. "ReplayKit Update". the plugin owns
+        // the icon (title bar + win11 taskbar button) for its own "Clips" and "ReplayKit Settings" windows, so those
+        // are skipped here to avoid a WM_SETICON tug-of-war. iconPath "" -> the bundled replaykit .ico.
+        public static void SetReplayKitWindowIcons(string iconPath)
+        {
+            lock (IconGate)
+            {
+                bool ok = LoadIconPair(iconPath, out IntPtr small, out IntPtr big);
+                if (!ok) ok = LoadIconPair(Constants.OBS_ICON_PATH, out small, out big);
+                if (!ok) return;
+                IntPtr useS = small == IntPtr.Zero ? big : small;
+                IntPtr useB = big == IntPtr.Zero ? small : big;
+
+                int hit = 0;
+                foreach (var hWnd in EnumerateTopLevelWindows())
+                {
+                    if (!IsWindowVisible(hWnd)) continue;
+                    GetWindowThreadProcessId(hWnd, out uint ownerPid);
+                    if (!IsObsFamilyProcess(ownerPid)) continue;
+                    string title = GetTitle(hWnd);
+                    if (string.IsNullOrEmpty(title) || title.IndexOf("ReplayKit", StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    // the tray plugin owns these two -- leave them alone.
+                    if (title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
+                        title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    SendIcons(hWnd, useS, useB);
+                    hit++;
+                }
+
+                IntPtr oldS = _rkOwnedSmall, oldB = _rkOwnedBig;
+                _rkOwnedSmall = hit > 0 ? small : IntPtr.Zero;
+                _rkOwnedBig = hit > 0 ? big : IntPtr.Zero;
+                if (oldS != IntPtr.Zero && oldS != small && oldS != big) DestroyIcon(oldS);
+                if (oldB != IntPtr.Zero && oldB != small && oldB != big && oldB != oldS) DestroyIcon(oldB);
+                if (hit == 0)
+                {
+                    if (small != IntPtr.Zero) DestroyIcon(small);
+                    if (big != IntPtr.Zero) DestroyIcon(big);
+                }
+            }
         }
 
         // shows/restores + attachthreadinput anti-focus-steal dance + bringwindowtotop + topmost toggle + setforegroundwindow. returns whether it actually ended up foreground.

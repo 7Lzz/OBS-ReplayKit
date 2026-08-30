@@ -141,6 +141,15 @@ namespace ReplayKitHelper
         }
 
         // windows balloon-tip notification: the upload finished and the link is on the clipboard. runs on its own one-shot sta thread with a short DoEvents pump -- NotifyIcon/ShowBalloonTip needs a message loop to actually paint and auto-dismiss, which this Task continuation (a plain threadpool thread) doesnt have. the ps original spawned a whole seperate powershell.exe for this since its watcher runspace was mta and had no easy way to get an sta thread with a pump; a background thread is the direct equivalent here and skips a process spawn entirely.
+        // the Appearance-tab icon for the balloon tip, or null to fall back to the system info glyph. a fresh Icon per toast (disposed with the NotifyIcon) -- Icon(path) loads the closest frame to the default small size.
+        private static System.Drawing.Icon LoadReplayKitToastIcon()
+        {
+            string path = ReplaykitSettings.EffectiveReplayKitIconPath();
+            if (string.IsNullOrEmpty(path)) return null;
+            try { return new System.Drawing.Icon(path, 32, 32); }
+            catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return null; }
+        }
+
         private static void ShowUploadToast(string url)
         {
             var thread = new Thread(() =>
@@ -149,7 +158,7 @@ namespace ReplayKitHelper
                 {
                     using (var icon = new System.Windows.Forms.NotifyIcon())
                     {
-                        icon.Icon = System.Drawing.SystemIcons.Information;
+                        icon.Icon = LoadReplayKitToastIcon() ?? System.Drawing.SystemIcons.Information;
                         icon.Visible = true;
                         icon.ShowBalloonTip(5000, "OBS clip uploaded", "Link copied to clipboard\n" + url, System.Windows.Forms.ToolTipIcon.Info);
                         var deadline = DateTime.UtcNow.AddSeconds(6);

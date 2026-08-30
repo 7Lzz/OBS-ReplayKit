@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Threading;
+using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
@@ -11,7 +12,7 @@ namespace ReplayKitHelper
     // scratch-file handoff (obsreplaykit_main_window.txt / obsreplaykit_projector_windows.txt / open_clips.command
     // / obs-allow-close). the plugin is the server because it outlives helper hot-swaps; this side just reconnects.
     // inbound (plugin -> helper): MAINWIN <hwnd>, PROJECTORS <csv>. outbound: OPENCLIPS, ALLOWCLOSE (+ ALLOWCLOSE_ACK
-    // back). newline-delimited utf8 text, one message per line.
+    // back), SETICON <path|->, SETICONDOT <0|1>, RKICON <path>. newline-delimited utf8 text, one message per line.
     internal static class PipeClient
     {
         private const string PipeName = "OBSReplayKitIpc";
@@ -51,6 +52,15 @@ namespace ReplayKitHelper
                         lock (WriteLock) { _stream = pipe; _writer = writer; }
                         lock (Server.State.IpcLock) Server.State.IpcClientConnected = true;
                         Log.Write("IPC pipe connected to the tray plugin.");
+                        // sync the appearance-tab icon + recording-dot toggle + branded fallback to a plugin that may have just (re)loaded
+                        try
+                        {
+                            var norm = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                            SendRkIcon(File.Exists(Constants.OBS_ICON_PATH) ? Constants.OBS_ICON_PATH : "");
+                            SendSetIcon(ReplaykitSettings.ResolveAppIconPath(norm));
+                            SendSetIconDot(norm["appIconRecordingDot"]?.Value<bool>() ?? true);
+                        }
+                        catch (Exception ex) { Log.Write("IPC SETICON on connect: " + ex.Message); }
 
                         string line;
                         while (!_stop && (line = reader.ReadLine()) != null)
@@ -117,6 +127,16 @@ namespace ReplayKitHelper
         }
 
         public static void SendOpenClips() => TryWrite("OPENCLIPS");
+
+        // tells the plugin which icon to put on obs's main window + taskbar + system tray. "-" restores obs's own icon.
+        // sent on every appearance-tab change and once on each (re)connect so a freshly-loaded plugin syncs.
+        public static void SendSetIcon(string iconPath) => TryWrite("SETICON " + (string.IsNullOrEmpty(iconPath) ? "-" : iconPath));
+
+        // whether the plugin overlays the red recording dot on a custom icon while recording / replay buffer is active.
+        public static void SendSetIconDot(bool on) => TryWrite("SETICONDOT " + (on ? "1" : "0"));
+
+        // the replaykit-branded .ico the plugin puts on our own windows (Clips, Settings) when appIcon is "default".
+        public static void SendRkIcon(string icoPath) { if (!string.IsNullOrEmpty(icoPath)) TryWrite("RKICON " + icoPath); }
 
         private static bool TryWrite(string line)
         {

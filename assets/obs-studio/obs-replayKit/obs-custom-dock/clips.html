@@ -1216,6 +1216,13 @@
   .preview:fullscreen .player-shade,
   .preview:-webkit-full-screen .player-shade { opacity: 1; }
 
+  /* theater mode: match the fullscreen player -- controls always shown over a shade, and the seek scrubber lifted
+     above the controls row instead of sitting flush at the very bottom of the stage. */
+  .card.is-theater-card .preview-controls { opacity: 1; pointer-events: auto; }
+  .card.is-theater-card .player-shade { opacity: 1; }
+  .card.is-theater-card .progress-bar { bottom: 42px; height: 12px; }
+  .card.is-theater-card .progress-fill { background: var(--primary_light); }
+
   /* hoist the controls row to a youtube-like bottom bar: edge-to-edge, play/volume/time on the left, fullscreen on the right. */
   .preview:fullscreen .preview-controls,
   .preview:-webkit-full-screen .preview-controls {

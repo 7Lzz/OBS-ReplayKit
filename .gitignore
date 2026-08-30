@@ -41,6 +41,9 @@ hotkey_capture_signal.json
 .env
 .env.local
 
+# custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder -- per-user, not repo content
+assets/obs-studio/obs-replayKit/icons/user/
+
 # backups created by the installer + cleanup script
 obs-studio.bak.*/
 obs-custom-dock.bak.*/

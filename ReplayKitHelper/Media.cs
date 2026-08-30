@@ -70,6 +70,7 @@ namespace ReplayKitHelper
             return Encoding.UTF8.GetBytes(svg);
         }
 
-        public static string GetObsIconIco() => File.Exists(Constants.OBS_ICON_PATH) ? Constants.OBS_ICON_PATH : null;
+        // follows the Appearance-tab choice so the dock favicon / served /obs-icon.ico matches everything else.
+        public static string GetObsIconIco() => ReplaykitSettings.EffectiveReplayKitIconPath();
     }
 }

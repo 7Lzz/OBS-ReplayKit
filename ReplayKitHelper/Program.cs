@@ -146,6 +146,7 @@ namespace ReplayKitHelper
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
             try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
+            try { ReplaykitSettings.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
 
             RunAcceptLoop();

@@ -20,6 +20,8 @@ target_link_libraries(replaykit-tray PRIVATE
     Qt6::Gui
     Qt6::Widgets
     ws2_32
+    ole32
+    shell32
     "${OBS_IMPLIB_DIR}/obs.lib"
     "${OBS_IMPLIB_DIR}/obs-frontend-api.lib"
 )

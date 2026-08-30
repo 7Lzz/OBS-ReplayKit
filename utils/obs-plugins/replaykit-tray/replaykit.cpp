@@ -28,6 +28,10 @@
 #include <QUrl>
 #include <QDir>
 #include <QGuiApplication>
+#include <QIcon>
+#include <QImage>
+#include <QPixmap>
+#include <QPainter>
 #include <QScreen>
 #include <QWindow>
 #include <QCursor>
@@ -51,6 +55,8 @@
 #include <vector>
 
 #include <windows.h>
+#include <shlobj.h>   // SHGetPropertyStoreForWindow
+#include <shobjidl.h> // ITaskbarList
 
 OBS_DECLARE_MODULE()
 
@@ -62,6 +68,13 @@ QPointer<QWidget> g_clipsWindow;
 QPointer<QCefWidget> g_clipsBrowser;
 QPointer<QWidget> g_settingsWindow;
 QPointer<QWidget> g_prewarmWindow;
+
+// app-icon state for our own windows -- declared up here because CreateSettingsWindow (which resets them on a
+// fresh WA_DeleteOnClose window) sits above the icon code. the rest of the icon statics live with RefreshAppIcon.
+HICON g_ownedIconClips = nullptr;
+HICON g_ownedIconSettings = nullptr;
+int g_taggedClips = -1;
+int g_taggedSettings = -1;
 constexpr int kOpenClipsHotkeyId = 0x524B;
 bool g_openClipsHotkeyRegistered = false;
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
@@ -373,6 +386,8 @@ protected:
 	}
 };
 
+void RefreshAppIcon(); // defined below -- re-pushes the app icon to obs + our own windows
+
 // ui-thread only -- builds the actual window once we know theres no existing clips window to reuse and cef is already confirmed started via EnsureCefReadyBlocking
 void CreateClipsWindow()
 {
@@ -403,6 +418,7 @@ void CreateClipsWindow()
 	win->show();
 	win->raise();
 	win->activateWindow();
+	RefreshAppIcon(); // give the fresh window the current app icon + taskbar retag
 }
 
 // same shape as CreateClipsWindow -- title matches settings.htmls <title> and the /close-window whitelist, size matches the controls_app.html popup so it looks the same either way its opened
@@ -429,6 +445,13 @@ void CreateSettingsWindow()
 	win->raise();
 	win->activateWindow();
 	g_settingsWindow = win;
+	// this window is WA_DeleteOnClose -- a fresh hwnd every open, so force the retag path to run again.
+	g_taggedSettings = -1;
+	if (g_ownedIconSettings) {
+		DestroyIcon(g_ownedIconSettings);
+		g_ownedIconSettings = nullptr;
+	}
+	RefreshAppIcon(); // give the fresh window the current app icon + taskbar retag
 }
 
 void ShowSettings()
@@ -959,6 +982,278 @@ void PublishMainWindow()
 	g_mainWinValue.store((quintptr)mainWindow->winId());
 }
 
+// -- live app-icon swap (helper Appearance tab) -- SETICON <path> over the ipc pipe. covers obss title bar,
+// taskbar button and system-tray icon; "-" restores what obs shipped with (captured on first use). SETICONDOT
+// toggles a red recording dot overlaid while a recording / replay buffer is running.
+//
+// win11 taskbar note: qt6 setWindowIcon (WM_SETICON at 16/32px) updates the title bar + alt-tab but NOT the
+// win11 taskbar button -- win11 only picks up an icon change when the WM_SETICON payload is large, and it also
+// reads the window CLASS icon. so we push one 256px HICON to every WM_SETICON slot AND the class, and re-assert
+// on Show/WindowStateChange (restoring from the tray rebuilds the taskbar button).
+static bool g_appIconDefaultsCaptured = false;
+static QIcon g_appIconDefaultMain;
+static QIcon g_appIconDefaultTray;
+static HICON g_classOrigBig = nullptr;   // obs's own class icons, captured once
+static HICON g_classOrigSmall = nullptr;
+static HICON g_ownedIcon = nullptr;      // the single 256px HICON we push to every slot + the class; freed on the next change
+static QString g_appIconPath;            // "" / "-" == default; last value the helper sent
+static QString g_rkIconPath;             // RKICON <path> -- the replaykit-branded .ico for our own windows when appIcon is default
+static bool g_recordingDotEnabled = true; // helper Appearance toggle (SETICONDOT)
+static int g_taskbarTaggedCustom = -1;   // -1 unknown / 0 default / 1 custom -- last state we retagged the obs taskbar button for
+// g_ownedIconClips / g_ownedIconSettings / g_taggedClips / g_taggedSettings are declared near the top of the file
+
+// QIcon -> HICON at a given px size (works for .ico and .png). caller owns the result (DestroyIcon).
+static HICON HIconFromQIcon(const QIcon &icon, int size)
+{
+	if (icon.isNull() || size <= 0)
+		return nullptr;
+	QImage img = icon.pixmap(size, size).toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+	if (img.isNull())
+		return nullptr;
+
+	BITMAPV5HEADER bi = {};
+	bi.bV5Size = sizeof(BITMAPV5HEADER);
+	bi.bV5Width = img.width();
+	bi.bV5Height = -img.height(); // top-down
+	bi.bV5Planes = 1;
+	bi.bV5BitCount = 32;
+	bi.bV5Compression = BI_BITFIELDS;
+	bi.bV5RedMask = 0x00FF0000;
+	bi.bV5GreenMask = 0x0000FF00;
+	bi.bV5BlueMask = 0x000000FF;
+	bi.bV5AlphaMask = 0xFF000000;
+
+	HDC hdc = GetDC(nullptr);
+	void *bits = nullptr;
+	HBITMAP color = CreateDIBSection(hdc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+	ReleaseDC(nullptr, hdc);
+	if (!color)
+		return nullptr;
+	for (int y = 0; y < img.height(); ++y)
+		memcpy((quint8 *)bits + (size_t)y * img.width() * 4, img.constScanLine(y), (size_t)img.width() * 4);
+
+	// all-zero AND mask -- the 32bpp alpha channel carries transparency; 1bpp rows are WORD-aligned.
+	std::vector<quint8> maskBits((size_t)(((img.width() + 15) / 16) * 2) * img.height(), 0);
+	HBITMAP mask = CreateBitmap(img.width(), img.height(), 1, 1, maskBits.data());
+	ICONINFO ii = {};
+	ii.fIcon = TRUE;
+	ii.hbmColor = color;
+	ii.hbmMask = mask;
+	HICON hIcon = CreateIconIndirect(&ii);
+	DeleteObject(color);
+	DeleteObject(mask);
+	return hIcon;
+}
+
+// overlays the recording indicator -- geometry matched to obs's own tray_active.png: a pure-red filled circle in
+// the bottom-left, 37.5% of the icon, ~5% inset from the left and bottom edges, no ring.
+static QIcon ComposeRecordingDot(const QIcon &base)
+{
+	if (base.isNull())
+		return base;
+	QIcon out;
+	for (int sz : {16, 20, 24, 32, 40, 48, 64, 128, 256}) {
+		QPixmap pm = base.pixmap(sz, sz);
+		if (pm.isNull())
+			continue;
+		qreal s = pm.width();
+		qreal d = s * 0.375;
+		QRectF dot(s * 0.047, s - s * 0.051 - d, d, d);
+		QPainter p(&pm);
+		p.setRenderHint(QPainter::Antialiasing, true);
+		p.setPen(Qt::NoPen);
+		p.setBrush(QColor(255, 0, 0));
+		p.drawEllipse(dot);
+		p.end();
+		out.addPixmap(pm);
+	}
+	return out.isNull() ? base : out;
+}
+
+// win11 resolves a running window's taskbar-button icon through obs64.exe / its start-menu shortcut and ignores
+// WM_SETICON + the class icon. giving the window its own explicit AppUserModelID (one that matches no shortcut)
+// breaks that resolution so the button falls back to the window icon we set; then DeleteTab/AddTab makes explorer
+// rebuild the button and re-read it. force=false clears the id so obs's normal grouping + icon come back. each
+// window needs a DISTINCT id or their taskbar buttons would merge into one group.
+static void RetagTaskbarButton(HWND hwnd, bool force, const wchar_t *aumid)
+{
+	// PKEY_AppUserModel_ID = {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, pid 5 -- inlined to skip the propsys.lib link.
+	static const PROPERTYKEY kAumidKey = {
+		{0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}}, 5};
+
+	IPropertyStore *store = nullptr;
+	if (SUCCEEDED(SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store))) && store) {
+		PROPVARIANT pv;
+		PropVariantInit(&pv); // vt stays VT_EMPTY -> SetValue clears the property
+		if (force && aumid) {
+			size_t n = (wcslen(aumid) + 1) * sizeof(wchar_t);
+			pv.pwszVal = (LPWSTR)CoTaskMemAlloc(n);
+			if (pv.pwszVal) {
+				memcpy(pv.pwszVal, aumid, n);
+				pv.vt = VT_LPWSTR;
+			}
+		}
+		store->SetValue(kAumidKey, pv);
+		store->Commit();
+		PropVariantClear(&pv);
+		store->Release();
+	}
+
+	ITaskbarList *tbl = nullptr;
+	if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&tbl))) && tbl) {
+		tbl->HrInit();
+		tbl->DeleteTab(hwnd);
+		tbl->AddTab(hwnd);
+		tbl->Release();
+	}
+}
+
+// our own top-level windows (Clips, ReplayKit Settings) -- give them the same icon obs is showing (custom, or the
+// replaykit-branded .ico on default) and the same win11 taskbar-button retag. no recording dot on these.
+static void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *aumid)
+{
+	if (!w)
+		return;
+	bool custom = !(g_appIconPath.isEmpty() || g_appIconPath == "-");
+	QIcon ic;
+	if (custom)
+		ic = QIcon(g_appIconPath);
+	else if (!g_rkIconPath.isEmpty())
+		ic = QIcon(g_rkIconPath);
+	else if (g_appIconDefaultsCaptured)
+		ic = g_appIconDefaultMain;
+	if (ic.isNull())
+		return;
+
+	w->setWindowIcon(ic);
+	HWND hwnd = (HWND)w->winId();
+
+	// a forced icon (custom or replaykit-branded) -> 256px on every slot + a distinct AUMID so the taskbar button
+	// shows it instead of obs64.exe's icon. only the bare obs default (no rk icon yet) leaves the slots alone.
+	bool forced = custom || !g_rkIconPath.isEmpty();
+	if (forced) {
+		HICON ni = HIconFromQIcon(ic, 256);
+		if (ni) {
+			SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)ni);
+			SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)ni);
+			SendMessage(hwnd, WM_SETICON, ICON_SMALL2, (LPARAM)ni);
+			HICON old = *owned;
+			*owned = ni;
+			if (old && old != ni)
+				DestroyIcon(old);
+		}
+	} else if (*owned) {
+		DestroyIcon(*owned);
+		*owned = nullptr;
+	}
+
+	if (*tagged != (forced ? 1 : 0)) {
+		RetagTaskbarButton(hwnd, forced, aumid);
+		*tagged = forced ? 1 : 0;
+	}
+}
+
+// snapshot obs's own window + class + tray icons before we touch anything. safe to call repeatedly.
+static void CaptureAppIconDefaults()
+{
+	if (g_appIconDefaultsCaptured)
+		return;
+	QWidget *mw = (QWidget *)obs_frontend_get_main_window();
+	if (!mw)
+		return; // main window not up yet -- try again later
+	g_appIconDefaultMain = mw->windowIcon();
+	HWND hwnd = (HWND)mw->winId();
+	g_classOrigBig = (HICON)GetClassLongPtr(hwnd, GCLP_HICON);
+	g_classOrigSmall = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM);
+	if (QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray())
+		g_appIconDefaultTray = tray->icon();
+	g_appIconDefaultsCaptured = true;
+}
+
+// the single place that pushes the current icon (custom-or-default, plus the recording dot when active) to every surface.
+void RefreshAppIcon()
+{
+	CaptureAppIconDefaults();
+
+	bool custom = !(g_appIconPath.isEmpty() || g_appIconPath == "-");
+
+	// nothing was ever swapped and nothing is requested -- leave obs's own icon untouched. (a branded rk icon for
+	// our own windows still counts as something to do.)
+	if (!custom && !g_appIconDefaultsCaptured && g_rkIconPath.isEmpty())
+		return;
+
+	QWidget *mw = (QWidget *)obs_frontend_get_main_window();
+	QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
+	bool recording = obs_frontend_recording_active() || obs_frontend_replay_buffer_active();
+
+	QIcon baseMain = custom ? QIcon(g_appIconPath) : g_appIconDefaultMain;
+	QIcon baseTray = custom ? QIcon(g_appIconPath) : g_appIconDefaultTray;
+	if (custom && baseMain.isNull()) {
+		blog(LOG_WARNING, "[replaykit] SETICON: could not load '%s'", g_appIconPath.toUtf8().constData());
+		return;
+	}
+
+	// the dot only rides a user-chosen icon -- on "default" obs manages its own recording indicator.
+	bool dot = recording && custom && g_recordingDotEnabled;
+	QIcon effMain = dot ? ComposeRecordingDot(baseMain) : baseMain;
+	QIcon effTray = dot ? ComposeRecordingDot(baseTray) : baseTray;
+
+	if (mw)
+		mw->setWindowIcon(effMain);
+	if (tray)
+		tray->setIcon(effTray);
+	if (custom)
+		QGuiApplication::setWindowIcon(effMain);
+
+	// win11 taskbar: needs a large WM_SETICON payload + the window class icon. push one 256px HICON to every slot,
+	// or restore obs's own class icons (qt's setWindowIcon above already put the default back on the WM_SETICON slots).
+	if (mw) {
+		HWND hwnd = (HWND)mw->winId();
+		if (custom) {
+			HICON ni = HIconFromQIcon(effMain, 256);
+			if (ni) {
+				SetClassLongPtr(hwnd, GCLP_HICON, (LONG_PTR)ni);
+				SetClassLongPtr(hwnd, GCLP_HICONSM, (LONG_PTR)ni);
+				SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)ni);
+				SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)ni);
+				SendMessage(hwnd, WM_SETICON, ICON_SMALL2, (LPARAM)ni);
+				HICON old = g_ownedIcon;
+				g_ownedIcon = ni;
+				if (old && old != ni)
+					DestroyIcon(old);
+			}
+		} else {
+			SetClassLongPtr(hwnd, GCLP_HICON, (LONG_PTR)g_classOrigBig);
+			SetClassLongPtr(hwnd, GCLP_HICONSM, (LONG_PTR)g_classOrigSmall);
+			if (g_ownedIcon) {
+				DestroyIcon(g_ownedIcon);
+				g_ownedIcon = nullptr;
+			}
+		}
+
+		// only on a real default<->custom transition -- DeleteTab/AddTab blips the button, so skip it for plain
+		// re-asserts (Show, recording-dot refreshes).
+		if (g_taskbarTaggedCustom != (custom ? 1 : 0)) {
+			RetagTaskbarButton(hwnd, custom, L"ReplayKit.OBSCustomIcon");
+			g_taskbarTaggedCustom = custom ? 1 : 0;
+		}
+	}
+
+	// our own windows follow along -- custom icon, or the replaykit-branded .ico on default. distinct AUMIDs so
+	// their taskbar buttons stay separate from obs's and from each other.
+	ApplyAuxWindowIcon(g_clipsWindow, &g_ownedIconClips, &g_taggedClips, L"ReplayKit.ClipsWindow");
+	ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow");
+
+	blog(LOG_INFO, "[replaykit] icon refresh: custom=%d recording=%d", custom ? 1 : 0, recording ? 1 : 0);
+}
+
+void ApplyAppIcon(const QString &path)
+{
+	g_appIconPath = path;
+	CaptureAppIconDefaults();
+	RefreshAppIcon();
+}
+
 // turns the OBS main window's close (X) into hide-to-tray while g_closeToTray is on. narrowly scoped to the
 // one QWidget (an app-wide filter caused a confirmed 2026-08-10 crash catching cef events mid-teardown). an
 // ALLOWCLOSE over the ipc pipe from the helpers restart/exit routes, right before they post WM_CLOSE, opens a
@@ -977,6 +1272,11 @@ protected:
 		if (type == QEvent::Move || type == QEvent::Resize) {
 			ScheduleObsMainGeometrySave();
 			return false; // observe only, never consume
+		}
+		if (type == QEvent::Show || type == QEvent::WindowStateChange) {
+			// restoring from the tray rebuilds the taskbar button -- put our icon back on it
+			RefreshAppIcon();
+			return false;
 		}
 		if (type != QEvent::Close || !g_closeToTray)
 			return false;
@@ -1013,6 +1313,10 @@ void InstallMainWindowCloseFilter()
 	auto *filter = new MainWindowCloseFilter(mw);
 	mw->installEventFilter(filter);
 	g_mainWindowCloseFilter = filter;
+
+	// grab obs's own icons now, while the main window is up and untouched, so a restore/aux-window path never
+	// finds them null.
+	CaptureAppIconDefaults();
 
 	// put the window back where it was last session. once here (obs has finished its own layout) and again shortly
 	// after, since qts platform code can still be repositioning the main window right after FINISHED_LOADING.
@@ -1065,6 +1369,17 @@ void PipeDispatchLine(const std::string &line)
 {
 	if (line == "OPENCLIPS") {
 		QMetaObject::invokeMethod(qApp, []() { ShowClips(); }, Qt::QueuedConnection);
+	} else if (line.rfind("SETICON ", 0) == 0) {
+		QString iconPath = QString::fromUtf8(line.substr(8).c_str());
+		QMetaObject::invokeMethod(qApp, [iconPath]() { ApplyAppIcon(iconPath); }, Qt::QueuedConnection);
+	} else if (line.rfind("SETICONDOT ", 0) == 0) {
+		bool on = line.substr(11) != "0";
+		QMetaObject::invokeMethod(
+			qApp, [on]() { g_recordingDotEnabled = on; RefreshAppIcon(); }, Qt::QueuedConnection);
+	} else if (line.rfind("RKICON ", 0) == 0) {
+		QString p = QString::fromUtf8(line.substr(7).c_str());
+		QMetaObject::invokeMethod(
+			qApp, [p]() { g_rkIconPath = p; RefreshAppIcon(); }, Qt::QueuedConnection);
 	} else if (line == "ALLOWCLOSE") {
 		// a real restart/exit is coming -- let the next WM_CLOSE through the close-to-tray filter for 60s, and
 		// ack so the helper knows the filter saw it before it posts the close.
@@ -1183,6 +1498,14 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		if (g_mainWindow)
 			SaveWindowGeometry("obsMainWindow", g_mainWindow);
 		CloseCefWidgetsBeforeShutdown();
+		return;
+	}
+
+	// recording / replay-buffer state drives the red dot on a custom app icon
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED ||
+	    event == OBS_FRONTEND_EVENT_RECORDING_PAUSED || event == OBS_FRONTEND_EVENT_RECORDING_UNPAUSED ||
+	    event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
+		QMetaObject::invokeMethod(qApp, []() { RefreshAppIcon(); }, Qt::QueuedConnection);
 		return;
 	}
 

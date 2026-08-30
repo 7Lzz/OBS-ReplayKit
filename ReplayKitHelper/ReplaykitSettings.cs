@@ -92,6 +92,11 @@ namespace ReplayKitHelper
                 ["screenshareGameOverrides"] = new JArray(),
                 ["screenshareAutoGameKeepFocused"] = false,
                 ["screenshareSwitchDelaySeconds"] = 1.0,
+                // "default" = leave obs/replaykit icons alone; "custom" = use appIconCustomPath; anything else = a filename in the bundled icons/ folder.
+                ["appIcon"] = "default",
+                ["appIconCustomPath"] = "",
+                // red recording dot on a custom app icon while recording / replay buffer is active (mirrors obs's own tray indicator).
+                ["appIconRecordingDot"] = true,
             };
         }
 
@@ -166,11 +171,22 @@ namespace ReplayKitHelper
             return v;
         }
 
+        // drops a single pair of wrapping quotes -- explorer's "copy as path" gives "C:\...\file", and users paste that verbatim.
+        public static string StripWrappingQuotes(string value)
+        {
+            if (value == null) return "";
+            value = value.Trim();
+            if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+                value = value.Substring(1, value.Length - 2).Trim();
+            return value;
+        }
+
         private static string ResolveClipDirSetting(string value)
         {
+            value = StripWrappingQuotes(value);
             if (string.IsNullOrWhiteSpace(value)) return "";
             if (value.Length > 4096) throw new InvalidOperationException("Clip folder path is too long.");
-            string expanded = Environment.ExpandEnvironmentVariables(value.Trim());
+            string expanded = Environment.ExpandEnvironmentVariables(value);
             if (!Path.IsPathRooted(expanded)) throw new InvalidOperationException("Clip folder must be an absolute path.");
             return Path.GetFullPath(expanded);
         }
@@ -330,7 +346,122 @@ namespace ReplayKitHelper
                 ["screenshareGameOverrides"] = NormalizeScreenshareGameOverrides(data["screenshareGameOverrides"]),
                 ["screenshareAutoGameKeepFocused"] = GetBoolSetting(data, "screenshareAutoGameKeepFocused", defaults["screenshareAutoGameKeepFocused"].Value<bool>()),
                 ["screenshareSwitchDelaySeconds"] = GetFloatSetting(data, "screenshareSwitchDelaySeconds", defaults["screenshareSwitchDelaySeconds"].Value<double>(), 0.05, 5.0),
+                ["appIcon"] = NormalizeAppIcon(data["appIcon"]?.ToString(), StripWrappingQuotes(data["appIconCustomPath"]?.ToString())),
+                ["appIconCustomPath"] = StripWrappingQuotes(GetTextSetting(data, "appIconCustomPath", defaults["appIconCustomPath"].Value<string>(), 1024)),
+                ["appIconRecordingDot"] = GetBoolSetting(data, "appIconRecordingDot", defaults["appIconRecordingDot"].Value<bool>()),
             };
+        }
+
+        private static readonly string[] AppIconExts = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
+
+        // a "user/<name>.ico" id -> absolute path in USER_ICONS_DIR, or null if the id is malformed. Path.GetFileName strips any traversal.
+        private static string UserIconIdToPath(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !id.StartsWith("user/", StringComparison.Ordinal)) return null;
+            string name = Path.GetFileName(id.Substring(5));
+            if (string.IsNullOrEmpty(name) || !name.EndsWith(".ico", StringComparison.OrdinalIgnoreCase)) return null;
+            return Path.Combine(Constants.USER_ICONS_DIR, name);
+        }
+
+        // "default" / "custom" / "user/<name>.ico" (a saved custom pick) / a bare filename in the bundled icons/ folder. anything unrecognised falls back to "default" so a stale settings file never leaves obs iconless.
+        private static string NormalizeAppIcon(string value, string customPath)
+        {
+            value = (value ?? "").Trim();
+            if (value == "" || value == "default") return "default";
+            if (value == "custom")
+                return TestUsableIconFile(customPath) ? "custom" : "default";
+            if (value.StartsWith("user/", StringComparison.Ordinal))
+            {
+                string up = UserIconIdToPath(value);
+                try { return (up != null && File.Exists(up)) ? "user/" + Path.GetFileName(up) : "default"; }
+                catch { return "default"; }
+            }
+            string safe = Path.GetFileName(value);
+            if (safe != value || !AppIconExts.Contains(Path.GetExtension(safe))) return "default";
+            try { return File.Exists(Path.Combine(Constants.APP_ICONS_DIR, safe)) ? safe : "default"; }
+            catch { return "default"; }
+        }
+
+        private static bool TestUsableIconFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            try { return File.Exists(path) && AppIconExts.Contains(Path.GetExtension(path)); }
+            catch { return false; }
+        }
+
+        // absolute path to the image the current appIcon resolves to, or "" when it should be left at the obs/replaykit default.
+        public static string ResolveAppIconPath(JObject settings)
+        {
+            string id = settings?["appIcon"]?.Value<string>() ?? "default";
+            if (id == "default") return "";
+            if (id == "custom")
+            {
+                string custom = settings?["appIconCustomPath"]?.Value<string>() ?? "";
+                return TestUsableIconFile(custom) ? custom : "";
+            }
+            if (id.StartsWith("user/", StringComparison.Ordinal))
+            {
+                try { string up = UserIconIdToPath(id); return (up != null && File.Exists(up)) ? up : ""; }
+                catch { return ""; }
+            }
+            try
+            {
+                string p = Path.Combine(Constants.APP_ICONS_DIR, Path.GetFileName(id));
+                return File.Exists(p) ? p : "";
+            }
+            catch { return ""; }
+        }
+
+        // converts a picked image to a multi-res .ico under USER_ICONS_DIR so it becomes a deletable preset, and returns its "user/<name>.ico" id (or null on failure). same source bytes -> same name, so re-picking a file never duplicates.
+        public static string ImportCustomIcon(string srcPath)
+        {
+            if (!TestUsableIconFile(srcPath)) return null;
+            try
+            {
+                Directory.CreateDirectory(Constants.USER_ICONS_DIR);
+                string hash;
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                using (var fs = File.OpenRead(srcPath))
+                    hash = BitConverter.ToString(sha.ComputeHash(fs), 0, 4).Replace("-", "").ToLowerInvariant();
+                string name = SanitizeIconBaseName(Path.GetFileNameWithoutExtension(srcPath)) + "-" + hash + ".ico";
+                string dest = Path.Combine(Constants.USER_ICONS_DIR, name);
+                if (!File.Exists(dest)) Native.ConvertImageToIco(srcPath, dest);
+                return "user/" + name;
+            }
+            catch (Exception ex) { Log.Write("ImportCustomIcon: " + ex.Message); return null; }
+        }
+
+        private static string SanitizeIconBaseName(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "icon";
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in s.Trim())
+                sb.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '-');
+            string outp = sb.ToString().Trim('-');
+            if (outp.Length > 40) outp = outp.Substring(0, 40);
+            return outp.Length == 0 ? "icon" : outp;
+        }
+
+        // read settings, set appIcon to id, persist, and push it live. used by /appearance/delete-icon when the removed icon was the active one.
+        public static JObject SetAppIconAndApply(string id)
+        {
+            var settings = Normalize(ReadSettings());
+            settings["appIcon"] = id;
+            settings = Normalize(settings);
+            WriteSettings(settings);
+            return ApplyAppIconLive(settings);
+        }
+
+        // what a ReplayKit-branded surface (own windows, toasts, dock favicon) should use right now: the chosen custom/preset icon, or the bundled replaykit .ico when appIcon is "default".
+        public static string EffectiveReplayKitIconPath()
+        {
+            try
+            {
+                string p = ResolveAppIconPath(Normalize(ReadSettings()));
+                if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+            }
+            catch { }
+            return File.Exists(Constants.OBS_ICON_PATH) ? Constants.OBS_ICON_PATH : null;
         }
 
         public static bool TestDiscordScreenshareEnabled(JObject settings)
@@ -4705,6 +4836,57 @@ namespace ReplayKitHelper
                 previous["motionBlurStrength"]?.Value<double>() != settings["motionBlurStrength"]?.Value<double>();
         }
 
+        private static bool TestOnlyAppIconChanged(JObject previous, JObject settings)
+        {
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (prop.Name == "appIcon" || prop.Name == "appIconCustomPath" || prop.Name == "appIconRecordingDot") continue;
+                if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
+            }
+            return previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
+                previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
+                previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>();
+        }
+
+        // pushes the resolved app icon to replaykit's own windows (helper) and to obs's window + taskbar + system tray
+        // (tray plugin over the ipc pipe). the obs main window is the plugin's job alone now -- the helper's own
+        // WM_SETICON on it raced the plugin at 16/32px and kept the win11 taskbar button small. all live, no restart.
+        public static JObject ApplyAppIconLive(JObject settings)
+        {
+            string path = ResolveAppIconPath(settings);
+            bool dot = settings["appIconRecordingDot"]?.Value<bool>() ?? true;
+            var applied = new List<string>();
+            try { Native.SetReplayKitWindowIcons(path); applied.Add("ReplayKit window icons"); }
+            catch (Exception ex) { Log.Write("ApplyAppIconLive: ReplayKit windows: " + ex.Message); }
+            try { PipeClient.SendSetIcon(path); PipeClient.SendSetIconDot(dot); applied.Add("OBS window + tray icon"); }
+            catch (Exception ex) { Log.Write("ApplyAppIconLive: OBS icon: " + ex.Message); }
+            return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray() };
+        }
+
+        // re-assert the chosen icon after the helper (re)starts with obs. obs's main window isnt necessarily up yet, so poll briefly; the tray plugin also gets it via the pipe-connect send.
+        public static void ApplyAppIconAtStartup()
+        {
+            JObject settings;
+            try { settings = Normalize(ReadSettings()); }
+            catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: read: " + ex.Message); return; }
+            if ((settings["appIcon"]?.Value<string>() ?? "default") == "default") return;
+            Task.Run(() =>
+            {
+                try
+                {
+                    for (int i = 0; i < 30; i++)
+                    {
+                        long hwndVal;
+                        lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
+                        if (hwndVal != 0) { ApplyAppIconLive(settings); return; }
+                        Thread.Sleep(1000);
+                    }
+                    ApplyAppIconLive(settings); // last try even without the hwnd -- covers the replaykit windows + tray
+                }
+                catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
+            });
+        }
+
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
         {
             var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
@@ -4772,6 +4954,17 @@ namespace ReplayKitHelper
                 current[prop.Name] = prop.Value;
             }
             var settings = Normalize(current);
+            // a fresh "custom" pick -> convert + file it as a saved preset, then carry on as if the user had selected that preset. subsequent saves send the "user/..." id directly and skip this.
+            if ((settings["appIcon"]?.Value<string>() ?? "") == "custom")
+            {
+                string imported = ImportCustomIcon(settings["appIconCustomPath"]?.Value<string>() ?? "");
+                if (imported != null)
+                {
+                    settings["appIcon"] = imported;
+                    settings["appIconCustomPath"] = "";
+                    settings = Normalize(settings);
+                }
+            }
             // takes effect on this already-running helper the moment settings are saved, not just after the next reload -- Log.Write gates on this flag on every call, so flipping it here is what actually lets someone enable logging, reproduce a bug, and have it show up without restarting obs.
             Server.State.LogEnabled = settings["debugLoggingEnabled"]?.Value<bool>() ?? false;
             var hotkeyRelease = EnsureHotkeyCaptureReleased(settings);
@@ -4874,6 +5067,17 @@ namespace ReplayKitHelper
                     ["restartRequired"] = false, ["restartReason"] = "",
                 };
             }
+            if (TestOnlyAppIconChanged(previous, settings))
+            {
+                var live = ApplyAppIconLive(settings);
+                return new JObject
+                {
+                    ["ok"] = true, ["settings"] = settings,
+                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                    ["restartRequired"] = false, ["restartReason"] = "",
+                };
+            }
             bool overlayStyleChanged = previous["overlayStyle"]?.Value<string>() != settings["overlayStyle"]?.Value<string>();
             bool overlayGeometryChanged = previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||
                 previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
@@ -4891,6 +5095,13 @@ namespace ReplayKitHelper
             bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
             bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
             var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput);
+            if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
+                previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
+                previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())
+            {
+                var iconLive = ApplyAppIconLive(settings);
+                liveResult["applied"] = ConcatArrays(liveResult["applied"] as JArray, iconLive["applied"] as JArray);
+            }
             return new JObject
             {
                 ["ok"] = true, ["settings"] = settings,
