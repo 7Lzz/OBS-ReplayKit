@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QWidgetAction>
+#include <QStyle>
 #include <QPointer>
 #include <QTimer>
 #include <QElapsedTimer>
@@ -387,6 +388,7 @@ protected:
 };
 
 void RefreshAppIcon(); // defined below -- re-pushes the app icon to obs + our own windows
+static void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *aumid); // defined below
 
 // ui-thread only -- builds the actual window once we know theres no existing clips window to reuse and cef is already confirmed started via EnsureCefReadyBlocking
 void CreateClipsWindow()
@@ -452,6 +454,10 @@ void CreateSettingsWindow()
 		g_ownedIconSettings = nullptr;
 	}
 	RefreshAppIcon(); // give the fresh window the current app icon + taskbar retag
+	// re-apply a couple times: winId()/the cef child arent fully realised on the first pass, and a slow RKICON over
+	// the pipe can land after this. cheap -- the tag guard skips the taskbar rebuild on the repeats.
+	QTimer::singleShot(500, qApp, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
+	QTimer::singleShot(1600, qApp, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
 }
 
 void ShowSettings()
@@ -836,12 +842,15 @@ public:
 	{
 		setAttribute(Qt::WA_Hover, true);
 		setCursor(Qt::PointingHandCursor);
-		setStyleSheet("QWidget:hover { background-color: palette(highlight); }");
+		// object name, not a type selector -- this class lives in an anon namespace with no Q_OBJECT, so qss sees it as plain "QWidget"; the id keeps the rules off the child labels
+		setObjectName("rkTrayActionRow");
 		// Minimum (not the QWidget default) means qt treats our sizeHint as a floor it can grow past but never shrink below -- structural insurance against the reported clipping/overlap, instead of only reacting to it after the fact once the chip already got squeezed.
 		setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 
 		nameLabel = new QLabel(this);
+		nameLabel->setObjectName("rkTrayRowName");
 		chipLabel = new QLabel(this);
+		ApplyThemeColors(QString(), QString(), QString(), QString());
 		// as tight as still legible -- reads as a small badge, not a second label competing for space.
 		chipLabel->setStyleSheet("background-color: rgba(0, 0, 0, 70); border-radius: 3px; padding: 0px 4px; font-size: 9px; color: rgba(255, 255, 255, 160);");
 		chipLabel->setVisible(false);
@@ -858,6 +867,32 @@ public:
 
 	QLabel *nameLabel;
 	QLabel *chipLabel;
+
+	void SetAction(QWidgetAction *a) { m_action = a; }
+	QWidgetAction *action() const { return m_action; }
+
+	// store the resolved theme colours and paint the rest state. everything is a DIRECT stylesheet on the row /
+	// the label -- no descendant selectors, no dynamic properties, no QMenu::hovered (that reports the wrong
+	// action for a QWidgetAction row -- the highlight sticks on the plain item next to it). the row's own
+	// HoverEnter/HoverLeave (from WA_Hover, the same events that power :hover) drive SetHovered().
+	void ApplyThemeColors(const QString &accent, const QString &accentLight, const QString &onAccent, const QString &text)
+	{
+		Q_UNUSED(accent);
+		m_fill = accentLight.isEmpty() ? QStringLiteral("palette(highlight)") : accentLight;
+		m_inkActive = onAccent.isEmpty() ? QStringLiteral("palette(highlighted-text)") : onAccent;
+		// hardcoded white, not palette(window-text): obs themes via qss, not qpalette, so the palette role is often
+		// qt-default black. only the value for the sub-100ms before the first /settings fetch lands anyway.
+		m_inkRest = text.isEmpty() ? QStringLiteral("#FFFFFF") : text;
+		SetHovered(m_hovered);
+	}
+
+	void SetHovered(bool on)
+	{
+		m_hovered = on;
+		setStyleSheet(on ? QStringLiteral("#rkTrayActionRow { border-radius: 4px; background-color: %1; border: 1px solid rgba(255, 255, 255, 70); }").arg(m_fill)
+				 : QStringLiteral("#rkTrayActionRow { border-radius: 4px; border: 1px solid transparent; }"));
+		nameLabel->setStyleSheet(QStringLiteral("color: %1;").arg(on ? m_inkActive : m_inkRest));
+	}
 
 	void SetKeybindLabel(const std::string &label)
 	{
@@ -897,10 +932,30 @@ protected:
 		QWidget::mouseReleaseEvent(event);
 	}
 
+	// HoverEnter/HoverLeave come from WA_Hover and pair up reliably (QEvent::Enter/Leave did not -- Leave never
+	// arrived, so an earlier version stuck dark). on enter we also make this the menu's active action so the
+	// plain item the mouse came from drops its native selection highlight instead of staying stuck lit.
+	bool event(QEvent *e) override
+	{
+		if (e->type() == QEvent::HoverEnter) {
+			SetHovered(true);
+			if (m_menu && m_action)
+				m_menu->setActiveAction(m_action);
+		} else if (e->type() == QEvent::HoverLeave) {
+			SetHovered(false);
+		}
+		return QWidget::event(e);
+	}
+
 private:
 	TrayRowKind m_kind;
 	QMenu *m_menu;
 	QElapsedTimer m_lastTrigger;
+	QWidgetAction *m_action = nullptr;
+	bool m_hovered = false;
+	QString m_fill;
+	QString m_inkRest;
+	QString m_inkActive;
 };
 
 QPointer<TrayActionRow> g_recordRow;
@@ -925,15 +980,30 @@ void RefreshDynamicMenuState()
 			std::string clipsLabel = KeybindLabelFromSettingsJson(settingsBody, "openClipsKeybind");
 			std::string clipLabel = KeybindLabelFromSettingsJson(settingsBody, "clipKeybind");
 			std::string recordingLabel = KeybindLabelFromSettingsJson(settingsBody, "recordingKeybind");
+			std::string menuColors = ExtractJsonObjectField(settingsBody, "menuColors");
+			std::string text = ExtractJsonStringField(menuColors, "text");
+			std::string accent = ExtractJsonStringField(menuColors, "accent");
+			std::string accentLight = ExtractJsonStringField(menuColors, "accentLight");
+			std::string onAccent = ExtractJsonStringField(menuColors, "onAccent");
 			QMetaObject::invokeMethod(
 				qApp,
-				[clipsLabel, clipLabel, recordingLabel]() {
-					if (g_clipsRow)
+				[clipsLabel, clipLabel, recordingLabel, text, accent, accentLight, onAccent]() {
+					const QString t = QString::fromStdString(text);
+					const QString a = QString::fromStdString(accent);
+					const QString al = QString::fromStdString(accentLight);
+					const QString oa = QString::fromStdString(onAccent);
+					if (g_clipsRow) {
+						g_clipsRow->ApplyThemeColors(a, al, oa, t);
 						g_clipsRow->SetKeybindLabel(clipsLabel);
-					if (g_replayBufferRow)
+					}
+					if (g_replayBufferRow) {
+						g_replayBufferRow->ApplyThemeColors(a, al, oa, t);
 						g_replayBufferRow->SetKeybindLabel(clipLabel);
-					if (g_recordRow)
+					}
+					if (g_recordRow) {
+						g_recordRow->ApplyThemeColors(a, al, oa, t);
 						g_recordRow->SetKeybindLabel(recordingLabel);
+					}
 				},
 				Qt::QueuedConnection);
 		}).detach();
@@ -1115,13 +1185,16 @@ static void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wcha
 	if (!w)
 		return;
 	bool custom = !(g_appIconPath.isEmpty() || g_appIconPath == "-");
+	// fall through until something loads -- these windows must NEVER end up with the bare exe icon.
 	QIcon ic;
 	if (custom)
 		ic = QIcon(g_appIconPath);
-	else if (!g_rkIconPath.isEmpty())
+	if (ic.isNull() && !g_rkIconPath.isEmpty())
 		ic = QIcon(g_rkIconPath);
-	else if (g_appIconDefaultsCaptured)
+	if (ic.isNull())
 		ic = g_appIconDefaultMain;
+	if (ic.isNull())
+		ic = QGuiApplication::windowIcon(); // obs's own app icon -- always valid once obs is up
 	if (ic.isNull())
 		return;
 
@@ -1547,6 +1620,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	auto *clipsRow = new TrayActionRow(TrayRowKind::Clips, trayMenu);
 	auto *clipsRowAction = new QWidgetAction(trayMenu);
 	clipsRowAction->setDefaultWidget(clipsRow);
+	clipsRow->SetAction(clipsRowAction);
 	QObject::connect(clipsRowAction, &QAction::triggered, trayMenu, [clipsRow]() {
 		if (clipsRow)
 			clipsRow->ProxyTrigger();
@@ -1572,6 +1646,14 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		// confirmed 2026-08-16 this alone didnt stick since qts native platform code can finish positioning the menu after aboutToShow returns and silently override an early move() -- kept it anyway (free if it does nothing) and queued a second attempt after native show finishes as the standard workaround. bumped 10ms to 50ms to give qts own positioning more headroom to finish first -- see the comment on PinMenuAboveTaskbar for why an unnecessary post-show move is suspected in a "clicking outside doesnt close the menu" report.
 		PinMenuAboveTaskbar(trayMenu);
 		QTimer::singleShot(50, trayMenu, [trayMenu]() { PinMenuAboveTaskbar(trayMenu); });
+	});
+
+	// the rows drive their own hover look off HoverEnter/HoverLeave. this only guarantees they end up un-hovered
+	// once the menu closes, in case a HoverLeave was missed on the way out.
+	QObject::connect(trayMenu, &QMenu::aboutToHide, trayMenu, []() {
+		if (g_clipsRow) g_clipsRow->SetHovered(false);
+		if (g_recordRow) g_recordRow->SetHovered(false);
+		if (g_replayBufferRow) g_replayBufferRow->SetHovered(false);
 	});
 
 	// lands right after "hide", before obss first separator, so it reads as part of the window-visibility group instead of mixed into streaming/recording actions
@@ -1630,6 +1712,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		auto *recordRow = new TrayActionRow(TrayRowKind::Recording, trayMenu);
 		auto *recordRowAction = new QWidgetAction(trayMenu);
 		recordRowAction->setDefaultWidget(recordRow);
+		recordRow->SetAction(recordRowAction);
 		QObject::connect(recordRowAction, &QAction::triggered, trayMenu, [recordRow]() {
 			if (recordRow)
 				recordRow->ProxyTrigger();
@@ -1641,6 +1724,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		auto *replayBufferRow = new TrayActionRow(TrayRowKind::ReplayBuffer, trayMenu);
 		auto *replayBufferRowAction = new QWidgetAction(trayMenu);
 		replayBufferRowAction->setDefaultWidget(replayBufferRow);
+		replayBufferRow->SetAction(replayBufferRowAction);
 		QObject::connect(replayBufferRowAction, &QAction::triggered, trayMenu, [replayBufferRow]() {
 			if (replayBufferRow)
 				replayBufferRow->ProxyTrigger();

@@ -43,6 +43,10 @@ hotkey_capture_signal.json
 
 # custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder -- per-user, not repo content
 assets/obs-studio/obs-replayKit/icons/user/
+# custom themes the user saves at runtime -- per-user
+assets/obs-studio/obs-replayKit/themes-user/
+# theme stylesheet the helper generates for the file:// dock -- runtime, per-user
+assets/obs-studio/obs-replayKit/obs-custom-dock/rk-theme.css
 
 # backups created by the installer + cleanup script
 obs-studio.bak.*/

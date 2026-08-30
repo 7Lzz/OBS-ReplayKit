@@ -38,6 +38,10 @@ namespace ReplayKitHelper
         public static readonly string APP_ICONS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "icons"));
         // custom icons the user has picked -- converted to .ico and saved here so they become deletable presets. kept out of APP_ICONS_DIR so the installer's assets/ mirror never touches them and so "delete" can be gated to this dir only.
         public static readonly string USER_ICONS_DIR = Path.Combine(APP_ICONS_DIR, "user");
+        // %APPDATA%\obs-studio -- APP_ICONS_DIR is ...\obs-replayKit\icons, so up two.
+        public static readonly string OBS_CONFIG_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", ".."));
+        // custom themes the user saved from the Appearance tab, one <name>.json of colour tokens each. per-user, gitignored.
+        public static readonly string USER_THEMES_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", "themes-user"));
 
         public static readonly string REPLAYKIT_TEMP_ROOT = Path.Combine(Path.GetTempPath(), "ReplayKit");
         public static readonly string THUMB_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "thumbs");

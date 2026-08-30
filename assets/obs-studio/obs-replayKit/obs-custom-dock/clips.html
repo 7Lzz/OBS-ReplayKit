@@ -37,6 +37,17 @@
     --primary: var(--blue3);
     --primary_light: var(--blue2);
     --link_accent: #4D96EE;
+    --on-accent: #ffffff;
+    --on-accent-rgb: 255, 255, 255;
+    --text-rgb: 255, 255, 255;
+    --bg-rgb: 29, 31, 38;
+    --accent-rgb: 40, 76, 184;
+    --danger-rgb: 227, 59, 87;
+    --hairline: rgba(var(--text-rgb),.08);
+    --overlay-soft: rgba(var(--text-rgb),.06);
+    --overlay-strong: rgba(var(--text-rgb),.14);
+    --shadow: rgba(0,0,0,.45);
+    --shadow-weak: rgba(0,0,0,.28);
     /* shared motion language. ease_pop is a light overshoot for taps/pops; ease_smooth is a long decelerating ease-out for panels that should glide into place and settle. */
     --ease_pop: cubic-bezier(.2, .7, .3, 1);
     --ease_smooth: cubic-bezier(.16, 1, .3, 1);
@@ -163,8 +174,8 @@
   }
   .clip-sort-trigger:hover { background: var(--grey5); }
   .clip-sort-wrap.is-open .clip-sort-trigger {
-    background: #2b303b;
-    border-color: #41495a;
+    background: var(--grey5);
+    border-color: var(--grey3);
     border-bottom-color: transparent;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
@@ -194,7 +205,7 @@
     display: none;
     width: 13px;
     height: 13px;
-    border: 2px solid rgba(255,255,255,.22);
+    border: 2px solid rgba(var(--text-rgb),.22);
     border-top-color: var(--text);
     border-radius: 50%;
     animation: clip-sort-spin .8s linear infinite;
@@ -234,8 +245,8 @@
     left: auto;
     min-width: 194px;
     max-height: 320px;
-    background: #2b303b;
-    border: 1px solid #41495a;
+    background: var(--grey5);
+    border: 1px solid var(--grey3);
     border-radius: 4px;
     border-top-right-radius: 0;
     padding: 4px 0;
@@ -284,8 +295,8 @@
   .clip-sort-item:hover { background: var(--button_bg_hover); }
   .clip-sort-label { flex: 1 1 auto; }
   /* the already-selected sort gets the same blue wash the app uses elsewhere for a selected row, plus the check. */
-  .clip-sort-item.is-active { background: rgba(71, 107, 215, .22); }
-  .clip-sort-item.is-active:hover { background: rgba(71, 107, 215, .3); }
+  .clip-sort-item.is-active { background: rgba(var(--accent-rgb),.22); }
+  .clip-sort-item.is-active:hover { background: rgba(var(--accent-rgb),.3); }
   .clip-sort-check {
     width: 15px;
     height: 15px;
@@ -387,12 +398,12 @@
   }
   .bulk-icon-btn:hover { background: var(--grey5); color: var(--text); }
   .bulk-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
-  .bulk-icon-btn.bulk-delete { color: #ff7188; }
-  .bulk-icon-btn.bulk-delete:hover { color: #ff9aaa; background: rgba(227, 59, 87, .15); }
-  .bulk-icon-btn.bulk-delete.is-armed { color: #fff; background: var(--red); }
+  .bulk-icon-btn.bulk-delete { color: var(--red); }
+  .bulk-icon-btn.bulk-delete:hover { color: var(--red); background: rgba(227, 59, 87, .15); }
+  .bulk-icon-btn.bulk-delete.is-armed { color: var(--text); background: var(--red); }
   .bulk-icon-btn:disabled { opacity: .5; cursor: progress; pointer-events: none; }
   /* upload button doubles as Stop while the queue drains -- keep it lit and clickable so the tooltip progress reads and a second click halts scheduling. */
-  #bulk-upload.is-running { color: #fff; background: var(--primary); }
+  #bulk-upload.is-running { color: var(--on-accent); background: var(--primary); }
   #bulk-upload.is-running:hover { background: var(--primary_light); }
   /* the bulk toolbar tooltip is a single js-positioned element (see showBulkTip) -- these buttons hug the window's left edge so a css-only tooltip either clips or has to be left-anchored off-center. js clamps the box into the viewport and slides the arrow to keep it pointing at the button. */
   #bulk-tip {
@@ -400,8 +411,8 @@
     z-index: 300;
     padding: 5px 8px;
     border-radius: 3px;
-    background: #08090c;
-    color: #fff;
+    background: var(--grey8);
+    color: var(--text);
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
@@ -418,7 +429,7 @@
     left: var(--tip-arrow, 50%);
     transform: translateX(-50%);
     border: 5px solid transparent;
-    border-bottom-color: #08090c;
+    border-bottom-color: var(--grey8);
   }
   .bulk-clear {
     height: 30px;
@@ -434,12 +445,13 @@
   .bulk-clear:hover { color: var(--white1); background: var(--grey5); }
   .bulk-clear:disabled { opacity: .5; cursor: progress; pointer-events: none; }
   /* transient "stop the whole upload run" button, sits next to Clear while the queue drains. */
-  .bulk-stop { color: #ff8a9b; font-variant-numeric: tabular-nums; }
-  .bulk-stop:hover { color: #ffb3bf; background: rgba(227, 59, 87, .15); }
+  .bulk-stop { color: var(--red); font-variant-numeric: tabular-nums; }
+  .bulk-stop:hover { color: var(--red); background: rgba(var(--danger-rgb), .15); }
   .bulk-stop[hidden] { display: none !important; }
   .tab-action:hover {
     background: var(--primary_light);
     border-color: var(--primary_light);
+    color: var(--on-accent);
   }
   .tab-action:disabled,
   .tab-action.is-disabled {
@@ -456,10 +468,11 @@
   .tab-action.is-running {
     background: var(--primary);
     border-color: var(--primary_light);
+    color: var(--on-accent);
     cursor: progress;
   }
   .tab-action .progress {
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(var(--on-accent-rgb), 0.72);
     margin-left: 2px;
     font-variant-numeric: tabular-nums;
   }
@@ -530,7 +543,7 @@
     min-height: 30px;
   }
   *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
-  *::-webkit-scrollbar-thumb:active { background-color: #6b7387; }
+  *::-webkit-scrollbar-thumb:active { background-color: var(--white5); }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -620,7 +633,7 @@
   }
   /* a hovered card that is also selected keeps the white ring and gains the same lift. */
   .card.is-selected:hover {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 5px 14px -8px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 1px rgba(var(--text-rgb), 0.6), 0 5px 14px -8px rgba(0, 0, 0, 0.4);
   }
   .preview {
     position: relative;
@@ -712,12 +725,15 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms linear;
+    /* everything in here floats on the video -- keep it white regardless of theme */
+    color: #fff;
   }
   .card:hover .preview-controls { opacity: 1; pointer-events: auto; }
 
   .icon-btn {
     background: rgba(0, 0, 0, 0.55);
     border: none;
+    /* sits on the video thumbnail -- fixed white icon on a dark pill, independent of the theme */
     color: #fff;
     width: 28px;
     height: 28px;
@@ -751,7 +767,7 @@
   }
   .favorite-btn:hover { background: rgba(0, 0, 0, 0.85); }
   /* filled star (favorited) renders in youtube-/imdb-style gold so it reads at a glance against the dark card; outline state keeps the white-on-translucent look so its visible without competing for attention with the play button. */
-  .favorite-btn.is-favorite { color: #f5c518; }
+  .favorite-btn.is-favorite { color: var(--amber); }
   .favorite-btn svg {
     width: 22px;
     height: 22px;
@@ -779,7 +795,7 @@
   .select-clip-btn:hover { background: transparent; }
   .select-clip-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.35; }
   /* transparent-white (not `none`) so the fill can animate to solid when the card is ticked. */
-  .select-clip-btn .select-ring { fill: rgba(255, 255, 255, 0); transition: fill 140ms linear, stroke 140ms linear; }
+  .select-clip-btn .select-ring { fill: rgba(var(--text-rgb), 0); transition: fill 140ms linear, stroke 140ms linear; }
   /* the check just fades + eases up to full size when a card is ticked -- no overshoot/bounce. */
   .select-clip-btn .select-check {
     fill: none;
@@ -801,10 +817,10 @@
     opacity: 1;
     pointer-events: auto;
   }
-  .card.is-selected { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, .45); }
-  .card.is-selected .select-clip-btn { background: transparent; color: #1d1f26; }
-  .card.is-selected .select-clip-btn .select-ring { display: block; fill: #fff; stroke: #fff; }
-  .card.is-selected .select-clip-btn .select-check { stroke: #1d1f26; stroke-width: 1.55; opacity: 1; scale: 1; }
+  .card.is-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .card.is-selected .select-clip-btn { background: transparent; }
+  .card.is-selected .select-clip-btn .select-ring { display: block; fill: var(--primary); stroke: var(--primary); }
+  .card.is-selected .select-clip-btn .select-check { stroke: var(--on-accent); stroke-width: 1.55; opacity: 1; scale: 1; }
   body.is-selection-mode .card:not(.is-selected) { opacity: .58; }
   body.is-selection-mode .card:not(.is-selected):hover { opacity: .78; }
   body.is-selection-mode .card { cursor: pointer; }
@@ -870,7 +886,7 @@
     appearance: none;
     width: 100%;
     height: 4px;
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(var(--text-rgb), 0.3);
     border-radius: 2px;
     outline: none;
     margin: 0;
@@ -881,7 +897,7 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--text);
     cursor: pointer;
     border: none;
   }
@@ -894,7 +910,7 @@
     z-index: 3;
     padding: 2px 6px;
     background: rgba(0, 0, 0, 0.75);
-    color: #FFFFFF;
+    color: #fff;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
@@ -919,7 +935,7 @@
     z-index: 3;
     padding: 2px 6px;
     background: rgba(0, 0, 0, 0.4);
-    color: #FFFFFF;
+    color: #fff;
     font-size: 11px;
     font-weight: 600;
     border-radius: 3px;
@@ -1106,7 +1122,7 @@
     background: rgba(255, 255, 255, 0.1);
     border: 0;
     border-radius: 16px;
-    color: #FFFFFF;
+    color: #fff;
     font-size: 24px;
     font-weight: 500;
     line-height: 1;
@@ -1134,7 +1150,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #FFFFFF;
+    background: var(--text);
     cursor: pointer;
     border: 0;
   }
@@ -1154,7 +1170,7 @@
     padding: 0;
     font-size: 12px;
     font-weight: 500;
-    color: #FFFFFF;
+    color: #fff;
     cursor: pointer;
     font-variant-numeric: tabular-nums;
     position: relative;
@@ -1166,7 +1182,7 @@
   .speed-pill:hover { background: rgba(255, 255, 255, 0.20); }
   .speed-pill.is-active {
     background: var(--primary);
-    color: #FFFFFF;
+    color: var(--on-accent);
   }
 
   /* center play/pause flash. pops in with a quick scale+fade-out every time the user toggles playback via click on the video surface, the play-toggle button, or the space key. mirrors the youtube indicator. js adds .is-flashing for 500 ms. */
@@ -1187,7 +1203,7 @@
     opacity: 0;
     transition: opacity 350ms ease-out, transform 350ms ease-out;
   }
-  .center-pulse svg { width: 22px; height: 22px; fill: #FFFFFF; }
+  .center-pulse svg { width: 22px; height: 22px; fill: var(--text); }
   /* the dock preview is small, so the flash matches the old resting play button; give it room in fullscreen. */
   .preview:fullscreen .center-pulse,
   .preview:-webkit-full-screen .center-pulse { width: 76px; height: 76px; }
@@ -1255,7 +1271,7 @@
     width: 36px;
     height: 36px;
     border-radius: 4px;
-    color: #FFFFFF;
+    color: #fff;
   }
   .preview:fullscreen .preview-controls .icon-btn:hover,
   .preview:-webkit-full-screen .preview-controls .icon-btn:hover,
@@ -1281,7 +1297,7 @@
   /* youtube-style time text: tabular numerics so the seconds tick doesnt shift the layout. uses css variable substitution so the content is js-controlled via setproperty on the badge. */
   .time-display {
     align-items: center;
-    color: #FFFFFF;
+    color: #fff;
     font-size: 13px;
     font-variant-numeric: tabular-nums;
     padding: 0 8px;
@@ -1377,7 +1393,7 @@
     left: var(--hover-x, 0px);
     padding: 3px 7px;
     background: rgba(0, 0, 0, 0.78);
-    color: #FFFFFF;
+    color: #fff;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     border-radius: 3px;
@@ -1500,8 +1516,8 @@
   }
   /* same hover-grow / press-shrink as every other button. transform composes with the armed-state width animation without disturbing it; the armed (confirm) state opts back out below. */
   .icon-mini-btn.delete-btn:hover {
-    color: #ff6b82;
-    background: rgba(227, 59, 87, 0.16);
+    color: var(--red);
+    background: rgba(var(--danger-rgb), 0.16);
     transform: scale(var(--hover_grow));
   }
   .icon-mini-btn.delete-btn:active { transform: scale(var(--press_shrink)); }
@@ -1525,7 +1541,7 @@
   .icon-mini-btn.delete-btn.is-armed:hover {
     width: 64px;
     background: var(--red);
-    color: #FFFFFF;
+    color: #fff;
   }
   .icon-mini-btn.delete-btn.is-armed svg {
     width: 0;
@@ -1545,8 +1561,8 @@
     left: var(--menu-left, 0px);
     right: auto;
     min-width: 190px;
-    background: #2b303b;
-    border: 1px solid #41495a;
+    background: var(--grey5);
+    border: 1px solid var(--grey3);
     border-radius: 4px;
     padding: 4px 0;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
@@ -1587,8 +1603,8 @@
   .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
   /* Create Link / Copy Link: keep the row text white like every other row, only the icon carries the blue accent. */
   .menu-item.link-menu-item .menu-item-icon { color: var(--link_accent); }
-  .menu-item.link-menu-item:hover { background: rgba(77, 150, 238, .13); }
-  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: #f5c518; }
+  .menu-item.link-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
+  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--amber); }
   .menu-item .menu-item-icon { margin-left: auto; }
   .menu-separator {
     height: 1px;
@@ -1596,9 +1612,9 @@
     background: var(--grey4);
   }
   .menu-item.delete-menu-item { color: var(--red); }
-  .menu-item.delete-menu-item:hover { background: rgba(227, 59, 87, 0.16); color: #ff6b82; }
+  .menu-item.delete-menu-item:hover { background: rgba(227, 59, 87, 0.16); color: var(--red); }
   .menu-item.delete-menu-item.is-armed,
-  .menu-item.delete-menu-item.is-armed:hover { background: var(--red); color: #fff; }
+  .menu-item.delete-menu-item.is-armed:hover { background: var(--red); color: var(--text); }
 
   /* link icon inside action buttons */
   .btn .btn-icon {
@@ -1657,7 +1673,7 @@
     padding: 0 10px;
     display: flex;
     gap: 6px;
-    background: #373c49;
+    background: var(--grey4);
     border-top: 0;
     border-radius: 0 0 5px 5px;
   }
@@ -1684,7 +1700,7 @@
   }
   .actions.is-progress {
     padding: 0;
-    background: #373c49;
+    background: var(--grey4);
   }
   .btn {
     display: inline-flex;
@@ -1724,6 +1740,7 @@
   .btn.primary {
     background-color: var(--primary);
     border-color: var(--primary_light);
+    color: var(--on-accent);
   }
   .btn.primary:hover { background-color: var(--primary_light); }
   /* in-card progress readout shown during compress / upload. its a plain div, not a button -- only the trailing X (.progress-cancel) is clickable, so the bar no longer swallows clicks or flips the whole control to a red Cancel the instant the pointer touches it. a real .progress-fill child holds the blue fill, kept out of pointer-events so the X stays hittable. no text -- the bar itself is the readout. */
@@ -1752,7 +1769,7 @@
     height: 6px;
     transform: translateY(-50%);
     border-radius: 3px;
-    background: #464c5c;
+    background: var(--grey3);
     overflow: hidden;
   }
   /* width is driven frame-by-frame from updateDisplayProgress -- no css width transition, it only fought the raf and added ~600ms of lag. */
@@ -1768,7 +1785,7 @@
   }
   /* finalizing: bytes are all sent; the bar holds at 99 while the quick transcode-trigger call finishes. a faint sheen keeps it from reading as stalled -- no text, no jump to 100. */
   .btn.is-progress.is-finalizing .progress-fill {
-    background-image: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .22) 50%, transparent 80%);
+    background-image: linear-gradient(100deg, transparent 20%, rgba(var(--on-accent-rgb), .22) 50%, transparent 80%);
     background-size: 220% 100%;
     animation: progress-sheen 1s linear infinite;
   }
@@ -1792,7 +1809,7 @@
     border: 0;
     border-radius: 4px;
     background: transparent;
-    color: #fff;
+    color: var(--text);
     cursor: pointer;
     transform: translateY(-50%);
     transition: color 80ms ease-out;
@@ -1831,7 +1848,7 @@
     position: absolute;
     width: 2px;
     height: 2px;
-    background: #ffffff;
+    background: var(--text);
     border-radius: 50%;
   }
   .resize-grip span:nth-child(1) { right: 0; bottom: 0; }
@@ -1880,8 +1897,8 @@
   /* width fills as much of the clips window (850-2400px, per the resize bounds in 71_routes.ps1) as it can without letting the 16:9 video wrap push the modal taller than the window -- bounded by whichever of window width or the height-derived-from-16:9 is tighter. floor matches the old fixed width so the window minimum looks unchanged. */
   .trim-modal {
     width: max(640px, min(90vw, calc((90vh - 330px) * 16 / 9), 1900px));
-    background: linear-gradient(180deg, #292c36, var(--grey6) 88px);
-    border-color: rgba(255, 255, 255, .12);
+    background: linear-gradient(180deg, var(--grey5), var(--grey6) 88px);
+    border-color: rgba(var(--text-rgb), .12);
   }
   /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
   .trim-processing-modal {
@@ -1895,7 +1912,7 @@
   .trim-processing-spinner {
     width: 28px;
     height: 28px;
-    border: 3px solid rgba(255,255,255,.18);
+    border: 3px solid rgba(var(--text-rgb),.18);
     border-top-color: var(--text);
     border-radius: 50%;
     animation: trim-processing-spin .8s linear infinite;
@@ -1978,7 +1995,7 @@
     left: 0; right: 0;
     bottom: 6px;
     height: 4px;
-    background: rgba(255, 255, 255, 0.28);
+    background: rgba(var(--text-rgb), 0.28);
   }
   .trim-seek-fill {
     position: absolute;
@@ -2100,7 +2117,7 @@
     left: 0;
     top: 5px;
     height: 4px;
-    background: rgba(255, 255, 255, .35);
+    background: rgba(var(--text-rgb), .35);
     border-radius: 0;
     pointer-events: none;
     z-index: 1;
@@ -2134,17 +2151,17 @@
     color: var(--red);
   }
   .btn.danger-action:hover {
-    background-color: rgba(227, 59, 87, 0.12);
+    background-color: rgba(var(--danger-rgb), 0.12);
     border-color: var(--red);
   }
   .btn.danger-action.is-armed {
     background-color: var(--red);
-    color: var(--white1);
+    color: #fff;
     border-color: var(--red);
   }
   .btn.danger-action.is-armed:hover {
-    background-color: #c4324b;
-    color: var(--white1);
+    background-color: var(--red);
+    color: #fff;
   }
   /* Medal-like edit rail: the actual controls remain native ranges for keyboard/accessibility, while the filmstrip makes the cut points readable at a glance. */
   .trim-timeline {
@@ -2161,7 +2178,7 @@
     right: 0;
     top: 0;
     height: 33px;
-    color: rgba(255, 255, 255, .62);
+    color: rgba(var(--text-rgb), .62);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
     pointer-events: none;
@@ -2178,7 +2195,7 @@
     top: 20px;
     left: 50%;
     height: 8px;
-    border-left: 1px solid rgba(255, 255, 255, .42);
+    border-left: 1px solid rgba(var(--text-rgb), .42);
   }
   .trim-time-mark:first-child { transform: none; }
   .trim-time-mark:first-child::after { left: 0; }
@@ -2189,14 +2206,14 @@
     top: 24px;
     width: 1px;
     height: 4px;
-    background: rgba(255, 255, 255, .24);
+    background: rgba(var(--text-rgb), .24);
     transform: translateX(-.5px) scaleX(.6);
   }
   .trim-filmstrip {
     display: grid;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     height: 38px;
-    background: #090a0d;
+    background: var(--grey8);
     border-radius: 4px;
     overflow: hidden;
   }
@@ -2205,7 +2222,7 @@
     height: 38px;
     display: block;
     border-right: 1px solid rgba(0, 0, 0, .72);
-    background: linear-gradient(135deg, #1d2028, #111319);
+    background: linear-gradient(135deg, var(--grey7), var(--grey8));
   }
   .trim-filmstrip canvas:last-child { border-right: 0; }
   .trim-outside {
@@ -2244,7 +2261,7 @@
     top: 0;
     bottom: 0;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, .95);
+    border: 1px solid rgba(var(--text-rgb), .95);
     border-radius: 4px;
     box-shadow: 0 1px 6px rgba(0, 0, 0, .38);
     pointer-events: none;
@@ -2267,7 +2284,7 @@
     width: 1px;
     height: 8px;
     border-radius: 1px;
-    background: #6f8dff;
+    background: var(--blue2);
     box-shadow: none;
     transform: translateX(-50%);
   }
@@ -2305,7 +2322,7 @@
     height: 38px;
     border: 0;
     border-radius: 0;
-    background: #ffffff;
+    background: var(--text);
     box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
     cursor: pointer;
     pointer-events: auto;
@@ -2314,18 +2331,18 @@
   /* keep the trim outline thin and continuous across the entire selected clip. each compact white endcap only gets one short center grip stroke, instead of a line that reaches the top and bottom edges. */
   #trim-start::-webkit-slider-thumb {
     border-radius: 5px 0 0 5px;
-    background-color: #ffffff;
+    background-color: var(--text);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 38'%3E%3Cpath d='M4 14v10' fill='none' stroke='%23252730' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
     background-size: 100% 100%;
   }
   #trim-end::-webkit-slider-thumb {
     border-radius: 0 5px 5px 0;
-    background-color: #ffffff;
+    background-color: var(--text);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 38'%3E%3Cpath d='M4 14v10' fill='none' stroke='%23252730' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
     background-size: 100% 100%;
   }
   .trim-bar input[type=range]:focus-visible::-webkit-slider-thumb {
-    box-shadow: 0 0 0 2px #7f97ff;
+    box-shadow: 0 0 0 2px var(--blue2);
   }
   .trim-bar input[type=range]::-webkit-slider-thumb:active { cursor: pointer; }
   .trim-info {
@@ -2343,16 +2360,16 @@
   }
   .trim-info b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
   .trim-info .preview-btn {
-    background: rgba(71, 107, 215, .14);
-    border: 1px solid rgba(71, 107, 215, .68);
-    color: #dce5ff;
+    background: rgba(var(--accent-rgb),.14);
+    border: 1px solid rgba(var(--accent-rgb),.68);
+    color: var(--text);
     border-radius: 4px;
     padding: 3px 9px;
     font: inherit;
     font-size: 11px;
     cursor: pointer;
   }
-  .trim-info .preview-btn:hover { background: rgba(71, 107, 215, .28); border-color: var(--primary_light); }
+  .trim-info .preview-btn:hover { background: rgba(var(--accent-rgb),.28); border-color: var(--primary_light); }
   /* current playhead is separate from the cut handles: click or drag anywhere on the frames to move it without changing what will be kept. */
   .trim-playhead {
     position: absolute;
@@ -2361,7 +2378,7 @@
     bottom: 0;
     width: 2px;
     background: var(--primary_light);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, .42), 0 0 8px rgba(71, 107, 215, .34);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .42), 0 0 8px rgba(var(--accent-rgb),.34);
     pointer-events: none;
     transform: translateX(-1px);
   }
@@ -2399,14 +2416,18 @@
     background: transparent;
     cursor: pointer;
   }
-  .trim-mode-row input[type=checkbox]:checked {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 14px 14px;
+  /* no fill -- just the tick in --text so it stays visible on the light theme (a fixed white check vanished there) */
+  .trim-mode-row input[type=checkbox]:checked::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--text);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
   }
   .trim-mode-row input[type=checkbox]:focus-visible {
-    border-color: var(--primary_light);
+    outline: 2px solid var(--primary_light);
+    outline-offset: 1px;
   }
   .trim-mode-row:hover { color: var(--text); }
 
@@ -2521,14 +2542,18 @@
     background: transparent;
     cursor: pointer;
   }
-  .compress-downsample-row input[type=checkbox]:checked {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 14px 14px;
+  /* no fill -- just the tick in --text so it stays visible on the light theme (a fixed white check vanished there) */
+  .compress-downsample-row input[type=checkbox]:checked::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--text);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
   }
   .compress-downsample-row input[type=checkbox]:focus-visible {
-    border-color: var(--primary_light);
+    outline: 2px solid var(--primary_light);
+    outline-offset: 1px;
   }
   .compress-downsample-row[hidden] { display: none !important; }
   .compress-downsample-detail {
@@ -2663,6 +2688,7 @@
   .modal-veil.is-open .modal { animation: rk-modal-in 190ms var(--ease_pop) both; }
   .toast.is-shown { animation: rk-toast-in 160ms var(--ease_pop) both; }
 </style>
+<link rel="stylesheet" href="rk-theme.css" />
 </head>
 <body>
   <div class="modal-veil" id="compress-veil">

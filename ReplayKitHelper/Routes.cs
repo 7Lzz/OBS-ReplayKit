@@ -23,6 +23,12 @@ namespace ReplayKitHelper
         private static string UserIconLabel(string fileName) =>
             Regex.Replace(Path.GetFileNameWithoutExtension(fileName), "-[0-9a-f]{8}$", "");
 
+        // the four colours the dock draws a theme tile from.
+        private static JObject ThemeSwatch(Themes.Tokens t) => new JObject
+        {
+            ["bg"] = t.Bg, ["panel"] = t.Panel, ["accent"] = t.Accent, ["text"] = t.Text,
+        };
+
         private sealed class OwnerWindow : System.Windows.Forms.IWin32Window
         {
             public OwnerWindow(IntPtr h) { Handle = h; }
@@ -821,6 +827,131 @@ namespace ReplayKitHelper
                     return false;
                 }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["wasSelected"] = wasSelected, ["selected"] = selected });
+                return false;
+            }
+
+            if (path == "/appearance/themes")
+            {
+                var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                var list = new JArray();
+                foreach (var kv in Themes.PresetOrder)
+                {
+                    var tk = Themes.Resolve(new JObject { ["theme"] = kv.Key });
+                    list.Add(new JObject { ["id"] = kv.Key, ["label"] = kv.Value, ["swatch"] = ThemeSwatch(tk), ["seed"] = tk.ToSeedJson() });
+                }
+                try
+                {
+                    if (Directory.Exists(Constants.USER_THEMES_DIR))
+                    {
+                        var files = Directory.GetFiles(Constants.USER_THEMES_DIR, "*.json");
+                        Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                        foreach (var f in files)
+                        {
+                            string id = "user/" + Path.GetFileNameWithoutExtension(f);
+                            var tk = Themes.Resolve(new JObject { ["theme"] = id });
+                            list.Add(new JObject { ["id"] = id, ["label"] = Themes.UserThemeLabel(Path.GetFileName(f)), ["swatch"] = ThemeSwatch(tk), ["seed"] = tk.ToSeedJson(), ["deletable"] = true });
+                        }
+                    }
+                }
+                catch (Exception ex) { Log.Write("/appearance/themes user: " + ex.Message); }
+                HttpResponse.SendJson(stream, 200, new JObject
+                {
+                    ["ok"] = true, ["themes"] = list,
+                    ["selected"] = s["theme"]?.Value<string>() ?? "default",
+                    ["custom"] = s["themeCustom"],
+                });
+                return false;
+            }
+
+            if (path == "/rk-theme.css")
+            {
+                // the committed theme stylesheet the dock pages <link> to. matches the physical rk-theme.css the
+                // helper writes for the file:// dock.
+                string css;
+                try
+                {
+                    var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                    css = (s["theme"]?.Value<string>() ?? "default") == "default" ? "/* default theme */" : Themes.DockCss(Themes.Resolve(s));
+                }
+                catch (Exception ex) { Log.Write("/rk-theme.css: " + ex.Message); css = ""; }
+                var hh = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/css; charset=utf-8" });
+                HttpResponse.SendBytes(stream, 200, "OK", hh, Encoding.UTF8.GetBytes(css));
+                return false;
+            }
+
+            if (path == "/appearance/theme.css")
+            {
+                // live-preview stylesheet -- ?theme=<id> or ?custom=<json> overrides the saved setting for the fetch.
+                var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                string previewId = Q("theme", "");
+                if (!string.IsNullOrEmpty(previewId)) s["theme"] = previewId;
+                string rawCustom = Q("custom", "");
+                if (!string.IsNullOrEmpty(rawCustom))
+                {
+                    try { s["themeCustom"] = JObject.Parse(rawCustom); s["theme"] = "custom"; } catch { }
+                }
+                string css;
+                try { css = (s["theme"]?.Value<string>() ?? "default") == "default" ? Themes.DockCss(Themes.Resolve(new JObject { ["theme"] = "default" })) : Themes.DockCss(Themes.Resolve(s)); }
+                catch (Exception ex) { Log.Write("/appearance/theme.css: " + ex.Message); css = ""; }
+                var h = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/css; charset=utf-8" });
+                HttpResponse.SendBytes(stream, 200, "OK", h, Encoding.UTF8.GetBytes(css));
+                return false;
+            }
+
+            if (path == "/appearance/save-theme")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string label = Q("label", "");
+                JObject payload;
+                try { payload = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body); }
+                catch { payload = null; }
+                if (payload == null)
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Missing theme colours." });
+                    return false;
+                }
+                string id;
+                try { id = Themes.SaveUserTheme(label, payload); }
+                catch (Exception ex) { Log.Write("/appearance/save-theme: " + ex.Message); id = null; }
+                if (id == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not save theme." }); return false; }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["id"] = id });
+                return false;
+            }
+
+            if (path == "/appearance/delete-theme")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string raw = Q("id", "");
+                if (!raw.StartsWith("user/", StringComparison.Ordinal))
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only saved themes can be removed." });
+                    return false;
+                }
+                string name = Path.GetFileNameWithoutExtension(Path.GetFileName(raw.Substring(5)));
+                bool wasSelected = false;
+                string selected = "default";
+                try
+                {
+                    var s = ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings());
+                    selected = s["theme"]?.Value<string>() ?? "default";
+                    wasSelected = selected == "user/" + name;
+                    string full = Path.Combine(Constants.USER_THEMES_DIR, name + ".json");
+                    if (File.Exists(full)) File.Delete(full);
+                    if (wasSelected)
+                    {
+                        var restart = ReplaykitSettings.SetThemeAndApply("default");
+                        selected = "default";
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["wasSelected"] = true, ["selected"] = "default", ["restartRequired"] = restart });
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("/appearance/delete-theme: " + ex.Message);
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message });
+                    return false;
+                }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["wasSelected"] = false, ["selected"] = selected });
                 return false;
             }
 

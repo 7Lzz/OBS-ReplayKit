@@ -349,6 +349,17 @@ namespace ReplayKitHelper
         public static int StyleWindow(string needle, string iconPath, bool taskbar)
         {
             int matched = 0;
+            int themeCaption = CAPTION_COLOR, themeBorder = BORDER_COLOR, themeText = TEXT_COLOR;
+            int themeDark = 1;
+            try
+            {
+                var th = Themes.Resolve(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
+                themeCaption = Themes.ToColorRef(th.Panel);
+                themeBorder = Themes.ToColorRef(th.Border);
+                themeText = Themes.ToColorRef(th.Text);
+                themeDark = th.Dark ? 1 : 0;
+            }
+            catch (Exception ex) { Log.Write("StyleWindow theme resolve: " + ex.Message); }
             IntPtr hIcon16 = IntPtr.Zero, hIcon32 = IntPtr.Zero;
             if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
             {
@@ -373,10 +384,10 @@ namespace ReplayKitHelper
                 string title = GetTitle(hWnd);
                 if (string.IsNullOrEmpty(title) || title.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0) continue;
 
-                int dark = 1;
+                int dark = themeDark;
                 DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
                 DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE_PRE20H1, ref dark, sizeof(int));
-                int caption = CAPTION_COLOR, border = BORDER_COLOR, text = TEXT_COLOR;
+                int caption = themeCaption, border = themeBorder, text = themeText;
                 DwmSetWindowAttribute(hWnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
                 DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
                 DwmSetWindowAttribute(hWnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
@@ -783,7 +794,10 @@ namespace ReplayKitHelper
         private static void PrimeResizeBackground(IntPtr hWnd)
         {
             if (_resizeBackgroundPrimed) return;
-            IntPtr brush = CreateSolidBrush(CAPTION_COLOR);
+            int bg = CAPTION_COLOR;
+            try { bg = Themes.ToColorRef(Themes.Resolve(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())).Bg); }
+            catch { }
+            IntPtr brush = CreateSolidBrush(bg);
             SetClassLongPtr64(hWnd, GCLP_HBRBACKGROUND, brush);
             _resizeBackgroundPrimed = true;
         }

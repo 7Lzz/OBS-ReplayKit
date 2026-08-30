@@ -41,6 +41,16 @@
     --primary_light: var(--blue2);
     --input_bg: var(--grey8);
     --input_border: var(--grey4);
+    --on-accent: #ffffff;
+    --on-accent-rgb: 255, 255, 255;
+    --text-rgb: 255, 255, 255;
+    --bg-rgb: 29, 31, 38;
+    --accent-rgb: 40, 76, 184;
+    --hairline: rgba(var(--text-rgb),.08);
+    --overlay-soft: rgba(var(--text-rgb),.06);
+    --overlay-strong: rgba(var(--text-rgb),.14);
+    --shadow: rgba(0,0,0,.45);
+    --shadow-weak: rgba(0,0,0,.28);
     /* shared motion language -- kept in step with clips.html / settings.html. */
     --ease_pop: cubic-bezier(.2, .7, .3, 1);
     --ease_smooth: cubic-bezier(.16, 1, .3, 1);
@@ -56,6 +66,7 @@
     margin: 0;
     padding: 0;
     background: var(--bg_window);
+    /* rk-theme.css / the helper's injected style overrides this per theme */
     color-scheme: dark;
   }
   body {
@@ -94,7 +105,7 @@
     min-height: 30px;
   }
   *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
-  *::-webkit-scrollbar-thumb:active { background-color: #6b7387; }
+  *::-webkit-scrollbar-thumb:active { background-color: var(--white5); }
   .btn {
     display: flex;
     align-items: center;
@@ -142,31 +153,35 @@
   .btn.is-flash-success {
     background-color: var(--primary);
     border-color: var(--primary_light);
+    color: var(--on-accent);
   }
   .btn.is-flash-error {
     background-color: var(--red);
     border-color: var(--red);
+    color: #fff;
   }
   .btn.primary {
     background-color: var(--primary);
     border-color: var(--primary_light);
+    color: var(--on-accent);
   }
   .btn.primary:hover { background-color: var(--primary_light); }
 
   /* share preview toggle. highlighted when the Discord/application-share preview is enabled. */
   .btn.projector-mode {
-    background-color: #8B5CF6;
-    border-color: #8B5CF6;
+    background-color: var(--blue3);
+    border-color: var(--blue3);
+    color: var(--on-accent);
   }
   .btn.projector-mode:hover {
-    background-color: #A78BFA;
-    border-color: #A78BFA;
+    background-color: var(--blue2);
+    border-color: var(--blue2);
   }
   .btn.projector-mode:focus-visible {
-    border-color: #8B5CF6;
+    border-color: var(--blue3);
   }
   .btn.projector-mode:hover:focus-visible {
-    border-color: #A78BFA;
+    border-color: var(--blue2);
   }
 
   /* auth row: third button stacks under view clips; "sign in" when out, "signed in" with a green dot when in. click signed-in opens a tiny dropdown menu (with sign out); click signed-out opens the login modal. */
@@ -286,6 +301,8 @@
   #controlsFrame > *:nth-child(5) { animation-delay: 140ms; }
   #controlsFrame > *:nth-child(6) { animation-delay: 175ms; }
 </style>
+<!-- theme override -- written by the helper (Themes.WriteDockThemeCss); empty on the default theme. this dock is loaded from a file:// url so the helper's http-time style injection never reaches it. -->
+<link rel="stylesheet" href="rk-theme.css" id="rk-theme-link" />
 </head>
 <body style="background:#272A33;color:#FFFFFF">
   <div id="controlsFrame">
@@ -308,6 +325,12 @@
   </div>
 
 <script>
+  // rk-theme.css is written by the helper; if the dock loaded before the helper got to it (first launch race), re-pull it once a few seconds in. real theme changes restart OBS -> full dock reload anyway.
+  setTimeout(function () {
+    var l = document.getElementById("rk-theme-link");
+    if (l) l.href = "rk-theme.css?t=" + Date.now();
+  }, 2500);
+
   // dock lockdown: stop accidental right-click menu / zoom shortcuts. cef treats the dock like a regular web page, so users can right-click and hit zoom in / refresh / back / inspect / etc. -- all of which are surprises in a dock context. mirrored in controls.html and clips.html.
   (function lockdown() {
     const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);

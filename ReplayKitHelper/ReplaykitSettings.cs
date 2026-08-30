@@ -97,6 +97,15 @@ namespace ReplayKitHelper
                 ["appIconCustomPath"] = "",
                 // red recording dot on a custom app icon while recording / replay buffer is active (mirrors obs's own tray indicator).
                 ["appIconRecordingDot"] = true,
+                // "default" (obs yami) / a bundled preset id (see Themes.PresetOrder) / "custom" / "user/<name>" (a saved custom). drives the dock, replaykit window chrome, and a generated obs theme variant.
+                ["theme"] = "default",
+                // the custom-editor working palette: 6 picks + dark, the rest derived by Themes.FromCustom.
+                ["themeCustom"] = new JObject
+                {
+                    ["bg"] = "#161617", ["panel"] = "#1D1F26", ["field"] = "#2F323C",
+                    ["text"] = "#FFFFFF", ["accent"] = "#284CB8", ["border"] = "#3C404D",
+                    ["danger"] = "#E33B57", ["dark"] = true,
+                },
             };
         }
 
@@ -349,7 +358,35 @@ namespace ReplayKitHelper
                 ["appIcon"] = NormalizeAppIcon(data["appIcon"]?.ToString(), StripWrappingQuotes(data["appIconCustomPath"]?.ToString())),
                 ["appIconCustomPath"] = StripWrappingQuotes(GetTextSetting(data, "appIconCustomPath", defaults["appIconCustomPath"].Value<string>(), 1024)),
                 ["appIconRecordingDot"] = GetBoolSetting(data, "appIconRecordingDot", defaults["appIconRecordingDot"].Value<bool>()),
+                ["theme"] = NormalizeTheme(data["theme"]?.ToString()),
+                ["themeCustom"] = NormalizeThemeCustom(data["themeCustom"], (JObject)defaults["themeCustom"]),
             };
+        }
+
+        // "default" / "custom" / a bundled preset id / "user/<name>" (an existing saved theme). unknown -> "default".
+        private static string NormalizeTheme(string value)
+        {
+            value = (value ?? "").Trim();
+            if (value == "" || value == "default") return "default";
+            if (value == "custom") return "custom";
+            if (Themes.IsPreset(value)) return value;
+            if (value.StartsWith("user/", StringComparison.Ordinal))
+            {
+                string name = Path.GetFileNameWithoutExtension(Path.GetFileName(value.Substring(5)));
+                try { return (!string.IsNullOrEmpty(name) && File.Exists(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"))) ? "user/" + name : "default"; }
+                catch { return "default"; }
+            }
+            return "default";
+        }
+
+        private static JObject NormalizeThemeCustom(JToken raw, JObject defaults)
+        {
+            var src = raw as JObject ?? new JObject();
+            var outObj = new JObject();
+            foreach (var k in new[] { "bg", "panel", "field", "text", "accent", "border", "danger" })
+                outObj[k] = Themes.CleanHex(src[k]?.ToString(), defaults[k].ToString());
+            outObj["dark"] = src["dark"]?.Type == JTokenType.Boolean ? src["dark"].Value<bool>() : defaults["dark"].Value<bool>();
+            return outObj;
         }
 
         private static readonly string[] AppIconExts = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
@@ -450,6 +487,18 @@ namespace ReplayKitHelper
             settings = Normalize(settings);
             WriteSettings(settings);
             return ApplyAppIconLive(settings);
+        }
+
+        // set theme to id, persist, write the obs .ovt + user.ini. returns true (obs restart still needed to pick it up).
+        // used by /appearance/delete-theme when the removed theme was the active one.
+        public static bool SetThemeAndApply(string id)
+        {
+            var settings = Normalize(ReadSettings());
+            settings["theme"] = id;
+            settings = Normalize(settings);
+            WriteSettings(settings);
+            try { Themes.ApplyToObs(settings); } catch (Exception ex) { Log.Write("SetThemeAndApply: " + ex.Message); }
+            return true;
         }
 
         // what a ReplayKit-branded surface (own windows, toasts, dock favicon) should use right now: the chosen custom/preset icon, or the bundled replaykit .ico when appIcon is "default".
@@ -4603,13 +4652,15 @@ namespace ReplayKitHelper
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
+            // always pin obs's recording folder to the RESOLVED clip dir (custom or the default) -- the helper's clip
+            // watcher/scanner uses that same resolved dir, so if obs's own RecFilePath ever drifts (it defaults to
+            // %USERPROFILE%\Videos, not our Pictures\Videos) clips land where nothing is looking for them.
             string clipDirValue = settings["clipDir"]?.Value<string>();
-            if (!string.IsNullOrEmpty(clipDirValue))
-            {
-                profileUpdates.Add(new[] { "SimpleOutput", "FilePath", clipDirValue });
-                profileUpdates.Add(new[] { "AdvOut", "RecFilePath", clipDirValue });
-                profileUpdates.Add(new[] { "AdvOut", "FFFilePath", clipDirValue });
-            }
+            string resolvedClipDir = string.IsNullOrWhiteSpace(clipDirValue) ? AppConfig.GetDefaultClipDir() : clipDirValue;
+            try { Directory.CreateDirectory(resolvedClipDir); } catch (Exception ex) { Log.Write("resolvedClipDir mkdir: " + ex.Message); }
+            profileUpdates.Add(new[] { "SimpleOutput", "FilePath", resolvedClipDir });
+            profileUpdates.Add(new[] { "AdvOut", "RecFilePath", resolvedClipDir });
+            profileUpdates.Add(new[] { "AdvOut", "FFFilePath", resolvedClipDir });
 
             var encoderWrite = WriteRecordEncoderJson(encoder);
             if (encoderWrite["ok"]?.Value<bool>() == true) applied.Add("recording encoder settings");
@@ -4622,7 +4673,7 @@ namespace ReplayKitHelper
             }
 
             applied.Add("OBS profile settings");
-            if (!string.IsNullOrEmpty(clipDirValue)) applied.Add("OBS recording folder");
+            applied.Add("OBS recording folder");
 
             if (applyRuntimeOutputs)
             {
@@ -4664,7 +4715,7 @@ namespace ReplayKitHelper
                 }
             }
 
-            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, or overlay changes require OBS to restart." : "";
+            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, theme, or overlay changes require OBS to restart." : "";
 
             return new JObject
             {
@@ -4677,6 +4728,25 @@ namespace ReplayKitHelper
         // fetches GetSettingsPayload; every settings-form submit goes through SaveSettingsFromRequest, which picks
         // the cheapest live-apply path that actually covers what changed instead of always running the full
         // ApplyLiveSettings orchestrator.
+
+        // resolved theme colours for the tray menu's custom keybind rows -- text is the normal (at-rest) label
+        // colour (a widget stylesheet on the row otherwise breaks the label's inherited menu colour), accentLight
+        // + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected.
+        private static JObject ThemeMenuColors(JObject settings)
+        {
+            try
+            {
+                var t = Themes.Resolve(settings);
+                return new JObject
+                {
+                    ["text"] = t.Text,
+                    ["accent"] = t.Accent,
+                    ["accentLight"] = t.Accent2,
+                    ["onAccent"] = Themes.OnColor(t.Accent),
+                };
+            }
+            catch { return new JObject(); }
+        }
 
         public static JObject GetSettingsPayload()
         {
@@ -4699,6 +4769,7 @@ namespace ReplayKitHelper
             {
                 ["ok"] = true,
                 ["settings"] = settings,
+                ["menuColors"] = ThemeMenuColors(settings),
                 ["options"] = new JObject
                 {
                     ["recordingPresets"] = new JArray(
@@ -4762,6 +4833,9 @@ namespace ReplayKitHelper
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
+            // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load).
+            if (previous["theme"]?.ToString() != settings["theme"]?.ToString()) return true;
+            if (settings["theme"]?.ToString() == "custom" && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])) return true;
             return previous["overlayStyle"]?.ToString() != settings["overlayStyle"]?.ToString();
         }
 
@@ -4884,6 +4958,56 @@ namespace ReplayKitHelper
                     ApplyAppIconLive(settings); // last try even without the hwnd -- covers the replaykit windows + tray
                 }
                 catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
+            });
+        }
+
+        // self-heal: obs's recording folder (SimpleOutput.FilePath / AdvOut.RecFilePath) defaults to %USERPROFILE%\Videos,
+        // but the helper watches + scans the RESOLVED clip dir (custom, or our Pictures\Videos default). if obs's own
+        // path drifts -- a reset profile, an obs update, a mid-session force-kill -- new replay clips land where nothing
+        // is looking. runs deferred (obs websocket needs a moment) and only writes on an actual mismatch.
+        public static void EnsureObsRecordingFolderAtStartup()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    string clipDir;
+                    try { clipDir = Normalize(ReadSettings())["clipDir"]?.Value<string>(); }
+                    catch { clipDir = null; }
+                    string resolved = string.IsNullOrWhiteSpace(clipDir) ? AppConfig.GetDefaultClipDir() : clipDir;
+                    try { resolved = Path.GetFullPath(resolved); } catch { }
+                    try { Directory.CreateDirectory(resolved); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolder mkdir: " + ex.Message); }
+
+                    for (int i = 0; i < 30; i++)
+                    {
+                        var cur = GetObsProfileParameterValue("AdvOut", "RecFilePath");
+                        if (cur["ok"]?.Value<bool>() == true)
+                        {
+                            string curPath = cur["value"]?.Value<string>() ?? "";
+                            string curNorm; try { curNorm = Path.GetFullPath(curPath); } catch { curNorm = curPath; }
+                            if (!string.Equals(curNorm.TrimEnd('\\', '/'), resolved.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                            {
+                                SetObsProfileParameterSafe("SimpleOutput", "FilePath", resolved);
+                                SetObsProfileParameterSafe("AdvOut", "RecFilePath", resolved);
+                                SetObsProfileParameterSafe("AdvOut", "FFFilePath", resolved);
+                                // the already-running Replay Buffer output caches its dir from init -- update it live too.
+                                try
+                                {
+                                    var rbEx = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+                                    JObject rbSet = rbEx.Ok && rbEx.Data?["outputSettings"] is JObject e ? (JObject)e.DeepClone() : new JObject();
+                                    rbSet["directory"] = resolved;
+                                    rbSet["path"] = resolved;
+                                    ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = rbSet }, 5000);
+                                }
+                                catch (Exception ex) { Log.Write("EnsureObsRecordingFolder live output: " + ex.Message); }
+                                Log.Write("EnsureObsRecordingFolder: OBS recording folder was '" + curPath + "', pinned to '" + resolved + "'");
+                            }
+                            return;
+                        }
+                        Thread.Sleep(1000);
+                    }
+                }
+                catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
             });
         }
 
@@ -5077,6 +5201,12 @@ namespace ReplayKitHelper
                     ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
                     ["restartRequired"] = false, ["restartReason"] = "",
                 };
+            }
+            // theme change -> write the obs .ovt variant + user.ini key now, before ApplyLiveSettings restarts obs to pick it up.
+            if (previous["theme"]?.ToString() != settings["theme"]?.ToString() ||
+                (settings["theme"]?.ToString() == "custom" && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])))
+            {
+                Themes.ApplyToObs(settings);
             }
             bool overlayStyleChanged = previous["overlayStyle"]?.Value<string>() != settings["overlayStyle"]?.Value<string>();
             bool overlayGeometryChanged = previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||

@@ -41,6 +41,35 @@ if (Test-Path -LiteralPath $scenesDir) {
         }
 }
 
+# theme change: obs rewrites user.ini from memory on its graceful exit, wiping the [Appearance] Theme= the helper set. the helper staged the wanted id in .replaykit-theme-pending; splice it into the fresh user.ini now.
+$themeMarker = Join-Path $env:APPDATA 'obs-studio\.replaykit-theme-pending'
+if (Test-Path -LiteralPath $themeMarker) {
+    $want = ''
+    try { $want = ([System.IO.File]::ReadAllText($themeMarker)).Trim() } catch {}
+    $iniPath = Join-Path $env:APPDATA 'obs-studio\user.ini'
+    try {
+        $lines = [System.Collections.Generic.List[string]]::new()
+        if (Test-Path -LiteralPath $iniPath) { [System.IO.File]::ReadAllLines($iniPath) | ForEach-Object { $lines.Add($_) } }
+        $appIdx = -1; $keyIdx = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            $s = $lines[$i].Trim()
+            if ($s -match '^\[.*\]$') { if ($appIdx -ge 0) { break }; if ($s -ieq '[Appearance]') { $appIdx = $i }; continue }
+            if ($appIdx -ge 0 -and $keyIdx -lt 0 -and $s -imatch '^Theme=') { $keyIdx = $i }
+        }
+        if ([string]::IsNullOrEmpty($want)) {
+            if ($keyIdx -ge 0) { $lines.RemoveAt($keyIdx) }
+        } elseif ($keyIdx -ge 0) {
+            $lines[$keyIdx] = "Theme=$want"
+        } elseif ($appIdx -ge 0) {
+            $lines.Insert($appIdx + 1, "Theme=$want")
+        } else {
+            $lines.Add('[Appearance]'); $lines.Add("Theme=$want")
+        }
+        [System.IO.File]::WriteAllLines($iniPath, $lines)
+    } catch {}
+    Remove-Item -LiteralPath $themeMarker -Force -ErrorAction SilentlyContinue
+}
+
 if (-not (Test-Path -LiteralPath $ObsPath)) { exit 1 }
 
 $workDir = [System.IO.Path]::GetDirectoryName($ObsPath)

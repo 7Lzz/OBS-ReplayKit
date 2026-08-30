@@ -22,8 +22,23 @@
     --muted:#969696;
     --disabled:#969696;
     --danger:#e33b57;
+    --danger-deep:#7f2232;
+    --success:#37D247;
+    --warning:#E2A33B;
+    --link:#5c78df;
     --button:#3C404D;
     --button-hover:#464B59;
+    --on-accent:#ffffff;
+    --on-accent-rgb:255, 255, 255;
+    --text-rgb:255, 255, 255;
+    --bg-rgb:29, 31, 38;
+    --accent-rgb:40, 76, 184;
+    --danger-rgb:227, 59, 87;
+    --hairline:rgba(var(--text-rgb),.08);
+    --overlay-soft:rgba(var(--text-rgb),.06);
+    --overlay-strong:rgba(var(--text-rgb),.14);
+    --shadow:rgba(0,0,0,.45);
+    --shadow-weak:rgba(0,0,0,.28);
     --font:"Segoe UI",system-ui,sans-serif;
     /* shared motion language -- kept in step with clips.html / controls_app.html. */
     --ease_pop:cubic-bezier(.2, .7, .3, 1);
@@ -52,7 +67,7 @@
     min-height:30px;
   }
   *::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
-  *::-webkit-scrollbar-thumb:active { background-color:#6b7387; }
+  *::-webkit-scrollbar-thumb:active { background-color:var(--muted); }
   .shell {
     width:100vw;
     height:100vh;
@@ -95,14 +110,14 @@
     color:var(--muted);
     flex:0 0 auto;
   }
-  .sidebar-github:hover { background:#3a3f4d; color:var(--text); }
+  .sidebar-github:hover { background:var(--button-hover); color:var(--text); }
   .sidebar-github svg { width:15px; height:15px; fill:currentColor; }
   .search-wrap {
     padding:0 3px 8px;
   }
   .search-wrap .search-input {
     height:30px;
-    background:#1D1F26;
+    background:var(--window);
   }
   .nav-btn {
     width:100%;
@@ -118,10 +133,11 @@
     cursor:pointer;
     text-align:left;
   }
-  .nav-btn:hover { background:#3a3f4d; }
+  .nav-btn:hover { background:var(--button-hover); }
   .nav-btn.is-active {
     background:var(--selected);
-    border-color:#5c78df;
+    border-color:var(--selected2);
+    color:var(--on-accent);
   }
   .nav-btn svg { width:17px; height:17px; fill:currentColor; flex:0 0 auto; }
   .main {
@@ -141,10 +157,10 @@
   .search-hidden-row { display:none !important; }
   .form-row.search-hit,
   .hotkey-row.search-hit {
-    background:#323746;
+    background:var(--field2);
   }
   .nav-btn.search-match {
-    border-color:#5c78df;
+    border-color:var(--selected2);
   }
   .box {
     background:var(--panel);
@@ -237,21 +253,21 @@
     bottom:1px;
     right:26px;
     width:1px;
-    background:#272A33;
+    background:var(--panel);
     pointer-events:none;
   }
   .combo.is-open .combo-button {
-    border-color:#284CB8;
-    background:#1D1F26;
+    border-color:var(--selected);
+    background:var(--window);
     border-radius:4px;
   }
   .combo.is-disabled .combo-button {
     color:var(--disabled);
-    border-color:#353A47;
-    background:#2D313C;
+    border-color:var(--field2);
+    background:var(--field2);
     cursor:default;
   }
-  .combo.is-disabled .combo-button::before { background:#353A47; }
+  .combo.is-disabled .combo-button::before { background:var(--field2); }
   .combo.is-disabled .combo-arrow { opacity:.65; }
   .combo.is-disabled .combo-menu { display:none; }
   .combo-label {
@@ -268,11 +284,11 @@
     /* slides open from zero height and back. max-height:0 + overflow:hidden means a closed menu adds no height to .main, so a combo in the last row cant summon a phantom scrollbar. */
     max-height:0;
     overflow:hidden;
-    background:#272A33;
+    background:var(--panel);
     border:1px solid var(--line);
     border-radius:4px;
     padding:0 3px;
-    box-shadow:0 10px 24px rgba(0,0,0,.28);
+    box-shadow:0 10px 24px var(--shadow-weak);
     opacity:0;
     visibility:hidden;
     pointer-events:none;
@@ -319,13 +335,14 @@
   .combo-option:hover,
   .combo-option.is-selected {
     background:var(--selected);
+    color:var(--on-accent);
   }
   .combo-option.is-selected {
-    outline:1px solid rgba(232,236,255,.7);
+    outline:1px solid rgba(var(--on-accent-rgb),.55);
     outline-offset:-1px;
   }
   .combo-option.is-disabled {
-    color:#8f96a5;
+    color:var(--muted);
     cursor:default;
     background:transparent;
   }
@@ -335,7 +352,7 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .combo-option.is-selected .option-blurb { color:#d9deff; }
+  .combo-option.is-selected .option-blurb { color:var(--on-accent); opacity:.82; }
   .game-rule-actions {
     width:100%;
     display:grid;
@@ -349,7 +366,7 @@
     border:1px solid var(--line);
     border-radius:4px;
     overflow:hidden;
-    background:#20232B;
+    background:var(--field-dark);
   }
   .game-rule-empty,
   .game-rule-row {
@@ -380,8 +397,8 @@
     margin-top:1px;
   }
   .form-row.is-disabled .game-rule-table {
-    border-color:#353A47;
-    background:#1E2129;
+    border-color:var(--field2);
+    background:var(--field-dark);
   }
   .projector-action-row {
     width:100%;
@@ -420,9 +437,9 @@
     height:16px;
     transform:translateY(-50%);
     background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(151,158,174,.65) calc(25% - .5px), rgba(151,158,174,.65) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(151,158,174,.65) calc(50% - .5px), rgba(151,158,174,.65) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(151,158,174,.65) calc(75% - .5px), rgba(151,158,174,.65) calc(75% + .5px), transparent calc(75% + .5px));
+      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
     background-repeat:no-repeat;
     background-size:100% 16px;
     background-position:center;
@@ -436,7 +453,7 @@
     margin:0;
     appearance:none;
     -webkit-appearance:none;
-    background:linear-gradient(to right, #476BD7 var(--fill, 100%), #5B6273 var(--fill, 100%));
+    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
     background-repeat:no-repeat;
     background-size:100% 4px;
     background-position:center;
@@ -455,13 +472,13 @@
     height:10px;
     border:0;
     border-radius:5px;
-    background:#ffffff;
+    background:var(--text);
     margin-top:11px;
-    box-shadow:0 0 0 1px rgba(255,255,255,.2);
+    box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25);
     cursor:pointer;
   }
   .volume-slider:focus-visible::-webkit-slider-thumb {
-    box-shadow:0 0 0 2px #7f97ff;
+    box-shadow:0 0 0 2px var(--selected2);
   }
   .color-control {
     width:100%;
@@ -502,7 +519,7 @@
     top:0;
     width:28px;
     height:32px;
-    border-left:1px solid #272A33;
+    border-left:1px solid var(--panel);
     display:grid;
     grid-template-rows:1fr 1fr;
     background:var(--field);
@@ -510,13 +527,13 @@
   .spin-btn {
     border:0;
     background:transparent;
-    color:#dce0ea;
+    color:var(--text);
     cursor:pointer;
     line-height:1;
     padding:0;
   }
   .spin-btn:hover { background:var(--button-hover); }
-  .spin-btn + .spin-btn { border-top:1px solid #272A33; }
+  .spin-btn + .spin-btn { border-top:1px solid var(--panel); }
   .spin-btn svg { width:9px; height:9px; fill:currentColor; }
   .check-row {
     min-height:28px;
@@ -534,18 +551,22 @@
     height:14px;
     flex:0 0 14px;
     margin:0;
-    border:1px solid #8b92a1;
+    border:1px solid var(--muted);
     border-radius:2px;
     background:transparent;
   }
-  .check-row input:checked {
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23ffffff' stroke-width='14' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;
-    background-position:center;
-    background-size:14px 14px;
+  /* no fill -- just the tick, painted in --text so it flips dark on the light theme (a fixed white check vanished there) */
+  .check-row input:checked::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    background:var(--text);
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/%3E%3Cline fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
   }
   .check-row input:focus-visible {
-    border-color:#6f89ee;
+    outline:2px solid var(--selected2);
+    outline-offset:1px;
   }
   .hotkey-grid {
     border:1px solid var(--line);
@@ -575,8 +596,8 @@
     white-space:nowrap;
   }
   .hotkey-input:focus {
-    border-color:#6f89ee;
-    background:#11141d;
+    border-color:var(--selected2);
+    background:var(--field-dark);
   }
   .hotkey-input.is-empty { color:var(--muted); }
   .hotkey-actions { display:flex; gap:3px; }
@@ -620,7 +641,7 @@
     transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
   }
   .icon-tile:hover { background:var(--button-hover); }
-  .icon-tile.is-selected { border-color:#5B7BFF; background:var(--selected); }
+  .icon-tile.is-selected { border-color:var(--selected2); background:var(--selected); color:var(--on-accent); }
   .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
   .icon-tile img { object-fit:contain; image-rendering:auto; }
   .icon-tile .icon-tile-swatch {
@@ -638,14 +659,26 @@
   .icon-tile:hover .icon-tile-del, .icon-tile-del:focus-visible { opacity:1; }
   .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
   .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
+  /* theme tile swatch */
+  .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
+  .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
+  .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
+  .theme-editor { display:flex; flex-wrap:wrap; gap:8px; }
+  .theme-pick { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; color:var(--muted); cursor:pointer; }
+  .theme-pick input[type=color] {
+    width:38px; height:30px; padding:0; border:1px solid var(--line); border-radius:6px;
+    background:var(--field-dark); cursor:pointer;
+  }
+  .theme-pick input[type=color]::-webkit-color-swatch-wrapper { padding:3px; }
+  .theme-pick input[type=color]::-webkit-color-swatch { border:none; border-radius:3px; }
   .inline-status {
     color:var(--muted);
     font-size:12px;
     line-height:1.35;
     min-height:18px;
   }
-  .inline-status.good { color:#9bd88f; }
-  .inline-status.bad { color:#ff8da0; }
+  .inline-status.good { color:var(--success); }
+  .inline-status.bad { color:var(--danger); }
   .footer {
     grid-column:2;
     display:flex;
@@ -657,9 +690,9 @@
   .btn {
     min-width:52px;
     height:30px;
-    border:1px solid #3C404D;
+    border:1px solid var(--field);
     border-radius:4px;
-    background:#3C404D;
+    background:var(--field);
     color:var(--text);
     padding:0 13px;
     cursor:pointer;
@@ -667,20 +700,22 @@
   .btn:hover { background:var(--button-hover); }
   .btn.is-primary {
     background:var(--selected);
-    border-color:#5c78df;
+    border-color:var(--selected2);
+    color:var(--on-accent);
   }
   .btn.is-primary:hover { background:var(--selected2); }
   .btn.is-danger {
-    background:#7f2232;
-    border-color:#a92c42;
+    background:var(--danger-deep);
+    border-color:var(--danger);
+    color:#fff;
   }
-  .btn.is-danger:hover { background:#963047; }
+  .btn.is-danger:hover { background:var(--danger); }
   .btn:disabled {
-    color:#8b91a0;
+    color:var(--muted);
     opacity:1;
     cursor:default;
-    background:#272A33;
-    border-color:#3C404D;
+    background:var(--panel);
+    border-color:var(--field);
   }
   .modal-backdrop {
     position:absolute;
@@ -698,7 +733,7 @@
     background:var(--panel);
     border:1px solid var(--line2);
     border-radius:4px;
-    box-shadow:0 16px 42px rgba(0,0,0,0.45);
+    box-shadow:0 16px 42px var(--shadow);
     overflow:hidden;
   }
   .modal-title {
@@ -708,7 +743,7 @@
     padding:0 10px;
     font-weight:700;
     border-bottom:1px solid var(--line);
-    background:#20232b;
+    background:var(--field-dark);
   }
   .modal-body {
     padding:13px 12px 12px;
@@ -746,7 +781,7 @@
     position:absolute;
     width:2px;
     height:2px;
-    background:#ffffff;
+    background:var(--text);
     border-radius:50%;
   }
   .resize-grip span:nth-child(1) { right:0; bottom:0; }
@@ -795,6 +830,7 @@
   .modal-backdrop.is-visible .modal { animation:rk-modal-in 190ms var(--ease_smooth) both; }
   .page.is-active { animation:rk-page-in 190ms var(--ease_smooth) both; }
 </style>
+<link rel="stylesheet" href="rk-theme.css" />
 </head>
 <body>
 <div class="shell">
@@ -1348,6 +1384,38 @@
 
     <section class="page" id="page-appearance">
       <div class="box">
+        <div class="box-title">Theme</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="hint">Restyles the ReplayKit dock, Clips &amp; Settings windows and OBS itself. ReplayKit updates instantly; OBS restarts to pick up its side. Pick a preset, or build a <b>Custom</b> one and save it.</div>
+        </div>
+        <div class="form-row">
+          <div class="label">Theme</div>
+          <div class="field-wrap is-stacked">
+            <div class="icon-grid" id="themeGrid"></div>
+          </div>
+        </div>
+        <div class="form-row" id="themeCustomRow" hidden>
+          <div class="label">Custom colours</div>
+          <div class="field-wrap is-stacked">
+            <div class="theme-editor" id="themeEditor">
+              <label class="theme-pick"><input type="color" data-k="bg"><span>Background</span></label>
+              <label class="theme-pick"><input type="color" data-k="panel"><span>Panel</span></label>
+              <label class="theme-pick"><input type="color" data-k="field"><span>Field</span></label>
+              <label class="theme-pick"><input type="color" data-k="text"><span>Text</span></label>
+              <label class="theme-pick"><input type="color" data-k="accent"><span>Accent</span></label>
+              <label class="theme-pick"><input type="color" data-k="border"><span>Border</span></label>
+              <label class="theme-pick"><input type="color" data-k="danger"><span>Danger</span></label>
+            </div>
+            <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeCustomDark"><span>Dark base</span></label>
+            <div class="form-row" style="grid-template-columns:1fr auto; gap:6px; margin-top:8px; padding:0">
+              <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
+              <button class="btn" type="button" id="saveThemeBtn">Save as preset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
         <div class="box-title">App Icon</div>
         <div class="form-row tight">
           <div></div>
@@ -1471,7 +1539,7 @@
   };
   // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings.
   // recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter"]);
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "theme", "themeCustom"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
@@ -1522,6 +1590,12 @@
     appIconCustomRow: document.getElementById("appIconCustomRow"),
     appIconCustomPath: document.getElementById("appIconCustomPath"),
     appIconRecordingDot: document.getElementById("appIconRecordingDot"),
+    themeGrid: document.getElementById("themeGrid"),
+    themeCustomRow: document.getElementById("themeCustomRow"),
+    themeEditor: document.getElementById("themeEditor"),
+    themeCustomDark: document.getElementById("themeCustomDark"),
+    themeName: document.getElementById("themeName"),
+    saveThemeBtn: document.getElementById("saveThemeBtn"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
     openClipsKeybind: document.getElementById("openClipsKeybind"),
@@ -2435,6 +2509,9 @@
     els.appIconCustomPath.value = state.appIconCustomPath || "";
     els.appIconRecordingDot.checked = state.appIconRecordingDot !== false;
     paintAppIconSelection();
+    if (state.themeCustom) fillThemeEditor(state.themeCustom);
+    paintThemeSelection();
+    applyThemePreview();
     els.obsStartupEnabled.checked = !!state.obsStartupEnabled;
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
@@ -2499,6 +2576,7 @@
     state.appIconCustomPath = unquote(els.appIconCustomPath.value);
     state.appIconRecordingDot = els.appIconRecordingDot.checked;
     if (state.appIcon === "custom" && !state.appIconCustomPath) state.appIcon = "default";
+    if (state.theme === "custom") state.themeCustom = themeCustomState();
     state.obsStartupEnabled = els.obsStartupEnabled.checked;
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
@@ -2973,6 +3051,8 @@
       acceptSettings(data.settings || {});
       // a "custom" pick gets filed as a saved preset server-side -- reflect the new tile + selection
       renderAppIconGrid();
+      renderThemeGrid();
+      applyThemePreview();
       const warnings = data.warnings || [];
       if (warnings.length) setStatus(warnings.join(" "), "bad");
       else setStatus(restartAfterApply ? "Settings saved. OBS is restarting..." : "Settings applied", "good");
@@ -3238,6 +3318,165 @@
     try { navigator.sendBeacon(HELPER + "/settings/overlay-preview?mode=cancel", new Blob(["{}"], { type:"application/json" })); } catch (_) {}
   });
 
+  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
+  const APPICON_X_SVG = '<svg viewBox="0 0 320.591 320.591" aria-hidden="true"><path d="m30.391 318.583c-7.86.457-15.59-2.156-21.56-7.288-11.774-11.844-11.774-30.973 0-42.817l257.812-257.813c12.246-11.459 31.462-10.822 42.921 1.424 10.362 11.074 10.966 28.095 1.414 39.875l-259.331 259.331c-5.893 5.058-13.499 7.666-21.256 7.288z"/><path d="m287.9 318.583c-7.966-.034-15.601-3.196-21.257-8.806l-257.813-257.814c-10.908-12.738-9.425-31.908 3.313-42.817 11.369-9.736 28.136-9.736 39.504 0l259.331 257.813c12.243 11.462 12.876 30.679 1.414 42.922-.456.487-.927.958-1.414 1.414-6.35 5.522-14.707 8.161-23.078 7.288z"/></svg>';
+  const THEME_KEYS = ["bg", "panel", "field", "text", "accent", "border", "danger"];
+  // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
+  let themesCache = [];
+  let themeLiveStyle = document.getElementById("rk-theme-live");
+  if (!themeLiveStyle) {
+    themeLiveStyle = document.createElement("style");
+    themeLiveStyle.id = "rk-theme-live";
+    document.head.appendChild(themeLiveStyle);
+  }
+  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves
+  // background-color transitions that resolve through var() half-finished when the custom props change,
+  // freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
+  const themeSwapFreeze = document.createElement("style");
+  themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
+  document.head.appendChild(themeSwapFreeze);
+  function themeCustomState() {
+    const o = {};
+    els.themeEditor.querySelectorAll("input[type=color]").forEach((i) => { o[i.dataset.k] = i.value; });
+    o.dark = els.themeCustomDark.checked;
+    return o;
+  }
+  let themePreviewTimer = 0;
+  function applyThemePreview() {
+    clearTimeout(themePreviewTimer);
+    themePreviewTimer = setTimeout(async () => {
+      const id = state.theme || "default";
+      let url = HELPER + "/appearance/theme.css?t=" + Date.now();
+      if (id === "custom") url += "&custom=" + encodeURIComponent(JSON.stringify(state.themeCustom || themeCustomState()));
+      else url += "&theme=" + encodeURIComponent(id);
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        const css = r.ok ? await r.text() : "";
+        document.documentElement.classList.add("rk-theme-swapping");
+        themeLiveStyle.textContent = css;
+        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
+        // rewriting this node's text alone doesnt always make CEF redo the cascade tie-break, so move it back
+        // to last to guarantee the preview wins.
+        document.head.appendChild(themeLiveStyle);
+        void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
+        requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping"));
+      } catch (e) { /* leave whatever's applied */ }
+    }, 40);
+  }
+  function paintThemeSelection() {
+    const sel = state.theme || "default";
+    els.themeGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
+    els.themeCustomRow.hidden = sel !== "custom";
+  }
+  function fillThemeEditor(c) {
+    c = c || {};
+    els.themeEditor.querySelectorAll("input[type=color]").forEach((i) => { if (c[i.dataset.k]) i.value = c[i.dataset.k]; });
+    els.themeCustomDark.checked = c.dark !== false;
+  }
+  function selectTheme(id) {
+    const prev = state.theme;
+    state.theme = id;
+    // picking Custom off a preset or saved theme carries that themes colors into the editor so it extends instead of starting blank
+    if (id === "custom" && prev !== "custom") {
+      const src = themesCache.find((t) => t.id === prev);
+      if (src && src.seed) state.themeCustom = Object.assign({}, src.seed);
+    }
+    if (id === "custom") fillThemeEditor(state.themeCustom);
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+  }
+  function themeSwatchEl(sw) {
+    sw = sw || {};
+    const box = document.createElement("span");
+    box.className = "theme-sw";
+    box.style.background = sw.bg || "#1d1f26";
+    const strip = document.createElement("i");
+    strip.style.background = sw.panel || "#272a33";
+    const dot = document.createElement("b");
+    dot.style.background = sw.accent || "#284cb8";
+    box.append(strip, dot);
+    return box;
+  }
+  function themeTile(id, label, sw, deletable) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "icon-tile";
+    tile.dataset.id = id;
+    const lab = document.createElement("span");
+    lab.className = "icon-tile-label";
+    lab.textContent = label;
+    tile.append(sw ? themeSwatchEl(sw) : (function () { const s = document.createElement("span"); s.className = "icon-tile-swatch"; s.textContent = "＋"; return s; })(), lab);
+    tile.addEventListener("click", () => selectTheme(id));
+    if (deletable) {
+      const del = document.createElement("span");
+      del.className = "icon-tile-del";
+      del.setAttribute("role", "button");
+      del.setAttribute("aria-label", "Remove " + label);
+      del.title = "Remove";
+      del.innerHTML = APPICON_X_SVG;
+      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
+      tile.appendChild(del);
+    }
+    return tile;
+  }
+  async function deleteUserTheme(id) {
+    let data;
+    try { data = await helperJson("appearance/delete-theme?id=" + encodeURIComponent(id), { method: "POST" }); }
+    catch (e) { setStatus("Could not remove theme", "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove theme", "bad"); return; }
+    if (state.theme === id) {
+      state.theme = "default";
+      if (originalState) originalState.theme = "default";
+      applyThemePreview();
+    }
+    await renderThemeGrid();
+  }
+  async function renderThemeGrid() {
+    let data;
+    try { data = await helperJson("appearance/themes"); } catch (e) { return; }
+    themesCache = data.themes || [];
+    els.themeGrid.innerHTML = "";
+    for (const th of (data.themes || []))
+      els.themeGrid.appendChild(themeTile(th.id, th.label || th.id, th.swatch, !!th.deletable));
+    els.themeGrid.appendChild(themeTile("custom", "Custom…", null, false));
+    if (!state.themeCustom && data.custom) state.themeCustom = data.custom;
+    if (state.theme === "custom") fillThemeEditor(state.themeCustom);
+    paintThemeSelection();
+  }
+  els.themeEditor.addEventListener("input", (e) => {
+    if (e.target.type !== "color") return;
+    if (state.theme !== "custom") { state.theme = "custom"; paintThemeSelection(); }
+    state.themeCustom = themeCustomState();
+    applyThemePreview();
+    markDirty();
+  });
+  els.themeCustomDark.addEventListener("change", () => {
+    state.themeCustom = themeCustomState();
+    applyThemePreview();
+    markDirty();
+  });
+  els.saveThemeBtn.addEventListener("click", async () => {
+    const name = (els.themeName.value || "").trim();
+    if (!name) { setStatus("Name the theme first", "bad"); els.themeName.focus(); return; }
+    els.saveThemeBtn.disabled = true;
+    let data;
+    try {
+      data = await helperJson("appearance/save-theme?label=" + encodeURIComponent(name), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(themeCustomState()),
+      });
+    } catch (e) { data = null; }
+    els.saveThemeBtn.disabled = false;
+    if (!data || !data.ok) { setStatus((data && data.message) || "Could not save theme", "bad"); return; }
+    els.themeName.value = "";
+    state.theme = data.id;
+    if (originalState) originalState.theme = data.id;
+    await renderThemeGrid();
+    selectTheme(data.id);
+  });
+  renderThemeGrid();
+
   // -- Appearance tab: app-icon picker -- applies on Apply through the normal save flow (state.appIcon / state.appIconCustomPath)
   function paintAppIconSelection() {
     const sel = state.appIcon || "default";
@@ -3250,7 +3489,6 @@
     if (id === "custom") els.appIconCustomPath.focus();
     markDirty();
   }
-  const APPICON_X_SVG = '<svg viewBox="0 0 320.591 320.591" aria-hidden="true"><path d="m30.391 318.583c-7.86.457-15.59-2.156-21.56-7.288-11.774-11.844-11.774-30.973 0-42.817l257.812-257.813c12.246-11.459 31.462-10.822 42.921 1.424 10.362 11.074 10.966 28.095 1.414 39.875l-259.331 259.331c-5.893 5.058-13.499 7.666-21.256 7.288z"/><path d="m287.9 318.583c-7.966-.034-15.601-3.196-21.257-8.806l-257.813-257.814c-10.908-12.738-9.425-31.908 3.313-42.817 11.369-9.736 28.136-9.736 39.504 0l259.331 257.813c12.243 11.462 12.876 30.679 1.414 42.922-.456.487-.927.958-1.414 1.414-6.35 5.522-14.707 8.161-23.078 7.288z"/></svg>';
   function appIconTile(id, label, url, glyph, deletable) {
     const tile = document.createElement("button");
     tile.type = "button";

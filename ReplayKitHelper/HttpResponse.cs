@@ -94,6 +94,22 @@ namespace ReplayKitHelper
             }
         }
 
+        // splice the active theme's :root override in right before </head> so every dock page loads themed. no-op on
+        // the default theme and if the markup has no </head>.
+        private static byte[] InjectThemeStyle(byte[] html)
+        {
+            try
+            {
+                string tag = Themes.DockStyleTag(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
+                if (string.IsNullOrEmpty(tag)) return html;
+                string s = System.Text.Encoding.UTF8.GetString(html);
+                int i = s.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return html;
+                return new UTF8Encoding(false).GetBytes(s.Substring(0, i) + tag + s.Substring(i));
+            }
+            catch { return html; }
+        }
+
         public static void ServeHtml(Stream stream, string filename)
         {
             var candidates = new[]
@@ -109,6 +125,7 @@ namespace ReplayKitHelper
                     try
                     {
                         byte[] bytes = File.ReadAllBytes(f);
+                        bytes = InjectThemeStyle(bytes);
                         var h = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
                         SendBytes(stream, 200, "OK", h, bytes);
                         return;
