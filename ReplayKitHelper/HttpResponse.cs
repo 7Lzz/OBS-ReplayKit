@@ -110,6 +110,56 @@ namespace ReplayKitHelper
             catch { return html; }
         }
 
+        private static readonly object _dockIconLock = new object();
+        private static string _dockIconStamp;
+        private static string _dockIconTag;
+
+        // splice the dock icon set in as window.RK_ICONS before </head>, same shape as InjectThemeStyle. the icons
+        // live as .svg files organised in subfolders of icons/ (player/, action/, nav/, ...); the dock html pulls
+        // their inner markup from this map, keyed by "<folder>/<name>" (see the ICON block in clips.html and the
+        // svg[data-i] init in settings.html). rebuilt only when a file mtime changes. icons/user/ holds .ico only.
+        private static string DockIconTag()
+        {
+            string dir = Constants.APP_ICONS_DIR;
+            if (!Directory.Exists(dir)) return "";
+            var files = Directory.GetFiles(dir, "*.svg", SearchOption.AllDirectories);
+            if (files.Length == 0) return "";
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            var sb = new StringBuilder(files.Length.ToString());
+            foreach (var f in files) sb.Append('|').Append(f).Append(':').Append(File.GetLastWriteTimeUtc(f).Ticks);
+            string stamp = sb.ToString();
+            lock (_dockIconLock)
+            {
+                if (stamp == _dockIconStamp && _dockIconTag != null) return _dockIconTag;
+                var map = new JObject();
+                foreach (var f in files)
+                {
+                    string key = f.Substring(dir.Length).TrimStart('\\', '/').Replace('\\', '/');
+                    if (key.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) key = key.Substring(0, key.Length - 4);
+                    map[key] = File.ReadAllText(f).Trim();
+                }
+                // escape < > so nothing in an svg can break out of the <script> block or be read as a tag
+                string json = map.ToString(Formatting.None).Replace("<", "\\u003c").Replace(">", "\\u003e");
+                _dockIconStamp = stamp;
+                _dockIconTag = "<script>window.RK_ICONS=" + json + ";</script>";
+                return _dockIconTag;
+            }
+        }
+
+        private static byte[] InjectDockIcons(byte[] html)
+        {
+            try
+            {
+                string tag = DockIconTag();
+                if (string.IsNullOrEmpty(tag)) return html;
+                string s = System.Text.Encoding.UTF8.GetString(html);
+                int i = s.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+                if (i < 0) return html;
+                return new UTF8Encoding(false).GetBytes(s.Substring(0, i) + tag + s.Substring(i));
+            }
+            catch { return html; }
+        }
+
         public static void ServeHtml(Stream stream, string filename)
         {
             var candidates = new[]
@@ -126,6 +176,7 @@ namespace ReplayKitHelper
                     {
                         byte[] bytes = File.ReadAllBytes(f);
                         bytes = InjectThemeStyle(bytes);
+                        bytes = InjectDockIcons(bytes);
                         var h = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
                         SendBytes(stream, 200, "OK", h, bytes);
                         return;
