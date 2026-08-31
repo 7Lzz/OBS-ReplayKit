@@ -79,9 +79,13 @@ namespace ReplayKitHelper
             request.KeepAlive = true;
             request.Proxy = null;
             request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
-            request.Timeout = 120000;
+            // AllowWriteStreamBuffering is off, so Timeout bounds the whole request -- the body upload included -- and a flat 120s aborted (RequestCanceled, mid-transfer, no retry) any clip that took longer than that to send. scale it to the file size at a 64 KB/s worst-case floor (min 15 min) so a real upload is never cut short; ReadWriteTimeout below stays the per-write stall guard that actually fails a dead connection.
+            request.Timeout = (int)Math.Min(int.MaxValue, Math.Max(15L * 60 * 1000, fileLen / (64 * 1024) * 1000));
             request.ReadWriteTimeout = 120000;
             request.AutomaticDecompression = DecompressionMethods.None;
+            // one big streamed POST: skip the expect/100-continue round-trip before the body, and turn nagle off so the last sub-mss buffer isnt held back. scoped to the s3 endpoints ServicePoint, nothing else in the helper hits s3.amazonaws.com.
+            request.ServicePoint.Expect100Continue = false;
+            request.ServicePoint.UseNagleAlgorithm = false;
 
             var reg = cancelToken.Register(() => { try { request.Abort(); } catch { } });
             try
@@ -92,7 +96,8 @@ namespace ReplayKitHelper
                     long sent = 0;
                     int lastPct = -1;
                     var lastAt = DateTime.UtcNow;
-                    var buf = new byte[128 * 1024];
+                    // 1 MiB blocks -- fewer read/write syscalls over a multi-GB body
+                    var buf = new byte[1024 * 1024];
                     using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, buf.Length, FileOptions.SequentialScan))
                     {
                         int n;
@@ -259,8 +264,14 @@ namespace ReplayKitHelper
                     catch (OperationCanceledException) { return new UploadOutcome { Ok = false, Message = "Cancelled" }; }
                     catch (WebException wex) when (attempt < 3 && IsTransientWebError(wex) && !cancelToken.IsCancellationRequested)
                     {
-                        Log.Write("Step 2: attempt " + attempt + " failed (" + wex.Status + "), retrying in 1s...", "upload", requestId);
-                        Thread.Sleep(1000);
+                        Log.Write("Step 2: attempt " + attempt + " failed (" + wex.Status + "), retrying in 3s...", "upload", requestId);
+                        Thread.Sleep(3000);
+                    }
+                    // a long upload spends minutes on the wire, so a mid-transfer socket drop (or ReadWriteTimeout surfacing as IOException rather than WebException) is a normal transient -- retry the same as a WebException instead of hard-failing.
+                    catch (IOException ioex) when (attempt < 3 && !cancelToken.IsCancellationRequested)
+                    {
+                        Log.Write("Step 2: attempt " + attempt + " failed (io: " + ioex.Message + "), retrying in 3s...", "upload", requestId);
+                        Thread.Sleep(3000);
                     }
                 }
                 if (s3Status < 200 || s3Status >= 300)
@@ -318,13 +329,7 @@ namespace ReplayKitHelper
                 Log.Write("DONE: " + finalUrl, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "done", "done", 100, url: finalUrl);
 
-                // push to clipboard so the link can be pasted anywhere immediately without looking at the dock. runs on a one-shot STA thread (via StaRunner) since this worker is an MTA thread-pool task and Clipboard is an OLE call. wrapped seperately (unlike the ps original) so a clipboard hiccup -- another app briefly holding an exclusive lock, a real and observed windows quirk -- cant flip an already-successful upload into a reported failure. skipped for quiet (bulk) uploads: N copies in a row just leave the last one, useless.
-                if (!quiet)
-                {
-                    try { StaRunner.Run(() => System.Windows.Forms.Clipboard.SetText(finalUrl)); }
-                    catch (Exception ex) { Log.Write("clipboard copy failed (non-fatal): " + ex.Message, "upload", requestId); }
-                }
-
+                // clipboard copy + the "link copied" toast now wait for streamables transcode to actually finish -- the transcode poll worker (TranscodePollWorker) does both when status reaches 2, so a link that isnt watchable yet never lands on the clipboard.
                 return new UploadOutcome { Ok = true, Url = finalUrl };
             }
             catch (Exception ex)

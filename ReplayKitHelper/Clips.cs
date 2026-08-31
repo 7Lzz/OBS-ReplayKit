@@ -202,6 +202,48 @@ namespace ReplayKitHelper
             }
         }
 
+        // drop the streamable link + its transcode state from a clips_db entry (the "remove link" action on a failed / unwanted upload). keeps the cmp_* compress-history fields; removes the whole entry if nothing else was on it. returns false when there was no entry to touch.
+        public static bool RemoveLink(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            lock (Server.State.ClipsMetaLock)
+            {
+                var db = ReadClipsDb();
+                if (!(db[name] is JObject entry)) return false;
+                foreach (var k in new[] { "url", "uploaded_at", "retention_days", "shortcode", "ready", "transcode_status", "transcode_percent", "failed", "transcode_error" })
+                    entry.Remove(k);
+                if (entry.Count > 0) db[name] = entry;
+                else db.Remove(name);
+                SaveClipsDb(db);
+                AppConfig.ClearClipsCache();
+                return true;
+            }
+        }
+
+        // copy a clip file to "<name> (copy).<ext>" (or " (copy 2)", " (copy 3)" ...) in the same folder, keeping the source mtime so it sorts right next to the original. the copy starts fresh -- no clips_db entry is carried over, so it has no link / favorite / compress marker.
+        public static JObject DuplicateClip(SafeClipPath src)
+        {
+            if (src == null || !File.Exists(src.Full))
+                return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
+            try
+            {
+                string dir = Path.GetDirectoryName(src.Full);
+                string baseName = Path.GetFileNameWithoutExtension(src.Full);
+                string ext = Path.GetExtension(src.Full);
+                string dest = Path.Combine(dir, baseName + " (copy)" + ext);
+                for (int i = 2; File.Exists(dest); i++) dest = Path.Combine(dir, baseName + " (copy " + i + ")" + ext);
+                File.Copy(src.Full, dest);
+                try { File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(src.Full)); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                AppConfig.ClearClipsCache();
+                return new JObject { ["ok"] = true, ["name"] = Path.GetFileName(dest) };
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return new JObject { ["ok"] = false, ["message"] = ex.Message };
+            }
+        }
+
         public static string GetClipIndexSignature()
         {
             string path = AppConfig.GetClipIndexPath();
@@ -650,10 +692,12 @@ namespace ReplayKitHelper
                 int end = Math.Min(total - 1, safeOffset + safeLimit - 1);
                 page = items.GetRange(safeOffset, end - safeOffset + 1);
             }
+            int linked = items.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
             var payload = new JObject
             {
                 ["version"] = Server.State.ClipsCacheVersion + "|sort:" + safeSort,
                 ["total"] = total,
+                ["linked"] = linked,
                 ["offset"] = safeOffset,
                 ["limit"] = safeLimit,
                 ["sort"] = safeSort,

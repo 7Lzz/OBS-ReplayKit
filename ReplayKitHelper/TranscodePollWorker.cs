@@ -13,7 +13,7 @@ namespace ReplayKitHelper
     {
         private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
 
-        public static int Run(string shortcode, string clipName, string dbPath, string api, string logPath, string cookieJar)
+        public static int Run(string shortcode, string clipName, string dbPath, string api, string logPath, string cookieJar, bool quiet = false)
         {
             void L(string m)
             {
@@ -28,7 +28,33 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
 
-            L("start clip='" + clipName + "'");
+            L("start clip='" + clipName + "' quiet=" + quiet);
+
+            bool readyNotified = false;
+            // fires once when streamable reports the video watchable (status 2): copies the link + shows the "clip ready" balloon. this is where the copy/toast live now -- the upload flow no longer does it, so a not-yet-playable link never lands on the clipboard. skipped for quiet (bulk / resumed-after-restart) polls.
+            void NotifyReady()
+            {
+                if (quiet || readyNotified) return;
+                readyNotified = true;
+                string url = "https://streamable.com/" + shortcode;
+                try { StaRunner.Run(() => System.Windows.Forms.Clipboard.SetText(url)); }
+                catch (Exception ex) { L("clipboard copy failed: " + ex.Message); }
+                // hand the toast to the running helper -- it has the settings loaded so the replaykit / custom icon resolves, and a real message pump. only fall back to a self-hosted balloon if the helper is gone (obs closed mid-transcode).
+                bool handed = false;
+                try
+                {
+                    var r = Curl.Run("-s", "-S", "--max-time", "5", "-X", "POST",
+                        "http://127.0.0.1:8767/internal/clip-ready?url=" + Uri.EscapeDataString(url) + "&name=" + Uri.EscapeDataString(clipName ?? ""));
+                    handed = r.ExitCode == 0 && (r.Stdout + r.Stderr).IndexOf("\"ok\":true", StringComparison.Ordinal) >= 0;
+                }
+                catch (Exception ex) { L("clip-ready POST failed: " + ex.Message); }
+                if (!handed)
+                {
+                    try { Upload.ShowUploadToast(url, clipName); }
+                    catch (Exception ex) { L("fallback toast failed: " + ex.Message); }
+                }
+                L("ready -> link copied, toast handed=" + handed);
+            }
 
             DateTime deadline = DateTime.Now.AddMinutes(30);
             string scratchDir = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch");
@@ -73,7 +99,8 @@ namespace ReplayKitHelper
                         {
                             var obj = JObject.Parse(body);
                             if (obj["status"] != null) status = obj["status"].Value<int>();
-                            if (obj["percentage_complete"] != null) percent = obj["percentage_complete"].Value<int>();
+                            // streamables field is "percent" (0-100) -- the old "percentage_complete" never existed on this response, so the dock only ever saw 0 and showed "Processing..." with no number.
+                            if (obj["percent"] != null) percent = obj["percent"].Value<int>();
                         }
                         catch (JsonException) { }
                     }
@@ -96,7 +123,7 @@ namespace ReplayKitHelper
                 string stateKey = status.Value + "|" + percent;
                 if (stateKey == lastWritten)
                 {
-                    if (status.Value >= 2) break;
+                    if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
                     continue;
                 }
                 lastWritten = stateKey;
@@ -121,7 +148,7 @@ namespace ReplayKitHelper
                     L("db update failed: " + ex.Message);
                 }
 
-                if (status.Value >= 2) break;
+                if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
             }
 
             if (DateTime.Now >= deadline)

@@ -375,6 +375,17 @@ protected:
 		hide();
 		event->ignore();
 	}
+	// minimize is treated exactly like close -- hide the window instead of leaving a taskbar stub, and drop the WindowMinimized bit so the next ShowClips/ToggleClips brings it back at its normal (or maximized) size rather than still-minimized; deferred one tick since clearing the state mid WindowStateChange fights the window managers own minimize animation.
+	void changeEvent(QEvent *event) override
+	{
+		QWidget::changeEvent(event);
+		if (event->type() == QEvent::WindowStateChange && isMinimized()) {
+			QTimer::singleShot(0, this, [this]() {
+				hide();
+				setWindowState(windowState() & ~Qt::WindowMinimized);
+			});
+		}
+	}
 	void moveEvent(QMoveEvent *event) override
 	{
 		QWidget::moveEvent(event);
@@ -386,6 +397,13 @@ protected:
 		ScheduleClipsGeometrySave();
 	}
 };
+
+// clear a leftover WindowMinimized bit before showing so a Clips window that was minimized then hidden comes back at its real size instead of a taskbar stub; keeps WindowMaximized intact.
+static void UnminimizeClips()
+{
+	if (g_clipsWindow)
+		g_clipsWindow->setWindowState(g_clipsWindow->windowState() & ~Qt::WindowMinimized);
+}
 
 void RefreshAppIcon(); // defined below -- re-pushes the app icon to obs + our own windows
 static void ApplyAuxWindowIcon(QWidget *w, HICON *owned, int *tagged, const wchar_t *aumid); // defined below
@@ -496,6 +514,7 @@ void ShowClips()
 	if (g_clipsWindow) {
 		if (!g_clipsWindow->isVisible() && g_clipsBrowser)
 			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
+		UnminimizeClips();
 		g_clipsWindow->show();
 		g_clipsWindow->raise();
 		g_clipsWindow->activateWindow();
@@ -596,6 +615,7 @@ void ToggleClips()
 		}
 		if (g_clipsBrowser)
 			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
+		UnminimizeClips();
 		g_clipsWindow->show();
 		g_clipsWindow->raise();
 		g_clipsWindow->activateWindow();

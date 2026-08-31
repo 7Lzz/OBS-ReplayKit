@@ -20,6 +20,38 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["required"] = true, ["path"] = authJar };
         }
 
+        // the 10-minute cap is a free/anon-tier limit -- any recognised paid plan uploads clips of any length.
+        public static bool SubjectToStreamableDurationLimit()
+        {
+            var a = Server.State.Auth;
+            return !a.SignedIn || string.IsNullOrEmpty(a.Plan) || string.Equals(a.Plan, "free", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // pre-flight against streamables 10-min free-tier limit: probe the clips duration and reject before the (multi-minute) upload instead of letting it fail transcode with "Video too long". returns the error JObject to send back, or null to proceed. fails open -- a probe failure just lets the upload run.
+        public static JObject CheckStreamableDuration(string path)
+        {
+            if (!SubjectToStreamableDurationLimit()) return null;
+            try
+            {
+                var meta = Compression.GetVideoMetadata(Compression.FindCompressionFfprobe(), Compression.FindCompressionFfmpeg(), path);
+                if (!meta.Ok || meta.Duration <= Constants.STREAMABLE_FREE_MAX_DURATION_SEC) return null;
+                int total = (int)Math.Round(meta.Duration);
+                string mmss = (total / 60) + ":" + (total % 60).ToString("D2");
+                return new JObject
+                {
+                    ["ok"] = false,
+                    ["tooLong"] = true,
+                    ["durationSec"] = total,
+                    ["message"] = "Clip is " + mmss + " long. Streamable's limit is 10 minutes -- trim it shorter first.",
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Write("CheckStreamableDuration probe failed (allowing upload): " + ex.Message, "upload");
+                return null;
+            }
+        }
+
         public static JObject StartStreamableUpload(Clips.SafeClipPath selected, string uploadPath = "", string displayName = "", bool quiet = false)
         {
             AppConfig.LoadConfig();
@@ -47,6 +79,13 @@ namespace ReplayKitHelper
                 string msg = "Upload file not found: " + uploadFull;
                 UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
                 return new JObject { ["ok"] = false, ["message"] = msg };
+            }
+
+            var tooLong = CheckStreamableDuration(uploadFull);
+            if (tooLong != null)
+            {
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: tooLong["message"].Value<string>());
+                return tooLong;
             }
 
             var fi = new FileInfo(uploadFull);
@@ -134,54 +173,44 @@ namespace ReplayKitHelper
 
             UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100, tempPath: "");
 
-            // quiet = part of a bulk selection; the dock shows per-card "Copy Link" + a summary toast, so skip the windows balloon.
-            if (!quiet) ShowUploadToast(result);
-
-            if (!string.IsNullOrEmpty(shortcode)) StartTranscodePoll(shortcode, clipName);
+            // the "link copied" toast + the actual clipboard write are deferred to TranscodePollWorker (fires on streamable status 2) so the link isnt handed over until the video is watchable. quiet (bulk) still suppresses both.
+            if (!string.IsNullOrEmpty(shortcode)) StartTranscodePoll(shortcode, clipName, quiet);
         }
 
-        // windows balloon-tip notification: the upload finished and the link is on the clipboard. runs on its own one-shot sta thread with a short DoEvents pump -- NotifyIcon/ShowBalloonTip needs a message loop to actually paint and auto-dismiss, which this Task continuation (a plain threadpool thread) doesnt have. the ps original spawned a whole seperate powershell.exe for this since its watcher runspace was mta and had no easy way to get an sta thread with a pump; a background thread is the direct equivalent here and skips a process spawn entirely.
-        // the Appearance-tab icon for the balloon tip, or null to fall back to the system info glyph. a fresh Icon per toast (disposed with the NotifyIcon) -- Icon(path) loads the closest frame to the default small size.
-        private static System.Drawing.Icon LoadReplayKitToastIcon()
+        // resolve a real .ico for the toast -- the appearance-tab custom/preset icon, else the bundled replaykit .ico. tries a couple of fixed locations so it still works from the detached poll process where the settings path may not resolve. never returns the system info glyph.
+        internal static string ResolveToastIconPath()
         {
-            string path = ReplaykitSettings.EffectiveReplayKitIconPath();
-            if (string.IsNullOrEmpty(path)) return null;
-            try { return new System.Drawing.Icon(path, 32, 32); }
-            catch (Exception ex) when (ex is IOException || ex is ArgumentException) { return null; }
-        }
-
-        private static void ShowUploadToast(string url)
-        {
-            var thread = new Thread(() =>
+            try
             {
-                try
-                {
-                    using (var icon = new System.Windows.Forms.NotifyIcon())
-                    {
-                        icon.Icon = LoadReplayKitToastIcon() ?? System.Drawing.SystemIcons.Information;
-                        icon.Visible = true;
-                        icon.ShowBalloonTip(5000, "OBS clip uploaded", "Link copied to clipboard\n" + url, System.Windows.Forms.ToolTipIcon.Info);
-                        var deadline = DateTime.UtcNow.AddSeconds(6);
-                        while (DateTime.UtcNow < deadline)
-                        {
-                            System.Windows.Forms.Application.DoEvents();
-                            Thread.Sleep(100);
-                        }
-                        icon.Visible = false;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Write("toast notification failed: " + ex.Message, "upload");
-                }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.IsBackground = true;
-            thread.Start();
+                string p = ReplaykitSettings.EffectiveReplayKitIconPath();
+                if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+            }
+            catch { }
+            foreach (var cand in new[]
+            {
+                Constants.OBS_ICON_PATH,
+                Path.Combine(Constants.APP_ICONS_DIR, "replaykit.ico"),
+                Path.Combine(Constants.HelperRoot, "obs-replaykit.ico"),
+            })
+            {
+                try { if (!string.IsNullOrEmpty(cand) && File.Exists(cand)) return cand; }
+                catch { }
+            }
+            return null;
+        }
+
+        // "Clip Uploaded" toast once streamable finishes. delegates to ToastNotify (real action-center notification via the start-menu shortcut + ToastNotificationManager) -- the shell falls back to a transient Shell_NotifyIcon balloon otherwise, which win11 shows with a generic (i) and doesnt keep in the notification list. link is NOT in the body -- its already on the clipboard.
+        internal static void ShowUploadToast(string url, string clipName = "")
+        {
+            string shownName = string.IsNullOrEmpty(clipName) ? "" : Path.GetFileNameWithoutExtension(clipName);
+            string body = string.IsNullOrEmpty(shownName)
+                ? "Your clip is ready and the link is on your clipboard"
+                : "Your \"" + shownName + "\" is ready, link copied to clipboard";
+            ToastNotify.Show("Clip Uploaded", body, ResolveToastIconPath());
         }
 
         // background transcode poller. streamables /transcode call only queues encoding; the video isnt watchable until the status field on /api/v1/videos/<shortcode> reaches 2. spawned detached (CREATE_BREAKAWAY_FROM_JOB) as this same exe running its hidden --transcode-poll mode, rather than a plain Task, becuase a plain in-process worker dies with the helper the instant obs/the helper exits -- confirmed 2026-08-19 (in the ps original) this was leaving clips permanently stuck showing "processing" even long after streamable had actually finished, since nothing ever resumed a poll that got killed mid-flight.
-        private static void StartTranscodePoll(string shortcode, string clipName)
+        private static void StartTranscodePoll(string shortcode, string clipName, bool quiet = false)
         {
             try
             {
@@ -201,13 +230,48 @@ namespace ReplayKitHelper
                     " -DbPath " + ProcessArgs.Quote(dbPath) +
                     " -Api " + ProcessArgs.Quote(Constants.STREAMABLE_API) +
                     " -LogPath " + ProcessArgs.Quote(logPath) +
-                    " -CookieJar " + ProcessArgs.Quote(cookieJar);
+                    " -CookieJar " + ProcessArgs.Quote(cookieJar) +
+                    " -Quiet " + (quiet ? "1" : "0");
                 Native.SpawnDetached(cmdLine, Constants.HelperRoot);
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
             {
                 Log.Write("Could not start transcode poll worker: " + ex.Message, "upload");
             }
+        }
+
+        // re-arm transcode polls at helper start for clips still mid-processing. the detached poll worker normally outlives a graceful restart, but a kill / crash / reboot leaves the clip frozen on "Processing" with nothing to update transcode_percent -- this catches those. a redundant poll when one did survive is harmless (both write the same values, atomic replace, both self-terminate at status>=2 or the 30-min deadline). bounded at 90 min since upload -- 3x the worker deadline, past which the clip is done or dead either way.
+        public static void ResumeTranscodePollsAtStartup()
+        {
+            JObject db;
+            try { db = Clips.ReadClipsDb(); }
+            catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: read db: " + ex.Message, "upload"); return; }
+            if (db == null) return;
+
+            long nowSec = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            int armed = 0;
+            foreach (var prop in db.Properties())
+            {
+                if (!(prop.Value is JObject e)) continue;
+                // clips_db stores the raw "shortcode" + "url"; the /clips response renames url -> streamable_url, so read the db field names here.
+                string shortcode = e["shortcode"]?.Value<string>();
+                if (string.IsNullOrEmpty(shortcode))
+                {
+                    var m = Regex.Match(e["url"]?.Value<string>() ?? "", @"^https://streamable\.com/([A-Za-z0-9_-]+)$");
+                    if (m.Success) shortcode = m.Groups[1].Value;
+                }
+                if (string.IsNullOrEmpty(shortcode)) continue;
+                bool ready = e["ready"]?.Value<bool>() ?? false;
+                int? ts = e["transcode_status"]?.Value<int?>();
+                // 2 = ready, 3 = failed, 4 = timed out -- only null/0/1 are still worth polling.
+                if (ready || ts == 2 || ts == 3 || ts == 4) continue;
+                long uploadedAt = e["uploaded_at"]?.Value<long>() ?? 0;
+                if (uploadedAt <= 0 || nowSec - uploadedAt > 90 * 60) continue;
+                // resumed after a restart -- the user has moved on, so no toast / clipboard-hijack when it finishes; the dock card still flips to "Copy Link".
+                StartTranscodePoll(shortcode, prop.Name, quiet: true);
+                armed++;
+            }
+            if (armed > 0) Log.Write("ResumeTranscodePollsAtStartup: re-armed " + armed + " transcode poll(s)", "upload");
         }
     }
 }

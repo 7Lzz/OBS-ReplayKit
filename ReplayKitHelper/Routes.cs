@@ -1197,6 +1197,39 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/internal/clip-ready")
+            {
+                // the detached transcode poll worker calls this once streamable finishes encoding -- the helper shows the "clip ready" toast (its settings are loaded, so the replaykit/custom icon resolves; the poll workers arent). clipboard was already set by the worker.
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string readyUrl = Q("url");
+                if (Regex.IsMatch(readyUrl, @"^https://streamable\.com/[A-Za-z0-9_-]+$"))
+                {
+                    try { Upload.ShowUploadToast(readyUrl, Q("name")); } catch (Exception ex) { Log.Write("/internal/clip-ready toast: " + ex.Message, "upload"); }
+                }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            if (path == "/remove-link")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
+                bool removed = Clips.RemoveLink(selected.Name);
+                HttpResponse.SendJson(stream, removed ? 200 : 404, new JObject { ["ok"] = removed });
+                return false;
+            }
+
+            if (path == "/duplicate-clip")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
+                var result = Clips.DuplicateClip(selected);
+                HttpResponse.SendJson(stream, result["ok"]?.Value<bool>() == true ? 200 : 400, result);
+                return false;
+            }
+
             if (path == "/cancel-upload")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

@@ -510,7 +510,8 @@
   .card.is-theater-card {
     position: fixed !important;
     z-index: 40;
-    inset: 58px 14px 14px;
+    /* !important -- `#grid .card { left:0; top:0 }` (id selector) otherwise beats this shorthand left/top and pins the stage flush to the top-left wall while right/bottom keep their 14px. */
+    inset: 58px 14px 14px !important;
     width: auto !important;
     height: auto !important;
     transform: none !important;
@@ -1790,6 +1791,10 @@
     animation: progress-sheen 1s linear infinite;
   }
   @keyframes progress-sheen { from { background-position: 140% 0; } to { background-position: -60% 0; } }
+  /* streamable transcode readout -- same bar mechanism as upload but amber, full-width (no cancel X, you cant cancel a server-side transcode), and the link stays uncopyable until it finishes. */
+  .btn.is-progress.is-transcode { padding: 0 12px; }
+  .btn.is-progress.is-transcode .progress-track { right: 12px; }
+  .btn.is-progress.is-transcode .progress-fill { background: var(--amber); }
   .btn.is-progress > .btn-icon,
   .btn.is-progress > .btn-label {
     display: none;
@@ -1816,6 +1821,25 @@
   }
   .btn.is-progress > .progress-cancel:hover { background: transparent; color: var(--red); }
   .btn.is-progress > .progress-cancel svg { width: 10px; height: 10px; fill: currentColor; }
+  /* "remove link" X on a failed upload -- same treatment as the upload bar cancel X, pushed to the right end of the action row. */
+  .actions .link-remove-btn {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text_muted);
+    cursor: pointer;
+    transition: color 80ms ease-out;
+  }
+  .actions .link-remove-btn:hover { background: transparent; color: var(--red); }
+  .actions .link-remove-btn svg { width: 10px; height: 10px; fill: currentColor; }
   .toast {
     position: fixed;
     right: 14px;
@@ -3034,6 +3058,7 @@
     CONTENT_CUT: _svgInner(_RKI["action/content-cut"]),
     CONTENT_COPY: _svgInner(_RKI["action/content-copy"]),
     COMPRESS: _svgInner(_RKI["action/compress"]),
+    DUPLICATE: _svgInner(_RKI["action/duplicate"]),
     PLAY: _svgInner(_RKI["player/play"]),
     PAUSE: _svgInner(_RKI["player/pause"]),
     FULLSCREEN_EXIT: _svgInner(_RKI["player/fullscreen-exit"]),
@@ -3210,6 +3235,8 @@
   let didInitialClipRender = false;
   let clipsPageVersion = "";
   let clipsTotal = 0;
+  // linked count for the whole clip set (not just the loaded page) -- the backend /clips page response carries it. lets the Linked tab badge be right before you click it.
+  let clipsLinkedTotal = 0;
   let clipsNextOffset = 0;
   let clipsLoadingMore = false;
   let clipSortPreparing = false;
@@ -3681,11 +3708,13 @@
 
   function updateTabs(source) {
     source = Array.isArray(source) ? source : [];
+    // favorites + linked count the whole clip set, not just the loaded page -- favoriteNames is the full stored set, clipsLinkedTotal comes from the /clips page response. (they were being computed off `source`, i.e. only the loaded rows, so the badges read low until you opened the tab.)
+    const linkedTotal = clipsLinkedTotal || source.filter(c => !!c.streamable_url).length;
     const counts = {
       all: clipsTotal || source.length,
-      favorites: source.filter(c => isFavorite(c.name)).length,
-      linked: source.filter(c => !!c.streamable_url).length,
-      local: source.filter(c => !c.streamable_url).length,
+      favorites: (typeof favoriteNames !== "undefined" && favoriteNames.size) || source.filter(c => isFavorite(c.name)).length,
+      linked: linkedTotal,
+      local: Math.max(0, (clipsTotal || source.length) - linkedTotal),
     };
     for (const btn of tabBtns) {
       const key = btn.dataset.filter;
@@ -4289,6 +4318,7 @@
       paged: true,
       version: String((data && data.version) || ""),
       total: Math.max(0, Number((data && data.total) || clips.length) || 0),
+      linked: Math.max(0, Number(data && data.linked) || 0),
       offset: Math.max(0, Number((data && data.offset) || requestedOffset) || 0),
       clips,
     };
@@ -4323,12 +4353,14 @@
     if (!page.paged) {
       clipsPageVersion = page.version;
       clipsTotal = page.total;
+      clipsLinkedTotal = page.linked;
       clipsNextOffset = page.clips.length;
       return page.clips;
     }
     const sameVersion = page.version && page.version === clipsPageVersion;
     clipsPageVersion = page.version;
     clipsTotal = page.total;
+    clipsLinkedTotal = page.linked;
     clipsNextOffset = Math.min(page.total, page.offset + page.clips.length);
     if (sameVersion && loadedClips.length) {
       return mergeClipsPage(page, loadedClips);
@@ -4352,6 +4384,7 @@
         return;
       }
       clipsTotal = page.total;
+      clipsLinkedTotal = page.linked;
       clipsNextOffset = Math.min(page.total, page.offset + page.clips.length);
       const merged = mergeClipsPage(page, loadedClips);
       const byName = new Map(lastClipsByName);
@@ -4446,7 +4479,9 @@
     if (!urlsByName.size) return clips;
     const applyLink = (clip) => {
       const url = clip && urlsByName.get(clip.name);
-      return url && clip.streamable_url !== url ? { ...clip, streamable_url: url } : clip;
+      if (!url || clip.streamable_url === url) return clip;
+      // stamp the same initial transcode state the helpers MarkUploaded writes, so the card goes straight to the amber "processing" bar instead of flashing "Copy Link" + "link NaNm left" before the next /clips lands.
+      return { ...clip, streamable_url: url, ready: false, transcode_status: 1, transcode_percent: 0 };
     };
     resolvedFavoriteClips = resolvedFavoriteClips.map(applyLink);
     return clips.map(applyLink);
@@ -4521,6 +4556,11 @@
         err.tooBig = true;
         err.sizeMb = Number(data.sizeMb) || 0;
         err.capMb  = Number(data.capMb)  || 0;
+      }
+      // over streamables 10-min limit -- no compress fix (compression doesnt shorten), just a clear message.
+      if (data.tooLong) {
+        err.tooLong = true;
+        err.durationSec = Number(data.durationSec) || 0;
       }
       // helper returns busy=true (409) at the concurrency cap. the bulk queue backs off and retries instead of failing the clip.
       if (data.busy) err.busy = true;
@@ -4907,6 +4947,10 @@
                   <span>Edit name</span>
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
                 </div>
+                <div class="menu-item duplicate-menu-item">
+                  <span>Duplicate</span>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.DUPLICATE}</svg>
+                </div>
                 <div class="menu-item trim-clip-item">
                   <span>Edit clip</span>
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
@@ -5056,6 +5100,11 @@
     // first fill once metadata is in (so total time replaces the placeholder "0:00" the markup ships with).
     video.addEventListener("loadedmetadata", setTimeDisplay);
     video.addEventListener("timeupdate",     setTimeDisplay);
+    // the raf-driven progress fill (tickProgress below) only runs while playing, so an arrow-key / scrub seek on a PAUSED video left the bar frozen at the old spot. repaint it here on every seek.
+    video.addEventListener("seeked", () => {
+      setTimeDisplay();
+      if (video.duration > 0) progressFill.style.width = (video.currentTime / video.duration * 100) + "%";
+    });
     // block dblclick from exiting fullscreen. two redundant guards becuase chromium has multiple paths that can toggle fullscreen off, and we want to be sure none of them fire from a dblclick: on the <video>: chromiums mediaelementscontroller used to respond to a video-level dblclick by toggling fullscreen. since we now fullscreen the .preview container (not the <video>) that path is mostly inert, but the listener stays as belt-and-suspenders in case cef behaviour drifts. on the .preview container: a dblclick on the now-fullscreen <div> can still bubble to a parent handler that calls exitfullscreen. preventdefault + stoppropagation + capture phase + a stopimmediatepropagation kills every pathway. esc and the in-overlay close button still work -- they go thru document.exitfullscreen() directly, not dom dblclick.
     const blockDblclick = (e) => {
       e.preventDefault();
@@ -5605,6 +5654,26 @@
       const currentClip = currentClipForCard(card);
       if (currentClip) openTrimModal(currentClip);
     });
+    card.querySelector(".duplicate-menu-item").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      closeCardMenu(menuDropdown);
+      const name = card.dataset.name;
+      if (!name) return;
+      try {
+        const res = await fetch(HELPER + "/duplicate-clip?file=" + encodeURIComponent(name) + "&t=" + Date.now(),
+                                { method: "POST", cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+        // force a fresh, non-merged clips fetch so the copy shows up on the next tick.
+        clipsPageVersion = "";
+        scheduleNextPoll(0);
+        showToast("Duplicated " + escapeHtml(displayClipName(name)), "info");
+        scheduleToastHide(2200);
+      } catch (err) {
+        showToast("Duplicate failed: " + escapeHtml(err.message || err));
+        scheduleToastHide(TOAST_ERROR_MS);
+      }
+    });
     card.querySelector(".clipboard-clip-item").addEventListener("click", async (e) => {
       e.stopPropagation();
       closeCardMenu(menuDropdown);
@@ -5947,7 +6016,7 @@
   document.addEventListener("fullscreenchange", handleHostFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleHostFullscreenChange);
 
-  function updateDisplayProgress(name, fill, reportedPercent) {
+  function updateDisplayProgress(name, fill, reportedPercent, smoothTime) {
     const reported = Math.max(0, Math.min(100, Number(reportedPercent) || 0));
     let v = progressVisuals.get(name);
     if (!v) {
@@ -5960,13 +6029,13 @@
     fill.style.width = v.displayed.toFixed(3) + "%";
     if (v.raf) return;
     v.lastT = 0;
-    // critically-damped follow (unity-style SmoothDamp): the fill carries a velocity, so a coarse jump in the reported percent (curl reports ~1/s in big steps) bends its path instead of restarting an ease -- kills the stop-and-go at each reported point. smoothTime ~= how long to close most of a gap; the bar trails real progress by a hair and is always moving.
-    const smoothTime = 0.6;
+    // critically-damped follow (unity-style SmoothDamp): the fill carries a velocity, so a coarse jump in the reported percent bends its path instead of restarting an ease -- kills the stop-and-go at each reported point. st ~= how long to close most of a gap: 0.6 for the ~1/s upload meter, larger for the transcode bar whose samples land ~5s apart (so it glides the whole gap instead of snapping then sitting).
+    const st = (typeof smoothTime === "number" && smoothTime > 0) ? smoothTime : 0.6;
     const step = (now) => {
       if (progressVisuals.get(name) !== v || !v.fill) { v.raf = 0; return; }
       const dt = v.lastT ? Math.min(0.05, (now - v.lastT) / 1000) : 0.016;
       v.lastT = now;
-      const omega = 2 / smoothTime;
+      const omega = 2 / st;
       const x = omega * dt;
       const expf = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
       const change = v.displayed - v.target;
@@ -6016,6 +6085,9 @@
     const transPct   = Number(clip.transcode_percent) || 0;
     const stillTicking = (state === "compressing" || state === "uploading");
     const finalizing = stillTicking && uploadPhaseIsFinalizing(status);
+    // amber transcode bar while streamable processes; the link is only offered once it is playable (ready, or our poll timed out and we give it the benefit of the doubt). a failed transcode offers no link.
+    const showTranscodeBar = !!clip.streamable_url && processing && !stillTicking;
+    const showCopy = !!clip.streamable_url && !processing && !failed;
     const actionSig = [
       state,
       clip.streamable_url || "",
@@ -6038,25 +6110,60 @@
         return;
       }
     }
+    // same fast path for the amber transcode bar -- nudge the fill in place instead of rebuilding actions each poll.
+    if (showTranscodeBar) {
+      const tbar = actions.querySelector(".btn.is-progress.is-transcode");
+      if (tbar) {
+        card.dataset.actionSig = actionSig;
+        // ~4.5s smoothing -- streamables percent lands roughly every 5s, so the bar glides the whole gap instead of snapping in 0.6s then stalling.
+        updateDisplayProgress(clip.name, tbar.querySelector(".progress-fill"), transPct, 4.5);
+        return;
+      }
+    }
     if (!force && card.dataset.actionSig === actionSig) return;
     card.dataset.actionSig = actionSig;
     meta.querySelectorAll(".link-status, .link-status-dot").forEach(n => n.remove());
     actions.innerHTML = "";
-    actions.classList.toggle("is-progress", state === "compressing" || state === "uploading");
+    actions.classList.toggle("is-progress", state === "compressing" || state === "uploading" || showTranscodeBar);
+    // cleared here (before the transcode bar is (re)built below) so a fresh amber bar smooth-damps up from 0 instead of inheriting the upload bar target of 100. the poll-to-poll nudge goes through the fast path above, which returns before this line.
     if (state !== "compressing" && state !== "uploading") progressVisuals.delete(clip.name);
     const linkMenuItem = card.querySelector(".link-menu-item");
     if (linkMenuItem) {
       const label = linkMenuItem.querySelector(".menu-item-label");
       const icon = linkMenuItem.querySelector(".menu-item-icon");
       const busy = !clip.streamable_url && stillTicking;
-      linkMenuItem.classList.toggle("is-disabled", busy);
-      linkMenuItem.title = clip.streamable_url ? "Copy Link" : (busy ? "Creating link" : "Create Link");
+      const linkLocked = !!clip.streamable_url && (processing || failed);
+      // coerce to a real boolean -- CEF treats classList.toggle(cls, undefined) as a plain toggle, so `false || undefined` was flipping is-disabled ON for every eligible (never-linked) clip.
+      linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked));
+      linkMenuItem.title = showCopy ? "Copy Link"
+        : processing ? "Processing on Streamable"
+        : failed ? "Processing failed"
+        : busy ? "Creating link" : "Create Link";
       linkMenuItem.setAttribute("aria-label", linkMenuItem.title);
       if (label) label.textContent = linkMenuItem.title;
-      if (icon) icon.innerHTML = clip.streamable_url ? COPY_ICON : ICON.LINK;
+      if (icon) icon.innerHTML = showCopy ? COPY_ICON : ICON.LINK;
     }
 
-    if (clip.streamable_url) {
+    const addMetaStatus = (text, expiring) => {
+      const dot = document.createElement("span");
+      dot.className = "dot link-status-dot";
+      const span = document.createElement("span");
+      span.className = "link-status" + (expiring ? " is-expiring" : "");
+      span.textContent = text;
+      span.title = text;
+      meta.appendChild(dot);
+      meta.appendChild(span);
+    };
+
+    if (showTranscodeBar) {
+      // streamable transcodes server-side after the upload; the link is not offered until it is playable. amber bar tracks transcode_percent.
+      const bar = document.createElement("div");
+      bar.className = "btn is-progress is-transcode";
+      bar.title = "Processing on Streamable";
+      bar.innerHTML = '<span class="progress-track"><span class="progress-fill"></span></span>';
+      actions.appendChild(bar);
+      updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), transPct, 4.5);
+    } else if (showCopy) {
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
       btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${COPY_ICON}</svg><span class="btn-label">Copy Link</span>`;
@@ -6075,19 +6182,8 @@
       });
       actions.appendChild(btn);
 
-      // streamables transcode runs server-side after our upload succeeds. the link works immediately to share, but viewers see "were processing this video" until status flips to ready. surface that here so the user knows whether the link will play right now.
-      let statusText = "", statusExpiring = false;
-      if (failed) {
-        statusText = "Processing failed";
-        statusExpiring = true;
-      } else if (timedOut) {
-        statusText = "Status check timed out";
-        statusExpiring = true;
-      } else if (processing) {
-        statusText = transPct > 0
-          ? "Processing " + transPct + "%"
-          : "Processing…";
-        statusExpiring = true;
+      if (timedOut) {
+        addMetaStatus("Status check timed out", true);
       } else {
         const expiry = formatExpiry(clip.uploaded_at, clip.retention_days);
         if (expiry) {
@@ -6095,21 +6191,8 @@
           const retSec = (clip.retention_days || 2) * 86400;
           const remaining = retSec - (Math.floor(Date.now() / 1000) - clip.uploaded_at);
           const threshold = retSec > 7 * 86400 ? 24 * 3600 : 6 * 3600;
-          statusText = "Link " + expiry + " left";
-          statusExpiring = remaining < threshold;
+          addMetaStatus("Link " + expiry + " left", remaining < threshold);
         }
-      }
-      if (statusText) {
-        const dot = document.createElement("span");
-        dot.className = "dot link-status-dot";
-        const span = document.createElement("span");
-        span.className = "link-status" + (statusExpiring ? " is-expiring" : "");
-        span.textContent = statusText;
-        span.title = statusText === "Processing…" || statusText.startsWith("Processing ")
-          ? "Processing on Streamable"
-          : statusText;
-        meta.appendChild(dot);
-        meta.appendChild(span);
       }
     } else if (state === "compressing" || state === "uploading") {
       // only built when the bar isnt already there (fresh card or a state flip into uploading) -- the fast path above keeps an existing bar alive across polls so the cancel X doesnt flash. the trailing X is the only cancel target, so aiming at the bar no longer turns the whole thing red.
@@ -6143,6 +6226,30 @@
       btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Create Link</span>`;
       btn.addEventListener("click", () => onCreateLink(clip.name, btn));
       actions.appendChild(btn);
+      // a failed transcode still has a (dead) streamable_url on the clip -- Create Link above retries; the X drops the dead link + the "Processing failed" note.
+      if (failed) {
+        addMetaStatus("Processing failed", true);
+        const x = document.createElement("button");
+        x.type = "button";
+        x.className = "link-remove-btn";
+        x.title = "Remove link";
+        x.setAttribute("aria-label", "Remove link");
+        x.innerHTML = '<svg viewBox="0 0 320.591 320.591" aria-hidden="true">' + CANCEL_ICON + '</svg>';
+        x.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          x.disabled = true;
+          const c = lastClipsByName.get(clip.name) || (loadedClips || []).find((z) => z && z.name === clip.name);
+          if (c) { delete c.streamable_url; delete c.transcode_status; delete c.transcode_percent; delete c.transcode_error; c.ready = undefined; }
+          clipsLinkedTotal = Math.max(0, clipsLinkedTotal - 1);
+          updateTabs(loadedClips);
+          try {
+            await fetch(HELPER + "/remove-link?file=" + encodeURIComponent(clip.name) + "&t=" + Date.now(), { method: "POST", cache: "no-store" });
+          } catch {}
+          rerenderCard(clip.name);
+          scheduleNextPoll(POLL_FAST_MS);
+        });
+        actions.appendChild(x);
+      }
     }
   }
 
@@ -6198,9 +6305,14 @@
           btn.disabled = false;
           label.textContent = "Create Link";
           rerenderCard(filename);
-          // "too big" -> offer the temp-compress path; "busy" -> the cap is full, say so plainly instead of a scary error; otherwise the generic toast.
+          // "too big" -> offer the temp-compress path; "too long" -> nothing to do but trim, say so; "busy" -> the cap is full, say so plainly instead of a scary error; otherwise the generic toast.
           if (e && e.tooBig) {
             openCompressModal(filename, e.sizeMb || 0, e.capMb || 0);
+          } else if (e && e.tooLong) {
+            const d = e.durationSec || 0;
+            const mmss = Math.floor(d / 60) + ":" + String(Math.round(d % 60)).padStart(2, "0");
+            showToast("Clip is " + mmss + " long. Streamable's limit is 10 minutes — trim it shorter first.", "bad");
+            scheduleToastHide(TOAST_ERROR_MS);
           } else if (e && e.busy) {
             showToast("Upload queue is full. Try that clip again in a moment.", "bad");
             scheduleToastHide(TOAST_ERROR_MS);

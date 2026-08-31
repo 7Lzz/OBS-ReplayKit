@@ -24,6 +24,8 @@ namespace ReplayKitHelper
         public const long ANON_SIZE_CAP = 250L * 1024 * 1024;
         public const int ANON_RETENTION_DAYS = 1;
         public const int SIGNED_IN_DEFAULT_RETENTION = 90;
+        // streamable free / anon tier caps a video at 10 minutes -- longer uploads fine then fail transcode with "Video too long".
+        public const int STREAMABLE_FREE_MAX_DURATION_SEC = 600;
         public const string STREAMABLE_API = "https://api-f.streamable.com";
         public const bool DEFAULT_LOG_ENABLED = false;
 
@@ -135,11 +137,15 @@ namespace ReplayKitHelper
         private static bool IsObsProcessName(string name) =>
             string.Equals(name, "obs64", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "obs", StringComparison.OrdinalIgnoreCase);
 
+        // hard ceiling on any upload from the free / anon tier. 0 = unlimited only applies to a recognised paid plan.
+        public const long HARD_UPLOAD_CAP = 1024L * 1024 * 1024;
+
         // size limit for the current auth state. 0 means unlimited.
         public static long GetEffectiveUploadCap()
         {
             long cap = Server.State.Auth.SizeCap;
-            return cap <= 0 ? 0 : cap;
+            if (cap > 0) return cap;                                        // basic / plus -- the plans own cap
+            return Upload.SubjectToStreamableDurationLimit() ? HARD_UPLOAD_CAP : 0;  // free/anon -> 1 GB, recognised pro -> unlimited
         }
 
         // retention to tag new uploads with. clips_db filtering still uses each entrys own stored retention_days, so an old anonymous link doesnt suddenly extend after signing in.

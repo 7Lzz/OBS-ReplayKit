@@ -83,7 +83,8 @@ namespace ReplayKitHelper
             string api = GetNamedArg(args, "-Api");
             string logPath = GetNamedArg(args, "-LogPath");
             string cookieJar = GetNamedArg(args, "-CookieJar");
-            return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar);
+            bool quiet = GetNamedArg(args, "-Quiet") == "1";
+            return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar, quiet);
         }
 
         private static int RunServer(string[] args)
@@ -148,6 +149,8 @@ namespace ReplayKitHelper
             try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { ReplaykitSettings.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
+            try { Upload.ResumeTranscodePollsAtStartup(); } catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: " + ex.Message); }
+            try { ToastNotify.EnsureRegistered(Upload.ResolveToastIconPath()); } catch (Exception ex) { Log.Write("ToastNotify.EnsureRegistered: " + ex.Message); }
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
 

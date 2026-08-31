@@ -375,6 +375,15 @@ namespace ReplayKitHelper
                 return new JObject { ["ok"] = false, ["message"] = msg };
             }
 
+            // compression shrinks bytes, not runtime -- a clip over streamables 10-min free limit still fails transcode, so stop it here too.
+            if (Upload.SubjectToStreamableDurationLimit() && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
+            {
+                int total = (int)Math.Round(duration);
+                string msg = "Clip is " + (total / 60) + ":" + (total % 60).ToString("D2") + " long. Streamable's limit is 10 minutes -- trim it shorter first.";
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                return new JObject { ["ok"] = false, ["message"] = msg, ["tooLong"] = true, ["durationSec"] = total };
+            }
+
             long targetBytes = (long)Math.Floor(effCap * 0.88);
             if (targetBytes < 5L * 1024 * 1024)
             {
