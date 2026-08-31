@@ -291,6 +291,33 @@ namespace ReplayKitHelper
                 throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
         }
 
+        // wipe the update temp dir before a fresh download. a stray locked leftover (an aborted prior run, an av scan,
+        // or a chromium profile some other process parked in here) must not abort the whole update -- if the full
+        // recursive delete cant finish, just clear the two files this flow actually rewrites and carry on. only a lock
+        // on those specific files is fatal, and then with a clear message instead of a cryptic child-file one.
+        private static void ClearUpdateTemp(string tempDir)
+        {
+            if (!Directory.Exists(tempDir)) return;
+            try
+            {
+                Directory.Delete(tempDir, true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                WriteUpdateDebug("update temp not fully cleared (" + ex.Message + "); clearing download slots only");
+            }
+            foreach (var name in new[] { InstallerAsset, HashAsset })
+            {
+                string p = Path.Combine(tempDir, name);
+                try { if (File.Exists(p)) File.Delete(p); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    throw new IOException("A previous update download in " + tempDir + " is still locked. Close any open ReplayKit update window, then try again.", ex);
+                }
+            }
+        }
+
         private static void SaveUrlFile(string url, string path)
         {
             if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -409,7 +436,7 @@ namespace ReplayKitHelper
 
                 string tempDir = GetUpdateTempDir();
                 AssertSafeUpdateTemp(tempDir);
-                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                ClearUpdateTemp(tempDir);
                 Directory.CreateDirectory(tempDir);
 
                 string installerPath = Path.Combine(tempDir, InstallerAsset);

@@ -83,8 +83,8 @@ if ($browserPath) {
     $versionParam = if ($latest) { '?version=' + [System.Uri]::EscapeDataString($latest) } else { '' }
     $url = "$origin/update-prompt$versionParam"
 
-    # separate profile so we never read or touch the users real browser data.
-    $profileDir = Join-Path $env:TEMP ("ReplayKit\update\popup-profile-$browserName")
+    # separate profile so we never read or touch the users real browser data. kept OUTSIDE ReplayKit\update -- that dir is what /update/apply wipes before downloading, and the browser holding this profile open (CrashpadMetrics-active.pma, lockfile) would make that recursive delete fail.
+    $profileDir = Join-Path $env:TEMP ("ReplayKit\update-prompt-profile-$browserName")
     try { [void](New-Item -ItemType Directory -Path $profileDir -Force -ErrorAction SilentlyContinue) } catch {}
 
     # center on the primary monitor -- winforms is the cheapest way to get screen bounds from ps; if the load fails (Server Core etc.) we fall back to a sensible fixed offset rather than abort.
