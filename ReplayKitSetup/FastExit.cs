@@ -21,6 +21,9 @@ namespace ReplayKitSetup
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool SetConsoleCtrlHandler(ConsoleCtrlDelegate handlerRoutine, bool add);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool FreeConsole();
+
         private delegate bool ConsoleCtrlDelegate(uint ctrlType);
 
         private const int SW_HIDE = 0;
@@ -32,6 +35,19 @@ namespace ReplayKitSetup
         {
             IntPtr hwnd = GetConsoleWindow();
             if (hwnd != IntPtr.Zero) ShowWindow(hwnd, SW_HIDE);
+        }
+
+        // headless modes (--update, --cleanup, --uninstall-discord-screenshare) give up their console entirely rather than just hiding it. the helper that spawns us dies moments after --update taskkills obs, and if we are still attached to a console that goes down with it, every attached process gets CTRL_CLOSE_EVENT -- whose default handler, and InstallConsoleCloseHandler below, both terminate the process outright. that skips every finally block, so obs is already dead and nothing relaunches it. after detaching there is nowhere for console output to go, so it is pointed at a null writer instead of an invalid handle; the log file is the real record for these modes anyway.
+        public static void DetachFromConsole()
+        {
+            HideConsoleWindow();
+            FreeConsole();
+            try
+            {
+                Console.SetOut(System.IO.TextWriter.Null);
+                Console.SetError(System.IO.TextWriter.Null);
+            }
+            catch (System.IO.IOException) { }
         }
 
         // exit now -- no onefile parent to chase down in the .net build, see file header.

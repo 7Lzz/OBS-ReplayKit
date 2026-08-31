@@ -411,7 +411,37 @@ namespace ReplayKitHelper
             }
         }
 
-        private static JObject StartUpdater(string installerPath, string tempDir)
+        private static string PsQuote(string value) => "'" + (value ?? "").Replace("'", "''") + "'";
+
+        // the installer can still be torn down mid-flight by something outside its control (this helper dies moments after obs does, and an av or a policy kill lands the same way), and a TerminateProcess skips its finally block -- so obs would stay dead with the popup waiting on a restart that never comes. this watchdog outlives all of it: detached + breakaway like the installer spawn itself, it waits for the installer pid to go away and only acts if no verdict was written, which is exactly the case where nobody else is going to bring obs back.
+        private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion)
+        {
+            string script = string.Join("\n", new[]
+            {
+                "$ErrorActionPreference='SilentlyContinue'",
+                "$installerPid=" + installerPid,
+                "$result=" + PsQuote(InstallResultPath()),
+                "$obs=" + PsQuote(obsPath ?? ""),
+                "$target=" + PsQuote(targetVersion ?? ""),
+                "$versionFile=" + PsQuote(GetVersionPath()),
+                "$deadline=(Get-Date).AddMinutes(15)",
+                "while ((Get-Date) -lt $deadline -and (Get-Process -Id $installerPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
+                "if (Test-Path -LiteralPath $result) { exit }",
+                "$installed=''",
+                "try { $installed=(Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json).version } catch {}",
+                "if (-not (Get-Process -Name obs64 -ErrorAction SilentlyContinue)) { if ($obs -and (Test-Path -LiteralPath $obs)) { Start-Process -FilePath $obs -WorkingDirectory (Split-Path -Parent $obs) } }",
+                "if ($installed -eq $target) { $o=@{ok=$true;stage='done';message=\"ReplayKit $target installed; OBS was restarted by the update watchdog.\";version=$target} }",
+                "else { $o=@{ok=$false;stage='aborted';message='The installer stopped before it finished. OBS has been restarted -- the update was not applied.';version=$target} }",
+                "$o.finishedAt=(Get-Date).ToUniversalTime().ToString('o')",
+                "[IO.File]::WriteAllText($result, ($o | ConvertTo-Json -Compress))",
+            });
+            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+            string cmdLine = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encoded;
+            int pid = Native.SpawnDetached(cmdLine, Constants.LOG_DIR);
+            WriteUpdateDebug(pid > 0 ? "update watchdog started (pid=" + pid + ", watching installer " + installerPid + ")" : "update watchdog failed to start; a mid-install abort will not self-recover");
+        }
+
+        private static JObject StartUpdater(string installerPath, string tempDir, string targetVersion)
         {
             string obsPath = GetUpdateObsPath();
             // wait on this helpers own pid, not obs -- obs is already confirmed dead synchronously before the installer even reaches this wait, but this helper process (which holds the lock on its own exe under scripts/helper/) only exits afterward, asynchronously, once its parent-watchdog notices obs is gone. waiting on obs pid here races the copy step against that and loses.
@@ -427,6 +457,7 @@ namespace ReplayKitHelper
                 WriteUpdateDebug("StartUpdater (admin, detached): " + cmdLine);
                 int installerPid = Native.SpawnDetached(cmdLine, tempDir);
                 if (installerPid <= 0) throw new InvalidOperationException("SpawnDetached returned 0 for installer");
+                StartUpdateWatchdog(installerPid, obsPath, targetVersion);
                 return new JObject { ["ok"] = true, ["processId"] = installerPid };
             }
 
@@ -443,6 +474,7 @@ namespace ReplayKitHelper
             };
             WriteUpdateDebug("StartUpdater (non-admin, runas): " + installerPath);
             var proc = Process.Start(psi);
+            StartUpdateWatchdog(proc.Id, obsPath, targetVersion);
             return new JObject { ["ok"] = true, ["processId"] = proc.Id };
         }
 
@@ -502,7 +534,7 @@ namespace ReplayKitHelper
                 }
 
                 ClearInstallResult();
-                var started = StartUpdater(installerPath, tempDir);
+                var started = StartUpdater(installerPath, tempDir, latest.LatestVersion);
                 return new JObject
                 {
                     ["ok"] = true, ["updateAvailable"] = true, ["installing"] = true,
