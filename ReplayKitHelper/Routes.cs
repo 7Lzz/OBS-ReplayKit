@@ -587,6 +587,14 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/update/install-result")
+            {
+                if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                HttpResponse.SendJson(stream, 200, Update.GetInstallResult());
+                return false;
+            }
+
             if (path == "/update/later")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }

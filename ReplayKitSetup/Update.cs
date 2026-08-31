@@ -6,6 +6,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
@@ -25,6 +27,30 @@ namespace ReplayKitSetup
         private const uint WAIT_OBJECT_0 = 0;
 
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
+
+        // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
+        private static string ResultFile() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_result.json");
+
+        private static void WriteResult(bool ok, string stage, string message)
+        {
+            try
+            {
+                string path = ResultFile();
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                var payload = new JObject
+                {
+                    ["ok"] = ok,
+                    ["stage"] = stage,
+                    ["message"] = message ?? "",
+                    ["version"] = VersionInfo.Version,
+                    ["finishedAt"] = DateTime.UtcNow.ToString("o"),
+                };
+                File.WriteAllText(path, payload.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+            }
+        }
 
         private static void Log(string message)
         {
@@ -61,12 +87,12 @@ namespace ReplayKitSetup
             try { target = Path.GetFullPath(path); }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
 
-            if (!string.Equals(new DirectoryInfo(target).Name, "ReplayKitUpdate", StringComparison.Ordinal)) return null;
-            if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(target, tempRoot, StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
+            // the helper downloads into %temp%\ReplayKit\update; test_update_mode.bat still uses the flat %temp%\ReplayKitUpdate. only those two shapes are accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder -- the nested one used to fall through this name check, which is why every update so far left its downloaded installer behind in %temp%.
+            var dir = new DirectoryInfo(target);
+            bool named = string.Equals(dir.Name, "ReplayKitUpdate", StringComparison.Ordinal) ||
+                         (string.Equals(dir.Name, "update", StringComparison.Ordinal) && string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal));
+            if (!named) return null;
+            if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
             return target;
         }
 
@@ -128,26 +154,55 @@ namespace ReplayKitSetup
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
 
+            bool obsClosed = false;
+            bool installed = false;
+            bool relaunched = false;
             try
             {
                 Log("update starting version=" + VersionInfo.Version);
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
 
+                // the payload is checked before obs is touched. a release exe built without its embedded assets used to get past here, kill obs, then discover it had nothing to install -- leaving no obs, no helper, and an update popup waiting on a restart that never came.
+                string runtimeSrc = Installer.GetRuntimeAssetsDir();
+                if (!Directory.Exists(runtimeSrc))
+                {
+                    string reason = AssetBundle.LastError ?? "This OBSReplayKit.exe was built without its bundled ReplayKit files.";
+                    string message = "ReplayKit runtime assets not found: " + runtimeSrc + ". " + reason;
+                    LogBoth("preflight failed, OBS was left running: " + message);
+                    WriteResult(false, "preflight", message);
+                    return 1;
+                }
+
                 Obs.CloseObs(LogBoth);
+                obsClosed = true;
                 WaitForPid(waitPid > 0 ? waitPid : 0, 60);
                 Obs.CleanupCrashFlags(LogBoth);
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth);
                 LogBoth($"runtime update copied {count} file(s)");
-                if (relaunch) LaunchObsPath(relaunchObs, LogBoth);
+                installed = true;
+
+                if (relaunch)
+                {
+                    relaunched = LaunchObsPath(relaunchObs, LogBoth);
+                    if (!relaunched)
+                    {
+                        WriteResult(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.");
+                        return 1;
+                    }
+                }
+                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).");
                 return 0;
             }
             catch (Exception exc)
             {
                 Log("update failed: " + exc.Message);
+                WriteResult(false, obsClosed ? "install" : "startup", exc.Message);
                 return 1;
             }
             finally
             {
+                // obs has to come back even when the install died partway thru the copy, otherwise a failed update costs the user their whole obs session. skipped once the install got far enough to report its own relaunch outcome.
+                if (obsClosed && relaunch && !installed) LaunchObsPath(relaunchObs, LogBoth);
                 ScheduleCleanup(cleanupDir);
             }
         }

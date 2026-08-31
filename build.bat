@@ -71,6 +71,9 @@ if errorlevel 1 goto :build_fail
 for %%I in ("%EXE_PATH%") do set /a "EXE_KB=%%~zI / 1024"
 for %%I in ("%EXE_PATH%") do set "EXE_BYTES=%%~zI"
 
+rem assets\ is embedded in the exe as a zip resource (PackAssetBundle in ReplayKitSetup.csproj, unpacked by AssetBundle.cs). without it the exe is around 1 mb and the auto-updater, which downloads only this file, closes obs and then has nothing to install -- so a build that lost the payload must not reach a release.
+if %EXE_BYTES% LSS 6000000 goto :bundle_fail
+
 echo.
 echo ============================================================
 echo  Build complete.
@@ -79,9 +82,10 @@ echo  Output:  %EXE_PATH%
 echo  Hash:    %EXE_PATH%.sha256
 echo  Size:    ~%EXE_KB% KB  (%EXE_BYTES% bytes)
 echo.
-echo  Note: single file, nothing else needs to ship alongside it. VC++ redist
-echo        is not bundled; it downloads from Microsoft only when missing.
-echo        Input-overlay presets are trimmed to WASD/mouse.
+echo  Note: single file, nothing else needs to ship alongside it -- assets\ is
+echo        embedded and unpacked at runtime, so the auto-update download works.
+echo        VC++ redist is not bundled; it downloads from Microsoft only when
+echo        missing. Input-overlay presets are trimmed to WASD/mouse.
 echo ============================================================
 echo.
 pause
@@ -101,6 +105,17 @@ exit /b 1
 :build_fail
 echo.
 echo Build FAILED.
+pause
+endlocal
+exit /b 1
+
+:bundle_fail
+echo.
+echo Build FAILED: OBSReplayKit.exe is only %EXE_BYTES% bytes, so assets\ was not
+echo embedded. Shipping it would break both fresh installs and the auto-update.
+echo Check the PackAssetBundle target in ReplayKitSetup\ReplayKitSetup.csproj.
+del /Q "%EXE_PATH%" >nul 2>nul
+del /Q "%EXE_PATH%.sha256" >nul 2>nul
 pause
 endlocal
 exit /b 1

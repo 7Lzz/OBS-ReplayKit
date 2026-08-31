@@ -20,6 +20,9 @@ namespace ReplayKitHelper
         private const string InstallerAsset = "OBSReplayKit.exe";
         private const string HashAsset = "OBSReplayKit.exe.sha256";
 
+        // a release exe built without its embedded assets\ payload is around 1 mb and can install nothing -- it closes obs first and only then discovers it has no files, which strands the user with no obs and no helper. the runtime tree alone is over 10 mb, so a complete build never lands anywhere near this floor. mirrors the same guard build.bat applies at the producing end.
+        private const long MinInstallerBytes = 6L * 1024 * 1024;
+
         private static readonly HttpClient Http = CreateHttpClient();
         private static HttpClient CreateHttpClient()
         {
@@ -280,6 +283,40 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["version"] = normalized };
         }
 
+        // written by the detached installer on its way out (ReplayKitSetup/Update.cs WriteResult). the popup polls this so a failed install shows its real reason instead of sitting on its last progress stage until the watchdog gives up.
+        private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, "update_result.json");
+
+        public static JObject GetInstallResult()
+        {
+            var result = new JObject { ["ok"] = true, ["present"] = false, ["installedVersion"] = "" };
+            try { result["installedVersion"] = NormalizeVersion(GetInstalledVersion()); }
+            catch (Exception) { }
+            try
+            {
+                string path = InstallResultPath();
+                if (!File.Exists(path)) return result;
+                var data = JObject.Parse(File.ReadAllText(path));
+                result["present"] = true;
+                result["installOk"] = data["ok"]?.Value<bool>() ?? false;
+                result["stage"] = data["stage"]?.Value<string>() ?? "";
+                result["message"] = data["message"]?.Value<string>() ?? "";
+                result["version"] = data["version"]?.Value<string>() ?? "";
+                result["finishedAt"] = data["finishedAt"]?.Value<string>() ?? "";
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                WriteUpdateDebug("install-result unreadable: " + ex.Message);
+            }
+            return result;
+        }
+
+        // cleared before each apply so the popup can never read a previous updates verdict as this ones.
+        private static void ClearInstallResult()
+        {
+            try { File.Delete(InstallResultPath()); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+        }
+
         public static string GetUpdateTempDir() => Constants.UPDATE_DIR;
 
         private static void AssertSafeUpdateTemp(string path)
@@ -457,6 +494,14 @@ namespace ReplayKitHelper
                     throw new InvalidOperationException("Downloaded installer hash did not match the release hash.");
                 }
 
+                long installerBytes = new FileInfo(installerPath).Length;
+                if (installerBytes < MinInstallerBytes)
+                {
+                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    throw new InvalidOperationException("The " + latest.LatestVersion + " installer is incomplete (" + (installerBytes / (1024 * 1024)) + " MB) -- it was published without its bundled ReplayKit files. OBS was left running; try again once a fixed release is out.");
+                }
+
+                ClearInstallResult();
                 var started = StartUpdater(installerPath, tempDir);
                 return new JObject
                 {

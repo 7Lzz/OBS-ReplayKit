@@ -359,10 +359,13 @@ namespace ReplayKitSetup
             }
         }
 
+        // the runtime tree an update installs from. exposed so the updater can preflight it before it closes obs, against the same path InstallReplaykitRuntimeUpdate walks.
+        public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
+
         // refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies SceneSourcePatches to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies.
         public static int InstallReplaykitRuntimeUpdate(Action<string> log = null)
         {
-            string runtimeSrc = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
+            string runtimeSrc = GetRuntimeAssetsDir();
             if (!Directory.Exists(runtimeSrc)) throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}");
 
             int count = 0;

@@ -502,31 +502,45 @@
     els.progressStage.classList.toggle("is-failed", kind === "failed");
   }
 
-  // after the helper spawns the detached installer it has only seconds to live: the installer taskkills obs, obs death triggers the helpers parent-watchdog and the helper exits. we poll /update/check on a short interval -- a connection error means the install window is in flight, a successful response from a fresh helper means the new obs is back up and we can close; capped so a stuck install eventually surfaces in the ui.
-  function watchForRestart(onComplete) {
+  // after the helper spawns the detached installer it has only seconds to live: the installer taskkills obs, obs death triggers the helpers parent-watchdog and the helper exits. /update/install-result is the installers own verdict, written to disk on its way out and served by whichever helper is up, so it survives that restart -- a connection error just means the install window is in flight. the stage labels below are driven by that, not by timers: the old fixed setTimeout chain would sit on "Copying ReplayKit files..." forever whenever the install died, since it had no way to hear about a failure.
+  function watchInstall(onComplete, onFail) {
     let seenHelperDown = false;
+    let percent = 80;
     const started = Date.now();
     restartWatchTimer = setInterval(async () => {
+      const stop = () => { clearInterval(restartWatchTimer); restartWatchTimer = null; };
       try {
-        const r = await fetch(HELPER + "/update/check?t=" + Date.now(), { cache:"no-store" });
+        const r = await fetch(HELPER + "/update/install-result?t=" + Date.now(), { cache:"no-store" });
         if (!r.ok) return;
         const body = await r.json().catch(() => ({}));
-        if (seenHelperDown && body && body.ok) {
-          // helper went away and came back -- obs has restarted from the installer.
-          clearInterval(restartWatchTimer);
-          restartWatchTimer = null;
-          onComplete();
+        if (body && body.present) {
+          stop();
+          if (body.installOk) onComplete();
+          else onFail(body.message || "The installer reported a failure.");
+          return;
         }
+        // helper is answering and has no verdict yet -- the installer is still working, or died before it could write one.
+        percent = Math.min(percent + 1, seenHelperDown ? 97 : 88);
+        setProgress(percent, seenHelperDown ? "Copying ReplayKit files..." : "Installing update...");
       } catch (_) {
-        // connection refused: helper is dead while the installer kills obs and copies files.
+        // connection refused: the helper went down with obs while the installer copies files.
         seenHelperDown = true;
+        percent = Math.min(percent + 1, 97);
+        setProgress(percent, "Closing OBS to apply files...");
       }
       if (Date.now() - started > 180000) {
-        // 3 minute safety net -- if obs hasnt come back by now, stop polling and leave the popup open so the user can see the last status.
-        clearInterval(restartWatchTimer);
-        restartWatchTimer = null;
+        stop();
+        onFail("The installer did not finish within 3 minutes. See %TEMP%\\OBSReplayKitUpdate.log");
       }
     }, 1500);
+  }
+
+  // every failure path lands here so the bar always ends in a visible failed state with a reason, and the buttons come back for a retry -- a stuck-looking bar is never the end state.
+  function failUpdate(message) {
+    setProgress(0, "Update failed: " + message, "failed");
+    setStatus("", "");
+    els.downloadBtn.disabled = !latest || !latest.updateAvailable;
+    els.laterBtn.disabled = false;
   }
 
   async function downloadUpdate() {
@@ -552,19 +566,14 @@
       }
       // /update/apply has returned -- download done, hash verified, installer spawned (detached).
       setProgress(80, "Installing update...");
-      setTimeout(() => setProgress(92, "Closing OBS to apply files..."), 1500);
-      setTimeout(() => setProgress(96, "Copying ReplayKit files..."),    3500);
       // wait for the installer to kill obs, copy files, and relaunch obs -- when the new helper is up, finish the bar and close the popup so the user is back in obs cleanly.
-      watchForRestart(() => {
+      watchInstall(() => {
         setProgress(100, "OBS is back up -- update complete.", "done");
         setTimeout(closeWindow, 1500);
-      });
+      }, failUpdate);
     } catch (e) {
       clearInterval(pulseTimer);
-      setProgress(0, "Update failed: " + (e.message || e), "failed");
-      setStatus("", "");
-      els.downloadBtn.disabled = !latest || !latest.updateAvailable;
-      els.laterBtn.disabled = false;
+      failUpdate(e.message || String(e));
     }
   }
 

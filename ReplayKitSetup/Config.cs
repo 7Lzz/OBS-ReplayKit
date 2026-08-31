@@ -33,7 +33,7 @@ namespace ReplayKitSetup
 
         public static readonly string[] OBS_EXE_CANDIDATES;
 
-        // bundled assets root. always the exe's own directory -- unlike pyinstaller, a compiled .net assembly has no separate frozen-vs-source-mode distinction to detect.
+        // bundled assets root. BUNDLE_ROOT is always the exe's own directory; ASSETS_DIR is a sibling assets\ folder when there is one, otherwise the copy unpacked from the exe's embedded bundle.
         public static readonly string BUNDLE_ROOT;
         public static readonly string ASSETS_DIR;
         public static readonly string OBS_ASSETS_DIR;
@@ -102,7 +102,7 @@ namespace ReplayKitSetup
                     .Concat(DefaultObsCandidates()));
 
             BUNDLE_ROOT = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
-            ASSETS_DIR = Path.Combine(BUNDLE_ROOT, "assets");
+            ASSETS_DIR = ResolveAssetsDir(BUNDLE_ROOT);
             OBS_ASSETS_DIR = Path.Combine(ASSETS_DIR, "obs-studio");
 
             OBS_INSTALL_DIR = FindObsInstallDir() ?? _DEFAULT_OBS_DIR;
@@ -118,6 +118,14 @@ namespace ReplayKitSetup
             REPLAYKIT_TRAY_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
             REPLAYKIT_TRAY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
             REPLAYKIT_TRAY_DLL_TARGET = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
+        }
+
+        // a sibling assets\ folder wins so a build run out of the repo always tests the working tree; a downloaded release exe has no sibling folder and unpacks its embedded bundle instead. falls back to the sibling path when neither exists so the "not found" message still names the folder a dev would expect.
+        private static string ResolveAssetsDir(string bundleRoot)
+        {
+            string sibling = Path.Combine(bundleRoot, "assets");
+            if (Directory.Exists(Path.Combine(sibling, "obs-studio"))) return sibling;
+            return AssetBundle.TryExtract() ?? sibling;
         }
 
         private static bool IsValidObsExe(string path)

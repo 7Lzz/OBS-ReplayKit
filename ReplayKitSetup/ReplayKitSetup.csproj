@@ -25,6 +25,27 @@
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.34" PrivateAssets="all" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <!-- assets\ ships inside the exe as one zip resource, unpacked at runtime by AssetBundle.cs. the auto-updater downloads only OBSReplayKit.exe and runs it from %temp%, so a build whose payload lives in a sibling folder closes obs and then finds nothing to install. staged into obj\ first because the working tree can hold per-user runtime folders (imported icons, saved themes) that must never ship. -->
+    <AssetBundleSourceDir>$(MSBuildProjectDirectory)\..\assets</AssetBundleSourceDir>
+    <!-- obj\ spelled out rather than $(IntermediateOutputPath): this target runs before PrepareForBuild, where that property is not resolved yet and the staging would land in the project folder. -->
+    <AssetBundleStageDir>$(MSBuildProjectDirectory)\obj\assets-bundle\</AssetBundleStageDir>
+    <AssetBundleZip>$(MSBuildProjectDirectory)\obj\assets.bundle.zip</AssetBundleZip>
+  </PropertyGroup>
+
+  <Target Name="PackAssetBundle" BeforeTargets="PrepareForBuild" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <AssetBundleFile Include="$(AssetBundleSourceDir)\**\*" Exclude="$(AssetBundleSourceDir)\obs-studio\obs-replayKit\icons\user\**\*;$(AssetBundleSourceDir)\obs-studio\obs-replayKit\themes-user\**\*;$(AssetBundleSourceDir)\obs-studio\obs-replayKit\obs-custom-dock\rk-theme.css" />
+    </ItemGroup>
+    <Error Condition="'@(AssetBundleFile)' == ''" Text="No files under $(AssetBundleSourceDir) -- the release exe would ship with no runtime payload." />
+    <RemoveDir Directories="$(AssetBundleStageDir)" />
+    <Copy SourceFiles="@(AssetBundleFile)" DestinationFiles="@(AssetBundleFile->'$(AssetBundleStageDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <ZipDirectory SourceDirectory="$(AssetBundleStageDir)" DestinationFile="$(AssetBundleZip)" Overwrite="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(AssetBundleZip)" LogicalName="ReplayKitSetup.assets.bundle.zip" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="ILRepackPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
     <ItemGroup>
       <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
