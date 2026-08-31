@@ -420,6 +420,10 @@ namespace ReplayKitSetup
             try { ShaderFilter.InstallReplaykitMotionBlurPlugin(log); }
             catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh skipped: {ex.Message}"); }
 
+            // the tray plugin was missing from this refresh entirely, so an updating install kept whatever replaykit.dll it already had and never picked up plugin-side changes -- and never dropped the pre-unification replaykit-tray.dll, which obs then loaded alongside the new one and injected every tray menu item twice. safe to copy here because the update flow has already closed obs.
+            try { TrayPlugin.InstallReplaykitTrayPlugin(log); }
+            catch (Exception ex) { log?.Invoke($"warn: tray plugin refresh skipped: {ex.Message}"); }
+
             try { InstallObsElevationTask(log); }
             catch (Exception ex) { log?.Invoke($"warn: elevation task refresh skipped: {ex.Message}"); }
 

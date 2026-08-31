@@ -71,6 +71,10 @@ namespace ReplayKitSetup
         public static readonly string REPLAYKIT_TRAY_PLUGIN_DIR;
         public static readonly string REPLAYKIT_TRAY_DLL_TARGET;
 
+        // pre-unification plugin locations. obs loads every dll it finds under plugins\<name>\bin\64bit\, so an old replaykit-tray left sitting beside the current replaykit\ is loaded alongside it and injects a second copy of every tray menu item.
+        public static readonly string REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR;
+        public static readonly string REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR;
+
         // file extensions the installer treats as text (PathRewrite + Prefs.ApplyPreferences).
         public static readonly HashSet<string> TEXT_EXTS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -118,6 +122,8 @@ namespace ReplayKitSetup
             REPLAYKIT_TRAY_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
             REPLAYKIT_TRAY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
             REPLAYKIT_TRAY_DLL_TARGET = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
+            REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit-tray");
+            REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");
         }
 
         // a sibling assets\ folder wins so a build run out of the repo always tests the working tree; a downloaded release exe has no sibling folder and unpacks its embedded bundle instead. falls back to the sibling path when neither exists so the "not found" message still names the folder a dev would expect.
