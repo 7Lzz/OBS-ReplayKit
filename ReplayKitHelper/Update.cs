@@ -270,8 +270,58 @@ namespace ReplayKitHelper
             status["admin"] = BrowserCookies.TestIsAdmin();
             status["autoUpdateEnabled"] = true;
             status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && (status["updateAvailable"]?.Value<bool>() ?? false) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
+
+            // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a
+            // fresh update window stacked on the one still showing them why the last attempt failed.
+            if (status["prompt"]?.Value<bool>() ?? false)
+            {
+                string suppress = StartupPromptSuppressedBecause(status["latestVersion"]?.Value<string>());
+                if (suppress != null)
+                {
+                    status["prompt"] = false;
+                    status["message"] = suppress;
+                    WriteUpdateDebug("startup prompt suppressed: " + suppress);
+                }
+            }
             try { WriteUpdateDebug("startup-check result: " + status.ToString(Formatting.None)); } catch (Exception) { }
             return status;
+        }
+
+        // how long a failed attempt keeps the startup prompt quiet. long enough to cover the restart the failure
+        // itself causes, short enough that the next real session still offers the update.
+        private static readonly TimeSpan FailureQuietPeriod = TimeSpan.FromMinutes(10);
+
+        // null when the prompt should show. the update window is its own browser process, so it survives the OBS
+        // restart a failed update triggers -- opening a second one on top of it is the loop the user sees.
+        private static string StartupPromptSuppressedBecause(string latestVersion)
+        {
+            try
+            {
+                if (Native.WindowWithTitleExists("ReplayKit Update"))
+                    return "An update window is already open.";
+            }
+            catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
+
+            try
+            {
+                string path = InstallResultPath();
+                if (!File.Exists(path)) return null;
+                var data = JObject.Parse(File.ReadAllText(path));
+                if (data["ok"]?.Value<bool>() ?? true) return null;
+                // never suppress a verdict the user has not been shown yet -- the window reopens to report it.
+                if (!(data["seen"]?.Value<bool>() ?? false)) return null;
+                // only for the version that failed -- a newer release should still be offered straight away.
+                string failedVersion = data["version"]?.Value<string>() ?? "";
+                if (!string.IsNullOrEmpty(latestVersion) && !string.Equals(failedVersion, latestVersion, StringComparison.OrdinalIgnoreCase)) return null;
+                var finishedAt = data["finishedAt"]?.Value<DateTime?>();
+                if (finishedAt == null) return null;
+                if (DateTime.UtcNow - finishedAt.Value.ToUniversalTime() > FailureQuietPeriod) return null;
+                return "The last update attempt failed; not prompting again yet.";
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                return null;
+            }
         }
 
         public static JObject SetUpdatePromptDismissed(string version)
@@ -308,12 +358,34 @@ namespace ReplayKitHelper
                 result["version"] = data["version"]?.Value<string>() ?? "";
                 result["finishedAt"] = data["finishedAt"]?.Value<string>() ?? "";
                 result["releaseUrl"] = data["releaseUrl"]?.Value<string>() ?? ReleasePage;
+                // "seen" means the update window has actually shown this verdict to the user. closing that window
+                // with the X runs no script at all, so a result can otherwise be written and never read by anyone.
+                result["seen"] = data["seen"]?.Value<bool>() ?? false;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
                 WriteUpdateDebug("install-result unreadable: " + ex.Message);
             }
             return result;
+        }
+
+        // stamped by the update window once it has displayed the verdict. until then the verdict counts as unseen and
+        // the next startup check reopens the window to show it, rather than the outcome being silently swallowed.
+        public static JObject MarkInstallResultSeen()
+        {
+            try
+            {
+                string path = InstallResultPath();
+                if (!File.Exists(path)) return new JObject { ["ok"] = true, ["present"] = false };
+                var data = JObject.Parse(File.ReadAllText(path));
+                data["seen"] = true;
+                File.WriteAllText(path, data.ToString(Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+                return new JObject { ["ok"] = true, ["present"] = true };
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                return new JObject { ["ok"] = false, ["message"] = ex.Message };
+            }
         }
 
         // cleared before each apply so the popup can never read a previous updates verdict as this ones.
@@ -360,6 +432,18 @@ namespace ReplayKitHelper
         // the github link instead of pretending a window appeared.
         public static JObject OpenUpdatePromptWindow(string version)
         {
+            // one window is enough -- bring the existing one forward rather than stacking another browser process on it.
+            try
+            {
+                if (Native.WindowWithTitleExists("ReplayKit Update"))
+                {
+                    Native.FocusWindow("ReplayKit Update");
+                    WriteUpdateDebug("update prompt already open; focused it instead of opening another");
+                    return new JObject { ["ok"] = true, ["alreadyOpen"] = true };
+                }
+            }
+            catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
+
             string browserName;
             string browser = FindPromptBrowser(out browserName);
             if (string.IsNullOrEmpty(browser))

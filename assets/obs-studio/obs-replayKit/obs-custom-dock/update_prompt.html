@@ -312,6 +312,10 @@
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
   const params = new URLSearchParams(location.search);
   const requestedVersion = params.get("version") || "";
+  // dismissed: a button already settled this window, so pagehide must not post a second /update/later.
+  // installStarted: an install is running -- closing the window then is not a dismissal of the update.
+  let dismissed = false;
+  let installStarted = false;
   const els = {
     title: document.getElementById("title"),
     body: document.getElementById("body"),
@@ -478,9 +482,11 @@
     }, 25);
   }
 
-  async function loadUpdate() {
+  // keepNotice: a previous attempt's failure is already on screen, so the headline and status stay put and only
+  // the version details and the enabled Download button are filled in underneath it.
+  async function loadUpdate(keepNotice) {
     els.downloadBtn.disabled = true;
-    setStatus("Checking...", "");
+    if (!keepNotice) setStatus("Checking...", "");
     try {
       const data = await helperJson("update/check?t=" + Date.now());
       latest = data;
@@ -494,11 +500,13 @@
         return;
       }
       // prefer the github release name when present (e.g. "ReplayKit 1.0.1 - hotfix"), fall back to the version-only string.
-      els.title.textContent = data.releaseName ? data.releaseName : ("ReplayKit " + data.latestVersion + " available");
-      els.body.textContent = "ReplayKit " + data.latestVersion + " is ready to install.";
+      if (!keepNotice) {
+        els.title.textContent = data.releaseName ? data.releaseName : ("ReplayKit " + data.latestVersion + " available");
+        els.body.textContent = "ReplayKit " + data.latestVersion + " is ready to install.";
+      }
       els.meta.textContent = "Installed: " + data.installedVersion + "  |  Latest: " + data.latestVersion;
       els.downloadBtn.disabled = false;
-      setStatus("OBS will restart after the download is verified.", "");
+      if (!keepNotice) setStatus("OBS will restart after the download is verified.", "");
       showReleaseNotes(data.releaseNotes || "");
     } catch (e) {
       els.title.textContent = "Update check failed";
@@ -563,6 +571,7 @@
   }
 
   async function downloadUpdate() {
+    installStarted = true;
     els.downloadBtn.disabled = true;
     els.laterBtn.disabled = true;
     setStatus("", "");
@@ -600,6 +609,7 @@
 
   async function later() {
     const version = (latest && latest.latestVersion) || requestedVersion;
+    dismissed = true;
     els.laterBtn.disabled = true;
     els.downloadBtn.disabled = true;
     try {
@@ -626,10 +636,48 @@
     }).catch(() => {});
   }
 
+  // closing with the title-bar X runs no script, so "Later" and X used to mean different things: Later recorded the
+  // dismissal, X left no trace. this makes them equivalent. skipped once an install is under way (dismissing an
+  // update you are actually installing is meaningless) and once a button has already settled the outcome.
+  window.addEventListener("pagehide", () => {
+    if (dismissed || installStarted) return;
+    const version = (latest && latest.latestVersion) || requestedVersion;
+    if (!version) return;
+    dismissed = true;
+    // keepalive so the request survives the window going away -- a plain fetch is cancelled on unload.
+    try {
+      fetch(HELPER + "/update/later", {
+        method:"POST", keepalive:true, cache:"no-store",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({ version }),
+      }).catch(() => {});
+    } catch (_) {}
+  });
+
+  // a verdict written while no window was open (X'd out mid-install, or the watchdog reported an abort) would
+  // otherwise never be seen by anyone. show it, then mark it seen so it is reported exactly once.
+  async function showUnseenResult() {
+    try {
+      const data = await helperJson("update/install-result?t=" + Date.now());
+      if (!data.present || data.seen) return false;
+      await helperJson("update/install-result/ack", { method:"POST" }).catch(() => {});
+      if (data.installOk) {
+        els.title.textContent = "Update complete";
+        els.body.textContent = data.message || "ReplayKit was updated.";
+        setStatus("", "");
+        return false;
+      }
+      els.title.textContent = "The last update did not finish";
+      els.body.textContent = data.message || "The update stopped before it was applied.";
+      setStatus("You can try again below.", "bad");
+      return true;
+    } catch (_) { return false; }
+  }
+
   els.downloadBtn.addEventListener("click", downloadUpdate);
   els.laterBtn.addEventListener("click", later);
   els.resizeGrip.addEventListener("pointerdown", beginResizeWindow);
-  loadUpdate();
+  showUnseenResult().then((failed) => loadUpdate(failed));
 </script>
 </body>
 </html>

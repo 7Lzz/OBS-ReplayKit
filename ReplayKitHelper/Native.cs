@@ -244,6 +244,20 @@ namespace ReplayKitHelper
         }
 
         // enumwindows + exact/prefix/suffix (ordinalignorecase) title match, scoped to obs-family windows when requireOwnerPid != 0. returns count closed.
+        // is a visible top-level window with this exact title already up? used to avoid stacking a second update
+        // window on top of one the user is already looking at -- the update popup is its own browser process, so it
+        // outlives the OBS restart that a failed update triggers.
+        public static bool WindowWithTitleExists(string title)
+        {
+            if (string.IsNullOrEmpty(title)) return false;
+            foreach (var hWnd in EnumerateTopLevelWindows())
+            {
+                if (!IsWindowVisible(hWnd)) continue;
+                if (string.Equals(GetTitle(hWnd), title, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
         public static int CloseWindowsByTitle(string[] titlePrefixes, uint requireOwnerPid)
         {
             int closed = 0;
