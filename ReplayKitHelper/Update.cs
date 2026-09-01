@@ -319,6 +319,86 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }
 
+        // chromium browsers the update window can be hosted in, in the order replaykit_update_bootstrap.ps1 tries
+        // them. the dock cannot open this window itself -- window.open from a page inside OBS's CEF escapes to the
+        // users real browser and lands as an ordinary tab, so the helper spawns the --app window instead.
+        private static string FindPromptBrowser(out string browserName)
+        {
+            string programFiles = Environment.GetEnvironmentVariable("ProgramFiles") ?? "";
+            string programFilesX86 = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? "";
+            string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? "";
+            var candidates = new[]
+            {
+                new[] { "msedge", Path.Combine(programFilesX86, @"Microsoft\Edge\Application\msedge.exe") },
+                new[] { "msedge", Path.Combine(programFiles, @"Microsoft\Edge\Application\msedge.exe") },
+                new[] { "chrome", Path.Combine(programFiles, @"Google\Chrome\Application\chrome.exe") },
+                new[] { "chrome", Path.Combine(programFilesX86, @"Google\Chrome\Application\chrome.exe") },
+                new[] { "chrome", Path.Combine(localAppData, @"Google\Chrome\Application\chrome.exe") },
+                new[] { "brave", Path.Combine(programFiles, @"BraveSoftware\Brave-Browser\Application\brave.exe") },
+                new[] { "brave", Path.Combine(programFilesX86, @"BraveSoftware\Brave-Browser\Application\brave.exe") },
+                new[] { "brave", Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\Application\brave.exe") },
+                new[] { "vivaldi", Path.Combine(localAppData, @"Vivaldi\Application\vivaldi.exe") },
+            };
+            foreach (var candidate in candidates)
+            {
+                if (string.IsNullOrEmpty(candidate[1])) continue;
+                if (File.Exists(candidate[1])) { browserName = candidate[0]; return candidate[1]; }
+            }
+            browserName = "";
+            return "";
+        }
+
+        // opens the same borderless update window the startup check shows, so an update started from Settings runs
+        // the identical flow. returns ok=false when no chromium browser is installed, so the caller can fall back to
+        // the github link instead of pretending a window appeared.
+        public static JObject OpenUpdatePromptWindow(string version)
+        {
+            string browserName;
+            string browser = FindPromptBrowser(out browserName);
+            if (string.IsNullOrEmpty(browser))
+                return new JObject { ["ok"] = false, ["message"] = "No supported browser was found to show the update window." };
+
+            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
+            string url = "http://127.0.0.1:" + port + "/update-prompt";
+            if (!string.IsNullOrWhiteSpace(version)) url += "?version=" + Uri.EscapeDataString(version);
+
+            // its own profile so the users real browser data is never touched, and deliberately NOT under the update
+            // temp dir -- /update/apply wipes that, and a browser holding a lockfile in there would break the delete.
+            string profileDir = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "update-prompt-profile-" + browserName);
+            try { Directory.CreateDirectory(profileDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+
+            int width = 700, height = 580, x = 200, y = 200;
+            try
+            {
+                var bounds = System.Windows.Forms.Screen.PrimaryScreen.Bounds;
+                x = bounds.X + (bounds.Width - width) / 2;
+                y = bounds.Y + (bounds.Height - height) / 2;
+            }
+            catch (Exception ex) { WriteUpdateDebug("prompt window centering failed: " + ex.Message); }
+
+            var args = new[]
+            {
+                "--app=" + url,
+                "--window-size=" + width + "," + height,
+                "--window-position=" + x + "," + y,
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--user-data-dir=" + profileDir,
+            };
+            try
+            {
+                var psi = new ProcessStartInfo(browser, ProcessArgs.Join(args)) { UseShellExecute = false, CreateNoWindow = true };
+                var proc = Process.Start(psi);
+                WriteUpdateDebug("update prompt opened from settings: " + browserName + " pid=" + (proc != null ? proc.Id : 0) + " url=" + url);
+                return new JObject { ["ok"] = true, ["browser"] = browserName };
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
+            {
+                WriteUpdateDebug("update prompt spawn failed: " + ex.Message);
+                return new JObject { ["ok"] = false, ["message"] = "Could not open the update window: " + ex.Message };
+            }
+        }
+
         public static string GetUpdateTempDir() => Constants.UPDATE_DIR;
 
         private static void AssertSafeUpdateTemp(string path)

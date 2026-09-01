@@ -3620,15 +3620,16 @@
   }
 
   // there is deliberately no Install button here. this box used to POST /update/apply itself, which skipped the update window entirely -- so there was no download progress, no stage labels, and nothing watching for the verdict the installer writes. checking hands off to that window instead, so an update started from Settings behaves exactly like the one offered at launch.
-  function openUpdatePrompt(version) {
-    const url = "/update-prompt?version=" + encodeURIComponent(version || "") + "&t=" + Date.now();
-    const opened = window.open(url, "replaykit_update_prompt", "popup=yes,width=700,height=620");
-    if (!opened) {
-      setUpdateStatus("Could not open the update window -- allow popups for ReplayKit, or use the GitHub link below.", "bad");
+  // the helper spawns this window, not window.open: this page runs inside OBS's CEF, where window.open escapes to
+  // the users real browser and the update prompt lands as an ordinary tab there.
+  async function openUpdatePrompt(version) {
+    try {
+      await helperJson("update/open-prompt?version=" + encodeURIComponent(version || ""), { method:"POST" });
+      return true;
+    } catch (e) {
+      setUpdateStatus((e.message || String(e)) + " Use the GitHub link below instead.", "bad");
       return false;
     }
-    try { opened.focus(); } catch (_) {}
-    return true;
   }
 
   async function checkForUpdates() {
@@ -3646,7 +3647,7 @@
         setUpdateStatus("Update available: " + data.latestVersion + ". Apply or cancel your settings changes first.", "bad");
         return;
       }
-      if (openUpdatePrompt(data.latestVersion)) {
+      if (await openUpdatePrompt(data.latestVersion)) {
         setUpdateStatus("Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
       }
     } catch (e) {
