@@ -796,7 +796,6 @@
   .release-link { color:var(--link); font-size:12px; text-decoration:none; }
   .release-link:hover { text-decoration:underline; }
   .release-link[hidden] { display:none; }
-  .footer .btn[hidden] { display:none; }
   .footer {
     grid-column:2;
     display:flex;
@@ -1604,7 +1603,7 @@
   <footer class="footer">
     <button class="btn" type="button" id="okBtn">OK</button>
     <button class="btn" type="button" id="cancelBtn">Cancel</button>
-    <button class="btn" type="button" id="applyBtn" disabled hidden>Apply</button>
+    <button class="btn" type="button" id="applyBtn" disabled>Apply</button>
   </footer>
   <div class="modal-backdrop" id="uninstallConfirmModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="uninstallConfirmTitle">
@@ -2069,10 +2068,6 @@
     els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
     els.applyBtn.classList.toggle("is-primary", restart);
     els.applyBtn.disabled = !dirty || applyInFlight;
-    // nothing to apply -- take the button out entirely rather than leaving a dead one (and a restart warning for
-    // a restart that will not happen). kept visible while an apply is in flight so the footer does not jump
-    // out from under the pointer at the moment it is clicked.
-    els.applyBtn.hidden = !dirty && !applyInFlight;
   }
 
   function markDirty() {
