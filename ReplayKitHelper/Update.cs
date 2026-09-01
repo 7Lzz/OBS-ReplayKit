@@ -287,6 +287,10 @@ namespace ReplayKitHelper
         // written by the detached installer on its way out (ReplayKitSetup/Update.cs WriteResult). the popup polls this so a failed install shows its real reason instead of sitting on its last progress stage until the watchdog gives up.
         private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, "update_result.json");
 
+        // the detached installer records its own pid here (ReplayKitSetup DetachedSpawn.WriteOwnPid) -- the process
+        // the helper starts is only a launcher and exits immediately, so watching that pid would read as "died".
+        private static string InstallPidPath() => Path.Combine(Constants.LOG_DIR, "update_pid");
+
         public static JObject GetInstallResult()
         {
             var result = new JObject { ["ok"] = true, ["present"] = false, ["installedVersion"] = "", ["releaseUrl"] = ReleasePage };
@@ -315,8 +319,11 @@ namespace ReplayKitHelper
         // cleared before each apply so the popup can never read a previous updates verdict as this ones.
         private static void ClearInstallResult()
         {
-            try { File.Delete(InstallResultPath()); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            foreach (string path in new[] { InstallResultPath(), InstallPidPath() })
+            {
+                try { File.Delete(path); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
         }
 
         // chromium browsers the update window can be hosted in, in the order replaykit_update_bootstrap.ps1 tries
@@ -506,13 +513,24 @@ namespace ReplayKitHelper
             string script = string.Join("\n", new[]
             {
                 "$ErrorActionPreference='SilentlyContinue'",
-                "$installerPid=" + installerPid,
+                "$launcherPid=" + installerPid,
+                "$pidFile=" + PsQuote(InstallPidPath()),
                 "$result=" + PsQuote(InstallResultPath()),
                 "$obs=" + PsQuote(obsPath ?? ""),
                 "$target=" + PsQuote(targetVersion ?? ""),
                 "$release=" + PsQuote(releaseUrl ?? ReleasePage),
                 "$versionFile=" + PsQuote(GetVersionPath()),
                 "$deadline=(Get-Date).AddMinutes(15)",
+                "$installerPid=0",
+                "$handoff=(Get-Date).AddSeconds(45)",
+                "while ((Get-Date) -lt $handoff) {",
+                "  if (Test-Path -LiteralPath $result) { exit }",
+                "  try { $installerPid=[int]((Get-Content -LiteralPath $pidFile -Raw).Trim()) } catch { $installerPid=0 }",
+                "  if ($installerPid -gt 0) { break }",
+                "  if (-not (Get-Process -Id $launcherPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
+                "  else { Start-Sleep -Seconds 1 }",
+                "}",
+                "if ($installerPid -le 0) { $installerPid=$launcherPid }",
                 "while ((Get-Date) -lt $deadline -and (Get-Process -Id $installerPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
                 "if (Test-Path -LiteralPath $result) { exit }",
                 "$installed=''",

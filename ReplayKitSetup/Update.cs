@@ -199,9 +199,14 @@ namespace ReplayKitSetup
 
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
+                // stage markers: a process that is killed leaves no exception behind, so the last line in the log is
+                // the only thing that says where it got to.
+                Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
                     throw new IOException("The old ReplayKit helper could not be stopped, so no files were changed.");
+                Log("stage: helper gone, clearing crash flags");
                 Obs.CleanupCrashFlags(LogBoth);
+                Log("stage: copying runtime files");
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth);
                 LogBoth($"runtime update copied {count} file(s)");
                 installed = true;
@@ -328,6 +333,26 @@ namespace ReplayKitSetup
                 return RunUninstallDiscordScreenshareMode(startDelay);
             }
             if (!argv.Contains("--update")) return null;
+
+            // hand the whole job to a copy of ourselves that owns no console and belongs to no job object, then get
+            // out of the way. everything this process inherited from the helper dies with OBS moments from now; the
+            // detached copy inherits none of it, so killing OBS cannot reach it. see DetachedSpawn.
+            if (!argv.Contains(DetachedSpawn.DetachedFlag))
+            {
+                int detachedPid = DetachedSpawn.Relaunch(argv);
+                if (detachedPid > 0)
+                {
+                    Log("relaunched detached as pid " + detachedPid + "; this launcher is done");
+                    return 0;
+                }
+                // could not detach -- carry on inline rather than skipping the update, and say so, so a failure right
+                // after OBS closes is recognisable instead of looking like a silent death.
+                Log("warn: could not relaunch detached, running inline (an OBS teardown may kill this process)");
+            }
+            else
+            {
+                DetachedSpawn.WriteOwnPid();
+            }
 
             string cleanupDir = StringArg(argv, "--cleanup-dir", "");
             string relaunchObs = StringArg(argv, "--relaunch-obs", "");
