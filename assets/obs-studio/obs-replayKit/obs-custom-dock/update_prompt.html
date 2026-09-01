@@ -127,6 +127,8 @@
   }
   .status.good { color:var(--good); }
   .status.bad { color:var(--bad); }
+  .release-link { color:var(--link); font-size:12px; text-decoration:none; align-self:flex-start; }
+  .release-link:hover { text-decoration:underline; }
   .footer {
     display:flex;
     justify-content:flex-end;
@@ -267,6 +269,7 @@
     <div class="notes-label" id="notesLabel">Description:</div>
     <div class="notes" id="notes"></div>
     <div class="status" id="status"></div>
+    <a class="release-link" id="releaseLink" href="https://github.com/7Lzz/OBS-ReplayKit/releases/latest" target="_blank" rel="noopener noreferrer">View release or download manually from GitHub</a>
     <div class="progress" id="progress">
       <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
       <div class="progress-stage" id="progressStage"></div>
@@ -314,6 +317,7 @@
     body: document.getElementById("body"),
     meta: document.getElementById("meta"),
     status: document.getElementById("status"),
+    releaseLink: document.getElementById("releaseLink"),
     laterBtn: document.getElementById("laterBtn"),
     downloadBtn: document.getElementById("downloadBtn"),
     progress: document.getElementById("progress"),
@@ -438,6 +442,16 @@
     els.status.classList.toggle("bad", kind === "bad");
   }
 
+  function setReleaseLink(value) {
+    const fallback = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
+    let url = fallback;
+    try {
+      const parsed = new URL(value || fallback);
+      if (parsed.protocol === "https:" && parsed.hostname === "github.com" && parsed.pathname.startsWith("/7Lzz/OBS-ReplayKit/releases/")) url = parsed.href;
+    } catch (_) {}
+    els.releaseLink.href = url;
+  }
+
   async function helperJson(path, options) {
     const res = await fetch(HELPER + "/" + path, {
       cache:"no-store",
@@ -445,7 +459,9 @@
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.ok === false) {
-      throw new Error(body.message || body.error || ("HTTP " + res.status));
+      const error = new Error(body.message || body.error || ("HTTP " + res.status));
+      error.data = body;
+      throw error;
     }
     return body;
   }
@@ -468,6 +484,7 @@
     try {
       const data = await helperJson("update/check?t=" + Date.now());
       latest = data;
+      setReleaseLink(data.releaseUrl);
       if (!data.updateAvailable) {
         els.title.textContent = "ReplayKit is up to date";
         els.body.textContent = data.message || "No ReplayKit update is available right now.";
@@ -488,6 +505,7 @@
       els.body.textContent = "ReplayKit could not check for updates.";
       els.meta.textContent = "";
       setStatus(e.message || String(e), "bad");
+      setReleaseLink(e.data && e.data.releaseUrl);
       showReleaseNotes("");
     }
   }
@@ -514,6 +532,7 @@
         if (!r.ok) return;
         const body = await r.json().catch(() => ({}));
         if (body && body.present) {
+          setReleaseLink(body.releaseUrl);
           stop();
           if (body.installOk) onComplete();
           else onFail(body.message || "The installer reported a failure.");
@@ -558,6 +577,7 @@
 
     try {
       const data = await helperJson("update/apply", { method:"POST" });
+      setReleaseLink(data.releaseUrl);
       clearInterval(pulseTimer);
       if (data.updateAvailable === false) {
         setProgress(100, "ReplayKit is already up to date.", "done");
@@ -573,6 +593,7 @@
       }, failUpdate);
     } catch (e) {
       clearInterval(pulseTimer);
+      setReleaseLink(e.data && e.data.releaseUrl);
       failUpdate(e.message || String(e));
     }
   }

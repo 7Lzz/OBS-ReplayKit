@@ -16,10 +16,33 @@ namespace ReplayKitHelper
         public sealed class Tokens
         {
             public string Bg, Panel, Field, Field2, Border, BorderStrong,
-                          Text, Muted, Disabled, Accent, Accent2, Danger, Success, Warning;
+                          Text, Muted, Disabled, Accent, Accent2, Danger, Success, Warning,
+                          Gradient;
             public bool Dark = true;
 
-            public Tokens Clone() => (Tokens)MemberwiseClone();
+            // a gradient per surface token, keyed by the swatch name the editor uses. only these four: text, border
+            // and danger are colour roles -- they end up in border-color, color and the Mix/Shift/ToColorRef maths,
+            // where a gradient value paints nothing at all. the colour field above always stays a real hex so every
+            // derived token, the win32 chrome and the qt theme keep working; the gradient is an extra paint layer.
+            public static readonly string[] GradientTargets = { "bg", "panel", "field", "accent" };
+            public Dictionary<string, GradientSpec> Gradients = new Dictionary<string, GradientSpec>(StringComparer.OrdinalIgnoreCase);
+
+            public GradientSpec GradientFor(string target)
+            {
+                GradientSpec spec;
+                return Gradients != null && Gradients.TryGetValue(target ?? "", out spec) && spec.IsSet ? spec : null;
+            }
+
+            public Tokens Clone()
+            {
+                var clone = (Tokens)MemberwiseClone();
+                clone.Gradients = new Dictionary<string, GradientSpec>(StringComparer.OrdinalIgnoreCase);
+                if (Gradients != null)
+                {
+                    foreach (var pair in Gradients) clone.Gradients[pair.Key] = pair.Value.Clone();
+                }
+                return clone;
+            }
 
             public JObject ToJson() => new JObject
             {
@@ -28,6 +51,7 @@ namespace ReplayKitHelper
                 ["text"] = Text, ["muted"] = Muted, ["disabled"] = Disabled,
                 ["accent"] = Accent, ["accent2"] = Accent2,
                 ["danger"] = Danger, ["success"] = Success, ["warning"] = Warning,
+                ["gradient"] = Gradient ?? "", ["gradients"] = GradientsJson(),
                 ["dark"] = Dark,
             };
 
@@ -35,8 +59,57 @@ namespace ReplayKitHelper
             public JObject ToSeedJson() => new JObject
             {
                 ["bg"] = Bg, ["panel"] = Panel, ["field"] = Field, ["text"] = Text,
-                ["accent"] = Accent, ["border"] = Border, ["danger"] = Danger, ["dark"] = Dark,
+                ["accent"] = Accent, ["border"] = Border, ["danger"] = Danger,
+                ["gradient"] = Gradient ?? "", ["gradients"] = GradientsJson(), ["dark"] = Dark,
             };
+
+            private JObject GradientsJson()
+            {
+                var result = new JObject();
+                foreach (string target in GradientTargets)
+                {
+                    GradientSpec spec = GradientFor(target);
+                    if (spec != null) result[target] = spec.ToJson();
+                }
+                return result;
+            }
+        }
+
+        public sealed class GradientStop
+        {
+            public string Color;
+            public int Position;
+        }
+
+        public sealed class GradientSpec
+        {
+            public string Type = "linear";
+            public int Angle = 135;
+            public int CenterX = 50;
+            public int CenterY = 50;
+            public List<GradientStop> Stops = new List<GradientStop>();
+
+            // under two stops there is nothing to interpolate, so the token just stays its solid colour.
+            public bool IsSet { get { return Stops != null && Stops.Count >= 2; } }
+
+            public GradientSpec Clone()
+            {
+                var clone = new GradientSpec { Type = Type, Angle = Angle, CenterX = CenterX, CenterY = CenterY };
+                foreach (GradientStop stop in Stops) clone.Stops.Add(new GradientStop { Color = stop.Color, Position = stop.Position });
+                return clone;
+            }
+
+            public JObject ToJson()
+            {
+                var stops = new JArray();
+                foreach (GradientStop stop in Stops)
+                    stops.Add(new JObject { ["color"] = stop.Color, ["position"] = stop.Position });
+                return new JObject
+                {
+                    ["type"] = Type, ["angle"] = Angle,
+                    ["centerX"] = CenterX, ["centerY"] = CenterY, ["stops"] = stops,
+                };
+            }
         }
 
         // presets. keep "default" first + exactly matching the dock's shipped :root so selecting it is a true no-op.
@@ -94,7 +167,7 @@ namespace ReplayKitHelper
                    Accent = Hex(c["accent"], "#284CB8"), Border = Hex(c["border"], "#3C404D"),
                    Danger = Hex(c["danger"], "#E33B57");
             bool dark = c["dark"] == null ? true : c["dark"].Value<bool>();
-            return new Tokens
+            var tokens = new Tokens
             {
                 Bg = Bg,
                 Panel = Panel,
@@ -112,6 +185,8 @@ namespace ReplayKitHelper
                 Warning = dark ? "#E2A33B" : "#B45309",
                 Dark = dark,
             };
+            ApplyGradient(c, tokens);
+            return tokens;
         }
 
         // the :root override the helper splices into every dock page before </head>. covers both var-naming schemes
@@ -123,19 +198,43 @@ namespace ReplayKitHelper
             string grey2 = Mix(t.Border, t.BorderStrong, 0.5);
             var sb = new StringBuilder();
             // beat the anti-FOUC inline style on <html>/<body> and the theme-color meta
-            sb.Append("html,body{background:").Append(t.Bg).Append("!important;color:").Append(t.Text).Append("!important;}");
+            string pageBackground = BackgroundCss(t);
+            sb.Append("html,body{background:").Append(pageBackground).Append("!important;color:").Append(t.Text).Append("!important;}");
+            // always emitted, even with no gradient: this stylesheet replaces one that may have set a gradient on
+            // .shell, and a theme that simply omitted the rule left that gradient painted -- html,body{background}
+            // cannot reach .shell. "none" is what actually clears it when switching back to a flat preset.
+            sb.Append("body,.shell{background-image:").Append(t.GradientFor("bg") != null ? pageBackground : "none")
+              .Append("!important;background-attachment:fixed!important;}");
             sb.Append("html{color-scheme:").Append(t.Dark ? "dark" : "light").Append("!important;}"); // beat the inline style + <meta>, so native controls/scrollbars flip on a light theme
+            // a surface token paints with its gradient where one is set; everything that needs a real colour --
+            // borders, text, the Mix/Shift maths above, the win32 chrome -- keeps reading the plain field. the
+            // *-solid vars exist for the handful of dock rules that use a surface token as a border colour.
+            string bgPaint = Paint(t, "bg", t.Bg);
+            string panelPaint = Paint(t, "panel", t.Panel);
+            string fieldPaint = Paint(t, "field", t.Field);
+            string accentPaint = Paint(t, "accent", t.Accent);
             sb.Append(":root{");
+            sb.Append("--window-solid:").Append(t.Bg).Append(';');
+            sb.Append("--panel-solid:").Append(t.Panel).Append(';');
+            sb.Append("--field-solid:").Append(t.Field).Append(';');
+            sb.Append("--selected-solid:").Append(t.Accent).Append(';');
+            // same four solids under the clips/controls names, so those files can stay in their own scheme
+            sb.Append("--grey4-solid:").Append(t.Field).Append(';');
+            sb.Append("--grey6-solid:").Append(t.Panel).Append(';');
+            sb.Append("--grey7-solid:").Append(t.Bg).Append(';');
+            sb.Append("--blue3-solid:").Append(t.Accent).Append(';');
+            sb.Append("--primary-solid:").Append(t.Accent).Append(';');
+            sb.Append("--button_bg-solid:").Append(t.Field).Append(';');
             // settings.html scheme
-            sb.Append("--window:").Append(t.Bg).Append(';');
-            sb.Append("--side:").Append(t.Panel).Append(';');
-            sb.Append("--panel:").Append(t.Panel).Append(';');
-            sb.Append("--field:").Append(t.Field).Append(';');
+            sb.Append("--window:").Append(bgPaint).Append(';');
+            sb.Append("--side:").Append(panelPaint).Append(';');
+            sb.Append("--panel:").Append(panelPaint).Append(';');
+            sb.Append("--field:").Append(fieldPaint).Append(';');
             sb.Append("--field2:").Append(t.Field2).Append(';');
-            sb.Append("--field-dark:").Append(t.Bg).Append(';');
+            sb.Append("--field-dark:").Append(bgPaint).Append(';');
             sb.Append("--line:").Append(t.Border).Append(';');
             sb.Append("--line2:").Append(t.BorderStrong).Append(';');
-            sb.Append("--selected:").Append(t.Accent).Append(';');
+            sb.Append("--selected:").Append(accentPaint).Append(';');
             sb.Append("--selected2:").Append(t.Accent2).Append(';');
             sb.Append("--text:").Append(t.Text).Append(';');
             sb.Append("--muted:").Append(t.Muted).Append(';');
@@ -145,38 +244,39 @@ namespace ReplayKitHelper
             sb.Append("--success:").Append(t.Success).Append(';');
             sb.Append("--warning:").Append(t.Warning).Append(';');
             sb.Append("--link:").Append(t.Accent2).Append(';');
-            sb.Append("--button:").Append(t.Field).Append(';');
+            sb.Append("--button:").Append(fieldPaint).Append(';');
             sb.Append("--button-hover:").Append(t.BorderStrong).Append(';');
             // clips.html / controls_app.html scheme
             sb.Append("--grey1:").Append(t.BorderStrong).Append(';');
             sb.Append("--grey2:").Append(grey2).Append(';');
             sb.Append("--grey3:").Append(t.Border).Append(';');
-            sb.Append("--grey4:").Append(t.Field).Append(';');
+            sb.Append("--grey4:").Append(fieldPaint).Append(';');
             sb.Append("--grey5:").Append(grey5).Append(';');
-            sb.Append("--grey6:").Append(t.Panel).Append(';');
-            sb.Append("--grey7:").Append(t.Bg).Append(';');
+            sb.Append("--grey6:").Append(panelPaint).Append(';');
+            sb.Append("--grey7:").Append(bgPaint).Append(';');
             sb.Append("--grey8:").Append(grey8).Append(';');
             sb.Append("--blue2:").Append(t.Accent2).Append(';');
-            sb.Append("--blue3:").Append(t.Accent).Append(';');
+            sb.Append("--blue3:").Append(accentPaint).Append(';');
             sb.Append("--green:").Append(t.Success).Append(';');
             sb.Append("--red:").Append(t.Danger).Append(';');
             sb.Append("--amber:").Append(t.Warning).Append(';');
             sb.Append("--white1:").Append(t.Text).Append(';');
             sb.Append("--white5:").Append(t.Muted).Append(';');
-            sb.Append("--bg_window:").Append(t.Bg).Append(';');
+            sb.Append("--bg_window:").Append(bgPaint).Append(';');
             sb.Append("--bg_card:").Append(grey5).Append(';');
-            sb.Append("--bg_dock:").Append(t.Panel).Append(';');
+            sb.Append("--bg_dock:").Append(panelPaint).Append(';');
             sb.Append("--text_muted:").Append(t.Muted).Append(';');
-            sb.Append("--button_bg:").Append(t.Field).Append(';');
+            sb.Append("--button_bg:").Append(fieldPaint).Append(';');
             sb.Append("--button_bg_hover:").Append(t.Border).Append(';');
             sb.Append("--button_bg_down:").Append(t.Bg).Append(';');
             sb.Append("--button_border:").Append(t.Field).Append(';');
             sb.Append("--button_border_hover:").Append(t.BorderStrong).Append(';');
-            sb.Append("--primary:").Append(t.Accent).Append(';');
+            sb.Append("--primary:").Append(accentPaint).Append(';');
             sb.Append("--primary_light:").Append(t.Accent2).Append(';');
             sb.Append("--link_accent:").Append(t.Accent2).Append(';');
-            sb.Append("--input_bg:").Append(t.Field).Append(';');
+            sb.Append("--input_bg:").Append(fieldPaint).Append(';');
             sb.Append("--input_border:").Append(t.Border).Append(';');
+            sb.Append("--theme-background:").Append(pageBackground).Append(';');
             // -- cross-theme helpers (used for checkmarks, translucent dividers/overlays, shadows) --
             string onAccent = OnColor(t.Accent);
             sb.Append("--on-accent:").Append(onAccent).Append(';');                 // readable icon/text ON the accent fill
@@ -364,6 +464,14 @@ namespace ReplayKitHelper
                 sb.Append("QComboBox QAbstractItemView::item:selected, QTabBar::tab:selected,\n");
                 sb.Append("SourceTreeItem[selected=\"true\"] { color: ").Append(onAccent).Append("; }\n");
             }
+            // only the window gradient goes to OBS: panel/field/accent are used as plain colours all through the
+            // generated .ovt, where a qgradient is not a valid value.
+            GradientSpec windowGradient = t.GradientFor("bg");
+            if (windowGradient != null)
+            {
+                sb.Append('\n');
+                sb.Append("QMainWindow, QDialog { background: ").Append(QtGradient(windowGradient)).Append("; }\n");
+            }
             return sb.ToString();
         }
 
@@ -408,18 +516,30 @@ namespace ReplayKitHelper
 
         // -- user (saved) themes --
 
-        public static string SaveUserTheme(string label, JObject customPayload)
+        public static string SaveUserTheme(string label, JObject customPayload, string existingId = null)
         {
             var t = FromCustom(customPayload);
             if (t == null) return null;
             Directory.CreateDirectory(Constants.USER_THEMES_DIR);
-            string slug = Slug(string.IsNullOrWhiteSpace(label) ? "theme" : label);
-            string name = slug;
-            int n = 2;
-            while (File.Exists(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"))) name = slug + "-" + n++;
+            string cleanLabel = CleanLabel(label);
+            string name;
+            if (!string.IsNullOrEmpty(existingId))
+            {
+                if (!existingId.StartsWith("user/", StringComparison.Ordinal)) return null;
+                name = Path.GetFileNameWithoutExtension(Path.GetFileName(existingId.Substring(5)));
+                if (string.IsNullOrEmpty(name) || existingId != "user/" + name) return null;
+                if (!File.Exists(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"))) return null;
+            }
+            else
+            {
+                string slug = Slug(string.IsNullOrWhiteSpace(cleanLabel) ? "theme" : cleanLabel);
+                name = slug;
+                int n = 2;
+                while (File.Exists(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"))) name = slug + "-" + n++;
+            }
             var j = t.ToJson();
-            j["label"] = string.IsNullOrWhiteSpace(label) ? slug : label.Trim();
-            File.WriteAllText(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"), j.ToString(), new UTF8Encoding(false));
+            j["label"] = string.IsNullOrWhiteSpace(cleanLabel) ? name : cleanLabel;
+            WriteJsonAtomic(Path.Combine(Constants.USER_THEMES_DIR, name + ".json"), j);
             return "user/" + name;
         }
 
@@ -431,7 +551,7 @@ namespace ReplayKitHelper
                 string p = Path.Combine(Constants.USER_THEMES_DIR, name + ".json");
                 if (string.IsNullOrEmpty(name) || !File.Exists(p)) return null;
                 var j = JObject.Parse(File.ReadAllText(p));
-                return new Tokens
+                var tokens = new Tokens
                 {
                     Bg = Hex(j["bg"], "#161617"), Panel = Hex(j["panel"], "#1D1F26"),
                     Field = Hex(j["field"], "#2F323C"), Field2 = Hex(j["field2"], "#242730"),
@@ -442,6 +562,8 @@ namespace ReplayKitHelper
                     Success = Hex(j["success"], "#37D247"), Warning = Hex(j["warning"], "#E2A33B"),
                     Dark = j["dark"] == null ? true : j["dark"].Value<bool>(),
                 };
+                ApplyGradient(j, tokens);
+                return tokens;
             }
             catch (Exception ex) { Log.Write("Themes.LoadUserTheme: " + ex.Message); return null; }
         }
@@ -482,6 +604,18 @@ namespace ReplayKitHelper
 
         private static string Hex(JToken tok, string fallback) => CleanHex(tok?.Value<string>(), fallback);
 
+        public static string CleanOptionalHex(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            return CleanHex(value, "");
+        }
+
+        public static int CleanAngle(int value)
+        {
+            value %= 360;
+            return value < 0 ? value + 360 : value;
+        }
+
         // "#abc" / "abcdef" / "#ABCDEF" -> "#AABBCC" uppercase, or fallback if unparseable.
         public static string CleanHex(string s, string fallback)
         {
@@ -496,6 +630,148 @@ namespace ReplayKitHelper
                 if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return fallback;
             }
             return s.ToUpperInvariant();
+        }
+
+        private static string CleanLabel(string value)
+        {
+            var sb = new StringBuilder();
+            foreach (char c in (value ?? "").Trim())
+            {
+                if (!char.IsControl(c)) sb.Append(c);
+                if (sb.Length == 40) break;
+            }
+            return sb.ToString().Trim();
+        }
+
+        private static void WriteJsonAtomic(string path, JObject value)
+        {
+            string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(temp, value.ToString(), new UTF8Encoding(false));
+                if (File.Exists(path)) File.Replace(temp, path, null, true);
+                else File.Move(temp, path);
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+            }
+        }
+
+        public static string BackgroundCss(Tokens t) => Paint(t, "bg", t.Bg);
+
+        // the css a token paints with: its gradient when one is set for that token, otherwise its plain colour.
+        // callers that need a real colour (border-color, colour arithmetic, ToColorRef) must use the field directly.
+        public static string Paint(Tokens t, string target, string solid)
+        {
+            GradientSpec spec = t?.GradientFor(target);
+            if (spec == null) return solid;
+            string stops = CssStops(spec.Stops);
+            if (spec.Type == "radial")
+                return "radial-gradient(circle at " + spec.CenterX + "% " + spec.CenterY + "%," + stops + ")";
+            return "linear-gradient(" + CleanAngle(spec.Angle).ToString(CultureInfo.InvariantCulture) + "deg," + stops + ")";
+        }
+
+        private static string QtGradient(GradientSpec spec)
+        {
+            string stops = QtStops(spec.Stops);
+            if (spec.Type == "radial")
+            {
+                string cx = (spec.CenterX / 100.0).ToString("0.###", CultureInfo.InvariantCulture);
+                string cy = (spec.CenterY / 100.0).ToString("0.###", CultureInfo.InvariantCulture);
+                return "qradialgradient(cx:" + cx + ",cy:" + cy + ",radius:0.75,fx:" + cx + ",fy:" + cy + "," + stops + ")";
+            }
+            double radians = CleanAngle(spec.Angle) * Math.PI / 180.0;
+            double dx = Math.Sin(radians) / 2.0;
+            double dy = -Math.Cos(radians) / 2.0;
+            string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+            return "qlineargradient(x1:" + F(0.5 - dx) + ",y1:" + F(0.5 - dy) + ",x2:" + F(0.5 + dx) + ",y2:" + F(0.5 + dy) + "," + stops + ")";
+        }
+
+        // reads the per-token gradients. themes written before gradients were per-token carry a flat
+        // gradientStops/gradientAngle block plus the even older single "gradient" colour -- both are read here as
+        // the bg gradient so an existing custom theme keeps looking the way its author left it.
+        private static void ApplyGradient(JObject source, Tokens tokens)
+        {
+            tokens.Gradients = new Dictionary<string, GradientSpec>(StringComparer.OrdinalIgnoreCase);
+            if (source?["gradients"] is JObject map)
+            {
+                foreach (string target in Tokens.GradientTargets)
+                {
+                    var spec = ReadGradientSpec(map[target] as JObject, tokens);
+                    if (spec != null) tokens.Gradients[target] = spec;
+                }
+            }
+            if (!tokens.Gradients.ContainsKey("bg"))
+            {
+                var legacy = ReadGradientSpec(source, tokens);
+                if (legacy != null) tokens.Gradients["bg"] = legacy;
+            }
+        }
+
+        // accepts both shapes: the per-token one ({type,angle,centerX,centerY,stops}) and the legacy flat one
+        // ({gradientType,gradientAngle,...,gradientStops} plus a bare "gradient" end colour).
+        private static GradientSpec ReadGradientSpec(JObject source, Tokens tokens)
+        {
+            if (source == null) return null;
+            bool flat = source["gradientStops"] != null || source["gradientType"] != null || source["gradient"] != null;
+            var spec = new GradientSpec
+            {
+                Type = string.Equals((flat ? source["gradientType"] : source["type"])?.ToString(), "radial", StringComparison.OrdinalIgnoreCase) ? "radial" : "linear",
+                Angle = ReadInt(flat ? source["gradientAngle"] : source["angle"], 135, 0, 359),
+                CenterX = ReadInt(flat ? source["gradientCenterX"] : source["centerX"], 50, 0, 100),
+                CenterY = ReadInt(flat ? source["gradientCenterY"] : source["centerY"], 50, 0, 100),
+            };
+            if ((flat ? source["gradientStops"] : source["stops"]) is JArray rawStops)
+            {
+                foreach (JToken raw in rawStops)
+                {
+                    if (!(raw is JObject item) || spec.Stops.Count >= 6) break;
+                    string color = CleanOptionalHex(item["color"]?.ToString());
+                    if (string.IsNullOrEmpty(color)) continue;
+                    spec.Stops.Add(new GradientStop { Color = color, Position = ReadInt(item["position"], spec.Stops.Count == 0 ? 0 : 100, 0, 100) });
+                }
+            }
+            if (spec.Stops.Count < 2 && flat)
+            {
+                string legacy = CleanOptionalHex(source["gradient"]?.ToString());
+                if (!string.IsNullOrEmpty(legacy))
+                {
+                    spec.Stops.Clear();
+                    spec.Stops.Add(new GradientStop { Color = tokens.Bg, Position = 0 });
+                    spec.Stops.Add(new GradientStop { Color = legacy, Position = 100 });
+                }
+            }
+            spec.Stops.Sort((left, right) => left.Position.CompareTo(right.Position));
+            return spec.IsSet ? spec : null;
+        }
+
+        private static int ReadInt(JToken value, int fallback, int min, int max)
+        {
+            if (value == null || !int.TryParse(value.ToString(), out int parsed)) return fallback;
+            return parsed < min ? min : (parsed > max ? max : parsed);
+        }
+
+        private static string CssStops(List<GradientStop> stops)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < stops.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(stops[i].Color).Append(' ').Append(stops[i].Position).Append('%');
+            }
+            return sb.ToString();
+        }
+
+        private static string QtStops(List<GradientStop> stops)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < stops.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append("stop:").Append((stops[i].Position / 100.0).ToString("0.##", CultureInfo.InvariantCulture)).Append(' ').Append(stops[i].Color);
+            }
+            return sb.ToString();
         }
 
         private static void ToRgb(string hex, out int r, out int g, out int b)

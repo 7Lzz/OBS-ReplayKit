@@ -99,12 +99,12 @@ namespace ReplayKitHelper
                 ["appIconRecordingDot"] = true,
                 // "default" (obs yami) / a bundled preset id (see Themes.PresetOrder) / "custom" / "user/<name>" (a saved custom). drives the dock, replaykit window chrome, and a generated obs theme variant.
                 ["theme"] = "default",
-                // the custom-editor working palette: 6 picks + dark, the rest derived by Themes.FromCustom.
+                // the custom-editor working palette; the second gradient stop is optional.
                 ["themeCustom"] = new JObject
                 {
                     ["bg"] = "#161617", ["panel"] = "#1D1F26", ["field"] = "#2F323C",
                     ["text"] = "#FFFFFF", ["accent"] = "#284CB8", ["border"] = "#3C404D",
-                    ["danger"] = "#E33B57", ["dark"] = true,
+                    ["danger"] = "#E33B57", ["gradient"] = "", ["gradients"] = new JObject(), ["dark"] = true,
                 },
             };
         }
@@ -385,8 +385,16 @@ namespace ReplayKitHelper
             var outObj = new JObject();
             foreach (var k in new[] { "bg", "panel", "field", "text", "accent", "border", "danger" })
                 outObj[k] = Themes.CleanHex(src[k]?.ToString(), defaults[k].ToString());
+            outObj["gradient"] = Themes.CleanOptionalHex(src["gradient"]?.ToString());
+            // gradients is the current per-token shape; the flat gradient* keys are still carried through so a
+            // settings file written before per-token gradients still resolves its background gradient (Themes.ApplyGradient reads both).
+            outObj["gradients"] = src["gradients"] is JObject gradients ? gradients.DeepClone() : new JObject();
+            foreach (var legacy in new[] { "gradientType", "gradientAngle", "gradientCenterX", "gradientCenterY", "gradientStops" })
+            {
+                if (src[legacy] != null) outObj[legacy] = src[legacy].DeepClone();
+            }
             outObj["dark"] = src["dark"]?.Type == JTokenType.Boolean ? src["dark"].Value<bool>() : defaults["dark"].Value<bool>();
-            return outObj;
+            return Themes.FromCustom(outObj).ToSeedJson();
         }
 
         private static readonly string[] AppIconExts = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
@@ -4833,7 +4841,8 @@ namespace ReplayKitHelper
             }
             // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load).
             if (previous["theme"]?.ToString() != settings["theme"]?.ToString()) return true;
-            if (settings["theme"]?.ToString() == "custom" && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])) return true;
+            string theme = settings["theme"]?.ToString() ?? "default";
+            if ((theme == "custom" || theme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])) return true;
             return previous["overlayStyle"]?.ToString() != settings["overlayStyle"]?.ToString();
         }
 
@@ -5201,8 +5210,9 @@ namespace ReplayKitHelper
                 };
             }
             // theme change -> write the obs .ovt variant + user.ini key now, before ApplyLiveSettings restarts obs to pick it up.
-            if (previous["theme"]?.ToString() != settings["theme"]?.ToString() ||
-                (settings["theme"]?.ToString() == "custom" && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])))
+            string nextTheme = settings["theme"]?.ToString() ?? "default";
+            if (previous["theme"]?.ToString() != nextTheme ||
+                ((nextTheme == "custom" || nextTheme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])))
             {
                 Themes.ApplyToObs(settings);
             }

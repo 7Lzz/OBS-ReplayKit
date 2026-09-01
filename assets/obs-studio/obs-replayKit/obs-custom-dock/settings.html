@@ -60,7 +60,7 @@
   *::-webkit-scrollbar-track { background:transparent; }
   *::-webkit-scrollbar-corner { background:transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color:var(--button-hover);
+    background-color:var(--line);
     border-radius:7px;
     border:4px solid transparent;
     background-clip:padding-box;
@@ -218,7 +218,7 @@
   .combo-button,.text-input,.spin-input,.hotkey-input {
     width:100%;
     height:32px;
-    border:1px solid var(--field);
+    border:1px solid var(--field-solid,var(--field));
     border-radius:4px;
     background:var(--field);
     color:var(--text);
@@ -257,7 +257,7 @@
     pointer-events:none;
   }
   .combo.is-open .combo-button {
-    border-color:var(--selected);
+    border-color:var(--selected-solid,var(--selected));
     background:var(--window);
     border-radius:4px;
   }
@@ -418,7 +418,7 @@
   }
   .volume-value {
     background:transparent;
-    border-color:var(--field);
+    border-color:var(--field-solid,var(--field));
     text-align:center;
     padding:0 8px;
   }
@@ -490,17 +490,14 @@
   .color-picker {
     width:42px;
     height:32px;
-    border:1px solid var(--field);
+    border:1px solid var(--field-solid,var(--field));
     border-radius:4px;
-    background:var(--field);
+    background:var(--color, var(--field));
     padding:3px;
     cursor:pointer;
+    box-shadow:inset 0 0 0 3px var(--field-dark);
   }
-  .color-picker::-webkit-color-swatch-wrapper { padding:0; }
-  .color-picker::-webkit-color-swatch {
-    border:0;
-    border-radius:2px;
-  }
+  .color-picker:hover { border-color:var(--line2); }
   .color-value {
     width:100%;
     text-transform:lowercase;
@@ -519,7 +516,7 @@
     top:0;
     width:28px;
     height:32px;
-    border-left:1px solid var(--panel);
+    border-left:1px solid var(--panel-solid,var(--panel));
     display:grid;
     grid-template-rows:1fr 1fr;
     background:var(--field);
@@ -533,7 +530,7 @@
     padding:0;
   }
   .spin-btn:hover { background:var(--button-hover); }
-  .spin-btn + .spin-btn { border-top:1px solid var(--panel); }
+  .spin-btn + .spin-btn { border-top:1px solid var(--panel-solid,var(--panel)); }
   .spin-btn svg { width:9px; height:9px; fill:currentColor; }
   .check-row {
     min-height:28px;
@@ -659,19 +656,135 @@
   }
   .icon-tile:hover .icon-tile-del, .icon-tile-del:focus-visible { opacity:1; }
   .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
+  .icon-tile-edit {
+    position:absolute; top:3px; left:3px;
+    display:flex; align-items:center; justify-content:center;
+    width:18px; height:18px; padding:0; border:0; border-radius:4px;
+    background:var(--field); color:var(--muted); cursor:pointer; opacity:0;
+    transition:opacity var(--anim_press) var(--ease_pop), color 80ms ease-out, background 80ms ease-out;
+  }
+  .icon-tile:hover .icon-tile-edit, .icon-tile-edit:focus-visible { opacity:1; }
+  .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
+  .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
   .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
   /* theme tile swatch */
   .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
   .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
   .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
+  .theme-section { width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:transparent; }
+  .theme-section + .theme-section { margin-top:9px; }
+  .theme-section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:12px; font-weight:600; }
+  .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
   .theme-editor { display:flex; flex-wrap:wrap; gap:8px; }
+  .theme-preview-row { margin-top:8px; }
+  .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
   .theme-pick { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; color:var(--muted); cursor:pointer; }
-  .theme-pick input[type=color] {
-    width:38px; height:30px; padding:0; border:1px solid var(--line); border-radius:6px;
-    background:var(--field-dark); cursor:pointer;
+  .theme-pick .color-picker { width:38px; height:30px; border-color:var(--line); border-radius:6px; }
+  .gradient-editor { width:100%; margin-top:9px; }
+  .gradient-editor[hidden] { display:none; }
+  .gradient-top { display:grid; grid-template-columns:130px 1fr; gap:8px; align-items:center; }
+  .gradient-preview { height:34px; border:1px solid var(--line2); border-radius:5px; background:var(--gradient-preview,var(--field)); }
+  .gradient-control { display:grid; grid-template-columns:88px minmax(120px,1fr) 58px; align-items:center; gap:8px; margin-top:8px; }
+  .gradient-control .label { font-size:11px; }
+  .gradient-number { width:58px; text-align:right; }
+  .gradient-stops-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+  .gradient-stop-list { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  .gradient-stop-row { display:grid; grid-template-columns:42px minmax(120px,1fr) 58px 28px; align-items:center; gap:7px; }
+  .gradient-stop-remove { min-width:28px; width:28px; padding:0; }
+  .gradient-stop-remove svg { width:10px; height:10px; fill:currentColor; }
+  .grad-targets { display:flex; gap:4px; flex-wrap:wrap; }
+  .grad-target {
+    display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; cursor:pointer;
+    border:1px solid var(--line); border-radius:4px; background:var(--field); color:var(--text);
+    font:inherit; font-size:12px;
   }
-  .theme-pick input[type=color]::-webkit-color-swatch-wrapper { padding:3px; }
-  .theme-pick input[type=color]::-webkit-color-swatch { border:none; border-radius:3px; }
+  .grad-target:hover { background:var(--line2); }
+  .grad-target.is-active { border-color:var(--selected2); background:var(--selected); color:var(--on-accent,#fff); }
+  /* filled only while that surface actually has a gradient, so the row doubles as an at-a-glance summary */
+  .grad-target-dot { width:7px; height:7px; border-radius:50%; background:transparent; box-shadow:inset 0 0 0 1px currentColor; }
+  .grad-target.has-gradient .grad-target-dot { background:currentColor; }
+
+  /* gradient stop ramp -- stops are dragged directly on the ramp that shows them, rather than edited as a list of number fields. --ramp is the left-to-right colour run, set from js. */
+  .grad-ramp {
+    position:relative; height:38px; margin:2px 0 0; border:1px solid var(--line2); border-radius:5px;
+    background-image:var(--ramp,none); background-color:var(--field-dark); cursor:copy;
+  }
+  /* handles borrow the trim bar's endcap language from clips.html -- same 12px full-height cap, 5px radius and
+     shadow. the white body becomes an inset ring instead, so the stop's colour reads through the middle; the
+     trim grip stroke is dropped rather than layered under the colour, where it would only show on pale stops. */
+  .grad-ramp-handle {
+    position:absolute; top:-1px; bottom:-1px; left:0; width:12px; margin-left:-6px; padding:0;
+    border:0; border-radius:5px; cursor:grab; background:var(--color,#000);
+    box-shadow:inset 0 0 0 2px var(--text), 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
+  }
+  .grad-ramp-handle.is-selected { box-shadow:inset 0 0 0 2px var(--text), 0 0 0 2px var(--selected2), 0 1px 6px rgba(0,0,0,.45); z-index:2; }
+  .grad-ramp-handle.is-dragging { cursor:grabbing; }
+  .grad-ramp-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:7px; }
+  .grad-ramp-foot .btn { flex:none; height:26px; padding:0 10px; font-size:12px; }
+
+  /* floating colour picker. position:fixed with js-set left/top so it can be dragged anywhere over the page; it is not a modal -- the rest of Settings stays live underneath so colours can be judged against the real ui while picking. */
+  .cpick {
+    position:fixed; z-index:400; width:288px; border:1px solid var(--line2); border-radius:7px;
+    background:var(--panel); box-shadow:0 14px 40px rgba(0,0,0,.5); overflow:hidden;
+    animation:cpick-in 150ms var(--ease_pop) both;
+  }
+  @keyframes cpick-in { from { opacity:0; transform:translateY(6px) scale(.98); } to { opacity:1; transform:none; } }
+  .cpick[hidden] { display:none; }
+  .cpick-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 8px 7px 11px;
+    background:var(--field); border-bottom:1px solid var(--line); cursor:grab; user-select:none;
+  }
+  .cpick.is-dragging .cpick-head { cursor:grabbing; }
+  .cpick-title { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cpick-x {
+    flex:none; width:20px; height:20px; display:grid; place-items:center; padding:0; line-height:1;
+    border:0; border-radius:3px; background:transparent; color:var(--muted); font-size:15px; cursor:pointer;
+  }
+  .cpick-x:hover { background:var(--line2); color:var(--text); }
+  .cpick-body { padding:10px; display:grid; gap:9px; }
+  .cpick-plane { width:100%; height:140px; display:block; border:1px solid var(--line2); border-radius:5px; cursor:crosshair; touch-action:none; }
+  /* the track has to stay a rainbow (it IS the hue scale), but the thumb matches .volume-slider so it reads as the same control as every other slider in the tab. */
+  .cpick-hue {
+    width:100%; height:10px; margin:0; padding:0; appearance:none; -webkit-appearance:none;
+    border-radius:5px; border:0; outline:none; cursor:pointer;
+    background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);
+  }
+  .cpick-hue::-webkit-slider-runnable-track { height:10px; background:transparent; border:0; }
+  .cpick-hue::-webkit-slider-thumb {
+    appearance:none; -webkit-appearance:none; width:21px; height:10px; margin-top:0;
+    border:0; border-radius:5px; background:var(--text); cursor:pointer;
+    box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25);
+  }
+  .cpick-hue:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  .cpick-row { display:grid; grid-template-columns:26px 1fr 30px; gap:7px; align-items:center; }
+  .cpick-swatch { width:26px; height:26px; border:1px solid var(--line2); border-radius:4px; background:var(--color,#000); }
+  .cpick-hex {
+    height:26px; min-width:0; border:1px solid var(--line); border-radius:4px; background:var(--field-dark);
+    color:var(--text); font:inherit; font-size:12px; padding:0 7px; text-transform:lowercase; outline:none;
+  }
+  .cpick-hex:focus { border-color:var(--selected2); }
+  .cpick-hex.is-bad { border-color:var(--danger); }
+  .cpick-eyedrop {
+    width:30px; height:26px; display:grid; place-items:center; padding:0; cursor:pointer;
+    border:1px solid var(--line); border-radius:4px; background:var(--field); color:var(--text);
+  }
+  .cpick-eyedrop:hover:not(:disabled) { background:var(--line2); }
+  .cpick-eyedrop:disabled { opacity:.5; cursor:default; }
+  .cpick-eyedrop svg { width:14px; height:14px; fill:currentColor; }
+  .cpick-status { min-height:14px; color:var(--muted); font-size:11px; line-height:1.3; }
+  .cpick-status.is-bad { color:var(--danger); }
+  .cpick-foot { display:flex; justify-content:flex-end; gap:7px; padding:0 10px 10px; }
+  .cpick-foot .btn { height:28px; padding:0 12px; font-size:12px; }
+
+  /* twin of clips.html's #bulk-tip -- same metrics, motion and --grey8 ground, so a tooltip reads identically in both windows. --grey8 arrives with the injected theme style; the fallback is the default theme's value for the file:// case where nothing is injected. */
+  #settings-tip {
+    position:fixed; z-index:300; padding:5px 8px; border-radius:3px; background:var(--grey8,#13141A); color:var(--text);
+    font-size:11px; font-weight:500; white-space:nowrap; pointer-events:none; opacity:0;
+    box-shadow:0 3px 10px rgba(0,0,0,.42); transform:translateY(3px) scale(.96); transform-origin:top center;
+    transition:opacity 100ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  #settings-tip.is-shown { opacity:1; transform:translateY(0) scale(1); }
+  #settings-tip::before { content:""; position:absolute; bottom:100%; left:var(--tip-arrow,50%); transform:translateX(-50%); border:5px solid transparent; border-bottom-color:var(--grey8,#13141A); }
   .inline-status {
     color:var(--muted);
     font-size:12px;
@@ -680,6 +793,10 @@
   }
   .inline-status.good { color:var(--success); }
   .inline-status.bad { color:var(--danger); }
+  .release-link { color:var(--link); font-size:12px; text-decoration:none; }
+  .release-link:hover { text-decoration:underline; }
+  .release-link[hidden] { display:none; }
+  .footer .btn[hidden] { display:none; }
   .footer {
     grid-column:2;
     display:flex;
@@ -691,7 +808,7 @@
   .btn {
     min-width:52px;
     height:30px;
-    border:1px solid var(--field);
+    border:1px solid var(--field-solid,var(--field));
     border-radius:4px;
     background:var(--field);
     color:var(--text);
@@ -716,7 +833,7 @@
     opacity:1;
     cursor:default;
     background:var(--panel);
-    border-color:var(--field);
+    border-color:var(--field-solid,var(--field));
   }
   .modal-backdrop {
     position:absolute;
@@ -1229,7 +1346,7 @@
           <div class="label">Color Multiply</div>
           <div class="field-wrap">
             <div class="color-control">
-              <input class="color-picker" id="overlayColorMultiply" type="color" aria-label="Overlay color multiply">
+              <button class="color-picker" id="overlayColorMultiply" type="button" aria-label="Overlay color multiply"></button>
               <input class="text-input color-value" id="overlayColorMultiplyValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex">
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayColorMultiply" title="Reset to default">
@@ -1241,7 +1358,7 @@
           <div class="label">Color Add</div>
           <div class="field-wrap">
             <div class="color-control">
-              <input class="color-picker" id="overlayColorAdd" type="color" aria-label="Overlay color add">
+              <button class="color-picker" id="overlayColorAdd" type="button" aria-label="Overlay color add"></button>
               <input class="text-input color-value" id="overlayColorAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex">
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayColorAdd" title="Reset to default">
@@ -1338,13 +1455,15 @@
         <div class="form-row">
           <div class="label">ReplayKit</div>
           <div class="field-wrap">
-            <button class="btn" type="button" id="checkUpdateBtn">Check</button>
-            <button class="btn" type="button" id="installUpdateBtn" disabled>Install</button>
+            <button class="btn" type="button" id="checkUpdateBtn">Check for updates</button>
           </div>
         </div>
         <div class="form-row tight">
           <div></div>
-          <div class="inline-status" id="updateStatusLine"></div>
+          <div>
+            <div class="inline-status" id="updateStatusLine"></div>
+            <a class="release-link" id="updateReleaseLink" href="https://github.com/7Lzz/OBS-ReplayKit/releases/latest" target="_blank" rel="noopener noreferrer" hidden>Download manually from GitHub</a>
+          </div>
         </div>
       </div>
       <div class="box">
@@ -1394,24 +1513,57 @@
           <div class="label">Theme</div>
           <div class="field-wrap is-stacked">
             <div class="icon-grid" id="themeGrid"></div>
+            <div class="theme-preview-row">
+              <button class="btn" type="button" id="openThemeClipsBtn" data-tooltip="Open the Clips window to see this theme on real clips">Preview in Clips</button>
+            </div>
           </div>
         </div>
         <div class="form-row" id="themeCustomRow" hidden>
-          <div class="label">Custom colours</div>
+          <div class="label">Custom theme</div>
           <div class="field-wrap is-stacked">
-            <div class="theme-editor" id="themeEditor">
-              <label class="theme-pick"><input type="color" data-k="bg"><span>Background</span></label>
-              <label class="theme-pick"><input type="color" data-k="panel"><span>Panel</span></label>
-              <label class="theme-pick"><input type="color" data-k="field"><span>Field</span></label>
-              <label class="theme-pick"><input type="color" data-k="text"><span>Text</span></label>
-              <label class="theme-pick"><input type="color" data-k="accent"><span>Accent</span></label>
-              <label class="theme-pick"><input type="color" data-k="border"><span>Border</span></label>
-              <label class="theme-pick"><input type="color" data-k="danger"><span>Danger</span></label>
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Base colors</span><span class="theme-section-hint">Click a swatch to open the floating editor.</span></div>
+              <div class="theme-editor" id="themeEditor">
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="field" aria-label="Field color"></button><span>Field</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="text" aria-label="Text color"></button><span>Text</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color"></button><span>Accent</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color"></button><span>Border</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color"></button><span>Danger</span></div>
+              </div>
             </div>
-            <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeCustomDark"><span>Dark base</span></label>
-            <div class="hint" style="margin:2px 0 0">On for a dark theme, off for a light one. Sets OBS's icon set, the window title bars and native menus/scrollbars to match &mdash; things the colours alone can't.</div>
-            <div class="form-row" style="grid-template-columns:1fr auto; gap:6px; margin-top:8px; padding:0">
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Gradients</span><span class="theme-section-hint">Give any surface a gradient instead of a flat color.</span></div>
+              <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
+              <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></label>
+              <div class="gradient-editor" id="themeGradientEditor" hidden>
+                <div class="gradient-top">
+                  <div class="combo" id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+                  <div class="gradient-preview" id="themeGradientPreview"></div>
+                </div>
+                <div id="themeGradientLinearControls">
+                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
+                </div>
+                <div id="themeGradientRadialControls" hidden>
+                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
+                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
+                </div>
+                <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops"></div>
+                <div class="grad-ramp-foot">
+                  <span class="theme-section-hint">Click the ramp to add a stop, drag to move it, click a stop to recolor.</span>
+                  <button class="btn" type="button" id="removeGradientStopBtn" disabled>Remove stop</button>
+                </div>
+              </div>
+            </div>
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Window behavior</span></div>
+              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span></label>
+              <div class="hint" style="margin:4px 0 0">Turn this off for light themes. It changes native OBS controls that swatches cannot restyle.</div>
+            </div>
+            <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
               <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
+              <button class="btn" type="button" id="cancelThemeEditBtn" hidden>Cancel edit</button>
               <button class="btn" type="button" id="saveThemeBtn">Save as preset</button>
             </div>
           </div>
@@ -1452,7 +1604,7 @@
   <footer class="footer">
     <button class="btn" type="button" id="okBtn">OK</button>
     <button class="btn" type="button" id="cancelBtn">Cancel</button>
-    <button class="btn" type="button" id="applyBtn" disabled>Apply</button>
+    <button class="btn" type="button" id="applyBtn" disabled hidden>Apply</button>
   </footer>
   <div class="modal-backdrop" id="uninstallConfirmModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="uninstallConfirmTitle">
@@ -1482,6 +1634,28 @@
     </div>
   </div>
   <div class="resize-grip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+</div>
+
+<!-- floating, non-modal colour picker. deliberately not a window.open popup: this page runs in OBS's CEF, where window.open escapes to the user's default browser instead of giving us a window we control. -->
+<div class="cpick" id="cpick" hidden role="dialog" aria-label="Choose color">
+  <div class="cpick-head" id="cpickHead">
+    <span class="cpick-title" id="cpickTitle">Choose color</span>
+    <button class="cpick-x" type="button" id="cpickClose" aria-label="Close color picker">&#215;</button>
+  </div>
+  <div class="cpick-body">
+    <canvas class="cpick-plane" id="cpickPlane" width="252" height="140"></canvas>
+    <input class="cpick-hue" id="cpickHue" type="range" min="0" max="359" step="1" aria-label="Hue">
+    <div class="cpick-row">
+      <span class="cpick-swatch" id="cpickSwatch"></span>
+      <input class="cpick-hex" id="cpickHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex color">
+      <button class="cpick-eyedrop" type="button" id="cpickEyedrop" data-tooltip="Pick a color from anywhere on screen" aria-label="Pick a color from anywhere on screen"><svg data-i="action/color-picker" viewBox="0 0 32 32" aria-hidden="true"></svg></button>
+    </div>
+    <div class="cpick-status" id="cpickStatus"></div>
+  </div>
+  <div class="cpick-foot">
+    <button class="btn" type="button" id="cpickCancel">Cancel</button>
+    <button class="btn is-primary" type="button" id="cpickApply">Apply</button>
+  </div>
 </div>
 
 <script>
@@ -1604,8 +1778,26 @@
     themeGrid: document.getElementById("themeGrid"),
     themeCustomRow: document.getElementById("themeCustomRow"),
     themeEditor: document.getElementById("themeEditor"),
+    openThemeClipsBtn: document.getElementById("openThemeClipsBtn"),
+    themeGradientEnabled: document.getElementById("themeGradientEnabled"),
+    themeGradientEditor: document.getElementById("themeGradientEditor"),
+    themeGradientType: document.getElementById("themeGradientType"),
+    themeGradientPreview: document.getElementById("themeGradientPreview"),
+    themeGradientLinearControls: document.getElementById("themeGradientLinearControls"),
+    themeGradientRadialControls: document.getElementById("themeGradientRadialControls"),
+    themeGradientAngle: document.getElementById("themeGradientAngle"),
+    themeGradientAngleValue: document.getElementById("themeGradientAngleValue"),
+    themeGradientCenterX: document.getElementById("themeGradientCenterX"),
+    themeGradientCenterXValue: document.getElementById("themeGradientCenterXValue"),
+    themeGradientCenterY: document.getElementById("themeGradientCenterY"),
+    themeGradientCenterYValue: document.getElementById("themeGradientCenterYValue"),
+    themeGradientRamp: document.getElementById("themeGradientRamp"),
+    themeGradientTargets: document.getElementById("themeGradientTargets"),
+    themeGradientEnabledLabel: document.getElementById("themeGradientEnabledLabel"),
+    removeGradientStopBtn: document.getElementById("removeGradientStopBtn"),
     themeCustomDark: document.getElementById("themeCustomDark"),
     themeName: document.getElementById("themeName"),
+    cancelThemeEditBtn: document.getElementById("cancelThemeEditBtn"),
     saveThemeBtn: document.getElementById("saveThemeBtn"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
@@ -1644,8 +1836,8 @@
     cancelBtn: document.getElementById("cancelBtn"),
     statusLine: document.getElementById("statusLine"),
     checkUpdateBtn: document.getElementById("checkUpdateBtn"),
-    installUpdateBtn: document.getElementById("installUpdateBtn"),
     updateStatusLine: document.getElementById("updateStatusLine"),
+    updateReleaseLink: document.getElementById("updateReleaseLink"),
     uninstallReplayKitBtn: document.getElementById("uninstallReplayKitBtn"),
     uninstallKeepSettings: document.getElementById("uninstallKeepSettings"),
     uninstallStatusLine: document.getElementById("uninstallStatusLine"),
@@ -1661,7 +1853,9 @@
     discordScreenshareConfirmCancelBtn: document.getElementById("discordScreenshareConfirmCancelBtn"),
     resizeGrip: document.querySelector(".resize-grip"),
   };
-  let pendingUpdate = null;
+
+  // seeded here rather than with the other bindings: applyThemeCustomToEditor can run first, and selecting into an unfilled combo would quietly land on Linear.
+  fillCombo(els.themeGradientType, [{ value:"linear", label:"Linear" }, { value:"radial", label:"Radial" }]);
   let overlayPreviewTimer = 0;
   let overlayPreviewPromise = null;
   let overlayPreviewPending = false;
@@ -1676,6 +1870,61 @@
   }
   styleNativeChrome();
   [400, 900, 1800, 3500].forEach((d) => setTimeout(styleNativeChrome, d));
+
+  const settingsTip = document.createElement("div");
+  settingsTip.id = "settings-tip";
+  settingsTip.setAttribute("role", "tooltip");
+  document.body.appendChild(settingsTip);
+  let settingsTipTarget = null;
+  function prepareTooltips(root) {
+    const nodes = [];
+    if (root && root.nodeType === 1 && root.hasAttribute("title")) nodes.push(root);
+    if (root && root.querySelectorAll) nodes.push(...root.querySelectorAll("[title]"));
+    nodes.forEach((node) => {
+      const text = node.getAttribute("title");
+      if (text) node.dataset.tooltip = text;
+      node.removeAttribute("title");
+    });
+  }
+  function positionSettingsTip() {
+    if (!settingsTipTarget) return;
+    const box = settingsTipTarget.getBoundingClientRect();
+    const width = settingsTip.offsetWidth;
+    const height = settingsTip.offsetHeight;
+    const center = box.left + box.width / 2;
+    const left = Math.max(6, Math.min(center - width / 2, window.innerWidth - width - 6));
+    const top = Math.max(6, Math.min(box.bottom + 8, window.innerHeight - height - 6));
+    settingsTip.style.left = Math.round(left) + "px";
+    settingsTip.style.top = Math.round(top) + "px";
+    settingsTip.style.setProperty("--tip-arrow", Math.round(Math.max(10, Math.min(center - left, width - 10))) + "px");
+  }
+  function showSettingsTip(target) {
+    if (!target || !target.dataset.tooltip || target.disabled) return;
+    settingsTipTarget = target;
+    settingsTip.textContent = target.dataset.tooltip;
+    settingsTip.classList.add("is-shown");
+    positionSettingsTip();
+  }
+  function hideSettingsTip() {
+    settingsTipTarget = null;
+    settingsTip.classList.remove("is-shown");
+  }
+  prepareTooltips(document.body);
+  document.addEventListener("pointerover", (event) => {
+    const target = event.target.closest && event.target.closest("[data-tooltip]");
+    if (target && target !== settingsTipTarget) showSettingsTip(target);
+  });
+  document.addEventListener("pointerout", (event) => {
+    if (settingsTipTarget && !settingsTipTarget.contains(event.relatedTarget)) hideSettingsTip();
+  });
+  document.addEventListener("pointerdown", hideSettingsTip, true);
+  window.addEventListener("resize", positionSettingsTip);
+  new MutationObserver((changes) => {
+    changes.forEach((change) => {
+      if (change.type === "attributes") prepareTooltips(change.target);
+      else change.addedNodes.forEach(prepareTooltips);
+    });
+  }).observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:["title"] });
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value || {}));
@@ -1692,6 +1941,17 @@
     els.updateStatusLine.textContent = text || "";
     els.updateStatusLine.classList.toggle("good", kind === "good");
     els.updateStatusLine.classList.toggle("bad", kind === "bad");
+  }
+
+  function setUpdateReleaseLink(value, visible) {
+    const fallback = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
+    let url = fallback;
+    try {
+      const parsed = new URL(value || fallback);
+      if (parsed.protocol === "https:" && parsed.hostname === "github.com" && parsed.pathname.startsWith("/7Lzz/OBS-ReplayKit/releases/")) url = parsed.href;
+    } catch (_) {}
+    els.updateReleaseLink.href = url;
+    els.updateReleaseLink.hidden = !visible;
   }
 
   function setUninstallStatus(text, kind) {
@@ -1784,7 +2044,9 @@
     const res = await fetch(HELPER + "/" + path, { cache:"no-store", ...(options || {}) });
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.ok === false) {
-      throw new Error(body.message || body.error || ("HTTP " + res.status));
+      const error = new Error(body.message || body.error || ("HTTP " + res.status));
+      error.data = body;
+      throw error;
     }
     return body;
   }
@@ -1807,6 +2069,10 @@
     els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
     els.applyBtn.classList.toggle("is-primary", restart);
     els.applyBtn.disabled = !dirty || applyInFlight;
+    // nothing to apply -- take the button out entirely rather than leaving a dead one (and a restart warning for
+    // a restart that will not happen). kept visible while an apply is in flight so the footer does not jump
+    // out from under the pointer at the moment it is clicked.
+    els.applyBtn.hidden = !dirty && !applyInFlight;
   }
 
   function markDirty() {
@@ -1950,7 +2216,8 @@
     dirty = false;
     syncUi();
     dirty = false;
-    els.applyBtn.disabled = true;
+    // through updateApplyButton rather than poking .disabled, so the hidden-when-clean rule stays in one place
+    updateApplyButton();
   }
 
   function comboOptionHtml(option, selectedValue) {
@@ -2241,6 +2508,232 @@
     return fallback;
   }
 
+  function setColorButton(button, value, fallback) {
+    const color = cleanHexColor(value, fallback || "#000000");
+    button.dataset.value = color;
+    button.style.setProperty("--color", color);
+    button.dataset.tooltip = color;
+    return color;
+  }
+
+  function rgbToHex(red, green, blue) {
+    const byte = (value) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0");
+    return "#" + byte(red) + byte(green) + byte(blue);
+  }
+
+  function hexToRgb(hex) {
+    const value = cleanHexColor(hex, "#000000");
+    return {
+      red:parseInt(value.slice(1, 3), 16),
+      green:parseInt(value.slice(3, 5), 16),
+      blue:parseInt(value.slice(5, 7), 16),
+    };
+  }
+
+  function rgbToHsv(red, green, blue) {
+    red /= 255; green /= 255; blue /= 255;
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    let hue = 0;
+    if (delta) {
+      if (max === red) hue = ((green - blue) / delta) % 6;
+      else if (max === green) hue = ((blue - red) / delta) + 2;
+      else hue = ((red - green) / delta) + 4;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+    }
+    return { hue, saturation:max === 0 ? 0 : delta / max, value:max };
+  }
+
+  function hsvToHex(hue, saturation, value) {
+    const chroma = value * saturation;
+    const section = (((hue % 360) + 360) % 360) / 60;
+    const x = chroma * (1 - Math.abs((section % 2) - 1));
+    let red = 0, green = 0, blue = 0;
+    if (section < 1) { red = chroma; green = x; }
+    else if (section < 2) { red = x; green = chroma; }
+    else if (section < 3) { green = chroma; blue = x; }
+    else if (section < 4) { green = x; blue = chroma; }
+    else if (section < 5) { red = x; blue = chroma; }
+    else { red = chroma; blue = x; }
+    const match = value - chroma;
+    return rgbToHex((red + match) * 255, (green + match) * 255, (blue + match) * 255);
+  }
+
+  // ---- floating colour picker ------------------------------------------------
+  // openColorDialog(value, title, apply) is the only entry point; `apply` is called on every
+  // change so the theme previews live, and again with the original value if the user cancels.
+  const cp = {
+    root:document.getElementById("cpick"), head:document.getElementById("cpickHead"), title:document.getElementById("cpickTitle"),
+    close:document.getElementById("cpickClose"), plane:document.getElementById("cpickPlane"), hue:document.getElementById("cpickHue"),
+    swatch:document.getElementById("cpickSwatch"), hex:document.getElementById("cpickHex"), eyedrop:document.getElementById("cpickEyedrop"),
+    status:document.getElementById("cpickStatus"), cancel:document.getElementById("cpickCancel"), apply:document.getElementById("cpickApply"),
+  };
+  const CPICK_POS_KEY = "replaykit-color-picker-pos";
+  let cpState = { hue:0, saturation:0, value:0 };
+  let cpRequest = null;
+  let cpPicking = false;
+
+  function cpSetStatus(text, bad) {
+    cp.status.textContent = text || "";
+    cp.status.classList.toggle("is-bad", !!bad);
+  }
+
+  function cpDraw() {
+    const ctx = cp.plane.getContext("2d"), w = cp.plane.width, h = cp.plane.height;
+    ctx.fillStyle = hsvToHex(cpState.hue, 1, 1);
+    ctx.fillRect(0, 0, w, h);
+    const white = ctx.createLinearGradient(0, 0, w, 0);
+    white.addColorStop(0, "#fff"); white.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = white; ctx.fillRect(0, 0, w, h);
+    const black = ctx.createLinearGradient(0, 0, 0, h);
+    black.addColorStop(0, "rgba(0,0,0,0)"); black.addColorStop(1, "#000");
+    ctx.fillStyle = black; ctx.fillRect(0, 0, w, h);
+    ctx.beginPath();
+    ctx.arc(cpState.saturation * w, (1 - cpState.value) * h, 5.5, 0, Math.PI * 2);
+    ctx.lineWidth = 2; ctx.strokeStyle = cpState.value > .55 ? "#111" : "#fff"; ctx.stroke();
+  }
+
+  // pushes the current colour back through the caller's apply() so the theme repaints as you drag.
+  function cpSync(preview) {
+    const color = hsvToHex(cpState.hue, cpState.saturation, cpState.value);
+    cp.hex.value = color;
+    cp.hex.classList.remove("is-bad");
+    cp.swatch.style.setProperty("--color", color);
+    cp.hue.value = String(Math.round(cpState.hue));
+    cpDraw();
+    if (preview && cpRequest) cpRequest.apply(color);
+    return color;
+  }
+
+  function cpSetHex(value, preview) {
+    const color = cleanHexColor(value, null);
+    if (!color) return false;
+    const rgb = hexToRgb(color);
+    cpState = rgbToHsv(rgb.red, rgb.green, rgb.blue);
+    cpSync(preview);
+    return true;
+  }
+
+  function cpClampInto(left, top) {
+    const rect = cp.root.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+    return { left:Math.max(8, Math.min(left, maxLeft)), top:Math.max(8, Math.min(top, maxTop)) };
+  }
+
+  function cpPlace() {
+    let stored = null;
+    try { stored = JSON.parse(localStorage.getItem(CPICK_POS_KEY) || "null"); } catch (_) {}
+    const start = stored && Number.isFinite(stored.left) && Number.isFinite(stored.top)
+      ? stored
+      : { left:window.innerWidth - 320, top:96 };
+    const at = cpClampInto(start.left, start.top);
+    cp.root.style.left = at.left + "px";
+    cp.root.style.top = at.top + "px";
+  }
+
+  function cpClose(restore) {
+    if (!cpRequest) return;
+    const request = cpRequest;
+    cpRequest = null;
+    if (restore) request.apply(request.original);
+    cp.root.hidden = true;
+    cpSetStatus("");
+  }
+
+  function openColorDialog(value, title, apply) {
+    const original = cleanHexColor(value, "#000000");
+    cpRequest = { original, apply };
+    cp.title.textContent = title || "Choose color";
+    cp.root.hidden = false;
+    cpPlace();
+    cpSetStatus("");
+    cpSetHex(original, false);
+    cp.hex.focus({ preventScroll:true });
+    cp.hex.select();
+  }
+
+  cp.head.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".cpick-x")) return;
+    const rect = cp.root.getBoundingClientRect();
+    const grabX = event.clientX - rect.left, grabY = event.clientY - rect.top;
+    cp.root.classList.add("is-dragging");
+    cp.head.setPointerCapture(event.pointerId);
+    const move = (moveEvent) => {
+      const at = cpClampInto(moveEvent.clientX - grabX, moveEvent.clientY - grabY);
+      cp.root.style.left = at.left + "px";
+      cp.root.style.top = at.top + "px";
+    };
+    const up = () => {
+      cp.head.removeEventListener("pointermove", move);
+      cp.head.removeEventListener("pointerup", up);
+      cp.root.classList.remove("is-dragging");
+      const rectNow = cp.root.getBoundingClientRect();
+      try { localStorage.setItem(CPICK_POS_KEY, JSON.stringify({ left:Math.round(rectNow.left), top:Math.round(rectNow.top) })); } catch (_) {}
+    };
+    cp.head.addEventListener("pointermove", move);
+    cp.head.addEventListener("pointerup", up);
+  });
+
+  function cpPlanePointer(event) {
+    const rect = cp.plane.getBoundingClientRect();
+    cpState.saturation = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    cpState.value = 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+    cpSync(true);
+  }
+  cp.plane.addEventListener("pointerdown", (event) => { cp.plane.setPointerCapture(event.pointerId); cpPlanePointer(event); });
+  cp.plane.addEventListener("pointermove", (event) => { if (cp.plane.hasPointerCapture(event.pointerId)) cpPlanePointer(event); });
+  cp.hue.addEventListener("input", () => { cpState.hue = parseInt(cp.hue.value, 10) || 0; cpSync(true); });
+  cp.hex.addEventListener("input", () => {
+    const color = cleanHexColor(cp.hex.value, null);
+    if (!color) { cp.hex.classList.add("is-bad"); return; }
+    cp.hex.classList.remove("is-bad");
+    const rgb = hexToRgb(color);
+    cpState = rgbToHsv(rgb.red, rgb.green, rgb.blue);
+    cp.swatch.style.setProperty("--color", color);
+    cp.hue.value = String(Math.round(cpState.hue));
+    cpDraw();
+    if (cpRequest) cpRequest.apply(color);
+  });
+
+  cp.eyedrop.addEventListener("click", async () => {
+    if (cpPicking) return;
+    cpPicking = true;
+    cp.eyedrop.disabled = true;
+    cpSetStatus("Click anywhere on any monitor. Esc or right-click cancels.");
+    try {
+      const data = await helperJson("appearance/pick-color", { method:"POST" });
+      if (!data.cancelled && data.color) cpSetHex(data.color, true);
+      cpSetStatus(data.cancelled ? "Cancelled." : "");
+    } catch (error) {
+      cpSetStatus(error.message || String(error), true);
+    } finally {
+      cpPicking = false;
+      cp.eyedrop.disabled = false;
+    }
+  });
+
+  cp.apply.addEventListener("click", () => {
+    if (!cleanHexColor(cp.hex.value, null)) { cp.hex.classList.add("is-bad"); cp.hex.focus(); return; }
+    cpClose(false);
+  });
+  cp.cancel.addEventListener("click", () => cpClose(true));
+  cp.close.addEventListener("click", () => cpClose(true));
+  document.addEventListener("keydown", (event) => {
+    if (cp.root.hidden) return;
+    if (event.key === "Escape") { event.stopPropagation(); cpClose(true); }
+    else if (event.key === "Enter" && cp.root.contains(document.activeElement)) cp.apply.click();
+  }, true);
+  window.addEventListener("resize", () => {
+    if (cp.root.hidden) return;
+    const rect = cp.root.getBoundingClientRect();
+    const at = cpClampInto(rect.left, rect.top);
+    cp.root.style.left = at.left + "px";
+    cp.root.style.top = at.top + "px";
+  });
+
   function clampMotionBlurStrength(value) {
     const n = parseFloat(value);
     return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.075;
@@ -2268,7 +2761,7 @@
 
   function syncColorControl(picker, input, value, fallback) {
     const colorValue = cleanHexColor(value, fallback);
-    picker.value = colorValue;
+    setColorButton(picker, colorValue, fallback);
     input.value = colorValue;
   }
 
@@ -2785,8 +3278,9 @@
     [els.overlayColorMultiply, els.overlayColorMultiplyValue, "overlayColorMultiply", "#ffffff", DEFAULT_OVERLAY_COLOR_MULTIPLY, "resetOverlayColorMultiply"],
     [els.overlayColorAdd, els.overlayColorAddValue, "overlayColorAdd", "#000000", DEFAULT_OVERLAY_COLOR_ADD, "resetOverlayColorAdd"],
   ].forEach(([picker, input, key, fallback, def, resetId]) => {
-    const applyPickerColor = () => {
-      state[key] = cleanHexColor(picker.value, fallback);
+    const applyPickerColor = (value) => {
+      state[key] = cleanHexColor(value, fallback);
+      setColorButton(picker, state[key], fallback);
       input.value = state[key];
       refreshFieldResetState(key, def);
       markDirty();
@@ -2799,9 +3293,7 @@
       markDirty();
       queueOverlayPreview(true);
     };
-    picker.addEventListener("input", applyPickerColor);
-    picker.addEventListener("change", applyPickerColor);
-    picker.addEventListener("blur", applyPickerColor);
+    picker.addEventListener("click", () => openColorDialog(state[key] || fallback, picker.getAttribute("aria-label"), applyPickerColor));
     input.addEventListener("input", () => {
       applyTextColor(false);
     });
@@ -3050,6 +3542,7 @@
       else setStatus(committedOverlayPreview ? "Settings applied" : "No settings changed", "good");
       return;
     }
+    await autoSaveCustomTheme();
     const restartAfterApply = needsObsRestart();
     setStatus(restartAfterApply ? "Applying settings and restarting OBS..." : "Applying settings...", "");
     try {
@@ -3071,6 +3564,34 @@
     } catch (e) {
       setStatus("Apply failed: " + (e.message || e), "bad");
       markDirty();
+    }
+  }
+
+  // applying while still on the anonymous "Custom" slot would leave the palette there, where the next custom
+  // edit silently overwrites it. so it is filed as a real preset first -- preset_1, preset_2, ... taking the
+  // next free number. runs only on a dirty apply, so pressing Apply with nothing changed never spawns one.
+  async function autoSaveCustomTheme() {
+    if (state.theme !== "custom") return;
+    let highest = 0;
+    themesCache.forEach((theme) => {
+      const match = /^preset_(\d+)$/i.exec((theme.label || "").trim());
+      if (match) highest = Math.max(highest, parseInt(match[1], 10) || 0);
+    });
+    const name = "preset_" + (highest + 1);
+    try {
+      const data = await helperJson("appearance/save-theme?label=" + encodeURIComponent(name), {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify(themeCustomState()),
+      });
+      if (!data || !data.ok || !data.id) return;
+      state.theme = data.id;
+      state.themeCustom = themeCustomState();
+      endThemeEdit();
+      await renderThemeGrid();
+      paintThemeSelection();
+    } catch (e) {
+      // a failed auto-save must not block the apply -- the theme still applies as "custom", just unnamed.
+      setStatus("Could not auto-save the custom theme: " + (e.message || e), "bad");
     }
   }
 
@@ -3103,51 +3624,41 @@
     finally { _externalRefreshInFlight = false; }
   }
 
+  // there is deliberately no Install button here. this box used to POST /update/apply itself, which skipped the update window entirely -- so there was no download progress, no stage labels, and nothing watching for the verdict the installer writes. checking hands off to that window instead, so an update started from Settings behaves exactly like the one offered at launch.
+  function openUpdatePrompt(version) {
+    const url = "/update-prompt?version=" + encodeURIComponent(version || "") + "&t=" + Date.now();
+    const opened = window.open(url, "replaykit_update_prompt", "popup=yes,width=700,height=620");
+    if (!opened) {
+      setUpdateStatus("Could not open the update window -- allow popups for ReplayKit, or use the GitHub link below.", "bad");
+      return false;
+    }
+    try { opened.focus(); } catch (_) {}
+    return true;
+  }
+
   async function checkForUpdates() {
-    pendingUpdate = null;
-    els.installUpdateBtn.disabled = true;
     els.checkUpdateBtn.disabled = true;
     setUpdateStatus("Checking...", "");
+    setUpdateReleaseLink("", false);
     try {
       const data = await helperJson("update/check?t=" + Date.now());
-      if (data.updateAvailable) {
-        pendingUpdate = data;
-        els.installUpdateBtn.disabled = false;
-        setUpdateStatus("Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
-      } else {
+      if (!data.updateAvailable) {
         setUpdateStatus(data.message || ("ReplayKit is up to date" + (data.installedVersion ? " (" + data.installedVersion + ")" : "")), "good");
+        return;
+      }
+      setUpdateReleaseLink(data.releaseUrl, true);
+      if (dirty) {
+        setUpdateStatus("Update available: " + data.latestVersion + ". Apply or cancel your settings changes first.", "bad");
+        return;
+      }
+      if (openUpdatePrompt(data.latestVersion)) {
+        setUpdateStatus("Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
       }
     } catch (e) {
       setUpdateStatus("Update check failed: " + (e.message || e), "bad");
+      setUpdateReleaseLink(e.data && e.data.releaseUrl, true);
     } finally {
       els.checkUpdateBtn.disabled = false;
-    }
-  }
-
-  async function installUpdate() {
-    if (dirty) {
-      setUpdateStatus("Apply or cancel settings changes before updating.", "bad");
-      return;
-    }
-    els.checkUpdateBtn.disabled = true;
-    els.installUpdateBtn.disabled = true;
-    setUpdateStatus("Downloading update...", "");
-    setStatus("Downloading ReplayKit update...", "");
-    try {
-      const data = await helperJson("update/apply", { method:"POST" });
-      if (data.updateAvailable === false) {
-        setUpdateStatus("ReplayKit is already up to date.", "good");
-        setStatus("ReplayKit is already up to date.", "good");
-        els.checkUpdateBtn.disabled = false;
-        return;
-      }
-      setUpdateStatus(data.message || "Installing update. OBS will restart.", "good");
-      setStatus("Installing ReplayKit update. OBS will restart.", "good");
-    } catch (e) {
-      setUpdateStatus("Update failed: " + (e.message || e), "bad");
-      setStatus("Update failed: " + (e.message || e), "bad");
-      els.checkUpdateBtn.disabled = false;
-      els.installUpdateBtn.disabled = !pendingUpdate;
     }
   }
 
@@ -3229,7 +3740,7 @@
     } catch (e) {
       els.uninstallDiscordScreenshareBtn.disabled = false;
       els.okBtn.disabled = false;
-      els.applyBtn.disabled = !dirty;
+      updateApplyButton();
       setDiscordScreenshareUninstallStatus("Removal failed: " + (e.message || e), "bad");
       setStatus("Removal failed: " + (e.message || e), "bad");
     }
@@ -3264,7 +3775,7 @@
     } catch (e) {
       els.uninstallReplayKitBtn.disabled = false;
       els.okBtn.disabled = false;
-      els.applyBtn.disabled = !dirty;
+      updateApplyButton();
       setUninstallStatus("Uninstall failed: " + (e.message || e), "bad");
       setStatus("Uninstall failed: " + (e.message || e), "bad");
     }
@@ -3284,7 +3795,6 @@
     }
   });
   els.checkUpdateBtn.addEventListener("click", checkForUpdates);
-  els.installUpdateBtn.addEventListener("click", installUpdate);
   els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
   els.uninstallDiscordScreenshareBtn.addEventListener("click", uninstallDiscordScreenshareOnly);
   els.discordScreenshareConfirmCancelBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(false));
@@ -3331,9 +3841,14 @@
 
   // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
   const APPICON_X_SVG = (window.RK_ICONS || {})["action/cancel-x"] || "";
-  const THEME_KEYS = ["bg", "panel", "field", "text", "accent", "border", "danger"];
+  const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
   // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
   let themesCache = [];
+  let editingThemeId = "";
+  let gradientStops = [];
+  let latestThemePreviewCss = "";
+  let themePreviewChannel = null;
+  try { themePreviewChannel = new BroadcastChannel("replaykit-theme-preview"); } catch (_) {}
   let themeLiveStyle = document.getElementById("rk-theme-live");
   if (!themeLiveStyle) {
     themeLiveStyle = document.createElement("style");
@@ -3346,11 +3861,117 @@
   const themeSwapFreeze = document.createElement("style");
   themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
   document.head.appendChild(themeSwapFreeze);
+  function publishThemePreview(css) {
+    latestThemePreviewCss = css || "";
+    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
+    try { if (themePreviewChannel) themePreviewChannel.postMessage({ css:latestThemePreviewCss }); } catch (_) {}
+  }
+  function clearThemePreview() {
+    latestThemePreviewCss = "";
+    try { localStorage.removeItem("replaykit-theme-preview"); } catch (_) {}
+    try { if (themePreviewChannel) themePreviewChannel.postMessage({ reset:true }); } catch (_) {}
+  }
+  setInterval(() => {
+    if (!latestThemePreviewCss) return;
+    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
+  }, 4000);
+  window.addEventListener("pagehide", clearThemePreview);
+
+  // gradients are per surface. only these four: text, border and danger are colour roles that end up in
+  // border-color / color and in the helper's colour arithmetic, where a gradient value paints nothing.
+  const GRADIENT_TARGETS = [
+    { key:"bg", label:"Background" },
+    { key:"panel", label:"Panel" },
+    { key:"field", label:"Field" },
+    { key:"accent", label:"Accent" },
+  ];
+  let gradientTarget = "bg";
+
+  function blankGradient() {
+    return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
+  }
+  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what
+  // decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
+  let gradientByTarget = {};
+  GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
+
+  function currentGradient() { return gradientByTarget[gradientTarget] || blankGradient(); }
+
   function themeCustomState() {
     const o = {};
-    els.themeEditor.querySelectorAll("input[type=color]").forEach((i) => { o[i.dataset.k] = i.value; });
+    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => { o[button.dataset.k] = button.dataset.value; });
+    captureGradientEditor();
+    const gradients = {};
+    GRADIENT_TARGETS.forEach((entry) => {
+      const spec = gradientByTarget[entry.key];
+      if (!spec || !spec.enabled || spec.stops.length < 2) return;
+      gradients[entry.key] = {
+        type:spec.type === "radial" ? "radial" : "linear",
+        angle:Math.max(0, Math.min(359, spec.angle | 0)),
+        centerX:Math.max(0, Math.min(100, spec.centerX | 0)),
+        centerY:Math.max(0, Math.min(100, spec.centerY | 0)),
+        stops:spec.stops.slice().sort((left, right) => left.position - right.position).map((stop) => ({ color:stop.color, position:stop.position })),
+      };
+    });
+    o.gradients = gradients;
+    // the helper still reads this legacy field when a theme predates per-token gradients; keep it pointed at bg.
+    o.gradient = gradients.bg ? gradients.bg.stops[gradients.bg.stops.length - 1].color : "";
     o.dark = els.themeCustomDark.checked;
     return o;
+  }
+
+  // pulls the live editor controls back into the selected target's spec, so nothing is lost on tab switch or save.
+  function captureGradientEditor() {
+    const spec = gradientByTarget[gradientTarget];
+    if (!spec) return;
+    spec.enabled = els.themeGradientEnabled.checked;
+    spec.type = comboValue(els.themeGradientType) === "radial" ? "radial" : "linear";
+    spec.angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngle.value, 10) || 0));
+    spec.centerX = clampPercent(els.themeGradientCenterX.value, 50);
+    spec.centerY = clampPercent(els.themeGradientCenterY.value, 50);
+    spec.stops = gradientStops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
+  }
+
+  function renderGradientTargets() {
+    els.themeGradientTargets.innerHTML = "";
+    GRADIENT_TARGETS.forEach((entry) => {
+      const spec = gradientByTarget[entry.key];
+      const on = !!(spec && spec.enabled && spec.stops.length >= 2);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "grad-target" + (entry.key === gradientTarget ? " is-active" : "") + (on ? " has-gradient" : "");
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", entry.key === gradientTarget ? "true" : "false");
+      button.dataset.tooltip = on ? entry.label + " uses a gradient" : entry.label + " is a flat color";
+      button.innerHTML = '<span class="grad-target-dot"></span>';
+      button.appendChild(document.createTextNode(entry.label));
+      button.addEventListener("click", () => {
+        if (entry.key === gradientTarget) return;
+        captureGradientEditor();
+        gradientTarget = entry.key;
+        loadGradientEditor();
+      });
+      els.themeGradientTargets.appendChild(button);
+    });
+  }
+
+  // pushes the selected target's spec into the shared editor controls.
+  function loadGradientEditor() {
+    const spec = currentGradient();
+    const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
+    els.themeGradientEnabledLabel.textContent = "Use a gradient for " + label;
+    els.themeGradientEnabled.checked = !!spec.enabled;
+    els.themeGradientEditor.hidden = !spec.enabled;
+    setComboValue(els.themeGradientType, spec.type === "radial" ? "radial" : "linear", false);
+    els.themeGradientAngle.value = String(spec.angle);
+    els.themeGradientAngleValue.value = String(spec.angle);
+    els.themeGradientCenterX.value = String(spec.centerX); els.themeGradientCenterXValue.value = String(spec.centerX);
+    els.themeGradientCenterY.value = String(spec.centerY); els.themeGradientCenterYValue.value = String(spec.centerY);
+    syncGradientSliderFills();
+    gradientStops = spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
+    selectedGradientStop = null;
+    renderGradientStops();
+    renderGradientTargets();
   }
   let themePreviewTimer = 0;
   function applyThemePreview() {
@@ -3365,6 +3986,7 @@
         const css = r.ok ? await r.text() : "";
         document.documentElement.classList.add("rk-theme-swapping");
         themeLiveStyle.textContent = css;
+        publishThemePreview(css);
         // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
         // rewriting this node's text alone doesnt always make CEF redo the cascade tie-break, so move it back
         // to last to guarantee the preview wins.
@@ -3379,12 +4001,174 @@
     els.themeGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
     els.themeCustomRow.hidden = sel !== "custom";
   }
+  function clampPercent(value, fallback) {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : fallback;
+  }
+  function gradientCss() {
+    if (!els.themeGradientEnabled.checked || gradientStops.length < 2) return "none";
+    const stops = gradientStops.slice().sort((left, right) => left.position - right.position)
+      .map((stop) => stop.color + " " + stop.position + "%").join(",");
+    if (comboValue(els.themeGradientType) === "radial")
+      return "radial-gradient(circle at " + els.themeGradientCenterX.value + "% " + els.themeGradientCenterY.value + "%," + stops + ")";
+    return "linear-gradient(" + els.themeGradientAngle.value + "deg," + stops + ")";
+  }
+  const GRADIENT_MAX_STOPS = 6;
+  let selectedGradientStop = null;
+
+  function updateGradientPreview() {
+    els.themeGradientPreview.style.setProperty("--gradient-preview", gradientCss());
+    const radial = comboValue(els.themeGradientType) === "radial";
+    els.themeGradientLinearControls.hidden = radial;
+    els.themeGradientRadialControls.hidden = !radial;
+    // the ramp always reads left-to-right regardless of angle/type -- it edits the colour run, the preview box shows how that run is projected.
+    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
+    els.themeGradientRamp.style.setProperty("--ramp",
+      sorted.length >= 2 ? "linear-gradient(90deg," + sorted.map((stop) => stop.color + " " + stop.position + "%").join(",") + ")" : "none");
+    els.removeGradientStopBtn.disabled = !selectedGradientStop || gradientStops.length <= 2;
+  }
+
+  // colour of the ramp at `position`, so a stop added by clicking the ramp starts as the colour already showing there.
+  function gradientColorAt(position) {
+    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
+    if (!sorted.length) return "#000000";
+    if (position <= sorted[0].position) return sorted[0].color;
+    const last = sorted[sorted.length - 1];
+    if (position >= last.position) return last.color;
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const from = sorted[i], to = sorted[i + 1];
+      if (position < from.position || position > to.position) continue;
+      const span = to.position - from.position;
+      const ratio = span <= 0 ? 0 : (position - from.position) / span;
+      const a = hexToRgb(from.color), b = hexToRgb(to.color);
+      return rgbToHex(a.red + (b.red - a.red) * ratio, a.green + (b.green - a.green) * ratio, a.blue + (b.blue - a.blue) * ratio);
+    }
+    return last.color;
+  }
+
+  function gradientPositionFromEvent(event) {
+    const rect = els.themeGradientRamp.getBoundingClientRect();
+    return clampPercent(Math.round(((event.clientX - rect.left) / Math.max(1, rect.width)) * 100), 0);
+  }
+
+  function renderGradientStops() {
+    gradientStops.sort((left, right) => left.position - right.position);
+    if (selectedGradientStop && !gradientStops.includes(selectedGradientStop)) selectedGradientStop = null;
+    els.themeGradientRamp.innerHTML = "";
+    gradientStops.forEach((stop, index) => {
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "grad-ramp-handle" + (stop === selectedGradientStop ? " is-selected" : "");
+      handle.style.left = stop.position + "%";
+      handle.style.setProperty("--color", stop.color);
+      handle.dataset.tooltip = stop.color + " at " + stop.position + "%";
+      handle.setAttribute("aria-label", "Gradient stop " + (index + 1) + ", " + stop.color + " at " + stop.position + "%");
+
+      // a press that never moves is a recolor; anything that moves is a drag. distinguishing them here is what lets one handle do both without a separate edit button.
+      handle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        selectedGradientStop = stop;
+        renderGradientStops();
+        const live = els.themeGradientRamp.querySelector(".grad-ramp-handle.is-selected") || handle;
+        live.classList.add("is-dragging");
+        live.setPointerCapture(event.pointerId);
+        let moved = false;
+        const move = (moveEvent) => {
+          const next = gradientPositionFromEvent(moveEvent);
+          if (next === stop.position) return;
+          moved = true;
+          stop.position = next;
+          live.style.left = next + "%";
+          live.dataset.tooltip = stop.color + " at " + next + "%";
+          updateGradientPreview();
+          applyThemeEditorChange();
+        };
+        const up = () => {
+          live.removeEventListener("pointermove", move);
+          live.removeEventListener("pointerup", up);
+          live.classList.remove("is-dragging");
+          if (moved) renderGradientStops();
+          else openColorDialog(stop.color, "Gradient stop " + (index + 1), (value) => {
+            stop.color = cleanHexColor(value, stop.color);
+            renderGradientStops();
+            applyThemeEditorChange();
+          });
+        };
+        live.addEventListener("pointermove", move);
+        live.addEventListener("pointerup", up);
+      });
+      els.themeGradientRamp.appendChild(handle);
+    });
+    updateGradientPreview();
+  }
+  // a fresh gradient for a surface starts from that surface's own colour so turning it on is a soft change
+  // rather than a jump to some unrelated pair.
+  function seedStopsFor(targetKey, c) {
+    const base = cleanHexColor(c[targetKey === "bg" ? "bg" : targetKey], null)
+      || cleanHexColor(c.bg, "#161617");
+    const away = cleanHexColor(c.accent, "#284cb8");
+    return [{ color:base, position:0 }, { color:away, position:100 }];
+  }
+
+  function normalizeStops(raw, targetKey, c) {
+    const list = Array.isArray(raw) ? raw : [];
+    const normalized = list.slice(0, 6).map((stop, index) => ({
+      color:cleanHexColor(stop && stop.color, index === 0 ? (c.bg || "#161617") : (c.accent || "#284cb8")),
+      position:clampPercent(stop && stop.position, index === 0 ? 0 : 100),
+    }));
+    return normalized.length >= 2 ? normalized : seedStopsFor(targetKey, c);
+  }
   function fillThemeEditor(c) {
     c = c || {};
-    els.themeEditor.querySelectorAll("input[type=color]").forEach((i) => { if (c[i.dataset.k]) i.value = c[i.dataset.k]; });
+    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
+      setColorButton(button, c[button.dataset.k] || "#000000", "#000000");
+    });
+    // per-token gradients, falling back to the flat gradient* keys a pre-per-token theme carries (read as bg).
+    const map = (c.gradients && typeof c.gradients === "object") ? c.gradients : {};
+    const legacyStops = Array.isArray(c.gradientStops) && c.gradientStops.length >= 2;
+    const legacyColor = cleanHexColor(c.gradient, null);
+    gradientByTarget = {};
+    GRADIENT_TARGETS.forEach((entry) => {
+      const raw = map[entry.key];
+      if (raw && typeof raw === "object") {
+        gradientByTarget[entry.key] = {
+          enabled:true,
+          type:raw.type === "radial" ? "radial" : "linear",
+          angle:Number.isFinite(parseInt(raw.angle, 10)) ? Math.max(0, Math.min(359, parseInt(raw.angle, 10))) : 135,
+          centerX:clampPercent(raw.centerX, 50),
+          centerY:clampPercent(raw.centerY, 50),
+          stops:normalizeStops(raw.stops, entry.key, c),
+        };
+        return;
+      }
+      const spec = blankGradient();
+      if (entry.key === "bg" && (legacyStops || legacyColor)) {
+        const parsedAngle = parseInt(c.gradientAngle, 10);
+        spec.enabled = true;
+        spec.type = c.gradientType === "radial" ? "radial" : "linear";
+        spec.angle = Number.isFinite(parsedAngle) ? Math.max(0, Math.min(359, parsedAngle)) : 135;
+        spec.centerX = clampPercent(c.gradientCenterX, 50);
+        spec.centerY = clampPercent(c.gradientCenterY, 50);
+        spec.stops = legacyStops ? normalizeStops(c.gradientStops, "bg", c)
+          : [{ color:cleanHexColor(c.bg, "#161617"), position:0 }, { color:legacyColor, position:100 }];
+      } else {
+        spec.stops = seedStopsFor(entry.key, c);
+      }
+      gradientByTarget[entry.key] = spec;
+    });
+    if (!gradientByTarget[gradientTarget]) gradientTarget = "bg";
+    loadGradientEditor();
     els.themeCustomDark.checked = c.dark !== false;
   }
+  function endThemeEdit() {
+    editingThemeId = "";
+    els.themeName.value = "";
+    els.saveThemeBtn.textContent = "Save as preset";
+    els.cancelThemeEditBtn.hidden = true;
+  }
   function selectTheme(id) {
+    endThemeEdit();
     const prev = state.theme;
     state.theme = id;
     // picking Custom off a preset or saved theme carries that themes colors into the editor so it extends instead of starting blank
@@ -3401,7 +4185,7 @@
     sw = sw || {};
     const box = document.createElement("span");
     box.className = "theme-sw";
-    box.style.background = sw.bg || "#1d1f26";
+    box.style.background = sw.background || sw.bg || "#1d1f26";
     const strip = document.createElement("i");
     strip.style.background = sw.panel || "#272a33";
     const dot = document.createElement("b");
@@ -3420,16 +4204,39 @@
     tile.append(sw ? themeSwatchEl(sw) : (function () { const s = document.createElement("span"); s.className = "icon-tile-swatch"; s.textContent = "＋"; return s; })(), lab);
     tile.addEventListener("click", () => selectTheme(id));
     if (deletable) {
+      const edit = document.createElement("span");
+      edit.className = "icon-tile-edit";
+      edit.setAttribute("role", "button");
+      edit.setAttribute("aria-label", "Edit " + label);
+      edit.dataset.tooltip = "Edit";
+      edit.innerHTML = THEME_EDIT_SVG;
+      edit.addEventListener("click", (e) => { e.stopPropagation(); editUserTheme(id); });
+      tile.appendChild(edit);
       const del = document.createElement("span");
       del.className = "icon-tile-del";
       del.setAttribute("role", "button");
       del.setAttribute("aria-label", "Remove " + label);
-      del.title = "Remove";
+      del.dataset.tooltip = "Remove";
       del.innerHTML = APPICON_X_SVG;
       del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
       tile.appendChild(del);
     }
     return tile;
+  }
+  function editUserTheme(id) {
+    const theme = themesCache.find((item) => item.id === id);
+    if (!theme || !theme.seed) return;
+    editingThemeId = id;
+    state.theme = "custom";
+    state.themeCustom = Object.assign({}, theme.seed);
+    fillThemeEditor(state.themeCustom);
+    els.themeName.value = theme.label || id.slice(5);
+    els.saveThemeBtn.textContent = "Update preset";
+    els.cancelThemeEditBtn.hidden = false;
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+    els.themeName.focus();
   }
   async function deleteUserTheme(id) {
     let data;
@@ -3441,6 +4248,7 @@
       if (originalState) originalState.theme = "default";
       applyThemePreview();
     }
+    if (editingThemeId === id) endThemeEdit();
     await renderThemeGrid();
   }
   async function renderThemeGrid() {
@@ -3455,36 +4263,112 @@
     if (state.theme === "custom") fillThemeEditor(state.themeCustom);
     paintThemeSelection();
   }
-  els.themeEditor.addEventListener("input", (e) => {
-    if (e.target.type !== "color") return;
+  function applyThemeEditorChange() {
     if (state.theme !== "custom") { state.theme = "custom"; paintThemeSelection(); }
     state.themeCustom = themeCustomState();
     applyThemePreview();
     markDirty();
+  }
+  els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
+    button.addEventListener("click", () => openColorDialog(button.dataset.value, button.getAttribute("aria-label"), (color) => {
+      setColorButton(button, color, "#000000");
+      applyThemeEditorChange();
+    }));
   });
-  els.themeCustomDark.addEventListener("change", () => {
-    state.themeCustom = themeCustomState();
-    applyThemePreview();
-    markDirty();
+  els.themeGradientEnabled.addEventListener("change", () => {
+    const spec = gradientByTarget[gradientTarget];
+    if (spec) {
+      spec.enabled = els.themeGradientEnabled.checked;
+      // turning it on with nothing stored yet seeds from the surface's own colour, so the first frame is subtle
+      if (spec.enabled && spec.stops.length < 2) spec.stops = seedStopsFor(gradientTarget, themeCustomState());
+    }
+    els.themeGradientEditor.hidden = !els.themeGradientEnabled.checked;
+    gradientStops = spec ? spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position })) : [];
+    selectedGradientStop = null;
+    renderGradientStops();
+    renderGradientTargets();
+    applyThemeEditorChange();
   });
+  els.themeGradientType.addEventListener("combochange", () => { updateGradientPreview(); applyThemeEditorChange(); });
+  // .volume-slider draws its track fill from --fill; every gradient slider keeps it current the same way the audio/overlay ones do.
+  function syncGradientSliderFills() {
+    setSliderFill(els.themeGradientAngle, parseInt(els.themeGradientAngle.value, 10) || 0, 0, 359);
+    setSliderFill(els.themeGradientCenterX, parseInt(els.themeGradientCenterX.value, 10) || 0, 0, 100);
+    setSliderFill(els.themeGradientCenterY, parseInt(els.themeGradientCenterY.value, 10) || 0, 0, 100);
+  }
+  els.themeGradientAngle.addEventListener("input", () => {
+    els.themeGradientAngleValue.value = els.themeGradientAngle.value;
+    syncGradientSliderFills();
+    updateGradientPreview();
+    applyThemeEditorChange();
+  });
+  els.themeGradientAngleValue.addEventListener("change", () => {
+    const angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngleValue.value, 10) || 0));
+    els.themeGradientAngle.value = String(angle);
+    els.themeGradientAngleValue.value = String(angle);
+    syncGradientSliderFills();
+    updateGradientPreview();
+    applyThemeEditorChange();
+  });
+  function bindGradientCenter(slider, input) {
+    slider.addEventListener("input", () => { input.value = slider.value; syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
+    input.addEventListener("change", () => { const value = clampPercent(input.value, 50); slider.value = String(value); input.value = String(value); syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
+  }
+  bindGradientCenter(els.themeGradientCenterX, els.themeGradientCenterXValue);
+  bindGradientCenter(els.themeGradientCenterY, els.themeGradientCenterYValue);
+  // clicking the ramp itself adds a stop where you clicked, already the colour showing there, so adding one never jolts the gradient.
+  els.themeGradientRamp.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".grad-ramp-handle")) return;
+    if (gradientStops.length >= GRADIENT_MAX_STOPS) {
+      setStatus("A gradient can have at most " + GRADIENT_MAX_STOPS + " stops.", "bad");
+      return;
+    }
+    const position = gradientPositionFromEvent(event);
+    const stop = { color:gradientColorAt(position), position };
+    gradientStops.push(stop);
+    selectedGradientStop = stop;
+    renderGradientStops();
+    applyThemeEditorChange();
+    renderGradientTargets();
+  });
+  els.removeGradientStopBtn.addEventListener("click", () => {
+    if (!selectedGradientStop || gradientStops.length <= 2) return;
+    gradientStops.splice(gradientStops.indexOf(selectedGradientStop), 1);
+    selectedGradientStop = null;
+    renderGradientStops();
+    applyThemeEditorChange();
+    renderGradientTargets();
+  });
+  els.themeCustomDark.addEventListener("change", applyThemeEditorChange);
+  els.openThemeClipsBtn.addEventListener("click", () => {
+    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus("Could not open Clips: " + (error.message || error), "bad"));
+  });
+  els.cancelThemeEditBtn.addEventListener("click", endThemeEdit);
   els.saveThemeBtn.addEventListener("click", async () => {
     const name = (els.themeName.value || "").trim();
     if (!name) { setStatus("Name the theme first", "bad"); els.themeName.focus(); return; }
     els.saveThemeBtn.disabled = true;
     let data;
+    let failure = "";
     try {
-      data = await helperJson("appearance/save-theme?label=" + encodeURIComponent(name), {
+      let url = "appearance/save-theme?label=" + encodeURIComponent(name);
+      if (editingThemeId) url += "&id=" + encodeURIComponent(editingThemeId);
+      data = await helperJson(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(themeCustomState()),
       });
-    } catch (e) { data = null; }
+    } catch (e) { data = null; failure = e.message || String(e); }
     els.saveThemeBtn.disabled = false;
-    if (!data || !data.ok) { setStatus((data && data.message) || "Could not save theme", "bad"); return; }
-    els.themeName.value = "";
+    if (!data || !data.ok) { setStatus(failure || (data && data.message) || "Could not save theme", "bad"); return; }
+    const updated = !!editingThemeId;
+    state.themeCustom = themeCustomState();
     state.theme = data.id;
-    if (originalState) originalState.theme = data.id;
+    endThemeEdit();
     await renderThemeGrid();
-    selectTheme(data.id);
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+    setStatus(updated ? "Preset updated. Apply to update OBS." : "Preset saved. Apply to use it in OBS.", "good");
   });
   renderThemeGrid();
 

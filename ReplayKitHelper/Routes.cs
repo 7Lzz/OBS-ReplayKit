@@ -23,10 +23,11 @@ namespace ReplayKitHelper
         private static string UserIconLabel(string fileName) =>
             Regex.Replace(Path.GetFileNameWithoutExtension(fileName), "-[0-9a-f]{8}$", "");
 
-        // the four colours the dock draws a theme tile from.
+        // the colours the dock draws a theme tile from.
         private static JObject ThemeSwatch(Themes.Tokens t) => new JObject
         {
             ["bg"] = t.Bg, ["panel"] = t.Panel, ["accent"] = t.Accent, ["text"] = t.Text,
+            ["background"] = Themes.BackgroundCss(t),
         };
 
         private sealed class OwnerWindow : System.Windows.Forms.IWin32Window
@@ -907,7 +908,9 @@ namespace ReplayKitHelper
             if (path == "/appearance/save-theme")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string label = Q("label", "");
+                string existingId = Q("id", "");
                 JObject payload;
                 try { payload = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body); }
                 catch { payload = null; }
@@ -917,16 +920,34 @@ namespace ReplayKitHelper
                     return false;
                 }
                 string id;
-                try { id = Themes.SaveUserTheme(label, payload); }
+                try { id = Themes.SaveUserTheme(label, payload, existingId); }
                 catch (Exception ex) { Log.Write("/appearance/save-theme: " + ex.Message); id = null; }
-                if (id == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not save theme." }); return false; }
+                if (id == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = string.IsNullOrEmpty(existingId) ? "Could not save theme." : "That saved theme no longer exists." }); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["id"] = id });
+                return false;
+            }
+
+            if (path == "/appearance/pick-color")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                try
+                {
+                    string color = DesktopColorPicker.Pick();
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["cancelled"] = string.IsNullOrEmpty(color), ["color"] = color });
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("/appearance/pick-color: " + ex.Message);
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Desktop color picker failed: " + ex.Message });
+                }
                 return false;
             }
 
             if (path == "/appearance/delete-theme")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string raw = Q("id", "");
                 if (!raw.StartsWith("user/", StringComparison.Ordinal))
                 {
@@ -1510,6 +1531,8 @@ namespace ReplayKitHelper
                     ["maskedUsername"] = a.SignedIn ? masked : "",
                     ["plan"] = a.Plan,
                     ["sizeCap"] = a.SizeCap,
+                    ["maxUploadBytes"] = Constants.GetEffectiveUploadCap(),
+                    ["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0,
                     ["retentionDays"] = a.RetentionDays,
                 });
                 return false;
@@ -1556,6 +1579,8 @@ namespace ReplayKitHelper
                         ["maskedUsername"] = a.SignedIn ? masked : "",
                         ["plan"] = a.Plan,
                         ["sizeCap"] = a.SizeCap,
+                        ["maxUploadBytes"] = Constants.GetEffectiveUploadCap(),
+                        ["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0,
                         ["retentionDays"] = a.RetentionDays,
                     });
                 }

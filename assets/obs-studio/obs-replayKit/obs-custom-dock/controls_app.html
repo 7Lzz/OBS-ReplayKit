@@ -35,12 +35,12 @@
     --button_bg: var(--grey4);
     --button_bg_hover: var(--grey3);
     --button_bg_down: var(--grey7);
-    --button_border: var(--button_bg);
+    --button_border: var(--button_bg-solid,var(--button_bg));
     --button_border_hover: var(--grey1);
     --primary: var(--blue3);
     --primary_light: var(--blue2);
     --input_bg: var(--grey8);
-    --input_border: var(--grey4);
+    --input_border: var(--grey4-solid,var(--grey4));
     --on-accent: #ffffff;
     --on-accent-rgb: 255, 255, 255;
     --text-rgb: 255, 255, 255;
@@ -85,7 +85,7 @@
     display: flex;
     flex-direction: column;
     background: var(--bg_dock);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-top: none;
     border-bottom-left-radius: var(--border_radius);
     border-bottom-right-radius: var(--border_radius);
@@ -170,7 +170,7 @@
   /* share preview toggle. highlighted when the Discord/application-share preview is enabled. */
   .btn.projector-mode {
     background-color: var(--blue3);
-    border-color: var(--blue3);
+    border-color: var(--blue3-solid,var(--blue3));
     color: var(--on-accent);
   }
   .btn.projector-mode:hover {
@@ -178,7 +178,7 @@
     border-color: var(--blue2);
   }
   .btn.projector-mode:focus-visible {
-    border-color: var(--blue3);
+    border-color: var(--blue3-solid,var(--blue3));
   }
   .btn.projector-mode:hover:focus-visible {
     border-color: var(--blue2);
@@ -222,7 +222,7 @@
     right: 0;
     z-index: 5;
     background: var(--grey6);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: var(--border_radius);
     /* collapses to a clipped zero-height box instead of display:none so it can slide open and shut. overflow:hidden + max-height:0 also means a closed menu adds no height to #controlsFrame, so it never forces the scrollbar the up/down flip is there to avoid. openMenu() still measures offsetHeight correctly -- max-height caps height, it doesnt force it. */
     max-height: 0;
@@ -258,7 +258,7 @@
     font-size: 11px;
     color: var(--text_muted);
     line-height: 1.45;
-    border-bottom: 1px solid var(--grey4);
+    border-bottom: 1px solid var(--grey4-solid,var(--grey4));
     margin-bottom: 3px;
   }
   .auth-menu .info b { color: var(--text); font-weight: 500; }

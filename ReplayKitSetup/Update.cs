@@ -23,15 +23,20 @@ namespace ReplayKitSetup
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr handle);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool TerminateProcess(IntPtr handle, uint exitCode);
+
         private const uint SYNCHRONIZE = 0x00100000;
+        private const uint PROCESS_TERMINATE = 0x0001;
         private const uint WAIT_OBJECT_0 = 0;
+        private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
 
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
 
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
         private static string ResultFile() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_result.json");
 
-        private static void WriteResult(bool ok, string stage, string message)
+        private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage)
         {
             try
             {
@@ -43,6 +48,7 @@ namespace ReplayKitSetup
                     ["stage"] = stage,
                     ["message"] = message ?? "",
                     ["version"] = VersionInfo.Version,
+                    ["releaseUrl"] = string.IsNullOrWhiteSpace(releaseUrl) ? ReleasePage : releaseUrl,
                     ["finishedAt"] = DateTime.UtcNow.ToString("o"),
                 };
                 File.WriteAllText(path, payload.ToString(Formatting.Indented) + "\n", new UTF8Encoding(false));
@@ -63,15 +69,18 @@ namespace ReplayKitSetup
             }
         }
 
-        private static bool WaitForPid(int pid, int timeoutS = 60)
+        private static bool WaitForPid(int pid, int timeoutS, Action<string> log)
         {
             if (pid <= 0) return true;
-            IntPtr handle = OpenProcess(SYNCHRONIZE, false, pid);
+            IntPtr handle = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, false, pid);
             if (handle == IntPtr.Zero) return true;
             try
             {
                 uint result = WaitForSingleObject(handle, (uint)(timeoutS * 1000));
-                return result == WAIT_OBJECT_0;
+                if (result == WAIT_OBJECT_0) return true;
+                log?.Invoke("old ReplayKit helper did not exit within " + timeoutS + "s; terminating it before the file transaction");
+                if (!TerminateProcess(handle, 1)) return false;
+                return WaitForSingleObject(handle, 10000) == WAIT_OBJECT_0;
             }
             finally
             {
@@ -89,8 +98,11 @@ namespace ReplayKitSetup
 
             // the helper downloads into %temp%\ReplayKit\update; test_update_mode.bat still uses the flat %temp%\ReplayKitUpdate. only those two shapes are accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder -- the nested one used to fall through this name check, which is why every update so far left its downloaded installer behind in %temp%.
             var dir = new DirectoryInfo(target);
-            bool named = string.Equals(dir.Name, "ReplayKitUpdate", StringComparison.Ordinal) ||
-                         (string.Equals(dir.Name, "update", StringComparison.Ordinal) && string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal));
+            string name = dir.Name ?? "";
+            bool uniqueUpdate = name.StartsWith("update-", StringComparison.OrdinalIgnoreCase) &&
+                                Guid.TryParseExact(name.Substring(7), "N", out Guid ignored);
+            bool named = string.Equals(name, "ReplayKitUpdate", StringComparison.Ordinal) ||
+                         (uniqueUpdate && string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal));
             if (!named) return null;
             if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
             return target;
@@ -146,7 +158,7 @@ namespace ReplayKitSetup
         }
 
         // run a non-interactive repair/update install from a downloaded release exe.
-        public static int RunUpdateMode(string cleanupDir = null, string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true)
+        public static int RunUpdateMode(string cleanupDir = null, string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage)
         {
             void LogBoth(string message)
             {
@@ -157,8 +169,20 @@ namespace ReplayKitSetup
             bool obsClosed = false;
             bool installed = false;
             bool relaunched = false;
+            Mutex updateGate = null;
+            bool updateGateHeld = false;
             try
             {
+                updateGate = new Mutex(false, @"Local\OBSReplayKit-runtime-update");
+                try { updateGateHeld = updateGate.WaitOne(TimeSpan.FromSeconds(5)); }
+                catch (AbandonedMutexException) { updateGateHeld = true; }
+                if (!updateGateHeld)
+                {
+                    const string busy = "Another ReplayKit update is already running.";
+                    LogBoth(busy);
+                    WriteResult(false, "busy", busy, releaseUrl);
+                    return 1;
+                }
                 Log("update starting version=" + VersionInfo.Version);
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
 
@@ -169,13 +193,14 @@ namespace ReplayKitSetup
                     string reason = AssetBundle.LastError ?? "This OBSReplayKit.exe was built without its bundled ReplayKit files.";
                     string message = "ReplayKit runtime assets not found: " + runtimeSrc + ". " + reason;
                     LogBoth("preflight failed, OBS was left running: " + message);
-                    WriteResult(false, "preflight", message);
+                    WriteResult(false, "preflight", message, releaseUrl);
                     return 1;
                 }
 
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
-                WaitForPid(waitPid > 0 ? waitPid : 0, 60);
+                if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
+                    throw new IOException("The old ReplayKit helper could not be stopped, so no files were changed.");
                 Obs.CleanupCrashFlags(LogBoth);
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth);
                 LogBoth($"runtime update copied {count} file(s)");
@@ -186,23 +211,25 @@ namespace ReplayKitSetup
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
                     if (!relaunched)
                     {
-                        WriteResult(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.");
+                        WriteResult(false, "relaunch", $"ReplayKit {VersionInfo.Version} was installed but OBS could not be restarted. Start OBS manually.", releaseUrl);
                         return 1;
                     }
                 }
-                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).");
+                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).", releaseUrl);
                 return 0;
             }
             catch (Exception exc)
             {
                 Log("update failed: " + exc.Message);
-                WriteResult(false, obsClosed ? "install" : "startup", exc.Message);
+                WriteResult(false, obsClosed ? "install" : "startup", exc.Message, releaseUrl);
                 return 1;
             }
             finally
             {
                 // obs has to come back even when the install died partway thru the copy, otherwise a failed update costs the user their whole obs session. skipped once the install got far enough to report its own relaunch outcome.
                 if (obsClosed && relaunch && !installed) LaunchObsPath(relaunchObs, LogBoth);
+                if (updateGateHeld) updateGate.ReleaseMutex();
+                updateGate?.Dispose();
                 ScheduleCleanup(cleanupDir);
             }
         }
@@ -307,7 +334,10 @@ namespace ReplayKitSetup
             bool noRelaunch = argv.Contains("--no-relaunch-obs");
             int waitPid = IntArg(argv, "--wait-pid", 0);
             int startDelayMs = IntArg(argv, "--start-delay-ms", 0);
-            return RunUpdateMode(cleanupDir, relaunchObs, waitPid, startDelayMs, !noRelaunch);
+            string releaseUrl = StringArg(argv, "--release-url", ReleasePage);
+            if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out Uri releaseUri) || releaseUri.Scheme != Uri.UriSchemeHttps)
+                releaseUrl = ReleasePage;
+            return RunUpdateMode(cleanupDir, relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl);
         }
 
         private static string StringArg(string[] argv, string name, string @default)

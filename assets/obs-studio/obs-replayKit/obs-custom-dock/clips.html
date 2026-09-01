@@ -32,7 +32,7 @@
     --button_bg: var(--grey4);
     --button_bg_hover: var(--grey3);
     --button_bg_down: var(--grey7);
-    --button_border: var(--button_bg);
+    --button_border: var(--button_bg-solid,var(--button_bg));
     --button_border_hover: var(--grey1);
     --primary: var(--blue3);
     --primary_light: var(--blue2);
@@ -79,7 +79,7 @@
     gap: 12px;
     padding: 9px 14px;
     background: var(--bg_window);
-    border-bottom: 1px solid var(--grey4);
+    border-bottom: 1px solid var(--grey4-solid,var(--grey4));
     overflow: visible;
   }
   .tab-group,
@@ -518,6 +518,18 @@
     translate: 0 0;
     contain: none;
   }
+  /* the stage animates on the standalone scale/opacity properties, not transform -- the rule above pins transform to none !important to beat `#grid .card`'s translate, so a transform-based entrance would never render. */
+  @keyframes clip-theater-in {
+    from { opacity: 0; scale: .985; }
+    to { opacity: 1; scale: 1; }
+  }
+  .card.is-theater-card { animation: clip-theater-in 170ms var(--ease_smooth) both; }
+  /* leaving theatre removes the classes that would have animated, so the grid coming back gets the exit motion instead -- one animation on the scroll container rather than one per card, which matters with the virtualised grid. */
+  @keyframes clip-theater-restore {
+    from { opacity: 0; scale: .994; }
+    to { opacity: 1; scale: 1; }
+  }
+  body.is-theater-restoring .scroll-area { animation: clip-theater-restore 170ms var(--ease_smooth) both; }
   .card.is-theater-card .preview {
     flex: 1 1 auto;
     min-height: 0;
@@ -585,7 +597,7 @@
   .section-heading-rest {
     margin-top: 6px;
     padding-top: 14px;
-    border-top: 1px solid var(--grey4);
+    border-top: 1px solid var(--grey4-solid,var(--grey4));
   }
   .virtual-spacer {
     height: 0;
@@ -614,7 +626,7 @@
   .card {
     position: relative;
     background: var(--bg_card);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: 6px;
     overflow: visible;
     display: flex;
@@ -818,7 +830,7 @@
     opacity: 1;
     pointer-events: auto;
   }
-  .card.is-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .card.is-selected { border-color: var(--primary-solid,var(--primary)); box-shadow: 0 0 0 1px var(--primary-solid,var(--primary)); }
   .card.is-selected .select-clip-btn { background: transparent; }
   .card.is-selected .select-clip-btn .select-ring { display: block; fill: var(--primary); stroke: var(--primary); }
   .card.is-selected .select-clip-btn .select-check { stroke: var(--on-accent); stroke-width: 1.55; opacity: 1; scale: 1; }
@@ -1733,6 +1745,11 @@
     cursor: progress;
     pointer-events: none;
   }
+  .actions .action-link-btn.is-blocked {
+    opacity: .55;
+    cursor: not-allowed;
+    pointer-events: auto;
+  }
   .btn.is-busy {
     opacity: 0.6;
     cursor: progress;
@@ -1856,7 +1873,7 @@
     display: none;
   }
   .toast.is-shown { display: block; }
-  .toast.is-info  { color: var(--text); border-color: var(--grey4); }
+  .toast.is-info  { color: var(--text); border-color: var(--grey4-solid,var(--grey4)); }
   .resize-grip {
     position: fixed;
     right: 2px;
@@ -1896,7 +1913,7 @@
   .modal {
     width: 360px;
     background: var(--grey6);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: 8px;
     padding: 18px 18px 14px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
@@ -2476,7 +2493,7 @@
     gap: 4px;
     padding: 10px 12px;
     background: var(--grey7);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: 6px;
     cursor: pointer;
     text-align: left;
@@ -2536,7 +2553,7 @@
     line-height: 1.5;
     padding: 10px 12px;
     background: var(--grey7);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: 6px;
   }
   .compress-mode-locked b { color: var(--text); font-weight: 600; }
@@ -2591,7 +2608,7 @@
     appearance: none;
     -webkit-appearance: none;
     background: var(--grey7);
-    border: 1px solid var(--grey4);
+    border: 1px solid var(--grey4-solid,var(--grey4));
     border-radius: 6px;
     color: var(--text);
     font: inherit;
@@ -3011,6 +3028,44 @@
   const HELPER = location.protocol === "http:"
     ? location.origin
     : "http://127.0.0.1:8767";
+
+  // live theme preview from the Settings Appearance tab, so "Open clips" shows the real thing while colours are still being edited. settings publishes on a BroadcastChannel and re-stamps localStorage every 4s; the stale check is what stops a settings window that was killed rather than closed from leaving this window themed forever. #rk-theme-live is appended last so it wins over the committed <style id="rk-theme"> the helper injects.
+  (function themePreviewListener() {
+    let liveStyle = null;
+    const freeze = document.createElement("style");
+    // same one-frame freeze settings.html uses: this CEF build leaves background-color transitions that resolve through var() half-finished when the custom properties change, stranding elements on the old accent.
+    freeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
+    document.head.appendChild(freeze);
+
+    function applyCss(css) {
+      if (!css) {
+        if (liveStyle) liveStyle.textContent = "";
+        return;
+      }
+      if (!liveStyle) {
+        liveStyle = document.createElement("style");
+        liveStyle.id = "rk-theme-live";
+        document.head.appendChild(liveStyle);
+      }
+      document.documentElement.classList.add("rk-theme-swapping");
+      liveStyle.textContent = css;
+      requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping")));
+    }
+
+    try {
+      const record = JSON.parse(localStorage.getItem("replaykit-theme-preview") || "null");
+      if (record && record.css && Date.now() - record.time <= 15000) applyCss(record.css);
+    } catch (_) {}
+
+    try {
+      const channel = new BroadcastChannel("replaykit-theme-preview");
+      channel.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.reset) applyCss("");
+        else if (typeof data.css === "string") applyCss(data.css);
+      };
+    } catch (_) {}
+  })();
   const POLL_FAST_MS = 2500;
   const POLL_UPLOAD_MS = 250;
   const POLL_IDLE_MS = 1000;
@@ -3784,6 +3839,33 @@
     render(filtered);
   }
 
+  // upload caps the helper actually enforces, read from /me rather than hardcoded so they follow the signed-in
+  // plan (free/anon: 1 GB + 10 min; paid plans raise or remove both). 0 on either field means "no limit".
+  let uploadLimits = { maxUploadBytes:0, maxDurationSec:0 };
+  async function refreshUploadLimits() {
+    try {
+      const res = await fetch(HELPER + "/me?t=" + Date.now(), { cache:"no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      uploadLimits = {
+        maxUploadBytes:Number(data.maxUploadBytes) || 0,
+        maxDurationSec:Number(data.maxDurationSec) || 0,
+      };
+    } catch (_) {}
+  }
+
+  // why this clip cannot be uploaded, or null when it can. deliberately silent when duration is unknown -- the
+  // clip index probes it asynchronously, and refusing on a missing value would grey out brand new clips.
+  function uploadBlockReason(clip) {
+    if (!clip) return null;
+    const cap = uploadLimits.maxUploadBytes;
+    if (cap > 0 && Number(clip.size) > cap) return "Over " + formatSize(cap);
+    const maxSeconds = uploadLimits.maxDurationSec;
+    const duration = Number(clip.duration);
+    if (maxSeconds > 0 && isFinite(duration) && duration > maxSeconds) return "Longer than " + Math.round(maxSeconds / 60) + " min";
+    return null;
+  }
+
   function formatSize(bytes) {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -4065,6 +4147,17 @@
     return true;
   }
 
+  // grid fade-back on theatre exit. the reflow read restarts the animation when theatre is toggled again before the previous one finished, which is otherwise a no-op because the class is already on the body.
+  let theaterRestoreTimer = null;
+  function playTheaterRestore() {
+    const body = document.body;
+    body.classList.remove("is-theater-restoring");
+    void body.offsetWidth;
+    body.classList.add("is-theater-restoring");
+    clearTimeout(theaterRestoreTimer);
+    theaterRestoreTimer = setTimeout(() => body.classList.remove("is-theater-restoring"), 220);
+  }
+
   function exitTheaterMode() {
     const preview = theaterPreview;
     if (!preview) return false;
@@ -4073,6 +4166,7 @@
     if (card) card.classList.remove("is-theater-card");
     preview.classList.remove("is-idle");
     document.body.classList.remove("is-clip-theater");
+    playTheaterRestore();
     resetVideoZoom(preview.querySelector("video"));
     syncTheaterButton(preview);
     if (pendingLoadedRenderAfterTheater) {
@@ -6134,8 +6228,10 @@
       const busy = !clip.streamable_url && stillTicking;
       const linkLocked = !!clip.streamable_url && (processing || failed);
       // coerce to a real boolean -- CEF treats classList.toggle(cls, undefined) as a plain toggle, so `false || undefined` was flipping is-disabled ON for every eligible (never-linked) clip.
-      linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked));
+      const menuBlockReason = showCopy ? null : uploadBlockReason(clip);
+      linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked || menuBlockReason));
       linkMenuItem.title = showCopy ? "Copy Link"
+        : menuBlockReason ? menuBlockReason + " -- Streamable will not accept this clip"
         : processing ? "Processing on Streamable"
         : failed ? "Processing failed"
         : busy ? "Creating link" : "Create Link";
@@ -6224,8 +6320,17 @@
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
       btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Create Link</span>`;
-      btn.addEventListener("click", () => onCreateLink(clip.name, btn));
+      // Streamable would reject this one anyway -- lock the button and say why instead of letting the upload run and fail.
+      const blockReason = uploadBlockReason(clip);
+      if (blockReason) {
+        btn.disabled = true;
+        btn.classList.add("is-blocked");
+        btn.title = blockReason + " -- Streamable will not accept this clip. Trim or compress it first.";
+      } else {
+        btn.addEventListener("click", () => onCreateLink(clip.name, btn));
+      }
       actions.appendChild(btn);
+      if (blockReason) addMetaStatus(blockReason, true);
       // a failed transcode still has a (dead) streamable_url on the clip -- Create Link above retries; the X drops the dead link + the "Processing failed" note.
       if (failed) {
         addMetaStatus("Processing failed", true);
@@ -8631,6 +8736,12 @@
   });
 
   hydrateClipUiState();
+  // the caps gate Create Link, so fetch them before the first paint and repaint once they land; re-fetched on
+  // re-show because signing in or out between sessions changes what Streamable will accept.
+  refreshUploadLimits().then(() => queueVirtualRender(true));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshUploadLimits().then(() => queueVirtualRender(true));
+  });
   poll();
 </script>
 </body>

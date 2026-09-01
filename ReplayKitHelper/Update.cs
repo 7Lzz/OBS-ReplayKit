@@ -19,6 +19,7 @@ namespace ReplayKitHelper
         private const string Repo = "OBS-ReplayKit";
         private const string InstallerAsset = "OBSReplayKit.exe";
         private const string HashAsset = "OBSReplayKit.exe.sha256";
+        private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
 
         // a release exe built without its embedded assets\ payload is around 1 mb and can install nothing -- it closes obs first and only then discovers it has no files, which strands the user with no obs and no helper. the runtime tree alone is over 10 mb, so a complete build never lands anywhere near this floor. mirrors the same guard build.bat applies at the producing end.
         private const long MinInstallerBytes = 6L * 1024 * 1024;
@@ -183,7 +184,7 @@ namespace ReplayKitHelper
                         ["installedVersion"] = NormalizeVersion(GetInstalledVersion()),
                         ["latestVersion"] = "",
                         ["tagName"] = "",
-                        ["releaseUrl"] = "",
+                        ["releaseUrl"] = ReleasePage,
                         ["releaseName"] = "",
                         ["releaseNotes"] = "",
                         ["updateAvailable"] = false,
@@ -191,7 +192,7 @@ namespace ReplayKitHelper
                         ["message"] = "No GitHub Release has been published yet.",
                     };
                 }
-                return new JObject { ["ok"] = false, ["message"] = ex.Message };
+                return new JObject { ["ok"] = false, ["message"] = ex.Message, ["releaseUrl"] = ReleasePage };
             }
         }
 
@@ -288,7 +289,7 @@ namespace ReplayKitHelper
 
         public static JObject GetInstallResult()
         {
-            var result = new JObject { ["ok"] = true, ["present"] = false, ["installedVersion"] = "" };
+            var result = new JObject { ["ok"] = true, ["present"] = false, ["installedVersion"] = "", ["releaseUrl"] = ReleasePage };
             try { result["installedVersion"] = NormalizeVersion(GetInstalledVersion()); }
             catch (Exception) { }
             try
@@ -302,6 +303,7 @@ namespace ReplayKitHelper
                 result["message"] = data["message"]?.Value<string>() ?? "";
                 result["version"] = data["version"]?.Value<string>() ?? "";
                 result["finishedAt"] = data["finishedAt"]?.Value<string>() ?? "";
+                result["releaseUrl"] = data["releaseUrl"]?.Value<string>() ?? ReleasePage;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
@@ -323,51 +325,56 @@ namespace ReplayKitHelper
         {
             string root = Path.GetFullPath(Constants.REPLAYKIT_TEMP_ROOT).TrimEnd('\\');
             string full = Path.GetFullPath(path).TrimEnd('\\');
-            if (Path.GetFileName(full) != "update") throw new InvalidOperationException("Update temp folder name is invalid.");
+            string name = Path.GetFileName(full);
+            if (!Regex.IsMatch(name ?? "", @"^update-[a-f0-9]{32}$", RegexOptions.IgnoreCase))
+                throw new InvalidOperationException("Update temp folder name is invalid.");
             if (!full.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
         }
 
-        // wipe the update temp dir before a fresh download. a stray locked leftover (an aborted prior run, an av scan,
-        // or a chromium profile some other process parked in here) must not abort the whole update -- if the full
-        // recursive delete cant finish, just clear the two files this flow actually rewrites and carry on. only a lock
-        // on those specific files is fatal, and then with a clear message instead of a cryptic child-file one.
-        private static void ClearUpdateTemp(string tempDir)
+        private static string CreateUpdateTemp()
         {
-            if (!Directory.Exists(tempDir)) return;
-            try
-            {
-                Directory.Delete(tempDir, true);
-                return;
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                WriteUpdateDebug("update temp not fully cleared (" + ex.Message + "); clearing download slots only");
-            }
-            foreach (var name in new[] { InstallerAsset, HashAsset })
-            {
-                string p = Path.Combine(tempDir, name);
-                try { if (File.Exists(p)) File.Delete(p); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    throw new IOException("A previous update download in " + tempDir + " is still locked. Close any open ReplayKit update window, then try again.", ex);
-                }
-            }
+            Directory.CreateDirectory(Constants.REPLAYKIT_TEMP_ROOT);
+            string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "update-" + Guid.NewGuid().ToString("N"));
+            AssertSafeUpdateTemp(path);
+            Directory.CreateDirectory(path);
+            return path;
         }
 
         private static void SaveUrlFile(string url, string path)
         {
-            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || uri.Scheme != Uri.UriSchemeHttps)
                 throw new InvalidOperationException("Update download URL must use HTTPS.");
-            using (var response = Http.GetAsync(url).GetAwaiter().GetResult())
+            string temp = path + ".part";
+            Exception failure = null;
+            for (int attempt = 1; attempt <= 3; attempt++)
             {
-                response.EnsureSuccessStatusCode();
-                using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                using (var fileStream = File.Create(path))
+                try
                 {
-                    stream.CopyTo(fileStream);
+                    try { if (File.Exists(temp)) File.Delete(temp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    using (var response = Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
+                    {
+                        response.EnsureSuccessStatusCode();
+                        using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                        using (var fileStream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 128, FileOptions.WriteThrough))
+                        {
+                            stream.CopyTo(fileStream);
+                            fileStream.Flush(true);
+                        }
+                    }
+                    if (File.Exists(path)) File.Delete(path);
+                    File.Move(temp, path);
+                    return;
+                }
+                catch (Exception ex) when (ex is HttpRequestException || ex is IOException || ex is UnauthorizedAccessException || ex is System.Threading.Tasks.TaskCanceledException)
+                {
+                    failure = ex;
+                    WriteUpdateDebug("download attempt " + attempt + " failed for " + Path.GetFileName(path) + ": " + ex.Message);
+                    if (attempt < 3) System.Threading.Thread.Sleep(attempt * 750);
                 }
             }
+            try { if (File.Exists(temp)) File.Delete(temp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            throw new IOException("Downloading " + Path.GetFileName(path) + " failed after 3 attempts.", failure);
         }
 
         private static string GetSha256FromText(string text)
@@ -414,7 +421,7 @@ namespace ReplayKitHelper
         private static string PsQuote(string value) => "'" + (value ?? "").Replace("'", "''") + "'";
 
         // the installer can still be torn down mid-flight by something outside its control (this helper dies moments after obs does, and an av or a policy kill lands the same way), and a TerminateProcess skips its finally block -- so obs would stay dead with the popup waiting on a restart that never comes. this watchdog outlives all of it: detached + breakaway like the installer spawn itself, it waits for the installer pid to go away and only acts if no verdict was written, which is exactly the case where nobody else is going to bring obs back.
-        private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion)
+        private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl)
         {
             string script = string.Join("\n", new[]
             {
@@ -423,6 +430,7 @@ namespace ReplayKitHelper
                 "$result=" + PsQuote(InstallResultPath()),
                 "$obs=" + PsQuote(obsPath ?? ""),
                 "$target=" + PsQuote(targetVersion ?? ""),
+                "$release=" + PsQuote(releaseUrl ?? ReleasePage),
                 "$versionFile=" + PsQuote(GetVersionPath()),
                 "$deadline=(Get-Date).AddMinutes(15)",
                 "while ((Get-Date) -lt $deadline -and (Get-Process -Id $installerPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
@@ -432,6 +440,7 @@ namespace ReplayKitHelper
                 "if (-not (Get-Process -Name obs64 -ErrorAction SilentlyContinue)) { if ($obs -and (Test-Path -LiteralPath $obs)) { Start-Process -FilePath $obs -WorkingDirectory (Split-Path -Parent $obs) } }",
                 "if ($installed -eq $target) { $o=@{ok=$true;stage='done';message=\"ReplayKit $target installed; OBS was restarted by the update watchdog.\";version=$target} }",
                 "else { $o=@{ok=$false;stage='aborted';message='The installer stopped before it finished. OBS has been restarted -- the update was not applied.';version=$target} }",
+                "$o.releaseUrl=$release",
                 "$o.finishedAt=(Get-Date).ToUniversalTime().ToString('o')",
                 "[IO.File]::WriteAllText($result, ($o | ConvertTo-Json -Compress))",
             });
@@ -441,12 +450,14 @@ namespace ReplayKitHelper
             WriteUpdateDebug(pid > 0 ? "update watchdog started (pid=" + pid + ", watching installer " + installerPid + ")" : "update watchdog failed to start; a mid-install abort will not self-recover");
         }
 
-        private static JObject StartUpdater(string installerPath, string tempDir, string targetVersion)
+        private static JObject StartUpdater(string installerPath, string tempDir, string targetVersion, string releaseUrl)
         {
             string obsPath = GetUpdateObsPath();
             // wait on this helpers own pid, not obs -- obs is already confirmed dead synchronously before the installer even reaches this wait, but this helper process (which holds the lock on its own exe under scripts/helper/) only exits afterward, asynchronously, once its parent-watchdog notices obs is gone. waiting on obs pid here races the copy step against that and loses.
             int waitPid = Process.GetCurrentProcess().Id;
             var argList = new List<string> { "--update", "--cleanup-dir", tempDir, "--start-delay-ms", "1200" };
+            argList.Add("--release-url");
+            argList.Add(releaseUrl ?? ReleasePage);
             if (!string.IsNullOrWhiteSpace(obsPath)) { argList.Add("--relaunch-obs"); argList.Add(obsPath); }
             if (waitPid > 0) { argList.Add("--wait-pid"); argList.Add(waitPid.ToString()); }
 
@@ -457,7 +468,7 @@ namespace ReplayKitHelper
                 WriteUpdateDebug("StartUpdater (admin, detached): " + cmdLine);
                 int installerPid = Native.SpawnDetached(cmdLine, tempDir);
                 if (installerPid <= 0) throw new InvalidOperationException("SpawnDetached returned 0 for installer");
-                StartUpdateWatchdog(installerPid, obsPath, targetVersion);
+                StartUpdateWatchdog(installerPid, obsPath, targetVersion, releaseUrl);
                 return new JObject { ["ok"] = true, ["processId"] = installerPid };
             }
 
@@ -474,7 +485,7 @@ namespace ReplayKitHelper
             };
             WriteUpdateDebug("StartUpdater (non-admin, runas): " + installerPath);
             var proc = Process.Start(psi);
-            StartUpdateWatchdog(proc.Id, obsPath, targetVersion);
+            StartUpdateWatchdog(proc.Id, obsPath, targetVersion, releaseUrl);
             return new JObject { ["ok"] = true, ["processId"] = proc.Id };
         }
 
@@ -488,25 +499,25 @@ namespace ReplayKitHelper
                 Server.State.UpdateApplyInProgress = true;
                 claimed = true;
             }
+            string releaseUrl = ReleasePage;
             try
             {
                 string installed = NormalizeVersion(GetInstalledVersion());
                 var latest = GetLatestRelease();
+                if (!string.IsNullOrWhiteSpace(latest.HtmlUrl)) releaseUrl = latest.HtmlUrl;
                 if (CompareVersion(installed, latest.LatestVersion) >= 0)
                 {
                     return new JObject
                     {
                         ["ok"] = true, ["updateAvailable"] = false,
                         ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
+                        ["releaseUrl"] = releaseUrl,
                         ["message"] = "ReplayKit is already up to date.",
                     };
                 }
                 if (string.IsNullOrWhiteSpace(latest.HashUrl)) throw new InvalidOperationException("Latest release is missing " + HashAsset + ".");
 
-                string tempDir = GetUpdateTempDir();
-                AssertSafeUpdateTemp(tempDir);
-                ClearUpdateTemp(tempDir);
-                Directory.CreateDirectory(tempDir);
+                string tempDir = CreateUpdateTemp();
 
                 string installerPath = Path.Combine(tempDir, InstallerAsset);
                 string hashPath = Path.Combine(tempDir, HashAsset);
@@ -534,18 +545,19 @@ namespace ReplayKitHelper
                 }
 
                 ClearInstallResult();
-                var started = StartUpdater(installerPath, tempDir, latest.LatestVersion);
+                var started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
                 return new JObject
                 {
                     ["ok"] = true, ["updateAvailable"] = true, ["installing"] = true,
                     ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
+                    ["releaseUrl"] = releaseUrl,
                     ["processId"] = started["processId"],
                     ["message"] = "ReplayKit " + latest.LatestVersion + " is installing. OBS will restart.",
                 };
             }
             catch (Exception ex)
             {
-                return new JObject { ["ok"] = false, ["message"] = ex.Message };
+                return new JObject { ["ok"] = false, ["message"] = ex.Message, ["releaseUrl"] = releaseUrl };
             }
             finally
             {
