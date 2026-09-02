@@ -56,6 +56,39 @@ namespace ReplayKitHelper
             {
                 ResolveParentViaWmi();
             }
+
+            // Lua can be hosted by a short-lived OBS browser child instead of the
+            // main OBS process. Watch the actual OBS lifetime in that case so the
+            // helper does not disappear as soon as the child exits.
+            if (!IsMainObsProcess(ParentName)) ResolveRunningObs();
+        }
+
+        private static bool IsMainObsProcess(string name) =>
+            string.Equals(name, "obs64", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "obs32", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "obs", StringComparison.OrdinalIgnoreCase);
+
+        private static void ResolveRunningObs()
+        {
+            foreach (string name in new[] { "obs64", "obs32", "obs" })
+            {
+                var processes = Process.GetProcessesByName(name);
+                try
+                {
+                    if (processes.Length == 0) continue;
+                    using (var process = processes[0])
+                    {
+                        ParentPid = process.Id;
+                        try { ParentStartTime = process.StartTime; } catch (System.ComponentModel.Win32Exception) { }
+                        ParentName = process.ProcessName;
+                        return;
+                    }
+                }
+                finally
+                {
+                    for (int i = 1; i < processes.Length; i++) processes[i].Dispose();
+                }
+            }
         }
 
         private static void ResolveParentViaWmi()

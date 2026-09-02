@@ -33,7 +33,17 @@ namespace ReplayKitHelper
             InstallCrashReporter();
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
-            return RunServer(args);
+            if (args.Length > 0 && string.Equals(args[0], "--update-watchdog", StringComparison.OrdinalIgnoreCase))
+                return UpdateWatchdog.Run(args);
+            if (args.Length > 0 && string.Equals(args[0], "--update-startup-check", StringComparison.OrdinalIgnoreCase))
+                return RunUpdateStartupCheck(args);
+            try { return RunServer(args); }
+            catch (Exception ex)
+            {
+                WriteStartupStatus(GetNamedArg(args, "-ConfigPath"), "failed", ex.Message);
+                WriteCrashReport("helper_startup", ex, true);
+                return 1;
+            }
         }
 
         private static void InstallCrashReporter()
@@ -95,6 +105,7 @@ namespace ReplayKitHelper
                 Console.Error.WriteLine("Missing required -ConfigPath argument.");
                 return 1;
             }
+            WriteStartupStatus(configPath, "starting", "");
             Server.State.ConfigPath = configPath;
             AppConfig.LoadConfig();
             AppConfig.ClearLogsAtStartup();
@@ -108,10 +119,12 @@ namespace ReplayKitHelper
             _listener = BindListener(port);
             if (_listener == null)
             {
+                WriteStartupStatus(configPath, "failed", "Could not bind 127.0.0.1:" + port);
                 Log.Write("Could not bind 127.0.0.1:" + port + " after takeover attempt -- giving up.");
                 ReleaseSingleton();
                 return 0;
             }
+            WriteStartupStatus(configPath, "ready", "");
             Log.Write("ReplayKit helper listening on http://" + Constants.HOST_ADDR + ":" + port);
 
             // client half of the ipc pipe with the native plugin -- main-window + projector hwnds in, open-clips + allow-close out. connects when the plugin's server is up and reconnects on its own; every consumer degrades gracefully while it isn't.
@@ -124,13 +137,10 @@ namespace ReplayKitHelper
             Log.Write("Helper PID=" + Process.GetCurrentProcess().Id + " admin=" + isAdmin + " parent=" + ParentWatchdog.ParentPid +
                 " (" + ParentWatchdog.ParentName + ", started " + ParentWatchdog.ParentStartTime + ")");
 
-            // open a real os handle on the parent so the watchdog can wait on a kernel signal instead of polling Get-Process. if this fails while we do have a known parent, we are at the wrong integrity level for it (or it is already dead) -- either way the right move is to exit now so the correctly-elevated helper can bind the port without us blocking it.
-            if (!ParentWatchdog.OpenHandle())
-            {
-                Log.Write("OpenParentForSync(" + ParentWatchdog.ParentPid + ") returned NULL -- this helper has the wrong integrity level for its parent (or parent is dead). Exiting so the correctly-elevated helper can bind the port.");
-                ReleaseSingleton();
-                return 0;
-            }
+            // Parent identity is diagnostic only. OBS can launch scripts through a
+            // short-lived child process, so treating a parent-handle failure as a
+            // reason to exit causes the local server to disappear after launch.
+            ParentWatchdog.OpenHandle();
 
             try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
 
@@ -309,14 +319,8 @@ namespace ReplayKitHelper
             {
                 while (!Server.State.Shutdown)
                 {
-                    if (!ParentWatchdog.CheckAlive()) break;
                     if (!_listener.Pending())
                     {
-                        if (ParentWatchdog.ExitedNow())
-                        {
-                            Log.Write("Parent terminated during idle (GetExitCodeProcess). Exiting.");
-                            break;
-                        }
                         try { DiscordProjector.KeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector keep-alive threw: " + ex.Message); }
                         Thread.Sleep(50);
                         continue;
@@ -374,84 +378,63 @@ namespace ReplayKitHelper
             }
         }
 
-        // if /restart-obs-clean queued a cookie wipe, run it now while obs is exiting: poll for the cookies file
-        // to become writable (obs-cef releases its exclusive lock as the obs-browser plugin shuts down) for up to
-        // 20 seconds, then delete every streamable/google/facebook row so a lingering google session cannot
-        // silently re-mint a streamable session on the next sign-in attempt.
+        // A forced re-login now clears ReplayKit's own WebView2 profile. It never
+        // edits OBS's browser database or any third-party application's cookies.
         private static void ClearStreamableCookiesOnExit()
         {
-            string obsCookies = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "plugin_config", "obs-browser", "Network", "Cookies");
-            Log.Write("ClearStreamableOnExit: waiting for OBS to release " + obsCookies);
-            bool unlocked = false;
-            for (int i = 0; i < 80; i++)
-            {
-                try
-                {
-                    using (var fs = new FileStream(obsCookies, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
-                    unlocked = true;
-                    break;
-                }
-                catch (IOException) { Thread.Sleep(250); }
-                catch (UnauthorizedAccessException) { Thread.Sleep(250); }
-            }
-            if (!unlocked)
-            {
-                Log.Write("ClearStreamableOnExit: timed out waiting for cookies file unlock; skipping.");
-                return;
-            }
+            AuthCore.ClearAuth();
+            StreamableSignIn.ClearProfile();
+            Log.Write("Cleared ReplayKit's owned Streamable profile.");
+        }
 
+        private static void WriteStartupStatus(string configPath, string state, string message)
+        {
+            if (string.IsNullOrWhiteSpace(configPath)) return;
             try
             {
-                IntPtr db = NativeSqlite.OpenReadWrite(obsCookies);
+                string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(configPath)), "helper_startup_status.json");
+                var data = new JObject
+                {
+                    ["state"] = state,
+                    ["message"] = message ?? "",
+                    ["pid"] = Process.GetCurrentProcess().Id,
+                    ["parentPid"] = ParentWatchdog.ParentPid,
+                    ["parentName"] = ParentWatchdog.ParentName,
+                    ["at"] = DateTime.UtcNow.ToString("o"),
+                };
+                File.WriteAllText(path, data.ToString());
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+        }
+
+        private static int RunUpdateStartupCheck(string[] args)
+        {
+            int port = int.TryParse(GetNamedArg(args, "-Port"), out int value) ? value : Constants.DEFAULT_PORT;
+            string origin = "http://127.0.0.1:" + port;
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
                 try
                 {
-                    IntPtr stmt = NativeSqlite.Prepare(db,
-                        "DELETE FROM cookies WHERE " +
-                        "host_key LIKE '%streamable.com' OR " +
-                        "host_key LIKE '%google.com' OR " +
-                        "host_key LIKE '%googleapis.com' OR " +
-                        "host_key LIKE '%facebook.com' OR " +
-                        "host_key LIKE '%facebook.net'");
-                    int sr = NativeSqlite.Step(stmt);
-                    NativeSqlite.Finalize(stmt);
-
-                    long changed = 0;
-                    IntPtr countStmt = NativeSqlite.Prepare(db, "SELECT changes()");
-                    if (NativeSqlite.Step(countStmt) == NativeSqlite.SQLITE_ROW) changed = NativeSqlite.ColumnInt64(countStmt, 0);
-                    NativeSqlite.Finalize(countStmt);
-                    Log.Write("ClearStreamableOnExit: DELETE step rc=" + sr + " rows=" + changed + " (101=DONE expected).");
-                }
-                finally
-                {
-                    NativeSqlite.Close(db);
-                }
-
-                // also wipe local storage + indexeddb for those origins so any cached oauth state cannot replay either -- deleting the per-origin subdirectories under the cef profile is enough, since the next visit recreates fresh empty storage automatically.
-                string idxDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "plugin_config", "obs-browser", "IndexedDB");
-                if (Directory.Exists(idxDir))
-                {
-                    var pattern = new System.Text.RegularExpressions.Regex(@"^https?_(streamable\.com|accounts\.google\.com|google\.com|googleapis\.com|facebook\.com)_", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    foreach (var dir in Directory.GetDirectories(idxDir))
+                    var request = (HttpWebRequest)WebRequest.Create(origin + "/update/startup-check");
+                    request.Method = "GET";
+                    request.Timeout = 30000;
+                    request.Headers["Origin"] = origin;
+                    using (var response = (HttpWebResponse)request.GetResponse())
+                    using (var reader = new StreamReader(response.GetResponseStream()))
                     {
-                        string name = Path.GetFileName(dir);
-                        if (!pattern.IsMatch(name)) continue;
-                        try
-                        {
-                            Directory.Delete(dir, true);
-                            Log.Write("ClearStreamableOnExit: removed IndexedDB " + name);
-                        }
-                        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                        {
-                            Log.Write("ClearStreamableOnExit: IndexedDB " + name + ": " + ex.Message);
-                        }
+                        var data = JObject.Parse(reader.ReadToEnd());
+                        if (data.Value<bool?>("ok") != true || data.Value<bool?>("prompt") != true) return 0;
+                        Update.OpenUpdatePromptWindow(data.Value<string>("latestVersion"));
+                        return 0;
                     }
                 }
-                // local storage uses a single leveldb shared by all origins -- we cant surgically delete per-origin keys without a leveldb library. the cookies wipe is the critical part anyway; local storage doesnt carry oauth re-auth state on its own.
+                catch (Exception ex)
+                {
+                    Log.Write("Startup update check attempt " + (attempt + 1) + " failed: " + ex.Message);
+                    Thread.Sleep(3000);
+                }
             }
-            catch (Exception ex)
-            {
-                Log.Write("ClearStreamableOnExit: " + ex.Message);
-            }
+            return 1;
         }
 
         // move any <name>.json.replaykit-pending staged by SetOverlaySceneFile onto the real scene collection. only safe once obs is gone (its own exit-save would clobber it otherwise) -- callers must run this post-exit, pre-relaunch.

@@ -1559,6 +1559,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try { AuthCore.StreamableBackgroundLogout(); } catch (Exception ex) { Log.Write("Background logout failed: " + ex.Message); }
                 AuthCore.ClearAuth();
+                StreamableSignIn.ClearProfile();
                 AppConfig.ClearClipsCache();
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -1566,45 +1567,12 @@ namespace ReplayKitHelper
 
             if (path == "/import-session")
             {
-                // find a chromium-based browser on the box that has a signed-in streamable.com session (edge, chrome, brave, vivaldi, opera, or obs's own cef), decrypt the cookies, validate against /me, and adopt them as our auth state. the find-and-validate logic is shared with startup restore so we dont pick up stale logged-out cookies and clobber working auth.
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                try
-                {
-                    string sourceParam = Q("source");
-                    bool obsOnly = sourceParam == "obs";
-                    Log.Write("/import-session source='" + sourceParam + "' obsOnly=" + obsOnly);
-                    var result = BrowserCookies.FindWorkingStreamableSession(obsOnly);
-                    if (!result.Ok)
-                    {
-                        HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = result.Error });
-                        return false;
-                    }
-                    AuthCore.SaveAuthBlob(result.Jar, result.User);
-                    AuthCore.ApplyAuth(result.User, result.Jar);
-                    AppConfig.ClearClipsCache();
-                    var a = Server.State.Auth;
-                    string masked = Constants.GetMaskedIdentity(a.Username);
-                    Log.Write("Imported session from " + result.SourceName + " for " + a.Username + " (plan=" + a.Plan + ")");
-                    HttpResponse.SendJson(stream, 200, new JObject
-                    {
-                        ["ok"] = true,
-                        ["source"] = result.SourceName,
-                        ["signedIn"] = a.SignedIn,
-                        ["username"] = "",
-                        ["displayName"] = a.SignedIn ? "Signed in" : "",
-                        ["maskedUsername"] = a.SignedIn ? masked : "",
-                        ["plan"] = a.Plan,
-                        ["sizeCap"] = a.SizeCap,
-                        ["maxUploadBytes"] = Constants.GetEffectiveUploadCap(),
-                        ["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0,
-                        ["retentionDays"] = a.RetentionDays,
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Log.Write("/import-session threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message });
-                }
+                var status = QFlag("start") ? StreamableSignIn.OpenOrGetStatus() : StreamableSignIn.GetStatus();
+                if (status.Value<bool?>("signedIn") == true) AppConfig.ClearClipsCache();
+                status["maxUploadBytes"] = Constants.GetEffectiveUploadCap();
+                status["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0;
+                HttpResponse.SendJson(stream, status.Value<bool?>("ok") == true ? 200 : 500, status);
                 return false;
             }
 
@@ -1645,9 +1613,9 @@ namespace ReplayKitHelper
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
                 try { AuthCore.ClearAuthBlob(); } catch { }
                 try { AuthCore.ClearAuth(); } catch { }
-                Server.State.ClearStreamableOnExit = true;
+                StreamableSignIn.ClearProfile();
                 Server.State.RestartAfterCleanObsPath = obsPath;
-                Log.Write("/restart-obs-clean: queued. Will kill OBS, wipe streamable cookies, relaunch from '" + obsPath + "'.");
+                Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile and will relaunch from '" + obsPath + "'.");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
 
                 // give the response a moment to flush before we kill obs (otherwise the dock's fetch sees a torn connection).

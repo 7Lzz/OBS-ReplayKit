@@ -1,0 +1,4 @@
+<Project>
+  <!-- Release merging is performed after publish in ReplayKitHelper.csproj.
+       This avoids feeding WebView2Loader.dll, a native dependency, to ILRepack. -->
+</Project>

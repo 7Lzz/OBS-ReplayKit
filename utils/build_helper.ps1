@@ -5,6 +5,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectDir = Join-Path $repoRoot "ReplayKitHelper"
 $csproj = Join-Path $projectDir "ReplayKitHelper.csproj"
 $outPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe"
+$loaderOutPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\WebView2Loader.dll"
 $publishTmp = Join-Path $repoRoot "publish_helper_tmp"
 
 # same shape as the native plugin build script's Test-TrayPluginOutputCurrent -- true only when $targetPath exists and is newer than every input.
@@ -19,7 +20,7 @@ function Test-HelperOutputCurrent([string]$targetPath, [string[]]$inputPaths) {
 }
 
 # excludes bin\/obj\ so a leftover compiled-output .cs (e.g. AssemblyInfo.cs under obj\) never counts as a source change; $PSCommandPath is included so an edit to this script itself also invalidates the cache.
-$sourceFiles = Get-ChildItem -LiteralPath $projectDir -Recurse -Include *.cs, *.csproj, *.manifest |
+$sourceFiles = Get-ChildItem -LiteralPath $projectDir -Recurse -Include *.cs, *.csproj, *.manifest, *.targets |
     Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' }
 $buildInputs = @($sourceFiles.FullName) + @($PSCommandPath)
 
@@ -38,6 +39,7 @@ if (Test-Path -LiteralPath $publishTmp) { Remove-Item $publishTmp -Recurse -Forc
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
 Copy-Item -LiteralPath (Join-Path $publishTmp "OBSReplayKit.exe") -Destination $outPath -Force
+Copy-Item -LiteralPath (Join-Path $publishTmp "WebView2Loader.dll") -Destination $loaderOutPath -Force
 Remove-Item $publishTmp -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $projectDir "bin")) { Remove-Item (Join-Path $projectDir "bin") -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $projectDir "obj")) { Remove-Item (Join-Path $projectDir "obj") -Recurse -Force }

@@ -93,6 +93,8 @@ ffi.cdef[[
 local kernel32 = ffi.load("kernel32")
 local ws2_32 = ffi.load("ws2_32")
 local CREATE_NO_WINDOW     = 0x08000000
+local CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+local DETACHED_PROCESS     = 0x00000008
 local STARTF_USESHOWWINDOW = 0x00000001
 local SW_HIDE              = 0
 local AF_INET              = 2
@@ -239,14 +241,15 @@ local function spawn_hidden(cmdline)
     local pi = ffi.new("PROCESS_INFORMATION")
     local buf = ffi.new("char[?]", #cmdline + 1)
     ffi.copy(buf, cmdline)
-    local ok = kernel32.CreateProcessA(
-        nil, buf,
-        nil, nil,
-        0,
-        CREATE_NO_WINDOW,
-        nil, nil,
-        si, pi
-    )
+    local flags = CREATE_NO_WINDOW + CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS
+    local ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, flags, nil, nil, si, pi)
+    -- Some restrictive job policies deny breakaway. The compiled helper still
+    -- works in that case, so retry with the ordinary launch flags.
+    if ok == 0 then
+        buf = ffi.new("char[?]", #cmdline + 1)
+        ffi.copy(buf, cmdline)
+        ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, CREATE_NO_WINDOW, nil, nil, si, pi)
+    end
     if ok == 0 then
         return false, tonumber(kernel32.GetLastError())
     end
@@ -316,21 +319,17 @@ end
 -- set to true once weve successfully launched the helper this session. re-spawn attempts are skipped while its true (the os port-bind would just fail anyway). stays false if the launch errored so the next helper_request() retries after a failed helper launch.
 local helper_started = false
 
-local function update_bootstrap_path()
-    return script_dir() .. "replaykit_update_bootstrap.ps1"
-end
-
--- spawns the standalone update-prompt launcher alongside the helper, living outside the dock so the popup still appears when obs starts minimized to the tray (cef suspends docks then, so the dock-driven window.open never fires) -- it waits for the helper to bind its port, then shows update_prompt.html in msedge --app or falls back to a winforms dialog.
+-- Runs the update startup check in the compiled helper. This keeps the prompt
+-- available while OBS is minimized without launching PowerShell.
 local update_bootstrap_started = false
 local function start_update_bootstrap()
     if update_bootstrap_started then return true end
-    local bootstrap = update_bootstrap_path()
-    if not file_exists(bootstrap) then
-        log(obs.LOG_INFO, "Update bootstrap script missing; skipping startup update check: " .. bootstrap)
+    local helper = helper_path()
+    if not file_exists(helper) then
+        log(obs.LOG_INFO, "Helper missing; skipping startup update check: " .. helper)
         return false
     end
-    local cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File ' ..
-                win_quote(bootstrap) .. ' -Port ' .. HTTP_PORT
+    local cmd = win_quote(helper) .. ' --update-startup-check -Port ' .. HTTP_PORT
     local ok, err = spawn_hidden(cmd)
     if not ok then
         log(obs.LOG_ERROR, "Update bootstrap spawn failed. Win32 error: " .. tostring(err))
@@ -360,8 +359,12 @@ local function start_helper()
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
         return false
     end
+    if not wait_for_helper_port(HELPER_START_WAIT_MS) then
+        helper_started = false
+        log(obs.LOG_ERROR, "ReplayKit helper did not bind port " .. HTTP_PORT .. " after launch")
+        return false
+    end
     helper_started = true
-    wait_for_helper_port(HELPER_START_WAIT_MS)
     start_update_bootstrap()
     return true
 end

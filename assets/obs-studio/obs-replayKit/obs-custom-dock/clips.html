@@ -5813,6 +5813,10 @@
       if (!res.ok || !data.ok) {
         throw new Error(data.message || ("HTTP " + res.status));
       }
+      // the clip just got deleted out from under whatever enlarged view is showing it -- drop back to the grid instead of leaving theater/fullscreen locked onto a card thats about to be torn out by renderLoadedClips below.
+      const preview = card.querySelector(".preview");
+      if (preview && isTheaterPreview(preview)) exitTheaterMode();
+      if (preview && (document.fullscreenElement === preview || document.webkitFullscreenElement === preview)) tryExitFullscreen();
       const video = card.querySelector("video");
       if (video) {
         if (activePreview === video) activePreview = null;

@@ -26,6 +26,8 @@ publish_helper_tmp/
 
 # regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches VersionInfo.cs
 /assets/obs-studio/obs-replayKit/version.json
+# same regeneration, feeds the Win32 version resource (FileVersion/AssemblyVersion) into both csproj files
+/Version.props
 
 # one-off smoke / scratch scripts
 _smoke_test.py

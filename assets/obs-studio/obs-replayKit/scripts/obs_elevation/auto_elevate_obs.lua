@@ -61,13 +61,6 @@ local SEE_MASK_NOCLOSEPROCESS = 0x00000040
 local DEFAULT_OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
 local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
 
--- name of the task scheduler entry the obs replaykit installer registers. keep in sync with task_name in obs_replaykit/scheduled_task.py. if this constant ever changes both sides have to move at once or the no-uac path silently degrades to shellexecuteex (which still works, but the familiar uac popup comes back).
-local SCHTASKS_TASK_NAME = "OBSReplayKit-Elevate"
-
--- handoff file that the lua side fills in with the current obs path + pid right before triggering the scheduled task. wscript cant recieve command-line arguments thru schtasks /run, so this is the only way for the elevated relauncher to know which process to terminate. path matches the one hidden_relauncher.vbs reads.
-local HANDOFF_PATH = (os.getenv("TEMP") or "C:\\Windows\\Temp") ..
-                     "\\ReplayKit\\scratch\\obsreplaykit_elevate.txt"
-
 -- same cap the other settings readers use; a json bigger than this is corrupt
 local MAX_SETTINGS_BYTES = 65536
 
@@ -132,56 +125,7 @@ local function has_required_obs_flag()
     return ffi.string(cmd):lower():find(REQUIRED_OBS_FLAG, 1, true) ~= nil
 end
 
--- write the runtime obs path + pid into the handoff file the elevated wscript will read. returns true on success, false otherwise; the caller treats a failed write as "fall back to uac flow".
-local function write_handoff(obs_pid)
-    -- io.open in "w" mode doesnt create missing parent directories, and this can run before anything else has touched %temp%\ReplayKit -- os_mkdir each level explicitly rather than assume its recursive; calling it on an already-existing dir is a harmless no-op.
-    local tempRoot = os.getenv("TEMP") or "C:\\Windows\\Temp"
-    obs.os_mkdir(tempRoot .. "\\ReplayKit")
-    obs.os_mkdir(tempRoot .. "\\ReplayKit\\scratch")
-    local f, err = io.open(HANDOFF_PATH, "w")
-    if not f then
-        print("[ElevateOBS] handoff write failed: " .. tostring(err))
-        return false
-    end
-    f:write(OBS_EXE, "\n", tostring(obs_pid), "\n")
-    f:close()
-    return true
-end
-
--- try to fire the obsreplaykit-elevate scheduled task. returns true on success. the task is registered with runlevel highestavailable so it runs elevated without a uac prompt; schtasks /run just signals the task scheduler to start it. the /i flag is "ignore the constraint that the task might already be running" -- harmless here becuase the task uses ignorenew multi-instance policy anyway.
-local function try_scheduled_task(obs_pid)
-    if not write_handoff(obs_pid) then return false end
-
-    -- shellexecuteex with sw_hide so the schtasks console flash never appears. verb "open" (the defualt) avoids triggering uac; only "runas" elevates, and schtasks itself doesnt need elevation to start a task the calling user owns.
-    local params = string.format('/Run /TN "%s" /I', SCHTASKS_TASK_NAME)
-
-    local info = ffi.new("SHELLEXECUTEINFOA")
-    ffi.fill(info, ffi.sizeof("SHELLEXECUTEINFOA"), 0)
-    info.cbSize       = ffi.sizeof("SHELLEXECUTEINFOA")
-    info.fMask        = SEE_MASK_NOCLOSEPROCESS
-    info.hwnd         = user32.GetForegroundWindow()
-    info.lpVerb       = "open"
-    info.lpFile       = "schtasks.exe"
-    info.lpParameters = params
-    info.nShow        = SW_HIDE
-
-    local ok = shell32.ShellExecuteExA(info)
-    if ok == 0 then
-        -- shellexecuteex returns 0 on any failure; the task may be absent (fresh install pre-apply) or group policy may be blocking task scheduler use.
-        print("[ElevateOBS] schtasks /Run ShellExecuteEx failed (task missing? GPO blocked?)")
-        return false
-    end
-
-    if info.hProcess ~= nil then
-        kernel32.CloseHandle(info.hProcess)
-    end
-
-    print("[ElevateOBS] scheduled task '" .. SCHTASKS_TASK_NAME ..
-          "' triggered (no UAC popup)")
-    return true
-end
-
--- last-resort fallback: per-launch uac popup. identical to the pre-scheduled-task implementation -- kept so installs without the task (older bundles, hand-extracted setups, task deleted by user via task scheduler) still elevate successfully, just with the familiar windows based script host uac prompt.
+-- relaunch obs elevated via a uac prompt on wscript.exe running hidden_relauncher.vbs. used to try a hidden, highest-privilege scheduled task first so this ran silently -- removed becuase that task was installed unconditionally on every apply regardless of whether run-as-admin was even on, and a hidden auto-elevating task is exactly the shape av heuristics flag as a persistence mechanism.
 local function launch_helper_uac(helper_path, obs_pid)
     local params = string.format(
         '"%s" "%s" %u',
@@ -241,16 +185,11 @@ function script_load(settings)
 
     local obs_pid = tonumber(kernel32.GetCurrentProcessId()) or 0
 
-    -- preferred path: scheduled task fires the relauncher elevated without a uac popup. apply registers the task once during install; this branch covers every subsequent launch.
     if not elevated then
-        print("[ElevateOBS] Not elevated - attempting silent elevation via scheduled task...")
+        print("[ElevateOBS] Not elevated - relaunching via UAC...")
     else
         print("[ElevateOBS] Missing required OBS launch flag - relaunching with ReplayKit flags...")
     end
-    if try_scheduled_task(obs_pid) then return end
-
-    -- fall back to the original shellexecuteex flow only if the scheduled task path fails (task missing becuase the user is on a bundle older than the task-installer, or becuase they deleted it from task scheduler manually).
-    print("[ElevateOBS] Scheduled-task path unavailable - falling back to UAC flow.")
     launch_helper_uac(helper_path, obs_pid)
 end
 

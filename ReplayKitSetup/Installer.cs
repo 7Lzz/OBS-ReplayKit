@@ -159,6 +159,7 @@ namespace ReplayKitSetup
         {
             Path.Combine("obs-replayKit", "scripts", "replay_buffer", "replay_buffer_saved.mp3"),
             Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
+            Path.Combine("obs-replayKit", "scripts", "helper", "replaykit_update_bootstrap.ps1"),
         };
 
         private static readonly string[] RuntimeStateRels =
@@ -543,8 +544,8 @@ namespace ReplayKitSetup
             try { TrayPlugin.InstallReplaykitTrayPlugin(log); }
             catch (Exception ex) { log?.Invoke($"warn: tray plugin refresh skipped: {ex.Message}"); }
 
-            try { InstallObsElevationTask(log); }
-            catch (Exception ex) { log?.Invoke($"warn: elevation task refresh skipped: {ex.Message}"); }
+            try { RemoveObsElevationTask(log); }
+            catch (Exception ex) { log?.Invoke($"warn: elevation task cleanup skipped: {ex.Message}"); }
 
             try
             {
@@ -625,8 +626,8 @@ namespace ReplayKitSetup
         // sanity-check the dock html survived the main walker. the walker already mirror-copies it; this just flags missing files loudly.
         public static int InstallObsCustomDock(Action<string> log = null) => Dock.VerifyDockInstall(log);
 
-        // register the obsreplaykit-elevate scheduled task so the lua elevation script can relaunch obs elevated without a per-launch uac popup. must run AFTER InstallObsConfig copies hidden_relauncher.vbs into place.
-        public static bool InstallObsElevationTask(Action<string> log = null) => ScheduledTask.InstallElevationTask(log);
+        // the hidden, highest-privilege OBSReplayKit-Elevate task used to get installed on every apply regardless of whether run-as-admin was even turned on -- exactly the shape av heuristics read as a persistence mechanism, and it was flagging on every build. run-as-admin now always goes thru the normal UAC prompt instead, so this just cleans up the task on installs that already have one from an older release.
+        public static bool RemoveObsElevationTask(Action<string> log = null) => ScheduledTask.DeleteElevationTask(log);
 
         // download + drop ffmpeg.exe and ffprobe.exe next to the helper. obs ships only obs-ffmpeg-mux.exe; compress/trim need the full pair. idempotent.
         public static bool InstallObsFfmpeg(Action<string> log = null) => FfmpegInstall.InstallFfmpeg(log);
