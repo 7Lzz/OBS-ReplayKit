@@ -589,45 +589,31 @@ namespace ReplayKitHelper
             }
         }
 
-        private static string PsQuote(string value) => "'" + (value ?? "").Replace("'", "''") + "'";
-
-        // the installer can still be torn down mid-flight by something outside its control (this helper dies moments after obs does, and an av or a policy kill lands the same way), and a TerminateProcess skips its finally block -- so obs would stay dead with the popup waiting on a restart that never comes. this watchdog outlives all of it: detached + breakaway like the installer spawn itself, it waits for the installer pid to go away and only acts if no verdict was written, which is exactly the case where nobody else is going to bring obs back.
+        // The watchdog is a detached copy of this C# helper. Keeping it native avoids
+        // hidden PowerShell, execution-policy bypasses, and encoded commands.
         private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl)
         {
-            string script = string.Join("\n", new[]
+            string source = Process.GetCurrentProcess().MainModule.FileName;
+            string watchdogDir = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "watchdog-" + Guid.NewGuid().ToString("N"));
+            string watchdogExe = Path.Combine(watchdogDir, "OBSReplayKit-watchdog.exe");
+            try
             {
-                "$ErrorActionPreference='SilentlyContinue'",
-                "$launcherPid=" + installerPid,
-                "$pidFile=" + PsQuote(InstallPidPath()),
-                "$result=" + PsQuote(InstallResultPath()),
-                "$obs=" + PsQuote(obsPath ?? ""),
-                "$target=" + PsQuote(targetVersion ?? ""),
-                "$release=" + PsQuote(releaseUrl ?? ReleasePage),
-                "$versionFile=" + PsQuote(GetVersionPath()),
-                "$deadline=(Get-Date).AddMinutes(15)",
-                "$installerPid=0",
-                "$handoff=(Get-Date).AddSeconds(45)",
-                "while ((Get-Date) -lt $handoff) {",
-                "  if (Test-Path -LiteralPath $result) { exit }",
-                "  try { $installerPid=[int]((Get-Content -LiteralPath $pidFile -Raw).Trim()) } catch { $installerPid=0 }",
-                "  if ($installerPid -gt 0) { break }",
-                "  if (-not (Get-Process -Id $launcherPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
-                "  else { Start-Sleep -Seconds 1 }",
-                "}",
-                "if ($installerPid -le 0) { $installerPid=$launcherPid }",
-                "while ((Get-Date) -lt $deadline -and (Get-Process -Id $installerPid -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 3 }",
-                "if (Test-Path -LiteralPath $result) { exit }",
-                "$installed=''",
-                "try { $installed=(Get-Content -LiteralPath $versionFile -Raw | ConvertFrom-Json).version } catch {}",
-                "if (-not (Get-Process -Name obs64 -ErrorAction SilentlyContinue)) { if ($obs -and (Test-Path -LiteralPath $obs)) { Start-Process -FilePath $obs -WorkingDirectory (Split-Path -Parent $obs) } }",
-                "if ($installed -eq $target) { $o=@{ok=$true;stage='done';message=\"ReplayKit $target installed; OBS was restarted by the update watchdog.\";version=$target} }",
-                "else { $o=@{ok=$false;stage='aborted';message='The installer stopped before it finished. OBS has been restarted -- the update was not applied.';version=$target} }",
-                "$o.releaseUrl=$release",
-                "$o.finishedAt=(Get-Date).ToUniversalTime().ToString('o')",
-                "[IO.File]::WriteAllText($result, ($o | ConvertTo-Json -Compress))",
-            });
-            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
-            string cmdLine = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encoded;
+                Directory.CreateDirectory(watchdogDir);
+                File.Copy(source, watchdogExe, true);
+            }
+            catch (Exception ex)
+            {
+                WriteUpdateDebug("update watchdog copy failed: " + ex.Message);
+                return;
+            }
+            var args = new[]
+            {
+                "--update-watchdog", "-LauncherPid", installerPid.ToString(),
+                "-PidFile", InstallPidPath(), "-Result", InstallResultPath(),
+                "-ObsPath", obsPath ?? "", "-TargetVersion", targetVersion ?? "",
+                "-ReleaseUrl", releaseUrl ?? ReleasePage, "-VersionPath", GetVersionPath(),
+            };
+            string cmdLine = ProcessArgs.Quote(watchdogExe) + " " + ProcessArgs.Join(args);
             int pid = Native.SpawnDetached(cmdLine, Constants.LOG_DIR);
             WriteUpdateDebug(pid > 0 ? "update watchdog started (pid=" + pid + ", watching installer " + installerPid + ")" : "update watchdog failed to start; a mid-install abort will not self-recover");
         }

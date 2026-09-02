@@ -702,7 +702,6 @@
 
   let authState   = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
   let loginPopup  = null;
-  let loginWatch  = null;
 
   function escapeHtml(s) {
     return String(s)
@@ -765,19 +764,16 @@
   }
   function closeMenu() { authMenu.classList.remove("is-open"); }
 
-  // sign-in popup state. we open the helpers /sign-in-loader page, which paints a branded spinner and meta-refreshes to streamable.com/login -- using helper-served html instead of about:blank avoids a cef compositor race that white-screens third-party spas. we poll /import-session here while the popup is open; when the helper picks up a valid session we win32 wm_close the popup and refresh dock auth state.
+  // Sign-in is hosted in ReplayKit's own persistent WebView2 profile. It never reads
+  // cookies or encryption keys from Chrome, Edge, OBS CEF, or any other browser.
   let importPollTimer = null;
   let popupCloseTimer = null;
   let loginTimeoutTimer = null;
-  let importInFlight = null;
   let loginFlowActive = false;
   let loginWindowsCloseRequested = false;
   let loginLastCloseRequestAt = 0;
-  let loginImportArmed = false;
   const LOGIN_TIMEOUT_MS = 120000;
-  const LOGIN_WINDOW_STATUS_MS = 125;
   const LOGIN_IMPORT_POLL_MS = 500;
-  const LOGIN_IMPORT_IDLE_MS = 3000;
 
   function setSigningIn(on, label) {
     if (on) {
@@ -793,7 +789,6 @@
     if (importPollTimer)   { clearInterval(importPollTimer);   importPollTimer = null; }
     if (popupCloseTimer)   { clearInterval(popupCloseTimer);   popupCloseTimer = null; }
     if (loginTimeoutTimer) { clearTimeout(loginTimeoutTimer);  loginTimeoutTimer = null; }
-    if (loginWatch)        { clearInterval(loginWatch);        loginWatch = null; }
   }
   function cleanupLoginFlow() {
     clearLoginTimers();
@@ -808,7 +803,6 @@
     loginPopup = null;
     loginWindowsCloseRequested = false;
     loginLastCloseRequestAt = 0;
-    loginImportArmed = false;
   }
   function requestSigninWindowClose(label) {
     if (label) setSigningIn(true, label);
@@ -822,136 +816,46 @@
     fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
   }
 
-  async function tryImport() {
-    if (importInFlight) return importInFlight;
-    importInFlight = (async () => {
-      try {
-        const res = await fetch(HELPER_HTTP_URL + "import-session?source=obs", {
-          method: "POST", cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.ok) return data;
-      } catch {}
-      return null;
-    })();
-    try { return await importInFlight; }
-    finally { importInFlight = null; }
-  }
-
+  // one sequenced poller drives the whole flow -- there used to be two independent, uncoordinated fetches (a
+  // fire-and-forget "&start=1" call and a separate immediate status check racing right behind it). the status
+  // check could reach the helper and see pending:false *before* the start=1 call had actually flipped it true
+  // server-side, which the close-detection added for the stuck-button fix then misread as "closed without
+  // signing in" and reset the button within a fraction of a second of the very click that opened it -- looking
+  // like the button "let you press it again" when the window was, in fact, still opening. sawWindowOpen is what
+  // tells a real close (seen pending:true, now false) apart from that startup race (never confirmed open yet).
   function openLoginPopup() {
-    if (loginPopup && !loginPopup.closed) {
-      try { loginPopup.focus(); } catch {}
-      return;
-    }
-    // open the popup directly to the helpers same-origin loading page. this page paints a branded spinner, then meta-refreshes to streamable.com/login. going thru helper-served html instead of about:blank + document.write avoids a cef race where the popups document wasnt yet writable, leaving the window stuck on a blank about:blank forever (visible as the literal "about:blank" window title).
-    loginPopup = window.open(
-      HELPER_HTTP_URL + "sign-in-loader",
-      "streamable_signin",
-      "width=560,height=720"
-    );
-    if (!loginPopup) {
-      alert("OBS blocked the sign-in window. Try clicking again, or allow popups for this dock.");
-      return;
-    }
-
     clearLoginTimers(); // wipe any stale timers from a previous attempt
     loginFlowActive = true;
     loginWindowsCloseRequested = false;
     loginLastCloseRequestAt = 0;
-    loginImportArmed = false;
+    let sawWindowOpen = false;
     setSigningIn(true, "Opening Streamable…");
 
-    // poll the helper for a successfully-imported session. as soon as the user signs in (with google, facebook, or email/pw on streamables own form), streamable sets cookies in obs cef, the helpers vss+sqlite import picks them up, /me validates, and we close the popup automatically. while were waiting, we also poll /signin-windows-status. it lets the button show where the flow is, and once streamable reaches the dashboard we close the popups while cookie import continues in the background.
-    const startedAt = Date.now();
-    let sawStreamable = false;
-    let sawGoogle = false;
-    let sawDashboard = false;
-    let lastImportAttempt = 0;
-    async function refreshStatus() {
-      // bail early if cleanup already happened (loginflowactive is false by cleanuploginflow). without this, an in-flight fetch from the previous poll could complete after cleanup and call setsigningin(true) again, leaving the auth button stuck with the pulsing blue orb even after sign-in succeeded.
+    async function pollStatus(isStartCall) {
       if (!loginFlowActive) return;
+      let res, data;
       try {
-        const r = await fetch(HELPER_HTTP_URL + "signin-windows-status?overlay=1",
-                              { cache: "no-store" });
-        // re-check after the await -- cleanup may have fired during the network round-trip.
-        if (!loginFlowActive) return;
-        const wins = await r.json();
-        if (!loginFlowActive) return;
-        const onStream = wins.some(w => w.streamable);
-        const onGoogle = wins.some(w => w.google);
-        const onDashboard = wins.some(w => /dashboard\s*-\s*streamable/i.test(w.title || ""));
-        let label;
-        if (onDashboard) {
-          sawDashboard = true;
-          loginImportArmed = true;
-          requestSigninWindowClose("Finalizing sign-in...");
-          sawStreamable = true;
-          return;
-        } else if (sawDashboard && (onGoogle || onStream)) {
-          loginImportArmed = true;
-          requestSigninWindowClose("Finalizing sign-in...");
-          return;
-        } else if (onGoogle) {
-          label = "Authenticating with Google…";
-          sawGoogle = true;
-        } else if (sawGoogle && !onGoogle) {
-          loginImportArmed = true;
-          label = "Finalizing sign-in…";
-        } else if (onStream) {
-          label = "Sign in on Streamable's page…";
-          sawStreamable = true;
-        } else if (sawStreamable) {
-          loginImportArmed = true;
-          label = "Finalizing sign-in…";
-        } else {
-          label = "Opening Streamable…";
-        }
-        setSigningIn(true, label);
-      } catch { /* helper offline; harmless */ }
-    }
-
-    refreshStatus();
-    loginWatch = setInterval(refreshStatus, LOGIN_WINDOW_STATUS_MS);
-
-    importPollTimer = setInterval(async () => {
-      const now = Date.now();
-      const interval = loginImportArmed ? LOGIN_IMPORT_POLL_MS : LOGIN_IMPORT_IDLE_MS;
-      if (!loginImportArmed && (now - startedAt) < 2500) return;
-      if ((now - lastImportAttempt) < interval) return;
-      lastImportAttempt = now;
-      const imported = await tryImport();
-      if (imported && loginFlowActive) {
-        applyAuthData(imported);
+        res = await fetch(HELPER_HTTP_URL + "import-session?source=owned" + (isStartCall ? "&start=1" : ""), {
+          method: "POST", cache: "no-store",
+        });
+        data = await res.json().catch(() => ({}));
+      } catch { return; } // helper unreachable this tick -- leave the label as-is rather than flipping it off a transient blip
+      if (!loginFlowActive || !res.ok) return; // cleanup may have already fired while this request was in flight
+      if (data.signedIn) {
+        applyAuthData(data);
         setSigningIn(true, "Signed in! Cleaning up…");
         cleanupLoginFlow();
+        return;
       }
-    }, LOGIN_IMPORT_POLL_MS);
+      if (data.pending === true) { sawWindowOpen = true; setSigningIn(true, "Sign in in the Streamable window…"); return; }
+      if (sawWindowOpen) { cleanupLoginFlow(); return; } // really did close without finishing
+      setSigningIn(true, "Opening Streamable…"); // pending:false before weve ever seen it open -- still starting up
+    }
 
-    // fire one immediate poll after a short delay so a returning user with valid cookies signs in within a second.
-    setTimeout(async () => {
-      refreshStatus();
-      if (!loginImportArmed) return;
-      const imported = await tryImport();
-      if (imported && loginFlowActive) {
-        applyAuthData(imported);
-        cleanupLoginFlow();
-      }
-    }, LOGIN_IMPORT_POLL_MS);
+    pollStatus(true); // opens the window (or focuses the existing one) and seeds status in the same call
+    importPollTimer = setInterval(() => pollStatus(false), LOGIN_IMPORT_POLL_MS);
 
-    // detect the user manually closing the popup so we re-check auth state right away instead of waiting for the next poll.
-    popupCloseTimer = setInterval(async () => {
-      if (loginPopup && loginPopup.closed) {
-        loginPopup = null;
-        if (loginWindowsCloseRequested) return;
-        // one last import attempt in case the popup closed mid-write.
-        const imported = await tryImport();
-        if (imported) applyAuthData(imported);
-        cleanupLoginFlow();
-        if (!imported) fetchMe();
-      }
-    }, 250);
-
-    // hard timeout: if nothings been picked up after 2 minutes, give up so we dont poll forever.
+    // Hard timeout: leave the user a usable sign-in button if the window was closed.
     loginTimeoutTimer = setTimeout(() => {
       cleanupLoginFlow();
     }, LOGIN_TIMEOUT_MS);

@@ -363,8 +363,40 @@ namespace ReplayKitHelper
         public static int StyleWindow(string needle, string iconPath, bool taskbar)
         {
             int matched = 0;
-            int themeCaption = CAPTION_COLOR, themeBorder = BORDER_COLOR, themeText = TEXT_COLOR;
-            int themeDark = 1;
+            IntPtr hIcon16, hIcon32;
+            int themeCaption, themeBorder, themeText, themeDark;
+            ResolveWindowTheme(iconPath, out hIcon16, out hIcon32, out themeCaption, out themeBorder, out themeText, out themeDark);
+
+            foreach (var hWnd in EnumerateTopLevelWindows())
+            {
+                if (!IsWindowVisible(hWnd)) continue;
+                GetWindowThreadProcessId(hWnd, out uint ownerPid);
+                if (!IsObsFamilyProcess(ownerPid)) continue;
+                string title = GetTitle(hWnd);
+                if (string.IsNullOrEmpty(title) || title.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                ApplyWindowThemeCore(hWnd, hIcon16, hIcon32, taskbar, themeCaption, themeBorder, themeText, themeDark);
+                matched++;
+            }
+            return matched;
+        }
+
+        // same styling StyleWindow applies to an obs-family window found by title, but for a window the helper
+        // already holds an hwnd for directly -- no enumeration or IsObsFamilyProcess ownership check, since a window
+        // this process created itself (e.g. the streamable sign-in form) is never going to be an obs-family process.
+        public static void ApplyWindowTheme(IntPtr hWnd, string iconPath, bool taskbar)
+        {
+            IntPtr hIcon16, hIcon32;
+            int themeCaption, themeBorder, themeText, themeDark;
+            ResolveWindowTheme(iconPath, out hIcon16, out hIcon32, out themeCaption, out themeBorder, out themeText, out themeDark);
+            ApplyWindowThemeCore(hWnd, hIcon16, hIcon32, taskbar, themeCaption, themeBorder, themeText, themeDark);
+        }
+
+        private static void ResolveWindowTheme(string iconPath, out IntPtr hIcon16, out IntPtr hIcon32,
+            out int themeCaption, out int themeBorder, out int themeText, out int themeDark)
+        {
+            themeCaption = CAPTION_COLOR; themeBorder = BORDER_COLOR; themeText = TEXT_COLOR;
+            themeDark = 1;
             try
             {
                 var th = Themes.Resolve(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
@@ -373,8 +405,9 @@ namespace ReplayKitHelper
                 themeText = Themes.ToColorRef(th.Text);
                 themeDark = th.Dark ? 1 : 0;
             }
-            catch (Exception ex) { Log.Write("StyleWindow theme resolve: " + ex.Message); }
-            IntPtr hIcon16 = IntPtr.Zero, hIcon32 = IntPtr.Zero;
+            catch (Exception ex) { Log.Write("window theme resolve: " + ex.Message); }
+
+            hIcon16 = IntPtr.Zero; hIcon32 = IntPtr.Zero;
             if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
             {
                 try
@@ -389,40 +422,37 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is ArgumentException || ex is OutOfMemoryException) { }
             }
+        }
 
-            foreach (var hWnd in EnumerateTopLevelWindows())
-            {
-                if (!IsWindowVisible(hWnd)) continue;
-                GetWindowThreadProcessId(hWnd, out uint ownerPid);
-                if (!IsObsFamilyProcess(ownerPid)) continue;
-                string title = GetTitle(hWnd);
-                if (string.IsNullOrEmpty(title) || title.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0) continue;
+        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm
+        // attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cef's
+        // non-client repaint race. harmless (just extra redundant calls) on a plain win32/winforms window that
+        // never had that race to begin with, so one sequence serves both callers.
+        private static void ApplyWindowThemeCore(IntPtr hWnd, IntPtr hIcon16, IntPtr hIcon32, bool taskbar,
+            int themeCaption, int themeBorder, int themeText, int themeDark)
+        {
+            int dark = themeDark;
+            DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE_PRE20H1, ref dark, sizeof(int));
+            int caption = themeCaption, border = themeBorder, text = themeText;
+            DwmSetWindowAttribute(hWnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
 
-                int dark = themeDark;
-                DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE_PRE20H1, ref dark, sizeof(int));
-                int caption = themeCaption, border = themeBorder, text = themeText;
-                DwmSetWindowAttribute(hWnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
+            if (hIcon16 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, new IntPtr(0), hIcon16);
+            if (hIcon32 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, new IntPtr(1), hIcon32);
 
-                if (hIcon16 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, new IntPtr(0), hIcon16);
-                if (hIcon32 != IntPtr.Zero) SendMessage(hWnd, WM_SETICON, new IntPtr(1), hIcon32);
+            if (taskbar) AddTaskbarTab(hWnd);
 
-                if (taskbar) AddTaskbarTab(hWnd);
-
-                SendMessage(hWnd, WM_THEMECHANGED, IntPtr.Zero, IntPtr.Zero);
-                DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
-                DwmSetWindowAttribute(hWnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
-                SendMessage(hWnd, WM_NCACTIVATE, new IntPtr(0), IntPtr.Zero);
-                SendMessage(hWnd, WM_NCACTIVATE, new IntPtr(1), IntPtr.Zero);
-                SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                RedrawWindow(hWnd, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
-                matched++;
-            }
-            return matched;
+            SendMessage(hWnd, WM_THEMECHANGED, IntPtr.Zero, IntPtr.Zero);
+            DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+            DwmSetWindowAttribute(hWnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
+            SendMessage(hWnd, WM_NCACTIVATE, new IntPtr(0), IntPtr.Zero);
+            SendMessage(hWnd, WM_NCACTIVATE, new IntPtr(1), IntPtr.Zero);
+            SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            RedrawWindow(hWnd, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
         }
 
         // the streamable/google sign-in popups are real cef window.open popups -- obs-browser never wires their page favicon to the hwnd, so they get the bare app icon and default light chrome. the dock polls /signin-windows-status every ~1s for the whole flow; style each distinct popup title once as it appears (dedup by title, not per-poll) so the repaint sequence in StyleWindow doesnt flicker the title bar on every tick. the icon + dwm caption colour persist on the hwnd across the in-page navigations, so one pass per title is enough.

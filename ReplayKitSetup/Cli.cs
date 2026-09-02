@@ -842,7 +842,7 @@ namespace ReplayKitSetup
             Add("Enable OBS WebSocket", "Lets the Clips and controls windows talk to OBS locally.", () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
             Add("Install Custom Controls and Clips", "Adds the ReplayKit dock and Clips browser files.", () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
             Add("Install tray plugin", "Adds View Clips, Share Preview, and Restart OBS to the system tray menu.", () => (object)TrayPlugin.InstallReplaykitTrayPlugin(progress.LogLine));
-            Add("Register launcher permission", "Avoids a UAC prompt every time OBS starts ReplayKit.", () => (object)Installer.InstallObsElevationTask(progress.LogLine));
+            Add("Remove legacy launcher task", "Cleans up the old no-prompt elevation task if a previous install left one behind.", () => (object)Installer.RemoveObsElevationTask(progress.LogLine));
             if (prefs.AllowSleepWhileActive)
                 Add("Allow monitor and PC sleep", "Lets Windows sleep timers run even if OBS, Replay Buffer, or Share Preview is active.", () => (object)Installer.InstallObsSleepOverride(true, progress.LogLine));
             else

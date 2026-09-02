@@ -110,14 +110,16 @@ namespace ReplayKitSetup
 
         private static string PsSingleQuote(string value) => "'" + value.Replace("'", "''") + "'";
 
+        // cant rmdir this update dir while this exe is still running from inside it, so hand the delete to a detached cmd that outlives us by a few seconds -- used to copy this exe under a new name and launch that copy with --cleanup-update-dir instead, but a self-duplicating renamed executable is exactly the shape av heuristics flag as a dropper, and it was doing that on every single update; target only ever comes from SafeCleanupDir, which limits it to our own temp-path shapes, so plain quoting is safe here since windows paths cannot contain a literal quote character.
         private static void ScheduleCleanup(string path)
         {
             string target = SafeCleanupDir(path);
             if (target == null) return;
-            string command = "Start-Sleep -Seconds 3; Remove-Item -LiteralPath " + PsSingleQuote(target) + " -Recurse -Force -ErrorAction SilentlyContinue";
             try
             {
-                var psi = new ProcessStartInfo("powershell.exe", Win32Args.Build("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", command))
+                // ping as the delay instead of timeout.exe -- timeout refuses to run when stdin isnt a real console handle, which is exactly the case for a process launched with UseShellExecute=false from another non-interactive process.
+                string cmdLine = "/c ping 127.0.0.1 -n 4 >nul & rmdir /s /q \"" + target + "\"";
+                var psi = new ProcessStartInfo("cmd.exe", cmdLine)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,

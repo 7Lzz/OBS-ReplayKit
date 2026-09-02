@@ -1,17 +1,13 @@
 Option Explicit
 
-Dim fso, shell, wmi, obsPath, existingObsPid, obsDir, handoffPath
+Dim fso, shell, wmi, obsPath, existingObsPid, obsDir
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 
-rem two invocation modes: shellexecuteex fallback (the original flow). the lua passes "<obspath> <pid>" on the command line, the uac prompt fires, and the elevated wscript receives both args directly. scheduled-task flow (the no-uac flow). schtasks /run cant forward arguments to the task action, so the lua writes the pair into %temp%\obsreplaykit_elevate.txt right before calling schtasks. the task action invokes this script with no args, so we look for that handoff file as the fallback. format is two lines, plain ascii: <absolute path to obs64.exe> <integer pid of the running obs to terminate> missing/malformed handoff file falls thru to the hardcoded defaults below, which is intentionally degraded behaviour: we still launch obs, we just cant terminate any specific stale instance first.
-handoffPath = shell.ExpandEnvironmentStrings("%TEMP%") & "\ReplayKit\scratch\obsreplaykit_elevate.txt"
-
+rem invoked directly by the uac-elevated wscript.exe call with "<obspath> <pid>": <absolute path to obs64.exe> <integer pid of the running obs to terminate>. a missing arg falls thru to the hardcoded defaults below, which is intentionally degraded behaviour: we still launch obs, we just cant terminate any specific stale instance first.
 If WScript.Arguments.Count >= 1 Then
   obsPath = WScript.Arguments.Item(0)
-ElseIf fso.FileExists(handoffPath) Then
-  obsPath = ReadHandoffLine(handoffPath, 1)
 End If
 If Len(obsPath) = 0 Then
   obsPath = FindObsPath()
@@ -19,46 +15,9 @@ End If
 
 If WScript.Arguments.Count >= 2 Then
   existingObsPid = CLng(WScript.Arguments.Item(1))
-ElseIf fso.FileExists(handoffPath) Then
-  existingObsPid = TryCLng(ReadHandoffLine(handoffPath, 2), 0)
 Else
   existingObsPid = 0
 End If
-
-rem delete the handoff file as soon as weve consumed it -- the values are stale the instant this script terminates, and a leftover file would feed the wrong pid into the next launch if the user manually invoked the task. best-effort; suppress errors if it was already cleaned up or is locked.
-On Error Resume Next
-If fso.FileExists(handoffPath) Then fso.DeleteFile handoffPath, True
-On Error GoTo 0
-
-Function ReadHandoffLine(ByVal path, ByVal lineNum)
-  Dim ts, i, line
-  ReadHandoffLine = ""
-  On Error Resume Next
-  Set ts = fso.OpenTextFile(path, 1, False, 0) ' forreading, ascii
-  If Err.Number <> 0 Then Err.Clear: Exit Function
-  On Error GoTo 0
-  i = 0
-  Do Until ts.AtEndOfStream
-    i = i + 1
-    line = ts.ReadLine
-    If i = lineNum Then
-      ts.Close
-      ReadHandoffLine = Trim(line)
-      Exit Function
-    End If
-  Loop
-  ts.Close
-End Function
-
-Function TryCLng(ByVal value, ByVal fallback)
-  On Error Resume Next
-  TryCLng = CLng(value)
-  If Err.Number <> 0 Then
-    Err.Clear
-    TryCLng = fallback
-  End If
-  On Error GoTo 0
-End Function
 
 Function CleanExePath(ByVal value)
   Dim s, comma
