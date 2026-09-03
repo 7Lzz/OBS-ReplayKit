@@ -31,15 +31,16 @@
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Net.Http" />
+    <!-- VbCable.cs bounces AudioEndpointBuilder/Audiosrv natively now instead of thru Stop-Service/Start-Service. -->
+    <Reference Include="System.ServiceProcess" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Newtonsoft.Json.dll ships as a loose sibling file next to OBSReplayKit.exe rather than ilrepack-merged into it; a merged exe reads as packed/obfuscated to several av heuristics (DeepInstinct, McAfeeD and others all cleared once this stopped merging), and a plain two-assembly deploy is completely standard .net shape. build.bat copies both files out, and the auto-updater (ReplayKitHelper/Update.cs) downloads both as separate release assets. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <!-- merges every referenced dll (Newtonsoft.Json.dll) into OBSReplayKit.exe so the shipped artifact is a single file. the package's own AfterTargets="Build" step handles plain `dotnet build`, but `dotnet publish` recomputes its file list from the project's dependency graph independently of whatever Build already did to bin/, so it re-copies a fresh Newtonsoft.Json.dll into the publish folder regardless; ILRepackPublish below re-merges the actual publish output to fix that. -->
-    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.34" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
-    <!-- assets\ ships inside the exe as one zip resource, unpacked at runtime by AssetBundle.cs. the auto-updater downloads only OBSReplayKit.exe and runs it from %temp%, so a build whose payload lives in a sibling folder closes obs and then finds nothing to install. staged into obj\ first because the working tree can hold per-user runtime folders (imported icons, saved themes) that must never ship. -->
+    <!-- assets\ ships inside the exe as one zip resource, unpacked at runtime by AssetBundle.cs; unlike Newtonsoft.Json.dll, this must stay embedded rather than a sibling file, since the auto-updater only knows to fetch OBSReplayKit.exe plus its one declared dependency, so a payload living anywhere else closes obs and then finds nothing to install. staged into obj\ first because the working tree can hold per-user runtime folders (imported icons, saved themes) that must never ship. -->
     <AssetBundleSourceDir>$(MSBuildProjectDirectory)\..\assets</AssetBundleSourceDir>
     <!-- obj\ spelled out rather than $(IntermediateOutputPath): this target runs before PrepareForBuild, where that property is not resolved yet and the staging would land in the project folder. -->
     <AssetBundleStageDir>$(MSBuildProjectDirectory)\obj\assets-bundle\</AssetBundleStageDir>
@@ -57,22 +58,5 @@
     <ItemGroup>
       <EmbeddedResource Include="$(AssetBundleZip)" LogicalName="ReplayKitSetup.assets.bundle.zip" />
     </ItemGroup>
-  </Target>
-
-  <Target Name="ILRepackPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
-    <ItemGroup>
-      <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
-      <PublishedAssemblies Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
-      <PublishedDllsToRemove Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt)" />
-    </ItemGroup>
-    <ILRepack
-        Parallel="true"
-        DebugInfo="false"
-        AllowDuplicateResources="false"
-        InputAssemblies="@(PublishedAssemblies)"
-        TargetKind="SameAsPrimaryAssembly"
-        OutputFile="$(PublishDir)$(TargetName)$(TargetExt)"
-    />
-    <Delete Files="@(PublishedDllsToRemove)" />
   </Target>
 </Project>

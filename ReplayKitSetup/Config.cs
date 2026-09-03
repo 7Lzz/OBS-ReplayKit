@@ -41,13 +41,13 @@ namespace ReplayKitSetup
         public static readonly string OBS_INSTALL_DIR;
         public static readonly string PROGRAMFILES_OBS_DIR;
 
-        // input-overlay plugin + its vc++ redist prerequisite. plugin installer is bundled in installers.zip; vc++ is downloaded from microsoft only when missing and is signature-checked before running.
-        public static readonly string INPUT_OVERLAY_INSTALLERS_ZIP;
-        public const string INPUT_OVERLAY_INSTALLER_NAME = "input-overlay-installer.exe";
+        // input-overlay ships as its own raw plugin files (dll + data), extracted once and checked into input-overlay-plugin.zip -- not an embedded, silently-executed third-party installer. an embedded-and-executed installer is exactly the shape av "application bundler" heuristics exist to catch, and BongoCat.cs already proved the raw-files-plus-safe-extract approach works. vc++ is the one real prerequisite still downloaded (from microsoft only when missing, signature-checked before running).
+        public static readonly string INPUT_OVERLAY_PLUGIN_ZIP;
         public const string VCPP_REDIST_DOWNLOAD_URL = "https://aka.ms/vc14/vc_redist.x64.exe";
         public const long VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
 
-        // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord.
+        // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord. still shipped via installers.zip's VBCABLE_Driver_Pack45.zip and its own setup exe.
+        public static readonly string INPUT_OVERLAY_INSTALLERS_ZIP;
         public const string VBCABLE_DRIVER_PACK_NAME = "VBCABLE_Driver_Pack45.zip";
         public const string VBCABLE_SETUP_EXE_NAME = "VBCABLE_Setup_x64.exe";
 
@@ -113,6 +113,7 @@ namespace ReplayKitSetup
             PROGRAMFILES_OBS_DIR = OBS_INSTALL_DIR;
 
             INPUT_OVERLAY_INSTALLERS_ZIP = Path.Combine(ASSETS_DIR, "installers.zip");
+            INPUT_OVERLAY_PLUGIN_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-plugin.zip");
             INPUT_OVERLAY_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-presets.zip");
             INPUT_OVERLAY_TARGET = Path.Combine(REPLAYKIT_CONFIG, "input-overlay-presets");
             WIN_CAPTURE_AUDIO_ZIP = Path.Combine(ASSETS_DIR, "win-capture-audio.zip");

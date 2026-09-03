@@ -1,6 +1,7 @@
 using System;
-using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
@@ -43,18 +44,6 @@ namespace ReplayKitSetup
             }
         }
 
-        private static readonly string ShortcutScript =
-            "param([string]$ShortcutPath, [string]$TargetPath, [string]$Arguments, [string]$WorkingDirectory)\r\n" +
-            "$ErrorActionPreference = 'Stop'\r\n" +
-            "$shell = New-Object -ComObject WScript.Shell\r\n" +
-            "$shortcut = $shell.CreateShortcut($ShortcutPath)\r\n" +
-            "$shortcut.TargetPath = $TargetPath\r\n" +
-            "$shortcut.Arguments = $Arguments\r\n" +
-            "$shortcut.WorkingDirectory = $WorkingDirectory\r\n" +
-            "$shortcut.IconLocation = \"$TargetPath,0\"\r\n" +
-            "$shortcut.Description = 'Start OBS ReplayKit when Windows signs in.'\r\n" +
-            "$shortcut.Save()\r\n";
-
         private static bool CreateStartupShortcut(Action<string> log)
         {
             string obsExe = Obs.FindObsExe();
@@ -80,47 +69,31 @@ namespace ReplayKitSetup
                 return false;
             }
 
-            string scriptPath = Path.Combine(Path.GetTempPath(), "obsreplaykit_startup_" + Guid.NewGuid().ToString("N") + ".ps1");
+            // builds the .lnk directly thru the same WScript.Shell COM object powershell used underneath -- in-process, no powershell.exe subprocess, no -ExecutionPolicy Bypass, and no temp script dropped to disk first. writing a script to temp then running it with the execution policy forced off is exactly the shape av heuristics flag; this does the identical shortcut creation without any of that.
+            object shell = null;
+            object shortcut = null;
             try
             {
-                File.WriteAllText(scriptPath, ShortcutScript, new System.Text.UTF8Encoding(false));
-                Process proc;
-                try
-                {
-                    string args = Win32Args.Build(
-                        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath,
-                        "-ShortcutPath", shortcutPath, "-TargetPath", obsExe,
-                        "-Arguments", Obs.OBS_START_ARGS, "-WorkingDirectory", Path.GetDirectoryName(obsExe));
-                    var psi = new ProcessStartInfo("powershell.exe", args)
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                    };
-                    proc = Process.Start(psi);
-                }
-                catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-                {
-                    log?.Invoke("warn: could not create Windows startup shortcut: " + exc.Message);
-                    return false;
-                }
-
-                string stderr = proc.StandardError.ReadToEnd();
-                string stdout = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit(20000);
-
-                if (proc.ExitCode != 0)
-                {
-                    string message = !string.IsNullOrEmpty(stderr) ? stderr : stdout;
-                    string firstLine = string.IsNullOrWhiteSpace(message) ? proc.ExitCode.ToString() : message.Trim().Split('\n')[0];
-                    log?.Invoke("warn: could not create Windows startup shortcut: " + firstLine);
-                    return false;
-                }
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+                shell = Activator.CreateInstance(shellType);
+                shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
+                Type shortcutType = shortcut.GetType();
+                shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe });
+                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { Obs.OBS_START_ARGS });
+                shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(obsExe) });
+                shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe + ",0" });
+                shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Start OBS ReplayKit when Windows signs in." });
+                shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+            }
+            catch (Exception exc) when (exc is COMException || exc is TargetInvocationException || exc is MissingMemberException)
+            {
+                log?.Invoke("warn: could not create Windows startup shortcut: " + exc.Message);
+                return false;
             }
             finally
             {
-                try { File.Delete(scriptPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                if (shortcut != null) Marshal.ReleaseComObject(shortcut);
+                if (shell != null) Marshal.ReleaseComObject(shell);
             }
 
             log?.Invoke("Windows startup: created shortcut at " + shortcutPath);

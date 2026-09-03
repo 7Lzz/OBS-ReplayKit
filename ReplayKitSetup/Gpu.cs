@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
+using System.Management;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 
@@ -44,42 +44,30 @@ namespace ReplayKitSetup
 
     public static class Gpu
     {
-        // win32_videocontroller rows as plain objects. powershell get-ciminstance becuase wmic was deprecated in win10 21h1 and isnt installed on win11. returns [] on any failure.
+        // win32_videocontroller rows as plain objects, read directly over wmi -- used to spawn powershell.exe to run Get-CimInstance for this (wmic was deprecated in win10 21h1 and isnt installed on win11), but that got caught by virustotal's sandbox as a sigma "non-interactive powershell spawned" match and tagged detect-debug-environment -- querying gpu info to fingerprint the host is also a standard vm/sandbox-detection technique, so the exact shape reads as suspicious regardless of intent. ReplayKitHelper/Gpu.cs already made this same switch to direct wmi; this brings ReplayKitSetup in line now that it references System.Management too. returns [] on any failure.
         private static List<JObject> QueryVideoControllers()
         {
-            const string command =
-                "ConvertTo-Json -Depth 3 -Compress -InputObject @(" +
-                "Get-CimInstance Win32_VideoController | " +
-                "Select-Object Name, AdapterRAM, DriverVersion)";
+            var result = new List<JObject>();
             try
             {
-                var psi = new ProcessStartInfo("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", command))
+                using (var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM, DriverVersion FROM Win32_VideoController"))
+                using (var rows = searcher.Get())
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                using (var proc = Process.Start(psi))
-                {
-                    string stdout = proc.StandardOutput.ReadToEnd();
-                    if (!proc.WaitForExit(10000))
+                    foreach (ManagementObject row in rows)
                     {
-                        try { proc.Kill(); } catch (InvalidOperationException) { }
-                        return new List<JObject>();
+                        long? ram = null;
+                        try { if (row["AdapterRAM"] != null) ram = Convert.ToInt64(row["AdapterRAM"]); } catch (Exception ex) when (ex is InvalidCastException || ex is OverflowException) { }
+                        result.Add(new JObject
+                        {
+                            ["Name"] = row["Name"] as string,
+                            ["AdapterRAM"] = ram,
+                            ["DriverVersion"] = row["DriverVersion"] as string,
+                        });
                     }
-                    if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout)) return new List<JObject>();
-
-                    var token = Newtonsoft.Json.JsonConvert.DeserializeObject<JToken>(stdout);
-                    if (token is JArray arr) return arr.OfType<JObject>().ToList();
-                    if (token is JObject obj) return new List<JObject> { obj };
-                    return new List<JObject>();
                 }
             }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is Newtonsoft.Json.JsonException)
-            {
-                return new List<JObject>();
-            }
+            catch (ManagementException) { }
+            return result;
         }
 
         private static readonly (Regex Pattern, Vendor Vendor)[] VendorPatterns =

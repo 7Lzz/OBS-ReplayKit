@@ -4,12 +4,15 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Text;
-using Newtonsoft.Json.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.ServiceProcess;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 namespace ReplayKitSetup
 {
-    // install and rename the virtual audio device used for obs stream audio. ported from obs_replaykit/vbcable.py. keeps the same mechanism the python version used -- a powershell script that Add-Type-compiles an inline c# com-interop helper -- rather than inlining the com interfaces natively in this project; that indirection existed to avoid ~150 lines of ctypes glue in python, but re-deriving the registry-walk-plus-com rename logic natively here is a bigger behavioral-risk surface than just launching the exact same, already-correct script from a different parent process.
+    // install and rename the virtual audio device used for obs stream audio. ported from obs_replaykit/vbcable.py. the com interop the python version ran through a powershell Add-Type script now lives natively in AudioHelper.cs -- straight in-process calls instead of shelling out.
     public static class VbCable
     {
         // post-install rename table -- the render endpoint is what obs monitors to, the loopback endpoint is what discord captures when the user selects it.
@@ -30,316 +33,168 @@ namespace ReplayKitSetup
             "Discord.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe",
         };
 
-        // powershell helper that compiles a c# class at runtime via add-type and calls IMMDeviceEnumerator + IPolicyConfigVistaClient. one powershell process per call (~300ms), same cost the python original paid.
-        private const string PsAudioHelper = @"
-$ErrorActionPreference = 'Stop'
-$source = @'
-using System;
-using System.Runtime.InteropServices;
-
-[ComImport, Guid(""BCDE0395-E52F-467C-8E3D-C4579291692E"")]
-public class MMDeviceEnumerator { }
-
-[Guid(""A95664D2-9614-4F35-A746-DE8DB63617E6""),
- InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IMMDeviceEnumerator {
-    [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr ppDevices);
-    [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppEndpoint);
-}
-
-[Guid(""D666063F-1587-4E43-81F1-B948E807363F""),
- InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IMMDevice {
-    [PreserveSig] int Activate(ref Guid iid, int dwClsCtx, IntPtr pActivationParams, out IntPtr ppInterface);
-    [PreserveSig] int OpenPropertyStore(int stgmAccess, out IntPtr ppProperties);
-    [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string ppstrId);
-    [PreserveSig] int GetState(out int pdwState);
-}
-
-[StructLayout(LayoutKind.Sequential, Pack = 4)]
-public struct PROPERTYKEY {
-    public Guid fmtid;
-    public uint pid;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct PROPVARIANT {
-    public ushort vt;
-    public ushort r1;
-    public ushort r2;
-    public ushort r3;
-    public IntPtr pszVal;
-    public IntPtr padding;
-}
-
-[ComImport, Guid(""294935CE-F637-4E7C-A41B-AB255460B862"")]
-public class _CPolicyConfigVistaClient { }
-
-[ComImport, Guid(""870AF99C-171D-4F9E-AF0D-E63DF40C2BC9"")]
-public class _CPolicyConfigClient { }
-
-[Guid(""568B9108-44BF-40B4-9006-86AFE5B5A620""),
- InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IPolicyConfigVistaClient {
-    [PreserveSig] int GetMixFormat(string a, IntPtr b);
-    [PreserveSig] int GetDeviceFormat(string a, bool b, IntPtr c);
-    [PreserveSig] int SetDeviceFormat(string a, IntPtr b, IntPtr c);
-    [PreserveSig] int GetProcessingPeriod(string a, bool b, IntPtr c, IntPtr d);
-    [PreserveSig] int SetProcessingPeriod(string a, IntPtr b);
-    [PreserveSig] int GetShareMode(string a, IntPtr b);
-    [PreserveSig] int SetShareMode(string a, IntPtr b);
-    [PreserveSig] int GetPropertyValue(string a, bool b, ref PROPERTYKEY key, IntPtr pv);
-    [PreserveSig] int SetPropertyValue(string deviceId, bool bFxStore, ref PROPERTYKEY key, ref PROPVARIANT pv);
-    [PreserveSig] int SetDefaultEndpoint(string deviceId, uint role);
-    [PreserveSig] int SetEndpointVisibility(string a, bool b);
-}
-
-[Guid(""F8679F50-850A-41CF-9C72-430F290290C8""),
- InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IPolicyConfigClient {
-    [PreserveSig] int GetMixFormat([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
-    [PreserveSig] int GetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a, int b, IntPtr c);
-    [PreserveSig] int ResetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a);
-    [PreserveSig] int SetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b, IntPtr c);
-    [PreserveSig] int GetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string a, int b, IntPtr c, IntPtr d);
-    [PreserveSig] int SetProcessingPeriod([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
-    [PreserveSig] int GetShareMode([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
-    [PreserveSig] int SetShareMode([MarshalAs(UnmanagedType.LPWStr)] string a, IntPtr b);
-    [PreserveSig] int GetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string a, ref PROPERTYKEY key, IntPtr pv);
-    [PreserveSig] int SetPropertyValue([MarshalAs(UnmanagedType.LPWStr)] string a, ref PROPERTYKEY key, ref PROPVARIANT pv);
-    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
-    [PreserveSig] int SetEndpointVisibility([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int visible);
-}
-
-public static class AudioHelper {
-    private static string _GetDefault(int dataFlow) {
-        var enumerator = (IMMDeviceEnumerator)(new MMDeviceEnumerator());
-        IMMDevice dev;
-        int rc = enumerator.GetDefaultAudioEndpoint(dataFlow, 0, out dev);
-        if (rc != 0 || dev == null) return null;
-        string id;
-        if (dev.GetId(out id) != 0) return null;
-        return id;
-    }
-    private static int _SetDefault(string id) {
-        var client = (IPolicyConfigVistaClient)(new _CPolicyConfigVistaClient());
-        int rc0 = client.SetDefaultEndpoint(id, 0);
-        int rc1 = client.SetDefaultEndpoint(id, 1);
-        int rc2 = client.SetDefaultEndpoint(id, 2);
-        return rc0 | rc1 | rc2;
-    }
-    public static string GetDefaultRender()      { return _GetDefault(0); }
-    public static string GetDefaultCapture()     { return _GetDefault(1); }
-    public static int    SetDefaultRender(string id)  { return _SetDefault(id); }
-    public static int    SetDefaultCapture(string id) { return _SetDefault(id); }
-    public static int    SetEndpointVisible(string id, bool visible) {
-        var client = (IPolicyConfigClient)(new _CPolicyConfigClient());
-        return client.SetEndpointVisibility(id, visible ? 1 : 0);
-    }
-    public static int RenameEndpoint(string deviceId, string newName) {
-        var client = (IPolicyConfigVistaClient)(new _CPolicyConfigVistaClient());
-        var key = new PROPERTYKEY {
-            fmtid = new Guid(""a45c254e-df1c-4efd-8020-67d146a850e0""),
-            pid = 2
-        };
-        IntPtr strPtr = Marshal.StringToCoTaskMemUni(newName);
-        var pv = new PROPVARIANT { vt = 31, pszVal = strPtr };
-        try {
-            return client.SetPropertyValue(deviceId, false, ref key, ref pv);
-        } finally {
-            Marshal.FreeCoTaskMem(strPtr);
-        }
-    }
-}
-'@
-Add-Type -TypeDefinition $source -Language CSharp | Out-Null
-";
-
-        // invoke powershell with the audio-helper c# class defined, run a one-liner that returns a string, and return the trimmed stdout.
-        private static string RunPs(string commandAfterHelper, Action<string> log = null)
-        {
-            string script = PsAudioHelper + "\n" + commandAfterHelper;
-            Process proc;
-            string stdout, stderr;
-            try
-            {
-                var psi = new ProcessStartInfo("powershell", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
-                {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                proc = Process.Start(psi);
-                stdout = proc.StandardOutput.ReadToEnd();
-                stderr = proc.StandardError.ReadToEnd();
-                if (!proc.WaitForExit(30000))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log?.Invoke("powershell helper failed: timed out");
-                    return null;
-                }
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("powershell helper failed: " + exc.Message);
-                return null;
-            }
-            if (proc.ExitCode != 0)
-            {
-                string err = (stderr ?? "").Trim();
-                log?.Invoke("powershell helper exit " + proc.ExitCode + ": " + (err.Length > 0 ? err.Split('\n')[0] : ""));
-                return null;
-            }
-            return stdout.Trim();
-        }
-
-        // guid-form device id of the current defualt playback (render) endpoint, or null.
+        // guid-form device id of the current defualt playback (render) endpoint, or null. was a [AudioHelper]::GetDefaultRender() call shelled out to a fresh powershell process; AudioHelper is now ReplayKitSetup/AudioHelper.cs, a straight in-process call.
         private static string GetDefaultPlayback(Action<string> log = null)
         {
-            string outp = RunPs("[AudioHelper]::GetDefaultRender()", log);
-            return string.IsNullOrEmpty(outp) ? null : outp;
+            try { return AudioHelper.GetDefaultRender(); }
+            catch (COMException ex) { log?.Invoke("warn: could not query default playback: " + ex.Message); return null; }
         }
 
         // guid-form device id of the current defualt capture (mic) endpoint, or null.
         private static string GetDefaultCapture(Action<string> log = null)
         {
-            string outp = RunPs("[AudioHelper]::GetDefaultCapture()", log);
-            return string.IsNullOrEmpty(outp) ? null : outp;
+            try { return AudioHelper.GetDefaultCapture(); }
+            catch (COMException ex) { log?.Invoke("warn: could not query default recording: " + ex.Message); return null; }
         }
 
         private static bool SetDefaultPlayback(string deviceId, Action<string> log = null)
         {
-            string safe = deviceId.Replace("'", "''");
-            string outp = RunPs($"[AudioHelper]::SetDefaultRender('{safe}')", log);
-            return outp != null && int.TryParse(outp, out int rc) && rc == 0;
+            try { return AudioHelper.SetDefaultRender(deviceId) == 0; }
+            catch (COMException ex) { log?.Invoke("warn: could not set default playback: " + ex.Message); return false; }
         }
 
         private static bool SetDefaultCapture(string deviceId, Action<string> log = null)
         {
-            string safe = deviceId.Replace("'", "''");
-            string outp = RunPs($"[AudioHelper]::SetDefaultCapture('{safe}')", log);
-            return outp != null && int.TryParse(outp, out int rc) && rc == 0;
+            try { return AudioHelper.SetDefaultCapture(deviceId) == 0; }
+            catch (COMException ex) { log?.Invoke("warn: could not set default recording: " + ex.Message); return false; }
         }
 
-        // rename the installed audio endpoints to obs stream audio names.
+        // matches a leading index prefix some endpoint friendly names carry (e.g. "2 - Speakers" -> "Speakers") before matching against the rename table.
+        private static readonly Regex LeadingIndexPrefix = new Regex(@"^\s*\d+\s*-\s*");
+
+        // the FriendlyName property under an endpoint's Properties key, registry-value-name-encoded as "{fmtid},pid" -- same PKEY the old powershell Get-ItemProperty call read.
+        private const string FriendlyNameValue = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
+        private const int HiddenStateFlag = 0x10000000;
+
+        private static void TryAudioCall(Action action, string what, Action<string> log)
+        {
+            try { action(); }
+            catch (COMException ex) { log?.Invoke($"warn: {what} failed: {ex.Message}"); }
+        }
+
+        // rename the installed audio endpoints to obs stream audio names -- native registry walk over the same MMDevices keys the old powershell script read, calling straight into AudioHelper instead of Add-Type-compiling it per invocation.
         private static void RenameEndpoints(Action<string> log = null)
         {
-            string psPairs = string.Join(";\n", EndpointRenames.Select(r => $"    '{r.Orig}' = '{r.New}'"));
-            string script = PsAudioHelper + $@"
-$renames = @{{
-{psPairs}
-}}
+            var renameLookup = EndpointRenames.ToDictionary(r => r.Orig, r => r.New);
+            int successes = 0, hidden = 0;
 
-$render  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render'
-$capture = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture'
-$friendlyKey = '{{a45c254e-df1c-4efd-8020-67d146a850e0}},2'
-$hiddenStateFlag = 0x10000000
+            foreach (int dataFlow in new[] { 0, 1 })
+            {
+                string root = dataFlow == 0
+                    ? @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+                    : @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture";
+                using (var rootKey = Registry.LocalMachine.OpenSubKey(root))
+                {
+                    if (rootKey == null) continue;
+                    foreach (string guid in rootKey.GetSubKeyNames())
+                    {
+                        using (var endpointKey = rootKey.OpenSubKey(guid))
+                        using (var propsKey = rootKey.OpenSubKey(guid + @"\Properties"))
+                        {
+                            if (propsKey == null) continue;
+                            object curValue = propsKey.GetValue(FriendlyNameValue);
+                            if (curValue == null) continue;
+                            string cur = curValue.ToString();
+                            if (string.IsNullOrEmpty(cur)) continue;
 
-$successes = 0
-$hidden = 0
-foreach ($root in @($render, $capture)) {{
-    foreach ($guid in (Get-ChildItem $root -ErrorAction SilentlyContinue).PSChildName) {{
-        $endpoint = Join-Path $root $guid
-        $props = Join-Path $root ""$guid\Properties""
-        if (-not (Test-Path $props)) {{ continue }}
-        $cur = (Get-ItemProperty -LiteralPath $props -Name $friendlyKey -ErrorAction SilentlyContinue).$friendlyKey
-        if (-not $cur) {{ continue }}
-        $state = (Get-ItemProperty -LiteralPath $endpoint -Name 'DeviceState' -ErrorAction SilentlyContinue).DeviceState
-        if ($null -eq $state) {{ $state = 0 }}
-        $newName = $null
-        $canonical = ([string]$cur -replace '^\s*\d+\s*-\s*', '').Trim()
-        $lower = $canonical.ToLowerInvariant()
-        $hideEndpoint = $lower.StartsWith('cable in 16ch') -or
-            $lower.StartsWith('cable out 16ch') -or
-            $lower -eq 'obs stream audio (surround)' -or
-            $lower -eq 'obs stream audio loopback (surround)'
-        if ($renames.ContainsKey($canonical)) {{
-            $newName = $renames[$canonical]
-        }} else {{
-            if ($lower.StartsWith('cable input')) {{
-                $newName = 'OBS Stream Audio'
-            }} elseif ($lower.StartsWith('cable in 16ch')) {{
-                $newName = 'OBS Stream Audio (Surround)'
-            }} elseif ($lower.StartsWith('cable output')) {{
-                $newName = 'OBS Stream Audio Loopback'
-            }} elseif ($lower.StartsWith('cable out 16ch')) {{
-                $newName = 'OBS Stream Audio Loopback (Surround)'
-            }}
-        }}
-        if (-not $newName -and -not $hideEndpoint) {{ continue }}
+                            object stateValue = endpointKey?.GetValue("DeviceState");
+                            int state = stateValue != null ? Convert.ToInt32(stateValue) : 0;
 
-        $dataFlow = if ($root -eq $render) {{ '0' }} else {{ '1' }}
-        $deviceId = ""{{0.0.$dataFlow.00000000}}.$guid""
-        if ($newName) {{
-            $rc = [AudioHelper]::RenameEndpoint($deviceId, $newName)
-            if ($rc -eq 0) {{
-                $successes++
-                Write-Host ""renamed: $cur -> $newName""
-            }} else {{
-                Write-Host ""rename FAILED for ${{cur}}: rc=0x$('{{0:x}}' -f $rc)""
-            }}
-        }}
-        if ($hideEndpoint -and (($state -band $hiddenStateFlag) -eq 0)) {{
-            $label = $cur
-            if ($newName) {{ $label = $newName }}
-            $vrc = [AudioHelper]::SetEndpointVisible($deviceId, $false)
-            if ($vrc -eq 0) {{
-                $hidden++
-                Write-Host ""hidden: $label""
-            }} else {{
-                Write-Host ""hide FAILED for ${{label}}: rc=0x$('{{0:x}}' -f $vrc)""
-            }}
-        }}
-    }}
-}}
+                            string canonical = LeadingIndexPrefix.Replace(cur, "").Trim();
+                            string lower = canonical.ToLowerInvariant();
+                            bool hideEndpoint = lower.StartsWith("cable in 16ch") ||
+                                lower.StartsWith("cable out 16ch") ||
+                                lower == "obs stream audio (surround)" ||
+                                lower == "obs stream audio loopback (surround)";
 
-if (($successes + $hidden) -gt 0) {{
-    Stop-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue
-    Start-Service AudioEndpointBuilder -ErrorAction SilentlyContinue
-    Start-Service Audiosrv -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
+                            string newName = null;
+                            if (renameLookup.TryGetValue(canonical, out string mapped)) newName = mapped;
+                            else if (lower.StartsWith("cable input")) newName = "OBS Stream Audio";
+                            else if (lower.StartsWith("cable in 16ch")) newName = "OBS Stream Audio (Surround)";
+                            else if (lower.StartsWith("cable output")) newName = "OBS Stream Audio Loopback";
+                            else if (lower.StartsWith("cable out 16ch")) newName = "OBS Stream Audio Loopback (Surround)";
 
-    $aeb = (Get-Service AudioEndpointBuilder -ErrorAction SilentlyContinue).Status
-    $asr = (Get-Service Audiosrv               -ErrorAction SilentlyContinue).Status
-    Write-Host ""renames=$successes hidden=$hidden audio-stack=AEB:$aeb Audiosrv:$asr explorer=unchanged""
-}} else {{
-    Write-Host ""renames=0 hidden=0 audio-stack=unchanged explorer=unchanged""
-}}
-";
-            Process proc;
-            string stdout, stderr;
+                            if (newName == null && !hideEndpoint) continue;
+
+                            string deviceId = $"{{0.0.{dataFlow}.00000000}}.{guid}";
+                            if (newName != null)
+                            {
+                                int rc = -1;
+                                TryAudioCall(() => rc = AudioHelper.RenameEndpoint(deviceId, newName), "rename " + cur, log);
+                                if (rc == 0) { successes++; log?.Invoke($"renamed: {cur} -> {newName}"); }
+                                else log?.Invoke($"rename FAILED for {cur}: rc=0x{rc:x}");
+                            }
+                            if (hideEndpoint && (state & HiddenStateFlag) == 0)
+                            {
+                                string label = newName ?? cur;
+                                int vrc = -1;
+                                TryAudioCall(() => vrc = AudioHelper.SetEndpointVisible(deviceId, false), "hide " + label, log);
+                                if (vrc == 0) { hidden++; log?.Invoke($"hidden: {label}"); }
+                                else log?.Invoke($"hide FAILED for {label}: rc=0x{vrc:x}");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (successes + hidden > 0)
+            {
+                BounceAudioServices(log);
+                log?.Invoke($"renames={successes} hidden={hidden}");
+            }
+            else
+            {
+                log?.Invoke("renames=0 hidden=0 audio-stack=unchanged");
+            }
+        }
+
+        // native equivalent of the old Stop-Service AudioEndpointBuilder -Force / Start-Service pair -- -Force stops dependent services too, which ServiceController does not do automatically, so DependentServices is walked by hand.
+        private static void BounceAudioServices(Action<string> log = null)
+        {
             try
             {
-                var psi = new ProcessStartInfo("powershell", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
+                using (var aeb = new ServiceController("AudioEndpointBuilder"))
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                proc = Process.Start(psi);
-                stdout = proc.StandardOutput.ReadToEnd();
-                stderr = proc.StandardError.ReadToEnd();
-                if (!proc.WaitForExit(30000))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    return;
+                    foreach (var dep in aeb.DependentServices)
+                    {
+                        dep.Refresh();
+                        if (dep.Status == ServiceControllerStatus.Running)
+                        {
+                            try { dep.Stop(); dep.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(5)); }
+                            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ServiceProcess.TimeoutException) { }
+                        }
+                    }
+                    aeb.Refresh();
+                    if (aeb.Status != ServiceControllerStatus.Stopped)
+                    {
+                        try { aeb.Stop(); aeb.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(5)); }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is System.ServiceProcess.TimeoutException) { }
+                    }
+                    aeb.Refresh();
+                    if (aeb.Status != ServiceControllerStatus.Running)
+                    {
+                        try { aeb.Start(); aeb.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(5)); }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is System.ServiceProcess.TimeoutException) { }
+                    }
                 }
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("warn: endpoint rename failed: " + exc.Message);
-                return;
-            }
-            if (log != null)
-            {
-                foreach (var line in (stdout ?? "").Trim().Split('\n')) if (line.Trim().Length > 0) log(line.TrimEnd('\r'));
-                if (proc.ExitCode != 0)
+                using (var audiosrv = new ServiceController("Audiosrv"))
                 {
-                    string err = (stderr ?? "").Trim();
-                    log("warn: rename script exited " + proc.ExitCode + ": " + (err.Length > 0 ? err.Split('\n')[0] : ""));
+                    audiosrv.Refresh();
+                    if (audiosrv.Status != ServiceControllerStatus.Running)
+                    {
+                        try { audiosrv.Start(); audiosrv.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(5)); }
+                        catch (Exception ex) when (ex is InvalidOperationException || ex is System.ServiceProcess.TimeoutException) { }
+                    }
                 }
+                System.Threading.Thread.Sleep(500);
+                string aebStatus = "unknown", asrStatus = "unknown";
+                try { using (var s = new ServiceController("AudioEndpointBuilder")) { s.Refresh(); aebStatus = s.Status.ToString(); } } catch (InvalidOperationException) { }
+                try { using (var s = new ServiceController("Audiosrv")) { s.Refresh(); asrStatus = s.Status.ToString(); } } catch (InvalidOperationException) { }
+                log?.Invoke($"audio-stack=AEB:{aebStatus} Audiosrv:{asrStatus}");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
+            {
+                log?.Invoke("warn: could not bounce audio services: " + ex.Message);
             }
         }
 
@@ -348,29 +203,39 @@ if (($successes + $hidden) -gt 0) {{
         {
             try
             {
-                var psi = new ProcessStartInfo("powershell", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command",
-                    "if (Get-CimInstance Win32_SoundDevice | Where-Object { $_.Name -match 'VB-Audio Virtual Cable' }) { 'yes' }"))
+                using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_SoundDevice WHERE Name LIKE '%VB-Audio Virtual Cable%'"))
+                using (var results = searcher.Get())
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                using (var proc = Process.Start(psi))
-                {
-                    string stdout = proc.StandardOutput.ReadToEnd();
-                    if (!proc.WaitForExit(10000))
-                    {
-                        try { proc.Kill(); } catch (InvalidOperationException) { }
-                        return false;
-                    }
-                    return (stdout ?? "").Contains("yes");
+                    return results.Count > 0;
                 }
             }
-            catch (System.ComponentModel.Win32Exception)
+            catch (ManagementException)
             {
                 return false;
             }
+        }
+
+        // native replacement for the old Get-CimInstance Win32_Process discord enumeration.
+        private static List<(int Pid, string Name, string ExecutablePath)> QueryDiscordProcesses()
+        {
+            var results = new List<(int, string, string)>();
+            string where = string.Join(" OR ", DiscordProcessNames.Select(n => $"Name='{n.Replace("'", "''")}'"));
+            try
+            {
+                using (var searcher = new ManagementObjectSearcher($"SELECT ProcessId, Name, ExecutablePath FROM Win32_Process WHERE {where}"))
+                using (var rows = searcher.Get())
+                {
+                    foreach (ManagementObject row in rows)
+                    {
+                        int pid = Convert.ToInt32(row["ProcessId"]);
+                        string name = row["Name"] as string ?? "";
+                        string exePath = row["ExecutablePath"] as string ?? "";
+                        results.Add((pid, name, exePath));
+                    }
+                }
+            }
+            catch (ManagementException) { }
+            return results;
         }
 
         // unpack the bundled audio-driver installer into a temp directory.
@@ -540,77 +405,37 @@ if (($successes + $hidden) -gt 0) {{
         // stop discord variants that commonly hold the replaykit cable open.
         private static (bool Ok, List<string> RestartPaths) StopDiscordForDriverUninstall(Action<string> log = null)
         {
-            string names = string.Join(",", DiscordProcessNames.Select(n => "'" + n.Replace("'", "''") + "'"));
-            string restartNames = string.Join(",", DiscordRestartProcessNames.Select(n => "'" + n.Replace("'", "''") + "'"));
-            string script = $@"
-$ErrorActionPreference = 'Stop'
-$names = @({names})
-$restartNames = @({restartNames})
-$procs = @(Get-CimInstance Win32_Process | Where-Object {{ $names -contains $_.Name }})
-$restart = @($procs | Where-Object {{ $restartNames -contains $_.Name -and -not [string]::IsNullOrWhiteSpace($_.ExecutablePath) }} | Select-Object -ExpandProperty ExecutablePath -Unique)
-foreach ($p in $procs) {{
-    try {{ Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction Stop }} catch {{ }}
-}}
-if ($procs.Count -gt 0) {{ Start-Sleep -Milliseconds 1200 }}
-$left = @(Get-CimInstance Win32_Process | Where-Object {{ $names -contains $_.Name }})
-[pscustomobject]@{{
-    stopped = [int]$procs.Count
-    remaining = [int]$left.Count
-    restart = $restart
-}} | ConvertTo-Json -Compress
-if ($left.Count -gt 0) {{ exit 2 }}
-";
-            Process proc;
-            string stdout, stderr;
-            try
+            var procs = QueryDiscordProcesses();
+            var restartPaths = procs
+                .Where(p => DiscordRestartProcessNames.Contains(p.Name) && !string.IsNullOrWhiteSpace(p.ExecutablePath))
+                .Select(p => p.ExecutablePath)
+                .Distinct()
+                .ToList();
+
+            int stopped = 0;
+            foreach (var p in procs)
             {
-                var psi = new ProcessStartInfo("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
+                try
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                proc = Process.Start(psi);
-                stdout = proc.StandardOutput.ReadToEnd();
-                stderr = proc.StandardError.ReadToEnd();
-                if (!proc.WaitForExit(20000))
+                    using (var proc = Process.GetProcessById(p.Pid))
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(2000);
+                        stopped++;
+                    }
+                }
+                catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
                 {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log?.Invoke("OBS Stream Audio cleanup could not check Discord: timed out");
-                    return (false, new List<string>());
+                    // already exited, or couldnt be killed -- the remaining-count check below is what actually gates success.
                 }
             }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("OBS Stream Audio cleanup could not check Discord: " + exc.Message);
-                return (false, new List<string>());
-            }
+            if (stopped > 0) System.Threading.Thread.Sleep(1200);
 
-            var restartPaths = new List<string>();
-            int stopped = 0, remaining = 0;
-            try
-            {
-                var info = JObject.Parse(string.IsNullOrWhiteSpace(stdout) ? "{}" : stdout.Trim());
-                var restartValue = info["restart"];
-                if (restartValue is JArray arr) restartPaths = arr.Select(t => t.ToString()).Where(s => s.Trim().Length > 0).ToList();
-                else if (restartValue != null && restartValue.Type == JTokenType.String) restartPaths = new List<string> { restartValue.ToString() };
-                stopped = info.Value<int?>("stopped") ?? 0;
-                remaining = info.Value<int?>("remaining") ?? 0;
-            }
-            catch (Newtonsoft.Json.JsonException)
-            {
-                stopped = 0;
-                remaining = 0;
-            }
-
+            var remaining = QueryDiscordProcesses();
             if (stopped > 0) log?.Invoke($"stopped Discord audio client(s) before driver removal ({stopped})");
-            if (proc.ExitCode != 0)
+            if (remaining.Count > 0)
             {
-                string detail = (string.IsNullOrEmpty(stderr) ? stdout : stderr) ?? "";
-                detail = detail.Trim();
-                string msg = detail.Length > 0 ? detail.Split('\n')[0] : $"{remaining} Discord process(es) still running";
-                log?.Invoke("OBS Stream Audio cleanup blocked by Discord: " + msg);
+                log?.Invoke($"OBS Stream Audio cleanup blocked by Discord: {remaining.Count} Discord process(es) still running");
                 return (false, restartPaths);
             }
             return (true, restartPaths);

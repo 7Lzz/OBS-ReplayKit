@@ -1,4 +1,4 @@
-# publishes ReplayKitHelper straight into assets\ (same net48+ilrepack single-file pattern build.ps1 uses for the tray plugin) -- skips dotnet publish entirely when the bundled exe is already newer than every source file, since a rebuild that produces byte-identical output still bumps the tracked exes mtime and shows up as a spurious git diff.
+# publishes ReplayKitHelper straight into assets\ (same net48+ilrepack pattern build.ps1 uses for the tray plugin) -- ships as the exe plus two loose sibling dlls (WebView2Loader.dll, which cant be merged; Newtonsoft.Json.dll, which isnt merged on purpose, see ReplayKitHelper.csproj) rather than one fully self-contained file. skips dotnet publish entirely when the bundled exe is already newer than every source file, since a rebuild that produces byte-identical output still bumps the tracked exes mtime and shows up as a spurious git diff.
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -6,6 +6,7 @@ $projectDir = Join-Path $repoRoot "ReplayKitHelper"
 $csproj = Join-Path $projectDir "ReplayKitHelper.csproj"
 $outPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\OBSReplayKit.exe"
 $loaderOutPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\WebView2Loader.dll"
+$jsonOutPath = Join-Path $repoRoot "assets\obs-studio\obs-replayKit\scripts\helper\Newtonsoft.Json.dll"
 $publishTmp = Join-Path $repoRoot "publish_helper_tmp"
 
 # same shape as the native plugin build script's Test-TrayPluginOutputCurrent -- true only when $targetPath exists and is newer than every input.
@@ -40,6 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
 Copy-Item -LiteralPath (Join-Path $publishTmp "OBSReplayKit.exe") -Destination $outPath -Force
 Copy-Item -LiteralPath (Join-Path $publishTmp "WebView2Loader.dll") -Destination $loaderOutPath -Force
+Copy-Item -LiteralPath (Join-Path $publishTmp "Newtonsoft.Json.dll") -Destination $jsonOutPath -Force
 Remove-Item $publishTmp -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $projectDir "bin")) { Remove-Item (Join-Path $projectDir "bin") -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $projectDir "obj")) { Remove-Item (Join-Path $projectDir "obj") -Recurse -Force }

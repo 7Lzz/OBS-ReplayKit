@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Management;
 
 namespace ReplayKitSetup
 {
@@ -41,12 +42,17 @@ namespace ReplayKitSetup
         {
             try
             {
-                var result = RunHidden("powershell.exe", Win32Args.Build(
-                    "-NoProfile", "-NonInteractive", "-Command",
-                    $"(Get-CimInstance Win32_Process -Filter \"ProcessId={Process.GetCurrentProcess().Id}\").ParentProcessId"));
-                return int.TryParse((result.Stdout ?? "").Trim(), out int pid) ? pid : (int?)null;
+                using (var searcher = new ManagementObjectSearcher($"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId={Process.GetCurrentProcess().Id}"))
+                using (var results = searcher.Get())
+                {
+                    foreach (ManagementObject row in results)
+                    {
+                        return Convert.ToInt32(row["ParentProcessId"]);
+                    }
+                }
+                return null;
             }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is TimeoutException)
+            catch (ManagementException)
             {
                 return null;
             }

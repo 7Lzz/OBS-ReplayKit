@@ -12,10 +12,10 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // install the input-overlay plugin (via the official inno setup installer) and extract its bundled presets. downloads the vc++ redist on demand if missing. ported from obs_replaykit/input_overlay.py.
+    // install the input-overlay plugin from its raw bundled files and extract its preset pack. downloads the vc++ redist on demand if missing. ported from obs_replaykit/input_overlay.py.
     public static class InputOverlay
     {
-        // canonical install paths the official inno setup installer writes.
+        // canonical install paths -- same locations the official inno setup installer used to write, so nothing downstream (obs, cli.cs) needed to change.
         private static readonly string PluginDll = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "input-overlay.dll");
         private static readonly string PluginSdl2 = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "SDL2.dll");
 
@@ -23,36 +23,25 @@ namespace ReplayKitSetup
         private const int MouseLayoutWidth = 285;
         private const int MouseLayoutHeight = 421;
 
-        // extract one installer from installers.zip to a temp dir. ships as zip_stored so pyinstaller/upx dont alter the pe bytes (which would break inno setups crc check).
-        private static string ExtractInstaller(string name, Action<string> log = null)
+        // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against Config.PROGRAMFILES_OBS_DIR before writing, so a malformed archive path can never escape the install root.
+        private const string PluginZipRoot = "input-overlay/";
+
+        private static bool IsSafeRelative(string[] parts)
         {
-            if (!File.Exists(Config.INPUT_OVERLAY_INSTALLERS_ZIP))
+            return parts.Length > 0 && parts.All(p => p != "" && p != "." && p != "..");
+        }
+
+        private static string TargetPath(string relPosix)
+        {
+            string targetRoot = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/');
+            var parts = relPosix.Split('/');
+            string target = Path.GetFullPath(Path.Combine(new[] { Config.PROGRAMFILES_OBS_DIR }.Concat(parts).ToArray()));
+            if (!string.Equals(target, targetRoot, StringComparison.OrdinalIgnoreCase) &&
+                !target.StartsWith(targetRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
-                log?.Invoke($"(no {Path.GetFileName(Config.INPUT_OVERLAY_INSTALLERS_ZIP)} bundled)");
-                return null;
+                throw new InvalidOperationException("unsafe archive path: " + relPosix);
             }
-            try
-            {
-                using (var zf = ZipFile.OpenRead(Config.INPUT_OVERLAY_INSTALLERS_ZIP))
-                {
-                    var entry = zf.Entries.FirstOrDefault(e => e.FullName == name);
-                    if (entry == null)
-                    {
-                        log?.Invoke($"({name} not in installers.zip)");
-                        return null;
-                    }
-                    string tmpdir = Path.Combine(Path.GetTempPath(), "obsreplaykit_" + Guid.NewGuid().ToString("N"));
-                    Directory.CreateDirectory(tmpdir);
-                    string dest = Path.Combine(tmpdir, name);
-                    entry.ExtractToFile(dest);
-                    return dest;
-                }
-            }
-            catch (Exception exc)
-            {
-                log?.Invoke("failed to extract " + name + ": " + exc.Message);
-                return null;
-            }
+            return target;
         }
 
         // vc++ 2015-2022 (x64) redistributable -- prerequisite for input-overlay.dll. downloaded from microsoft only when missing.
@@ -288,50 +277,45 @@ $cert = $sig.SignerCertificate
                 return true;
             }
 
-            string installer = ExtractInstaller(Config.INPUT_OVERLAY_INSTALLER_NAME, log);
-            if (installer == null)
+            if (!File.Exists(Config.INPUT_OVERLAY_PLUGIN_ZIP))
             {
-                log?.Invoke("(input-overlay installer not available, skipping)");
+                log?.Invoke($"(no {Path.GetFileName(Config.INPUT_OVERLAY_PLUGIN_ZIP)} bundled, skipping)");
                 return false;
             }
 
-            log?.Invoke($"running {Config.INPUT_OVERLAY_INSTALLER_NAME} (silent)...");
+            log?.Invoke($"extracting {Path.GetFileName(Config.INPUT_OVERLAY_PLUGIN_ZIP)} -> {Config.PROGRAMFILES_OBS_DIR}");
 
-            Process proc;
-            string stderr;
             try
             {
-                var psi = new ProcessStartInfo(installer, Win32Args.Build("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=" + Config.PROGRAMFILES_OBS_DIR))
+                using (var zf = ZipFile.OpenRead(Config.INPUT_OVERLAY_PLUGIN_ZIP))
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                proc = Process.Start(psi);
-                proc.StandardOutput.ReadToEndAsync();
-                stderr = proc.StandardError.ReadToEnd();
-                if (!proc.WaitForExit(120000))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log?.Invoke("installer timed out after 120s - skipping");
-                    return false;
+                    foreach (var entry in zf.Entries)
+                    {
+                        string name = entry.FullName.Replace("\\", "/");
+                        if (!name.StartsWith(PluginZipRoot)) continue;
+                        string relText = name.Substring(PluginZipRoot.Length).Trim('/');
+                        if (relText.Length == 0) continue;
+                        var parts = relText.Split('/');
+                        if (!IsSafeRelative(parts)) throw new InvalidOperationException("unsafe archive path: " + entry.FullName);
+                        string dest = TargetPath(relText);
+                        bool isDir = name.EndsWith("/") && entry.Length == 0;
+                        if (isDir)
+                        {
+                            Directory.CreateDirectory(dest);
+                            continue;
+                        }
+                        Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                        using (var src = entry.Open())
+                        using (var dst = File.Open(dest, FileMode.Create, FileAccess.Write))
+                        {
+                            src.CopyTo(dst);
+                        }
+                    }
                 }
             }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
+            catch (Exception exc)
             {
-                log?.Invoke("installer launch failed: " + exc.Message);
-                return false;
-            }
-            finally
-            {
-                try { Directory.Delete(Path.GetDirectoryName(installer), true); } catch (IOException) { }
-            }
-
-            if (proc.ExitCode != 0)
-            {
-                log?.Invoke($"installer exited with code {proc.ExitCode}");
-                if (!string.IsNullOrWhiteSpace(stderr)) log?.Invoke("stderr: " + stderr.Trim().Split('\n')[0]);
+                log?.Invoke("input-overlay extraction failed: " + exc.Message);
                 return false;
             }
 

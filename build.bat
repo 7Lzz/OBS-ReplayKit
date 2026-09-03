@@ -2,11 +2,13 @@
 setlocal
 cd /d "%~dp0"
 
-rem build OBSReplayKit.exe (ReplayKitSetup, the c# port) straight into this folder via dotnet publish.
+rem build OBSReplayKit.exe (ReplayKitSetup, the c# port) into build\ via dotnet publish.
 rem the old pyinstaller-based build (single-file, self-extracting bootloader) is retired -- that
 rem self-extraction pattern was the dominant driver of av false positives across every pyinstaller
 rem variant tried, and no build flag fixed it. a compiled net48 exe has no bootstrap/extract step,
 rem so assets\ ships as a plain sibling folder instead of embedded data.
+
+set "BUILD_DIR=%~dp0build"
 
 where dotnet >nul 2>nul
 if errorlevel 1 goto :no_dotnet
@@ -15,7 +17,7 @@ echo [1/5] Syncing bundled ReplayKit version ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\sync_version.ps1"
 if errorlevel 1 goto :build_fail
 
-rem build the ReplayKit helper server (Clips browser, dock http api, upload/compress/trim workers) straight into assets\ -- same net48+ILRepack single-file pattern as the setup exe itself (step 5 below), just a different project and a different sibling-file drop location; this replaced a much smaller thin launcher that used to just host PowerShell in-process to run the (now-retired) PS implementation of the same server. build_helper.ps1 skips the rebuild entirely when the bundled exe is already newer than every source file, same convention as the tray plugin build below.
+rem build the ReplayKit helper server (Clips browser, dock http api, upload/compress/trim workers) straight into assets\ -- same net48+ILRepack pattern as the setup exe itself (step 5 below), just a different project and a different sibling-file drop location; this replaced a much smaller thin launcher that used to just host PowerShell in-process to run the (now-retired) PS implementation of the same server. build_helper.ps1 skips the rebuild entirely when the bundled exe is already newer than every source file, same convention as the tray plugin build below.
 echo [2/5] Compiling ReplayKit helper into assets\ ...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\build_helper.ps1"
 if errorlevel 1 goto :launcher_fail
@@ -27,20 +29,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\obs-plugins\repl
 if errorlevel 1 goto :tray_plugin_fail
 if not exist "%~dp0assets\obs-plugins\replaykit\bin\64bit\replaykit.dll" goto :tray_plugin_fail
 
-rem remove old output before rebuilding so the folder only keeps the latest final exe.
+rem remove old output before rebuilding so build\ only ever holds the latest release files.
 echo [4/5] Cleaning previous build artifacts ...
 if exist "ReplayKitSetup\bin"    rmdir /S /Q "ReplayKitSetup\bin"
 if exist "ReplayKitSetup\obj"    rmdir /S /Q "ReplayKitSetup\obj"
 if exist "publish_tmp"           rmdir /S /Q "publish_tmp"
-if exist "OBSReplayKit.exe"      del   /Q   "OBSReplayKit.exe"
-if exist "OBSReplayKit.exe.sha256" del /Q   "OBSReplayKit.exe.sha256"
-rem stale companions from before the exe shipped as a single merged file -- harmless to leave the check in even once every checkout has moved past them.
-if exist "OBSReplayKit.exe.config" del /Q   "OBSReplayKit.exe.config"
-if exist "Newtonsoft.Json.dll"   del   /Q   "Newtonsoft.Json.dll"
+if exist "%BUILD_DIR%"           rmdir /S /Q "%BUILD_DIR%"
+mkdir "%BUILD_DIR%"
+rem stale companions from the days the exe shipped to the repo root, plus the earlier
+rem per-file .sha256 pair now replaced by one combined checksums.sha256 -- harmless to
+rem leave the check in even once every checkout has moved past them.
+if exist "OBSReplayKit.exe"        del /Q "OBSReplayKit.exe"
+if exist "OBSReplayKit.exe.sha256" del /Q "OBSReplayKit.exe.sha256"
+if exist "OBSReplayKit.exe.config" del /Q "OBSReplayKit.exe.config"
+if exist "Newtonsoft.Json.dll"        del /Q "Newtonsoft.Json.dll"
+if exist "Newtonsoft.Json.dll.sha256" del /Q "Newtonsoft.Json.dll.sha256"
 
-rem publish, then merge Newtonsoft.Json.dll straight into the exe (see ILRepackPublish in
-rem ReplayKitSetup.csproj) so the shipped artifact is one file with nothing else alongside it.
-rem the small auto-generated .exe.config (declares the target framework) isnt required at
+rem publish; Newtonsoft.Json.dll ships as a loose sibling file next to the exe rather than
+rem ilrepack-merged into it (see ReplayKitSetup.csproj) -- a merged single file reads as
+rem packed to several av heuristics, and this is a completely standard two-assembly .net
+rem deploy. the auto-updater (ReplayKitHelper/Update.cs) downloads both plus checksums.sha256
+rem as separate github release assets, so all three have to be uploaded when cutting a
+rem release, not just the exe. the small auto-generated .exe.config (declares the target framework) isnt required at
 rem runtime on any machine with only .net framework 4.8 present, which is every current
 rem windows install, so its dropped too -- confirmed by running without it. no .pdb copied
 rem out either -- debug symbols arent needed by end users and stay in ReplayKitSetup\bin like
@@ -50,42 +60,50 @@ echo.
 dotnet publish "ReplayKitSetup\ReplayKitSetup.csproj" -c Release -o "publish_tmp" --nologo
 if errorlevel 1 goto :build_fail
 
-copy /Y "publish_tmp\OBSReplayKit.exe" "OBSReplayKit.exe" >nul
+copy /Y "publish_tmp\OBSReplayKit.exe" "%BUILD_DIR%\OBSReplayKit.exe" >nul
+if errorlevel 1 goto :build_fail
+copy /Y "publish_tmp\Newtonsoft.Json.dll" "%BUILD_DIR%\Newtonsoft.Json.dll" >nul
 if errorlevel 1 goto :build_fail
 rmdir /S /Q "publish_tmp"
 
-set "EXE_PATH=%CD%\OBSReplayKit.exe"
+set "EXE_PATH=%BUILD_DIR%\OBSReplayKit.exe"
 if not exist "%EXE_PATH%" goto :build_fail
 
-rem the shipped exe is safely copied out to the repo root above, so ReplayKitSetup\bin and \obj
-rem (the compiled intermediates dotnet publish leaves behind, including the pre-merge exe copy
-rem and the debug symbols) are done being useful -- clear them so the folder doesnt accumulate
-rem build byproducts across runs. next build recreates both from scratch either way, since the
-rem cleanup step above already force-cleans them before every build regardless.
+rem the shipped files are safely copied out to build\ above, so ReplayKitSetup\bin and \obj
+rem (the compiled intermediates dotnet publish leaves behind, including the debug symbols)
+rem are done being useful -- clear them so the folder doesnt accumulate build byproducts
+rem across runs. next build recreates both from scratch either way, since the cleanup step
+rem above already force-cleans them before every build regardless.
 if exist "ReplayKitSetup\bin" rmdir /S /Q "ReplayKitSetup\bin"
 if exist "ReplayKitSetup\obj" rmdir /S /Q "ReplayKitSetup\obj"
 
-echo Generating release hash ...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-FileHash -LiteralPath '%EXE_PATH%' -Algorithm SHA256).Hash + '  OBSReplayKit.exe' | Set-Content -LiteralPath '%EXE_PATH%.sha256' -Encoding ASCII"
+rem one combined checksums.sha256 (one "<hash>  <filename>" line per asset) instead of a
+rem .sha256 per file -- ReplayKitHelper/Update.cs parses both lines back out of it, same
+rem real integrity check per file, one fewer file to upload per release.
+echo Generating checksums.sha256 ...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$e=(Get-FileHash -LiteralPath '%EXE_PATH%' -Algorithm SHA256).Hash; $d=(Get-FileHash -LiteralPath '%BUILD_DIR%\Newtonsoft.Json.dll' -Algorithm SHA256).Hash; ($e+'  OBSReplayKit.exe'+[Environment]::NewLine+$d+'  Newtonsoft.Json.dll') | Set-Content -LiteralPath '%BUILD_DIR%\checksums.sha256' -Encoding ASCII"
 if errorlevel 1 goto :build_fail
 for %%I in ("%EXE_PATH%") do set /a "EXE_KB=%%~zI / 1024"
 for %%I in ("%EXE_PATH%") do set "EXE_BYTES=%%~zI"
 
-rem assets\ is embedded in the exe as a zip resource (PackAssetBundle in ReplayKitSetup.csproj, unpacked by AssetBundle.cs). without it the exe is around 1 mb and the auto-updater, which downloads only this file, closes obs and then has nothing to install -- so a build that lost the payload must not reach a release.
+rem assets\ is embedded in the exe as a zip resource (PackAssetBundle in ReplayKitSetup.csproj, unpacked by AssetBundle.cs). without it the exe is around 1 mb and the auto-updater, which downloads it plus Newtonsoft.Json.dll, closes obs and then has nothing to install -- so a build that lost the payload must not reach a release.
 if %EXE_BYTES% LSS 6000000 goto :bundle_fail
 
 echo.
 echo ============================================================
 echo  Build complete.
 echo ============================================================
-echo  Output:  %EXE_PATH%
-echo  Hash:    %EXE_PATH%.sha256
-echo  Size:    ~%EXE_KB% KB  (%EXE_BYTES% bytes)
+echo  Output:  %BUILD_DIR%\
+echo    OBSReplayKit.exe            (~%EXE_KB% KB, %EXE_BYTES% bytes)
+echo    Newtonsoft.Json.dll
+echo    checksums.sha256
 echo.
-echo  Note: single file, nothing else needs to ship alongside it -- assets\ is
-echo        embedded and unpacked at runtime, so the auto-update download works.
-echo        VC++ redist is not bundled; it downloads from Microsoft only when
-echo        missing. Input-overlay presets are trimmed to WASD/mouse.
+echo  Note: Newtonsoft.Json.dll ships as a loose sibling file next to the exe, not
+echo        merged into it -- upload all three files when cutting a github release.
+echo        assets\ is embedded inside the exe itself and unpacked at runtime, so
+echo        that part of the auto-update download still works off just these two
+echo        files. VC++ redist is not bundled; it downloads from Microsoft only
+echo        when missing. Input-overlay presets are trimmed to WASD/mouse.
 echo ============================================================
 echo.
 pause
@@ -115,7 +133,8 @@ echo Build FAILED: OBSReplayKit.exe is only %EXE_BYTES% bytes, so assets\ was no
 echo embedded. Shipping it would break both fresh installs and the auto-update.
 echo Check the PackAssetBundle target in ReplayKitSetup\ReplayKitSetup.csproj.
 del /Q "%EXE_PATH%" >nul 2>nul
-del /Q "%EXE_PATH%.sha256" >nul 2>nul
+del /Q "%BUILD_DIR%\Newtonsoft.Json.dll" >nul 2>nul
+del /Q "%BUILD_DIR%\checksums.sha256" >nul 2>nul
 pause
 endlocal
 exit /b 1

@@ -833,7 +833,12 @@ namespace ReplayKitSetup
             Add("Close OBS", "Stops OBS so settings can be written cleanly.", () => (object)Obs.CloseObs(progress.LogLine));
             Add("Back up current OBS settings", "Keeps a restore copy before ReplayKit writes the new setup.", () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
             Add("Prepare OBS settings folder", "Creates the OBS config folder and clears crash-recovery prompts.", () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
-            Add("Build ReplayKit helper", "Makes sure the local Clips and controls helper is ready.", () => (object)Installer.EnsureLauncherBuilt(progress.LogLine));
+            // a bool false here used to just add a line to the "Needs attention" list while the rest of the flow, including the "Setup complete" summary, ran anyway -- misleading for the one step everything else depends on, since no helper means no dock, no clips, no settings ui at all. throwing instead routes thru RunApplyStep's existing failed-step handling and ApplySettings' "Apply stopped" catch, which already skip the success messaging correctly -- no new control flow needed, just using the path every other genuine failure already takes.
+            Add("Build ReplayKit helper", "Makes sure the local Clips and controls helper is ready.", () =>
+            {
+                if (Installer.EnsureLauncherBuilt(progress.LogLine)) return (object)true;
+                throw new InvalidOperationException("OBS ReplayKit cannot run without the helper -- see the warning above for why it's missing.");
+            });
             if (prefs.DiscordScreenshareEnabled)
                 Add("Install OBS Stream Audio", "Installs and renames VB-Audio Cable for Discord share audio.", () => (object)VbCable.EnsureVbcable(progress.LogLine));
             else

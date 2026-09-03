@@ -18,7 +18,10 @@ namespace ReplayKitHelper
         private const string Owner = "7Lzz";
         private const string Repo = "OBS-ReplayKit";
         private const string InstallerAsset = "OBSReplayKit.exe";
-        private const string HashAsset = "OBSReplayKit.exe.sha256";
+        // Newtonsoft.Json.dll ships as a loose sibling file next to the exe instead of ilrepack-merged into it (see ReplayKitSetup.csproj) -- a required dependency, not optional, so its missing from a release is treated the same as a missing installer.
+        private const string DependencyAsset = "Newtonsoft.Json.dll";
+        // one combined sha256sum-style file (one "<hash>  <filename>" line per asset) instead of a separate .sha256 per file -- same integrity check, one fewer file to upload per release.
+        private const string ChecksumsAsset = "checksums.sha256";
         private const string ReleasePage = "https://github.com/7Lzz/OBS-ReplayKit/releases/latest";
 
         // a release exe built without its embedded assets\ payload is around 1 mb and can install nothing -- it closes obs first and only then discovers it has no files, which strands the user with no obs and no helper. the runtime tree alone is over 10 mb, so a complete build never lands anywhere near this floor. mirrors the same guard build.bat applies at the producing end.
@@ -125,7 +128,8 @@ namespace ReplayKitHelper
             public string LatestVersion;
             public string HtmlUrl;
             public string InstallerUrl;
-            public string HashUrl = "";
+            public string DependencyUrl;
+            public string ChecksumsUrl = "";
             public string Body = "";
             public string Name = "";
         }
@@ -140,7 +144,11 @@ namespace ReplayKitHelper
             string installerUrl = installer?["browser_download_url"]?.Value<string>();
             if (installer == null || string.IsNullOrEmpty(installerUrl))
                 throw new InvalidOperationException("Latest release is missing " + InstallerAsset + ".");
-            var hash = GetReleaseAsset(release, HashAsset);
+            var dependency = GetReleaseAsset(release, DependencyAsset);
+            string dependencyUrl = dependency?["browser_download_url"]?.Value<string>();
+            if (dependency == null || string.IsNullOrEmpty(dependencyUrl))
+                throw new InvalidOperationException("Latest release is missing " + DependencyAsset + " -- " + InstallerAsset + " wont run without it.");
+            var checksums = GetReleaseAsset(release, ChecksumsAsset);
             return new ReleaseInfo
             {
                 TagName = tagName,
@@ -148,7 +156,8 @@ namespace ReplayKitHelper
                 HtmlUrl = release["html_url"]?.Value<string>() ?? "",
                 InstallerUrl = installerUrl,
                 // body and name are part of the same /releases/latest payload, no extra api call -- body is github-flavored markdown, the popup renders + escapes it client-side.
-                HashUrl = hash?["browser_download_url"]?.Value<string>() ?? "",
+                DependencyUrl = dependencyUrl,
+                ChecksumsUrl = checksums?["browser_download_url"]?.Value<string>() ?? "",
                 Body = release["body"]?.Value<string>() ?? "",
                 Name = release["name"]?.Value<string>() ?? "",
             };
@@ -548,11 +557,31 @@ namespace ReplayKitHelper
             throw new IOException("Downloading " + Path.GetFileName(path) + " failed after 3 attempts.", failure);
         }
 
-        private static string GetSha256FromText(string text)
+        // one combined checksums file instead of a .sha256 per asset -- "<hash>  <filename>" per line, standard sha256sum shape (a leading "*" before the filename, for binary-mode tools, is tolerated but never written by build.bat).
+        private static Dictionary<string, string> ParseChecksums(string text)
         {
-            var m = Regex.Match(text, @"(?i)\b[a-f0-9]{64}\b");
-            if (!m.Success) throw new InvalidOperationException("SHA-256 file did not contain a valid hash.");
-            return m.Value.ToUpperInvariant();
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string rawLine in text.Split('\n'))
+            {
+                string line = rawLine.Trim();
+                if (line.Length == 0) continue;
+                var m = Regex.Match(line, @"^([a-fA-F0-9]{64})\s+\*?(.+)$");
+                if (!m.Success) continue;
+                result[m.Groups[2].Value.Trim()] = m.Groups[1].Value.ToUpperInvariant();
+            }
+            return result;
+        }
+
+        // shared by both the installer and its dependency dll -- compares the actual file on disk against its expected hash, already parsed out of the combined checksums file.
+        private static bool VerifySha256(string filePath, string expectedHash)
+        {
+            string actual;
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(filePath))
+            {
+                actual = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToUpperInvariant();
+            }
+            return string.Equals(actual, expectedHash, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetUpdateObsPath()
@@ -683,26 +712,38 @@ namespace ReplayKitHelper
                         ["message"] = "ReplayKit is already up to date.",
                     };
                 }
-                if (string.IsNullOrWhiteSpace(latest.HashUrl)) throw new InvalidOperationException("Latest release is missing " + HashAsset + ".");
+                if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException("Latest release is missing " + ChecksumsAsset + ".");
 
                 string tempDir = CreateUpdateTemp();
 
                 string installerPath = Path.Combine(tempDir, InstallerAsset);
-                string hashPath = Path.Combine(tempDir, HashAsset);
+                string dependencyPath = Path.Combine(tempDir, DependencyAsset);
+                string checksumsPath = Path.Combine(tempDir, ChecksumsAsset);
                 SaveUrlFile(latest.InstallerUrl, installerPath);
-                SaveUrlFile(latest.HashUrl, hashPath);
+                // downloaded alongside the exe, not merged into it -- see ReplayKitSetup.csproj. OBSReplayKit.exe wont run without this sitting next to it.
+                SaveUrlFile(latest.DependencyUrl, dependencyPath);
+                SaveUrlFile(latest.ChecksumsUrl, checksumsPath);
 
-                string expected = GetSha256FromText(File.ReadAllText(hashPath));
-                string actual;
-                using (var sha = SHA256.Create())
-                using (var stream = File.OpenRead(installerPath))
+                var checksums = ParseChecksums(File.ReadAllText(checksumsPath));
+                if (!checksums.TryGetValue(InstallerAsset, out string expectedInstallerHash))
                 {
-                    actual = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToUpperInvariant();
+                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + InstallerAsset + ".");
                 }
-                if (actual != expected)
+                if (!checksums.TryGetValue(DependencyAsset, out string expectedDependencyHash))
+                {
+                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + DependencyAsset + ".");
+                }
+                if (!VerifySha256(installerPath, expectedInstallerHash))
                 {
                     try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     throw new InvalidOperationException("Downloaded installer hash did not match the release hash.");
+                }
+                if (!VerifySha256(dependencyPath, expectedDependencyHash))
+                {
+                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    throw new InvalidOperationException("Downloaded " + DependencyAsset + " hash did not match the release hash.");
                 }
 
                 long installerBytes = new FileInfo(installerPath).Length;

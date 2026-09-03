@@ -43,10 +43,9 @@
   <Target Name="ILRepackPublish" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
     <ItemGroup>
       <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
-      <!-- WebView2Loader.dll is a native loader and cannot be merged. It ships next
-           to the helper; managed WebView2 assemblies still merge into the EXE. -->
-      <PublishedAssemblies Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt);$(PublishDir)WebView2Loader.dll" />
-      <PublishedDllsToRemove Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt);$(PublishDir)WebView2Loader.dll" />
+      <!-- WebView2Loader.dll is a native loader and cannot be merged, same as before. Newtonsoft.Json.dll now ships unmerged too; a merged exe reads as packed to several av heuristics, and build_helper.ps1 already copies it out as a plain sibling file next to the helper. managed WebView2 assemblies still merge into the EXE. -->
+      <PublishedAssemblies Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt);$(PublishDir)WebView2Loader.dll;$(PublishDir)Newtonsoft.Json.dll" />
+      <PublishedDllsToRemove Include="$(PublishDir)*.dll" Exclude="$(PublishDir)$(TargetName)$(TargetExt);$(PublishDir)WebView2Loader.dll;$(PublishDir)Newtonsoft.Json.dll" />
     </ItemGroup>
     <ILRepack
         Parallel="true"
