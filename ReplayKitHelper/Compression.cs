@@ -163,11 +163,15 @@ namespace ReplayKitHelper
                 };
                 using (var proc = Process.Start(psi))
                 {
+                    var stdout = proc.StandardOutput.ReadToEndAsync();
+                    var stderr = proc.StandardError.ReadToEndAsync();
                     if (!proc.WaitForExit(5000))
                     {
                         try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
                         return false;
                     }
+                    stdout.GetAwaiter().GetResult();
+                    stderr.GetAwaiter().GetResult();
                     return proc.ExitCode == 0;
                 }
             }
@@ -194,13 +198,16 @@ namespace ReplayKitHelper
                 };
                 using (var proc = Process.Start(psi))
                 {
-                    string outText = proc.StandardOutput.ReadToEnd();
+                    var stdout = proc.StandardOutput.ReadToEndAsync();
+                    var stderr = proc.StandardError.ReadToEndAsync();
                     if (!proc.WaitForExit(5000))
                     {
                         try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
                         return false;
                     }
                     if (proc.ExitCode != 0) return false;
+                    string outText = stdout.GetAwaiter().GetResult();
+                    stderr.GetAwaiter().GetResult();
                     return Regex.IsMatch(outText, @"(?m)^\s*[VAS][^\s]*\s+" + Regex.Escape(encoder) + @"\s");
                 }
             }

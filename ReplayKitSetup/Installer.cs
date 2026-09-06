@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -112,20 +111,7 @@ namespace ReplayKitSetup
                 {
                     File.Copy(source, target, true);
                 }
-                // Newtonsoft.Json.dll ships as a sibling file next to the exe, not merged into it (see ReplayKitSetup.csproj) -- the cached copy needs its own sibling too, or ReplayKitHelper/Uninstall.cs's later Process.Start of this exe fails to load it.
-                string depSource = Path.Combine(Config.BUNDLE_ROOT, "Newtonsoft.Json.dll");
-                if (File.Exists(depSource))
-                {
-                    string depTarget = Path.Combine(Path.GetDirectoryName(target), "Newtonsoft.Json.dll");
-                    if (!string.Equals(Path.GetFullPath(depSource), Path.GetFullPath(depTarget), StringComparison.OrdinalIgnoreCase))
-                    {
-                        File.Copy(depSource, depTarget, true);
-                    }
-                }
-                else
-                {
-                    log?.Invoke("warn: Newtonsoft.Json.dll was not found next to the setup executable, cached copy will not run");
-                }
+                // self-contained single-file exe (see ReplayKitSetup.csproj) -- the cached copy runs standalone, no sibling assemblies to carry across.
                 log?.Invoke($"cached setup executable -> {target}");
                 return true;
             }
@@ -647,7 +633,7 @@ namespace ReplayKitSetup
         // download + drop ffmpeg.exe and ffprobe.exe next to the helper. obs ships only obs-ffmpeg-mux.exe; compress/trim need the full pair. idempotent.
         public static bool InstallObsFfmpeg(Action<string> log = null) => FfmpegInstall.InstallFfmpeg(log);
 
-        // enable obs-websocket on port 6455 (no auth, loopback) so the save replay dock button can drive obs.
+        // Configure authenticated OBS WebSocket access for the helper.
         public static bool ConfigureObsWebsocket(Action<string> log = null) => WebSocketConfig.InstallWebsocketConfig(log);
 
         // let windows monitor/system sleep timers run while obs is active, or restore obs defaults.
@@ -659,36 +645,8 @@ namespace ReplayKitSetup
         {
             string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
             if (File.Exists(launcherPath)) return true;
-            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe.
-            string reason = DefenderRemovedRecently("OBSReplayKit.exe")
-                ? "Windows Defender removed it right after install -- open Windows Security > Protection History to see the detection"
-                : "your antivirus likely quarantined it right after install. check its quarantine/history";
-            log?.Invoke($"warn: helper launcher missing at {launcherPath} -- {reason}, restore or exclude the ReplayKit temp folder, then reinstall.");
-            return false;
-        }
-
-        // reads defenders own wmi threat log -- the same data Windows Security's Protection History page and Get-MpThreatDetection read -- for a detection naming this file in the last few minutes, without spawning powershell for it. best-effort: lets EnsureLauncherBuilt name Defender specifically instead of guessing "your antivirus" when it wasnt, or missing the chance to point straight at Protection History when it was.
-        private static bool DefenderRemovedRecently(string fileName)
-        {
-            try
-            {
-                var scope = new ManagementScope(@"root\Microsoft\Windows\Defender");
-                scope.Connect();
-                using (var searcher = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT Resources, InitialDetectionTime FROM MSFT_MpThreatDetection")))
-                using (var rows = searcher.Get())
-                {
-                    foreach (ManagementObject row in rows)
-                    {
-                        var resources = row["Resources"] as string[];
-                        if (resources == null || !resources.Any(r => r.IndexOf(fileName, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
-                        DateTime detected = ManagementDateTimeConverter.ToDateTime((string)row["InitialDetectionTime"]);
-                        if (DateTime.Now - detected < TimeSpan.FromMinutes(10)) return true;
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is ManagementException || ex is UnauthorizedAccessException || ex is FormatException || ex is ArgumentOutOfRangeException)
-            {
-            }
+            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defender's wmi threat log to name Defender specifically -- dropped with System.Management for the trimmed build; the generic pointer covers Defender's Protection History too.
+            log?.Invoke($"warn: helper launcher missing at {launcherPath} -- your antivirus likely quarantined it right after install. check its quarantine or history (Windows Security > Protection History for Defender), restore or exclude the ReplayKit temp folder, then reinstall.");
             return false;
         }
     }

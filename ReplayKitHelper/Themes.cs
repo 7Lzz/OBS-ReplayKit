@@ -16,8 +16,7 @@ namespace ReplayKitHelper
         public sealed class Tokens
         {
             public string Bg, Panel, Field, Field2, Border, BorderStrong,
-                          Text, Muted, Disabled, Accent, Accent2, Danger, Success, Warning,
-                          Gradient;
+                          Text, Muted, Disabled, Accent, Accent2, Danger, Success, Warning;
             public bool Dark = true;
 
             // a gradient per surface token, keyed by the swatch name the editor uses. only these four: text, border
@@ -51,7 +50,7 @@ namespace ReplayKitHelper
                 ["text"] = Text, ["muted"] = Muted, ["disabled"] = Disabled,
                 ["accent"] = Accent, ["accent2"] = Accent2,
                 ["danger"] = Danger, ["success"] = Success, ["warning"] = Warning,
-                ["gradient"] = Gradient ?? "", ["gradients"] = GradientsJson(),
+                ["gradient"] = "", ["gradients"] = GradientsJson(),
                 ["dark"] = Dark,
             };
 
@@ -60,7 +59,7 @@ namespace ReplayKitHelper
             {
                 ["bg"] = Bg, ["panel"] = Panel, ["field"] = Field, ["text"] = Text,
                 ["accent"] = Accent, ["border"] = Border, ["danger"] = Danger,
-                ["gradient"] = Gradient ?? "", ["gradients"] = GradientsJson(), ["dark"] = Dark,
+                ["gradient"] = "", ["gradients"] = GradientsJson(), ["dark"] = Dark,
             };
 
             private JObject GradientsJson()

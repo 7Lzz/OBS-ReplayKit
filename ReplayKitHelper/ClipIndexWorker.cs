@@ -88,12 +88,15 @@ namespace ReplayKitHelper
             };
             using (var proc = Process.Start(psi))
             {
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(15000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
                     return null;
                 }
-                string stdout = proc.StandardOutput.ReadToEnd();
+                string stdout = stdoutTask.GetAwaiter().GetResult();
+                stderrTask.GetAwaiter().GetResult();
                 if (proc.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout)) return null;
                 try { return JObject.Parse(stdout); } catch (JsonException) { return null; }
             }

@@ -1499,12 +1499,7 @@ namespace ReplayKitHelper
 
         private static string GetObsInstallRoot()
         {
-            string obs = Server.State.ObsExe;
-            if (string.IsNullOrWhiteSpace(obs) || !File.Exists(obs))
-            {
-                string candidate = Constants.ResolveObsExe();
-                if (File.Exists(candidate)) obs = candidate;
-            }
+            string obs = Constants.ResolveObsExe();
             try
             {
                 return Directory.GetParent(Directory.GetParent(Directory.GetParent(obs).FullName).FullName).FullName;
@@ -2541,14 +2536,16 @@ namespace ReplayKitHelper
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
-                var process = Process.Start(psi);
+                using var process = Process.Start(psi);
                 if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
+                var stdout = process.StandardOutput.ReadToEndAsync();
+                var stderr = process.StandardError.ReadToEndAsync();
                 if (!process.WaitForExit(10000))
                 {
                     try { process.Kill(); } catch (InvalidOperationException) { } catch (Win32Exception) { }
                     return new JObject { ["ok"] = false, ["message"] = "powercfg timed out." };
                 }
-                string output = (process.StandardOutput.ReadToEnd() + "\n" + process.StandardError.ReadToEnd()).Trim();
+                string output = (stdout.GetAwaiter().GetResult() + "\n" + stderr.GetAwaiter().GetResult()).Trim();
                 if (process.ExitCode != 0)
                 {
                     string line = output.Split('\n').Select(l => l.TrimEnd('\r')).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
@@ -2594,12 +2591,7 @@ namespace ReplayKitHelper
 
         private static string GetObsStartupTarget()
         {
-            string obs = Server.State.ObsExe;
-            if (string.IsNullOrEmpty(obs) || !File.Exists(obs))
-            {
-                string candidate = Constants.ResolveObsExe();
-                if (File.Exists(candidate)) obs = candidate;
-            }
+            string obs = Constants.ResolveObsExe();
             if (string.IsNullOrEmpty(obs) || !File.Exists(obs)) throw new InvalidOperationException("OBS executable was not found.");
             return obs;
         }

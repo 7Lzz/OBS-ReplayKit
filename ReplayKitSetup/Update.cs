@@ -118,13 +118,14 @@ namespace ReplayKitSetup
             try
             {
                 // ping as the delay instead of timeout.exe -- timeout refuses to run when stdin isnt a real console handle, which is exactly the case for a process launched with UseShellExecute=false from another non-interactive process.
-                string cmdLine = "/c ping 127.0.0.1 -n 4 >nul & rmdir /s /q \"" + target + "\"";
+                string cmdLine = "/d /v:off /c ping 127.0.0.1 -n 4 >nul & rmdir /s /q \"%OBSREPLAYKIT_CLEANUP%\"";
                 var psi = new ProcessStartInfo("cmd.exe", cmdLine)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
-                Process.Start(psi);
+                psi.EnvironmentVariables["OBSREPLAYKIT_CLEANUP"] = target;
+                Process.Start(psi)?.Dispose();
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {

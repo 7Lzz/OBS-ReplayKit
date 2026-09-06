@@ -785,6 +785,25 @@
   }
   #settings-tip.is-shown { opacity:1; transform:translateY(0) scale(1); }
   #settings-tip::before { content:""; position:absolute; bottom:100%; left:var(--tip-arrow,50%); transform:translateX(-50%); border:5px solid transparent; border-bottom-color:var(--grey8,#13141A); }
+  /* multi-line variant of the tooltip for the info-dot notes -- same ground, shadow, arrow and pop as above, just wraps. */
+  #settings-tip.tip-rich { white-space:normal; max-width:264px; line-height:1.42; text-align:left; padding:7px 10px; }
+  /* small "i" that reveals an item's note in the shared tooltip on hover, keyboard focus or click. */
+  .info-dot {
+    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
+    display:inline-flex; vertical-align:middle;
+    border:0; background:transparent; color:var(--muted);
+    cursor:help; -webkit-user-select:none; user-select:none;
+    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content:""; width:100%; height:100%; background-color:currentColor;
+    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
+    mask:url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .info-dot:active { transform:scale(.94); }
+  .info-dot:focus { outline:none; }
+  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
   .inline-status {
     color:var(--muted);
     font-size:12px;
@@ -1011,7 +1030,8 @@
           <div></div>
           <label class="check-row">
             <input type="checkbox" id="runObsAsAdmin">
-            <span>Run OBS and ReplayKit as administrator (takes effect on next OBS launch NOT RECOMMENDED)</span>
+            <span>Run OBS and ReplayKit as administrator</span>
+            <button class="info-dot" type="button" aria-label="About running as administrator" title="Launches OBS and ReplayKit with administrator rights on the next OBS launch. Rarely needed and adds a UAC prompt every time. Not recommended."></button>
           </label>
         </div>
         <div class="form-row tight">
@@ -1162,14 +1182,10 @@
         </div>
         <div class="form-row tight" id="screenshareAutoGameKeepFocusedRow">
           <div></div>
-          <div class="field-wrap"><label class="check-row"><input type="checkbox" id="screenshareAutoGameKeepFocused"><span>Keep Game Focus</span></label></div>
-        </div>
-        <div class="form-row tight" id="screenshareAutoGameKeepFocusedHintRow">
-          <div></div>
-          <div class="hint">Keeps the screenshare locked on the matched game through brief tab-outs (for example to Discord or this Settings window) instead of switching to Desktop Capture.</div>
+          <div class="field-wrap"><label class="check-row"><input type="checkbox" id="screenshareAutoGameKeepFocused"><span>Keep Game Focus</span><button class="info-dot" type="button" aria-label="About Keep Game Focus" title="Keeps the screenshare locked on the matched game through brief tab-outs (for example to Discord or this Settings window) instead of switching to Desktop Capture."></button></label></div>
         </div>
         <div class="form-row" id="screenshareSwitchDelayRow">
-          <div class="label">Switch Speed</div>
+          <div class="label">Switch Speed <button class="info-dot" type="button" aria-label="About Switch Speed" title="How long ReplayKit waits after you tab out of a game or window before switching back to Desktop Capture, in seconds. Lower reacts faster; higher avoids flicker on brief alt-tabs."></button></div>
           <div class="field-wrap">
             <div class="volume-control">
               <input class="text-input volume-value" id="screenshareSwitchDelayValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Capture switch delay in seconds">
@@ -1181,10 +1197,6 @@
               <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
-        </div>
-        <div class="form-row tight" id="screenshareSwitchDelayHintRow">
-          <div></div>
-          <div class="hint">How long ReplayKit waits after you tab out of a game or window before switching back to Desktop Capture, in seconds. Lower reacts faster; higher avoids flicker on brief alt-tabs.</div>
         </div>
         <div class="form-row">
           <div class="label">Projector Tools</div>
@@ -1399,7 +1411,8 @@
           <div></div>
           <label class="check-row">
             <input type="checkbox" id="trimPreciseDefault">
-            <span>Enable frame-accurate trim by default</span>
+            <span>Enable frame-accurate trim by default (NOT RECOMMENDED)</span>
+            <button class="info-dot" type="button" aria-label="About frame-accurate trim" title="Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles, which takes much longer."></button>
           </label>
         </div>
         <div class="form-row tight">
@@ -1414,22 +1427,16 @@
           <label class="check-row">
             <input type="checkbox" id="debugLoggingEnabled">
             <span>Enable debug logging</span>
+            <button class="info-dot" type="button" aria-label="About debug logging" title="Writes helper activity (Share Preview, clips, uploads) to %TEMP%\ReplayKit\logs for troubleshooting. Leave off unless asked to turn it on."></button>
           </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="hint">Writes helper activity (Share Preview, clips, uploads) to %TEMP%\ReplayKit\logs for troubleshooting. Leave off unless asked to turn it on.</div>
         </div>
         <div class="form-row tight" id="autoDeleteLogsOnLaunchRow">
           <div></div>
           <label class="check-row">
             <input type="checkbox" id="autoDeleteLogsOnLaunch">
             <span>Automatically delete logs on next launch</span>
+            <button class="info-dot" type="button" aria-label="About auto-deleting logs" title="Clears the logs above at the start of each OBS launch so they do not fill up disk space over time. Recommended to leave on unless you need to keep logs from a previous session."></button>
           </label>
-        </div>
-        <div class="form-row tight" id="autoDeleteLogsOnLaunchHintRow">
-          <div></div>
-          <div class="hint">Clears the logs above at the start of each OBS launch so they do not fill up disk space over time. Recommended to leave on unless you need to keep logs from a previous session.</div>
         </div>
         <div class="form-row tight">
           <div></div>
@@ -1488,11 +1495,8 @@
           <div class="label">Discord screenshare / Share Preview audio</div>
           <div class="field-wrap">
             <button class="btn is-danger" type="button" id="uninstallDiscordScreenshareBtn">Uninstall</button>
+            <button class="info-dot" type="button" aria-label="About removing Share Preview audio" title="Removes the OBS Stream Audio virtual audio driver that Share Preview depends on. Keeps the rest of ReplayKit installed."></button>
           </div>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="hint">Removes the OBS Stream Audio virtual audio driver that Share Preview depends on. Keeps the rest of ReplayKit installed.</div>
         </div>
         <div class="form-row tight">
           <div></div>
@@ -1503,11 +1507,7 @@
 
     <section class="page" id="page-appearance">
       <div class="box">
-        <div class="box-title">Theme</div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="hint">Restyles the ReplayKit dock, Clips &amp; Settings windows and OBS itself. ReplayKit updates instantly; OBS restarts to pick up its side. Pick a preset, or build a <b>Custom</b> one and save it.</div>
-        </div>
+        <div class="box-title">Theme <button class="info-dot" type="button" aria-label="About themes" title="Restyles the ReplayKit dock, Clips and Settings windows and OBS itself. ReplayKit updates instantly; OBS restarts to pick up its side. Pick a preset, or build a Custom one and save it."></button></div>
         <div class="form-row">
           <div class="label">Theme</div>
           <div class="field-wrap is-stacked">
@@ -1521,7 +1521,7 @@
           <div class="label">Custom theme</div>
           <div class="field-wrap is-stacked">
             <div class="theme-section">
-              <div class="theme-section-title"><span>Base colors</span><span class="theme-section-hint">Click a swatch to open the floating editor.</span></div>
+              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a swatch to open the floating editor."></button></span></div>
               <div class="theme-editor" id="themeEditor">
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
@@ -1533,7 +1533,7 @@
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Gradients</span><span class="theme-section-hint">Give any surface a gradient instead of a flat color.</span></div>
+              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Give any surface a gradient instead of a flat color."></button></span></div>
               <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
               <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></label>
               <div class="gradient-editor" id="themeGradientEditor" hidden>
@@ -1557,8 +1557,7 @@
             </div>
             <div class="theme-section">
               <div class="theme-section-title"><span>Window behavior</span></div>
-              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span></label>
-              <div class="hint" style="margin:4px 0 0">Turn this off for light themes. It changes native OBS controls that swatches cannot restyle.</div>
+              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off for light themes. It changes native OBS controls that swatches cannot restyle."></button></label>
             </div>
             <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
               <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
@@ -1569,11 +1568,7 @@
         </div>
       </div>
       <div class="box">
-        <div class="box-title">App Icon</div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="hint">Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly &mdash; no restart, no admin. "Default" restores OBS's own icon. Drop more <code>.ico</code>/<code>.png</code> files into <code>obs-replayKit\icons\</code> to add presets.</div>
-        </div>
+        <div class="box-title">App Icon <button class="info-dot" type="button" aria-label="About the app icon" title="Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly, no restart or admin. Default restores OBS's own icon. Drop more .ico or .png files into obs-replayKit\icons\ to add presets."></button></div>
         <div class="form-row">
           <div class="label">Icon</div>
           <div class="field-wrap is-stacked">
@@ -1745,13 +1740,11 @@
     screenshareGameOverrideList: document.getElementById("screenshareGameOverrideList"),
     screenshareAutoGameKeepFocused: document.getElementById("screenshareAutoGameKeepFocused"),
     screenshareAutoGameKeepFocusedRow: document.getElementById("screenshareAutoGameKeepFocusedRow"),
-    screenshareAutoGameKeepFocusedHintRow: document.getElementById("screenshareAutoGameKeepFocusedHintRow"),
     sidebarVersion: document.getElementById("sidebarVersion"),
     sidebarGithubLink: document.getElementById("sidebarGithubLink"),
     screenshareSwitchDelay: document.getElementById("screenshareSwitchDelay"),
     screenshareSwitchDelayValue: document.getElementById("screenshareSwitchDelayValue"),
     screenshareSwitchDelayRow: document.getElementById("screenshareSwitchDelayRow"),
-    screenshareSwitchDelayHintRow: document.getElementById("screenshareSwitchDelayHintRow"),
     overlayStyle: document.getElementById("overlayStyle"),
     overlayOpacity: document.getElementById("overlayOpacity"),
     overlayOpacityValue: document.getElementById("overlayOpacityValue"),
@@ -1822,7 +1815,6 @@
     debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
     autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
     autoDeleteLogsOnLaunchRow: document.getElementById("autoDeleteLogsOnLaunchRow"),
-    autoDeleteLogsOnLaunchHintRow: document.getElementById("autoDeleteLogsOnLaunchHintRow"),
     openLogFolderBtn: document.getElementById("openLogFolderBtn"),
     logFolderStatusLine: document.getElementById("logFolderStatusLine"),
     settingsProjectorInspectBtn: document.getElementById("settingsProjectorInspectBtn"),
@@ -1901,6 +1893,7 @@
     if (!target || !target.dataset.tooltip || target.disabled) return;
     settingsTipTarget = target;
     settingsTip.textContent = target.dataset.tooltip;
+    settingsTip.classList.toggle("tip-rich", target.classList.contains("info-dot"));
     settingsTip.classList.add("is-shown");
     positionSettingsTip();
   }
@@ -1917,6 +1910,22 @@
     if (settingsTipTarget && !settingsTipTarget.contains(event.relatedTarget)) hideSettingsTip();
   });
   document.addEventListener("pointerdown", hideSettingsTip, true);
+  // info-dots are buttons -- clicking or tabbing to one focuses it, so mirror the hover show/hide onto focus so click and keyboard both reveal the note.
+  document.addEventListener("focusin", (event) => {
+    const dot = event.target.closest && event.target.closest(".info-dot");
+    if (dot && dot !== settingsTipTarget) showSettingsTip(dot);
+  });
+  document.addEventListener("focusout", (event) => {
+    const dot = event.target.closest && event.target.closest(".info-dot");
+    if (dot && settingsTipTarget === dot) hideSettingsTip();
+  });
+  // pointerdown (capture, above) just hid the tip -- re-show it on the click so a tap reveals the note even where focus is unreliable, and swallow the click so a dot inside a label never toggles its checkbox.
+  document.addEventListener("click", (event) => {
+    const dot = event.target.closest && event.target.closest(".info-dot");
+    if (!dot) return;
+    event.preventDefault();
+    showSettingsTip(dot);
+  });
   window.addEventListener("resize", positionSettingsTip);
   new MutationObserver((changes) => {
     changes.forEach((change) => {
@@ -2870,10 +2879,8 @@
     setComboDisabled(els.screenshareGameOverridePicker, !usesAutoList);
     els.screenshareGameOverridesRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareAutoGameKeepFocusedRow.classList.toggle("is-disabled", !usesAutoList);
-    els.screenshareAutoGameKeepFocusedHintRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareAutoGameKeepFocused.disabled = !usesAutoList;
     els.screenshareSwitchDelayRow.classList.toggle("is-disabled", !usesAutoList);
-    els.screenshareSwitchDelayHintRow.classList.toggle("is-disabled", !usesAutoList);
     els.screenshareSwitchDelay.disabled = !usesAutoList;
     els.screenshareSwitchDelayValue.disabled = !usesAutoList;
     if (fieldResetBtns.screenshareSwitchDelaySeconds) fieldResetBtns.screenshareSwitchDelaySeconds.disabled = !usesAutoList;
@@ -2925,7 +2932,6 @@
   function syncDebugLoggingFields() {
     const enabled = els.debugLoggingEnabled.checked;
     els.autoDeleteLogsOnLaunchRow.classList.toggle("is-disabled", !enabled);
-    els.autoDeleteLogsOnLaunchHintRow.classList.toggle("is-disabled", !enabled);
     els.autoDeleteLogsOnLaunch.disabled = !enabled;
   }
 

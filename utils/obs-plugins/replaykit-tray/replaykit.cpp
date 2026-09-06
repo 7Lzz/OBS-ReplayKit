@@ -48,6 +48,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <thread>
+#include <future>
+#include <functional>
 #include <atomic>
 #include <mutex>
 #include <chrono>
@@ -62,6 +64,41 @@
 OBS_DECLARE_MODULE()
 
 namespace {
+
+QObject *g_callbacks = nullptr;
+std::mutex g_workerMutex;
+std::vector<std::future<void>> g_workers;
+bool g_workersStopping = false;
+std::mutex g_cefMutex;
+
+void RunAsync(std::function<void()> work)
+{
+	std::lock_guard<std::mutex> lock(g_workerMutex);
+	if (g_workersStopping)
+		return;
+	for (auto it = g_workers.begin(); it != g_workers.end();) {
+		if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+			try { it->get(); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
+			it = g_workers.erase(it);
+		} else {
+			++it;
+		}
+	}
+	g_workers.emplace_back(std::async(std::launch::async, std::move(work)));
+}
+
+void StopWorkers()
+{
+	std::vector<std::future<void>> workers;
+	{
+		std::lock_guard<std::mutex> lock(g_workerMutex);
+		g_workersStopping = true;
+		workers.swap(g_workers);
+	}
+	for (auto &worker : workers) {
+		try { worker.get(); } catch (...) { blog(LOG_WARNING, "ReplayKit background task failed"); }
+	}
+}
 
 QCef *g_cef = nullptr;
 bool g_cefInitTried = false;
@@ -132,6 +169,7 @@ QElapsedTimer g_menuShownTimer;
 // background-thread only, can block for real time on a cold start -- waits for cefs background thread so widgets never hit the "first open only" white window race from being created before cef is ready
 bool EnsureCefReadyBlocking()
 {
+	std::lock_guard<std::mutex> lock(g_cefMutex);
 	if (!g_cefInitTried) {
 		g_cefInitTried = true;
 		g_cef = obs_browser_init_panel();
@@ -337,6 +375,9 @@ void RestoreWindowGeometry(const QString &key, QWidget *w)
 
 QPointer<QTimer> g_clipsGeoSaveTimer;
 QPointer<QTimer> g_obsGeoSaveTimer;
+QPointer<QTimer> g_geoPollTimer;
+QByteArray g_lastPolledObsGeo;
+QByteArray g_lastPolledClipsGeo;
 
 // coalesce the flood of move/resize events into one write a little after motion stops.
 void ScheduleClipsGeometrySave()
@@ -344,9 +385,9 @@ void ScheduleClipsGeometrySave()
 	if (!g_clipsWindow)
 		return;
 	if (!g_clipsGeoSaveTimer) {
-		g_clipsGeoSaveTimer = new QTimer(qApp);
+		g_clipsGeoSaveTimer = new QTimer(g_callbacks);
 		g_clipsGeoSaveTimer->setSingleShot(true);
-		QObject::connect(g_clipsGeoSaveTimer, &QTimer::timeout, qApp,
+		QObject::connect(g_clipsGeoSaveTimer, &QTimer::timeout, g_callbacks,
 				 []() { SaveWindowGeometry("clipsWindow", g_clipsWindow); });
 	}
 	g_clipsGeoSaveTimer->start(400);
@@ -357,12 +398,50 @@ void ScheduleObsMainGeometrySave()
 	if (!g_mainWindow)
 		return;
 	if (!g_obsGeoSaveTimer) {
-		g_obsGeoSaveTimer = new QTimer(qApp);
+		g_obsGeoSaveTimer = new QTimer(g_callbacks);
 		g_obsGeoSaveTimer->setSingleShot(true);
-		QObject::connect(g_obsGeoSaveTimer, &QTimer::timeout, qApp,
+		QObject::connect(g_obsGeoSaveTimer, &QTimer::timeout, g_callbacks,
 				 []() { SaveWindowGeometry("obsMainWindow", g_mainWindow); });
 	}
 	g_obsGeoSaveTimer->start(600);
+}
+
+// belt-and-suspenders for a forced close. taskkill /F, a crash, or an OS shutdown can end obs without firing the
+// close/hide handlers or letting the debounced savers above flush, losing whatever move happened since the last
+// event. this slow poll writes the current geometry every few seconds so a hard kill loses at most one interval of
+// position. change-checked against an in-memory copy, and skips hidden/minimized windows so it never clobbers a
+// good saved position with a tray-hidden or minimized rect.
+void PollWindowGeometry()
+{
+	QByteArray obsGeo, clipsGeo;
+	if (g_mainWindow && g_mainWindow->isVisible() && !g_mainWindow->isMinimized())
+		obsGeo = g_mainWindow->saveGeometry();
+	if (g_clipsWindow && g_clipsWindow->isVisible() && !g_clipsWindow->isMinimized())
+		clipsGeo = g_clipsWindow->saveGeometry();
+
+	const bool obsChanged = !obsGeo.isEmpty() && obsGeo != g_lastPolledObsGeo;
+	const bool clipsChanged = !clipsGeo.isEmpty() && clipsGeo != g_lastPolledClipsGeo;
+	if (!obsChanged && !clipsChanged)
+		return;
+
+	QSettings s(WindowStateIniPath(), QSettings::IniFormat);
+	if (obsChanged) {
+		s.setValue("obsMainWindow", obsGeo);
+		g_lastPolledObsGeo = obsGeo;
+	}
+	if (clipsChanged) {
+		s.setValue("clipsWindow", clipsGeo);
+		g_lastPolledClipsGeo = clipsGeo;
+	}
+}
+
+void StartWindowGeometryPoll()
+{
+	if (g_geoPollTimer)
+		return;
+	g_geoPollTimer = new QTimer(g_callbacks);
+	QObject::connect(g_geoPollTimer, &QTimer::timeout, g_callbacks, PollWindowGeometry);
+	g_geoPollTimer->start(5000);
 }
 
 // CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore
@@ -474,8 +553,8 @@ void CreateSettingsWindow()
 	RefreshAppIcon(); // give the fresh window the current app icon + taskbar retag
 	// re-apply a couple times: winId()/the cef child arent fully realised on the first pass, and a slow RKICON over
 	// the pipe can land after this. cheap -- the tag guard skips the taskbar rebuild on the repeats.
-	QTimer::singleShot(500, qApp, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
-	QTimer::singleShot(1600, qApp, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
+	QTimer::singleShot(500, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
+	QTimer::singleShot(1600, g_callbacks, []() { if (g_settingsWindow) ApplyAuxWindowIcon(g_settingsWindow, &g_ownedIconSettings, &g_taggedSettings, L"ReplayKit.SettingsWindow"); });
 }
 
 void ShowSettings()
@@ -493,18 +572,18 @@ void ShowSettings()
 	g_settingsCheckInFlight = true;
 
 	// same reasoning as ShowClips -- the docks own settings button opens a window.open() popup this cant see directly, so check for it by title before opening a second one
-	std::thread([]() {
+	RunAsync([]() {
 		bool focused = HttpFocusWindowSucceeded("/focus-window?title=ReplayKit%20Settings", 8767, 800);
 		bool cefReady = focused || EnsureCefReadyBlocking();
 		QMetaObject::invokeMethod(
-			qApp,
+			g_callbacks,
 			[focused, cefReady]() {
 				g_settingsCheckInFlight = false;
 				if (!focused && cefReady)
 					CreateSettingsWindow();
 			},
 			Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 void ShowClips()
@@ -525,18 +604,18 @@ void ShowClips()
 	g_clipsCheckInFlight = true;
 
 	// checks /focus-window first since the docks own button or a leftover window may already have one open, then runs both blocking http calls off the ui thread and posts back thru queued invokeMethod since qwidget/qcefwidget arent thread-safe
-	std::thread([]() {
+	RunAsync([]() {
 		bool focused = HttpFocusWindowSucceeded("/focus-window?title=Clips", 8767, 800);
 		bool cefReady = focused || EnsureCefReadyBlocking();
 		QMetaObject::invokeMethod(
-			qApp,
+			g_callbacks,
 			[focused, cefReady]() {
 				g_clipsCheckInFlight = false;
 				if (!focused && cefReady)
 					CreateClipsWindow();
 			},
 			Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 bool IsReplayKitFault(DWORD code)
@@ -700,14 +779,14 @@ void LoadOpenClipsHotkey()
 	if (g_openClipsHotkeyRequestInFlight)
 		return;
 	g_openClipsHotkeyRequestInFlight = true;
-	std::thread([]() {
+	RunAsync([]() {
 		std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 3000);
-		QMetaObject::invokeMethod(qApp, [settingsBody]() {
+		QMetaObject::invokeMethod(g_callbacks, [settingsBody]() {
 			g_openClipsHotkeyRequestInFlight = false;
 			g_closeToTray = JsonBoolField(settingsBody, "closeToTray", true);
 			RegisterOpenClipsHotkey(settingsBody);
 		}, Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 // posts to the same /share-preview route the dock uses so the projector/audio-monitoring logic stays in one place -- fire and forget, since aboutToShow re-reads the real state next open so a failed toggle just looks unchanged
@@ -715,18 +794,18 @@ void ToggleSharePreview(bool checked)
 {
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
-	std::thread([checked]() {
+	RunAsync([checked]() {
 		std::string json = checked ? "{\"enabled\":true}" : "{\"enabled\":false}";
 		std::string body = HttpRequest("POST", "/share-preview", 8767, json.c_str(), 8000);
 		bool enabled = JsonBoolField(body, "enabled", !checked);
 		QMetaObject::invokeMethod(
-			qApp,
+			g_callbacks,
 			[enabled]() {
 				if (g_sharePreviewAction)
 					g_sharePreviewAction->setChecked(enabled);
 			},
 			Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 // posts to the helpers /restart-obs, a plain close-and-reopen (not the settings pages signed-out "clean" restart) -- confirms first since it force-kills obs rather than stopping gracefully, then fires and forgets since obs is about to die anyway
@@ -740,7 +819,7 @@ void RestartObs()
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 	if (reply != QMessageBox::Yes)
 		return;
-	std::thread([]() { HttpRequest("POST", "/restart-obs", 8767, nullptr, 5000); }).detach();
+	RunAsync([]() { HttpRequest("POST", "/restart-obs", 8767, nullptr, 5000); });
 }
 
 // opens obss fixed crash-report folder directly in explorer rather than guessing "the latest one", mkpath first since a machine that never crashed wont have the folder yet
@@ -764,7 +843,7 @@ void ConfirmedExit()
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 	if (reply != QMessageBox::Yes)
 		return;
-	std::thread([]() { HttpRequest("POST", "/exit-obs", 8767, nullptr, 5000); }).detach();
+	RunAsync([]() { HttpRequest("POST", "/exit-obs", 8767, nullptr, 5000); });
 }
 
 // invisible throwaway browser to eat the first-ever cef surfaces one-time cost -- the real clips window paints only a corner and stays white the first time each obs session, and this burns that bad first attempt off-screen instead of chasing the exact cef-internal cause
@@ -776,10 +855,10 @@ void PrewarmCefBrowser()
 		return;
 	g_cefPrewarmed = true;
 
-	std::thread([]() {
+	RunAsync([]() {
 		bool cefReady = EnsureCefReadyBlocking();
 		QMetaObject::invokeMethod(
-			qApp,
+			g_callbacks,
 			[cefReady]() {
 				if (!cefReady || !g_cef)
 					return;
@@ -799,7 +878,7 @@ void PrewarmCefBrowser()
 				QTimer::singleShot(3000, warmWin, &QObject::deleteLater);
 			},
 			Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 // synchronously deletes our cef widgets before obs_module_unload, mirroring how OBSBasic.cpp deletes extraBrowsers early, to dodge upstream race obsproject/obs-browser#353 where cef can still be mid-teardown when the browser-manager thread is joined -- direct delete not deleteLater becuase a deferred one wouldnt run before applicationShutdown anyway
@@ -989,7 +1068,7 @@ void RefreshDynamicMenuState()
 {
 	RefreshActionRowText();
 	if (g_clipsRow || g_recordRow || g_replayBufferRow) {
-		std::thread([]() {
+		RunAsync([]() {
 			std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 500);
 			std::string clipsLabel = KeybindLabelFromSettingsJson(settingsBody, "openClipsKeybind");
 			std::string clipLabel = KeybindLabelFromSettingsJson(settingsBody, "clipKeybind");
@@ -1000,7 +1079,7 @@ void RefreshDynamicMenuState()
 			std::string accentLight = ExtractJsonStringField(menuColors, "accentLight");
 			std::string onAccent = ExtractJsonStringField(menuColors, "onAccent");
 			QMetaObject::invokeMethod(
-				qApp,
+				g_callbacks,
 				[clipsLabel, clipLabel, recordingLabel, text, accent, accentLight, onAccent]() {
 					const QString t = QString::fromStdString(text);
 					const QString a = QString::fromStdString(accent);
@@ -1020,16 +1099,16 @@ void RefreshDynamicMenuState()
 					}
 				},
 				Qt::QueuedConnection);
-		}).detach();
+		});
 	}
 	if (!g_sharePreviewAction)
 		return;
-	std::thread([]() {
+	RunAsync([]() {
 		std::string getBody = HttpRequest("GET", "/share-preview", 8767, nullptr, 500);
 		bool available = JsonBoolField(getBody, "available", false);
 		bool enabled = JsonBoolField(getBody, "enabled", false);
 		QMetaObject::invokeMethod(
-			qApp,
+			g_callbacks,
 			[available, enabled]() {
 				if (!g_sharePreviewAction)
 					return;
@@ -1037,7 +1116,7 @@ void RefreshDynamicMenuState()
 				g_sharePreviewAction->setChecked(enabled);
 			},
 			Qt::QueuedConnection);
-	}).detach();
+	});
 }
 
 // only pulls the menu up when it would actually overlap the taskbar (y), or back onto the screen when it would run off the right edge (x) -- this used to pin the bottom edge to the taskbar top unconditionally, which was wrong for a tray icon sitting in the hidden-icons flyout (a separate window that floats well above the taskbar): the menu snapped down to the taskbar instead of staying near the flyout it was actually opened from. checking against the menus own natural popup() position instead of always recomputing from the taskbar makes it adapt to wherever the icon actually is. skips the move() entirely when already at the target position -- re-positioning an already-visible native popup is a plausible cause of a reported "clicking outside the menu doesnt close it" bug (moving a shown popups hwnd can desync qts click-outside-to-dismiss tracking on windows), so this only touches geometry when it actually needs correcting.
@@ -1408,11 +1487,14 @@ void InstallMainWindowCloseFilter()
 	// put the window back where it was last session. once here (obs has finished its own layout) and again shortly
 	// after, since qts platform code can still be repositioning the main window right after FINISHED_LOADING.
 	RestoreWindowGeometry("obsMainWindow", mw);
-	QTimer::singleShot(400, qApp, []() {
+	QTimer::singleShot(400, g_callbacks, []() {
 		RestoreWindowGeometry("obsMainWindow", g_mainWindow);
 		// capture a baseline even if the user never moves the window this session.
 		ScheduleObsMainGeometrySave();
 	});
+
+	// slow safety-net save so a forced close cannot lose the last position -- see PollWindowGeometry.
+	StartWindowGeometryPoll();
 }
 
 QTimer *g_projectorPublishTimer = nullptr;
@@ -1455,18 +1537,18 @@ bool PipeWriteLine(HANDLE pipe, const std::string &line)
 void PipeDispatchLine(const std::string &line)
 {
 	if (line == "OPENCLIPS") {
-		QMetaObject::invokeMethod(qApp, []() { ShowClips(); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, []() { ShowClips(); }, Qt::QueuedConnection);
 	} else if (line.rfind("SETICON ", 0) == 0) {
 		QString iconPath = QString::fromUtf8(line.substr(8).c_str());
-		QMetaObject::invokeMethod(qApp, [iconPath]() { ApplyAppIcon(iconPath); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, [iconPath]() { ApplyAppIcon(iconPath); }, Qt::QueuedConnection);
 	} else if (line.rfind("SETICONDOT ", 0) == 0) {
 		bool on = line.substr(11) != "0";
 		QMetaObject::invokeMethod(
-			qApp, [on]() { g_recordingDotEnabled = on; RefreshAppIcon(); }, Qt::QueuedConnection);
+			g_callbacks, [on]() { g_recordingDotEnabled = on; RefreshAppIcon(); }, Qt::QueuedConnection);
 	} else if (line.rfind("RKICON ", 0) == 0) {
 		QString p = QString::fromUtf8(line.substr(7).c_str());
 		QMetaObject::invokeMethod(
-			qApp, [p]() { g_rkIconPath = p; RefreshAppIcon(); }, Qt::QueuedConnection);
+			g_callbacks, [p]() { g_rkIconPath = p; RefreshAppIcon(); }, Qt::QueuedConnection);
 	} else if (line == "ALLOWCLOSE") {
 		// a real restart/exit is coming -- let the next WM_CLOSE through the close-to-tray filter for 60s, and
 		// ack so the helper knows the filter saw it before it posts the close.
@@ -1519,6 +1601,8 @@ void PipeServeClient(HANDLE pipe)
 			if (!ReadFile(pipe, buf, want, &got, nullptr) || got == 0)
 				return;
 			inbound.append(buf, got);
+			if (inbound.size() > 64 * 1024)
+				return;
 			avail -= got;
 		}
 		size_t nl;
@@ -1539,7 +1623,7 @@ void PipeServerThread()
 {
 	while (!g_pipeStop.load()) {
 		HANDLE pipe = CreateNamedPipeW(kIpcPipeName, PIPE_ACCESS_DUPLEX,
-					       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 64 * 1024, 64 * 1024,
+					       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS, 1, 64 * 1024, 64 * 1024,
 					       0, nullptr);
 		if (pipe == INVALID_HANDLE_VALUE) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -1579,6 +1663,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 			g_clipsGeoSaveTimer->stop();
 		if (g_obsGeoSaveTimer)
 			g_obsGeoSaveTimer->stop();
+		if (g_geoPollTimer)
+			g_geoPollTimer->stop();
 		// final geometry capture while the windows are still up and positioned (CloseCefWidgets deletes Clips next).
 		if (g_clipsWindow)
 			SaveWindowGeometry("clipsWindow", g_clipsWindow);
@@ -1592,7 +1678,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED ||
 	    event == OBS_FRONTEND_EVENT_RECORDING_PAUSED || event == OBS_FRONTEND_EVENT_RECORDING_UNPAUSED ||
 	    event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {
-		QMetaObject::invokeMethod(qApp, []() { RefreshAppIcon(); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, []() { RefreshAppIcon(); }, Qt::QueuedConnection);
 		return;
 	}
 
@@ -1602,14 +1688,14 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	PrewarmCefBrowser();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
-	g_openClipsHotkeyTimer = new QTimer(qApp);
-	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, qApp, []() { LoadOpenClipsHotkey(); });
+	g_openClipsHotkeyTimer = new QTimer(g_callbacks);
+	QObject::connect(g_openClipsHotkeyTimer, &QTimer::timeout, g_callbacks, []() { LoadOpenClipsHotkey(); });
 	g_openClipsHotkeyTimer->start(1000);
 	LoadOpenClipsHotkey();
 
 	// 250ms matches the helpers own poll cadence when its waiting for a projector to appear -- the pipe thread forwards this snapshot to the helper at the same rate.
-	g_projectorPublishTimer = new QTimer(qApp);
-	QObject::connect(g_projectorPublishTimer, &QTimer::timeout, qApp, []() { PublishProjectorWindows(); });
+	g_projectorPublishTimer = new QTimer(g_callbacks);
+	QObject::connect(g_projectorPublishTimer, &QTimer::timeout, g_callbacks, []() { PublishProjectorWindows(); });
 	g_projectorPublishTimer->start(250);
 	PublishProjectorWindows();
 
@@ -1767,6 +1853,9 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
+	g_callbacks = new QObject();
+	g_workersStopping = false;
+	g_pipeStop.store(false);
 	StartReplayKitCrashReporter();
 	g_openClipsHotkeyFilter = new OpenClipsHotkeyFilter();
 	qApp->installNativeEventFilter(g_openClipsHotkeyFilter);
@@ -1777,14 +1866,20 @@ bool obs_module_load(void)
 
 void obs_module_unload(void)
 {
+	obs_frontend_remove_event_callback(OnFrontendEvent, nullptr);
 	StopReplayKitCrashReporter();
 	g_pipeStop.store(true);
-	// wake a PipeServerThread blocked in ConnectNamedPipe so it can see the stop flag and exit.
-	HANDLE poke = CreateFileW(kIpcPipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-	if (poke != INVALID_HANDLE_VALUE)
-		CloseHandle(poke);
-	if (g_pipeThread.joinable())
+	if (g_pipeThread.joinable()) {
+		// Cover a connect/write that starts just after the stop flag was set.
+		while (WaitForSingleObject(g_pipeThread.native_handle(), 50) == WAIT_TIMEOUT)
+			CancelSynchronousIo(g_pipeThread.native_handle());
 		g_pipeThread.join();
+	}
+	StopWorkers();
+	// Destroy queued callbacks before their code is unloaded with this module.
+	delete g_callbacks;
+	g_callbacks = nullptr;
+	g_projectorPublishTimer = nullptr;
 	if (g_openClipsHotkeyTimer)
 		g_openClipsHotkeyTimer->stop();
 	if (g_openClipsHotkeyRegistered)
@@ -1797,4 +1892,5 @@ void obs_module_unload(void)
 	// the filter is parented to the main window, so it is already gone if the window was destroyed first; guard with the QPointer and only detach when both still exist.
 	if (g_mainWindow && g_mainWindowCloseFilter)
 		g_mainWindow->removeEventFilter(g_mainWindowCloseFilter);
+	delete g_mainWindowCloseFilter.data();
 }

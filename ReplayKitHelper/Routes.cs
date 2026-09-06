@@ -279,7 +279,9 @@ namespace ReplayKitHelper
         // an explicit origin/referer/user-agent check since the dock pages are loaded from a file:// or loopback-http origin the browser doesnt sandbox the way it would a remote site -- these routes can change settings or trigger an obs restart, so anything that isnt recognizably "our own dock" is rejected.
         private static bool TestSettingsOrigin(HttpRequest req)
         {
-            if (!req.Headers.TryGetValue("origin", out string origin)) return true;
+            if (!req.Headers.TryGetValue("origin", out string origin))
+                return !req.Headers.TryGetValue("sec-fetch-site", out string site) ||
+                    !string.Equals(site, "cross-site", StringComparison.OrdinalIgnoreCase);
             origin = origin.Trim().ToLowerInvariant();
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
             if (origin == "http://127.0.0.1:" + port || origin == "http://localhost:" + port) return true;
@@ -419,6 +421,18 @@ namespace ReplayKitHelper
         public static bool DispatchRequest(Stream stream, HttpRequest req)
         {
             AppConfig.LoadConfig();
+
+            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
+            if (!req.Headers.TryGetValue("host", out string host) ||
+                !(string.Equals(host, "127.0.0.1:" + port, StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(host, "localhost:" + port, StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)) ||
+                !TestSettingsOrigin(req))
+            {
+                HttpResponse.SendText(stream, 403, "Forbidden", "Untrusted request origin or host.");
+                return false;
+            }
 
             if (req.Method == "OPTIONS")
             {

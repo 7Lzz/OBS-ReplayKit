@@ -165,28 +165,15 @@ namespace ReplayKitHelper
                 if (!int.TryParse(r.Stdout.Trim(), out int code) || code < 200 || code >= 300) return null;
                 if (!File.Exists(respPath)) return null;
                 string body = File.ReadAllText(respPath);
-                // log the identity-relevant fields so its visible why username ends up blank when streamable returns a degraded response. surfacing just the auth-shaped keys keeps the log clean.
                 try
                 {
                     var u = JObject.Parse(body);
-                    string id = u["id"]?.ToString() ?? "?";
-                    string name = u["user_name"]?.Value<string>() ?? "";
-                    string email = u["email"]?.Value<string>() ?? "";
-                    string plan = u["plan_name"]?.Value<string>() ?? "";
-                    string emailV = u["email_verified"] != null ? u["email_verified"].ToString() : "?";
-                    Log.Write(string.Format("Streamable /me ok: id={0} user_name='{1}' email='{2}' plan='{3}' email_verified={4}  bodylen={5}",
-                        id, name, email, plan, emailV, body.Length));
-                    // if identity fields are missing, dump the entire response so its visible what fields are present. truncated at 2kb to avoid log spam if a future response is enormous.
-                    if (u["id"] == null || string.IsNullOrEmpty(u["user_name"]?.Value<string>()))
-                    {
-                        string dump = body.Length > 2000 ? body.Substring(0, 2000) + "..." : body;
-                        Log.Write("Streamable /me DEGRADED body: " + Regex.Replace(dump, @"\s+", " "));
-                    }
+                    Log.Write("Streamable session validated.");
                     return u;
                 }
-                catch (JsonException ex)
+                catch (JsonException)
                 {
-                    Log.Write("Streamable /me: JSON parse failed (" + ex.Message + "); body[0..200]=" + body.Substring(0, Math.Min(200, body.Length)));
+                    Log.Write("Streamable /me: invalid JSON response.");
                     return null;
                 }
             }
@@ -213,7 +200,7 @@ namespace ReplayKitHelper
             if (live != null)
             {
                 ApplyAuth(live, cookies);
-                Log.Write("Restored signed-in session for " + Server.State.Auth.Username + " (plan=" + Server.State.Auth.Plan + ")");
+                Log.Write("Restored signed-in session.");
                 return;
             }
             Log.Write("Stored auth blob exists but Streamable rejected the session -- clearing.");

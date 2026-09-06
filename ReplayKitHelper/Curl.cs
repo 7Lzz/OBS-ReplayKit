@@ -18,7 +18,7 @@ namespace ReplayKitHelper
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "curl.exe",
+                FileName = System.IO.Path.Combine(Environment.SystemDirectory, "curl.exe"),
                 Arguments = ProcessArgs.Join(args),
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -28,10 +28,10 @@ namespace ReplayKitHelper
             using (var proc = Process.Start(psi))
             {
                 onStarted?.Invoke(proc);
-                string stdout = proc.StandardOutput.ReadToEnd();
-                string stderr = proc.StandardError.ReadToEnd();
+                var stdout = proc.StandardOutput.ReadToEndAsync();
+                var stderr = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
-                return new Result { ExitCode = proc.ExitCode, Stdout = stdout, Stderr = stderr };
+                return new Result { ExitCode = proc.ExitCode, Stdout = stdout.GetAwaiter().GetResult(), Stderr = stderr.GetAwaiter().GetResult() };
             }
         }
 

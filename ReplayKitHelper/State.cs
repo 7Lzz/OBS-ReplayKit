@@ -243,7 +243,6 @@ namespace ReplayKitHelper
         public volatile bool Shutdown;
 
         // written by route handlers, read once by the shutdown path -- single write-then-read-once, no dedicated lock (matches the ps original's reliance on happens-before at process-exit time).
-        public volatile bool ClearStreamableOnExit;
         // null means no restart pending; a non-null value is the obs executable path to relaunch once this process exits (the legacy fallback path used only when the detached relauncher in Routes.cs cant be started).
         public volatile string RestartAfterCleanObsPath;
 
@@ -295,7 +294,6 @@ namespace ReplayKitHelper
         public bool ReplaykitStartupUpdateChecked;
         public bool UpdateApplyInProgress;
 
-        public string ObsExe;
     }
 
     // one upload/compress/trim-overwrite job. StartedAt/UpdatedAt are unix milliseconds (the exact shape the frontends /status json expects), not DateTime -- matches New-UploadJobRecord/Copy-UploadJobForJson in the ps original exactly. Cts/EncoderProcess/TempPath are internal-only (never serialized to the frontend, same as the ps originals now-eliminated processId/statusPath were) -- they replace those cross-process coordination handles with direct in-process ones now that upload/compress/trim run as Tasks in this same process instead of spawned children a status file had to bridge to.

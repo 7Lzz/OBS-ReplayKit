@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Management;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Text.RegularExpressions;
@@ -198,43 +197,53 @@ namespace ReplayKitSetup
             }
         }
 
-        // true iff the bundled virtual audio driver is registered.
+        // sound/media device setup class; one NNNN subkey per installed audio driver, DriverDesc is the same string Win32_SoundDevice.Name returned.
+        private const string MediaClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e96c-e325-11ce-bfc1-08002be10318}";
+
+        // true iff the bundled virtual audio driver is registered. was a Win32_SoundDevice wmi query; System.Management is not trim-safe and this project publishes trimmed, so it checks the media-class driver descriptions in the registry.
         public static bool IsVbcableInstalled()
         {
             try
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_SoundDevice WHERE Name LIKE '%VB-Audio Virtual Cable%'"))
-                using (var results = searcher.Get())
+                using (var classKey = Registry.LocalMachine.OpenSubKey(MediaClassKey))
                 {
-                    return results.Count > 0;
-                }
-            }
-            catch (ManagementException)
-            {
-                return false;
-            }
-        }
-
-        // native replacement for the old Get-CimInstance Win32_Process discord enumeration.
-        private static List<(int Pid, string Name, string ExecutablePath)> QueryDiscordProcesses()
-        {
-            var results = new List<(int, string, string)>();
-            string where = string.Join(" OR ", DiscordProcessNames.Select(n => $"Name='{n.Replace("'", "''")}'"));
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher($"SELECT ProcessId, Name, ExecutablePath FROM Win32_Process WHERE {where}"))
-                using (var rows = searcher.Get())
-                {
-                    foreach (ManagementObject row in rows)
+                    if (classKey == null) return false;
+                    foreach (string sub in classKey.GetSubKeyNames())
                     {
-                        int pid = Convert.ToInt32(row["ProcessId"]);
-                        string name = row["Name"] as string ?? "";
-                        string exePath = row["ExecutablePath"] as string ?? "";
-                        results.Add((pid, name, exePath));
+                        if (sub.Length != 4 || !sub.All(char.IsDigit)) continue;
+                        using (var dev = classKey.OpenSubKey(sub))
+                        {
+                            string desc = dev?.GetValue("DriverDesc") as string;
+                            if (!string.IsNullOrEmpty(desc) && desc.IndexOf("VB-Audio Virtual Cable", StringComparison.OrdinalIgnoreCase) >= 0)
+                                return true;
+                        }
                     }
                 }
             }
-            catch (ManagementException) { }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is IOException) { }
+            return false;
+        }
+
+        // running discord processes as (pid, "Name.exe", exe path). was a Win32_Process wmi query; walks the process list directly now. Name keeps the .exe so DiscordRestartProcessNames still matches.
+        private static List<(int Pid, string Name, string ExecutablePath)> QueryDiscordProcesses()
+        {
+            var results = new List<(int, string, string)>();
+            foreach (string exeName in DiscordProcessNames)
+            {
+                string bare = Path.GetFileNameWithoutExtension(exeName);
+                Process[] procs;
+                try { procs = Process.GetProcessesByName(bare); }
+                catch (InvalidOperationException) { continue; }
+                foreach (var p in procs)
+                {
+                    string path = "";
+                    try { path = p.MainModule?.FileName ?? ""; }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is NotSupportedException) { }
+                    try { results.Add((p.Id, exeName, path)); }
+                    catch (InvalidOperationException) { }
+                    finally { p.Dispose(); }
+                }
+            }
             return results;
         }
 
@@ -310,7 +319,7 @@ namespace ReplayKitSetup
             log?.Invoke("    Windows Security may prompt for an audio driver - click Install");
 
             string setup = Path.Combine(packDir, Config.VBCABLE_SETUP_EXE_NAME);
-            Process proc;
+            using var proc = new Process();
             string stderr;
             try
             {
@@ -321,9 +330,10 @@ namespace ReplayKitSetup
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
-                proc = Process.Start(psi);
+                proc.StartInfo = psi;
+                proc.Start();
                 proc.StandardOutput.ReadToEndAsync();
-                stderr = proc.StandardError.ReadToEnd();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(300000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
@@ -331,6 +341,7 @@ namespace ReplayKitSetup
                     try { Directory.Delete(packDir, true); } catch (IOException) { }
                     return false;
                 }
+                stderr = stderrTask.GetAwaiter().GetResult();
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {
@@ -484,7 +495,7 @@ namespace ReplayKitSetup
             }
 
             string setup = Path.Combine(packDir, Config.VBCABLE_SETUP_EXE_NAME);
-            Process proc;
+            using var proc = new Process();
             try
             {
                 var psi = new ProcessStartInfo(setup, Win32Args.Build("-u", "-h"))
@@ -494,7 +505,8 @@ namespace ReplayKitSetup
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
-                proc = Process.Start(psi);
+                proc.StartInfo = psi;
+                proc.Start();
                 proc.StandardOutput.ReadToEndAsync();
                 proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(300000))

@@ -51,6 +51,8 @@ namespace ReplayKitHelper
             CancellationToken cancelToken, out int statusCode)
         {
             statusCode = 0;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri destination) || destination.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException("Upload destination must use HTTPS.");
             string boundary = "----ReplayKit" + Guid.NewGuid().ToString("N");
             string fileName = Path.GetFileName(filePath).Replace("\"", "").Replace("\r", "").Replace("\n", "");
             long fileLen = new FileInfo(filePath).Length;
@@ -230,14 +232,12 @@ namespace ReplayKitHelper
                 var r1 = Curl.Run(step1Args.ToArray(), proc => UploadState.SetUploadState(requestId: requestId, encoderProcess: proc));
                 if (r1.ExitCode != 0 || string.IsNullOrWhiteSpace(r1.Stdout))
                 {
-                    string detail = string.Join(" ", new[] { r1.Stderr, r1.Stdout }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
-                    if (string.IsNullOrWhiteSpace(detail)) detail = "no curl output";
-                    throw new InvalidOperationException("Step 1 curl failed (exit=" + r1.ExitCode + "). Output: " + detail);
+                    throw new InvalidOperationException("Step 1 curl failed (exit=" + r1.ExitCode + ").");
                 }
                 var data = JObject.Parse(r1.Stdout);
                 string shortcode = data["shortcode"]?.Value<string>();
                 if (string.IsNullOrEmpty(shortcode))
-                    throw new InvalidOperationException("Step 1 response missing shortcode. Body: " + r1.Stdout.Substring(0, Math.Min(400, r1.Stdout.Length)));
+                    throw new InvalidOperationException("Step 1 response missing shortcode.");
                 Log.Write("shortcode: " + shortcode, "upload", requestId);
 
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
@@ -275,7 +275,7 @@ namespace ReplayKitHelper
                     }
                 }
                 if (s3Status < 200 || s3Status >= 300)
-                    throw new InvalidOperationException("S3 upload failed: HTTP " + s3Status + ". Body: " + (s3Body ?? "").Trim());
+                    throw new InvalidOperationException("S3 upload failed: HTTP " + s3Status + ".");
                 Log.Write("S3: HTTP " + s3Status, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "finalizing", 100);
 
@@ -308,17 +308,14 @@ namespace ReplayKitHelper
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
                 if (r3.ExitCode != 0 || string.IsNullOrWhiteSpace(r3.Stdout))
                 {
-                    string detail = string.Join(" ", new[] { r3.Stderr, r3.Stdout }.Where(s => !string.IsNullOrWhiteSpace(s))).Trim();
-                    if (string.IsNullOrWhiteSpace(detail)) detail = "no curl output";
-                    throw new InvalidOperationException("Transcode trigger curl failed (exit=" + r3.ExitCode + "). Output: " + detail);
+                    throw new InvalidOperationException("Transcode trigger curl failed (exit=" + r3.ExitCode + ").");
                 }
                 var tcLines = r3.Stdout.Split('\n');
                 if (!int.TryParse(tcLines[tcLines.Length - 1].Trim(), out int tcStatus))
-                    throw new InvalidOperationException("Transcode trigger returned an unreadable status. Body: " + r3.Stdout.Substring(0, Math.Min(400, r3.Stdout.Length)));
+                    throw new InvalidOperationException("Transcode trigger returned an unreadable status.");
                 if (tcStatus < 200 || tcStatus >= 300)
                 {
-                    string tcBody = string.Join("\n", tcLines, 0, tcLines.Length - 1);
-                    throw new InvalidOperationException("Transcode trigger failed: HTTP " + tcStatus + ". Body: " + tcBody);
+                    throw new InvalidOperationException("Transcode trigger failed: HTTP " + tcStatus + ".");
                 }
                 Log.Write("transcode: HTTP " + tcStatus, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "copying link", 100);

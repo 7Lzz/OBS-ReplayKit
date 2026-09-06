@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
@@ -229,7 +230,8 @@ namespace ReplayKitSetup
                 }
             }
             if (!first) sb.Append(',');
-            sb.Append("\"key\":\"").Append(combo["key"]).Append('"');
+            if (!(combo["key"] is string key)) throw new ArgumentException("Hotkey key must be a string.");
+            sb.Append("\"key\":").Append(JsonConvert.ToString(key));
             sb.Append('}');
             return sb.ToString();
         }
@@ -251,25 +253,28 @@ namespace ReplayKitSetup
         // parse the json obs persists under [Hotkeys] ReplayBuffer=. returns the first ReplayBuffer.Save keybind dict, or null if malformed.
         public static Dictionary<string, object> FromBasicIniValue(string text)
         {
-            object data;
+            JToken data;
             try
             {
-                data = new JavaScriptSerializer().DeserializeObject(text);
+                data = JToken.Parse(text);
             }
-            catch (ArgumentException)
-            {
-                return null;
-            }
-            catch (InvalidOperationException)
+            catch (JsonException)
             {
                 return null;
             }
 
-            if (!(data is Dictionary<string, object> dict)) return null;
-            if (!dict.TryGetValue("ReplayBuffer.Save", out var bindsObj)) return null;
-            if (!(bindsObj is object[] binds) || binds.Length == 0) return null;
-            if (!(binds[0] is Dictionary<string, object> first) || !first.ContainsKey("key")) return null;
-            return first;
+            if (!(data is JObject obj)) return null;
+            if (!(obj["ReplayBuffer.Save"] is JArray binds) || binds.Count == 0) return null;
+            if (!(binds[0] is JObject first) || first["key"]?.Type != JTokenType.String) return null;
+
+            // flatten to the Dictionary<string, object> the rest of Keybind works with -- bool for the modifier
+            // flags, string for key, matching what JavaScriptSerializer used to hand back.
+            var combo = new Dictionary<string, object>();
+            foreach (var prop in first.Properties())
+            {
+                combo[prop.Name] = (prop.Value as JValue)?.Value;
+            }
+            return combo;
         }
 
         // the shift+\\ keybind the bundled basic.ini ships with.

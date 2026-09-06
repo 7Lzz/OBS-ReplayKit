@@ -431,6 +431,43 @@
     border: 5px solid transparent;
     border-bottom-color: var(--grey8);
   }
+  /* multi-line variant of the tooltip for the info-dot notes -- same ground, shadow, arrow and pop, just wraps. */
+  #bulk-tip.tip-rich {
+    white-space: normal;
+    max-width: 264px;
+    line-height: 1.42;
+    text-align: left;
+    padding: 7px 10px;
+  }
+  /* small "i" that reveals an item's note in the shared tooltip on hover, keyboard focus or click. twin of settings.html's .info-dot. */
+  .info-dot {
+    flex: none;
+    margin-left: 4px;
+    padding: 0;
+    width: 15px;
+    height: 15px;
+    display: inline-flex;
+    vertical-align: middle;
+    border: 0;
+    background: transparent;
+    color: var(--text_muted, #969696);
+    cursor: help;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content: "";
+    width: 100%;
+    height: 100%;
+    background-color: currentColor;
+    -webkit-mask: url(/icons/ui/info.svg) center / contain no-repeat;
+    mask: url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color: var(--text); transform: scale(1.12); }
+  .info-dot:active { transform: scale(.94); }
+  .info-dot:focus { outline: none; }
+  .info-dot:focus-visible { color: var(--text); border-radius: 50%; box-shadow: 0 0 0 2px var(--selected2, #476bd7); }
   .bulk-clear {
     height: 30px;
     padding: 0 7px;
@@ -2802,7 +2839,7 @@
 
   <div class="modal-veil" id="trim-veil">
     <div class="modal trim-modal" id="trim-modal">
-      <div class="trim-heading"><h2>Edit clip</h2><span>Drag the handles to choose what to keep</span></div>
+      <div class="trim-heading"><h2>Edit clip <button class="info-dot" type="button" aria-label="About editing clips" data-tooltip="Drag the handles to choose what to keep."></button></h2></div>
       <div class="clip-name" id="trim-clip-name"></div>
       <div class="trim-video-wrap preview">
         <video id="trim-video" preload="metadata" playsinline
@@ -2857,9 +2894,10 @@
         <span>End <b id="trim-end-time">0:00.00</b></span>
         <span>Length <b id="trim-length-time">0:00.00</b></span>
       </div>
-      <label class="trim-mode-row" title="Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles.">
+      <label class="trim-mode-row">
         <input type="checkbox" id="trim-precise">
         <span>Frame-accurate (re-encode for exact cut, takes much longer)</span>
+        <button class="info-dot" type="button" aria-label="About frame-accurate trim" data-tooltip="Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles."></button>
       </label>
       <label class="trim-mode-row" title="Drops the audio stream from the edited output.">
         <input type="checkbox" id="trim-remove-audio">
@@ -7706,6 +7744,7 @@
     if (btn === sortButton && sortWrap && sortWrap.classList.contains("is-open")) return;
     bulkTipBtn = btn;
     bulkTip.textContent = btn.dataset.tooltip;
+    bulkTip.classList.toggle("tip-rich", btn.classList.contains("info-dot"));
     bulkTip.classList.add("is-shown");
     positionBulkTip();
   }
@@ -7724,6 +7763,14 @@
     btn.addEventListener("mouseenter", () => showBulkTip(btn));
     btn.addEventListener("mouseleave", hideBulkTip);
     bulkTipObserver.observe(btn, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
+  });
+  // info-dots share the same tip -- revealed on hover, on the focus a tab hands the button, or on a click (swallowed so a dot inside a label never toggles its checkbox).
+  document.querySelectorAll(".info-dot[data-tooltip]").forEach((dot) => {
+    dot.addEventListener("mouseenter", () => showBulkTip(dot));
+    dot.addEventListener("mouseleave", hideBulkTip);
+    dot.addEventListener("focus", () => showBulkTip(dot));
+    dot.addEventListener("blur", hideBulkTip);
+    dot.addEventListener("click", (e) => { e.preventDefault(); showBulkTip(dot); });
   });
   // hide on any click EXCEPT one on the tipped button itself -- clicking it is about to change its tooltip, and the observer will swap the text live.
   document.addEventListener("mousedown", (e) => {

@@ -26,15 +26,15 @@ namespace ReplayKitSetup
                 };
                 using (var proc = Process.Start(psi))
                 {
-                    string stdout = proc.StandardOutput.ReadToEnd();
-                    string stderr = proc.StandardError.ReadToEnd();
+                    var stdout = proc.StandardOutput.ReadToEndAsync();
+                    var stderr = proc.StandardError.ReadToEndAsync();
                     if (!proc.WaitForExit(10000))
                     {
                         try { proc.Kill(); } catch (InvalidOperationException) { }
                         log?.Invoke("warn: powercfg " + arguments + " failed: timed out");
                         return null;
                     }
-                    return (proc.ExitCode, stdout, stderr);
+                    return (proc.ExitCode, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
                 }
             }
             catch (System.ComponentModel.Win32Exception exc)

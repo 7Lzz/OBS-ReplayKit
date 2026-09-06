@@ -16,6 +16,7 @@ namespace ReplayKitHelper
         {
             if (string.IsNullOrEmpty(raw)) return null;
             string decoded = Uri.UnescapeDataString(raw);
+            if (decoded.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
             string name = Path.GetFileName(decoded).Trim();
             if (string.IsNullOrEmpty(name)) return null;
             string ext = Path.GetExtension(name).ToLowerInvariant();
@@ -37,6 +38,7 @@ namespace ReplayKitHelper
             string full = Path.GetFullPath(Path.Combine(root, name));
             string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString()) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
+            if (File.Exists(full) && (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0) return null;
             return new SafeClipPath { Name = name, Full = full };
         }
 

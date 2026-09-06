@@ -18,28 +18,63 @@ namespace ReplayKitHelper
     // per-connection http/1.1 request parsing and the accept-loop's per-socket handler: read one request, dispatch it, and (for /file/ range requests only) keep the socket open for a short idle window so a video element's next range request reuses it instead of paying a fresh tcp handshake per chunk. ported from obs_replaykit helper modules/80_connection.ps1.
     internal static class Connection
     {
+        internal static readonly Encoding WireEncoding = Encoding.GetEncoding(28591);
+        private static readonly Encoding BodyEncoding = new UTF8Encoding(false, true);
+
+        private static string ReadLine(StreamReader reader)
+        {
+            var line = new StringBuilder();
+            while (line.Length <= 8192)
+            {
+                int value = reader.Read();
+                if (value < 0)
+                {
+                    if (line.Length == 0) return null;
+                    throw new InvalidDataException("Incomplete HTTP header.");
+                }
+                if (value == '\r')
+                {
+                    if (reader.Read() != '\n') throw new InvalidDataException("Invalid HTTP line ending.");
+                    return line.ToString();
+                }
+                if (value < 32 && value != '\t' || value > 126)
+                    throw new InvalidDataException("Invalid HTTP header character.");
+                line.Append((char)value);
+            }
+            throw new InvalidDataException("HTTP header line too long.");
+        }
+
         // returns null on a closed connection or a request line too broken to route, which the caller treats as "stop reading this connection".
         public static HttpRequest ReadHttpRequest(Stream stream, StreamReader reader)
         {
-            string requestLine = reader.ReadLine();
+            string requestLine = ReadLine(reader);
             if (string.IsNullOrEmpty(requestLine)) return null;
             var parts = requestLine.Split(' ');
-            if (parts.Length < 2) return null;
+            if (parts.Length != 3 || (parts[2] != "HTTP/1.1" && parts[2] != "HTTP/1.0") || !parts[1].StartsWith("/", StringComparison.Ordinal))
+                throw new InvalidDataException("Invalid HTTP request line.");
             string method = parts[0];
             string rawPath = parts[1];
 
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string line;
-            while (!string.IsNullOrEmpty(line = reader.ReadLine()))
+            int headerBytes = requestLine.Length + 2;
+            while ((line = ReadLine(reader)) != "")
             {
+                if (line == null) throw new InvalidDataException("Incomplete HTTP headers.");
+                headerBytes += line.Length + 2;
+                if (headerBytes > 32768) throw new InvalidDataException("HTTP headers too large.");
                 int idx = line.IndexOf(':');
-                if (idx > 0)
+                if (idx <= 0) throw new InvalidDataException("Invalid HTTP header.");
                 {
                     string k = line.Substring(0, idx).Trim().ToLowerInvariant();
                     string v = line.Substring(idx + 1).Trim();
-                    headers[k] = v;
+                    if (headers.ContainsKey(k)) throw new InvalidDataException("Duplicate HTTP header.");
+                    headers.Add(k, v);
                 }
             }
+
+            if (headers.ContainsKey("transfer-encoding"))
+                throw new InvalidDataException("Transfer-Encoding is not supported.");
 
             string body = "";
             int bodyLen = 0;
@@ -63,10 +98,11 @@ namespace ReplayKitHelper
                 while (read < bodyLen)
                 {
                     int n = reader.Read(buf, read, bodyLen - read);
-                    if (n <= 0) break;
+                    if (n <= 0) throw new InvalidDataException("Incomplete HTTP body.");
                     read += n;
                 }
-                body = new string(buf, 0, read);
+                // Content-Length counts bytes; the wire reader maps each byte to one character.
+                body = BodyEncoding.GetString(WireEncoding.GetBytes(buf, 0, read));
             }
 
             int qIdx = rawPath.IndexOf('?');
@@ -105,7 +141,7 @@ namespace ReplayKitHelper
                 // a write that stalls (client not draining its receive window) blocks this connection's pool thread for the full timeout before .net aborts it -- nothing on localhost legitimately needs anywhere near that long, and a stuck client shouldnt tie up a pool slot repeatedly.
                 client.SendTimeout = 3000;
                 var stream = client.GetStream();
-                using (var reader = new StreamReader(stream, Encoding.ASCII, false, 8192, true))
+                using (var reader = new StreamReader(stream, WireEncoding, false, 8192, true))
                 {
                     // every route answers once and closes (Connection: close from GetNoStoreHeaders) except /file/, which can ask to keep going so a video element's next range request reuses this socket instead of paying a fresh tcp handshake per chunk.
                     while (true)
@@ -115,19 +151,7 @@ namespace ReplayKitHelper
                         bool keepAlive = Routes.DispatchRequest(stream, req);
                         if (!keepAlive) break;
 
-                        // a kept-alive /file/ socket is betting the same video element's next range request follows within tens of ms, so it gets a short idle timeout instead of the fresh-connection 5s one. sacrificing this slot the instant a new connection shows up elsewhere in the pool once broke ordinary mid-playback traffic, so this waits out its own budget regardless of what else the listener is doing.
-                        int waitedMs = 0;
-                        bool gotNextRequest = false;
-                        while (waitedMs < 500)
-                        {
-                            if (client.Client.Poll(20000, SelectMode.SelectRead)) { gotNextRequest = true; break; }
-                            waitedMs += 20;
-                        }
-                        if (!gotNextRequest)
-                        {
-                            Log.Write("Handle-Connection: keep-alive idle-timeout path=" + req.Path + " waitedMs=" + waitedMs);
-                            break;
-                        }
+                        // Read buffered requests first; polling the socket misses StreamReader's read-ahead.
                         client.ReceiveTimeout = 500;
                     }
                 }

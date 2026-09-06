@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // enable obs-websocket on loopback so the docks save-replay button can drive obs. plugin ships with obs since 28; just flip server_enabled=true, auth off. windows/wsl hyper-v port exclusion ranges are recomputed every reboot from whatever the machines dynamic port range happens to be, so no single hardcoded port stays safe forever on every pc -- 4455 then 6455 both eventually got swallowed (WSAEACCES on listen) on different machines. this verifies the configured port actually binds and auto-repicks from a spread of fallbacks when it does not, instead of hardcoding a third number and hoping. ported from obs_replaykit/websocket.py.
+    // Configure authenticated OBS WebSocket access for the local helper.
     public static class WebSocketConfig
     {
         public static readonly string WEBSOCKET_CONFIG_PATH = Path.Combine(Config.OBS_CONFIG, "plugin_config", "obs-websocket", "config.json");
@@ -16,7 +16,7 @@ namespace ReplayKitSetup
         private static JObject DefaultConfig() => new JObject
         {
             ["alerts_enabled"] = false,
-            ["auth_required"] = false,
+            ["auth_required"] = true,
             ["first_load"] = false,
             ["server_enabled"] = true,
             ["server_password"] = "",
@@ -29,6 +29,7 @@ namespace ReplayKitSetup
         // true if a loopback listener can actually take this port right now.
         private static bool PortIsBindable(int port)
         {
+            if (port < 1 || port > 65535) return false;
             try
             {
                 using (var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
@@ -55,7 +56,7 @@ namespace ReplayKitSetup
             return null;
         }
 
-        // current config or {} (also {} on parse failure so a corrupted file doesnt block install).
+        // Preserve existing settings; unreadable configuration must not be overwritten.
         private static JObject LoadExisting()
         {
             if (!File.Exists(WEBSOCKET_CONFIG_PATH)) return new JObject();
@@ -65,11 +66,11 @@ namespace ReplayKitSetup
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
-                return new JObject();
+                throw new InvalidDataException("Existing OBS websocket configuration could not be read; it was not changed.", ex);
             }
         }
 
-        // ensure obs-websocket is enabled on a port that actually binds on this pc. preserves auth_required if the user has already turned it on. runs on every apply (not just fresh installs), so a port thats become blocked since the last run gets caught and repicked automatically -- called with obs already closed, so this is testing the same bind obs-websocket itself will attempt.
+        // Called with OBS closed so port availability can be checked before configuration is written.
         public static bool InstallWebsocketConfig(Action<string> log = null)
         {
             var existing = LoadExisting();
@@ -78,8 +79,9 @@ namespace ReplayKitSetup
 
             // force only what the helper depends on; everything else (alerts, etc.) keeps the users value.
             merged["server_enabled"] = true;
-            // if auth is already on, leave it on. only defualt to off for fresh configs.
-            if (existing.Property("auth_required") == null) merged["auth_required"] = false;
+            merged["auth_required"] = true;
+            if (string.IsNullOrWhiteSpace(merged.Value<string>("server_password")))
+                merged["server_password"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
             int wantedPort = merged.Value<int?>("server_port") ?? 6455;
             if (!PortIsBindable(wantedPort))
@@ -92,7 +94,8 @@ namespace ReplayKitSetup
                 }
                 else if (!found.HasValue)
                 {
-                    log?.Invoke($"warn: every candidate port is blocked on this pc; leaving server_port={wantedPort} (obs-websocket will fail to start)");
+                    log?.Invoke("warn: every candidate OBS websocket port is blocked; configuration was not changed.");
+                    return false;
                 }
             }
 
@@ -107,8 +110,7 @@ namespace ReplayKitSetup
                 return false;
             }
 
-            bool authRequired = merged.Value<bool?>("auth_required") ?? false;
-            string authNote = authRequired ? " (auth required - helper will need the password)" : "";
+            string authNote = " (authentication enabled)";
             log?.Invoke($"server_enabled=true port={merged["server_port"]}{authNote}");
             return true;
         }

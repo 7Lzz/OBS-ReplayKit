@@ -69,6 +69,19 @@ namespace ReplayKitSetup
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool EnumDisplayDevicesW(string lpDevice, uint iDevNum, ref DISPLAY_DEVICEW lpDisplayDevice, uint dwFlags);
 
+        internal static IEnumerable<string> AdapterRegistryPaths()
+        {
+            const string prefix = @"\Registry\Machine\";
+            for (uint index = 0; ; index++)
+            {
+                var device = new DISPLAY_DEVICEW { cb = (uint)Marshal.SizeOf<DISPLAY_DEVICEW>() };
+                if (!EnumDisplayDevicesW(null, index, ref device, 0)) yield break;
+                if ((device.StateFlags & 8) == 0 && device.DeviceKey != null &&
+                    device.DeviceKey.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    yield return device.DeviceKey.Substring(prefix.Length);
+            }
+        }
+
         // every active display, primary first.
         public static List<DisplayInfo> ListDisplays()
         {

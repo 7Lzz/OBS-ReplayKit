@@ -7,6 +7,16 @@ param(
     [switch]$InstallAfterBuild
 )
 $ErrorActionPreference = "Stop"
+$ProgressPreference = 'SilentlyContinue'
+
+function RemoveBuildDirectory([string]$path) {
+    $root = [IO.Path]::GetFullPath($WorkDir).TrimEnd('\') + '\'
+    $target = [IO.Path]::GetFullPath($path).TrimEnd('\')
+    if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Build cleanup is outside the work directory: $target"
+    }
+    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+}
 
 if (-not $OutPath) {
     $OutPath = Join-Path $PSScriptRoot '..\..\..\assets\obs-plugins\replaykit\bin\64bit\replaykit.dll'
@@ -38,7 +48,9 @@ function Test-TrayPluginOutputCurrent([string]$targetPath, [string[]]$inputPaths
 
 $obsExe = "C:\Program Files\obs-studio\bin\64bit\obs64.exe"
 if (-not (Test-Path $obsExe)) { throw "OBS not found at $obsExe" }
-$obsVersion = (Get-Item $obsExe).VersionInfo.FileVersion.TrimEnd('.0') -replace '(\d+\.\d+\.\d+)\.\d+$', '$1'
+$versionText = (Get-Item -LiteralPath $obsExe).VersionInfo.FileVersion
+if ($versionText -notmatch '^(\d+\.\d+\.\d+)(?:\.\d+)?$') { throw "Unexpected OBS version: $versionText" }
+$obsVersion = $matches[1]
 Write-Output "detected OBS version: $obsVersion"
 
 # skip the whole rebuild (qt6 download, header checkout, import-lib generation, cmake/ninja) when the bundled dll is already newer than every source input and the installed obs itself -- obs64.exe is in the list becuase a different obs version needs different headers/qt6/import-libs even if none of this plugins own files changed.
@@ -75,6 +87,7 @@ New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 Write-Output "reading CMakePresets.json for obs-studio tag $obsVersion..."
 # gh prints the base64 content wrapped at ~60 chars/line, and powershell splits that captured output into one array element per line, so it has to be rejoined into a single string before decoding -- decoding line-by-line silently corrupts anything past the first line instead of erroring.
 $presetsLines = gh api "repos/obsproject/obs-studio/contents/CMakePresets.json?ref=$obsVersion" --jq '.content'
+if ($LASTEXITCODE -ne 0) { throw 'Could not read OBS dependency metadata.' }
 $presetsBase64 = $presetsLines -join ''
 $presetsJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($presetsBase64))
 $presets = $presetsJson | ConvertFrom-Json
@@ -84,15 +97,19 @@ if (-not $depsVersion) { throw "could not find qt6 dependency version in CMakePr
 Write-Output "obs-deps tag for this obs version: $depsVersion"
 
 # step 2: sparse-checkout obs-studio headers at the matching tag
-$obsSrcDir = Join-Path $WorkDir "obs-src"
+$obsSrcDir = Join-Path $WorkDir "obs-src-$obsVersion"
 if (-not (Test-Path (Join-Path $obsSrcDir "libobs\obs.h"))) {
     Write-Output "checking out obs-studio $obsVersion headers (libobs/, frontend/api/)..."
-    if (Test-Path $obsSrcDir) { Remove-Item -Recurse -Force $obsSrcDir }
+    RemoveBuildDirectory $obsSrcDir
     git clone --filter=blob:none --no-checkout --depth 1 --branch $obsVersion https://github.com/obsproject/obs-studio.git $obsSrcDir
+    if ($LASTEXITCODE -ne 0) { throw 'OBS header checkout failed.' }
     Push-Location $obsSrcDir
-    git sparse-checkout set --no-cone libobs frontend/api
-    git checkout $obsVersion
-    Pop-Location
+    try {
+        git sparse-checkout set --no-cone libobs frontend/api
+        if ($LASTEXITCODE -ne 0) { throw 'OBS sparse checkout failed.' }
+        git checkout $obsVersion
+        if ($LASTEXITCODE -ne 0) { throw 'OBS version checkout failed.' }
+    } finally { Pop-Location }
 }
 $obsConfigPath = Join-Path $obsSrcDir "libobs\obsconfig.h"
 if (-not (Test-Path $obsConfigPath)) {
@@ -105,13 +122,13 @@ if (-not (Test-Path $obsConfigPath)) {
 }
 
 # step 3: download the matching prebuilt qt6 package
-$qtDir = Join-Path $WorkDir "qt6"
+$qtDir = Join-Path $WorkDir "qt6-$depsVersion"
 if (-not (Test-Path (Join-Path $qtDir "lib\cmake\Qt6\Qt6Config.cmake"))) {
     Write-Output "downloading obs-deps qt6 ($depsVersion, ~250MB)..."
     $qtZip = Join-Path $WorkDir "qt6.zip"
     $qtUrl = "https://github.com/obsproject/obs-deps/releases/download/$depsVersion/windows-deps-qt6-$depsVersion-x64.zip"
     Invoke-WebRequest -Uri $qtUrl -OutFile $qtZip
-    if (Test-Path $qtDir) { Remove-Item -Recurse -Force $qtDir }
+    RemoveBuildDirectory $qtDir
     Expand-Archive -Path $qtZip -DestinationPath $qtDir -Force
     Remove-Item $qtZip
 }
@@ -122,6 +139,7 @@ New-Item -ItemType Directory -Force -Path $implibDir | Out-Null
 
 function New-ImportLib([string]$dllPath, [string]$dllName, [string]$outName) {
     $exportsText = & $dumpbin /exports $dllPath
+    if ($LASTEXITCODE -ne 0) { throw "Could not inspect exports: $dllPath" }
     $names = New-Object System.Collections.Generic.List[string]
     $inTable = $false
     foreach ($line in $exportsText) {
@@ -137,6 +155,7 @@ function New-ImportLib([string]$dllPath, [string]$dllName, [string]$outName) {
     @("LIBRARY $dllName", "EXPORTS") + ($names | ForEach-Object { "    $_" }) |
         Set-Content -LiteralPath $defPath -Encoding ascii
     & $libExe "/def:$defPath" "/out:$(Join-Path $implibDir "$outName.lib")" "/machine:x64" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not generate import library: $outName" }
 }
 Write-Output "generating obs.lib / obs-frontend-api.lib from the installed dlls..."
 New-ImportLib "C:\Program Files\obs-studio\bin\64bit\obs.dll" "obs.dll" "obs"
@@ -152,7 +171,7 @@ foreach ($line in $envDump) {
 $env:PATH = (Split-Path $ninja) + ";" + $env:PATH
 
 $buildDir = Join-Path $WorkDir "build"
-if (Test-Path $buildDir) { Remove-Item -Recurse -Force $buildDir }
+RemoveBuildDirectory $buildDir
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 $pluginSrcDir = $PSScriptRoot
 

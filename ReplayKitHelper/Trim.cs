@@ -202,7 +202,8 @@ namespace ReplayKitHelper
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
         public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false)
         {
-            if (double.IsNaN(startSec) || double.IsNaN(endSec)) return new TrimResult { Ok = false, Message = "Bad start/end" };
+            if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
+                return new TrimResult { Ok = false, Message = "Bad start/end" };
             if (startSec < 0) return new TrimResult { Ok = false, Message = "Start must be >= 0" };
             if (endSec <= startSec) return new TrimResult { Ok = false, Message = "End must be greater than start" };
             double duration = endSec - startSec;

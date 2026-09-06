@@ -142,7 +142,7 @@ $cert = $sig.SignerCertificate
   Issuer = if ($cert) { [string]$cert.Issuer } else { """" }
 } | ConvertTo-Json -Compress
 ";
-            Process proc;
+            using var proc = new Process();
             string stdout, stderr;
             try
             {
@@ -154,15 +154,18 @@ $cert = $sig.SignerCertificate
                     CreateNoWindow = true,
                 };
                 psi.EnvironmentVariables["OBSREPLAYKIT_REDIST_PATH"] = path;
-                proc = Process.Start(psi);
-                stdout = proc.StandardOutput.ReadToEnd();
-                stderr = proc.StandardError.ReadToEnd();
+                proc.StartInfo = psi;
+                proc.Start();
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(30000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     log?.Invoke("VC++ redist signature check failed to run: timed out");
                     return false;
                 }
+                stdout = stdoutTask.GetAwaiter().GetResult();
+                stderr = stderrTask.GetAwaiter().GetResult();
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {
@@ -212,7 +215,7 @@ $cert = $sig.SignerCertificate
 
             log?.Invoke("installing VC++ 2015-2022 Redistributable (silent)...");
 
-            Process proc;
+            using var proc = new Process();
             string stderr;
             try
             {
@@ -223,15 +226,18 @@ $cert = $sig.SignerCertificate
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
-                proc = Process.Start(psi);
-                proc.StandardOutput.ReadToEndAsync();
-                stderr = proc.StandardError.ReadToEnd();
+                proc.StartInfo = psi;
+                proc.Start();
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(300000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     log?.Invoke("VC++ redist install timed out after 300s");
                     return false;
                 }
+                stdoutTask.GetAwaiter().GetResult();
+                stderr = stderrTask.GetAwaiter().GetResult();
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {

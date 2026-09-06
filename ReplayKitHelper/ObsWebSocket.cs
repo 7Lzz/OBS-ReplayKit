@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
@@ -28,6 +29,7 @@ namespace ReplayKitHelper
             public bool Unavailable;
             public string Message;
             public int Port;
+            public string Password;
         }
 
         private static SettingsResult GetObsWebSocketSettings()
@@ -43,15 +45,27 @@ namespace ReplayKitHelper
 
             if (!(cfg["server_enabled"]?.Value<bool>() ?? false))
                 return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket server is disabled." };
-            if (cfg["auth_required"]?.Value<bool>() ?? false)
-                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket authentication is enabled." };
+            string password = cfg["server_password"]?.Value<string>() ?? "";
+            if ((cfg["auth_required"]?.Value<bool>() ?? false) && string.IsNullOrEmpty(password))
+                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket password is missing." };
 
             int port = 6455;
             var portToken = cfg["server_port"];
             if (portToken != null) int.TryParse(portToken.ToString(), out port);
             if (port <= 0 || port > 65535)
                 return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket port is invalid." };
-            return new SettingsResult { Ok = true, Port = port };
+            return new SettingsResult { Ok = true, Port = port, Password = password };
+        }
+
+        internal static string CreateAuthentication(string password, string salt, string challenge)
+        {
+            if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(salt) || string.IsNullOrEmpty(challenge))
+                throw new InvalidOperationException("OBS websocket authentication data is missing.");
+            using (var sha = SHA256.Create())
+            {
+                string secret = Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(password + salt)));
+                return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(secret + challenge)));
+            }
         }
 
         private static JObject ReceiveMessage(ClientWebSocket socket, CancellationToken token)
@@ -65,6 +79,8 @@ namespace ReplayKitHelper
                 {
                     result = socket.ReceiveAsync(segment, token).GetAwaiter().GetResult();
                     if (result.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException("OBS websocket closed the connection.");
+                    if (result.MessageType != WebSocketMessageType.Text || ms.Length + result.Count > 16 * 1024 * 1024)
+                        throw new InvalidDataException("OBS websocket message is invalid or too large.");
                     if (result.Count > 0) ms.Write(buffer, 0, result.Count);
                 } while (!result.EndOfMessage);
                 return JObject.Parse(Encoding.UTF8.GetString(ms.ToArray()));
@@ -84,12 +100,8 @@ namespace ReplayKitHelper
             if (socket == null) return;
             Server.State.ObsWebSocket = null;
             Server.State.ObsWebSocketPort = 0;
-            try
-            {
-                if (socket.State == WebSocketState.Open)
-                    socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None).GetAwaiter().GetResult();
-            }
-            catch (Exception ex) when (ex is WebSocketException || ex is OperationCanceledException || ex is ObjectDisposedException) { }
+            // Cleanup must not wait for a peer's close handshake while holding the request lock.
+            socket.Abort();
             socket.Dispose();
         }
 
@@ -105,7 +117,8 @@ namespace ReplayKitHelper
             using (var probe = new TcpClient())
             {
                 var ar = probe.BeginConnect("127.0.0.1", settings.Port, null, null);
-                if (!ar.AsyncWaitHandle.WaitOne(500)) throw new InvalidOperationException("OBS websocket is not reachable.");
+                using (var wait = ar.AsyncWaitHandle)
+                    if (!wait.WaitOne(500)) throw new InvalidOperationException("OBS websocket is not reachable.");
                 probe.EndConnect(ar);
             }
 
@@ -117,10 +130,10 @@ namespace ReplayKitHelper
 
                 var hello = ReceiveMessage(socket, token);
                 if (hello["op"]?.Value<int>() != 0) throw new InvalidOperationException("OBS websocket did not send Hello.");
-                if (hello["d"]?["authentication"] != null) throw new InvalidOperationException("OBS websocket requires authentication.");
-
-                int rpcVersion = hello["d"]?["rpcVersion"]?.Value<int>() ?? 1;
-                SendMessage(socket, new JObject { ["op"] = 1, ["d"] = new JObject { ["rpcVersion"] = rpcVersion } }, token);
+                var identify = new JObject { ["rpcVersion"] = 1, ["eventSubscriptions"] = 0 };
+                if (hello["d"]?["authentication"] is JObject auth)
+                    identify["authentication"] = CreateAuthentication(settings.Password, auth["salt"]?.Value<string>(), auth["challenge"]?.Value<string>());
+                SendMessage(socket, new JObject { ["op"] = 1, ["d"] = identify }, token);
 
                 var identified = ReceiveMessage(socket, token);
                 if (identified["op"]?.Value<int>() != 2) throw new InvalidOperationException("OBS websocket did not identify this client.");

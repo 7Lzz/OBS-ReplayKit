@@ -15,6 +15,7 @@ namespace ReplayKitSetup
             else FastExit.InstallConsoleCloseHandler();
 
             int rc = Run(args);
+            AssetBundle.Cleanup();
             FastExit.FastExitNow(rc);
             return rc; // unreachable -- FastExitNow terminates the process directly, matching pythons fast_exit(main()) at module scope.
         }
@@ -38,8 +39,9 @@ namespace ReplayKitSetup
                 string logPath = null;
                 try
                 {
-                    logPath = Path.Combine(Config.BUNDLE_ROOT, "OBSReplayKit-error.log");
-                    File.WriteAllText(logPath, tb, new UTF8Encoding(false));
+                    string candidate = Path.Combine(AppContext.BaseDirectory, "OBSReplayKit-error.log");
+                    File.WriteAllText(candidate, tb, new UTF8Encoding(false));
+                    logPath = candidate;
                 }
                 catch (Exception)
                 {
@@ -50,8 +52,11 @@ namespace ReplayKitSetup
                     if (logPath != null) Console.WriteLine($"Details were written to: {logPath}");
                     Console.WriteLine();
                     Console.WriteLine(tb);
-                    Console.Write("Press Enter to exit...");
-                    Console.ReadLine();
+                    if (!IsHeadlessMode(args) && !Console.IsInputRedirected)
+                    {
+                        Console.Write("Press Enter to exit...");
+                        Console.ReadLine();
+                    }
                 }
                 catch (Exception)
                 {

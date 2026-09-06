@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Management;
 using Microsoft.Win32;
 
 namespace ReplayKitSetup
@@ -127,12 +127,14 @@ namespace ReplayKitSetup
             REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR = Path.Combine(REPLAYKIT_TRAY_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");
         }
 
-        // a sibling assets\ folder wins so a build run out of the repo always tests the working tree; a downloaded release exe has no sibling folder and unpacks its embedded bundle instead. falls back to the sibling path when neither exists so the "not found" message still names the folder a dev would expect.
+        // Release builds use their embedded payload. Debug builds can use sibling assets.
         private static string ResolveAssetsDir(string bundleRoot)
         {
             string sibling = Path.Combine(bundleRoot, "assets");
-            if (Directory.Exists(Path.Combine(sibling, "obs-studio"))) return sibling;
-            return AssetBundle.TryExtract() ?? sibling;
+            string extracted = AssetBundle.TryExtract();
+            if (extracted != null) return extracted;
+            if (AssetBundle.LastError != null) throw new IOException(AssetBundle.LastError);
+            return sibling;
         }
 
         private static bool IsValidObsExe(string path)
@@ -177,24 +179,25 @@ namespace ReplayKitSetup
             return result;
         }
 
-        // native wmi query instead of shelling out to powershell for the same cim lookup the python version used -- same result, one less process spawned.
+        // full exe path of any running obs process. was a Win32_Process wmi query; System.Management is not trim-safe and this project publishes trimmed, so it walks the process list directly now. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
         private static IEnumerable<string> RunningObsCandidates()
         {
             var result = new List<string>();
-            try
+            foreach (string name in OBS_PROCESSES.Select(n => Path.GetFileNameWithoutExtension(n)).Distinct())
             {
-                string clause = string.Join(" OR ", OBS_PROCESSES.Select(n => "Name = '" + n.Replace("'", "''") + "'"));
-                using (var searcher = new ManagementObjectSearcher("SELECT ExecutablePath FROM Win32_Process WHERE " + clause))
+                Process[] procs;
+                try { procs = Process.GetProcessesByName(name); }
+                catch (InvalidOperationException) { continue; }
+                foreach (var p in procs)
                 {
-                    foreach (ManagementObject mo in searcher.Get())
+                    try
                     {
-                        var execPath = mo["ExecutablePath"] as string;
-                        if (!string.IsNullOrEmpty(execPath)) result.Add(execPath);
+                        string path = p.MainModule?.FileName;
+                        if (!string.IsNullOrEmpty(path)) result.Add(path);
                     }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is NotSupportedException) { }
+                    finally { p.Dispose(); }
                 }
-            }
-            catch (ManagementException)
-            {
             }
             return result.Distinct();
         }

@@ -231,8 +231,7 @@ namespace ReplayKitHelper
             try
             {
                 var l = new TcpListener(IPAddress.Loopback, port);
-                // ReuseAddress lets us bind a port lingering in TIME_WAIT after a clean restart.
-                l.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                l.ExclusiveAddressUse = true;
                 l.Start();
                 // clear HANDLE_FLAG_INHERIT on the underlying socket handle. without this, any child process this helper spawns (or any process that inherits our handle table via CreateProcess with bInheritHandles=true) duplicates this handle. when the helper dies abruptly, the kernel cannot gc the listening socket until every duplicate is closed -- and if those duplicates are inside long-lived obs cef children, the listener stays parked under the dead pid forever. clearing inherit at bind time is the only documented prevention.
                 try { SetHandleInformation(l.Server.Handle, HANDLE_FLAG_INHERIT, 0); }
@@ -258,8 +257,13 @@ namespace ReplayKitHelper
                 };
                 using (var proc = Process.Start(psi))
                 {
-                    string output = proc.StandardOutput.ReadToEnd();
-                    proc.WaitForExit(3000);
+                    var stdout = proc.StandardOutput.ReadToEndAsync();
+                    if (!proc.WaitForExit(3000))
+                    {
+                        try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+                        return 0;
+                    }
+                    string output = stdout.GetAwaiter().GetResult();
                     foreach (var line in output.Split('\n'))
                     {
                         var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -384,15 +388,6 @@ namespace ReplayKitHelper
             }
         }
 
-        // A forced re-login now clears ReplayKit's own WebView2 profile. It never
-        // edits OBS's browser database or any third-party application's cookies.
-        private static void ClearStreamableCookiesOnExit()
-        {
-            AuthCore.ClearAuth();
-            StreamableSignIn.ClearProfile();
-            Log.Write("Cleared ReplayKit's owned Streamable profile.");
-        }
-
         private static void WriteStartupStatus(string configPath, string state, string message)
         {
             if (string.IsNullOrWhiteSpace(configPath)) return;
@@ -503,11 +498,6 @@ namespace ReplayKitHelper
             if (ParentWatchdog.ParentDied && CrashPopupSuppressed())
             {
                 try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
-            }
-
-            if (Server.State.ClearStreamableOnExit)
-            {
-                try { ClearStreamableCookiesOnExit(); } catch (Exception ex) { Log.Write("ClearStreamableCookiesOnExit: " + ex.Message); }
             }
 
             string restartObsPath = Server.State.RestartAfterCleanObsPath;

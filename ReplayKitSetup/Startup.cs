@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -44,6 +45,9 @@ namespace ReplayKitSetup
             }
         }
 
+        // wscript.shell is late-bound com; InvokeMember routes through IDispatch at runtime and needs no managed metadata, so the trimmer's warnings here are moot -- it never removes anything this path depends on.
+        [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "com idispatch dispatch, no trimmable managed members")]
+        [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
         private static bool CreateStartupShortcut(Action<string> log)
         {
             string obsExe = Obs.FindObsExe();

@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Management;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // detect the users gpu(s) and classify them for encoder selection. pulls win32_videocontroller via cim/wmi and parses the adapter name to tag the architecture tier (registry/wmi doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. ported from obs_replaykit/gpu.py.
+    // detect the users gpu(s) and classify them for encoder selection. reads the display-adapter class keys under HKLM and parses the adapter name to tag the architecture tier (the registry doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. ported from obs_replaykit/gpu.py.
     public enum Vendor { Nvidia, Amd, Intel, Unknown }
 
     // coarse nvenc capability tiers.
@@ -44,30 +44,44 @@ namespace ReplayKitSetup
 
     public static class Gpu
     {
-        // win32_videocontroller rows as plain objects, read directly over wmi -- used to spawn powershell.exe to run Get-CimInstance for this (wmic was deprecated in win10 21h1 and isnt installed on win11), but that got caught by virustotal's sandbox as a sigma "non-interactive powershell spawned" match and tagged detect-debug-environment -- querying gpu info to fingerprint the host is also a standard vm/sandbox-detection technique, so the exact shape reads as suspicious regardless of intent. ReplayKitHelper/Gpu.cs already made this same switch to direct wmi; this brings ReplayKitSetup in line now that it references System.Management too. returns [] on any failure.
+        // one row per installed display adapter, read from the registry instead of Win32_VideoController -- System.Management is not trim-safe (WmiNetUtilsHelper throws under the linker) and this project publishes trimmed. DriverDesc is the same marketing string wmi's Name returns; qwMemorySize (REG_QWORD, newer drivers) or MemorySize (older) is the vram. returns [] on any failure.
         private static List<JObject> QueryVideoControllers()
         {
             var result = new List<JObject>();
             try
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM, DriverVersion FROM Win32_VideoController"))
-                using (var rows = searcher.Get())
+                foreach (string path in Display.AdapterRegistryPaths().Distinct(StringComparer.OrdinalIgnoreCase))
                 {
-                    foreach (ManagementObject row in rows)
+                    using (var adapter = Registry.LocalMachine.OpenSubKey(path))
                     {
-                        long? ram = null;
-                        try { if (row["AdapterRAM"] != null) ram = Convert.ToInt64(row["AdapterRAM"]); } catch (Exception ex) when (ex is InvalidCastException || ex is OverflowException) { }
+                        string name = adapter?.GetValue("DriverDesc") as string;
+                        if (string.IsNullOrEmpty(name)) continue;
+                        long? ram = ReadVram(adapter);
                         result.Add(new JObject
                         {
-                            ["Name"] = row["Name"] as string,
+                            ["Name"] = name,
                             ["AdapterRAM"] = ram,
-                            ["DriverVersion"] = row["DriverVersion"] as string,
+                            ["DriverVersion"] = adapter.GetValue("DriverVersion") as string,
                         });
                     }
                 }
             }
-            catch (ManagementException) { }
+            catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException || ex is System.IO.IOException) { }
             return result;
+        }
+
+        private static long? ReadVram(RegistryKey adapter)
+        {
+            try
+            {
+                object q = adapter.GetValue("HardwareInformation.qwMemorySize");
+                if (q != null) return Convert.ToInt64(q);
+                object m = adapter.GetValue("HardwareInformation.MemorySize");
+                if (m is int mi) return mi == -1 ? (long?)null : unchecked((uint)mi);
+                if (m is byte[] mb && mb.Length == 4) return BitConverter.ToUInt32(mb, 0);
+            }
+            catch (Exception ex) when (ex is InvalidCastException || ex is OverflowException || ex is FormatException) { }
+            return null;
         }
 
         private static readonly (Regex Pattern, Vendor Vendor)[] VendorPatterns =

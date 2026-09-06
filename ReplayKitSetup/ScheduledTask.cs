@@ -20,13 +20,15 @@ namespace ReplayKitSetup
             };
             using (var proc = Process.Start(psi))
             {
-                string stdout = proc.StandardOutput.ReadToEnd();
-                string stderr = proc.StandardError.ReadToEnd();
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(20000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     throw new TimeoutException("schtasks timed out");
                 }
+                string stdout = stdoutTask.GetAwaiter().GetResult();
+                string stderr = stderrTask.GetAwaiter().GetResult();
                 return (proc.ExitCode, string.IsNullOrEmpty(stderr) ? stdout : stderr);
             }
         }

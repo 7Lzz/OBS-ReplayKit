@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Management;
+using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
@@ -27,32 +27,43 @@ namespace ReplayKitSetup
             };
             using (var proc = Process.Start(psi))
             {
-                string stdout = proc.StandardOutput.ReadToEnd();
-                string stderr = proc.StandardError.ReadToEnd();
+                var stdout = proc.StandardOutput.ReadToEndAsync();
+                var stderr = proc.StandardError.ReadToEndAsync();
                 if (!proc.WaitForExit(timeoutMs))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
                     throw new TimeoutException(fileName + " timed out");
                 }
-                return (proc.ExitCode, stdout, stderr);
+                return (proc.ExitCode, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
             }
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr ExitStatus;
+            public IntPtr PebBaseAddress;
+            public IntPtr AffinityMask;
+            public IntPtr BasePriority;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
+        // own parent pid. was a Win32_Process wmi lookup; System.Management is not trim-safe and this project publishes trimmed, so it reads ProcessBasicInformation directly. null on any failure -- caller just skips adding it to the keep-set.
         private static int? CurrentParentPid()
         {
             try
             {
-                using (var searcher = new ManagementObjectSearcher($"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId={Process.GetCurrentProcess().Id}"))
-                using (var results = searcher.Get())
-                {
-                    foreach (ManagementObject row in results)
-                    {
-                        return Convert.ToInt32(row["ParentProcessId"]);
-                    }
-                }
-                return null;
+                var pbi = new PROCESS_BASIC_INFORMATION();
+                using var process = Process.GetCurrentProcess();
+                int rc = NtQueryInformationProcess(process.Handle, 0, ref pbi, Marshal.SizeOf(pbi), out _);
+                if (rc != 0) return null;
+                return pbi.InheritedFromUniqueProcessId.ToInt32();
             }
-            catch (ManagementException)
+            catch (Exception ex) when (ex is DllNotFoundException || ex is EntryPointNotFoundException || ex is InvalidOperationException)
             {
                 return null;
             }
