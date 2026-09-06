@@ -319,8 +319,14 @@ namespace ReplayKitHelper
             {
                 while (!Server.State.Shutdown)
                 {
+                    if (!ParentWatchdog.CheckAlive()) break;
                     if (!_listener.Pending())
                     {
+                        if (ParentWatchdog.ExitedNow())
+                        {
+                            Log.Write("Parent terminated during idle (GetExitCodeProcess). Exiting.");
+                            break;
+                        }
                         try { DiscordProjector.KeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector keep-alive threw: " + ex.Message); }
                         Thread.Sleep(50);
                         continue;
