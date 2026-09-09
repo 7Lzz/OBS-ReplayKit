@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#272A33;color:#FFFFFF">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>Controls</title>
+<link rel="icon" type="image/x-icon" href="http://127.0.0.1:8767/obs-icon.ico?v=2" />
+<style>
+  :root {
+    --input_height: 32px;
+    --padding_wide: 16px;
+    --spacing_outer: 4px;
+    --spacing_sides: 6px;
+    --spacing_top: 6px;
+    --border_radius: 4px;
+    --font_size: 13px;
+    --font_family: "Segoe UI", system-ui, sans-serif;
+    --grey1: #5B6273;
+    --grey3: #464B59;
+    --grey4: #3C404D;
+    --grey6: #272A33;
+    --grey7: #1D1F26;
+    --grey8: #13141A;
+    --blue2: #476BD7;
+    --blue3: #284CB8;
+    --green: #37D247;
+    --red: #E33B57;
+    --white1: #FFFFFF;
+    --white5: #969696;
+    --bg_dock: var(--grey6);
+    --bg_window: var(--grey7);
+    --text: var(--white1);
+    --text_muted: var(--white5);
+    --button_bg: var(--grey4);
+    --button_bg_hover: var(--grey3);
+    --button_bg_down: var(--grey7);
+    --button_border: var(--button_bg-solid,var(--button_bg));
+    --button_border_hover: var(--grey1);
+    --primary: var(--blue3);
+    --primary_light: var(--blue2);
+    --input_bg: var(--grey8);
+    --input_border: var(--grey4-solid,var(--grey4));
+    --on-accent: #ffffff;
+    --on-accent-rgb: 255, 255, 255;
+    --text-rgb: 255, 255, 255;
+    --bg-rgb: 29, 31, 38;
+    --accent-rgb: 40, 76, 184;
+    --hairline: rgba(var(--text-rgb),.08);
+    --overlay-soft: rgba(var(--text-rgb),.06);
+    --overlay-strong: rgba(var(--text-rgb),.14);
+    --shadow: rgba(0,0,0,.45);
+    --shadow-weak: rgba(0,0,0,.28);
+    /* shared motion language -- kept in step with clips.html / settings.html. */
+    --ease_pop: cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth: cubic-bezier(.16, 1, .3, 1);
+    --anim_press: 130ms;
+    --anim_menu: 200ms;
+    --hover_grow: 1.012;
+    --press_shrink: .985;
+  }
+
+  * { box-sizing: border-box; }
+  html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_window);
+    /* rk-theme.css / the helper's injected style overrides this per theme */
+    color-scheme: dark;
+  }
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_dock);
+    color: var(--text);
+    font-family: var(--font_family);
+    font-size: var(--font_size);
+    user-select: none;
+    overflow: hidden;
+  }
+  #controlsFrame {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg_dock);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-top: none;
+    border-bottom-left-radius: var(--border_radius);
+    border-bottom-right-radius: var(--border_radius);
+    padding: var(--spacing_top) var(--spacing_sides) var(--spacing_outer);
+    gap: var(--spacing_outer);
+    overflow-y: auto;
+  }
+  /* obs yami-style pill scrollbar -- same rules as clips.html so the dock matches the sources / mixer panels. the thumb is narrower than the track becuase the border is transparent + the background is clipped to padding-box, giving the floating-capsule look. */
+  *::-webkit-scrollbar        { width: 14px; height: 14px; background: transparent; }
+  *::-webkit-scrollbar-track  { background: transparent; }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--grey3);
+    border-radius: 7px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+    min-height: 30px;
+  }
+  *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
+  *::-webkit-scrollbar-thumb:active { background-color: var(--white5); }
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button_bg);
+    color: var(--text);
+    border: 1px solid var(--button_border);
+    border-radius: var(--border_radius);
+    height: var(--input_height);
+    min-height: var(--input_height);
+    padding: 0 var(--padding_wide);
+    font: inherit;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear, border-color 90ms linear;
+  }
+  /* a tiny fixed lift, never scale() -- these buttons are full width, so a proportional grow gets bigger with the dock */
+  .btn:hover {
+    background-color: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+    transform: translateY(-0.5px);
+  }
+  .btn:focus-visible { border-color: var(--button_border_hover); }
+  .btn:active { background-color: var(--button_bg_down); transform: translateY(0.5px); }
+  .btn:disabled {
+    opacity: 0.65;
+    cursor: progress;
+    transform: none;
+  }
+  .btn.is-disconnected,
+  .btn.is-busy,
+  .btn.is-signing-in { transform: none; }
+  .btn.is-disconnected {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .btn.is-busy {
+    opacity: 0.65;
+    cursor: progress;
+  }
+  /* greyed but still clickable -- Share Preview when it is not set up yet (the click offers to install it) */
+  .btn.is-muted {
+    opacity: 0.5;
+    transform: none;
+  }
+  .btn.is-muted:hover {
+    opacity: 0.72;
+    background-color: var(--button_bg);
+    border-color: var(--button_border);
+    transform: none;
+  }
+  /* brief success/error flash on the upload button. we no longer have a seperate url textbox -- status is conveyed by the button itself (e.g. "link copied!" / "upload failed"), then it returns to its defualt label. */
+  .btn.is-flash-success {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+    color: var(--on-accent);
+  }
+  .btn.is-flash-error {
+    background-color: var(--red);
+    border-color: var(--red);
+    color: #fff;
+  }
+  .btn.primary {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+    color: var(--on-accent);
+  }
+  .btn.primary:hover { background-color: var(--primary_light); }
+
+  /* share preview toggle. highlighted when the Discord/application-share preview is enabled. */
+  .btn.projector-mode {
+    background-color: var(--blue3);
+    border-color: var(--blue3-solid,var(--blue3));
+    color: var(--on-accent);
+  }
+  .btn.projector-mode:hover {
+    background-color: var(--blue2);
+    border-color: var(--blue2);
+  }
+  .btn.projector-mode:focus-visible {
+    border-color: var(--blue3-solid,var(--blue3));
+  }
+  .btn.projector-mode:hover:focus-visible {
+    border-color: var(--blue2);
+  }
+
+  /* a wide button paired with a small square icon button, the way OBS pairs Replay Buffer + save. */
+  .split-row { display: flex; gap: var(--spacing_outer); }
+  .split-row > .btn:first-child { flex: 1 1 auto; min-width: 0; }
+  .btn.icon-btn {
+    flex: 0 0 auto;
+    width: var(--input_height);
+    min-width: var(--input_height);
+    padding: 0;
+  }
+  .btn.icon-btn svg { width: 18px; height: 18px; display: block; }
+  /* clipping / recording toggles light up while their output is running */
+  .btn.is-on {
+    background-color: var(--blue3);
+    border-color: var(--blue3-solid,var(--blue3));
+    color: var(--on-accent);
+  }
+  .btn.is-on:hover { background-color: var(--blue2); border-color: var(--blue2); }
+  .btn.is-recording {
+    background-color: var(--red);
+    border-color: var(--red);
+    color: #fff;
+  }
+  .btn.is-recording:hover { background-color: var(--red); border-color: var(--red); filter: brightness(1.1); }
+
+  /* auth row: third button stacks under view clips; "sign in" when out, "signed in" with a green dot when in. click signed-in opens a tiny dropdown menu (with sign out); click signed-out opens the login modal. */
+  .auth-wrap { position: relative; }
+  .auth-wrap .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .auth-wrap .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text_muted);
+    margin-right: 7px;
+    flex-shrink: 0;
+  }
+  .auth-wrap .btn.is-signed-in .dot { background: var(--green); }
+
+  /* "signing in..." state while the popup is open. pulses the dot blue and disables the button so the user has clear feedback that somethings happening between popup-open and import-success. */
+  .auth-wrap .btn.is-signing-in {
+    opacity: 0.85;
+    cursor: progress;
+    pointer-events: none;
+  }
+  .auth-wrap .btn.is-signing-in .dot {
+    background: var(--blue2);
+    animation: auth-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes auth-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50%      { opacity: 1;    transform: scale(1.15); }
+  }
+
+  /* opens down by defualt; openmenu() flips to .is-up if the menu would extend past #controlsframe and force a scrollbar. direction sets top/bottom + shadow side so the soft edge always points away from the button. */
+  .auth-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    background: var(--grey6);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-radius: var(--border_radius);
+    /* collapses to a clipped zero-height box instead of display:none so it can slide open and shut. overflow:hidden + max-height:0 also means a closed menu adds no height to #controlsFrame, so it never forces the scrollbar the up/down flip is there to avoid. openMenu() still measures offsetHeight correctly -- max-height caps height, it doesnt force it. */
+    max-height: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-5px) scale(.98);
+    transform-origin: top center;
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .auth-menu.is-open {
+    max-height: 240px;
+    padding: 4px 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  .auth-menu.is-up { transform-origin: bottom center; }
+  .auth-menu.is-down {
+    top: calc(100% + 3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  }
+  .auth-menu.is-up {
+    bottom: calc(100% + 3px);
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
+  }
+  .auth-menu .info {
+    padding: 7px 10px 5px;
+    font-size: 11px;
+    color: var(--text_muted);
+    line-height: 1.45;
+    border-bottom: 1px solid var(--grey4-solid,var(--grey4));
+    margin-bottom: 3px;
+  }
+  .auth-menu .info b { color: var(--text); font-weight: 500; }
+  .auth-menu .spoiler {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--grey1);
+    color: transparent;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .auth-menu .spoiler:hover,
+  .auth-menu .spoiler:focus {
+    background: transparent;
+    color: var(--text);
+    outline: 1px solid var(--grey1);
+  }
+  .auth-menu .item {
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text);
+    user-select: none;
+    transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear;
+  }
+  .auth-menu .item:hover { background: var(--button_bg_hover); transform: translateX(3px); }
+  .auth-menu .item:active { transform: translateX(3px) scale(var(--press_shrink)); }
+
+  /* one-time cascade as the dock view loads. backwards fill so the rows sit hidden through their
+     stagger delay, then settle -- and dont keep a transform that would fight the :hover pop. */
+  @keyframes rk-dock-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  #controlsFrame > * { animation: rk-dock-in 300ms var(--ease_smooth) backwards; }
+  #controlsFrame > *:nth-child(2) { animation-delay: 35ms; }
+  #controlsFrame > *:nth-child(3) { animation-delay: 70ms; }
+  #controlsFrame > *:nth-child(4) { animation-delay: 105ms; }
+  #controlsFrame > *:nth-child(5) { animation-delay: 140ms; }
+  #controlsFrame > *:nth-child(6) { animation-delay: 175ms; }
+  #controlsFrame > *:nth-child(7) { animation-delay: 210ms; }
+</style>
+<!-- theme override -- written by the helper (Themes.WriteDockThemeCss); empty on the default theme. this dock is loaded from a file:// url so the helper's http-time style injection never reaches it. -->
+<link rel="stylesheet" href="rk-theme.css" id="rk-theme-link" />
+<!--#include interaction-states-->
+
+<!-- inlined verbatim copy of _tooltip.html. the other dock pages get it through a helper-side include; this dock
+     loads from a file url so includes are never expanded here. keep it in step with _tooltip.html by hand. -->
+<style>
+  #rk-tip {
+    position: fixed;
+    z-index: 300;
+    padding: 5px 8px;
+    border-radius: 3px;
+    background: var(--grey8);
+    background: color-mix(in srgb, var(--grey8) 88%, transparent);
+    color: var(--text);
+    font-family: var(--font_family, var(--font, "Segoe UI", system-ui, sans-serif));
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .42);
+    transform: translateY(3px) scale(.96);
+    transform-origin: top center;
+    transition: opacity 100ms linear, transform var(--anim_press, 130ms) var(--ease_pop, ease);
+  }
+  #rk-tip.is-shown { opacity: 1; transform: translateY(0) scale(1); }
+  #rk-tip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: var(--tip-arrow, 50%);
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: var(--grey8);
+    border-bottom-color: color-mix(in srgb, var(--grey8) 88%, transparent);
+  }
+  #rk-tip.tip-rich {
+    white-space: normal;
+    max-width: 264px;
+    line-height: 1.42;
+    text-align: left;
+    padding: 7px 10px;
+  }
+  /* dock-only override: this panel is narrow, so wrap every tip instead of letting a nowrap line clip at the edge */
+  #rk-tip {
+    white-space: normal;
+    max-width: 200px;
+    line-height: 1.4;
+    text-align: left;
+  }
+</style>
+<script>
+(function () {
+  var tip = document.createElement("div");
+  tip.id = "rk-tip";
+  tip.setAttribute("role", "tooltip");
+  var current = null;
+  var suppress = function () { return false; };
+
+  function attach() {
+    if (!tip.parentNode && document.body) document.body.appendChild(tip);
+  }
+  if (document.body) attach();
+  else document.addEventListener("DOMContentLoaded", attach);
+
+  function reposition() {
+    if (!current) return;
+    var b = current.getBoundingClientRect();
+    var tw = tip.offsetWidth;
+    var th = tip.offsetHeight;
+    var edge = 6;
+    var gap = 8;
+    var centre = b.left + b.width / 2;
+    var left = Math.max(edge, Math.min(centre - tw / 2, window.innerWidth - tw - edge));
+    var top = Math.max(edge, Math.min(b.bottom + gap, window.innerHeight - th - edge));
+    tip.style.left = Math.round(left) + "px";
+    tip.style.top = Math.round(top) + "px";
+    tip.style.setProperty("--tip-arrow", Math.round(Math.max(10, Math.min(centre - left, tw - 10))) + "px");
+  }
+
+  function show(el) {
+    if (!el || !el.dataset.tooltip || el.disabled) return;
+    if (suppress(el)) return;
+    attach();
+    current = el;
+    tip.textContent = el.dataset.tooltip;
+    tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
+    tip.classList.add("is-shown");
+    reposition();
+  }
+
+  function hide() {
+    current = null;
+    tip.classList.remove("is-shown");
+  }
+
+  var observer = new MutationObserver(function () {
+    if (!current) return;
+    if (current.offsetParent === null || !current.dataset.tooltip) { observer.disconnect(); hide(); return; }
+    tip.textContent = current.dataset.tooltip;
+    reposition();
+  });
+
+  document.addEventListener("mouseover", function (e) {
+    var el = e.target.closest("[data-tooltip]");
+    if (!el || el === current || el.classList.contains("menu-item")) return;
+    observer.disconnect();
+    show(el);
+    if (current) observer.observe(el, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
+  });
+  document.addEventListener("mouseout", function (e) {
+    if (!current) return;
+    if (e.relatedTarget && current.contains(e.relatedTarget)) return;
+    observer.disconnect();
+    hide();
+  });
+  document.addEventListener("focusin", function (e) {
+    var dot = e.target.closest(".info-dot[data-tooltip]");
+    if (dot) show(dot);
+  });
+  document.addEventListener("focusout", function (e) {
+    if (e.target.closest(".info-dot[data-tooltip]")) hide();
+  });
+  document.addEventListener("click", function (e) {
+    var dot = e.target.closest(".info-dot[data-tooltip]");
+    if (!dot) return;
+    e.preventDefault();
+    show(dot);
+  });
+  document.addEventListener("mousedown", function (e) {
+    if (current && current.contains(e.target)) return;
+    hide();
+  }, true);
+  window.addEventListener("resize", reposition);
+  window.addEventListener("scroll", hide, true);
+
+  function adopt(root) {
+    var nodes = [];
+    if (root && root.nodeType === 1 && root.hasAttribute("title")) nodes.push(root);
+    if (root && root.querySelectorAll) nodes.push.apply(nodes, root.querySelectorAll("[title]"));
+    nodes.forEach(function (node) {
+      var text = node.getAttribute("title");
+      if (text) node.dataset.tooltip = text;
+      node.removeAttribute("title");
+    });
+  }
+  function watch(root) {
+    adopt(root);
+    new MutationObserver(function (changes) {
+      changes.forEach(function (change) {
+        if (change.type === "attributes") adopt(change.target);
+        else change.addedNodes.forEach(adopt);
+      });
+    }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["title"] });
+  }
+
+  window.RKTooltip = {
+    show: show, hide: hide, reposition: reposition, adopt: adopt, watch: watch,
+    suppressWhen: function (fn) { if (typeof fn === "function") suppress = fn; },
+  };
+})();
+</script>
+</head>
+<body style="background:#272A33;color:#FFFFFF">
+  <div id="controlsFrame">
+    <button class="btn" id="mode-btn">Enable Share Preview</button>
+    <div class="split-row">
+      <button class="btn" id="clip-toggle-btn">Start Clipping</button>
+      <button class="btn icon-btn" id="save-clip-btn" type="button" title="Save Clip" aria-label="Save Clip">
+        <!-- OBS's own replay-buffer save icon (data/obs-studio/themes/Dark/save.svg), fill -> currentColor -->
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="m 8 0 c -0.550781 0 -1 0.449219 -1 1 v 8.585938 l -1.292969 -1.292969 c -0.1875 -0.1875 -0.441406 -0.292969 -0.707031 -0.292969 s -0.519531 0.105469 -0.707031 0.292969 c -0.390625 0.390625 -0.390625 1.023437 0 1.414062 l 3 3 c 0.390625 0.390625 1.023437 0.390625 1.414062 0 l 3 -3 c 0.390625 -0.390625 0.390625 -1.023437 0 -1.414062 s -1.023437 -0.390625 -1.414062 0 l -1.292969 1.292969 v -8.585938 c 0 -0.550781 -0.449219 -1 -1 -1 z m -7 14 v 2 h 14 v -2 z m 0 0"/></svg>
+      </button>
+    </div>
+    <button class="btn" id="record-btn">Start Recording</button>
+    <div class="split-row">
+      <button class="btn" id="view-clips-btn">View Clips</button>
+      <button class="btn icon-btn" id="open-folder-btn" type="button" title="Open clips folder" aria-label="Open clips folder">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="m 2 3 c -1.101562 0 -2 0.898438 -2 2 v 6 c 0 1.101562 0.898438 2 2 2 h 12 c 1.101562 0 2 -0.898438 2 -2 v -5 c 0 -1.101562 -0.898438 -2 -2 -2 h -5.4375 l -1.28125 -1.28125 c -0.375 -0.375 -0.882812 -0.585938 -1.414062 -0.585938 h -1.867188 z m 0 0"/></svg>
+      </button>
+    </div>
+    <div class="auth-wrap" id="auth-wrap">
+      <button class="btn" id="auth-btn" type="button">
+        <span class="dot"></span>
+        <span id="auth-label">Sign in to Streamable</span>
+      </button>
+      <div class="auth-menu" id="auth-menu">
+        <div class="info" id="auth-info"></div>
+        <div class="item" id="auth-logout">Sign out</div>
+        <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
+      </div>
+    </div>
+    <button class="btn" id="obs-settings-btn">OBS Studio Settings</button>
+    <button class="btn" id="settings-btn">ReplayKit Settings</button>
+  </div>
+
+<script>
+  if (window.RKHover) RKHover.apply(document, { control: ".btn", nav: ".auth-menu .item" });
+  // adopt every title= into the modern hover tooltip (and keep doing it for markup added later)
+  if (window.RKTooltip) RKTooltip.watch(document.body);
+  // rk-theme.css is written by the helper; if the dock loaded before the helper got to it (first launch race), re-pull it once a few seconds in. real theme changes restart OBS -> full dock reload anyway.
+  setTimeout(function () {
+    var l = document.getElementById("rk-theme-link");
+    if (l) l.href = "rk-theme.css?t=" + Date.now();
+  }, 2500);
+
+  // dock lockdown: stop accidental right-click menu / zoom shortcuts. cef treats the dock like a regular web page, so users can right-click and hit zoom in / refresh / back / inspect / etc. -- all of which are surprises in a dock context. mirrored in controls.html and clips.html.
+  (function lockdown() {
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
+    document.addEventListener("wheel", function (e) {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive: false, capture: true });
+    document.addEventListener("keydown", function (e) {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") {
+        e.preventDefault();
+        return;
+      }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+        e.preventDefault();
+      }
+      if (e.key === "BrowserBack" || e.key === "BrowserForward" || e.code === "BrowserBack" || e.code === "BrowserForward") {
+        e.preventDefault();
+      }
+    }, true);
+  })();
+
+  const HELPER_HTTP_URL = location.protocol === "http:"
+    ? location.origin + "/"
+    : "http://127.0.0.1:8767/";
+
+  const POLL_IDLE_MS = 5000;
+  const UPDATE_STARTUP_CHECK_DELAY_MS = 8000;
+  const FIRST_RUN_CHECK_DELAY_MS = 3500;
+  const modeBtn = document.getElementById("mode-btn");
+  const clipToggleBtn = document.getElementById("clip-toggle-btn");
+  const saveClipBtn = document.getElementById("save-clip-btn");
+  const recordBtn = document.getElementById("record-btn");
+  const viewClipsBtn = document.getElementById("view-clips-btn");
+  const openFolderBtn = document.getElementById("open-folder-btn");
+  const obsSettingsBtn = document.getElementById("obs-settings-btn");
+  const settingsBtn = document.getElementById("settings-btn");
+
+  let pollTimerId = null;
+  let helperConnected = false;
+  let sharePreviewActionInFlight = false;
+  let sharePreviewEnabled = false;
+  let sharePreviewAvailable = true;
+  let clipActionInFlight = false;
+  let recordActionInFlight = false;
+  let replayBufferActive = false;
+  let recordActive = false;
+
+  function setConnected(yes) {
+    helperConnected = yes;
+    [modeBtn, clipToggleBtn, saveClipBtn, recordBtn, viewClipsBtn, openFolderBtn, obsSettingsBtn, settingsBtn]
+      .forEach((b) => b.classList.toggle("is-disconnected", !yes));
+  }
+
+  function flashButton(btn, text, cls, ms, fallbackText) {
+    btn.textContent = text;
+    btn.classList.remove("is-flash-success", "is-flash-error");
+    if (cls) btn.classList.add(cls);
+    setTimeout(() => {
+      btn.classList.remove("is-flash-success", "is-flash-error");
+      btn.textContent = fallbackText;
+      btn.disabled = false;
+    }, ms);
+  }
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER_HTTP_URL + path, {
+      cache: "no-store",
+      ...(options || {}),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || body.error || ("HTTP " + res.status));
+    }
+    return body;
+  }
+
+  // native confirm dialog, drawn by the tray plugin over the whole dimmed OBS window (a CEF dock can only paint its
+  // own panel). the plugin runs the follow-up action itself on OK, so nothing comes back here.
+  function rkNativeConfirm(kind) {
+    return helperJson("ui-confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: kind }),
+    });
+  }
+
+  function sharePreviewLabel(enabled, available) {
+    // stays clickable when unavailable -- the click offers to set Share Preview up instead of doing nothing
+    if (available === false) return "Enable Share Preview";
+    return enabled ? "Disable Share Preview" : "Enable Share Preview";
+  }
+
+  function renderSharePreview(enabled, available) {
+    sharePreviewAvailable = available !== false;
+    sharePreviewEnabled = sharePreviewAvailable && !!enabled;
+    modeBtn.classList.toggle("projector-mode", sharePreviewEnabled);
+    // not set up -> greyed out but still clickable (the click opens the setup prompt)
+    modeBtn.classList.toggle("is-muted", !sharePreviewAvailable);
+    modeBtn.textContent = sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable);
+    modeBtn.disabled = sharePreviewActionInFlight;
+    modeBtn.title = !sharePreviewAvailable
+      ? "Set up Discord screenshare so Discord and other apps can capture your OBS scene."
+      : sharePreviewEnabled
+      ? "Stop letting Discord or other apps capture your OBS scene (Application screen share)."
+      : "Let Discord or other apps capture your OBS scene (use Application screen share).";
+  }
+
+  async function saveReplay() {
+    return await helperJson("save-replay", { method: "POST" });
+  }
+
+  // Start / Stop Clipping = OBS replay buffer. save-clip is only useful while it is running.
+  function renderClipState() {
+    if (!clipActionInFlight) clipToggleBtn.textContent = replayBufferActive ? "Stop Clipping" : "Start Clipping";
+    clipToggleBtn.classList.toggle("is-on", replayBufferActive && !clipActionInFlight);
+    clipToggleBtn.title = replayBufferActive
+      ? "Stop the replay buffer. You will not be able to save clips until it is started again."
+      : "Start the replay buffer so you can save clips.";
+    saveClipBtn.classList.toggle("is-muted", !replayBufferActive);
+    saveClipBtn.title = replayBufferActive ? "Save Clip" : "Start clipping first";
+  }
+
+  function renderRecordState() {
+    if (!recordActionInFlight) recordBtn.textContent = recordActive ? "Stop Recording" : "Start Recording";
+    recordBtn.classList.toggle("is-recording", recordActive && !recordActionInFlight);
+  }
+
+  // one poll for the whole dock: helper liveness + share preview + replay-buffer / recording output state.
+  async function pollControls() {
+    try {
+      const s = await helperJson("controls-state?t=" + Date.now());
+      setConnected(true);
+      renderSharePreview(!!s.sharePreviewEnabled, s.sharePreviewAvailable !== false);
+      if (typeof s.replayBufferActive === "boolean") { replayBufferActive = s.replayBufferActive; renderClipState(); }
+      if (typeof s.recordActive === "boolean") { recordActive = s.recordActive; renderRecordState(); }
+    } catch {
+      setConnected(false);
+    }
+  }
+
+  function schedulePoll() {
+    if (pollTimerId) clearTimeout(pollTimerId);
+    const delay = document.visibilityState === "visible" ? 2000 : POLL_IDLE_MS;
+    pollTimerId = setTimeout(async () => {
+      await pollControls();
+      schedulePoll();
+    }, delay);
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { pollControls(); schedulePoll(); } });
+
+  let updateWindow = null;
+
+  function styleUpdatePromptWindow() {
+    fetch(HELPER_HTTP_URL + "style-window?title=ReplayKit%20Update&taskbar=1&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  function focusUpdatePromptWindowNative() {
+    fetch(HELPER_HTTP_URL + "focus-window?title=ReplayKit%20Update&t=" + Date.now(),
+          { cache: "no-store" }).catch(() => {});
+  }
+
+  // returns true when the popup is up (or already up); false means cef declined window.open (either popup-blocked or document hidden) and the caller should retry later.
+  function openUpdatePrompt(data) {
+    if (updateWindow && !updateWindow.closed) {
+      try { updateWindow.focus(); } catch (_) {}
+      focusUpdatePromptWindowNative();
+      return true;
+    }
+    const version = data && data.latestVersion ? encodeURIComponent(data.latestVersion) : "";
+    const w = window.open(
+      HELPER_HTTP_URL + "update-prompt" + (version ? "?version=" + version : ""),
+      "replaykit_update_prompt",
+      "popup=yes,width=520,height=300"
+    );
+    if (!w) {
+      focusUpdatePromptWindowNative();
+      return false;
+    }
+    updateWindow = w;
+    try { updateWindow.focus(); } catch (_) {}
+    [80, 250, 750, 1500, 3000].forEach((delay) => {
+      setTimeout(styleUpdatePromptWindow, delay);
+    });
+    return true;
+  }
+
+  // hold the startup-check result until obs is actually on screen -- opening the popup while the dock is hidden (obs minimized / not foregrounded yet) makes cef silently drop the window.open, which is why the popup never appeared when the user launched obs into the background.
+  let pendingUpdateData = null;
+  let updatePopupAttempted = false;
+
+  function tryOpenPendingUpdate() {
+    if (updatePopupAttempted || !pendingUpdateData) return;
+    if (document.visibilityState !== "visible") return;
+    if (openUpdatePrompt(pendingUpdateData)) {
+      updatePopupAttempted = true;
+    }
+  }
+
+  async function runStartupUpdateCheck() {
+    try {
+      const data = await helperJson("update/startup-check?t=" + Date.now());
+      if (data && data.ok && data.prompt) {
+        pendingUpdateData = data;
+        tryOpenPendingUpdate();
+      }
+    } catch (_) {}
+  }
+
+  function scheduleStartupUpdateCheck() {
+    setTimeout(() => {
+      runStartupUpdateCheck();
+    }, UPDATE_STARTUP_CHECK_DELAY_MS);
+  }
+
+  // first-run setup wizard: the installer arms setupWizardPending on a genuine first install, and the dock opens the
+  // tray-plugin-owned wizard window once, the first time obs is on screen after that. same visibility gating as the
+  // update popup so it isnt fired while obs is still booting hidden.
+  let firstRunPending = false;
+  let firstRunHandled = false;
+
+  // opens the wizard at most once per dock load and never again -- the helper also kicks it on its first pipe connect, and re-sending OPENSETUP just raises the existing window, which reads as the setup stealing focus every time obs comes forward.
+  function tryOpenPendingSetup() {
+    if (firstRunHandled || !firstRunPending) return;
+    if (document.visibilityState !== "visible") return;
+    firstRunHandled = true;
+    helperJson("open-setup-window", { method: "POST" }).catch(() => {});
+  }
+
+  async function runFirstRunCheck() {
+    try {
+      const data = await helperJson("setup/state?t=" + Date.now());
+      if (data && data.ok && data.pending) {
+        firstRunPending = true;
+        tryOpenPendingSetup();
+      }
+    } catch (_) {}
+  }
+
+  function scheduleFirstRunCheck() {
+    setTimeout(runFirstRunCheck, FIRST_RUN_CHECK_DELAY_MS);
+  }
+
+  // re-attempt the pending update popup whenever the dock becomes visible/focused -- handles the "obs started in the background" case. the setup wizard is deliberately NOT retried here: the helper opens it on its first pipe connect regardless of window state, so retrying on focus only ever re-raises a window the user already has.
+  document.addEventListener("visibilitychange", () => { tryOpenPendingUpdate(); });
+  window.addEventListener("focus", () => { tryOpenPendingUpdate(); });
+
+  settingsBtn.addEventListener("click", () => {
+    // the tray plugin owns the reusable Settings host; sending the same command here keeps the dock button and tray row on one open/focus path, and avoids a window.open popup that cef hands to the real browser.
+    helperJson("open-settings-window", { method: "POST" }).catch(() => {});
+  });
+
+  viewClipsBtn.addEventListener("click", () => {
+    // the tray plugin owns the reusable Clips host; sending the same command here keeps the dock button and tray row on one open/focus/reset path.
+    helperJson("open-clips-window", { method:"POST" }).catch(() => {});
+  });
+
+  obsSettingsBtn.addEventListener("click", () => {
+    helperJson("open-obs-settings", { method: "POST" }).catch(() => {});
+  });
+
+  // icon buttons: no text, so a brief colour flash is the feedback instead of a label swap
+  function flashIcon(btn, cls) {
+    btn.classList.add(cls);
+    setTimeout(() => btn.classList.remove(cls), cls === "is-flash-error" ? 2500 : 1300);
+  }
+  saveClipBtn.addEventListener("click", async () => {
+    if (saveClipBtn.classList.contains("is-busy")) return;
+    if (!replayBufferActive) { flashIcon(saveClipBtn, "is-flash-error"); return; }
+    saveClipBtn.classList.add("is-busy");
+    try {
+      await saveReplay();
+      flashIcon(saveClipBtn, "is-flash-success");
+    } catch (e) {
+      flashIcon(saveClipBtn, "is-flash-error");
+    } finally {
+      saveClipBtn.classList.remove("is-busy");
+    }
+  });
+
+  openFolderBtn.addEventListener("click", async () => {
+    if (openFolderBtn.classList.contains("is-busy")) return;
+    openFolderBtn.classList.add("is-busy");
+    try {
+      await helperJson("open-clip-folder", { method: "POST" });
+      flashIcon(openFolderBtn, "is-flash-success");
+    } catch (e) {
+      flashIcon(openFolderBtn, "is-flash-error");
+    } finally {
+      openFolderBtn.classList.remove("is-busy");
+    }
+  });
+
+  clipToggleBtn.addEventListener("click", async () => {
+    if (clipActionInFlight) return;
+    clipActionInFlight = true;
+    clipToggleBtn.classList.add("is-busy");
+    clipToggleBtn.textContent = replayBufferActive ? "Stopping..." : "Starting...";
+    try {
+      const r = await helperJson("obs/replay-buffer", { method: "POST" });
+      if (typeof r.active === "boolean") replayBufferActive = r.active;
+    } catch (e) {
+      flashButton(clipToggleBtn, ("Failed: " + (e.message || e)).slice(0, 40), "is-flash-error", 2500,
+                  replayBufferActive ? "Stop Clipping" : "Start Clipping");
+    } finally {
+      clipActionInFlight = false;
+      clipToggleBtn.classList.remove("is-busy");
+      renderClipState();
+    }
+  });
+
+  recordBtn.addEventListener("click", async () => {
+    if (recordActionInFlight) return;
+    recordActionInFlight = true;
+    recordBtn.classList.add("is-busy");
+    recordBtn.textContent = recordActive ? "Stopping..." : "Starting...";
+    try {
+      const r = await helperJson("obs/record", { method: "POST" });
+      if (typeof r.active === "boolean") recordActive = r.active;
+    } catch (e) {
+      flashButton(recordBtn, ("Failed: " + (e.message || e)).slice(0, 40), "is-flash-error", 2500,
+                  recordActive ? "Stop Recording" : "Start Recording");
+    } finally {
+      recordActionInFlight = false;
+      recordBtn.classList.remove("is-busy");
+      renderRecordState();
+    }
+  });
+
+  // Share Preview is off because the audio cable + hidden projector were never set up. the plugin draws the confirm
+  // over the whole OBS window and, on OK, runs the install (closes OBS, installs, turns Share Preview on).
+  async function promptInstallSharePreview() {
+    if (sharePreviewActionInFlight) return;
+    try {
+      await rkNativeConfirm("sharepreview-setup");
+    } catch (e) {
+      flashButton(modeBtn, ("Setup failed: " + (e.message || e)).slice(0, 42), "is-flash-error", 3000, "Enable Share Preview");
+    }
+  }
+
+  async function toggleSharePreview() {
+    if (sharePreviewActionInFlight || modeBtn.disabled) return;
+    if (!sharePreviewAvailable) { promptInstallSharePreview(); return; }
+    const nextEnabled = !sharePreviewEnabled;
+    sharePreviewActionInFlight = true;
+    modeBtn.disabled = true;
+    modeBtn.classList.add("is-busy");
+    modeBtn.textContent = nextEnabled ? "Enabling..." : "Disabling...";
+    try {
+      const result = await helperJson("share-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const enabled = !!(result && result.enabled);
+      const available = !(result && result.available === false);
+      renderSharePreview(enabled, available);
+      const warnings = Array.isArray(result && result.warnings) ? result.warnings : [];
+      flashButton(modeBtn, !available ? "Preview disabled" : warnings.length ? "Preview warning" : (enabled ? "Preview enabled" : "Preview disabled"),
+                  warnings.length ? "is-flash-error" : "is-flash-success",
+                  warnings.length ? 3000 : 1400,
+                  sharePreviewLabel(enabled, available));
+    } catch (e) {
+      flashButton(modeBtn, ("Preview failed: " + (e.message || e)).slice(0, 42),
+                  "is-flash-error", 3000, sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable));
+    } finally {
+      modeBtn.classList.remove("is-busy");
+      sharePreviewActionInFlight = false;
+      modeBtn.disabled = false;
+    }
+  }
+
+  renderSharePreview(false);
+  renderClipState();
+  renderRecordState();
+  modeBtn.addEventListener("click", toggleSharePreview);
+
+  pollControls().then(schedulePoll);
+  scheduleStartupUpdateCheck();
+  scheduleFirstRunCheck();
+
+  // streamable account ui (third button + dropdown + login popup). sign-in is cookie-based: the popup goes to streamable.com, the helper imports cookies via /import-session, and we reflect state thru /me and /logout.
+  const authBtn    = document.getElementById("auth-btn");
+  const authLabel  = document.getElementById("auth-label");
+  const authMenu   = document.getElementById("auth-menu");
+  const authInfo   = document.getElementById("auth-info");
+  const authLogout = document.getElementById("auth-logout");
+  const authForce  = document.getElementById("auth-force-signout");
+
+  let authState   = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
+  let loginPopup  = null;
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : "Free"; }
+
+  function applyAuthData(data) {
+    authState = {
+      signedIn:      !!data.signedIn,
+      username:      data.maskedUsername || data.displayName || data.username || "",
+      plan:          data.plan || "",
+      sizeCap:       Number(data.sizeCap) || 0,
+      retentionDays: Number(data.retentionDays) || 2,
+    };
+    renderAuth();
+  }
+
+  function renderAuth() {
+    if (authState.signedIn) {
+      authBtn.classList.add("is-signed-in");
+      authLabel.textContent = "Signed in";
+      authInfo.innerHTML =
+        '<b class="spoiler" tabindex="0">' +
+        escapeHtml(authState.username || "(signed in)") + "</b><br>" +
+        escapeHtml(planLabel(authState.plan)) + " &middot; " +
+        authState.retentionDays + "d retention";
+    } else {
+      authBtn.classList.remove("is-signed-in");
+      authLabel.textContent = "Sign in to Streamable";
+      authInfo.innerHTML = "Not signed in";
+    }
+  }
+  renderAuth();
+
+  async function fetchMe() {
+    try {
+      const data = await helperJson("me?t=" + Date.now());
+      applyAuthData(data);
+    } catch { /* helper offline -- setConnected(false) already runs via pollStatus */ }
+  }
+  fetchMe();
+
+  // open downward when theres room below the auth button inside the dock; otherwise flip upward so the menu doesnt force a scrollbar. we add is-down before measuring, then swap to is-up if it wont fit. both class changes happen in the same tick so the browser never paints the intermediate state. scrollHeight (not offsetHeight) is read on purpose -- the menu now slides open from max-height:0, and scrollHeight reports the full content height regardless of where that animation currently sits, where offsetHeight would read ~0 on the first frame.
+  const authWrap = document.getElementById("auth-wrap");
+  const controlsFrame = document.getElementById("controlsFrame");
+  function openMenu() {
+    authMenu.classList.remove("is-up");
+    authMenu.classList.add("is-down", "is-open");
+    const menuH = authMenu.scrollHeight;
+    const spaceBelow =
+      controlsFrame.getBoundingClientRect().bottom -
+      authWrap.getBoundingClientRect().bottom;
+    // 3px gap from css + a couple pixels of breathing room.
+    if (menuH + 6 > spaceBelow) {
+      authMenu.classList.remove("is-down");
+      authMenu.classList.add("is-up");
+    }
+  }
+  function closeMenu() { authMenu.classList.remove("is-open"); }
+
+  // Sign-in is hosted in ReplayKit's own persistent WebView2 profile. It never reads
+  // cookies or encryption keys from Chrome, Edge, OBS CEF, or any other browser.
+  let importPollTimer = null;
+  let popupCloseTimer = null;
+  let loginTimeoutTimer = null;
+  let loginFlowActive = false;
+  let loginWindowsCloseRequested = false;
+  let loginLastCloseRequestAt = 0;
+  const LOGIN_TIMEOUT_MS = 120000;
+  const LOGIN_IMPORT_POLL_MS = 500;
+
+  function setSigningIn(on, label) {
+    if (on) {
+      authBtn.classList.add("is-signing-in");
+      authLabel.textContent = label || "Signing in…";
+    } else {
+      authBtn.classList.remove("is-signing-in");
+      // renderauth() will set the right label based on current state.
+      renderAuth();
+    }
+  }
+  function clearLoginTimers() {
+    if (importPollTimer)   { clearInterval(importPollTimer);   importPollTimer = null; }
+    if (popupCloseTimer)   { clearInterval(popupCloseTimer);   popupCloseTimer = null; }
+    if (loginTimeoutTimer) { clearTimeout(loginTimeoutTimer);  loginTimeoutTimer = null; }
+  }
+  function cleanupLoginFlow() {
+    clearLoginTimers();
+    loginFlowActive = false;
+    setSigningIn(false);
+    // tier 1: try window.close() from js. cef refuses this for cross-origin popups so it usually does nothing, but its free.
+    if (loginPopup && !loginPopup.closed) {
+      try { loginPopup.close(); } catch {}
+    }
+    // tier 2: ask the helper to win32 wm_close the stuck popups. this bypasses cefs same-origin policy entirely by going thru the os message queue. handles our own popup and the streamable / google oauth windows streamables js spawned that we dont have handles for.
+    fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
+    loginPopup = null;
+    loginWindowsCloseRequested = false;
+    loginLastCloseRequestAt = 0;
+  }
+  function requestSigninWindowClose(label) {
+    if (label) setSigningIn(true, label);
+    const now = Date.now();
+    if (loginWindowsCloseRequested && (now - loginLastCloseRequestAt) < 250) return;
+    loginWindowsCloseRequested = true;
+    loginLastCloseRequestAt = now;
+    if (loginPopup && !loginPopup.closed) {
+      try { loginPopup.close(); } catch {}
+    }
+    fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
+  }
+
+  // one sequenced poller drives the whole flow -- there used to be two independent, uncoordinated fetches (a
+  // fire-and-forget "&start=1" call and a separate immediate status check racing right behind it). the status
+  // check could reach the helper and see pending:false *before* the start=1 call had actually flipped it true
+  // server-side, which the close-detection added for the stuck-button fix then misread as "closed without
+  // signing in" and reset the button within a fraction of a second of the very click that opened it -- looking
+  // like the button "let you press it again" when the window was, in fact, still opening. sawWindowOpen is what
+  // tells a real close (seen pending:true, now false) apart from that startup race (never confirmed open yet).
+  function openLoginPopup() {
+    clearLoginTimers(); // wipe any stale timers from a previous attempt
+    loginFlowActive = true;
+    loginWindowsCloseRequested = false;
+    loginLastCloseRequestAt = 0;
+    let sawWindowOpen = false;
+    setSigningIn(true, "Opening Streamable…");
+
+    async function pollStatus(isStartCall) {
+      if (!loginFlowActive) return;
+      let res, data;
+      try {
+        res = await fetch(HELPER_HTTP_URL + "import-session?source=owned" + (isStartCall ? "&start=1" : ""), {
+          method: "POST", cache: "no-store",
+        });
+        data = await res.json().catch(() => ({}));
+      } catch { return; } // helper unreachable this tick -- leave the label as-is rather than flipping it off a transient blip
+      if (!loginFlowActive || !res.ok) return; // cleanup may have already fired while this request was in flight
+      if (data.signedIn) {
+        applyAuthData(data);
+        setSigningIn(true, "Signed in! Cleaning up…");
+        cleanupLoginFlow();
+        return;
+      }
+      if (data.pending === true) { sawWindowOpen = true; setSigningIn(true, "Sign in in the Streamable window…"); return; }
+      if (sawWindowOpen) { cleanupLoginFlow(); return; } // really did close without finishing
+      setSigningIn(true, "Opening Streamable…"); // pending:false before weve ever seen it open -- still starting up
+    }
+
+    pollStatus(true); // opens the window (or focuses the existing one) and seeds status in the same call
+    importPollTimer = setInterval(() => pollStatus(false), LOGIN_IMPORT_POLL_MS);
+
+    // Hard timeout: leave the user a usable sign-in button if the window was closed.
+    loginTimeoutTimer = setTimeout(() => {
+      cleanupLoginFlow();
+    }, LOGIN_TIMEOUT_MS);
+  }
+
+  authBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (authState.signedIn) {
+      if (authMenu.classList.contains("is-open")) closeMenu();
+      else openMenu();
+    } else {
+      openLoginPopup();
+    }
+  });
+
+  authForce.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeMenu();
+    // the plugin draws the confirm over the dimmed OBS window and, on OK, hits /restart-obs-clean itself (kill obs,
+    // wait for the cookies file to unlock, drop streamable.com rows, relaunch obs as admin).
+    try { await rkNativeConfirm("streamable-relogin"); } catch { /* helper unreachable -- nothing to do */ }
+  });
+
+  authLogout.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    closeMenu();
+    authState = { signedIn: false, username: "", plan: "", sizeCap: 0, retentionDays: 2 };
+    renderAuth();
+    fetch(HELPER_HTTP_URL + "logout", { method: "POST", cache: "no-store" }).catch(() => {});
+  });
+
+  // outside-click / mouseleave / blur all close the auth menu.
+  document.addEventListener("mousedown", (e) => {
+    if (e.target.closest("#auth-wrap")) return;
+    closeMenu();
+  });
+  document.documentElement.addEventListener("mouseleave", () => { closeMenu(); if (window.RKTooltip) RKTooltip.hide(); });
+  window.addEventListener("blur", closeMenu);
+
+</script>
+</body>
+</html>

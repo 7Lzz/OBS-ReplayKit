@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Setup</title>
+  <link rel="icon" type="image/svg+xml" href="http://127.0.0.1:8767/obs-icon.svg?v=3" />
+<style>
+  /* tokens + components lifted from settings.html so the wizard is the same product, not a lookalike. */
+  :root {
+    --window:#1D1F26;
+    --panel:#272A33;
+    --field:#3C404D;
+    --field2:#323540;
+    --field-dark:#1D1F26;
+    --line:#3C404D;
+    --line2:#5B6273;
+    --selected:#284CB8;
+    --selected2:#476BD7;
+    --text:#ffffff;
+    --muted:#969696;
+    --disabled:#969696;
+    --danger:#e33b57;
+    --success:#37D247;
+    --link:#5c78df;
+    --button:#3C404D;
+    --button-hover:#464B59;
+    --on-accent:#ffffff;
+    --on-accent-rgb:255, 255, 255;
+    --text-rgb:255, 255, 255;
+    --bg-rgb:29, 31, 38;
+    --shadow-weak:rgba(0,0,0,.28);
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --anim_press:130ms;
+    --anim_menu:200ms;
+    --hover_grow:1.03;
+    --press_shrink:.96;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:var(--window); color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button,input { font:inherit; }
+  button { user-select:none; }
+  *::-webkit-scrollbar { width:14px; height:14px; background:transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color:var(--line); border-radius:7px; border:4px solid transparent;
+    background-clip:padding-box; min-height:30px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
+
+  .shell {
+    width:100vw; height:100vh;
+    display:grid;
+    grid-template-rows:auto 1fr 58px;
+    background:var(--window);
+    padding:14px 10px 0 14px;
+    position:relative;
+  }
+  .wiz-head { padding:2px 8px 12px 0; }
+  /* one segmented bar -- the step labels ARE the progress track, filled left to right */
+  .wiz-prog {
+    display:flex; gap:2px; height:26px; border-radius:6px; overflow:hidden; background:var(--line);
+  }
+  .wiz-seg {
+    flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:center;
+    background:var(--field); color:var(--muted); font-size:10.5px; letter-spacing:.2px;
+    transition:background 160ms linear, color 160ms linear;
+  }
+  .wiz-seg > span { max-width:100%; padding:0 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wiz-seg.is-done { background:var(--selected2); color:var(--on-accent); }
+  .wiz-seg.is-current { background:var(--selected); color:var(--on-accent); font-weight:600; }
+
+  .box {
+    background:var(--panel); border-radius:4px;
+    padding:14px 0 12px; margin:0 8px 10px 0;
+    height:100%; overflow:auto;
+  }
+  .box-title { height:30px; display:flex; align-items:center; padding:0 12px; font-weight:700; font-size:15px; }
+  .box-lead { color:var(--muted); font-size:12px; line-height:1.5; padding:2px 12px 8px; }
+
+  .panel { animation:rk-page-in 190ms var(--ease_smooth) both; }
+  @keyframes rk-page-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+
+  .form-row {
+    display:grid; grid-template-columns:180px minmax(240px,1fr);
+    align-items:center; column-gap:8px; min-height:42px; padding:3px 12px;
+  }
+  .form-row.is-stacked-row { align-items:start; }
+  .label { justify-self:end; text-align:right; color:var(--text); line-height:1.25; }
+  .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
+  .hint { color:var(--muted); font-size:12px; margin-left:4px; }
+
+  .combo-button,.text-input,.spin-input,.hotkey-input {
+    width:100%; height:32px;
+    border:1px solid var(--field);
+    border-radius:4px; background:var(--field); color:var(--text); outline:none;
+  }
+  .text-input { padding:0 9px; }
+
+  .combo { position:relative; flex:1; min-width:0; }
+  .combo-button {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 37px 0 9px; cursor:pointer; text-align:left; position:relative;
+  }
+  .combo-arrow { position:absolute; right:0; top:1px; width:28px; height:30px; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  .combo-arrow svg { width:16px; height:16px; fill:currentColor; transition:transform var(--anim_menu) var(--ease_smooth); }
+  .combo.is-open .combo-arrow svg { transform:rotate(180deg); }
+  .combo-button::before { content:""; position:absolute; top:1px; bottom:1px; right:26px; width:1px; background:var(--panel); pointer-events:none; }
+  .combo.is-open .combo-button { border-color:var(--selected); background:var(--window); }
+  .combo-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .combo-menu {
+    position:absolute; z-index:20; top:34px; left:0; right:0;
+    max-height:0; overflow:hidden;
+    background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:0 3px;
+    box-shadow:0 10px 24px var(--shadow-weak);
+    opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-6px); transform-origin:top center;
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .combo.is-open .combo-menu {
+    max-height:300px; overflow:auto; padding:3px; opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0);
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  .combo.is-open .combo-option { animation:rk-option-in 200ms var(--ease_smooth) backwards; }
+  .combo.is-open .combo-option:nth-child(2) { animation-delay:26ms; }
+  .combo.is-open .combo-option:nth-child(3) { animation-delay:48ms; }
+  .combo.is-open .combo-option:nth-child(n+4) { animation-delay:68ms; }
+  @keyframes rk-option-in { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
+  .combo-option {
+    min-height:28px; display:flex; align-items:center; padding:0 10px; border-radius:3px;
+    color:var(--text); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .combo-option:hover,.combo-option.is-selected { background:var(--selected); color:var(--on-accent); }
+  .combo-option.is-selected { outline:1px solid rgba(var(--on-accent-rgb),.55); outline-offset:-1px; }
+  .combo-option .option-blurb { color:var(--muted); margin-left:4px; overflow:hidden; text-overflow:ellipsis; }
+  .combo-option.is-selected .option-blurb { color:var(--on-accent); opacity:.82; }
+
+  .check-row { min-height:28px; display:flex; align-items:center; gap:7px; color:var(--text); cursor:pointer; padding:6px 12px; }
+  .check-row input {
+    appearance:none; -webkit-appearance:none; position:relative; width:14px; height:14px; flex:0 0 14px; margin:0;
+    border:1px solid var(--muted); border-radius:2px; background:transparent;
+  }
+  .check-row input:checked::after {
+    content:""; position:absolute; inset:0; background:var(--text);
+    -webkit-mask:url(/icons/ui/check.svg) center / 12px 12px no-repeat; mask:url(/icons/ui/check.svg) center / 12px 12px no-repeat;
+  }
+  .theme-preview-row { padding:8px 12px 0; }
+  .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
+  .theme-hint { color:var(--muted); font-size:11px; padding:6px 12px 0; }
+  .theme-hint[hidden] { display:none; }
+
+  .spin { position:relative; width:100%; }
+  .spin-input { padding:0 37px 0 9px; }
+  .spin-buttons {
+    position:absolute; right:0; top:0; width:28px; height:32px;
+    border-left:1px solid var(--panel); display:grid; grid-template-rows:1fr 1fr; background:var(--field);
+  }
+  .spin-btn { border:0; background:transparent; color:var(--text); cursor:pointer; line-height:1; padding:0; transition:background-color 90ms linear; }
+  .spin-btn:hover { background:var(--button-hover); }
+  .spin-btn + .spin-btn { border-top:1px solid var(--panel); }
+  .spin-btn svg { width:9px; height:9px; fill:currentColor; }
+
+  .hotkey-grid { border:1px solid var(--line); border-radius:4px; padding:12px 0; margin:0 12px; }
+  .hotkey-section { font-weight:700; padding:9px 8px 5px; }
+  .hotkey-row { display:grid; grid-template-columns:220px minmax(200px,1fr) auto; gap:6px; align-items:center; min-height:36px; padding:0 8px; }
+  .hotkey-row .label { justify-self:end; }
+  .hotkey-input { display:flex; align-items:center; padding:0 9px; overflow:hidden; white-space:nowrap; cursor:pointer; }
+  .hotkey-input:focus { border-color:var(--selected2); background:var(--field-dark); }
+  .hotkey-input.is-empty { color:var(--muted); }
+  .hotkey-actions { display:flex; gap:3px; }
+
+  .icon-btn {
+    width:28px; height:28px; border:1px solid var(--line2); border-radius:4px;
+    background:var(--button); color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .icon-btn:hover { background:var(--button-hover); }
+  .icon-btn:disabled { color:var(--disabled); opacity:.65; cursor:default; }
+  .icon-btn svg { width:16px; height:16px; fill:currentColor; }
+  .field-wrap:has(> .field-browse) > .text-input { width:auto; flex:1 1 0; min-width:0; }
+  .field-browse { flex:none; }
+
+  .icon-grid { display:flex; flex-wrap:wrap; gap:8px; padding:4px 12px 0; }
+  .icon-tile {
+    position:relative; display:flex; flex-direction:column; align-items:center; gap:6px;
+    width:78px; padding:9px 4px 7px;
+    background:var(--field-dark); border:1px solid var(--line); border-radius:7px;
+    color:var(--text); cursor:pointer; font-size:11px; line-height:1;
+    transition:background var(--anim_press) var(--ease_pop), border-color var(--anim_press) var(--ease_pop);
+  }
+  .icon-tile:hover { background:var(--button-hover); }
+  .icon-tile.is-selected { border-color:var(--selected2); background:var(--selected); color:var(--on-accent); }
+  .icon-tile-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
+  .icon-tile img, .icon-tile .icon-tile-swatch { width:40px; height:40px; }
+  .icon-tile img { object-fit:contain; }
+  .icon-tile .icon-tile-swatch { display:flex; align-items:center; justify-content:center; background:var(--field); border-radius:6px; color:var(--muted); font-size:9px; text-align:center; }
+  .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
+  .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
+  .theme-sw b { position:absolute; top:5px; right:5px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1.5px rgba(0,0,0,.25); }
+
+  .footer { display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:9px 8px 13px 0; }
+  .footer .status { margin-right:auto; font-size:12px; color:var(--muted); padding-left:4px; }
+  .footer .status.bad { color:var(--danger); }
+  .footer .status.good { color:var(--success); }
+  .btn {
+    min-width:52px; height:30px; border:1px solid var(--field); border-radius:4px;
+    background:var(--field); color:var(--text); padding:0 13px; cursor:pointer;
+  }
+  .btn:hover { background:var(--button-hover); }
+  .btn.is-primary { background:var(--selected); border-color:var(--selected2); color:var(--on-accent); }
+  .btn.is-primary:hover { background:var(--selected2); }
+  .btn:disabled { color:var(--muted); cursor:default; background:var(--panel); border-color:var(--field); }
+  .btn[hidden] { display:none; }
+
+
+  @media (max-width:760px) {
+    .form-row { grid-template-columns:130px minmax(180px,1fr); }
+    .hotkey-row { grid-template-columns:150px minmax(160px,1fr) auto; }
+  }
+</style>
+<link rel="stylesheet" href="rk-theme.css" />
+<!--#include interaction-states-->
+</head>
+<body>
+<!-- color picker lives outside .shell so its injected style/div/script are not extra grid children of the 3-row shell -->
+<!--#include color-picker-->
+<!--#include tooltip-->
+<div class="shell">
+  <div class="wiz-head">
+    <div class="wiz-prog" id="crumbs">
+      <div class="wiz-seg" data-step="1"><span>Welcome</span></div>
+      <div class="wiz-seg" data-step="2"><span>Recording</span></div>
+      <div class="wiz-seg" data-step="3"><span>Clip length</span></div>
+      <div class="wiz-seg" data-step="4"><span>Hotkeys</span></div>
+      <div class="wiz-seg" data-step="5"><span>Overlay</span></div>
+      <div class="wiz-seg" data-step="6"><span>Appearance</span></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <section class="panel" data-step="1" hidden>
+      <div class="box-title">Welcome to OBS ReplayKit</div>
+      <div class="box-lead">A few quick choices and you are set. Everything here can be changed later in ReplayKit Settings, which opens from the OBS dock or the tray menu.</div>
+    </section>
+
+    <section class="panel" data-step="2" hidden>
+      <div class="box-title">Recording</div>
+      <div class="form-row">
+        <div class="label">Recording Path</div>
+        <div class="field-wrap">
+          <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Videos">
+          <button class="icon-btn field-browse" type="button" id="browseClipDir" title="Choose folder">
+            <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="label">Recording Quality</div>
+        <div class="field-wrap"><div class="combo" id="recordingPreset" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+      </div>
+    </section>
+
+    <section class="panel" data-step="3" hidden>
+      <div class="box-title">Clip Length</div>
+      <div class="box-lead">How long each clip is when you press the save hotkey.</div>
+      <div class="form-row">
+        <div class="label">Clip Length</div>
+        <div class="field-wrap">
+          <div class="spin">
+            <input class="spin-input" id="replaySeconds" type="text" inputmode="numeric" autocomplete="off">
+            <div class="spin-buttons">
+              <button class="spin-btn" type="button" data-spin="up" aria-label="Increase clip length"><svg data-i="nav/chevron-up" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+              <button class="spin-btn" type="button" data-spin="down" aria-label="Decrease clip length"><svg data-i="nav/chevron-down" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-step="4" hidden>
+      <div class="box-title">Hotkeys</div>
+      <div class="box-lead">Click a field, then press the key combo you want. These are global OBS hotkeys.</div>
+      <div class="hotkey-grid">
+        <div class="hotkey-section">Clipping</div>
+        <div class="hotkey-row">
+          <div class="label">Save Clip</div>
+          <div class="hotkey-input" id="clipKeybind" tabindex="0" role="textbox" aria-label="Save Clip hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-reset="clipKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="clipKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+        <div class="hotkey-section">Recording</div>
+        <div class="hotkey-row">
+          <div class="label">Start / Stop Recording</div>
+          <div class="hotkey-input" id="recordingKeybind" tabindex="0" role="textbox" aria-label="Start or Stop Recording hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-reset="recordingKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="recordingKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+        <div class="hotkey-section">Clips</div>
+        <div class="hotkey-row">
+          <div class="label">Open Clips</div>
+          <div class="hotkey-input" id="openClipsKeybind" tabindex="0" role="textbox" aria-label="Open clips hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-reset="openClipsKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="openClipsKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-step="5" hidden>
+      <div class="box-title">Overlay</div>
+      <div class="box-lead">Pick an input overlay and tune it &mdash; the preview reacts to your keyboard and mouse.</div>
+      <div class="form-row is-stacked-row">
+        <div class="label" style="line-height:32px">Preview</div>
+        <div class="field-wrap" style="flex-direction:column; align-items:stretch"><!--#include live2d-bongo--><!--#include overlay-preview--></div>
+      </div>
+      <!--#include overlay-controls-->
+    </section>
+
+    <section class="panel" data-step="6" hidden>
+      <div class="box-title">Appearance</div>
+      <div class="box-lead">Theme the ReplayKit windows and OBS. This window previews live; OBS restarts once at the end.</div>
+      <!--#include appearance-panel-->
+    </section>
+
+    <section class="panel" data-step="done" hidden>
+      <div class="box-title">All set</div>
+      <div class="box-lead" id="doneMsg">ReplayKit is ready. This window will close on its own.</div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <span class="status" id="status"></span>
+    <button class="btn" type="button" id="backBtn" disabled>Back</button>
+    <button class="btn is-primary" type="button" id="nextBtn">Next</button>
+  </footer>
+  <!--#include window-chrome-->
+</div>
+
+<script>
+  if (window.RKHover) RKHover.apply(document, { control: ".btn, .icon-btn, .spin-btn" });
+  // fill the <svg data-i="..."> placeholders from the helper-injected window.RK_ICONS map (same as settings.html)
+  (function () {
+    const m = window.RK_ICONS || {};
+    document.querySelectorAll("svg[data-i]").forEach((el) => {
+      const full = m[el.dataset.i];
+      if (full) el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+    });
+  })();
+
+  (function lockdown() {
+    const blockedCommandKeys = new Set(["+", "=", "-", "_", "0", "r", "R", "f", "F", "l", "L", "o", "O", "p", "P", "s", "S", "u", "U"]);
+    const blockedCommandCodes = new Set(["Equal", "Minus", "Digit0", "NumpadAdd", "NumpadSubtract", "Numpad0"]);
+    const blockedDevToolsCodes = new Set(["KeyI", "KeyJ", "KeyC"]);
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+    document.addEventListener("keydown", (e) => {
+      const command = e.ctrlKey || e.metaKey;
+      if (command && (blockedCommandKeys.has(e.key) || blockedCommandCodes.has(e.code) || (e.shiftKey && blockedDevToolsCodes.has(e.code)))) { e.preventDefault(); return; }
+      if (e.key === "F5" || e.code === "F5" || e.key === "F12" || e.code === "F12") { e.preventDefault(); return; }
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) e.preventDefault();
+      if (e.key === "BrowserBack" || e.key === "BrowserForward") e.preventDefault();
+    }, true);
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const TOTAL_STEPS = 6;
+  const REPLAY_SECONDS_MIN = 5;
+  const REPLAY_SECONDS_MAX = 1200;
+  const DEFAULT_CLIP_KEYBIND = { key:"OBS_KEY_F8" };
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + "/" + path, { cache:"no-store", ...(options || {}) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) throw new Error(body.message || body.error || ("HTTP " + res.status));
+    return body;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function clone(v) { return JSON.parse(JSON.stringify(v || {})); }
+
+  const els = {
+    panels: Array.from(document.querySelectorAll(".panel")),
+    status: document.getElementById("status"),
+    backBtn: document.getElementById("backBtn"),
+    nextBtn: document.getElementById("nextBtn"),
+    resizeGrip: document.querySelector(".resize-grip"),
+    clipDir: document.getElementById("clipDir"),
+    browseClipDir: document.getElementById("browseClipDir"),
+    recordingPreset: document.getElementById("recordingPreset"),
+    replaySeconds: document.getElementById("replaySeconds"),
+    clipKeybind: document.getElementById("clipKeybind"),
+    recordingKeybind: document.getElementById("recordingKeybind"),
+    openClipsKeybind: document.getElementById("openClipsKeybind"),
+    doneMsg: document.getElementById("doneMsg"),
+  };
+
+  const state = {
+    clipDir: "",
+    recordingPreset: "balanced",
+    replaySeconds: 90,
+    clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
+    recordingKeybind: {},
+    openClipsKeybind: {},
+    overlayStyle: "off",
+    overlayFlipH: false,
+    overlayOpacity: 100,
+    overlayScale: 100,
+    overlayHueShift: 0,
+    overlayColorMultiply: "#ffffff",
+    overlayColorAdd: "#000000",
+    // where the user dragged each overlay in the preview, keyed by style
+    overlayPosition: {},
+    theme: "default",
+    themeCustom: null,
+    appIcon: "default",
+    appIconCustomPath: "",
+    appIconRecordingDot: true,
+  };
+
+  function setStatus(text, kind) {
+    els.status.textContent = text || "";
+    els.status.classList.toggle("bad", kind === "bad");
+    els.status.classList.toggle("good", kind === "good");
+  }
+
+  // tooltips come from the shared _tooltip partial; watch() also adopts native title= attributes, including on markup added later
+  if (window.RKTooltip) RKTooltip.watch(document.body);
+
+  // ---- combos (verbatim behaviour from settings.html) ----
+  function comboOptionHtml(option, selectedValue) {
+    const selected = option.value === selectedValue ? " is-selected" : "";
+    const blurb = option.blurb ? '<span class="option-blurb">- ' + escapeHtml(option.blurb) + '</span>' : "";
+    return '<div class="combo-option' + selected + '" role="option" data-value="' + escapeHtml(option.value) +
+      '" aria-selected="' + (option.value === selectedValue ? "true" : "false") + '"><span>' + escapeHtml(option.label) + '</span>' + blurb + '</div>';
+  }
+  function comboValue(combo) { return combo.dataset.value || ""; }
+  function comboOptions(combo) { try { return JSON.parse(combo.dataset.options || "[]"); } catch { return []; } }
+  function renderCombo(combo) {
+    const options = comboOptions(combo);
+    const value = comboValue(combo);
+    const option = options.find((o) => o.value === value) || options[0] || { label:"" };
+    combo.querySelector(".combo-label").textContent = option.label || "";
+    const menu = combo.querySelector(".combo-menu");
+    const sig = value + "|" + (combo.dataset.options || "");
+    if (menu.dataset.sig === sig) return;
+    menu.dataset.sig = sig;
+    menu.innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
+  }
+  function setComboValue(combo, value, notify) {
+    const options = comboOptions(combo);
+    const selected = options.find((o) => o.value === value) || options[0];
+    combo.dataset.value = selected ? selected.value : "";
+    renderCombo(combo);
+    if (notify) combo.dispatchEvent(new CustomEvent("combochange", { bubbles:true }));
+  }
+  function fillCombo(combo, options) { combo.dataset.options = JSON.stringify(options || []); setComboValue(combo, comboValue(combo), false); }
+  function closeCombos(except) {
+    document.querySelectorAll(".combo.is-open").forEach((c) => { if (c !== except) { c.classList.remove("is-open"); c.setAttribute("aria-expanded", "false"); } });
+  }
+  function openCombo(combo) { closeCombos(combo); combo.classList.add("is-open"); combo.setAttribute("aria-expanded", "true"); }
+  // the shared partials bring their own combos and wire them themselves -- claiming those here put two toggle handlers on one button, which opened then immediately closed the menu
+  document.querySelectorAll(".combo:not([data-self-wired])").forEach((combo) => {
+    combo.querySelector(".combo-button").addEventListener("click", (e) => {
+      e.stopPropagation();
+      combo.classList.contains("is-open") ? closeCombos() : openCombo(combo);
+    });
+    combo.addEventListener("click", (e) => {
+      const option = e.target.closest(".combo-option");
+      if (!option) return;
+      setComboValue(combo, option.dataset.value, true);
+      closeCombos();
+    });
+    combo.addEventListener("keydown", (e) => {
+      const options = comboOptions(combo);
+      if (!options.length) return;
+      const current = Math.max(0, options.findIndex((o) => o.value === comboValue(combo)));
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); combo.classList.contains("is-open") ? closeCombos() : openCombo(combo); }
+      else if (e.key === "Escape") { e.preventDefault(); closeCombos(); }
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        setComboValue(combo, options[(current + delta + options.length) % options.length].value, true);
+      }
+    });
+  });
+  document.addEventListener("click", () => closeCombos());
+  els.recordingPreset.addEventListener("combochange", () => { state.recordingPreset = comboValue(els.recordingPreset); });
+
+  // ---- clip length (mm:ss like settings.html) ----
+  function readReplaySeconds() {
+    const raw = String(els.replaySeconds.value || "").trim();
+    const parts = raw.match(/^(?:(\d+)\s*m)?\s*(?:(\d+)\s*s?)?$/i);
+    const total = (parts && (parts[1] !== undefined || parts[2] !== undefined))
+      ? (parseInt(parts[1] || "0", 10) * 60) + parseInt(parts[2] || "0", 10)
+      : parseInt(raw, 10);
+    return Number.isFinite(total) ? Math.max(REPLAY_SECONDS_MIN, Math.min(REPLAY_SECONDS_MAX, total)) : 90;
+  }
+  function replaySecondsLabel(value) {
+    const v = Math.max(0, Math.round(value));
+    if (v < 60) return v + "s";
+    const m = Math.floor(v / 60), s = v % 60;
+    return s === 0 ? (m + "m") : (m + "m " + s + "s");
+  }
+  function commitReplaySeconds(next) {
+    state.replaySeconds = Math.max(REPLAY_SECONDS_MIN, Math.min(REPLAY_SECONDS_MAX, next));
+    els.replaySeconds.value = replaySecondsLabel(state.replaySeconds);
+  }
+  els.replaySeconds.addEventListener("change", () => commitReplaySeconds(readReplaySeconds()));
+  els.replaySeconds.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    commitReplaySeconds(readReplaySeconds() + (e.deltaY < 0 ? 5 : -5));
+  }, { passive:false });
+  document.querySelectorAll("[data-spin]").forEach((btn) => {
+    btn.addEventListener("click", () => commitReplaySeconds(readReplaySeconds() + (btn.dataset.spin === "up" ? 5 : -5)));
+  });
+
+  // ---- hotkeys (verbatim behaviour from settings.html) ----
+  function keyLabel(obsKey) {
+    const named = {
+      OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space", OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc",
+      OBS_KEY_TAB:"Tab", OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
+      OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
+    };
+    if (named[obsKey]) return named[obsKey];
+    if (obsKey && obsKey.startsWith("OBS_KEY_")) return obsKey.slice(8).replace(/_/g, " ");
+    return obsKey || "";
+  }
+  function comboToLabel(combo) {
+    combo = combo || {};
+    if (!combo.key) return "";
+    const parts = [];
+    if (combo.control) parts.push("Ctrl");
+    if (combo.alt) parts.push("Alt");
+    if (combo.shift) parts.push("Shift");
+    if (combo.command) parts.push("Win");
+    parts.push(keyLabel(combo.key));
+    return parts.join(" + ");
+  }
+  function obsKeyFromEvent(e) {
+    const k = e.key;
+    if (!k || ["Shift","Control","Alt","Meta"].includes(k)) return "";
+    const byCode = {
+      Backslash:"OBS_KEY_BACKSLASH", Slash:"OBS_KEY_SLASH", Minus:"OBS_KEY_MINUS", Equal:"OBS_KEY_EQUAL",
+      BracketLeft:"OBS_KEY_BRACKETLEFT", BracketRight:"OBS_KEY_BRACKETRIGHT", Semicolon:"OBS_KEY_SEMICOLON",
+      Quote:"OBS_KEY_APOSTROPHE", Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
+    };
+    if (byCode[e.code]) return byCode[e.code];
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
+    if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
+    if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
+    const byKey = {
+      "\\":"OBS_KEY_BACKSLASH", "|":"OBS_KEY_BACKSLASH", "/":"OBS_KEY_SLASH", "?":"OBS_KEY_SLASH", " ":"OBS_KEY_SPACE",
+      "Enter":"OBS_KEY_RETURN", "Escape":"OBS_KEY_ESCAPE", "Tab":"OBS_KEY_TAB", "Delete":"OBS_KEY_DELETE",
+      "Backspace":"OBS_KEY_BACKSPACE", "ArrowUp":"OBS_KEY_UP", "ArrowDown":"OBS_KEY_DOWN",
+      "ArrowLeft":"OBS_KEY_LEFT", "ArrowRight":"OBS_KEY_RIGHT", "-":"OBS_KEY_MINUS", "=":"OBS_KEY_EQUAL",
+      "[":"OBS_KEY_BRACKETLEFT", "]":"OBS_KEY_BRACKETRIGHT", ";":"OBS_KEY_SEMICOLON", "'":"OBS_KEY_APOSTROPHE",
+      ",":"OBS_KEY_COMMA", ".":"OBS_KEY_PERIOD", "`":"OBS_KEY_QUOTELEFT",
+    };
+    return byKey[k] || "";
+  }
+
+  const hotkeyFields = {
+    clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
+    recordingKeybind: { el:els.recordingKeybind, defaultValue:{} },
+    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:{} },
+  };
+  let hotkeyCaptureActive = false, hotkeyCapturePending = null, hotkeyCaptureDesired = false, activeHotkeyField = null, hotkeyCaptureTimer = null;
+  const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
+
+  function setHotkeyCapture(active, keepalive) {
+    hotkeyCaptureDesired = !!active;
+    if (!active && hotkeyCapturePending) return hotkeyCapturePending.finally(() => setHotkeyCapture(false, keepalive));
+    if (active && hotkeyCaptureActive) return Promise.resolve(true);
+    if (!active && !hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
+    const url = HELPER + "/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now();
+    const request = fetch(url, { method:"POST", cache:"no-store", keepalive:!!keepalive })
+      .then((res) => res.json()).then((body) => {
+        if (!body || body.ok !== true) throw new Error((body && body.message) || "Hotkey capture failed");
+        if (hotkeyCaptureDesired === !!active) hotkeyCaptureActive = !!active;
+        return true;
+      }).catch(() => false).finally(() => { if (hotkeyCapturePending === request) hotkeyCapturePending = null; });
+    hotkeyCapturePending = request;
+    return request;
+  }
+  function syncHotkeyField(name) {
+    const field = hotkeyFields[name];
+    const label = comboToLabel(state[name]);
+    field.el.textContent = label || "";
+    field.el.classList.toggle("is-empty", !label);
+  }
+  function syncHotkeyFields() { Object.keys(hotkeyFields).forEach(syncHotkeyField); }
+  function beginHotkeyCapture(name) {
+    const field = hotkeyFields[name];
+    activeHotkeyField = name;
+    const before = comboToLabel(state[name]);
+    field.el.textContent = "Connecting...";
+    field.el.classList.add("is-empty");
+    if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
+    setHotkeyCapture(true, false).then((ok) => {
+      if (document.activeElement !== field.el || activeHotkeyField !== name) return;
+      if (comboToLabel(state[name]) !== before) { syncHotkeyField(name); return; }
+      if (!ok) { field.el.textContent = "Could not pause OBS hotkey"; field.el.classList.add("is-empty"); return; }
+      field.el.textContent = "Listening...";
+      field.el.classList.add("is-empty");
+      hotkeyCaptureTimer = setTimeout(() => { hotkeyCaptureTimer = null; if (activeHotkeyField === name) field.el.blur(); }, HOTKEY_CAPTURE_TIMEOUT_MS);
+    });
+  }
+  function releaseHotkeyCapture(keepalive) {
+    activeHotkeyField = null;
+    if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
+    if (!hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
+    return setHotkeyCapture(false, keepalive !== false);
+  }
+  Object.keys(hotkeyFields).forEach((name) => {
+    const field = hotkeyFields[name];
+    field.el.addEventListener("pointerdown", () => { setHotkeyCapture(true, false); });
+    field.el.addEventListener("focus", () => beginHotkeyCapture(name));
+    field.el.addEventListener("blur", () => { releaseHotkeyCapture(true); syncHotkeyField(name); });
+    field.el.addEventListener("keydown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+      activeHotkeyField = name;
+      if (!hotkeyCaptureActive && !hotkeyCapturePending) setHotkeyCapture(true, false);
+      const obsKey = obsKeyFromEvent(e);
+      if (!obsKey) return;
+      if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
+      const combo = { key:obsKey };
+      if (e.ctrlKey) combo.control = true;
+      if (e.altKey) combo.alt = true;
+      if (e.shiftKey) combo.shift = true;
+      if (e.metaKey) combo.command = true;
+      state[name] = combo;
+      syncHotkeyField(name);
+    });
+  });
+  // hotkey rows only -- the overlay partial carries its own data-reset buttons for the overlay fields and resets those itself
+  document.querySelectorAll("[data-reset]").forEach((b) => {
+    if (!hotkeyFields[b.dataset.reset]) return;
+    b.addEventListener("click", () => {
+      state[b.dataset.reset] = clone(hotkeyFields[b.dataset.reset].defaultValue);
+      syncHotkeyField(b.dataset.reset);
+    });
+  });
+  document.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", () => {
+    state[b.dataset.clear] = {};
+    syncHotkeyField(b.dataset.clear);
+  }));
+
+  // theme + app icon come from the shared _appearance-panel partial; overlay controls from _overlay-controls;
+  // the fake overlay projector from _overlay-preview. wired in init() once state is seeded from /settings.
+
+  if (window.RKWindowChrome) RKWindowChrome.bindResizeGrip({
+    title: "ReplayKit Setup",
+    helper: HELPER,
+    beforeStart: closeCombos,
+  });
+
+  // ---- step navigation ----
+  // set when the user drags the overlay in the projector, so Finish knows to push a position at the scene item
+  let step = 1;
+  const crumbs = Array.from(document.querySelectorAll(".wiz-seg"));
+  function showStep(n) {
+    step = n;
+    els.panels.forEach((p) => { p.hidden = p.dataset.step !== String(n); });
+    const done = n === "done";
+    const shown = done ? TOTAL_STEPS : n;
+    crumbs.forEach((c) => {
+      const cs = Number(c.dataset.step);
+      c.classList.toggle("is-current", !done && cs === n);
+      c.classList.toggle("is-done", cs < shown || done);
+    });
+    els.backBtn.hidden = done;
+    els.nextBtn.hidden = done;
+    els.backBtn.disabled = done || n <= 1;
+    els.nextBtn.textContent = n === TOTAL_STEPS ? "Finish" : "Next";
+    // the fake overlay projector only listens to input + renders while the Overlay step is on screen
+    if (window.RKOverlayPreview) { if (n === 5) { RKOverlayPreview.refresh(); RKOverlayPreview.start(); } else RKOverlayPreview.stop(); }
+    setStatus("");
+  }
+  els.backBtn.addEventListener("click", () => { if (typeof step === "number" && step > 1) showStep(step - 1); });
+  els.nextBtn.addEventListener("click", async () => {
+    if (activeHotkeyField) return;
+    if (step === 3) commitReplaySeconds(readReplaySeconds());
+    if (step === 2) state.clipDir = els.clipDir.value.trim();
+    if (typeof step === "number" && step < TOTAL_STEPS) { showStep(step + 1); return; }
+    await finish();
+  });
+
+  els.browseClipDir.addEventListener("click", async () => {
+    els.browseClipDir.disabled = true;
+    try {
+      const data = await helperJson("browse-folder?initial=" + encodeURIComponent(els.clipDir.value.trim()) + "&t=" + Date.now());
+      if (data && data.ok && data.path) { els.clipDir.value = data.path; state.clipDir = data.path; }
+    } catch (_) {}
+    els.browseClipDir.disabled = false;
+  });
+
+  async function finish() {
+    els.nextBtn.disabled = true;
+    els.backBtn.disabled = true;
+    setStatus("Saving...");
+    const payload = {
+      clipDir: state.clipDir,
+      recordingPreset: state.recordingPreset,
+      replaySeconds: state.replaySeconds,
+      clipNotificationSeconds: state.replaySeconds,
+      clipKeybind: state.clipKeybind,
+      recordingKeybind: state.recordingKeybind,
+      openClipsKeybind: state.openClipsKeybind,
+    };
+    if (window.RKOverlay) Object.assign(payload, RKOverlay.collect());
+    if (window.RKAppearance) {
+      const ap = RKAppearance.collect();
+      Object.keys(ap).forEach((k) => { if (ap[k] !== undefined) payload[k] = ap[k]; });
+    }
+    payload.overlayPosition = state.overlayPosition;
+    // clear the flag first: a theme change restarts obs and takes this window with it; if the flag were still set the wizard would just reopen -- worst case /settings fails and the user finishes in Settings, which beats a loop
+    try { await helperJson("setup/complete", { method:"POST" }); } catch (_) {}
+    try {
+      const res = await helperJson("settings", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify(payload),
+      });
+      const restarting = res && res.restartRequired;
+      showStep("done");
+      els.doneMsg.textContent = restarting
+        ? "ReplayKit is ready. OBS will restart now to finish applying the theme."
+        : "ReplayKit is ready. This window will close on its own.";
+      setTimeout(closeWindow, restarting ? 1200 : 2400);
+    } catch (e) {
+      els.nextBtn.disabled = false;
+      els.backBtn.disabled = false;
+      setStatus("Could not save: " + (e.message || e) + ". You can finish in ReplayKit Settings.", "bad");
+    }
+  }
+
+  function closeWindow() {
+    releaseHotkeyCapture();
+    fetch(HELPER + "/close-window?title=ReplayKit%20Setup&t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+    try { window.close(); } catch (_) {}
+  }
+  window.addEventListener("pagehide", () => { releaseHotkeyCapture(true); });
+
+  async function init() {
+    let opts = {};
+    try {
+      const s = await helperJson("settings?t=" + Date.now());
+      opts = s.options || {};
+      if (s.defaultClipDir) els.clipDir.placeholder = s.defaultClipDir;
+      const g = s.settings || {};
+      if (typeof g.clipDir === "string") state.clipDir = g.clipDir;
+      if (g.recordingPreset) state.recordingPreset = g.recordingPreset;
+      if (Number.isFinite(g.replaySeconds)) state.replaySeconds = g.replaySeconds;
+      if (g.clipKeybind && g.clipKeybind.key) state.clipKeybind = g.clipKeybind;
+      if (g.recordingKeybind && g.recordingKeybind.key) state.recordingKeybind = g.recordingKeybind;
+      if (g.openClipsKeybind && g.openClipsKeybind.key) state.openClipsKeybind = g.openClipsKeybind;
+      [
+        "overlayStyle","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
+        "theme","themeCustom","appIcon","appIconCustomPath","appIconRecordingDot",
+      ].forEach((k) => { if (g[k] !== undefined && g[k] !== null) state[k] = g[k]; });
+    } catch (_) {}
+
+    fillCombo(els.recordingPreset, opts.recordingPresets || [
+      { value:"performance", label:"Performance", blurb:"720p30. Lowest load." },
+      { value:"balanced", label:"Balanced", blurb:"1080p60. Recommended." },
+      { value:"quality", label:"Quality", blurb:"Higher-quality target." },
+    ]);
+    setComboValue(els.recordingPreset, state.recordingPreset, false);
+
+    els.clipDir.value = state.clipDir;
+    els.replaySeconds.value = replaySecondsLabel(state.replaySeconds);
+    syncHotkeyFields();
+
+    const hostGet = (k) => state[k];
+    const hostSet = (k, v) => { state[k] = v; };
+    if (window.RKOverlay) RKOverlay.init({ get:hostGet, set:hostSet, onChange:() => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); } });
+    // stored per style, becuase the two overlays are nothing alike in size and one shared corner would put the other one off the canvas
+    if (window.RKOverlayPreview) RKOverlayPreview.init(() => state, (x, y) => {
+      const style = state.overlayStyle;
+      if (style !== "input_overlay" && style !== "bongo_cat") return;
+      state.overlayPosition = Object.assign({}, state.overlayPosition);
+      state.overlayPosition[style] = { x, y };
+    });
+    if (window.RKAppearance) RKAppearance.init({ get:hostGet, set:hostSet, onChange:() => {}, setStatus });
+
+    showStep(1);
+  }
+
+  init();
+</script>
+</body>
+</html>

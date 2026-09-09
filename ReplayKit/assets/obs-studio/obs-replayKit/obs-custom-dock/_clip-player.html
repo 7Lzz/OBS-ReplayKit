@@ -1,0 +1,29 @@
+<!-- Shared Clip-player control factory. The parent owns media and timeline state; this owns the reusable chrome. -->
+<script>
+(function () {
+  function controlsHtml(icons, volumeIcon) {
+    return `
+      <div class="preview-controls">
+        <div class="controls-left">
+          <button class="play-toggle-btn" type="button" data-tooltip="Play" aria-label="Play / pause"><svg viewBox="0 0 24 24" class="pt-play">${icons.PLAY}</svg><svg viewBox="0 0 24 24" class="pt-pause" style="display:none">${icons.PAUSE}</svg></button>
+          <div class="volume-control"><button class="volume-btn" type="button" data-tooltip="Volume" data-level="0">${volumeIcon}</button><div class="volume-slider-wrap"><input type="range" class="volume-slider" min="0" max="100" step="1" value="60"></div></div>
+          <span class="time-display"><span class="time-current">0:00</span> / <span class="time-total">0:00</span></span>
+        </div>
+        <div class="controls-right">
+          <div class="settings-wrap">
+            <button class="icon-btn settings-btn" type="button" data-tooltip="Playback settings" aria-label="Playback settings"><svg viewBox="0 0 24 24">${icons.SETTINGS}</svg></button>
+            <div class="settings-menu" role="menu">
+              <div class="menu-header"><svg viewBox="0 0 24 24">${icons.SETTINGS}</svg><span>Playback speed</span></div>
+              <div class="speed-current"><input type="text" class="speed-current-value" inputmode="decimal" autocomplete="off" spellcheck="false" maxlength="5" value="1.00"><span class="speed-current-unit">x</span></div>
+              <div class="speed-slider-row"><button class="speed-step-btn speed-down" type="button" aria-label="Slower">&minus;</button><input type="range" class="speed-slider" min="0.1" max="16" step="any" value="1"><button class="speed-step-btn speed-up" type="button" aria-label="Faster">&plus;</button></div>
+              <div class="speed-pills"><button class="speed-pill" data-speed="0.25">0.25</button><button class="speed-pill" data-speed="0.5">0.5</button><button class="speed-pill is-active" data-speed="1">1.0</button><button class="speed-pill" data-speed="1.5">1.5</button><button class="speed-pill" data-speed="2">2.0</button><button class="speed-pill" data-speed="10">10.0</button></div>
+            </div>
+          </div>
+          <button class="icon-btn theater-btn" type="button" data-tooltip="Theater mode" aria-label="Theater mode"><svg viewBox="0 0 24 24" class="theater-enter-icon">${icons.THEATER}</svg><svg viewBox="0 0 24 24" class="theater-exit-icon" style="display:none">${icons.THEATER_EXIT}</svg></button>
+          <button class="icon-btn fullscreen-btn" type="button" data-tooltip="Fullscreen" aria-label="Toggle fullscreen"><svg viewBox="0 0 24 24" class="fs-enter-icon">${icons.FULLSCREEN}</svg><svg viewBox="0 0 24 24" class="fs-exit-icon" style="display:none">${icons.FULLSCREEN_EXIT}</svg></button>
+        </div>
+      </div>`;
+  }
+  window.RKClipPlayer = { controlsHtml: controlsHtml };
+})();
+</script>

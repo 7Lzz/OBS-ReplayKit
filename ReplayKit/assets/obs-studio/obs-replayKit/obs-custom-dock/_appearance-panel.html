@@ -1,0 +1,996 @@
+<!-- shared partial (helper #include target: appearance-panel). the full Settings Appearance UI (theme presets + grid, custom colour/gradient editor, save-as-preset, app icon picker, recording dot) lifted from settings.html so the wizard is 1:1. host: RKAppearance.init({ get, set, onChange, setStatus }); RKAppearance.collect() -> {theme, themeCustom, appIcon, appIconCustomPath, appIconRecordingDot}. depends on _color-picker being on the page. -->
+<style>
+  /* when this partial is dropped inside a host that already uses .box as a scroll container (the setup wizard), neutralise the nesting */
+  .box .box { height:auto; overflow:visible; background:transparent; padding:0; margin:0 8px 12px 0; }
+  .box .box + .box { border-top:1px solid var(--line); padding-top:10px; }
+  /* setup.html has no stacked-field rules, so the theme grid + its buttons collapse onto one line there */
+  .field-wrap.is-stacked { flex-direction:column; align-items:stretch; }
+  .form-row:has(> .field-wrap.is-stacked) { align-items:start; }
+  .form-row:has(> .field-wrap.is-stacked) > .label { line-height:32px; }
+  /* the [hidden] attribute otherwise loses to .form-row display:grid (author sheet beats the ua one), which left the custom-theme + custom-icon rows permanently on screen in setup. settings.html carries this rule already */
+  .form-row[hidden] { display:none; }
+  .volume-control {
+    width:100%;
+    display:grid;
+    grid-template-columns:72px minmax(180px,1fr);
+    align-items:center;
+    gap:8px;
+  }
+  .volume-value {
+    background:transparent;
+    border-color:var(--field-solid,var(--field));
+    text-align:center;
+    padding:0 8px;
+  }
+  .volume-slider-wrap {
+    position:relative;
+    height:32px;
+    min-width:0;
+  }
+  .volume-slider-wrap::before {
+    content:"";
+    position:absolute;
+    z-index:0;
+    left:0;
+    right:0;
+    top:50%;
+    height:16px;
+    transform:translateY(-50%);
+    background:
+      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
+    background-repeat:no-repeat;
+    background-size:100% 16px;
+    background-position:center;
+    pointer-events:none;
+  }
+  .volume-slider {
+    position:relative;
+    z-index:1;
+    width:100%;
+    height:32px;
+    margin:0;
+    appearance:none;
+    -webkit-appearance:none;
+    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
+    background-repeat:no-repeat;
+    background-size:100% 4px;
+    background-position:center;
+    border:0;
+    outline:none;
+  }
+  .volume-slider::-webkit-slider-runnable-track {
+    height:32px;
+    background:transparent;
+    border:0;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    appearance:none;
+    -webkit-appearance:none;
+    width:21px;
+    height:10px;
+    border:0;
+    border-radius:5px;
+    background:var(--text);
+    margin-top:11px;
+    box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25);
+    cursor:pointer;
+  }
+  .volume-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow:0 0 0 2px var(--selected2);
+  }
+  .color-control {
+    width:100%;
+    display:grid;
+    grid-template-columns:42px minmax(120px, 180px);
+    align-items:center;
+    gap:8px;
+  }
+  .color-picker {
+    width:42px;
+    height:32px;
+    border:1px solid var(--field-solid,var(--field));
+    border-radius:4px;
+    background:var(--color, var(--field));
+    padding:3px;
+    cursor:pointer;
+    box-shadow:inset 0 0 0 3px var(--field-dark);
+  }
+  .color-picker:hover { border-color:var(--line2); }
+  .color-value {
+    width:100%;
+    text-transform:lowercase;
+  }
+  .theme-section { width:100%; padding:10px; border:1px solid var(--line); border-radius:6px; background:transparent; }
+  .theme-section + .theme-section { margin-top:9px; }
+  .theme-section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; font-size:12px; font-weight:600; }
+  .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
+  .theme-editor { display:flex; flex-wrap:wrap; gap:8px; }
+  .theme-preview-row { margin-top:8px; }
+  .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
+  .theme-pick { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; color:var(--muted); cursor:pointer; }
+  .theme-pick .color-picker { width:38px; height:30px; border-color:var(--line); border-radius:6px; }
+  .gradient-editor { width:100%; margin-top:9px; }
+  .gradient-editor[hidden] { display:none; }
+  .gradient-top { display:grid; grid-template-columns:130px 1fr; gap:8px; align-items:center; }
+  .gradient-preview { height:34px; border:1px solid var(--line2); border-radius:5px; background:var(--gradient-preview,var(--field)); }
+  .gradient-control { display:grid; grid-template-columns:88px minmax(120px,1fr) 58px; align-items:center; gap:8px; margin-top:8px; }
+  .gradient-control .label { font-size:11px; }
+  .gradient-number { width:58px; text-align:right; }
+  .gradient-stops-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+  .gradient-stop-list { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  .gradient-stop-row { display:grid; grid-template-columns:42px minmax(120px,1fr) 58px 28px; align-items:center; gap:7px; }
+  .gradient-stop-remove { min-width:28px; width:28px; padding:0; }
+  .gradient-stop-remove svg { width:10px; height:10px; fill:currentColor; }
+  .grad-targets { display:flex; gap:4px; flex-wrap:wrap; }
+  .grad-target {
+    display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; cursor:pointer;
+    border:1px solid var(--line); border-radius:4px; background:var(--field); color:var(--text);
+    font:inherit; font-size:12px;
+  }
+  .grad-target:hover { background:var(--line2); }
+  .grad-target.is-active { border-color:var(--selected2); background:var(--selected); color:var(--on-accent,#fff); }
+  /* filled only while that surface actually has a gradient, so the row doubles as an at-a-glance summary */
+  .grad-target-dot { width:7px; height:7px; border-radius:50%; background:transparent; box-shadow:inset 0 0 0 1px currentColor; }
+  .grad-target.has-gradient .grad-target-dot { background:currentColor; }
+
+  /* gradient stop ramp -- stops are dragged directly on the ramp that shows them, rather than edited as a list of number fields. --ramp is the left-to-right colour run, set from js. */
+  .grad-ramp {
+    position:relative; height:38px; margin:2px 0 0; border:1px solid var(--line2); border-radius:5px;
+    background-image:var(--ramp,none); background-color:var(--field-dark); cursor:copy;
+  }
+  /* handles borrow the trim bar's endcap language from clips.html -- same 12px full-height cap, 5px radius and
+     shadow. the white body becomes an inset ring instead, so the stop's colour reads through the middle; the
+     trim grip stroke is dropped rather than layered under the colour, where it would only show on pale stops. */
+  .grad-ramp-handle {
+    position:absolute; top:-1px; bottom:-1px; left:0; width:12px; margin-left:-6px; padding:0;
+    border:0; border-radius:5px; cursor:grab; background:var(--color,#000);
+    box-shadow:inset 0 0 0 2px var(--text), 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
+  }
+  .grad-ramp-handle.is-selected { box-shadow:inset 0 0 0 2px var(--text), 0 0 0 2px var(--selected2), 0 1px 6px rgba(0,0,0,.45); z-index:2; }
+  .grad-ramp-handle.is-dragging { cursor:grabbing; }
+  .grad-ramp-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:7px; }
+  .grad-ramp-foot .btn { flex:none; height:26px; padding:0 10px; font-size:12px; }
+
+  /* the floating colour picker lives in the shared _color-picker partial now */
+
+  /* small "i" that reveals an item's note in the shared tooltip on hover, keyboard focus or click. */
+  .info-dot {
+    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
+    display:inline-flex; vertical-align:middle;
+    border:0; background:transparent; color:var(--muted);
+    cursor:help; -webkit-user-select:none; user-select:none;
+    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content:""; width:100%; height:100%; background-color:currentColor;
+    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
+    mask:url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .info-dot:active { transform:scale(.94); }
+  .info-dot:focus { outline:none; }
+  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
+  .theme-preview-row { margin-top:8px; }
+  .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
+  .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
+  .icon-tile-del { position:absolute; top:3px; right:3px; display:flex; align-items:center; justify-content:center; width:16px; height:16px; padding:0; border:0; border-radius:4px; background:var(--field); color:var(--muted); cursor:pointer; opacity:0; transition:opacity 120ms; }
+  .icon-tile:hover .icon-tile-del { opacity:1; }
+  .icon-tile-del:hover { background:var(--field-dark); color:var(--danger); }
+  .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
+  .icon-tile-edit { position:absolute; top:3px; left:3px; display:flex; align-items:center; justify-content:center; width:18px; height:18px; padding:0; border:0; border-radius:4px; background:var(--field); color:var(--muted); cursor:pointer; opacity:0; transition:opacity 120ms; }
+  .icon-tile:hover .icon-tile-edit { opacity:1; }
+  .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
+  .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
+</style>
+<div class="box">
+  <div class="box-title">Theme</div>
+        <div class="form-row">
+          <div class="label">Theme</div>
+          <div class="field-wrap is-stacked">
+            <div class="icon-grid" id="themeGrid"></div>
+            <div class="theme-preview-row">
+              <button class="btn" type="button" id="openThemeClipsBtn" data-tooltip="Open the Clips window to see this theme on real clips">Preview in Clips</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row" id="themeCustomRow" hidden>
+          <div class="label">Custom theme</div>
+          <div class="field-wrap is-stacked">
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a swatch to open the floating editor."></button></span></div>
+              <div class="theme-editor" id="themeEditor">
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="field" aria-label="Field color"></button><span>Field</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="text" aria-label="Text color"></button><span>Text</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color"></button><span>Accent</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color"></button><span>Border</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color"></button><span>Danger</span></div>
+              </div>
+            </div>
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Give any surface a gradient instead of a flat color."></button></span></div>
+              <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
+              <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></label>
+              <div class="gradient-editor" id="themeGradientEditor" hidden>
+                <div class="gradient-top">
+                  <div class="combo" data-self-wired id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+                  <div class="gradient-preview" id="themeGradientPreview"></div>
+                </div>
+                <div id="themeGradientLinearControls">
+                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
+                </div>
+                <div id="themeGradientRadialControls" hidden>
+                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
+                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
+                </div>
+                <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops"></div>
+                <div class="grad-ramp-foot">
+                  <span class="theme-section-hint">Click the ramp to add a stop, drag to move it, click a stop to recolor.</span>
+                  <button class="btn" type="button" id="removeGradientStopBtn" disabled>Remove stop</button>
+                </div>
+              </div>
+            </div>
+            <div class="theme-section">
+              <div class="theme-section-title"><span>Window behavior</span></div>
+              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off for light themes. It changes native OBS controls that swatches cannot restyle."></button></label>
+            </div>
+            <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
+              <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
+              <button class="btn" type="button" id="cancelThemeEditBtn" hidden>Cancel edit</button>
+              <button class="btn" type="button" id="saveThemeBtn">Save as preset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">App Icon <button class="info-dot" type="button" aria-label="About the app icon" title="Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly, no restart or admin. Default restores OBS's own icon. Drop more .ico or .png files into obs-replayKit\icons\ to add presets."></button></div>
+        <div class="form-row">
+          <div class="label">Icon</div>
+          <div class="field-wrap is-stacked">
+            <div class="icon-grid" id="appIconGrid"></div>
+          </div>
+        </div>
+        <div class="form-row" id="appIconCustomRow" hidden>
+          <div class="label">Custom file</div>
+          <div class="field-wrap">
+            <input class="text-input" id="appIconCustomPath" type="text" spellcheck="false" placeholder="C:\path\to\icon.ico  (.ico, .png, .jpg, .bmp)">
+            <button class="icon-btn field-browse" type="button" id="browseAppIcon" title="Choose image">
+              <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <label class="check-row">
+            <input type="checkbox" id="appIconRecordingDot">
+            <span>Show a red recording dot on a custom icon while recording</span>
+          </label>
+        </div>
+      </div>
+<script>
+(function () {
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var state = {};
+  var originalState = null;
+  var host = { get: function () {}, set: function () {}, onChange: function () {}, setStatus: function () {} };
+  function markDirty() { try { host.onChange(); } catch (_) {} }
+  function setStatus(t, k) { try { host.setStatus(t, k); } catch (_) {} }
+  async function helperJson(pathIn, options) {
+    var res = await fetch(HELPER + "/" + pathIn, { cache: "no-store", ...(options || {}) });
+    var body = await res.json().catch(function () { return {}; });
+    if (!res.ok || body.ok === false) throw new Error(body.message || body.error || ("HTTP " + res.status));
+    return body;
+  }
+  function clone(v) { return JSON.parse(JSON.stringify(v || {})); }
+  function setSliderFill(slider, value, min, max) {
+    var span = Math.max(1, max - min);
+    var pct = Math.max(0, Math.min(100, ((value - min) / span) * 100));
+    slider.style.setProperty("--fill", pct + "%");
+  }
+  var cleanHexColor = window.RKColor.cleanHexColor, setColorButton = window.RKColor.setColorButton;
+  var rgbToHex = window.RKColor.rgbToHex, hexToRgb = window.RKColor.hexToRgb, rgbToHsv = window.RKColor.rgbToHsv, hsvToHex = window.RKColor.hsvToHex;
+  var openColorDialog = window.openColorDialog;
+
+  function comboValue(c) { return c.dataset.value || ""; }
+  function renderCombo(c) {
+    var opts = c._opts || [];
+    var v = c.dataset.value;
+    var cur = opts.find(function (o) { return o.value === v; }) || opts[0] || { label: "" };
+    var lbl = c.querySelector(".combo-label"); if (lbl) lbl.textContent = cur.label || "";
+    var menu = c.querySelector(".combo-menu");
+    if (menu) menu.innerHTML = opts.map(function (o) {
+      return '<div class="combo-option' + (o.value === v ? " is-selected" : "") + '" data-value="' + o.value + '">' + o.label + '</div>';
+    }).join("");
+  }
+  function fillCombo(c, opts) {
+    c._opts = opts || [];
+    if (!c.dataset.value && opts && opts[0]) c.dataset.value = opts[0].value;
+    renderCombo(c);
+  }
+  function setComboValue(c, v, notify) {
+    c.dataset.value = v; renderCombo(c);
+    if (notify) c.dispatchEvent(new CustomEvent("combochange", { bubbles: true }));
+  }
+  function wireCombo(c) {
+    c.querySelector(".combo-button").addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = !c.classList.contains("is-open");
+      // the host owns other combos and cannot see this click (stopPropagation keeps our own document listener from closing us), so shut them here to keep one menu open at a time
+      if (open) document.querySelectorAll(".combo.is-open").forEach(function (o) { if (o !== c) { o.classList.remove("is-open"); o.setAttribute("aria-expanded", "false"); } });
+      c.classList.toggle("is-open", open);
+      c.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    c.addEventListener("click", function (e) {
+      var o = e.target.closest(".combo-option"); if (!o) return;
+      setComboValue(c, o.dataset.value, true); c.classList.remove("is-open");
+    });
+    document.addEventListener("click", function () { c.classList.remove("is-open"); });
+  }
+
+  var els = {};
+  ["themeGrid", "themeCustomRow", "themeEditor", "themeGradientTargets", "themeGradientEnabled", "themeGradientEnabledLabel",
+   "themeGradientEditor", "themeGradientType", "themeGradientPreview", "themeGradientLinearControls", "themeGradientRadialControls",
+   "themeGradientAngle", "themeGradientAngleValue", "themeGradientCenterX", "themeGradientCenterXValue", "themeGradientCenterY",
+   "themeGradientCenterYValue", "themeGradientRamp", "removeGradientStopBtn", "themeCustomDark", "themeName", "cancelThemeEditBtn",
+   "saveThemeBtn", "openThemeClipsBtn", "appIconGrid", "appIconCustomRow", "appIconCustomPath", "browseAppIcon", "appIconRecordingDot"
+  ].forEach(function (id) { els[id] = document.getElementById(id); });
+
+  function unquote(s) {
+    s = String(s || "").trim();
+    return s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"' ? s.slice(1, -1).trim() : s;
+  }
+  async function browsePathHelper(route, initial) {
+    try {
+      var data = await helperJson(route + "?initial=" + encodeURIComponent(initial || "") + "&t=" + Date.now());
+      return data && data.ok ? data.path : "";
+    } catch (e) { return ""; }
+  }
+
+  // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
+  const APPICON_X_SVG = (window.RK_ICONS || {})["action/cancel-x"] || "";
+  const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
+  // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
+  let themesCache = [];
+  let editingThemeId = "";
+  let gradientStops = [];
+  let latestThemePreviewCss = "";
+  let themePreviewChannel = null;
+  try { themePreviewChannel = new BroadcastChannel("replaykit-theme-preview"); } catch (_) {}
+  let themeLiveStyle = document.getElementById("rk-theme-live");
+  if (!themeLiveStyle) {
+    themeLiveStyle = document.createElement("style");
+    themeLiveStyle.id = "rk-theme-live";
+    document.head.appendChild(themeLiveStyle);
+  }
+  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves
+  // background-color transitions that resolve through var() half-finished when the custom props change,
+  // freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
+  const themeSwapFreeze = document.createElement("style");
+  themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
+  document.head.appendChild(themeSwapFreeze);
+  function publishThemePreview(css) {
+    latestThemePreviewCss = css || "";
+    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
+    try { if (themePreviewChannel) themePreviewChannel.postMessage({ css:latestThemePreviewCss }); } catch (_) {}
+  }
+  function clearThemePreview() {
+    latestThemePreviewCss = "";
+    try { localStorage.removeItem("replaykit-theme-preview"); } catch (_) {}
+    try { if (themePreviewChannel) themePreviewChannel.postMessage({ reset:true }); } catch (_) {}
+  }
+  setInterval(() => {
+    if (!latestThemePreviewCss) return;
+    try { localStorage.setItem("replaykit-theme-preview", JSON.stringify({ css:latestThemePreviewCss, time:Date.now() })); } catch (_) {}
+  }, 4000);
+  window.addEventListener("pagehide", clearThemePreview);
+
+  // gradients are per surface. only these four: text, border and danger are colour roles that end up in
+  // border-color / color and in the helper's colour arithmetic, where a gradient value paints nothing.
+  const GRADIENT_TARGETS = [
+    { key:"bg", label:"Background" },
+    { key:"panel", label:"Panel" },
+    { key:"field", label:"Field" },
+    { key:"accent", label:"Accent" },
+  ];
+  let gradientTarget = "bg";
+
+  function blankGradient() {
+    return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
+  }
+  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what
+  // decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
+  let gradientByTarget = {};
+  GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
+
+  function currentGradient() { return gradientByTarget[gradientTarget] || blankGradient(); }
+
+  function themeCustomState() {
+    const o = {};
+    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => { o[button.dataset.k] = button.dataset.value; });
+    captureGradientEditor();
+    const gradients = {};
+    GRADIENT_TARGETS.forEach((entry) => {
+      const spec = gradientByTarget[entry.key];
+      if (!spec || !spec.enabled || spec.stops.length < 2) return;
+      gradients[entry.key] = {
+        type:spec.type === "radial" ? "radial" : "linear",
+        angle:Math.max(0, Math.min(359, spec.angle | 0)),
+        centerX:Math.max(0, Math.min(100, spec.centerX | 0)),
+        centerY:Math.max(0, Math.min(100, spec.centerY | 0)),
+        stops:spec.stops.slice().sort((left, right) => left.position - right.position).map((stop) => ({ color:stop.color, position:stop.position })),
+      };
+    });
+    o.gradients = gradients;
+    // the helper still reads this legacy field when a theme predates per-token gradients; keep it pointed at bg.
+    o.gradient = gradients.bg ? gradients.bg.stops[gradients.bg.stops.length - 1].color : "";
+    o.dark = els.themeCustomDark.checked;
+    return o;
+  }
+
+  // pulls the live editor controls back into the selected target's spec, so nothing is lost on tab switch or save.
+  function captureGradientEditor() {
+    const spec = gradientByTarget[gradientTarget];
+    if (!spec) return;
+    spec.enabled = els.themeGradientEnabled.checked;
+    spec.type = comboValue(els.themeGradientType) === "radial" ? "radial" : "linear";
+    spec.angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngle.value, 10) || 0));
+    spec.centerX = clampPercent(els.themeGradientCenterX.value, 50);
+    spec.centerY = clampPercent(els.themeGradientCenterY.value, 50);
+    spec.stops = gradientStops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
+  }
+
+  function renderGradientTargets() {
+    els.themeGradientTargets.innerHTML = "";
+    GRADIENT_TARGETS.forEach((entry) => {
+      const spec = gradientByTarget[entry.key];
+      const on = !!(spec && spec.enabled && spec.stops.length >= 2);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "grad-target" + (entry.key === gradientTarget ? " is-active" : "") + (on ? " has-gradient" : "");
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", entry.key === gradientTarget ? "true" : "false");
+      button.dataset.tooltip = on ? entry.label + " uses a gradient" : entry.label + " is a flat color";
+      button.innerHTML = '<span class="grad-target-dot"></span>';
+      button.appendChild(document.createTextNode(entry.label));
+      button.addEventListener("click", () => {
+        if (entry.key === gradientTarget) return;
+        captureGradientEditor();
+        gradientTarget = entry.key;
+        loadGradientEditor();
+      });
+      els.themeGradientTargets.appendChild(button);
+    });
+  }
+
+  // pushes the selected target's spec into the shared editor controls.
+  function loadGradientEditor() {
+    const spec = currentGradient();
+    const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
+    els.themeGradientEnabledLabel.textContent = "Use a gradient for " + label;
+    els.themeGradientEnabled.checked = !!spec.enabled;
+    els.themeGradientEditor.hidden = !spec.enabled;
+    setComboValue(els.themeGradientType, spec.type === "radial" ? "radial" : "linear", false);
+    els.themeGradientAngle.value = String(spec.angle);
+    els.themeGradientAngleValue.value = String(spec.angle);
+    els.themeGradientCenterX.value = String(spec.centerX); els.themeGradientCenterXValue.value = String(spec.centerX);
+    els.themeGradientCenterY.value = String(spec.centerY); els.themeGradientCenterYValue.value = String(spec.centerY);
+    syncGradientSliderFills();
+    gradientStops = spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position }));
+    selectedGradientStop = null;
+    renderGradientStops();
+    renderGradientTargets();
+  }
+  let themePreviewTimer = 0;
+  function applyThemePreview() {
+    clearTimeout(themePreviewTimer);
+    themePreviewTimer = setTimeout(async () => {
+      const id = state.theme || "default";
+      let url = HELPER + "/appearance/theme.css?t=" + Date.now();
+      // mid-edit the preset's saved css is stale -- preview whatever the editor currently holds
+      if (id === "custom" || editingThemeId) url += "&custom=" + encodeURIComponent(JSON.stringify(themeCustomState()));
+      else url += "&theme=" + encodeURIComponent(id);
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        const css = r.ok ? await r.text() : "";
+        document.documentElement.classList.add("rk-theme-swapping");
+        themeLiveStyle.textContent = css;
+        publishThemePreview(css);
+        // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
+        // rewriting this node's text alone doesnt always make CEF redo the cascade tie-break, so move it back
+        // to last to guarantee the preview wins.
+        document.head.appendChild(themeLiveStyle);
+        void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
+        requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping"));
+      } catch (e) { /* leave whatever's applied */ }
+    }, 40);
+  }
+  function paintThemeSelection() {
+    const sel = state.theme || "default";
+    els.themeGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
+    els.themeCustomRow.hidden = sel !== "custom" && !editingThemeId;
+  }
+  function clampPercent(value, fallback) {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : fallback;
+  }
+  function gradientCss() {
+    if (!els.themeGradientEnabled.checked || gradientStops.length < 2) return "none";
+    const stops = gradientStops.slice().sort((left, right) => left.position - right.position)
+      .map((stop) => stop.color + " " + stop.position + "%").join(",");
+    if (comboValue(els.themeGradientType) === "radial")
+      return "radial-gradient(circle at " + els.themeGradientCenterX.value + "% " + els.themeGradientCenterY.value + "%," + stops + ")";
+    return "linear-gradient(" + els.themeGradientAngle.value + "deg," + stops + ")";
+  }
+  const GRADIENT_MAX_STOPS = 6;
+  let selectedGradientStop = null;
+
+  function updateGradientPreview() {
+    els.themeGradientPreview.style.setProperty("--gradient-preview", gradientCss());
+    const radial = comboValue(els.themeGradientType) === "radial";
+    els.themeGradientLinearControls.hidden = radial;
+    els.themeGradientRadialControls.hidden = !radial;
+    // the ramp always reads left-to-right regardless of angle/type -- it edits the colour run, the preview box shows how that run is projected.
+    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
+    els.themeGradientRamp.style.setProperty("--ramp",
+      sorted.length >= 2 ? "linear-gradient(90deg," + sorted.map((stop) => stop.color + " " + stop.position + "%").join(",") + ")" : "none");
+    els.removeGradientStopBtn.disabled = !selectedGradientStop || gradientStops.length <= 2;
+  }
+
+  // colour of the ramp at `position`, so a stop added by clicking the ramp starts as the colour already showing there.
+  function gradientColorAt(position) {
+    const sorted = gradientStops.slice().sort((left, right) => left.position - right.position);
+    if (!sorted.length) return "#000000";
+    if (position <= sorted[0].position) return sorted[0].color;
+    const last = sorted[sorted.length - 1];
+    if (position >= last.position) return last.color;
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const from = sorted[i], to = sorted[i + 1];
+      if (position < from.position || position > to.position) continue;
+      const span = to.position - from.position;
+      const ratio = span <= 0 ? 0 : (position - from.position) / span;
+      const a = hexToRgb(from.color), b = hexToRgb(to.color);
+      return rgbToHex(a.red + (b.red - a.red) * ratio, a.green + (b.green - a.green) * ratio, a.blue + (b.blue - a.blue) * ratio);
+    }
+    return last.color;
+  }
+
+  function gradientPositionFromEvent(event) {
+    const rect = els.themeGradientRamp.getBoundingClientRect();
+    return clampPercent(Math.round(((event.clientX - rect.left) / Math.max(1, rect.width)) * 100), 0);
+  }
+
+  function renderGradientStops() {
+    gradientStops.sort((left, right) => left.position - right.position);
+    if (selectedGradientStop && !gradientStops.includes(selectedGradientStop)) selectedGradientStop = null;
+    els.themeGradientRamp.innerHTML = "";
+    gradientStops.forEach((stop, index) => {
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "grad-ramp-handle" + (stop === selectedGradientStop ? " is-selected" : "");
+      handle.style.left = stop.position + "%";
+      handle.style.setProperty("--color", stop.color);
+      handle.dataset.tooltip = stop.color + " at " + stop.position + "%";
+      handle.setAttribute("aria-label", "Gradient stop " + (index + 1) + ", " + stop.color + " at " + stop.position + "%");
+
+      // a press that never moves is a recolor; anything that moves is a drag. distinguishing them here is what lets one handle do both without a separate edit button.
+      handle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        selectedGradientStop = stop;
+        renderGradientStops();
+        const live = els.themeGradientRamp.querySelector(".grad-ramp-handle.is-selected") || handle;
+        live.classList.add("is-dragging");
+        live.setPointerCapture(event.pointerId);
+        let moved = false;
+        const move = (moveEvent) => {
+          const next = gradientPositionFromEvent(moveEvent);
+          if (next === stop.position) return;
+          moved = true;
+          stop.position = next;
+          live.style.left = next + "%";
+          live.dataset.tooltip = stop.color + " at " + next + "%";
+          updateGradientPreview();
+          applyThemeEditorChange();
+        };
+        const up = () => {
+          live.removeEventListener("pointermove", move);
+          live.removeEventListener("pointerup", up);
+          live.classList.remove("is-dragging");
+          if (moved) renderGradientStops();
+          else openColorDialog(stop.color, "Gradient stop " + (index + 1), (value) => {
+            stop.color = cleanHexColor(value, stop.color);
+            renderGradientStops();
+            applyThemeEditorChange();
+          });
+        };
+        live.addEventListener("pointermove", move);
+        live.addEventListener("pointerup", up);
+      });
+      els.themeGradientRamp.appendChild(handle);
+    });
+    updateGradientPreview();
+  }
+  // a fresh gradient for a surface starts from that surface's own colour so turning it on is a soft change
+  // rather than a jump to some unrelated pair.
+  function seedStopsFor(targetKey, c) {
+    const base = cleanHexColor(c[targetKey === "bg" ? "bg" : targetKey], null)
+      || cleanHexColor(c.bg, "#161617");
+    const away = cleanHexColor(c.accent, "#284cb8");
+    return [{ color:base, position:0 }, { color:away, position:100 }];
+  }
+
+  function normalizeStops(raw, targetKey, c) {
+    const list = Array.isArray(raw) ? raw : [];
+    const normalized = list.slice(0, 6).map((stop, index) => ({
+      color:cleanHexColor(stop && stop.color, index === 0 ? (c.bg || "#161617") : (c.accent || "#284cb8")),
+      position:clampPercent(stop && stop.position, index === 0 ? 0 : 100),
+    }));
+    return normalized.length >= 2 ? normalized : seedStopsFor(targetKey, c);
+  }
+  function fillThemeEditor(c) {
+    c = c || {};
+    els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
+      setColorButton(button, c[button.dataset.k] || "#000000", "#000000");
+    });
+    // per-token gradients, falling back to the flat gradient* keys a pre-per-token theme carries (read as bg).
+    const map = (c.gradients && typeof c.gradients === "object") ? c.gradients : {};
+    const legacyStops = Array.isArray(c.gradientStops) && c.gradientStops.length >= 2;
+    const legacyColor = cleanHexColor(c.gradient, null);
+    gradientByTarget = {};
+    GRADIENT_TARGETS.forEach((entry) => {
+      const raw = map[entry.key];
+      if (raw && typeof raw === "object") {
+        gradientByTarget[entry.key] = {
+          enabled:true,
+          type:raw.type === "radial" ? "radial" : "linear",
+          angle:Number.isFinite(parseInt(raw.angle, 10)) ? Math.max(0, Math.min(359, parseInt(raw.angle, 10))) : 135,
+          centerX:clampPercent(raw.centerX, 50),
+          centerY:clampPercent(raw.centerY, 50),
+          stops:normalizeStops(raw.stops, entry.key, c),
+        };
+        return;
+      }
+      const spec = blankGradient();
+      if (entry.key === "bg" && (legacyStops || legacyColor)) {
+        const parsedAngle = parseInt(c.gradientAngle, 10);
+        spec.enabled = true;
+        spec.type = c.gradientType === "radial" ? "radial" : "linear";
+        spec.angle = Number.isFinite(parsedAngle) ? Math.max(0, Math.min(359, parsedAngle)) : 135;
+        spec.centerX = clampPercent(c.gradientCenterX, 50);
+        spec.centerY = clampPercent(c.gradientCenterY, 50);
+        spec.stops = legacyStops ? normalizeStops(c.gradientStops, "bg", c)
+          : [{ color:cleanHexColor(c.bg, "#161617"), position:0 }, { color:legacyColor, position:100 }];
+      } else {
+        spec.stops = seedStopsFor(entry.key, c);
+      }
+      gradientByTarget[entry.key] = spec;
+    });
+    if (!gradientByTarget[gradientTarget]) gradientTarget = "bg";
+    loadGradientEditor();
+    els.themeCustomDark.checked = c.dark !== false;
+  }
+  function endThemeEdit() {
+    editingThemeId = "";
+    els.themeName.value = "";
+    els.saveThemeBtn.textContent = "Save as preset";
+    els.cancelThemeEditBtn.hidden = true;
+  }
+  function selectTheme(id) {
+    endThemeEdit();
+    const prev = state.theme;
+    state.theme = id;
+    // picking Custom off a preset or saved theme carries that themes colors into the editor so it extends instead of starting blank
+    if (id === "custom" && prev !== "custom") {
+      const src = themesCache.find((t) => t.id === prev);
+      if (src && src.seed) state.themeCustom = Object.assign({}, src.seed);
+    }
+    if (id === "custom") fillThemeEditor(state.themeCustom);
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+  }
+  function themeSwatchEl(sw) {
+    sw = sw || {};
+    const box = document.createElement("span");
+    box.className = "theme-sw";
+    box.style.background = sw.background || sw.bg || "#1d1f26";
+    const strip = document.createElement("i");
+    strip.style.background = sw.panel || "#272a33";
+    const dot = document.createElement("b");
+    dot.style.background = sw.accent || "#284cb8";
+    box.append(strip, dot);
+    return box;
+  }
+  function themeTile(id, label, sw, deletable) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "icon-tile";
+    tile.dataset.id = id;
+    const lab = document.createElement("span");
+    lab.className = "icon-tile-label";
+    lab.textContent = label;
+    tile.append(sw ? themeSwatchEl(sw) : (function () { const s = document.createElement("span"); s.className = "icon-tile-swatch"; s.textContent = "＋"; return s; })(), lab);
+    tile.addEventListener("click", () => selectTheme(id));
+    if (deletable) {
+      const edit = document.createElement("span");
+      edit.className = "icon-tile-edit";
+      edit.setAttribute("role", "button");
+      edit.setAttribute("aria-label", "Edit " + label);
+      edit.dataset.tooltip = "Edit";
+      edit.innerHTML = THEME_EDIT_SVG;
+      edit.addEventListener("click", (e) => { e.stopPropagation(); editUserTheme(id); });
+      tile.appendChild(edit);
+      const del = document.createElement("span");
+      del.className = "icon-tile-del";
+      del.setAttribute("role", "button");
+      del.setAttribute("aria-label", "Remove " + label);
+      del.dataset.tooltip = "Remove";
+      del.innerHTML = APPICON_X_SVG;
+      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
+      tile.appendChild(del);
+    }
+    return tile;
+  }
+  function editUserTheme(id) {
+    const theme = themesCache.find((item) => item.id === id);
+    if (!theme || !theme.seed) return;
+    editingThemeId = id;
+    // stay on the preset being edited -- the editor is changing that preset's contents, not forking it into Custom
+    state.theme = id;
+    state.themeCustom = Object.assign({}, theme.seed);
+    fillThemeEditor(state.themeCustom);
+    els.themeName.value = theme.label || id.slice(5);
+    els.saveThemeBtn.textContent = "Update preset";
+    els.cancelThemeEditBtn.hidden = false;
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+    els.themeName.focus();
+  }
+  async function deleteUserTheme(id) {
+    let data;
+    try { data = await helperJson("appearance/delete-theme?id=" + encodeURIComponent(id), { method: "POST" }); }
+    catch (e) { setStatus("Could not remove theme", "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove theme", "bad"); return; }
+    if (state.theme === id) {
+      state.theme = "default";
+      if (originalState) originalState.theme = "default";
+      applyThemePreview();
+    }
+    if (editingThemeId === id) endThemeEdit();
+    await renderThemeGrid();
+  }
+  async function renderThemeGrid() {
+    let data;
+    try { data = await helperJson("appearance/themes"); } catch (e) { return; }
+    themesCache = data.themes || [];
+    els.themeGrid.innerHTML = "";
+    for (const th of (data.themes || []))
+      els.themeGrid.appendChild(themeTile(th.id, th.label || th.id, th.swatch, !!th.deletable));
+    els.themeGrid.appendChild(themeTile("custom", "Custom…", null, false));
+    if (!state.themeCustom && data.custom) state.themeCustom = data.custom;
+    if (state.theme === "custom") fillThemeEditor(state.themeCustom);
+    paintThemeSelection();
+  }
+  function applyThemeEditorChange() {
+    if (!editingThemeId && state.theme !== "custom") { state.theme = "custom"; paintThemeSelection(); }
+    state.themeCustom = themeCustomState();
+    applyThemePreview();
+    markDirty();
+  }
+  els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
+    button.addEventListener("click", () => openColorDialog(button.dataset.value, button.getAttribute("aria-label"), (color) => {
+      setColorButton(button, color, "#000000");
+      applyThemeEditorChange();
+    }));
+  });
+  els.themeGradientEnabled.addEventListener("change", () => {
+    const spec = gradientByTarget[gradientTarget];
+    if (spec) {
+      spec.enabled = els.themeGradientEnabled.checked;
+      // turning it on with nothing stored yet seeds from the surface's own colour, so the first frame is subtle
+      if (spec.enabled && spec.stops.length < 2) spec.stops = seedStopsFor(gradientTarget, themeCustomState());
+    }
+    els.themeGradientEditor.hidden = !els.themeGradientEnabled.checked;
+    gradientStops = spec ? spec.stops.slice().map((stop) => ({ color:stop.color, position:stop.position })) : [];
+    selectedGradientStop = null;
+    renderGradientStops();
+    renderGradientTargets();
+    applyThemeEditorChange();
+  });
+  els.themeGradientType.addEventListener("combochange", () => { updateGradientPreview(); applyThemeEditorChange(); });
+  // .volume-slider draws its track fill from --fill; every gradient slider keeps it current the same way the audio/overlay ones do.
+  function syncGradientSliderFills() {
+    setSliderFill(els.themeGradientAngle, parseInt(els.themeGradientAngle.value, 10) || 0, 0, 359);
+    setSliderFill(els.themeGradientCenterX, parseInt(els.themeGradientCenterX.value, 10) || 0, 0, 100);
+    setSliderFill(els.themeGradientCenterY, parseInt(els.themeGradientCenterY.value, 10) || 0, 0, 100);
+  }
+  els.themeGradientAngle.addEventListener("input", () => {
+    els.themeGradientAngleValue.value = els.themeGradientAngle.value;
+    syncGradientSliderFills();
+    updateGradientPreview();
+    applyThemeEditorChange();
+  });
+  els.themeGradientAngleValue.addEventListener("change", () => {
+    const angle = Math.max(0, Math.min(359, parseInt(els.themeGradientAngleValue.value, 10) || 0));
+    els.themeGradientAngle.value = String(angle);
+    els.themeGradientAngleValue.value = String(angle);
+    syncGradientSliderFills();
+    updateGradientPreview();
+    applyThemeEditorChange();
+  });
+  function bindGradientCenter(slider, input) {
+    slider.addEventListener("input", () => { input.value = slider.value; syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
+    input.addEventListener("change", () => { const value = clampPercent(input.value, 50); slider.value = String(value); input.value = String(value); syncGradientSliderFills(); updateGradientPreview(); applyThemeEditorChange(); });
+  }
+  bindGradientCenter(els.themeGradientCenterX, els.themeGradientCenterXValue);
+  bindGradientCenter(els.themeGradientCenterY, els.themeGradientCenterYValue);
+  // clicking the ramp itself adds a stop where you clicked, already the colour showing there, so adding one never jolts the gradient.
+  els.themeGradientRamp.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".grad-ramp-handle")) return;
+    if (gradientStops.length >= GRADIENT_MAX_STOPS) {
+      setStatus("A gradient can have at most " + GRADIENT_MAX_STOPS + " stops.", "bad");
+      return;
+    }
+    const position = gradientPositionFromEvent(event);
+    const stop = { color:gradientColorAt(position), position };
+    gradientStops.push(stop);
+    selectedGradientStop = stop;
+    renderGradientStops();
+    applyThemeEditorChange();
+    renderGradientTargets();
+  });
+  els.removeGradientStopBtn.addEventListener("click", () => {
+    if (!selectedGradientStop || gradientStops.length <= 2) return;
+    gradientStops.splice(gradientStops.indexOf(selectedGradientStop), 1);
+    selectedGradientStop = null;
+    renderGradientStops();
+    applyThemeEditorChange();
+    renderGradientTargets();
+  });
+  els.themeCustomDark.addEventListener("change", applyThemeEditorChange);
+  els.openThemeClipsBtn.addEventListener("click", () => {
+    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus("Could not open Clips: " + (error.message || error), "bad"));
+  });
+  // cancelling an edit closes the editor and drops the unsaved colours back to whatever the preset actually holds
+  els.cancelThemeEditBtn.addEventListener("click", () => {
+    endThemeEdit();
+    paintThemeSelection();
+    applyThemePreview();
+  });
+  els.saveThemeBtn.addEventListener("click", async () => {
+    const name = (els.themeName.value || "").trim();
+    if (!name) { setStatus("Name the theme first", "bad"); els.themeName.focus(); return; }
+    els.saveThemeBtn.disabled = true;
+    let data;
+    let failure = "";
+    try {
+      let url = "appearance/save-theme?label=" + encodeURIComponent(name);
+      if (editingThemeId) url += "&id=" + encodeURIComponent(editingThemeId);
+      data = await helperJson(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(themeCustomState()),
+      });
+    } catch (e) { data = null; failure = e.message || String(e); }
+    els.saveThemeBtn.disabled = false;
+    if (!data || !data.ok) { setStatus(failure || (data && data.message) || "Could not save theme", "bad"); return; }
+    const updated = !!editingThemeId;
+    state.themeCustom = themeCustomState();
+    state.theme = data.id;
+    endThemeEdit();
+    await renderThemeGrid();
+    paintThemeSelection();
+    applyThemePreview();
+    markDirty();
+    setStatus(updated ? "Preset updated. Apply to update OBS." : "Preset saved. Apply to use it in OBS.", "good");
+  });
+  /* renderThemeGrid -> boot() */
+
+  // -- Appearance tab: app-icon picker -- applies on Apply through the normal save flow (state.appIcon / state.appIconCustomPath)
+  function paintAppIconSelection() {
+    const sel = state.appIcon || "default";
+    els.appIconGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
+    els.appIconCustomRow.hidden = sel !== "custom";
+  }
+  function selectAppIcon(id) {
+    state.appIcon = id;
+    paintAppIconSelection();
+    if (id === "custom") els.appIconCustomPath.focus();
+    markDirty();
+  }
+  function appIconTile(id, label, url, glyph, deletable) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "icon-tile";
+    tile.dataset.id = id;
+    let swatch;
+    if (url) { swatch = document.createElement("img"); swatch.src = HELPER + url; swatch.alt = ""; }
+    else { swatch = document.createElement("span"); swatch.className = "icon-tile-swatch"; swatch.textContent = glyph || ""; }
+    const lab = document.createElement("span");
+    lab.className = "icon-tile-label";
+    lab.textContent = label;
+    tile.append(swatch, lab);
+    tile.addEventListener("click", () => selectAppIcon(id));
+    if (deletable) {
+      const del = document.createElement("span");
+      del.className = "icon-tile-del";
+      del.setAttribute("role", "button");
+      del.setAttribute("aria-label", "Remove " + label);
+      del.title = "Remove";
+      del.innerHTML = APPICON_X_SVG;
+      del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserIcon(id); });
+      tile.appendChild(del);
+    }
+    return tile;
+  }
+  async function deleteUserIcon(id) {
+    let data;
+    try { data = await helperJson("appearance/delete-icon?file=" + encodeURIComponent(id), { method: "POST" }); }
+    catch (e) { setStatus("Could not remove icon", "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove icon", "bad"); return; }
+    if (state.appIcon === id) {
+      state.appIcon = "default";
+      if (originalState) originalState.appIcon = "default";
+    }
+    await renderAppIconGrid();
+  }
+  async function renderAppIconGrid() {
+    let data;
+    try { data = await helperJson("appearance/icons"); } catch (e) { return; }
+    els.appIconGrid.innerHTML = "";
+    for (const ic of (data.icons || []))
+      els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
+    els.appIconGrid.appendChild(appIconTile("custom", "Custom…", "", "＋", false));
+    paintAppIconSelection();
+  }
+  /* renderAppIconGrid -> boot() */
+  els.appIconCustomPath.addEventListener("input", () => {
+    state.appIconCustomPath = unquote(els.appIconCustomPath.value);
+    if (state.appIconCustomPath && state.appIcon !== "custom") { state.appIcon = "custom"; paintAppIconSelection(); }
+    markDirty();
+  });
+
+  function boot() {
+    fillCombo(els.themeGradientType, [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }]);
+    wireCombo(els.themeGradientType);
+    renderThemeGrid();
+    renderAppIconGrid();
+    if (els.appIconRecordingDot) {
+      els.appIconRecordingDot.checked = state.appIconRecordingDot !== false;
+      els.appIconRecordingDot.addEventListener("change", function () { state.appIconRecordingDot = els.appIconRecordingDot.checked; markDirty(); });
+    }
+    if (els.browseAppIcon) {
+      els.browseAppIcon.addEventListener("click", async function () {
+        els.browseAppIcon.disabled = true;
+        var p = await browsePathHelper("browse-file", els.appIconCustomPath.value.trim());
+        els.browseAppIcon.disabled = false;
+        if (p) { els.appIconCustomPath.value = p; els.appIconCustomPath.dispatchEvent(new Event("input")); }
+      });
+    }
+  }
+
+  window.RKAppearance = {
+    init: function (h) {
+      if (h) host = Object.assign(host, h);
+      ["theme", "themeCustom", "appIcon", "appIconCustomPath", "appIconRecordingDot"].forEach(function (k) {
+        var v = host.get(k);
+        if (v !== undefined && v !== null) state[k] = v;
+      });
+      if (!state.theme) state.theme = "default";
+      boot();
+    },
+    collect: function () {
+      return {
+        theme: state.theme,
+        themeCustom: state.theme === "custom" ? themeCustomState() : (state.themeCustom || undefined),
+        appIcon: state.appIcon || "default",
+        appIconCustomPath: state.appIconCustomPath || "",
+        appIconRecordingDot: state.appIconRecordingDot !== false,
+      };
+    },
+  };
+})();
+</script>

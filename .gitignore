@@ -4,10 +4,10 @@ __pycache__/
 *$py.class
 
 # dotnet build outputs (ReplayKitSetup and ReplayKitHelper, the c# ports)
-ReplayKitSetup/bin/
-ReplayKitSetup/obj/
-ReplayKitHelper/bin/
-ReplayKitHelper/obj/
+ReplayKit/ReplayKitSetup/bin/
+ReplayKit/ReplayKitSetup/obj/
+ReplayKit/ReplayKitHelper/bin/
+ReplayKit/ReplayKitHelper/obj/
 
 # build outputs (build.bat publishes ReplayKitSetup into the repo root as a single merged exe, same spot the old pyinstaller build used; publish_helper_tmp is the equivalent scratch dir for the ReplayKitHelper step, normally self-cleaned but ignored too in case a build fails partway through)
 build/
@@ -22,12 +22,12 @@ publish_helper_tmp/
 
 # private pyinstaller build with a locally-compiled bootloader, see build.bat -- rebuilt once per
 # machine from pypi source, not committed, and never touches the shared global python environment
-/utils/pyinstaller_local/
+/ReplayKit/utils/pyinstaller_local/
 
 # regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches VersionInfo.cs
-/assets/obs-studio/obs-replayKit/version.json
+/ReplayKit/assets/obs-studio/obs-replayKit/version.json
 # same regeneration, feeds the Win32 version resource (FileVersion/AssemblyVersion) into both csproj files
-/Version.props
+/ReplayKit/Version.props
 
 # one-off smoke / scratch scripts
 _smoke_test.py
@@ -44,11 +44,11 @@ hotkey_capture_signal.json
 .env.local
 
 # custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder -- per-user, not repo content
-assets/obs-studio/obs-replayKit/icons/user/
+ReplayKit/assets/obs-studio/obs-replayKit/icons/user/
 # custom themes the user saves at runtime -- per-user
-assets/obs-studio/obs-replayKit/themes-user/
+ReplayKit/assets/obs-studio/obs-replayKit/themes-user/
 # theme stylesheet the helper generates for the file:// dock -- runtime, per-user
-assets/obs-studio/obs-replayKit/obs-custom-dock/rk-theme.css
+ReplayKit/assets/obs-studio/obs-replayKit/obs-custom-dock/rk-theme.css
 
 # backups created by the installer + cleanup script
 obs-studio.bak.*/

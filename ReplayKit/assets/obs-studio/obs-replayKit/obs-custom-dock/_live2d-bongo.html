@@ -1,0 +1,196 @@
+<!-- shared partial (helper #include target: live2d-bongo). renders the bongo cat plugin's own Live2D models (mode/standard model/cat + model/cat right hand) in a webgl canvas so the mouse arm actually deforms instead of being a pasted sprite. drives the same parameters Bongobs-Cat's Model.cpp does: ParamMouseX = mouseX*60-30, ParamMouseY = (1-mouseY)*60-30, ParamMouseLeftDown / ParamMouseRightDown. runtime is Live2D Cubism Core for Web (redistributable per Live2D's proprietary license, same component the plugin already ships natively). host: RKBongoLive2D.mount(canvas) -> promise, then .setInput(mx,my,l,r) / .start() / .stop(). -->
+<script>
+(function () {
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var BASE = HELPER + "/overlay-preview/live2d/";
+  var VERT = "attribute vec2 a_pos;attribute vec2 a_uv;varying vec2 v_uv;void main(){v_uv=a_uv;gl_Position=vec4(a_pos,0.0,1.0);}";
+  var FRAG = "precision mediump float;varying vec2 v_uv;uniform sampler2D u_tex;uniform float u_alpha;void main(){gl_FragColor=texture2D(u_tex,v_uv)*u_alpha;}";
+  // csmDrawable flags from the cubism core headers. constant: additive 1<<0, multiplicative 1<<1, double-sided 1<<2. dynamic: visible 1<<0.
+  var IS_VISIBLE = 1, BLEND_ADD = 1, BLEND_MULT = 2;
+
+  var canvas = null, gl = null, prog = null, loc = {};
+  var entries = [], running = false, raf = 0, mounted = null;
+  var input = { mx: 0.5, my: 0.5, left: 0, right: 0 };
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      if (window.Live2DCubismCore) { resolve(); return; }
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("cubism core failed to load")); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadTexture(url) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        var t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        // cubism uvs put the origin bottom-left, an <img> upload puts the first row at t=0 -- without the flip every drawable samples empty atlas space and draws nothing
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        resolve(t);
+      };
+      img.onerror = function () { reject(new Error("texture " + url)); };
+      img.src = url;
+    });
+  }
+
+  function compile() {
+    function sh(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    }
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    loc.pos = gl.getAttribLocation(prog, "a_pos");
+    loc.uv = gl.getAttribLocation(prog, "a_uv");
+    loc.tex = gl.getUniformLocation(prog, "u_tex");
+    loc.alpha = gl.getUniformLocation(prog, "u_alpha");
+  }
+
+  async function loadModel(mocName, texName) {
+    var res = await fetch(BASE + mocName, { cache: "force-cache" });
+    var moc = window.Live2DCubismCore.Moc.fromArrayBuffer(await res.arrayBuffer());
+    if (!moc) throw new Error("bad moc " + mocName);
+    var model = window.Live2DCubismCore.Model.fromMoc(moc);
+    if (!model) throw new Error("bad model " + mocName);
+    var ids = {};
+    for (var i = 0; i < model.parameters.count; i++) ids[model.parameters.ids[i]] = i;
+    return {
+      model: model, ids: ids, tex: await loadTexture(BASE + texName),
+      bufPos: gl.createBuffer(), bufUv: gl.createBuffer(), bufIdx: gl.createBuffer(),
+      scratch: null, uvSent: [],
+    };
+  }
+
+  function setParam(e, id, value) {
+    var i = e.ids[id];
+    if (i === undefined) return;
+    var p = e.model.parameters;
+    var v = p.defaultValues[i] + value;
+    if (v < p.minimumValues[i]) v = p.minimumValues[i];
+    if (v > p.maximumValues[i]) v = p.maximumValues[i];
+    p.values[i] = v;
+  }
+
+  // mirrors Model.cpp: the mouse params sweep -30..30 across the screen, vertical flipped, and the two click params latch the paw
+  function applyInput(e) {
+    setParam(e, "ParamMouseX", input.mx * 60 - 30);
+    setParam(e, "ParamMouseY", (1 - input.my) * 60 - 30);
+    setParam(e, "ParamMouseLeftDown", input.left);
+    setParam(e, "ParamMouseRightDown", input.right);
+  }
+
+  function drawEntry(e) {
+    var model = e.model, d = model.drawables, ci = model.canvasinfo;
+    var sx = 2 * ci.PixelsPerUnit / ci.CanvasWidth, sy = 2 * ci.PixelsPerUnit / ci.CanvasHeight;
+    var ox = 2 * ci.CanvasOriginX / ci.CanvasWidth - 1, oy = 2 * ci.CanvasOriginY / ci.CanvasHeight - 1;
+    var order = [];
+    for (var i = 0; i < d.count; i++) order.push(i);
+    order.sort(function (a, b) { return d.renderOrders[a] - d.renderOrders[b]; });
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, e.tex);
+    gl.uniform1i(loc.tex, 0);
+
+    for (var k = 0; k < order.length; k++) {
+      var di = order[k];
+      if (!(d.dynamicFlags[di] & IS_VISIBLE)) continue;
+      var opacity = d.opacities[di];
+      if (opacity <= 0.001) continue;
+      var vp = d.vertexPositions[di], vu = d.vertexUvs[di], ind = d.indices[di];
+      if (!ind || ind.length === 0) continue;
+
+      if (!e.scratch || e.scratch.length < vp.length) e.scratch = new Float32Array(vp.length);
+      var out = e.scratch;
+      for (var j = 0; j < vp.length; j += 2) { out[j] = vp[j] * sx + ox; out[j + 1] = vp[j + 1] * sy + oy; }
+
+      var cf = d.constantFlags[di];
+      if (cf & BLEND_ADD) gl.blendFunc(gl.ONE, gl.ONE);
+      else if (cf & BLEND_MULT) gl.blendFunc(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA);
+      else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, e.bufPos);
+      gl.bufferData(gl.ARRAY_BUFFER, out.subarray(0, vp.length), gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(loc.pos);
+      gl.vertexAttribPointer(loc.pos, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, e.bufUv);
+      gl.bufferData(gl.ARRAY_BUFFER, vu, gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(loc.uv);
+      gl.vertexAttribPointer(loc.uv, 2, gl.FLOAT, false, 0, 0);
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, e.bufIdx);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ind, gl.DYNAMIC_DRAW);
+
+      gl.uniform1f(loc.alpha, opacity);
+      gl.drawElements(gl.TRIANGLES, ind.length, gl.UNSIGNED_SHORT, 0);
+    }
+  }
+
+  function resize() {
+    if (!canvas) return;
+    var r = canvas.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+
+  function frame() {
+    if (!running) return;
+    resize();
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+    gl.useProgram(prog);
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      applyInput(e);
+      e.model.update();
+      drawEntry(e);
+      e.model.drawables.resetDynamicFlags();
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  window.RKBongoLive2D = {
+    ready: false,
+    mount: function (el) {
+      if (mounted) return mounted;
+      mounted = (async function () {
+        canvas = el;
+        gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: true });
+        if (!gl) throw new Error("no webgl");
+        await loadScript(BASE + "core.js");
+        compile();
+        // draw order per Bongobs-Cat View::Render -- the cat model first, then the mouse-side hand model
+        entries = [await loadModel("cat.moc3", "cat.png"), await loadModel("hand.moc3", "hand.png")];
+        window.RKBongoLive2D.ready = true;
+        return true;
+      })();
+      return mounted;
+    },
+    setInput: function (mx, my, left, right) {
+      input.mx = mx; input.my = my; input.left = left ? 1 : 0; input.right = right ? 1 : 0;
+    },
+    start: function () { if (!running && window.RKBongoLive2D.ready) { running = true; raf = requestAnimationFrame(frame); } },
+    stop: function () { running = false; if (raf) { cancelAnimationFrame(raf); raf = 0; } },
+  };
+})();
+</script>

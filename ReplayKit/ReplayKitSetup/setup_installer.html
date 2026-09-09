@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>OBS ReplayKit Setup</title>
+<style>
+  :root {
+    --window:#1D1F26;
+    --panel:#272A33;
+    --field:#3C404D;
+    --card:#2F323C;
+    --line:#3C404D;
+    --line2:#5B6273;
+    --selected:#284CB8;
+    --selected2:#476BD7;
+    --text:#ffffff;
+    --muted:#969696;
+    --danger:#e33b57;
+    --success:#37D247;
+    --on-accent:#ffffff;
+    --button-hover:#464B59;
+    --text-rgb:255, 255, 255;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:var(--window); color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button,input { font:inherit; }
+
+  .shell { width:100%; height:100%; display:grid; grid-template-rows:1fr 70px; background:var(--window); overflow:hidden; }
+
+  /* hero: keyboard art fills the left, copy sits on the right -- the update-window shape */
+  .hero { position:relative; overflow:hidden; }
+  .hero-art {
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:left center; pointer-events:none;
+    /* dissolve the board before it reaches the copy, so no keys run through the text */
+    -webkit-mask-image:linear-gradient(to right, #000 0%, #000 34%, transparent 60%);
+            mask-image:linear-gradient(to right, #000 0%, #000 34%, transparent 60%);
+  }
+  /* fixed box (window width minus the art strip) so every line wraps inside it instead of running off the edge */
+  .hero-copy {
+    position:absolute; left:196px; right:0; top:0; bottom:0; padding-right:22px;
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  .hero-title {
+    font-size:20px; font-weight:700; letter-spacing:-.2px; line-height:1.4; margin:0 0 8px;
+    animation:rk-rise 420ms var(--ease_smooth) both;
+  }
+  .hero-title.is-bad { color:var(--danger); }
+  .hero-line { color:var(--muted); font-size:12.5px; line-height:1.5; margin:0 0 6px; animation:rk-rise 420ms var(--ease_smooth) both 60ms; }
+  .hero-line + .hero-line { animation-delay:100ms; }
+  .hero-line[hidden] { display:none; }
+  @keyframes rk-rise { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+
+  /* the one setup choice -- shown on the landing screen, gone once the install starts */
+  .opt { margin-top:13px; display:flex; align-items:flex-start; gap:8px; cursor:pointer; animation:rk-rise 420ms var(--ease_smooth) both 140ms; }
+  .opt[hidden] { display:none; }
+  .opt input {
+    appearance:none; -webkit-appearance:none; position:relative;
+    width:14px; height:14px; flex:0 0 14px; margin:2px 0 0; border:1px solid var(--muted);
+    border-radius:2px; background:transparent;
+  }
+  .opt input:checked::after {
+    content:""; position:absolute; inset:0; background:var(--text);
+    -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/></svg>") center / 12px 12px no-repeat;
+            mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/></svg>") center / 12px 12px no-repeat;
+  }
+  .opt input:focus-visible { outline:2px solid var(--selected2); outline-offset:1px; }
+  .opt .t { font-size:12.5px; color:var(--text); }
+  .opt .s { display:block; color:var(--muted); font-size:11.5px; line-height:1.45; margin-top:2px; }
+
+  /* brand left, live status right; the thin fill along the top edge is the progress bar -- same as the update window */
+  .foot {
+    position:relative; display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px; background:var(--card); border-top:1px solid var(--line);
+  }
+  .foot-fill {
+    position:absolute; left:0; top:-1px; height:2px; width:0%;
+    background:var(--selected2); transition:width 220ms var(--ease_smooth);
+  }
+  .foot-fill.is-done { background:var(--success); }
+  .foot-fill.is-bad { background:var(--danger); }
+  .brand { display:flex; align-items:center; gap:9px; flex:none; }
+  .brand .mark { width:24px; height:24px; flex:none; }
+  .brand span { font-size:17px; font-weight:600; letter-spacing:-.2px; }
+  /* the status block shrinks to its content (0 on the landing screen where only the buttons show) and is capped so long
+     step text never pushes the buttons off the edge; js shrinks the font so it stays one line */
+  .stat { display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:none; min-width:0; }
+  .stat-text { flex:0 1 auto; min-width:0; max-width:286px; text-align:right; overflow:hidden; }
+  .stat-line { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stat-line.is-bad { color:var(--danger); }
+  .stat-line:empty { display:none; }
+  .stat-detail { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .stat-detail:empty { display:none; }
+  .stat-pct { flex:none; width:36px; text-align:right; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .stat-pct:empty { display:none; }
+  .spinner {
+    width:20px; height:20px; flex:none; border-radius:50%;
+    border:3px solid rgba(var(--text-rgb),.2); border-top-color:var(--text);
+    animation:rk-spin .75s linear infinite;
+  }
+  .spinner[hidden] { display:none; }
+  @keyframes rk-spin { to { transform:rotate(360deg); } }
+
+  .btn {
+    min-width:52px; height:30px; border:1px solid var(--field); border-radius:4px;
+    background:var(--field); color:var(--text); padding:0 13px; cursor:pointer;
+    transition:background 90ms linear, transform 130ms var(--ease_smooth);
+  }
+  .btn:hover { background:var(--button-hover); }
+  .btn:active { transform:scale(.97); }
+  .btn.is-primary { background:var(--selected); border-color:var(--selected2); color:var(--on-accent); }
+  .btn.is-primary:hover { background:var(--selected2); }
+  .btn[hidden] { display:none; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <main class="hero">
+    <img class="hero-art" src="{{HERO_ART}}" alt="" />
+    <div class="hero-copy">
+      <h1 class="hero-title" id="title">Set up OBS ReplayKit</h1>
+      <div class="hero-line" id="line1">Installs OBS Studio if it is not already here, applies the ReplayKit setup, and starts OBS.</div>
+      <div class="hero-line" id="line2">Everything else is set up in the wizard that opens the first time OBS launches.</div>
+      <label class="opt" id="opt">
+        <input type="checkbox" id="discord">
+        <span>
+          <span class="t">Enable Discord screenshare (Share Preview)</span>
+          <span class="s">Installs an audio cable driver and a hidden OBS projector window so you can screen-share OBS's output in Discord. Leave unchecked to not install the driver or have support for Discord screenshare.</span>
+        </span>
+      </label>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-fill" id="fill"></div>
+    <div class="brand">
+      <img class="mark" src="{{BRAND_ICON}}" alt="" />
+      <span>ReplayKit</span>
+    </div>
+    <div class="stat">
+      <div class="stat-text">
+        <div class="stat-line" id="statLine"></div>
+        <div class="stat-detail" id="statDetail"></div>
+      </div>
+      <div class="stat-pct" id="statPct"></div>
+      <button class="btn" type="button" id="reinstallBtn" hidden>Re-Install</button>
+      <button class="btn is-primary" type="button" id="installBtn">Install</button>
+      <button class="btn" type="button" id="closeBtn" hidden>Close</button>
+      <div class="spinner" id="spinner" hidden></div>
+    </div>
+  </footer>
+</div>
+<script>window.__SETUP = {{SETUP_STATE}};</script>
+<script>
+  (function () {
+    const SETUP = (window.__SETUP && typeof window.__SETUP === "object") ? window.__SETUP : { installed: false, cable: false, screenshare: false };
+    (function lockdown() {
+      document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+      document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && ["+", "=", "-", "_", "0", "r", "p", "f"].includes(e.key.toLowerCase())) e.preventDefault();
+        if (e.key === "F5" || e.key === "F12") e.preventDefault();
+      }, true);
+    })();
+
+    const host = (window.chrome && window.chrome.webview) ? window.chrome.webview : null;
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      title: $("title"), line1: $("line1"), line2: $("line2"), opt: $("opt"), discord: $("discord"),
+      fill: $("fill"), statLine: $("statLine"), statDetail: $("statDetail"), statPct: $("statPct"),
+      spinner: $("spinner"), installBtn: $("installBtn"), reinstallBtn: $("reinstallBtn"), closeBtn: $("closeBtn"),
+    };
+    let running = false;
+
+    function send(obj) { if (host) host.postMessage(JSON.stringify(obj)); }
+
+    // existing install -> the primary button updates in place; Re-Install wipes ReplayKit's saved settings first.
+    if (SETUP.installed) {
+      els.installBtn.textContent = "Update";
+      els.reinstallBtn.hidden = false;
+      els.line1.textContent = "Updates the ReplayKit files and keeps your current settings.";
+      els.line2.hidden = true;
+    }
+    // pre-check the Discord opt-in when the audio cable is already on the machine (or the current install has it on) --
+    // a fresh machine with no cable stays unchecked. unchecking it before Update / Re-Install removes the cable.
+    els.discord.checked = !!(SETUP.cable || SETUP.screenshare);
+
+    function startFlow(mode) {
+      if (running) return;
+      running = true;
+      els.title.textContent = mode === "reinstall" ? "Re-installing OBS ReplayKit" : "Setting up OBS ReplayKit";
+      els.line1.textContent = "This can take a few minutes.";
+      els.line2.hidden = true;
+      els.opt.hidden = true;
+      els.installBtn.hidden = true;
+      els.reinstallBtn.hidden = true;
+      els.spinner.hidden = false;
+      els.statLine.textContent = "Starting…";
+      send({ cmd: "start", mode: mode, discord: els.discord.checked });
+    }
+
+    els.installBtn.addEventListener("click", () => startFlow(SETUP.installed ? "update" : "install"));
+    els.reinstallBtn.addEventListener("click", () => startFlow("reinstall"));
+    els.closeBtn.addEventListener("click", () => send({ cmd: "close" }));
+
+    // shrink a nowrap line until it fits its fixed-width box, so long step text scales down instead of clipping
+    function fit(el, max, min) {
+      el.style.fontSize = max + "px";
+      let s = max;
+      while (s > min && el.scrollWidth > el.clientWidth + 1) { s -= 0.5; el.style.fontSize = s + "px"; }
+    }
+
+    function setPct(p) {
+      if (typeof p !== "number") return;
+      const v = Math.max(0, Math.min(100, p));
+      els.fill.style.width = v + "%";
+      els.statPct.textContent = Math.round(v) + "%";
+    }
+
+    function fitStat() { fit(els.statLine, 13, 10); fit(els.statDetail, 12, 9); }
+
+    function onMessage(d) {
+      if (!d || typeof d !== "object") return;
+      switch (d.type) {
+        case "step":
+          if (d.title != null) { els.statLine.textContent = d.title; els.statDetail.textContent = ""; }
+          if (d.detail != null) els.statDetail.textContent = d.detail;
+          els.statLine.classList.toggle("is-bad", d.state === "failed");
+          setPct(d.percent);
+          fitStat();
+          break;
+        case "log":
+          if (d.line) { els.statDetail.textContent = d.line; fitStat(); }
+          break;
+        case "done":
+          els.spinner.hidden = true;
+          els.statLine.classList.remove("is-bad");
+          // never surface a warning count here -- benign per-step notes (audio default restore, an optional plugin
+          // skipped) read as "something is broken" to a user watching the installer finish.
+          els.statLine.textContent = "Done. OBS is starting…";
+          els.statDetail.textContent = "";
+          els.statPct.textContent = "";
+          els.fill.style.width = "100%";
+          els.fill.classList.add("is-done");
+          fitStat();
+          break;
+        case "failed":
+          els.spinner.hidden = true;
+          els.title.classList.add("is-bad");
+          els.title.textContent = "Setup failed";
+          els.statLine.classList.add("is-bad");
+          els.statLine.textContent = d.message || "unknown error";
+          els.statPct.textContent = "";
+          els.fill.classList.add("is-bad");
+          els.closeBtn.hidden = false;
+          fitStat();
+          break;
+      }
+    }
+
+    if (host) {
+      host.addEventListener("message", (e) => {
+        let d = e.data;
+        if (typeof d === "string") { try { d = JSON.parse(d); } catch (_) { return; } }
+        onMessage(d);
+      });
+    }
+  })();
+</script>
+</body>
+</html>

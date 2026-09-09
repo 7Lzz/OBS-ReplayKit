@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 360" width="560" height="360" fill="none">
+  <defs>
+    <!-- the board dissolves before it reaches the copy on the right, so no hard edge cuts across the window -->
+    <linearGradient id="rkFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0.00" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.12" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.44" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="rkFadeMask">
+      <rect x="0" y="0" width="560" height="360" fill="url(#rkFade)"/>
+    </mask>
+  </defs>
+  <g mask="url(#rkFadeMask)">
+    <path d="M 26.1 147.3 L 68.1 134.0 L 71.3 140.9 L 29.3 154.1" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 18.4 110.2 L 43.6 102.2 Q 52.0 99.6 55.2 106.5 L 64.9 127.1 Q 68.1 134.0 59.7 136.7 L 34.5 144.6 Q 26.1 147.3 22.9 140.4 L 13.2 119.7 Q 10.0 112.8 18.4 110.2 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 74.6 132.0 L 116.6 118.7 L 119.9 125.6 L 77.9 138.9" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 66.9 94.9 L 92.1 86.9 Q 100.5 84.3 103.7 91.2 L 113.4 111.9 Q 116.6 118.7 108.2 121.4 L 83.0 129.3 Q 74.6 132.0 71.4 125.1 L 61.7 104.4 Q 58.5 97.5 66.9 94.9 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 123.2 116.7 L 165.2 103.5 L 168.4 110.4 L 126.4 123.6" fill="none" stroke="#2C4BFF" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M 115.5 79.6 L 140.7 71.7 Q 149.1 69.0 152.3 75.9 L 162.0 96.6 Q 165.2 103.5 156.8 106.1 L 131.6 114.0 Q 123.2 116.7 120.0 109.8 L 110.3 89.1 Q 107.1 82.2 115.5 79.6 Z" fill="none" stroke="#2C4BFF" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M 171.7 101.4 L 213.7 88.2 L 217.0 95.1 L 175.0 108.3" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 164.0 64.3 L 189.2 56.4 Q 197.6 53.7 200.8 60.6 L 210.5 81.3 Q 213.7 88.2 205.3 90.8 L 180.1 98.8 Q 171.7 101.4 168.5 94.5 L 158.8 73.9 Q 155.6 67.0 164.0 64.3 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 220.3 86.1 L 262.3 72.9 L 265.5 79.8 L 223.5 93.0" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 212.5 49.0 L 237.8 41.1 Q 246.2 38.5 249.4 45.3 L 259.1 66.0 Q 262.3 72.9 253.9 75.6 L 228.7 83.5 Q 220.3 86.1 217.0 79.2 L 207.4 58.6 Q 204.1 51.7 212.5 49.0 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 44.7 187.1 L 86.7 173.8 L 90.0 180.7 L 47.9 194.0" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 37.0 150.0 L 62.2 142.0 Q 70.6 139.4 73.8 146.3 L 83.5 166.9 Q 86.7 173.8 78.3 176.5 L 53.1 184.4 Q 44.7 187.1 41.5 180.2 L 31.8 159.5 Q 28.6 152.6 37.0 150.0 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 93.3 171.8 L 135.3 158.6 L 138.5 165.4 L 96.5 178.7" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 85.5 134.7 L 110.8 126.8 Q 119.2 124.1 122.4 131.0 L 132.1 151.7 Q 135.3 158.6 126.9 161.2 L 101.7 169.1 Q 93.3 171.8 90.0 164.9 L 80.4 144.2 Q 77.1 137.3 85.5 134.7 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 141.8 156.5 L 183.8 143.3 L 187.1 150.2 L 145.0 163.4" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 134.1 119.4 L 159.3 111.5 Q 167.7 108.8 170.9 115.7 L 180.6 136.4 Q 183.8 143.3 175.4 145.9 L 150.2 153.9 Q 141.8 156.5 138.6 149.6 L 128.9 128.9 Q 125.7 122.1 134.1 119.4 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 190.4 141.2 L 232.4 128.0 L 235.6 134.9 L 193.6 148.1" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 182.6 104.1 L 207.8 96.2 Q 216.2 93.5 219.5 100.4 L 229.1 121.1 Q 232.4 128.0 224.0 130.6 L 198.8 138.6 Q 190.4 141.2 187.1 134.3 L 177.5 113.7 Q 174.2 106.8 182.6 104.1 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 238.9 125.9 L 280.9 112.7 L 284.1 119.6 L 242.1 132.8" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 231.2 88.8 L 256.4 80.9 Q 264.8 78.3 268.0 85.2 L 277.7 105.8 Q 280.9 112.7 272.5 115.4 L 247.3 123.3 Q 238.9 125.9 235.7 119.0 L 226.0 98.4 Q 222.8 91.5 231.2 88.8 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 63.4 226.9 L 105.4 213.6 L 108.6 220.5 L 66.6 233.8" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 55.6 189.8 L 80.8 181.8 Q 89.2 179.2 92.5 186.1 L 102.1 206.8 Q 105.4 213.6 97.0 216.3 L 71.8 224.2 Q 63.4 226.9 60.1 220.0 L 50.5 199.3 Q 47.2 192.4 55.6 189.8 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 111.9 211.6 L 153.9 198.4 L 157.1 205.3 L 115.1 218.5" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 104.2 174.5 L 129.4 166.6 Q 137.8 163.9 141.0 170.8 L 150.7 191.5 Q 153.9 198.4 145.5 201.0 L 120.3 208.9 Q 111.9 211.6 108.7 204.7 L 99.0 184.0 Q 95.8 177.1 104.2 174.5 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 160.5 196.3 L 202.5 183.1 L 205.7 190.0 L 163.7 203.2" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 152.7 159.2 L 177.9 151.3 Q 186.3 148.6 189.6 155.5 L 199.2 176.2 Q 202.5 183.1 194.1 185.7 L 168.9 193.7 Q 160.5 196.3 157.2 189.4 L 147.5 168.7 Q 144.3 161.9 152.7 159.2 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 209.0 181.0 L 251.0 167.8 L 254.2 174.7 L 212.2 187.9" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 201.3 143.9 L 226.5 136.0 Q 234.9 133.4 238.1 140.2 L 247.8 160.9 Q 251.0 167.8 242.6 170.4 L 217.4 178.4 Q 209.0 181.0 205.8 174.1 L 196.1 153.5 Q 192.9 146.6 201.3 143.9 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 257.5 165.7 L 299.6 152.5 L 302.8 159.4 L 260.8 172.6" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 249.8 128.7 L 275.0 120.7 Q 283.4 118.1 286.7 125.0 L 296.3 145.6 Q 299.6 152.5 291.2 155.2 L 265.9 163.1 Q 257.5 165.7 254.3 158.9 L 244.6 138.2 Q 241.4 131.3 249.8 128.7 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 82.0 266.7 L 124.0 253.5 L 127.2 260.3 L 85.2 273.6" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 74.3 229.6 L 99.5 221.6 Q 107.9 219.0 111.1 225.9 L 120.8 246.6 Q 124.0 253.5 115.6 256.1 L 90.4 264.0 Q 82.0 266.7 78.8 259.8 L 69.1 239.1 Q 65.9 232.2 74.3 229.6 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 130.5 251.4 L 172.6 238.2 L 175.8 245.1 L 133.8 258.3" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 122.8 214.3 L 148.0 206.4 Q 156.4 203.7 159.6 210.6 L 169.3 231.3 Q 172.6 238.2 164.1 240.8 L 138.9 248.8 Q 130.5 251.4 127.3 244.5 L 117.6 223.8 Q 114.4 216.9 122.8 214.3 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 179.1 236.1 L 221.1 222.9 L 224.3 229.8 L 182.3 243.0" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 171.4 199.0 L 196.6 191.1 Q 205.0 188.4 208.2 195.3 L 217.9 216.0 Q 221.1 222.9 212.7 225.5 L 187.5 233.5 Q 179.1 236.1 175.9 229.2 L 166.2 208.6 Q 163.0 201.7 171.4 199.0 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 227.6 220.8 L 269.6 207.6 L 272.9 214.5 L 230.9 227.7" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 219.9 183.7 L 245.1 175.8 Q 253.5 173.2 256.7 180.1 L 266.4 200.7 Q 269.6 207.6 261.2 210.3 L 236.0 218.2 Q 227.6 220.8 224.4 213.9 L 214.7 193.3 Q 211.5 186.4 219.9 183.7 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 276.2 205.6 L 318.2 192.3 L 321.4 199.2 L 279.4 212.4" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <path d="M 268.5 168.5 L 293.7 160.5 Q 302.1 157.9 305.3 164.8 L 315.0 185.4 Q 318.2 192.3 309.8 195.0 L 284.6 202.9 Q 276.2 205.6 273.0 198.7 L 263.3 178.0 Q 260.1 171.1 268.5 168.5 Z" fill="none" stroke="#31343D" stroke-width="2.0" stroke-linejoin="round"/>
+    <text x="39.0" y="123.4" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 39.0 123.4)">F6</text>
+    <text x="87.6" y="108.1" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 87.6 108.1)">F7</text>
+    <text x="136.1" y="92.9" fill="#2C4BFF" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 136.1 92.9)">F8</text>
+    <text x="184.7" y="77.6" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 184.7 77.6)">F9</text>
+    <text x="233.2" y="62.3" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 233.2 62.3)">F10</text>
+    <text x="59.5" y="167.1" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 59.5 167.1)">7</text>
+    <text x="53.0" y="153.3" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 53.0 153.3)">&amp;</text>
+    <text x="108.0" y="151.8" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 108.0 151.8)">8</text>
+    <text x="101.6" y="138.0" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 101.6 138.0)">*</text>
+    <text x="156.5" y="136.5" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 156.5 136.5)">9</text>
+    <text x="150.1" y="122.7" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 150.1 122.7)">(</text>
+    <text x="205.1" y="121.2" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 205.1 121.2)">0</text>
+    <text x="198.6" y="107.4" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 198.6 107.4)">)</text>
+    <text x="253.6" y="105.9" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 253.6 105.9)">-</text>
+    <text x="247.2" y="92.2" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 247.2 92.2)">_</text>
+    <text x="76.3" y="203.0" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 76.3 203.0)">Y</text>
+    <text x="124.8" y="187.8" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 124.8 187.8)">U</text>
+    <text x="173.4" y="172.5" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 173.4 172.5)">I</text>
+    <text x="221.9" y="157.2" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 221.9 157.2)">O</text>
+    <text x="270.5" y="141.9" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 270.5 141.9)">P</text>
+    <text x="94.9" y="242.8" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 94.9 242.8)">H</text>
+    <text x="143.5" y="227.6" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 143.5 227.6)">J</text>
+    <text x="192.0" y="212.3" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 192.0 212.3)">K</text>
+    <text x="240.6" y="197.0" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 240.6 197.0)">L</text>
+    <text x="290.9" y="185.5" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 290.9 185.5)">;</text>
+    <text x="284.5" y="171.8" fill="#31343D" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="middle" transform="rotate(-11.6 284.5 171.8)">:</text>
+  </g>
+</svg>

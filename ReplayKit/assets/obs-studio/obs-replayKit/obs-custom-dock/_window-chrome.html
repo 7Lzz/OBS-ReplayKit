@@ -1,0 +1,35 @@
+<!-- Shared resize corner. Bind it with RKWindowChrome.bindResizeGrip({ title, beforeStart, onFailure }). -->
+<style>
+  .rk-resize-grip { position: fixed; right: 2px; bottom: 2px; width: 18px; height: 18px; opacity: .95; cursor: nwse-resize; pointer-events: auto; z-index: 30; }
+  .rk-resize-grip span { position: absolute; width: 2px; height: 2px; background: var(--text); border-radius: 50%; }
+  .rk-resize-grip span:nth-child(1) { right: 0; bottom: 0; }
+  .rk-resize-grip span:nth-child(2) { right: 3px; bottom: 0; }
+  .rk-resize-grip span:nth-child(3) { right: 6px; bottom: 0; }
+  .rk-resize-grip span:nth-child(4) { right: 0; bottom: 3px; }
+  .rk-resize-grip span:nth-child(5) { right: 3px; bottom: 3px; }
+  .rk-resize-grip span:nth-child(6) { right: 0; bottom: 6px; }
+</style>
+<div class="rk-resize-grip" data-rk-resize-grip aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+<script>
+(function () {
+  function bindResizeGrip(options) {
+    options = options || {};
+    var root = options.root || document;
+    var grip = root.querySelector("[data-rk-resize-grip]");
+    if (!grip || !options.title || grip.dataset.rkResizeBound) return;
+    grip.dataset.rkResizeBound = "1";
+    grip.addEventListener("pointerdown", function (event) {
+      event.preventDefault();
+      if (typeof options.beforeStart === "function") options.beforeStart();
+      fetch((options.helper || "http://127.0.0.1:8767") + "/window/resize?title=" + encodeURIComponent(options.title) + "&t=" + Date.now(), {
+        method: "POST", cache: "no-store",
+      }).then(function (response) { return response.json(); }).then(function (result) {
+        if (!result || result.resizing !== true) throw new Error("Resize could not start.");
+      }).catch(function () {
+        if (typeof options.onFailure === "function") options.onFailure();
+      });
+    });
+  }
+  window.RKWindowChrome = { bindResizeGrip: bindResizeGrip };
+})();
+</script>

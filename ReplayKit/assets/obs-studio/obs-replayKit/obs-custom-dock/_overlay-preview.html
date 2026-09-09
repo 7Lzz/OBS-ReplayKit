@@ -1,0 +1,564 @@
+<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is the plugin's standard-mode sprite set. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle) where getStyle() -> the overlay* fields, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
+<style>
+  /* the overlay renders at its true canvas fraction, so small parts (the mouse wheel is ~0.4% of canvas width) only become readable on a wide screen */
+  .ovp-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
+  .ovp-screen {
+    position:relative; width:100%; aspect-ratio:16 / 9; overflow:hidden;
+    border-radius:4px; background:var(--window); border:1px solid var(--line);
+    /* js sets background-image to the once-per-session desktop grab from /desktop-preview.jpg; var(--window) stays as the colour behind it while it loads or if it fails */
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+  }
+  .ovp-off {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:12px; letter-spacing:.3px; text-shadow:0 1px 3px rgba(0,0,0,.85);
+  }
+  .ovp-off[hidden] { display:none; }
+  .ovp-stage { position:absolute; transform-origin:center; will-change:transform,opacity,filter; cursor:grab; touch-action:none; }
+  .ovp-stage[hidden] { display:none; }
+  .ovp-stage.is-dragging { cursor:grabbing; }
+  .ovp-stage::after {
+    content:""; position:absolute; inset:-2px; border:1px dashed transparent; border-radius:2px;
+    pointer-events:none; transition:border-color 120ms linear;
+  }
+  .ovp-screen:hover .ovp-stage::after, .ovp-stage.is-dragging::after { border-color:var(--line2); }
+  .ovp-layer { position:absolute; overflow:visible; }
+  .ovp-layer[hidden] { display:none; }
+  .ovp-sprite { position:absolute; left:0; top:0; transform-origin:0 0; }
+  .ovp-key { position:absolute; background-repeat:no-repeat; }
+  .ovp-bongo { position:absolute; inset:0; }
+  .ovp-bongo[hidden] { display:none; }
+  .ovp-bongo img, .ovp-bongo canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .ovp-tint { position:absolute; inset:0; pointer-events:none; }
+  .ovp-hint { display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:4px; }
+  .ovp-hint-text { font-size:10.5px; color:var(--muted); }
+  /* the dot styling + the wrapping tooltip variant live here so the partial looks the same in Settings and in the wizard */
+  .ovp-hint .info-dot {
+    position:relative; width:14px; height:14px; padding:0; flex:none; border:0; border-radius:50%;
+    background:transparent; color:var(--muted); cursor:help; transition:transform 120ms, color 120ms;
+  }
+  .ovp-hint .info-dot::before {
+    content:"i"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    border:1px solid currentColor; border-radius:50%; font-size:9px; font-style:italic; font-weight:700; line-height:1;
+  }
+  .ovp-hint .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .ovp-hint .info-dot:focus { outline:none; }
+</style>
+<div class="ovp-wrap">
+  <div class="ovp-hint">
+    <span class="ovp-hint-text">Drag to position</span>
+    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag the overlay to move it. It snaps to the canvas edges and centre &mdash; hold Shift while dragging to place it freely, or Ctrl+Z to undo a move. The move is applied in OBS when you press Apply."></button>
+  </div>
+  <div class="ovp-screen" id="ovpScreen">
+    <div class="ovp-off" id="ovpOff" hidden>Input overlay is off</div>
+    <div class="ovp-stage" id="ovpStage">
+      <div class="ovp-layer" id="ovpWasd"><div class="ovp-sprite" id="ovpWasdInner"></div></div>
+      <div class="ovp-layer" id="ovpMouse"><div class="ovp-sprite" id="ovpMouseInner"></div></div>
+      <!-- layer order copied from Bongobs-Cat View::Render: catbg, pressed keys, the live2d cat + mouse arm, then the keyboard arm -->
+      <div class="ovp-bongo" id="ovpBongo" hidden>
+        <img id="ovpBongoBase" alt=""><img id="ovpBongoKbd" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><canvas id="ovpBongoGl"></canvas><img id="ovpBongoLeft" alt="">
+      </div>
+      <div class="ovp-tint" id="ovpTintMul" style="mix-blend-mode:multiply"></div>
+      <div class="ovp-tint" id="ovpTintAdd" style="mix-blend-mode:screen"></div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var screenEl = document.getElementById("ovpScreen");
+  var stage = document.getElementById("ovpStage");
+  var offEl = document.getElementById("ovpOff");
+  var wasdEl = document.getElementById("ovpWasd"), wasdInner = document.getElementById("ovpWasdInner");
+  var mouseEl = document.getElementById("ovpMouse"), mouseInner = document.getElementById("ovpMouseInner");
+  var bongoEl = document.getElementById("ovpBongo");
+  var bBase = document.getElementById("ovpBongoBase"), bKbd = document.getElementById("ovpBongoKbd");
+  var bLeft = document.getElementById("ovpBongoLeft"), bGl = document.getElementById("ovpBongoGl");
+  var tintMul = document.getElementById("ovpTintMul"), tintAdd = document.getElementById("ovpTintAdd");
+
+  var getStyle = function () { return {}; };
+  var onMove = function () {};
+
+  // one desktop grab painted behind the fake screen so the overlay is positioned against the users real screen. the token is fixed per page load, so a fresh settings/setup open refetches but refresh()/start() do not -- the helper serves it no-store and captures just once per obs session anyway. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a failure clears the flag so a later start() retries.
+  var BACKDROP_TOKEN = Date.now();
+  var backdropSet = false;
+  function ensureBackdrop() {
+    if (backdropSet) return;
+    backdropSet = true;
+    var url = HELPER + "/desktop-preview.jpg?rk=" + BACKDROP_TOKEN;
+    var img = new Image();
+    img.onload = function () { screenEl.style.backgroundImage = "url('" + url + "')"; };
+    img.onerror = function () { backdropSet = false; };
+    img.src = url;
+  }
+  // the overlay's top-left as canvas fractions -- null means "use the corner the helper transforms compute". seeded from obs, updated by dragging. posDirty means the user has dragged since the last apply, so the obs poll must not snap their edit back.
+  var posOverride = null, stageRect = null, posTimer = 0, posDirty = false;
+  // the item's real rect on the canvas as reported by obs, so the preview draws the same box the projector does
+  var liveRect = null;
+  var running = false, wired = false;
+  var mode = "input_overlay";
+  var wasdBuilt = false, mouseBuilt = false, bongoBuilt = false;
+  var wasdSize = { w: 568, h: 394 }, mouseSize = { w: 285, h: 421 };
+
+  var BLANK_PX = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  // gap between an element's released sprite and the pressed one directly below it, measured on both preset sheets
+  var SPRITE_GUTTER = 3;
+
+  // KeyboardEvent.code -> element id in wasd-minimal.json (it only carries these 9)
+  var CODE_TO_ID = {
+    KeyQ:"q", KeyW:"w", KeyE:"e", KeyA:"a", KeyS:"s", KeyD:"d",
+    ControlLeft:"ctrl", ControlRight:"ctrl", ShiftLeft:"shift", ShiftRight:"shift", Space:"space",
+  };
+  // MouseEvent.button -> element id in mouse-no-movement.json
+  var BTN_TO_ID = { 0:"lmb", 2:"rmb", 3:"smb2", 4:"smb1" };
+  // KeyboardEvent.code -> bongo standard-mode frame suffix (its config KeyUse list)
+  var CODE_TO_BONGO = {
+    Digit1:"1", Digit2:"2", Digit3:"3", Digit4:"4", Digit5:"5", Digit6:"6", Digit7:"7",
+    KeyQ:"q", KeyE:"e", KeyR:"r", Space:"space", KeyA:"a", KeyD:"d", KeyS:"s", KeyW:"w",
+  };
+
+  // starting guess only (basic.ini BaseCX/BaseCY) -- the position poll replaces both with the projector's real resolution as soon as obs answers.
+  var CANVAS_W = 2560, CANVAS_H = 1440;
+  var REF = CANVAS_H / 1080;
+
+  // real overlay rects in canvas px -- mirrors ReplaykitSettings.InputOverlayTransform / BongoTransform
+  function overlayRects(style, scalePct) {
+    var f = clampNum(scalePct, 50, 200, 100) / 100;
+    if (style === "bongo_cat") {
+      // twin of ReplaykitSettings.BongoTransform. the box is the 1280x768 render target (bongobs-cat Define.cpp), not the 612x354 art: View::InitializeSpirite builds every sprite at the full buffer size, so the art is stretched over the whole source. flush to the canvas bottom-left.
+      var ratio = CANVAS_H / 1080 * f;
+      var w = 1280 * 0.4892578125 * ratio, h = 768 * 0.48828125 * ratio;
+      return { bongo: { x: 0, y: Math.max(0, CANVAS_H - h), w: w, h: h } };
+    }
+    var sc = CANVAS_H / 1440 * f;
+    var gx = Math.max(0, 15 * REF);
+    var gy = Math.max(0, CANVAS_H - 292 * sc - 16 * REF);
+    return {
+      wasd:  { x: gx,               y: gy, w: 568 * 0.73958331 * sc, h: 394 * 0.73888886 * sc },
+      mouse: { x: gx + 431 * sc,    y: gy, w: 285 * 0.69097221 * sc, h: 421 * 0.69097221 * sc },
+    };
+  }
+
+  // one positioned div per input-overlay layout element; elements with a code also carry the offset of their pressed sprite
+  async function buildLayout(container, jsonUrl, sheetUrl) {
+    var layout = await (await fetch(jsonUrl, { cache: "force-cache" })).json();
+    var maxX = 0, maxY = 0;
+    container.innerHTML = "";
+    (layout.elements || []).forEach(function (e) {
+      var u = e.mapping[0], v = e.mapping[1], w = e.mapping[2], h = e.mapping[3];
+      var x = e.pos[0], y = e.pos[1];
+      var d = document.createElement("div");
+      d.className = "ovp-key";
+      d.dataset.id = e.id;
+      d.dataset.u = u; d.dataset.v = v;
+      if (e.code !== undefined && e.code !== null) d.dataset.press = v + h + SPRITE_GUTTER;
+      // a scroll wheel carries no code -- its states are four frames to the right: idle, middle-down, scroll up, scroll down
+      if (e.type === 4) d.dataset.wheel = w + SPRITE_GUTTER;
+      d.style.cssText = "left:" + x + "px;top:" + y + "px;width:" + w + "px;height:" + h +
+        "px;background-image:url(" + sheetUrl + ");background-position:" + (-u) + "px " + (-v) + "px";
+      container.appendChild(d);
+      maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+    });
+    container.style.width = maxX + "px";
+    container.style.height = maxY + "px";
+    return { w: maxX || layout.overlay_width || 1, h: maxY || layout.overlay_height || 1 };
+  }
+
+  function setPressed(container, id, down) {
+    var el = container.querySelector('.ovp-key[data-id="' + id + '"]');
+    if (!el || !el.dataset.press) return;
+    el.style.backgroundPosition = (-el.dataset.u) + "px " + (down ? -el.dataset.press : -el.dataset.v) + "px";
+  }
+
+  var wheelTimer = 0;
+  function setWheel(frame) {
+    var el = mouseInner.querySelector(".ovp-key[data-wheel]");
+    if (!el) return;
+    el.style.backgroundPosition = (-(+el.dataset.u + (+el.dataset.wheel) * frame)) + "px " + (-el.dataset.v) + "px";
+  }
+  function pulseWheel(frame) {
+    setWheel(frame);
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(function () { setWheel(0); }, 160);
+  }
+
+  async function ensureInputOverlay() {
+    if (wasdBuilt && mouseBuilt) return;
+    var base = HELPER + "/overlay-preview/";
+    if (!wasdBuilt) {
+      wasdBuilt = true;
+      try { wasdSize = await buildLayout(wasdInner, base + "wasd/wasd-minimal.json", base + "wasd/wasd.png"); }
+      catch (_) { wasdBuilt = false; }
+    }
+    if (!mouseBuilt) {
+      mouseBuilt = true;
+      try { mouseSize = await buildLayout(mouseInner, base + "mouse/mouse-no-movement.json", base + "mouse/mouse.png"); }
+      catch (_) { mouseBuilt = false; }
+    }
+    layout();
+  }
+
+  function ensureBongo() {
+    if (bongoBuilt) return;
+    bongoBuilt = true;
+    var base = HELPER + "/overlay-preview/bongo/";
+    bBase.src = base + "catbg.png";
+    bLeft.src = base + "l-up.png";
+    if (window.RKBongoLive2D) {
+      window.RKBongoLive2D.mount(bGl)
+        .then(function () { if (running && mode === "bongo_cat") window.RKBongoLive2D.start(); })
+        .catch(function () { bGl.hidden = true; });
+    }
+  }
+
+  function setBox(el, x, y, w, h) {
+    el.style.left = x + "px"; el.style.top = y + "px";
+    el.style.width = w + "px"; el.style.height = h + "px";
+  }
+
+  function layout() {
+    var sw = screenEl.clientWidth, sh = screenEl.clientHeight;
+    if (!sw || !sh) return;
+    var k = sw / CANVAS_W;
+    var r = overlayRects(mode, curScalePct());
+    var bx, by, bw, bh;
+    if (mode === "bongo_cat") {
+      bx = r.bongo.x; by = r.bongo.y; bw = r.bongo.w; bh = r.bongo.h;
+    } else if (mode === "input_overlay") {
+      bx = Math.min(r.wasd.x, r.mouse.x); by = Math.min(r.wasd.y, r.mouse.y);
+      bw = Math.max(r.wasd.x + r.wasd.w, r.mouse.x + r.mouse.w) - bx;
+      bh = Math.max(r.wasd.y + r.wasd.h, r.mouse.y + r.mouse.h) - by;
+    } else { applyStyle(); return; }
+    var localW = bw, localH = bh, localX0 = bx, localY0 = by;
+    // obs is authoritative for the item's real box -- take its size too, not just its corner, or the drawn box is the right shape in the wrong place (the overlay reads as floating above the canvas bottom when obs has it flush)
+    if (liveRect) {
+      bx = liveRect.x * CANVAS_W; by = liveRect.y * CANVAS_H;
+      bw = liveRect.w * CANVAS_W; bh = liveRect.h * CANVAS_H;
+      // an unapplied size edit grows the real box, anchored the way ScaleTransformInPlace does: centred, unless the item already hugs an outer third
+      var f = clampNum(curScalePct(), 50, 200, 100) / (liveRect.scalePct || 100);
+      if (Math.abs(f - 1) > 0.0005) {
+        var nw = bw * f, nh = bh * f;
+        var cxp = bx + bw / 2, cyp = by + bh / 2;
+        bx = cxp <= CANVAS_W / 3 ? bx : (cxp >= CANVAS_W * 2 / 3 ? bx + (bw - nw) : bx + (bw - nw) / 2);
+        by = cyp <= CANVAS_H / 3 ? by : (cyp >= CANVAS_H * 2 / 3 ? by + (bh - nh) : by + (bh - nh) / 2);
+        bw = nw; bh = nh;
+      }
+    }
+    // no live rect means obs is still showing the other overlay, so honour whatever this style was last dragged to before falling back to the canonical corner
+    if (!liveRect) {
+      var saved = savedPosition();
+      if (saved) { bx = saved.x * CANVAS_W; by = saved.y * CANVAS_H; }
+    }
+    if (posOverride) { bx = posOverride.x * CANVAS_W; by = posOverride.y * CANVAS_H; }
+    setBox(stage, bx * k, by * k, bw * k, bh * k);
+    stageRect = { x: bx, y: by, w: bw, h: bh };
+    if (mode === "input_overlay") {
+      // the sub-layers are laid out in the computed local space, then scaled into whatever box obs reports
+      var fx = localW > 0 ? bw / localW : 1, fy = localH > 0 ? bh / localH : 1;
+      setBox(wasdEl, (r.wasd.x - localX0) * k * fx, (r.wasd.y - localY0) * k * fy, r.wasd.w * k * fx, r.wasd.h * k * fy);
+      setBox(mouseEl, (r.mouse.x - localX0) * k * fx, (r.mouse.y - localY0) * k * fy, r.mouse.w * k * fx, r.mouse.h * k * fy);
+      if (wasdSize.w > 0) wasdInner.style.transform = "scale(" + (r.wasd.w * k * fx / wasdSize.w) + ")";
+      if (mouseSize.w > 0) mouseInner.style.transform = "scale(" + (r.mouse.w * k * fx / mouseSize.w) + ")";
+    }
+    applyStyle();
+  }
+
+  // ---- drag to reposition ----
+  var drag = null;
+  // committed drag positions so ctrl+z steps back. each entry is a {x,y} canvas-fraction override, or null meaning
+  // "back to the corner obs / the saved setting produces". a fresh drag clears the redo stack.
+  var moveUndo = [], moveRedo = [], MOVE_HISTORY_MAX = 60;
+  function clearMoveHistory() { moveUndo.length = 0; moveRedo.length = 0; }
+  function onStageDown(ev) {
+    if (!running || mode === "off" || ev.button !== 0) return;
+    var sw = screenEl.clientWidth;
+    if (!sw || !stageRect) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    drag = { px: ev.clientX, py: ev.clientY, x: stageRect.x, y: stageRect.y, k: sw / CANVAS_W,
+             before: posOverride ? { x: posOverride.x, y: posOverride.y } : null, dirty: false };
+    stage.classList.add("is-dragging");
+    try { stage.setPointerCapture(ev.pointerId); } catch (_) {}
+  }
+  // snap the leading, centre and trailing edge to the canvas edges + centre line, within a pixel budget that stays constant on screen whatever the canvas resolution is
+  function snapAxis(v, size, canvas, tol) {
+    var targets = [
+      { at: 0, to: 0 },                              // flush to the near edge
+      { at: canvas - size, to: canvas - size },      // flush to the far edge
+      { at: (canvas - size) / 2, to: (canvas - size) / 2 }, // centred
+    ];
+    for (var i = 0; i < targets.length; i++) {
+      if (Math.abs(v - targets[i].at) <= tol) return targets[i].to;
+    }
+    return v;
+  }
+  function onStageMove(ev) {
+    if (!drag) return;
+    var nx = drag.x + (ev.clientX - drag.px) / drag.k;
+    var ny = drag.y + (ev.clientY - drag.py) / drag.k;
+    if (Math.abs(ev.clientX - drag.px) > 1 || Math.abs(ev.clientY - drag.py) > 1) drag.dirty = true;
+    if (!ev.shiftKey) {
+      var tol = 3 / drag.k; // ~3 screen px of pull, expressed in canvas units -- hold Shift to place freely
+      nx = snapAxis(nx, stageRect.w, CANVAS_W, tol);
+      ny = snapAxis(ny, stageRect.h, CANVAS_H, tol);
+    }
+    // keep a sliver on screen so the overlay can never be dragged fully out of reach
+    nx = Math.max(-stageRect.w + 24, Math.min(CANVAS_W - 24, nx));
+    ny = Math.max(-stageRect.h + 24, Math.min(CANVAS_H - 24, ny));
+    posOverride = { x: nx / CANVAS_W, y: ny / CANVAS_H };
+    layout();
+  }
+  function onStageUp(ev) {
+    if (!drag) return;
+    var wasDirty = drag.dirty, before = drag.before;
+    drag = null;
+    stage.classList.remove("is-dragging");
+    try { stage.releasePointerCapture(ev.pointerId); } catch (_) {}
+    if (posOverride && wasDirty) {
+      moveUndo.push(before);
+      if (moveUndo.length > MOVE_HISTORY_MAX) moveUndo.shift();
+      moveRedo.length = 0;
+      posDirty = true;
+      onMove(posOverride.x, posOverride.y);
+    }
+  }
+
+  // restore a history entry ({x,y} override, or null = the corner obs / the saved setting produces) and re-stage it
+  function applyHistoryEntry(entry) {
+    posOverride = entry ? { x: entry.x, y: entry.y } : null;
+    posDirty = true;
+    layout();
+    if (posOverride) onMove(posOverride.x, posOverride.y);
+    else if (stageRect) onMove(stageRect.x / CANVAS_W, stageRect.y / CANVAS_H);
+  }
+  function curOverride() { return posOverride ? { x: posOverride.x, y: posOverride.y } : null; }
+  function undoMove() {
+    if (!running || mode === "off" || !moveUndo.length) return;
+    moveRedo.push(curOverride());
+    applyHistoryEntry(moveUndo.pop());
+  }
+  function redoMove() {
+    if (!running || mode === "off" || !moveRedo.length) return;
+    moveUndo.push(curOverride());
+    applyHistoryEntry(moveRedo.pop());
+  }
+  function onHistoryKey(ev) {
+    if (!(ev.ctrlKey || ev.metaKey)) return;
+    // ev.key is layout-aware (ev.code "KeyZ" is the physical QWERTY slot -- wrong on AZERTY etc.)
+    var k = (ev.key || "").toLowerCase();
+    var isZ = k === "z" || ev.code === "KeyZ";
+    var isY = k === "y" || ev.code === "KeyY";
+    if (isZ && !ev.shiftKey) { ev.preventDefault(); ev.stopPropagation(); undoMove(); }
+    else if ((isZ && ev.shiftKey) || isY) { ev.preventDefault(); ev.stopPropagation(); redoMove(); }
+  }
+
+  function applyStyle() {
+    var s = getStyle() || {};
+    var op = clampNum(s.overlayOpacity, 0, 100, 100) / 100;
+    var hue = clampNum(s.overlayHueShift, -180, 180, 0);
+    stage.style.opacity = String(op);
+    stage.style.transform = s.overlayFlipH ? "scaleX(-1)" : "none";
+    stage.style.filter = hue ? ("hue-rotate(" + hue + "deg)") : "none";
+    var mul = normHex(s.overlayColorMultiply, "#ffffff");
+    var add = normHex(s.overlayColorAdd, "#000000");
+    tintMul.style.background = mul === "#ffffff" ? "transparent" : mul;
+    tintAdd.style.background = add === "#000000" ? "transparent" : add;
+  }
+
+  // switching style swaps the whole scene item, so the rect polled for the old one -- and any drag aimed at it -- stop describing anything that exists. dropping them falls the preview back to the computed corner the helper transforms will actually produce.
+  function setMode(m) {
+    if (m === mode) return false;
+    mode = m;
+    liveRect = null;
+    posOverride = null;
+    posDirty = false;
+    clearMoveHistory();
+    return true;
+  }
+
+  function applyMode() {
+    var off = mode === "off";
+    offEl.hidden = !off;
+    stage.hidden = off;
+    var bongo = mode === "bongo_cat";
+    bongoEl.hidden = !bongo;
+    wasdEl.hidden = bongo;
+    mouseEl.hidden = bongo;
+    if (bongo) ensureBongo(); else ensureInputOverlay();
+    if (window.RKBongoLive2D) { if (bongo && running) window.RKBongoLive2D.start(); else window.RKBongoLive2D.stop(); }
+    layout();
+  }
+
+  // ---- live input ----
+  var bongoCode = "";
+  function bongoDown(code) {
+    var n = CODE_TO_BONGO[code];
+    if (!n) return;
+    bongoCode = code;
+    var base = HELPER + "/overlay-preview/bongo/";
+    bKbd.src = base + "k-" + n + ".png";
+    bLeft.src = base + "l-" + n + ".png";
+  }
+  function bongoUp(code) {
+    if (code !== bongoCode) return;
+    bongoCode = "";
+    bKbd.src = BLANK_PX;
+    bLeft.src = HELPER + "/overlay-preview/bongo/l-up.png";
+  }
+  // the cat + mouse arm are live2d models the plugin rigs at runtime; RKBongoLive2D renders them and takes the same normalised cursor + button state Model.cpp feeds the rig
+  var pawMx = 0.5, pawMy = 0.5, pawL = 0, pawR = 0;
+  function pushLive2d() {
+    if (window.RKBongoLive2D) window.RKBongoLive2D.setInput(pawMx, pawMy, pawL, pawR);
+  }
+  function bongoButton(button, down) {
+    if (button === 0) pawL = down ? 1 : 0;
+    else if (button === 2) pawR = down ? 1 : 0;
+    else return;
+    pushLive2d();
+  }
+  function bongoTrack(ev) {
+    var w = window.innerWidth || 1, h = window.innerHeight || 1;
+    pawMx = Math.max(0, Math.min(1, ev.clientX / w));
+    pawMy = Math.max(0, Math.min(1, ev.clientY / h));
+    pushLive2d();
+  }
+  function onKey(down) {
+    return function (ev) {
+      if (!running) return;
+      var code = ev.code || "";
+      if (mode === "bongo_cat") {
+        if (down) bongoDown(code); else bongoUp(code);
+        return;
+      }
+      var id = CODE_TO_ID[code];
+      if (id) setPressed(wasdInner, id, down);
+    };
+  }
+  var onDown = onKey(true), onUp = onKey(false);
+  function onMouseDown(ev) {
+    if (!running) return;
+    if (mode === "bongo_cat") { bongoButton(ev.button, true); return; }
+    if (mode !== "input_overlay") return;
+    if (ev.button === 1) { setWheel(1); return; }
+    var id = BTN_TO_ID[ev.button];
+    if (id) setPressed(mouseInner, id, true);
+  }
+  function onMouseUp(ev) {
+    if (mode === "bongo_cat") { bongoButton(ev.button, false); return; }
+    if (ev.button === 1) { setWheel(0); return; }
+    var id = BTN_TO_ID[ev.button];
+    if (id) setPressed(mouseInner, id, false);
+  }
+  function onWheel(ev) {
+    if (running && mode === "input_overlay") pulseWheel(ev.deltaY < 0 ? 2 : 3);
+  }
+  function onMouseMove(ev) { if (running && mode === "bongo_cat") bongoTrack(ev); }
+
+  function wire() {
+    if (wired) return; wired = true;
+    // both targets -- some CEF hosts route key events to one but not the other
+    document.addEventListener("keydown", onHistoryKey, true);
+    window.addEventListener("keydown", onHistoryKey, true);
+    document.addEventListener("keydown", onDown, true);
+    document.addEventListener("keyup", onUp, true);
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("mouseup", onMouseUp, true);
+    document.addEventListener("mousemove", onMouseMove, true);
+    window.addEventListener("wheel", onWheel, { passive: true, capture: true });
+    window.addEventListener("resize", layout);
+    stage.addEventListener("pointerdown", onStageDown);
+    stage.addEventListener("pointermove", onStageMove);
+    stage.addEventListener("pointerup", onStageUp);
+    stage.addEventListener("pointercancel", onStageUp);
+  }
+
+  // obs owns the real position, so poll it while the section is on screen -- moving the item in the projector shows up here without a reload. skipped mid-drag so it cannot fight the pointer.
+  async function pollPosition() {
+    if (!running) return;
+    if (!drag && !posDirty && document.visibilityState === "visible" && screenEl.offsetParent !== null) {
+      try {
+        var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
+        var d = await r.json();
+        if (d && d.ok && !drag && !posDirty) {
+          var changed = false;
+          // mirror the projector's own resolution so the fake screen has the same aspect and the overlay covers the same fraction of it. reported even when the item cannot be resolved, so the box stays true while the overlay is off.
+          if (d.canvasWidth > 0 && d.canvasHeight > 0 && (d.canvasWidth !== CANVAS_W || d.canvasHeight !== CANVAS_H)) {
+            CANVAS_W = d.canvasWidth; CANVAS_H = d.canvasHeight;
+            REF = CANVAS_H / 1080;
+            screenEl.style.aspectRatio = CANVAS_W + " / " + CANVAS_H;
+            changed = true;
+          }
+          // obs still holds the applied style, so while the dropdown shows a different one its rect is the wrong overlay entirely -- draw the computed one for the previewed style instead
+          if (!d.available || d.style !== mode) {
+            if (liveRect) { liveRect = null; changed = true; }
+          } else if (!liveRect || Math.abs(liveRect.x - d.x) > 0.0005 || Math.abs(liveRect.y - d.y) > 0.0005 ||
+              Math.abs(liveRect.w - d.w) > 0.0005 || Math.abs(liveRect.h - d.h) > 0.0005 ||
+              liveRect.scalePct !== d.scalePct) {
+            liveRect = { x: d.x, y: d.y, w: d.w, h: d.h, scalePct: d.scalePct || 100 };
+            posOverride = null;
+            changed = true;
+          }
+          if (changed) layout();
+        }
+      } catch (_) {}
+    }
+    if (running) posTimer = setTimeout(pollPosition, 1200);
+  }
+
+  function curScalePct() { var s = getStyle() || {}; return s.overlayScale; }
+  // the saved overlayPosition setting for the style being previewed, as canvas fractions, or null
+  function savedPosition() {
+    var s = getStyle() || {};
+    var at = s.overlayPosition && s.overlayPosition[mode];
+    if (!at) return null;
+    var x = Number(at.x), y = Number(at.y);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x: x, y: y } : null;
+  }
+  function clampNum(v, lo, hi, dflt) { v = Number(v); return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : dflt; }
+  function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
+
+  window.RKOverlayPreview = {
+    init: function (fn, onMoveFn) {
+      if (typeof fn === "function") getStyle = fn;
+      if (typeof onMoveFn === "function") onMove = onMoveFn;
+      ensureBackdrop();
+    },
+    // host calls this once the drag has been saved, so the poll can resume following the scene item
+    positionApplied: function () { posDirty = false; },
+    // exposed so settings.html can also drive undo/redo -- its keyboard handling is the reliable one in the CEF host
+    undo: function () { undoMove(); },
+    redo: function () { redoMove(); },
+    // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until
+    // Apply updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
+    resetPosition: function () {
+      liveRect = null;
+      posOverride = null;
+      posDirty = true;
+      clearMoveHistory();
+      var s = getStyle() || {};
+      if (setMode(s.overlayStyle || "input_overlay")) applyMode();
+      else layout();
+    },
+    start: function () {
+      running = true;
+      wire();
+      ensureBackdrop();
+      var s = getStyle() || {};
+      setMode(s.overlayStyle || "input_overlay");
+      applyMode();
+      requestAnimationFrame(layout);
+      clearTimeout(posTimer);
+      posTimer = setTimeout(pollPosition, 60);
+    },
+    stop: function () {
+      running = false;
+      clearTimeout(posTimer); posTimer = 0;
+      if (window.RKBongoLive2D) window.RKBongoLive2D.stop();
+    },
+    refresh: function () {
+      var s = getStyle() || {};
+      if (setMode(s.overlayStyle || "input_overlay")) applyMode();
+      else layout();
+    },
+  };
+})();
+</script>

@@ -1,0 +1,254 @@
+<!-- shared partial (helper #include target: overlay-controls). the input-overlay control set (style, flip, opacity, size, hue, colour multiply/add + resets) for the setup wizard. uses settings.html's OWN component classes and markup -- .combo, .check-row, .volume-control, .color-control, .field-reset -- so the wizard and Settings are the same controls, not lookalikes; the css those need is carried here because setup.html does not define it. host: RKOverlay.init({ get, set, onChange }); RKOverlay.collect() returns the overlay* fields. depends on _color-picker being on the page. -->
+<style>
+  /* lifted verbatim from settings.html so the sliders keep their quarter tick lines and the colour boxes stay filled */
+  .volume-control { width:100%; display:grid; grid-template-columns:72px minmax(180px,1fr); align-items:center; gap:8px; }
+  .volume-value { background:transparent; border-color:var(--field-solid,var(--field)); text-align:center; padding:0 8px; }
+  .volume-slider-wrap { position:relative; height:32px; min-width:0; }
+  .volume-slider-wrap::before {
+    content:""; position:absolute; z-index:0; left:0; right:0; top:50%; height:16px; transform:translateY(-50%);
+    background:
+      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
+    background-repeat:no-repeat; background-size:100% 16px; background-position:center; pointer-events:none;
+  }
+  .volume-slider {
+    position:relative; z-index:1; width:100%; height:32px; margin:0; appearance:none; -webkit-appearance:none;
+    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
+    background-repeat:no-repeat; background-size:100% 4px; background-position:center; border:0; outline:none;
+  }
+  .volume-slider::-webkit-slider-runnable-track { height:32px; background:transparent; border:0; }
+  .volume-slider::-webkit-slider-thumb {
+    appearance:none; -webkit-appearance:none; width:21px; height:10px; border:0; border-radius:5px;
+    background:var(--text); margin-top:11px; box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25); cursor:pointer;
+  }
+  .volume-slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  .color-control { width:100%; display:grid; grid-template-columns:42px minmax(120px, 180px); align-items:center; gap:8px; }
+  .color-picker {
+    width:42px; height:32px; border:1px solid var(--field-solid,var(--field)); border-radius:4px;
+    background:var(--color, var(--field)); padding:3px; cursor:pointer; box-shadow:inset 0 0 0 3px var(--field-dark);
+  }
+  .color-picker:hover { border-color:var(--line2); }
+  .color-value { width:100%; text-transform:lowercase; }
+  .field-wrap:has(> .field-reset) > .volume-control,
+  .field-wrap:has(> .field-reset) > .color-control { width:auto; flex:1; }
+  .field-reset { flex:none; }
+  .field-reset.is-default { opacity:.4; }
+  .field-reset.is-default:hover { opacity:1; }
+  .form-row.tight { min-height:30px; }
+  /* setup.html's standalone .check-row carries its own row padding; inside a form-row the grid already supplies it */
+  .form-row .check-row { padding:0; }
+</style>
+<div class="form-row">
+  <div class="label">Overlay</div>
+  <div class="field-wrap">
+    <div class="combo" data-self-wired id="ovcStyle" tabindex="0" role="combobox" aria-expanded="false">
+      <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+      <div class="combo-menu" role="listbox"></div>
+    </div>
+  </div>
+</div>
+<div class="form-row tight">
+  <div></div>
+  <label class="check-row"><input type="checkbox" id="ovcFlip"><span>Flip horizontally</span></label>
+</div>
+<div class="form-row">
+  <div class="label">Opacity</div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="ovcOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
+      <div class="volume-slider-wrap"><input class="volume-slider" id="ovcOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider"></div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayOpacity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row">
+  <div class="label">Size</div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="ovcScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
+      <div class="volume-slider-wrap"><input class="volume-slider" id="ovcScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider"></div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayScale" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row">
+  <div class="label">Hue Shift</div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="ovcHueValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
+      <div class="volume-slider-wrap"><input class="volume-slider" id="ovcHue" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider"></div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayHueShift" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row">
+  <div class="label">Color Multiply</div>
+  <div class="field-wrap">
+    <div class="color-control">
+      <button class="color-picker" id="ovcMul" type="button" aria-label="Overlay color multiply"></button>
+      <input class="text-input color-value" id="ovcMulValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex">
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayColorMultiply" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row">
+  <div class="label">Color Add</div>
+  <div class="field-wrap">
+    <div class="color-control">
+      <button class="color-picker" id="ovcAdd" type="button" aria-label="Overlay color add"></button>
+      <input class="text-input color-value" id="ovcAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex">
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayColorAdd" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<script>
+(function () {
+  var DEF = { overlayStyle:"off", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
+  var STYLES = [
+    { value:"input_overlay", label:"WASD / mouse", blurb:"Simple keyboard and mouse overlay." },
+    { value:"bongo_cat", label:"Bongo Cat", blurb:"Animated keyboard and mouse overlay." },
+    { value:"off", label:"Off", blurb:"No input overlay in the OBS scene." },
+  ];
+  var host = { get:function(k){ return DEF[k]; }, set:function(){}, onChange:function(){} };
+  var st = Object.assign({}, DEF);
+
+  var combo = document.getElementById("ovcStyle");
+  var comboLabel = combo.querySelector(".combo-label"), comboMenu = combo.querySelector(".combo-menu");
+  var flip = document.getElementById("ovcFlip");
+  var sliders = {
+    overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:0, max:100 },
+    overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:50, max:200 },
+    overlayHueShift:{ r:document.getElementById("ovcHue"), n:document.getElementById("ovcHueValue"), min:-180, max:180 },
+  };
+  var colors = {
+    overlayColorMultiply:{ b:document.getElementById("ovcMul"), n:document.getElementById("ovcMulValue") },
+    overlayColorAdd:{ b:document.getElementById("ovcAdd"), n:document.getElementById("ovcAddValue") },
+  };
+  var resets = {};
+  document.querySelectorAll("[data-reset]").forEach(function (b) { resets[b.dataset.reset] = b; });
+
+  function clamp(v, lo, hi, dflt) { v = Number(v); return Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : dflt; }
+  function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
+  function fire() { host.onChange(); }
+  function resetOverlayPosition(style) {
+    if (style !== "input_overlay" && style !== "bongo_cat") return;
+    var saved = host.get("overlayPosition");
+    var next = saved && typeof saved === "object" && !Array.isArray(saved) ? Object.assign({}, saved) : {};
+    delete next[style];
+    host.set("overlayPosition", next);
+  }
+  function setFill(el, value, min, max) {
+    el.style.setProperty("--fill", Math.max(0, Math.min(100, ((value - min) / Math.max(1, max - min)) * 100)) + "%");
+  }
+
+  function renderCombo() {
+    var cur = STYLES.find(function (o) { return o.value === st.overlayStyle; }) || STYLES[2];
+    comboLabel.textContent = cur.label;
+    comboMenu.innerHTML = STYLES.map(function (o) {
+      var blurb = o.blurb ? '<span class="option-blurb">- ' + o.blurb + '</span>' : "";
+      return '<div class="combo-option' + (o.value === st.overlayStyle ? " is-selected" : "") + '" role="option" data-v="' + o.value + '"><span>' + o.label + '</span>' + blurb + "</div>";
+    }).join("");
+  }
+  function closeCombo() { combo.classList.remove("is-open"); combo.setAttribute("aria-expanded", "false"); }
+  combo.querySelector(".combo-button").addEventListener("click", function (e) {
+    e.stopPropagation();
+    var open = !combo.classList.contains("is-open");
+    // the host page owns other combos and cannot see this click (stopPropagation keeps our own document listener from closing us), so shut them here to keep one menu open at a time
+    if (open) document.querySelectorAll(".combo.is-open").forEach(function (c) {
+      if (c === combo) return;
+      c.classList.remove("is-open");
+      c.setAttribute("aria-expanded", "false");
+    });
+    combo.classList.toggle("is-open", open);
+    combo.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  comboMenu.addEventListener("click", function (e) {
+    var o = e.target.closest(".combo-option");
+    if (!o) return;
+    st.overlayStyle = o.dataset.v;
+    resetOverlayPosition(st.overlayStyle);
+    renderCombo(); closeCombo();
+    host.set("overlayStyle", st.overlayStyle); fire();
+    if (window.RKOverlayPreview) RKOverlayPreview.resetPosition();
+  });
+  document.addEventListener("click", closeCombo);
+
+  flip.addEventListener("change", function () {
+    st.overlayFlipH = flip.checked;
+    host.set("overlayFlipH", st.overlayFlipH); refreshResets(); fire();
+  });
+
+  Object.keys(sliders).forEach(function (key) {
+    var c = sliders[key];
+    c.commit = function (val) {
+      st[key] = clamp(val, c.min, c.max, DEF[key]);
+      c.r.value = String(st[key]); c.n.value = String(st[key]);
+      setFill(c.r, st[key], c.min, c.max);
+      host.set(key, st[key]); refreshResets(); fire();
+    };
+    c.r.addEventListener("input", function () { c.commit(c.r.value); });
+    c.n.addEventListener("change", function () { c.commit(c.n.value); });
+  });
+
+  Object.keys(colors).forEach(function (key) {
+    var c = colors[key];
+    c.commit = function (v) {
+      st[key] = normHex(v, DEF[key]);
+      c.b.style.setProperty("--color", st[key]); c.n.value = st[key];
+      host.set(key, st[key]); refreshResets(); fire();
+    };
+    c.b.addEventListener("click", function () {
+      if (!window.openColorDialog) return;
+      window.openColorDialog(st[key], c.b.getAttribute("aria-label"), function (color) { c.commit(color); });
+    });
+    c.n.addEventListener("change", function () { c.commit(c.n.value); });
+  });
+
+  Object.keys(resets).forEach(function (key) {
+    resets[key].addEventListener("click", function () {
+      if (colors[key]) colors[key].commit(DEF[key]);
+      else if (sliders[key]) sliders[key].commit(DEF[key]);
+    });
+  });
+  function refreshResets() {
+    Object.keys(resets).forEach(function (key) {
+      resets[key].classList.toggle("is-default", String(st[key]) === String(DEF[key]));
+    });
+  }
+
+  function paint() {
+    renderCombo();
+    flip.checked = !!st.overlayFlipH;
+    Object.keys(sliders).forEach(function (key) {
+      var c = sliders[key];
+      c.r.value = String(st[key]); c.n.value = String(st[key]);
+      setFill(c.r, st[key], c.min, c.max);
+    });
+    Object.keys(colors).forEach(function (key) {
+      colors[key].b.style.setProperty("--color", st[key]);
+      colors[key].n.value = st[key];
+    });
+    refreshResets();
+  }
+
+  var KEYS = ["overlayStyle","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd"];
+  function pull() {
+    KEYS.forEach(function (k) {
+      var v = host.get(k);
+      if (v !== undefined && v !== null) st[k] = v;
+    });
+    st.overlayOpacity = clamp(st.overlayOpacity, 0, 100, 100);
+    st.overlayScale = clamp(st.overlayScale, 50, 200, 100);
+    st.overlayHueShift = clamp(st.overlayHueShift, -180, 180, 0);
+    st.overlayColorMultiply = normHex(st.overlayColorMultiply, "#ffffff");
+    st.overlayColorAdd = normHex(st.overlayColorAdd, "#000000");
+  }
+
+  window.RKOverlay = {
+    init: function (h) { if (h) host = Object.assign(host, h); pull(); paint(); },
+    collect: function () { return Object.assign({}, st); },
+    refresh: function () { pull(); paint(); },
+  };
+})();
+</script>

@@ -1,0 +1,52 @@
+<!-- Shared hover API. Call RKHover.apply(root, { profile: selector }) to assign one of the reusable profiles. -->
+<style>
+  .rk-hover-control {
+    transition: transform var(--anim_press, 120ms) var(--ease_pop, ease), background-color 90ms linear,
+      border-color 90ms linear, color 90ms linear, opacity 120ms linear;
+  }
+  .rk-hover-control:not(:disabled):not(.is-disabled):not(.is-busy):not(.is-progress):not(.is-flashing):not(.is-armed):hover {
+    transform: scale(var(--hover_grow, 1.04));
+  }
+  .rk-hover-control:not(:disabled):not(.is-disabled):not(.is-busy):not(.is-progress):not(.is-flashing):not(.is-armed):active {
+    transform: scale(var(--press_shrink, .97));
+  }
+  .rk-hover-control:focus-visible { outline: 2px solid var(--primary_light, var(--primary)); outline-offset: 2px; }
+
+  .rk-hover-row { transition: background-color 90ms linear, color 90ms linear, padding-left var(--anim_press, 120ms) var(--ease_pop, ease); }
+  .rk-hover-row:not(.is-disabled):hover { background: var(--button_bg_hover); padding-left: calc(var(--rk-row-padding, 14px) + 2px); }
+  .rk-hover-accent:hover { background: rgba(var(--accent-rgb), .13); }
+  .rk-hover-danger:hover { background: rgba(227, 59, 87, .16); color: var(--red); }
+  .rk-hover-danger.is-armed:hover { background: var(--red); color: var(--text); padding-left: var(--rk-row-padding, 14px); }
+  .rk-hover-nav { transition: transform var(--anim_press, 120ms) var(--ease_pop, ease), background-color 90ms linear, border-color 90ms linear; }
+  .rk-hover-nav:hover { transform: translateX(var(--rk-nav-hover-x, 3px)); }
+  .rk-hover-nav:active { transform: translateX(var(--rk-nav-hover-x, 3px)) scale(var(--press_shrink, .97)); }
+
+  .rk-hover-card {
+    transition: translate 160ms var(--ease_smooth, ease), box-shadow 200ms var(--ease_smooth, ease),
+      border-color 100ms linear, opacity 150ms linear;
+  }
+  .rk-hover-card:hover { border-color: var(--grey1); translate: 0 -2px; box-shadow: 0 5px 14px -8px rgba(0, 0, 0, .4); }
+  .rk-hover-card.is-selected:hover { box-shadow: 0 0 0 1px rgba(var(--text-rgb), .6), 0 5px 14px -8px rgba(0, 0, 0, .4); }
+
+  .rk-hover-surface { transition: width 200ms var(--ease_smooth, ease), background-color 90ms linear; }
+  .rk-hover-surface:hover { background: var(--rk-hover-surface-bg, rgba(0, 0, 0, .85)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rk-hover-control, .rk-hover-row, .rk-hover-card, .rk-hover-surface { transition-duration: 0ms; }
+  }
+</style>
+<script>
+(function () {
+  var profiles = ["control", "overlay", "row", "accent", "danger", "nav", "card", "surface"];
+  window.RKHover = {
+    apply: function (root, mappings) {
+      if (!root || !mappings) return;
+      profiles.forEach(function (profile) {
+        var selector = mappings[profile];
+        if (typeof selector !== "string" || !selector) return;
+        root.querySelectorAll(selector).forEach(function (element) { element.classList.add("rk-hover-" + profile); });
+      });
+    },
+  };
+})();
+</script>

@@ -1,0 +1,176 @@
+<!-- shared partial (helper #include target: tooltip). the modern hover tooltip every dock page uses: one js-positioned
+     element rather than a css ::before, so it clamps into the viewport and slides its arrow to keep pointing at the
+     control. self-wires to any [data-tooltip] element, delegated so controls created later (virtualized clip cards)
+     are covered too. host: nothing required; optionally RKTooltip.suppressWhen(fn) to mute it for a control whose own
+     menu is open, and RKTooltip.hide() / .reposition() for manual control.
+     the tray plugin paints a native twin of this for the title-bar bell (NotifyTip in replaykit.cpp) -- when the
+     numbers below change, change them there too. -->
+<style>
+  #rk-tip {
+    position: fixed;
+    z-index: 300;
+    padding: 5px 8px;
+    border-radius: 3px;
+    background: var(--grey8);
+    background: color-mix(in srgb, var(--grey8) 88%, transparent);
+    color: var(--text);
+    font-family: var(--font_family, var(--font, "Segoe UI", system-ui, sans-serif));
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .42);
+    /* grows in from just under the control instead of a flat fade */
+    transform: translateY(3px) scale(.96);
+    transform-origin: top center;
+    transition: opacity 100ms linear, transform var(--anim_press, 130ms) var(--ease_pop, ease);
+  }
+  #rk-tip.is-shown { opacity: 1; transform: translateY(0) scale(1); }
+  #rk-tip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: var(--tip-arrow, 50%);
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-bottom-color: var(--grey8);
+    border-bottom-color: color-mix(in srgb, var(--grey8) 88%, transparent);
+  }
+  /* multi-line variant for the info-dot notes -- same ground, shadow, arrow and pop, just wraps. */
+  #rk-tip.tip-rich {
+    white-space: normal;
+    max-width: 264px;
+    line-height: 1.42;
+    text-align: left;
+    padding: 7px 10px;
+  }
+</style>
+<script>
+(function () {
+  var tip = document.createElement("div");
+  tip.id = "rk-tip";
+  tip.setAttribute("role", "tooltip");
+  var current = null;
+  var suppress = function () { return false; };
+
+  function attach() {
+    if (!tip.parentNode && document.body) document.body.appendChild(tip);
+  }
+  if (document.body) attach();
+  else document.addEventListener("DOMContentLoaded", attach);
+
+  function reposition() {
+    if (!current) return;
+    var b = current.getBoundingClientRect();
+    var tw = tip.offsetWidth;
+    var th = tip.offsetHeight;
+    var edge = 6;   // min gap from any window edge
+    var gap = 8;    // vertical gap between control and tip
+    var centre = b.left + b.width / 2;
+    var left = Math.max(edge, Math.min(centre - tw / 2, window.innerWidth - tw - edge));
+    var top = Math.max(edge, Math.min(b.bottom + gap, window.innerHeight - th - edge));
+    tip.style.left = Math.round(left) + "px";
+    tip.style.top = Math.round(top) + "px";
+    // arrow rides the control centre, clamped so it stays on the tip body
+    tip.style.setProperty("--tip-arrow", Math.round(Math.max(10, Math.min(centre - left, tw - 10))) + "px");
+  }
+
+  function show(el) {
+    if (!el || !el.dataset.tooltip || el.disabled) return;
+    if (suppress(el)) return;
+    attach();
+    current = el;
+    tip.textContent = el.dataset.tooltip;
+    tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
+    tip.classList.add("is-shown");
+    reposition();
+  }
+
+  function hide() {
+    current = null;
+    tip.classList.remove("is-shown");
+  }
+
+  // controls that rewrite their own label (Upload -> "Stop uploads (3 / 8)") update the visible tip instead of making
+  // the user re-hover. only the hovered one is watched, so this costs nothing when nothing is tipped.
+  var observer = new MutationObserver(function () {
+    if (!current) return;
+    if (current.offsetParent === null || !current.dataset.tooltip) { observer.disconnect(); hide(); return; }
+    tip.textContent = current.dataset.tooltip;
+    reposition();
+  });
+
+  // delegated: card controls are created and recycled as a grid virtualizes, so anything wired once at load would miss
+  // every one built afterwards. mouseover/mouseout bubble, mouseenter/mouseleave do not.
+  document.addEventListener("mouseover", function (e) {
+    var el = e.target.closest("[data-tooltip]");
+    // menu rows carry the same labels for a11y but already show their text, so they never get a tip
+    if (!el || el === current || el.classList.contains("menu-item")) return;
+    observer.disconnect();
+    show(el);
+    if (current) observer.observe(el, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
+  });
+  document.addEventListener("mouseout", function (e) {
+    if (!current) return;
+    if (e.relatedTarget && current.contains(e.relatedTarget)) return;
+    observer.disconnect();
+    hide();
+  });
+  // info-dots also answer to the focus a tab hands them, and to a click (swallowed so a dot inside a label never
+  // toggles its checkbox).
+  document.addEventListener("focusin", function (e) {
+    var dot = e.target.closest(".info-dot[data-tooltip]");
+    if (dot) show(dot);
+  });
+  document.addEventListener("focusout", function (e) {
+    if (e.target.closest(".info-dot[data-tooltip]")) hide();
+  });
+  document.addEventListener("click", function (e) {
+    var dot = e.target.closest(".info-dot[data-tooltip]");
+    if (!dot) return;
+    e.preventDefault();
+    show(dot);
+  });
+  // hide on any click EXCEPT one on the tipped control itself -- clicking it is about to change its tooltip, and the
+  // observer will swap the text live.
+  document.addEventListener("mousedown", function (e) {
+    if (current && current.contains(e.target)) return;
+    hide();
+  }, true);
+  window.addEventListener("resize", reposition);
+  window.addEventListener("scroll", hide, true);
+
+  // pulls native title= attributes onto data-tooltip so an existing page gets the modern tip without every element
+  // being rewritten by hand, and keeps doing it for markup added later.
+  function adopt(root) {
+    var nodes = [];
+    if (root && root.nodeType === 1 && root.hasAttribute("title")) nodes.push(root);
+    if (root && root.querySelectorAll) nodes.push.apply(nodes, root.querySelectorAll("[title]"));
+    nodes.forEach(function (node) {
+      var text = node.getAttribute("title");
+      if (text) node.dataset.tooltip = text;
+      node.removeAttribute("title");
+    });
+  }
+  function watch(root) {
+    adopt(root);
+    new MutationObserver(function (changes) {
+      changes.forEach(function (change) {
+        if (change.type === "attributes") adopt(change.target);
+        else change.addedNodes.forEach(adopt);
+      });
+    }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["title"] });
+  }
+
+  window.RKTooltip = {
+    show: show,
+    hide: hide,
+    reposition: reposition,
+    adopt: adopt,
+    watch: watch,
+    // fn(el) -> true to mute the tip for that control, e.g. while its own menu is open
+    suppressWhen: function (fn) { if (typeof fn === "function") suppress = fn; },
+  };
+})();
+</script>
