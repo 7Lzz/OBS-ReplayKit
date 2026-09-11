@@ -6084,7 +6084,8 @@
         : failed ? "Processing failed"
         : busy ? "Creating link" : "Create Link";
       linkMenuItem.setAttribute("aria-label", linkMenuItem.title);
-      if (label) label.textContent = linkMenuItem.title;
+      // the full reason lives in the title tooltip above -- putting it in the visible label too is what was ballooning the menus height when it wrapped across lines
+      if (label) label.textContent = menuBlockReason ? "Create Link" : linkMenuItem.title;
       if (icon) icon.innerHTML = showCopy ? COPY_ICON : ICON.LINK;
     }
 
