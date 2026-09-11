@@ -7595,6 +7595,8 @@
   let trimThumbnailRequestSeq = 0;
   let trimTimelineScrubbing = false;
   let trimPlayerScrubbing = false;
+  // true if trimVideo was mid-playback when a drag-scrub started, so it can resume on release instead of staying paused
+  let trimScrubResumePlay = false;
   // last time trimVideo actually advanced while it should have been playing -- a range request that fails mid-scrub doesnt reliably fire a JS-visible error on an already-loading video, it just stops advancing and sits on its last decoded frame since <video> never retries a failed range request on its own, so its watched on a timer below rather than off network events.
   let trimLastProgressAt = 0;
   let trimStallRecovering = false;
@@ -7778,7 +7780,8 @@
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const time = ratio * duration;
     trimPreviewActive = false;
-    try { trimVideo.pause(); } catch {}
+    // no pause here -- it fires on every pointermove during a drag. the pointerdown handler below pauses once (if it
+    // was playing) and the pointerup/cancel handler resumes it, so skipping never leaves playback stuck paused.
     previewSeek(time, false);
     trimSeek.value = String(time);
     updateSeekFill();
@@ -7803,6 +7806,9 @@
     trimProgressBar.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       trimPlayerScrubbing = true;
+      // pause for the drag (still frame per position instead of racing playback), resumed in stopTrimPlayerScrub if it was actually playing
+      trimScrubResumePlay = !trimVideo.paused;
+      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
       trimProgressBar.classList.add("is-scrubbing");
       try { trimProgressBar.setPointerCapture(e.pointerId); } catch (_) {}
       scrubTrimPlayer(e.clientX);
@@ -7819,6 +7825,7 @@
       trimPlayerScrubbing = false;
       trimProgressBar.classList.remove("is-scrubbing");
       try { trimProgressBar.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
     };
     trimProgressBar.addEventListener("pointerup", stopTrimPlayerScrub);
     trimProgressBar.addEventListener("pointercancel", stopTrimPlayerScrub);
@@ -7844,7 +7851,7 @@
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const time = ratio * max;
     trimPreviewActive = false;
-    try { trimVideo.pause(); } catch {}
+    // no pause here -- same reasoning as scrubTrimPlayer above, this also runs on every pointermove during the drag.
     previewSeek(time, false);
     trimSeek.value = String(time);
     updateSeekFill();
@@ -7856,6 +7863,9 @@
       if (!trimSourceClip) return;
       e.preventDefault();
       trimTimelineScrubbing = true;
+      // pause for the drag (still frame per position instead of racing playback), resumed in stopTimelineScrub if it was actually playing
+      trimScrubResumePlay = !trimVideo.paused;
+      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
       try { trimScrubber.setPointerCapture(e.pointerId); } catch (_) {}
       scrubTrimTimeline(e.clientX);
     });
@@ -7865,6 +7875,7 @@
     const stopTimelineScrub = (e) => {
       trimTimelineScrubbing = false;
       try { trimScrubber.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
     };
     trimScrubber.addEventListener("pointerup", stopTimelineScrub);
     trimScrubber.addEventListener("pointercancel", stopTimelineScrub);
@@ -8417,8 +8428,8 @@
     if (duration <= 0) return;
     e.preventDefault();
     const delta = e.key === "ArrowRight" ? VIDEO_SEEK_STEP_SECONDS : -VIDEO_SEEK_STEP_SECONDS;
+    // a single keypress has nothing to race, unlike a drag scrub -- no pause needed, so playback just keeps going
     trimPreviewActive = false;
-    try { trimVideo.pause(); } catch {}
     const target = Math.max(0, Math.min(duration, trimVideo.currentTime + delta));
     trimVideo.currentTime = target;
     trimSeek.value = String(target);
