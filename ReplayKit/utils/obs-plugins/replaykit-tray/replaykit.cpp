@@ -1065,7 +1065,7 @@ public:
 	static const int kHeight = 20;
 	static const int kChipRadius = 3;
 	static const int kChipPadX = 5;
-	static const int kChipGap = 24;
+	static const int kChipGap = 18;
 	static const int kLabelChipGap = 5;
 	// bigger than plain breathing room needs to be -- also covers CaptionTitleFonts measured title width running a bit short of the real rendered title on the main obs window
 	static const int kDividerGapBefore = 18;

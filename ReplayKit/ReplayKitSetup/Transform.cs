@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
@@ -478,54 +479,66 @@ namespace ReplayKitSetup
         }
 
         // write the runtime settings consumed by the obs dock helper.
+        // _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose
+        // every setting the wizard has no field for (openClipsKeybind and anything added since this list was last
+        // touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by
+        // this transform's own from-scratch object, and anything not listed below reverts as if never set. merging onto
+        // whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
         public static string ApplyReplaykitSettingsJson(string _text, Preferences prefs)
         {
+            JObject obj;
+            try
+            {
+                obj = File.Exists(Prefs.RUNTIME_SETTINGS_FILE) ? JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE)) : new JObject();
+            }
+            catch (Exception ex) when (ex is JsonException || ex is IOException || ex is UnauthorizedAccessException)
+            {
+                obj = new JObject();
+            }
+
             string recDirNorm = prefs.RecordingPath.Replace("\\", "/").TrimEnd('/').ToLowerInvariant();
             string clipDir = recDirNorm == DefaultClipDirNorm() ? "" : prefs.RecordingPath.Replace("\\", "/");
-            var obj = new JObject
-            {
-                ["recordingPreset"] = prefs.RecordingPreset,
-                ["compressionMode"] = prefs.CompressionMode,
-                ["codecPreference"] = prefs.CodecPreference,
-                ["replaySeconds"] = prefs.ReplayBufferSeconds,
-                ["clipDir"] = clipDir,
-                ["clipKeybind"] = JObject.FromObject(prefs.ClipKeybind),
-                ["recordingKeybind"] = JObject.FromObject(prefs.RecordingKeybind),
-                ["overlayStyle"] = prefs.OverlayStyle,
-                ["overlayOpacity"] = prefs.OverlayOpacity,
-                ["overlayScale"] = prefs.OverlayScale,
-                ["overlayHueShift"] = prefs.OverlayHueShift,
-                ["overlayColorMultiply"] = prefs.OverlayColorMultiply,
-                ["overlayColorAdd"] = prefs.OverlayColorAdd,
-                ["obsStartupEnabled"] = prefs.ObsStartupEnabled,
-                ["disableObsCloseWarning"] = prefs.DisableObsCloseWarning,
-                ["closeToTray"] = prefs.CloseToTray,
-                ["allowSleepWhileActive"] = prefs.AllowSleepWhileActive,
-                ["clipNotificationEnabled"] = prefs.ClipNotificationEnabled,
-                ["recordingNotificationEnabled"] = prefs.RecordingNotificationEnabled,
-                ["clipNotificationSeconds"] = prefs.ReplayBufferSeconds,
-                ["trimPreciseDefault"] = prefs.TrimPreciseDefault,
-                ["debugLoggingEnabled"] = prefs.DebugLoggingEnabled,
-                ["clipSoundVolume"] = prefs.ClipSoundVolume,
-                ["recordingSoundVolume"] = prefs.RecordingSoundVolume,
-                ["shareMode"] = prefs.ShareMode,
-                ["discord_screenshare_enabled"] = prefs.DiscordScreenshareEnabled,
-                ["discord_output_mode"] = prefs.DiscordOutputMode,
-                ["discord_projector_enabled"] = prefs.DiscordProjectorEnabled,
-                ["discord_projector_width"] = prefs.DiscordProjectorWidth,
-                ["discord_projector_height"] = prefs.DiscordProjectorHeight,
-                ["discord_projector_visible_pixels"] = prefs.DiscordProjectorVisiblePixels,
-                ["discord_projector_monitor_index"] = prefs.DiscordProjectorMonitorIndex,
-                ["discord_projector_edge"] = prefs.DiscordProjectorEdge,
-                ["discord_projector_title_hint"] = prefs.DiscordProjectorTitleHint,
-                ["discord_projector_hide_taskbar"] = prefs.DiscordProjectorHideTaskbar,
-                ["screenshareCaptureMode"] = prefs.ScreenshareCaptureMode,
-                ["screenshareGameWindow"] = prefs.ScreenshareGameWindow,
-                ["screenshareGameOverrides"] = JArray.FromObject(prefs.ScreenshareGameOverrides),
-                ["screenshareAutoGameKeepFocused"] = prefs.ScreenshareAutoGameKeepFocused,
-                ["motionBlurEnabled"] = prefs.MotionBlurEnabled,
-                ["motionBlurStrength"] = prefs.MotionBlurStrength,
-            };
+            obj["recordingPreset"] = prefs.RecordingPreset;
+            obj["compressionMode"] = prefs.CompressionMode;
+            obj["codecPreference"] = prefs.CodecPreference;
+            obj["replaySeconds"] = prefs.ReplayBufferSeconds;
+            obj["clipDir"] = clipDir;
+            obj["clipKeybind"] = JObject.FromObject(prefs.ClipKeybind);
+            obj["recordingKeybind"] = JObject.FromObject(prefs.RecordingKeybind);
+            obj["overlayStyle"] = prefs.OverlayStyle;
+            obj["overlayOpacity"] = prefs.OverlayOpacity;
+            obj["overlayScale"] = prefs.OverlayScale;
+            obj["overlayHueShift"] = prefs.OverlayHueShift;
+            obj["overlayColorMultiply"] = prefs.OverlayColorMultiply;
+            obj["overlayColorAdd"] = prefs.OverlayColorAdd;
+            obj["obsStartupEnabled"] = prefs.ObsStartupEnabled;
+            obj["disableObsCloseWarning"] = prefs.DisableObsCloseWarning;
+            obj["closeToTray"] = prefs.CloseToTray;
+            obj["allowSleepWhileActive"] = prefs.AllowSleepWhileActive;
+            obj["clipNotificationEnabled"] = prefs.ClipNotificationEnabled;
+            obj["recordingNotificationEnabled"] = prefs.RecordingNotificationEnabled;
+            obj["clipNotificationSeconds"] = prefs.ReplayBufferSeconds;
+            obj["trimPreciseDefault"] = prefs.TrimPreciseDefault;
+            obj["debugLoggingEnabled"] = prefs.DebugLoggingEnabled;
+            obj["clipSoundVolume"] = prefs.ClipSoundVolume;
+            obj["recordingSoundVolume"] = prefs.RecordingSoundVolume;
+            obj["shareMode"] = prefs.ShareMode;
+            obj["discord_screenshare_enabled"] = prefs.DiscordScreenshareEnabled;
+            obj["discord_output_mode"] = prefs.DiscordOutputMode;
+            obj["discord_projector_enabled"] = prefs.DiscordProjectorEnabled;
+            obj["discord_projector_width"] = prefs.DiscordProjectorWidth;
+            obj["discord_projector_height"] = prefs.DiscordProjectorHeight;
+            obj["discord_projector_visible_pixels"] = prefs.DiscordProjectorVisiblePixels;
+            obj["discord_projector_monitor_index"] = prefs.DiscordProjectorMonitorIndex;
+            obj["discord_projector_edge"] = prefs.DiscordProjectorEdge;
+            obj["discord_projector_title_hint"] = prefs.DiscordProjectorTitleHint;
+            obj["discord_projector_hide_taskbar"] = prefs.DiscordProjectorHideTaskbar;
+            obj["screenshareCaptureMode"] = prefs.ScreenshareCaptureMode;
+            obj["screenshareGameWindow"] = prefs.ScreenshareGameWindow;
+            obj["screenshareGameOverrides"] = JArray.FromObject(prefs.ScreenshareGameOverrides);
+            obj["screenshareAutoGameKeepFocused"] = prefs.ScreenshareAutoGameKeepFocused;
+            obj["motionBlurEnabled"] = prefs.MotionBlurEnabled;
+            obj["motionBlurStrength"] = prefs.MotionBlurStrength;
             return obj.ToString(Formatting.Indented); // matches pythons json.dumps({...}, indent=2) -- newtonsofts default indent width is also 2
         }
 
