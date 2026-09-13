@@ -395,7 +395,7 @@ namespace ReplayKitHelper
             int maxFiles = Constants.MAX_CLIPS > 0 ? Math.Max(Constants.MAX_CLIPS, 1) : 20000;
 
             Task.Run(() => ClipIndexWorker.Run(clipDir, indexPath, ffprobe, Constants.ALLOWED_EXTS, maxFiles))
-                .ContinueWith(_ =>
+                .ContinueWith(t =>
                 {
                     lock (Server.State.ClipsMetaLock)
                     {
@@ -404,7 +404,33 @@ namespace ReplayKitHelper
                         Server.State.ClipIndexCacheSig = "";
                         AppConfig.ClearClipsCache();
                     }
+                    // only the freshest few -- an old backlog doesnt need proactive warming (nobody is about to edit
+                    // a clip from last week the moment it gets reindexed), and capping this keeps a first-ever big
+                    // clip folder from firing a burst of ffprobe/shell-thumbnail work all at once.
+                    if (t.Status == TaskStatus.RanToCompletion)
+                        foreach (var name in t.Result.Take(3)) WarmClipMetadata(name);
                 });
+        }
+
+        // fires the keyframe scan and grid thumbnail for a clip in the background, before the user ever opens it --
+        // GetClipKeyframeTimes and GetCachedThumbnail both dedupe/cache by the files own path+size+mtime, so this can
+        // never race a live trim-modal open for the same clip: whichever call gets there first starts the one shared
+        // job/file, the other just sees it already in flight (or already on disk) and uses that.
+        private static void WarmClipMetadata(string name)
+        {
+            var source = GetSafeClipPath(name);
+            if (source == null || !File.Exists(source.Full)) return;
+            try { Trim.GetClipKeyframeTimes(name); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            Task.Run(() =>
+            {
+                try
+                {
+                    var fi = new FileInfo(source.Full);
+                    if (fi.Exists) Media.GetCachedThumbnail(source, fi);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            });
         }
 
         public static string NormalizeClipSort(string sort)

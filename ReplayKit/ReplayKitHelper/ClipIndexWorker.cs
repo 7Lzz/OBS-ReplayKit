@@ -178,13 +178,17 @@ namespace ReplayKitHelper
             }
         }
 
-        public static void Run(string clipDir, string indexPath, string ffprobe, IEnumerable<string> allowedExts, int maxFiles)
+        // returns the names actually (re)probed this pass (not reused from the existing index) -- newest-first, same
+        // order as the enumeration below -- so a caller can proactively warm up just-created clips without also
+        // rescanning every clip already sitting in the folder.
+        public static List<string> Run(string clipDir, string indexPath, string ffprobe, IEnumerable<string> allowedExts, int maxFiles)
         {
+            var freshlyIndexed = new List<string>();
             try
             {
-                if (string.IsNullOrWhiteSpace(clipDir) || string.IsNullOrWhiteSpace(indexPath)) return;
+                if (string.IsNullOrWhiteSpace(clipDir) || string.IsNullOrWhiteSpace(indexPath)) return freshlyIndexed;
                 string root = Path.GetFullPath(clipDir);
-                if (!Directory.Exists(root)) return;
+                if (!Directory.Exists(root)) return freshlyIndexed;
                 string indexFull = Path.GetFullPath(indexPath);
                 var allowed = new HashSet<string>(allowedExts, StringComparer.OrdinalIgnoreCase);
 
@@ -211,6 +215,7 @@ namespace ReplayKitHelper
                     }
                     var metadata = ReadFfprobeMetadata(ffprobe, file.FullName);
                     entries[file.Name] = NewIndexEntry(file, metadata);
+                    freshlyIndexed.Add(file.Name);
                 }
                 WriteIndexFile(indexFull, entries);
             }
@@ -219,6 +224,7 @@ namespace ReplayKitHelper
                 try { File.WriteAllText(indexPath + ".error.txt", ex.Message, Utf8NoBom); }
                 catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
             }
+            return freshlyIndexed;
         }
     }
 }

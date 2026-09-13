@@ -147,15 +147,16 @@ namespace ReplayKitHelper
             return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are still loading", RetryMs = 500 };
         }
 
-        private static KeyframeScanResult StartTrimKeyframeWorker(Clips.SafeClipPath source, string ffprobe, string cacheKey, string cacheSig)
+        // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one"
+        // one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never
+        // both see "no job yet" and each start their own ffprobe for the same file.
+        private static TrimKeyframeJob StartTrimKeyframeWorkerLocked(Clips.SafeClipPath source, string ffprobe, string jobKey, string cacheSig)
         {
-            string jobKey = cacheKey + "|" + cacheSig;
             var cts = new CancellationTokenSource();
             var task = Task.Run(() => TrimKeyframesWorker.Run(ffprobe, source.Full, source.Name, cts.Token));
-
             var job = new TrimKeyframeJob { Key = jobKey, Sig = cacheSig, Task = task, StartedAt = DateTime.UtcNow, Cts = cts };
-            lock (Server.State.TrimKeyframeJobsLock) { Server.State.TrimKeyframeJobs[jobKey] = job; }
-            return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are loading", RetryMs = 500 };
+            Server.State.TrimKeyframeJobs[jobKey] = job;
+            return job;
         }
 
         public static KeyframeScanResult GetClipKeyframeTimes(string sourceName, double durationSec = 0.0)
@@ -173,14 +174,20 @@ namespace ReplayKitHelper
 
             string jobKey = cacheKey + "|" + cacheSig;
             TrimKeyframeJob job;
-            lock (Server.State.TrimKeyframeJobsLock) { Server.State.TrimKeyframeJobs.TryGetValue(jobKey, out job); }
-            if (job != null) return GetTrimKeyframeWorkerResult(job, cacheKey, cacheSig, source.Name);
-
-            string ffprobe = Compression.GetHelperCapabilities()["ffprobe"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
-                return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
-
-            return StartTrimKeyframeWorker(source, ffprobe, cacheKey, cacheSig);
+            bool startedNew = false;
+            lock (Server.State.TrimKeyframeJobsLock)
+            {
+                if (!Server.State.TrimKeyframeJobs.TryGetValue(jobKey, out job))
+                {
+                    string ffprobe = Compression.GetHelperCapabilities()["ffprobe"]?.Value<string>();
+                    if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
+                        return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
+                    job = StartTrimKeyframeWorkerLocked(source, ffprobe, jobKey, cacheSig);
+                    startedNew = true;
+                }
+            }
+            if (startedNew) return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are loading", RetryMs = 500 };
+            return GetTrimKeyframeWorkerResult(job, cacheKey, cacheSig, source.Name);
         }
 
         // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the clip folder. returns null if 99 candidates are taken.

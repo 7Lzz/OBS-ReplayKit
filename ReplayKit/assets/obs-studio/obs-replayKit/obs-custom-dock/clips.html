@@ -8236,7 +8236,11 @@
       } else {
         syncTrimSnapMode(false);
       }
-      await filmstripPromise;
+      // not awaited: each filmstrip canvas already shows the grid thumbnail as a fallback background until its real
+      // frame lands, so the editor can open as soon as the keyframe probe above settles (the part that actually
+      // looked broken half-finished) while the 12 real frames keep filling in behind it instead of adding their own
+      // sequential wait on top. buildTrimFilmstrip already guards its own loop against a stale/cancelled request.
+      filmstripPromise.catch(() => {});
       // the user couldve cancelled (or opened a different clip) while the probe above was in flight -- dont pop the menu open behind them at that point.
       if (trimSourceClip !== clip) return;
       trimSeek.value = "0";
