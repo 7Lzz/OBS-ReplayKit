@@ -109,15 +109,14 @@
   }
   .item.is-open .item-chevron { transform:rotate(180deg); }
 
-  /* release notes sit one step below the row, the same relationship a clip card body has to its card. collapses both ways like .clip-sort-menu in clips.html (max-height instead of that menus clip-path, since this sits in normal flow and has to shrink the space it takes up, not just what gets painted) */
+  /* release notes sit one step below the row, the same relationship a clip card body has to its card */
   .item-body {
     margin-top:9px; padding:10px 12px; border-radius:4px;
     background:var(--window); border:1px solid var(--grey3);
     font-size:12px; line-height:1.55; color:var(--text);
-    max-height:0; overflow:hidden; opacity:0; user-select:text; -webkit-user-select:text;
-    transition:max-height 190ms var(--ease_smooth), opacity 120ms ease;
+    display:none; max-height:210px; overflow-y:auto; user-select:text; -webkit-user-select:text;
   }
-  .item.is-open .item-body { overflow-y:auto; opacity:1; }
+  .item.is-open .item-body { display:block; }
   .item-body h3,.item-body h4,.item-body h5 { margin:9px 0 4px; font-size:12.5px; color:var(--text); }
   .item-body h3:first-child,.item-body h4:first-child,.item-body h5:first-child { margin-top:0; }
   .item-body p { margin:5px 0; color:var(--text_muted); }
@@ -308,11 +307,6 @@
         "</div>";
     }).join("");
     applyHovers(listEl);
-    // a row rebuilt while already marked open (whats-new refresh, a delete elsewhere in the list) needs its real height re-applied without animating -- theres no prior frame to transition from on a freshly inserted node anyway
-    if (openId) {
-      const openRow = rowFor(openId);
-      if (openRow) setBodyHeight(openRow, true);
-    }
   }
 
   async function load() {
@@ -325,23 +319,15 @@
     }
   }
 
-  // max-height cant just target a flat guess (this used to be a fixed 210px) -- transitioning to a value far past a short notes actual height makes the reveal look instant, since the box reaches its real size long before the transitions clock runs out; sizing to the real scrollHeight (still capped, so one huge changelog cant eat the whole panel) is what makes the full 190ms actually play
-  function setBodyHeight(row, opening) {
-    const body = row.querySelector(".item-body");
-    if (!body) return;
-    body.style.maxHeight = opening ? Math.min(body.scrollHeight, 210) + "px" : "0px";
-  }
-
-  // toggles which row is expanded in place (classList + setBodyHeight, not a full render()) so the max-height/opacity transitions on .item-body and .item-chevron actually have an existing element to animate between states -- render() replaces every rows markup wholesale, and a freshly-inserted element has nothing to transition from
+  // toggles which row is expanded in place so the chevron and aria state stay in sync
   function setItemOpen(row, id, opening) {
     if (openId && openId !== id) {
       const prevRow = rowFor(openId);
-      if (prevRow) { prevRow.classList.remove("is-open"); prevRow.setAttribute("aria-expanded", "false"); setBodyHeight(prevRow, false); }
+      if (prevRow) { prevRow.classList.remove("is-open"); prevRow.setAttribute("aria-expanded", "false"); }
     }
     openId = opening ? id : "";
     row.classList.toggle("is-open", opening);
     row.setAttribute("aria-expanded", opening ? "true" : "false");
-    setBodyHeight(row, opening);
   }
 
   // same in-place reasoning as setItemOpen -- also used by the right-click menu, so both entry points animate and update the unread badge identically instead of one of them forcing a full rebuild
@@ -433,8 +419,6 @@
     }
     const row = e.target.closest(".item");
     if (!row) return;
-    // clicking inside expanded notes should let the user select text, not collapse the row
-    if (e.target.closest(".item-body")) return;
     const id = row.dataset.id;
     setItemOpen(row, id, openId !== id);
     setItemReadState(id, true);
