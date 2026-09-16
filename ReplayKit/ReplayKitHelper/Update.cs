@@ -415,9 +415,7 @@ namespace ReplayKitHelper
         {
             if (string.IsNullOrWhiteSpace(version)) throw new InvalidOperationException("Missing update version.");
             string normalized = NormalizeVersion(version);
-            var settings = ReplaykitSettings.ReadSettings();
-            settings["lastUpdatePromptVersion"] = normalized;
-            ReplaykitSettings.WriteSettings(settings);
+            SettingsStore.Update(settings => settings["lastUpdatePromptVersion"] = normalized);
             return new JObject { ["ok"] = true, ["version"] = normalized };
         }
 

@@ -227,7 +227,7 @@ namespace ReplayKitHelper
         }
 
         // reads both streams concurrently before WaitForExit so a chatty child cant deadlock against an unread, full pipe buffer; stdout then stderr, matching the ps originals 2>&1 merge closely enough for the regex/line scans every caller does over the result. an optional cancellation token kills the child outright -- used by callers (keyframe scanning) that need to reproduce the ps originals external kill-a-hung-worker timeout now that theres no separate process to Stop-Process by pid.
-        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000)
         {
             var psi = new ProcessStartInfo
             {
@@ -238,8 +238,11 @@ namespace ReplayKitHelper
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
+            cancellationToken.ThrowIfCancellationRequested();
             using (var proc = Process.Start(psi))
-            using (cancellationToken.Register(() =>
+            using (var deadline = new System.Threading.CancellationTokenSource(timeoutMs))
+            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
+            using (stopping.Token.Register(() =>
             {
                 try { if (!proc.HasExited) proc.Kill(); }
                 catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
@@ -249,6 +252,8 @@ namespace ReplayKitHelper
                 var stderrTask = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
                 string combined = stdoutTask.Result + stderrTask.Result;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
                 return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = combined.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };
             }
         }
@@ -357,95 +362,96 @@ namespace ReplayKitHelper
             if (selected == null || !File.Exists(selected.Full))
                 return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
 
-            var decision = UploadState.GetUploadJobStartDecision(selected.Name);
-            if (!decision.Ok) return new JObject { ["ok"] = false, ["busy"] = decision.Busy, ["message"] = decision.Message };
-
-            long effCap = Constants.GetEffectiveUploadCap();
-            if (effCap <= 0) return Upload.StartStreamableUpload(selected);
-
-            var caps = GetHelperCapabilities();
-            string ffmpeg = caps["ffmpeg"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg))
+            using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-upload", out string busy))
             {
-                string msg = "ffmpeg.exe not found in your configured clip folder.";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
+                if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
+
+                long effCap = Constants.GetEffectiveUploadCap();
+                if (effCap <= 0) return Upload.StartStreamableUpload(selected);
+
+                var caps = GetHelperCapabilities();
+                string ffmpeg = caps["ffmpeg"]?.Value<string>();
+                if (string.IsNullOrWhiteSpace(ffmpeg))
+                {
+                    string msg = "ffmpeg.exe not found in your configured clip folder.";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+                string ffprobe = caps["ffprobe"]?.Value<string>();
+
+                var metadata = GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
+                double duration = metadata.Duration;
+                if (duration < 1)
+                {
+                    string msg = "Could not read video duration for compression.";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+
+                // compression shrinks bytes, not runtime -- a clip over streamables 10-min free limit still fails transcode, so stop it here too.
+                if (Upload.SubjectToStreamableDurationLimit() && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
+                {
+                    int total = (int)Math.Round(duration);
+                    string msg = "Clip is " + (total / 60) + ":" + (total % 60).ToString("D2") + " long. Streamable's limit is 10 minutes -- trim it shorter first.";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg, ["tooLong"] = true, ["durationSec"] = total };
+                }
+
+                long targetBytes = (long)Math.Floor(effCap * 0.88);
+                if (targetBytes < 5L * 1024 * 1024)
+                {
+                    string msg = "Upload size limit is too small for automatic compression.";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+
+                int totalKbps = (int)Math.Floor((targetBytes * 8.0 / duration) / 1000.0);
+                int audioKbps = totalKbps < 400 ? 48 : totalKbps < 900 ? 64 : 96;
+                int videoKbps = totalKbps - audioKbps;
+                if (videoKbps < 120)
+                {
+                    long capMb = effCap / 1024 / 1024;
+                    long sizeMb = (long)Math.Ceiling(new FileInfo(selected.Full).Length / 1024.0 / 1024.0);
+                    string msg = "Clip is too long to compress under " + capMb + " MB without going below a safe video bitrate";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = sizeMb, ["capMb"] = capMb };
+                }
+
+                var auth = Upload.ResolveUploadAuthJar();
+                if (!auth["ok"].Value<bool>())
+                {
+                    string msg = auth["message"]?.Value<string>() ?? "";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+
+                Directory.CreateDirectory(Constants.COMPRESS_TMP_DIR);
+                string safeBase = Regex.Replace(Path.GetFileNameWithoutExtension(selected.Name), "[^A-Za-z0-9_.-]+", "_");
+                if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "clip";
+                string tempOut = Path.Combine(Constants.COMPRESS_TMP_DIR, safeBase + "_" + requestId + ".mp4");
+                string passLog = Path.Combine(Constants.COMPRESS_TMP_DIR, "ffmpeg-pass-" + requestId);
+
+                UploadState.SetUploadState(
+                    requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
+                    startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "analyzing",
+                    percent: 1, kind: "compress-upload", tempPath: tempOut);
+
+                Log.Write("Start-CompressedStreamableUpload clip=" + selected.Name + " ffmpeg=" + ffmpeg + " ffprobe=" + ffprobe +
+                    " metadata=" + metadata.Source + " targetKbps=" + totalKbps + " videoKbps=" + videoKbps + " audioKbps=" + audioKbps, "compress", requestId);
+
+                bool authRequired = auth["required"]?.Value<bool>() ?? false;
+                string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
+                string selectedName = selected.Name;
+                string selectedFull = selected.Full;
+
+                reservation.Start(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, authJarPath, authRequired), t =>
+                {
+                    try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    Upload.HandleUploadCompletion(t, requestId, selectedName);
+                });
+
+                return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = "Compressing temp copy and uploading" };
             }
-            string ffprobe = caps["ffprobe"]?.Value<string>();
-
-            var metadata = GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
-            double duration = metadata.Duration;
-            if (duration < 1)
-            {
-                string msg = "Could not read video duration for compression.";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
-            }
-
-            // compression shrinks bytes, not runtime -- a clip over streamables 10-min free limit still fails transcode, so stop it here too.
-            if (Upload.SubjectToStreamableDurationLimit() && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
-            {
-                int total = (int)Math.Round(duration);
-                string msg = "Clip is " + (total / 60) + ":" + (total % 60).ToString("D2") + " long. Streamable's limit is 10 minutes -- trim it shorter first.";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg, ["tooLong"] = true, ["durationSec"] = total };
-            }
-
-            long targetBytes = (long)Math.Floor(effCap * 0.88);
-            if (targetBytes < 5L * 1024 * 1024)
-            {
-                string msg = "Upload size limit is too small for automatic compression.";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
-            }
-
-            int totalKbps = (int)Math.Floor((targetBytes * 8.0 / duration) / 1000.0);
-            int audioKbps = totalKbps < 400 ? 48 : totalKbps < 900 ? 64 : 96;
-            int videoKbps = totalKbps - audioKbps;
-            if (videoKbps < 120)
-            {
-                long capMb = effCap / 1024 / 1024;
-                long sizeMb = (long)Math.Ceiling(new FileInfo(selected.Full).Length / 1024.0 / 1024.0);
-                string msg = "Clip is too long to compress under " + capMb + " MB without going below a safe video bitrate";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = sizeMb, ["capMb"] = capMb };
-            }
-
-            var auth = Upload.ResolveUploadAuthJar();
-            if (!auth["ok"].Value<bool>())
-            {
-                string msg = auth["message"]?.Value<string>() ?? "";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
-            }
-
-            Directory.CreateDirectory(Constants.COMPRESS_TMP_DIR);
-            string safeBase = Regex.Replace(Path.GetFileNameWithoutExtension(selected.Name), "[^A-Za-z0-9_.-]+", "_");
-            if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "clip";
-            string tempOut = Path.Combine(Constants.COMPRESS_TMP_DIR, safeBase + "_" + requestId + ".mp4");
-            string passLog = Path.Combine(Constants.COMPRESS_TMP_DIR, "ffmpeg-pass-" + requestId);
-
-            UploadState.SetUploadState(
-                requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
-                startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "analyzing",
-                percent: 1, kind: "compress-upload", tempPath: tempOut);
-
-            Log.Write("Start-CompressedStreamableUpload clip=" + selected.Name + " ffmpeg=" + ffmpeg + " ffprobe=" + ffprobe +
-                " metadata=" + metadata.Source + " targetKbps=" + totalKbps + " videoKbps=" + videoKbps + " audioKbps=" + audioKbps, "compress", requestId);
-
-            bool authRequired = auth["required"]?.Value<bool>() ?? false;
-            string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
-            string selectedName = selected.Name;
-            string selectedFull = selected.Full;
-
-            var task = Task.Run(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, authJarPath, authRequired));
-            task.ContinueWith(t =>
-            {
-                try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                Upload.HandleUploadCompletion(t, requestId, selectedName);
-            });
-
-            return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = "Compressing temp copy and uploading" };
         }
     }
 }

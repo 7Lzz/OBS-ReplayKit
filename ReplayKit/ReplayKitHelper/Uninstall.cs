@@ -95,10 +95,11 @@ namespace ReplayKitHelper
             // writes its own prefs.json, and the helper reads discord_screenshare_enabled from replaykit_settings.json.
             try
             {
-                var settings = ReplaykitSettings.ReadSettings();
-                settings["discord_screenshare_enabled"] = install;
-                settings["discord_projector_enabled"] = install;
-                ReplaykitSettings.WriteSettings(settings);
+                SettingsStore.Update(settings =>
+                {
+                    settings["discord_screenshare_enabled"] = install;
+                    settings["discord_projector_enabled"] = install;
+                });
             }
             catch (Exception ex) { Log.Write("Discord screenshare settings flip failed: " + ex.Message); }
 

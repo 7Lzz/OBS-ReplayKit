@@ -146,7 +146,15 @@ namespace ReplayKitHelper
                     // every route answers once and closes (Connection: close from GetNoStoreHeaders) except /file/, which can ask to keep going so a video element's next range request reuses this socket instead of paying a fresh tcp handshake per chunk.
                     while (true)
                     {
-                        var req = ReadHttpRequest(stream, reader);
+                        HttpRequest req;
+                        using (var deadline = new System.Threading.Timer(_ => client.Close(), null, 10000, System.Threading.Timeout.Infinite))
+                        {
+                            req = ReadHttpRequest(stream, reader);
+                            using (var drained = new System.Threading.ManualResetEvent(false))
+                            {
+                                if (deadline.Dispose(drained)) drained.WaitOne();
+                            }
+                        }
                         if (req == null) break;
                         bool keepAlive = Routes.DispatchRequest(stream, req);
                         if (!keepAlive) break;

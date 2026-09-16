@@ -17,10 +17,10 @@ namespace ReplayKitHelper
         {
             var h = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["Access-Control-Allow-Origin"] = "*",
-                ["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS",
-                ["Access-Control-Allow-Headers"] = "Content-Type,Range",
                 ["Cache-Control"] = "no-store",
+                ["X-Frame-Options"] = "DENY",
+                ["Cross-Origin-Resource-Policy"] = "same-origin",
+                ["X-Content-Type-Options"] = "nosniff",
                 ["Connection"] = "close",
             };
             if (extra != null) foreach (var kv in extra) h[kv.Key] = kv.Value;
@@ -355,7 +355,6 @@ namespace ReplayKitHelper
                 {
                     var h = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                     {
-                        ["Access-Control-Allow-Origin"] = "*",
                         ["Cache-Control"] = "public, max-age=31536000, immutable",
                         ["Content-Type"] = "image/jpeg",
                         ["Connection"] = "close",

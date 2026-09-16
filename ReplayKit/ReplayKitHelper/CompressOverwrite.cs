@@ -19,43 +19,45 @@ namespace ReplayKitHelper
             if (selected == null || !File.Exists(selected.Full))
                 return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
 
-            var decision = UploadState.GetUploadJobStartDecision(selected.Name);
-            if (!decision.Ok) return new JObject { ["ok"] = false, ["busy"] = decision.Busy, ["message"] = decision.Message };
+            using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-overwrite", out string busy))
+            {
+                if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
 
-            var caps = Compression.GetHelperCapabilities();
-            string ffmpeg = caps["ffmpeg"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
-                return new JObject { ["ok"] = false, ["message"] = "ffmpeg.exe not found in clip folder" };
-            string ffprobe = caps["ffprobe"]?.Value<string>();
+                var caps = Compression.GetHelperCapabilities();
+                string ffmpeg = caps["ffmpeg"]?.Value<string>();
+                if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
+                    return new JObject { ["ok"] = false, ["message"] = "ffmpeg.exe not found in clip folder" };
+                string ffprobe = caps["ffprobe"]?.Value<string>();
 
-            var metadata = Compression.GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
-            if (metadata.Duration < 1)
-                return new JObject { ["ok"] = false, ["message"] = "Could not read video duration" };
-            double duration = metadata.Duration;
+                var metadata = Compression.GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
+                if (metadata.Duration < 1)
+                    return new JObject { ["ok"] = false, ["message"] = "Could not read video duration" };
+                double duration = metadata.Duration;
 
-            string ext = Path.GetExtension(selected.Name);
-            // encode into %temp% so the in-flight file never shows in the clip folder. the worker handles cross-volume safely with a sidecar copy + atomic rename on the source volume.
-            string tempPath = Path.Combine(Constants.SCRATCH_DIR, "replaykit_compress_" + requestId + ext);
-            long preBytes = 0;
-            try { preBytes = new FileInfo(selected.Full).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                string ext = Path.GetExtension(selected.Name);
+                // encode into %temp% so the in-flight file never shows in the clip folder. the worker handles cross-volume safely with a sidecar copy + atomic rename on the source volume.
+                string tempPath = Path.Combine(Constants.SCRATCH_DIR, "replaykit_compress_" + requestId + ext);
+                long preBytes = 0;
+                try { preBytes = new FileInfo(selected.Full).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-            UploadState.SetUploadState(
-                requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
-                startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "compressing",
-                percent: 1, kind: "compress-overwrite", cancelRequested: false, tempPath: tempPath);
+                UploadState.SetUploadState(
+                    requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
+                    startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "compressing",
+                    percent: 1, kind: "compress-overwrite", tempPath: tempPath);
 
-            Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration + " scaleHeight=" + scaleHeight, "compress", requestId);
+                Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration + " scaleHeight=" + scaleHeight, "compress", requestId);
 
-            string fastEncoder = caps["fastEncoder"]?.Value<string>();
-            string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
-            string sourceFull = selected.Full;
-            string selectedName = selected.Name;
-            int scale = scaleHeight;
+                string fastEncoder = caps["fastEncoder"]?.Value<string>();
+                string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
+                string sourceFull = selected.Full;
+                string selectedName = selected.Name;
+                int scale = scaleHeight;
 
-            var task = Task.Run(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale));
-            task.ContinueWith(t => OnCompressOverwriteComplete(t, requestId, tempPath));
+                reservation.Start(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale),
+                    t => OnCompressOverwriteComplete(t, requestId, tempPath));
 
-            return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId };
+                return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId };
+            }
         }
 
         // runs once the worker task finishes: reads its result, resolves the shared job state to idle/error, and cleans up the temp encode file. mirrors Start-CompressOverwriteResultWatcher, minus the clips-cache invalidation (CompressOverwriteWorker.Run already does that via Clips.MarkCompressed on success) and the status-file read (the worker reports thru UploadState.SetUploadState directly, so theres nothing left to read back).
@@ -70,7 +72,6 @@ namespace ReplayKitHelper
                 var job = Server.State.Jobs.TryGetValue(requestId, out var j) ? j : Server.State.Upload;
                 if (job.CancelRequested)
                 {
-                    job.CancelRequested = false;
                     cancelled = true;
                 }
             }

@@ -14,7 +14,7 @@ namespace ReplayKitHelper
         }
 
         // onStarted fires right after the process launches, letting a caller (Upload.cs) publish the live Process onto the current job record so a cancel request can kill whichever curl step happens to be running -- the ps original got this for free since its cancel killed the whole upload_worker.ps1 wrapper process tree; there is no equivalent single wrapper process here to kill instead.
-        public static Result Run(string[] args, Action<Process> onStarted)
+        public static Result Run(string[] args, Action<Process> onStarted, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var psi = new ProcessStartInfo
             {
@@ -25,12 +25,18 @@ namespace ReplayKitHelper
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
+            cancellationToken.ThrowIfCancellationRequested();
             using (var proc = Process.Start(psi))
+            using (var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromMinutes(2)))
+            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
+            using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
                 onStarted?.Invoke(proc);
                 var stdout = proc.StandardOutput.ReadToEndAsync();
                 var stderr = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (deadline.IsCancellationRequested) throw new TimeoutException("Network worker exceeded its time limit.");
                 return new Result { ExitCode = proc.ExitCode, Stdout = stdout.GetAwaiter().GetResult(), Stderr = stderr.GetAwaiter().GetResult() };
             }
         }

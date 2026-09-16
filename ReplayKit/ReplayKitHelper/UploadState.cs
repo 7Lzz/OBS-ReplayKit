@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Management;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -59,80 +58,6 @@ namespace ReplayKitHelper
                 if (kv.Value.UpdatedAt > 0 && kv.Value.UpdatedAt < cutoff) toRemove.Add(kv.Key);
             }
             foreach (var key in toRemove) Server.State.Jobs.Remove(key);
-        }
-
-        // cached cpu percent sample. wmis PercentProcessorTime is an instantaneous reading -- cached for a few seconds so a burst of "can we start one more" checks from the bulk compress queue doesnt fire wmi queries back to back. returns -1 if sampling fails so callers fall back to the steady-state limit only (never the burst headroom). only ever called from GetUploadJobStartDecision, which already holds UploadLock for its whole body, so no dedicated lock here.
-        private static double GetRecentCpuPercent()
-        {
-            var now = DateTime.UtcNow;
-            if (Server.State.CpuSamplePercent >= 0 && (now - Server.State.CpuSampleAt).TotalSeconds < 4)
-                return Server.State.CpuSamplePercent;
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher("SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor WHERE Name='_Total'"))
-                {
-                    foreach (ManagementObject row in searcher.Get())
-                    {
-                        if (row["PercentProcessorTime"] != null)
-                        {
-                            Server.State.CpuSamplePercent = Convert.ToInt32(row["PercentProcessorTime"]);
-                            Server.State.CpuSampleAt = now;
-                            return Server.State.CpuSamplePercent;
-                        }
-                    }
-                }
-            }
-            catch (ManagementException)
-            {
-                // Win32_PerfFormattedData_* can flake on freshly-booted systems before the perflib counters are warm. -1 keeps the caller at the steady-state cap.
-            }
-            return -1;
-        }
-
-        public sealed class JobStartDecision
-        {
-            public bool Ok;
-            public bool Busy;
-            public bool Burst;
-            public double Cpu;
-            public string Message;
-        }
-
-        public static JobStartDecision GetUploadJobStartDecision(string clipName)
-        {
-            lock (Server.State.UploadLock)
-            {
-                int activeCount = 0;
-                foreach (var job in Server.State.Jobs.Values)
-                {
-                    if (!job.Active) continue;
-                    if (string.Equals(job.ClipName, clipName, StringComparison.OrdinalIgnoreCase))
-                        return new JobStartDecision { Ok = false, Busy = true, Message = "That clip already has an operation running" };
-                    activeCount++;
-                }
-                // below the steady-state cap -- always allowed.
-                if (activeCount < Constants.MAX_CONCURRENT_VIDEO_JOBS) return new JobStartDecision { Ok = true };
-                // between steady-state and burst -- only allowed if the host isnt already pegged. lets "compress all" auto-scale on underutilised machines without thrashing busy ones.
-                if (activeCount < Constants.MAX_BURST_CONCURRENT_VIDEO_JOBS)
-                {
-                    double cpu = GetRecentCpuPercent();
-                    if (cpu >= 0 && cpu < Constants.CPU_BURST_THRESHOLD_PCT) return new JobStartDecision { Ok = true, Burst = true, Cpu = cpu };
-                }
-                return new JobStartDecision { Ok = false, Busy = true, Message = "Already running " + activeCount + " video operations" };
-            }
-        }
-
-        public static bool TestClipHasActiveUploadJob(string clipName)
-        {
-            if (string.IsNullOrWhiteSpace(clipName)) return false;
-            lock (Server.State.UploadLock)
-            {
-                foreach (var job in Server.State.Jobs.Values)
-                {
-                    if (job.Active && string.Equals(job.ClipName, clipName, StringComparison.OrdinalIgnoreCase)) return true;
-                }
-                return false;
-            }
         }
 
         // merges only the parameters actually passed (matches the ps originals hashtable-merge semantics: a key absent from @{...} leaves the field untouched). requestId null/blank falls back to the current Upload jobs id, same as the original.
@@ -208,27 +133,6 @@ namespace ReplayKitHelper
             }
         }
 
-        public static void StopProcessTree(int processId)
-        {
-            if (processId <= 0) return;
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher("SELECT ProcessId FROM Win32_Process WHERE ParentProcessId=" + processId))
-                {
-                    foreach (ManagementObject child in searcher.Get())
-                    {
-                        StopProcessTree((int)(uint)child["ProcessId"]);
-                    }
-                }
-            }
-            catch (ManagementException) { }
-            try
-            {
-                using (var proc = Process.GetProcessById(processId)) { proc.Kill(); }
-            }
-            catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
-        }
-
         public sealed class CancelResult
         {
             public bool Ok;
@@ -240,9 +144,9 @@ namespace ReplayKitHelper
             UploadJobRecord u = null;
             lock (Server.State.UploadLock)
             {
-                if (!string.IsNullOrWhiteSpace(requestId) && Server.State.Jobs.TryGetValue(requestId, out var byId))
+                if (!string.IsNullOrWhiteSpace(requestId))
                 {
-                    u = byId;
+                    Server.State.Jobs.TryGetValue(requestId, out u);
                 }
                 else if (!string.IsNullOrWhiteSpace(clipName))
                 {
@@ -257,26 +161,9 @@ namespace ReplayKitHelper
                 }
             }
 
-            if (u == null || !u.Active) return new CancelResult { Ok = false, Message = "No upload is running" };
-
-            string activeRequestId = u.RequestId;
-            var cts = u.Cts;
-            var encoderProcess = u.EncoderProcess;
-            string tempPath = u.TempPath;
-
-            // mark cancelled before the kill so the tasks continuation (blocked awaiting the worker) sees the flag as soon as it wakes up and skips its generic "failed" overwrite.
-            SetUploadState(requestId: activeRequestId, state: "error", active: false, error: "Cancelled", phase: "cancelled", percent: 0, cancelRequested: true);
-
-            try { cts?.Cancel(); } catch (ObjectDisposedException) { }
-            if (encoderProcess != null)
-            {
-                try { StopProcessTree(encoderProcess.Id); } catch (InvalidOperationException) { }
-            }
-            if (!string.IsNullOrEmpty(tempPath))
-            {
-                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            }
-            return new CancelResult { Ok = true, Message = "Cancelled" };
+            if (u == null || !JobCoordinator.Cancel(u.RequestId))
+                return new CancelResult { Ok = false, Message = "Operation has already finished or committed" };
+            return new CancelResult { Ok = true, Message = "Cancellation requested" };
         }
 
         private static IEnumerable<string> SafeEnumerateFiles(string dir, string pattern = "*")

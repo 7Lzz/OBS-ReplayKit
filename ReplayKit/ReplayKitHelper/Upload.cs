@@ -70,64 +70,65 @@ namespace ReplayKitHelper
             }
 
             string clipName = !string.IsNullOrWhiteSpace(displayName) ? displayName : clip.Name;
-            var decision = UploadState.GetUploadJobStartDecision(clipName);
-            if (!decision.Ok) return new JObject { ["ok"] = false, ["busy"] = decision.Busy, ["message"] = decision.Message };
-
-            string uploadFull = !string.IsNullOrWhiteSpace(uploadPath) ? Path.GetFullPath(uploadPath) : clip.Full;
-            if (!File.Exists(uploadFull))
+            using (var reservation = JobCoordinator.TryReserve(requestId, clipName, clip.Full, "upload", out string busy))
             {
-                string msg = "Upload file not found: " + uploadFull;
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
+                if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
+
+                string uploadFull = !string.IsNullOrWhiteSpace(uploadPath) ? Path.GetFullPath(uploadPath) : clip.Full;
+                if (!File.Exists(uploadFull))
+                {
+                    string msg = "Upload file not found: " + uploadFull;
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+
+                var tooLong = CheckStreamableDuration(uploadFull);
+                if (tooLong != null)
+                {
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: tooLong["message"].Value<string>());
+                    return tooLong;
+                }
+
+                var fi = new FileInfo(uploadFull);
+                long effCap = Constants.GetEffectiveUploadCap();
+                if (effCap > 0 && fi.Length > effCap)
+                {
+                    // keep this short -- the dock button caps display at 60 chars and the popup buttons cap at 28. full context goes via toast in the popup.
+                    long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);
+                    long cap = effCap / 1024 / 1024;
+                    string msg = "Too big: " + mb + " MB / " + cap + " MB limit";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = mb, ["capMb"] = cap };
+                }
+
+                var auth = ResolveUploadAuthJar();
+                if (!auth["ok"].Value<bool>())
+                {
+                    string msg = auth["message"]?.Value<string>() ?? "";
+                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
+                    return new JObject { ["ok"] = false, ["message"] = msg };
+                }
+
+                UploadState.SetUploadState(
+                    requestId: requestId, state: "uploading", active: true, clipName: clipName,
+                    startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "preparing",
+                    percent: 1, kind: "upload", tempPath: "");
+
+                bool authRequired = auth["required"]?.Value<bool>() ?? false;
+                string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
+
+                Log.Write("Start-StreamableUpload spawning in-process upload task", "upload", requestId);
+
+                // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that
+                // lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say)
+                // 70% could still finish the S3 upload + trigger the transcode.
+                var token = JobCoordinator.Token(requestId);
+
+                reservation.Start(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet, token),
+                    t => HandleUploadCompletion(t, requestId, clipName, quiet));
+
+                return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
             }
-
-            var tooLong = CheckStreamableDuration(uploadFull);
-            if (tooLong != null)
-            {
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: tooLong["message"].Value<string>());
-                return tooLong;
-            }
-
-            var fi = new FileInfo(uploadFull);
-            long effCap = Constants.GetEffectiveUploadCap();
-            if (effCap > 0 && fi.Length > effCap)
-            {
-                // keep this short -- the dock button caps display at 60 chars and the popup buttons cap at 28. full context goes via toast in the popup.
-                long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);
-                long cap = effCap / 1024 / 1024;
-                string msg = "Too big: " + mb + " MB / " + cap + " MB limit";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = mb, ["capMb"] = cap };
-            }
-
-            var auth = ResolveUploadAuthJar();
-            if (!auth["ok"].Value<bool>())
-            {
-                string msg = auth["message"]?.Value<string>() ?? "";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
-                return new JObject { ["ok"] = false, ["message"] = msg };
-            }
-
-            UploadState.SetUploadState(
-                requestId: requestId, state: "uploading", active: true, clipName: clipName,
-                startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "preparing",
-                percent: 1, kind: "upload", tempPath: "");
-
-            bool authRequired = auth["required"]?.Value<bool>() ?? false;
-            string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
-
-            Log.Write("Start-StreamableUpload spawning in-process upload task", "upload", requestId);
-
-            // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that
-            // lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say)
-            // 70% could still finish the S3 upload + trigger the transcode.
-            var cts = new CancellationTokenSource();
-            UploadState.SetUploadState(requestId: requestId, cts: cts);
-
-            var task = Task.Run(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet, cts.Token));
-            task.ContinueWith(t => HandleUploadCompletion(t, requestId, clipName, quiet));
-
-            return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
         }
 
         // runs once an upload task finishes -- whether it was a plain upload or the tail of a compress-then-upload chain (Compression.StartCompressedStreamableUpload calls this too, since the ps original routed both thru this same Start-UploadResultWatcher). on success, records the clips_db entry (url + initial "still processing" transcode state), shows a toast, and starts the background transcode poller; on failure or cancellation, resolves the job to error/idle. mirrors Start-UploadResultWatcher, minus the process-wait + status-file read (UploadWorker.Run reports thru UploadState.SetUploadState directly and returns its outcome, so theres nothing left to poll for).
@@ -142,11 +143,10 @@ namespace ReplayKitHelper
                 var job = Server.State.Jobs.TryGetValue(requestId, out var j) ? j : Server.State.Upload;
                 if (job.CancelRequested)
                 {
-                    job.CancelRequested = false;
                     cancelled = true;
                 }
             }
-            // cancel-activeupload has already written the final "cancelled" state -- dont overwrite it with a generic failure built from whatever the worker happened to return after being killed mid-flight.
+            // The coordinator publishes final cancellation only after the worker and completion cleanup have stopped.
             if (cancelled) return;
 
             if (workerThrew)
@@ -169,9 +169,12 @@ namespace ReplayKitHelper
             if (match.Success) shortcode = match.Groups[1].Value;
 
             // the transcode step just triggered streamables encode; the video isnt watchable until streamable finishes processing it. mark ready=false and let the background poller flip it once streamables api reports status=2.
-            Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0);
+            JobCoordinator.Commit(requestId, () =>
+            {
+                Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0);
 
-            UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100, tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100, tempPath: "");
+            });
 
             // the "link copied" toast + the actual clipboard write are deferred to TranscodePollWorker (fires on streamable status 2) so the link isnt handed over until the video is watchable. quiet (bulk) still suppresses both.
             if (!string.IsNullOrEmpty(shortcode)) StartTranscodePoll(shortcode, clipName, quiet);

@@ -286,35 +286,25 @@ namespace ReplayKitHelper
             }
         }
 
-        // an explicit origin/referer/user-agent check since the dock pages are loaded from a file:// or loopback-http origin the browser doesnt sandbox the way it would a remote site -- these routes can change settings or trigger an obs restart, so anything that isnt recognizably "our own dock" is rejected.
         private static bool TestSettingsOrigin(HttpRequest req)
         {
+            if (req.Headers.TryGetValue("sec-fetch-site", out string site) &&
+                !string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(site, "same-site", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(site, "none", StringComparison.OrdinalIgnoreCase)) return false;
             if (!req.Headers.TryGetValue("origin", out string origin))
-                return !req.Headers.TryGetValue("sec-fetch-site", out string site) ||
-                    !string.Equals(site, "cross-site", StringComparison.OrdinalIgnoreCase);
-            origin = origin.Trim().ToLowerInvariant();
-            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
-            if (origin == "http://127.0.0.1:" + port || origin == "http://localhost:" + port) return true;
-            if (origin == "null") return TestInstalledDockReferer(req) || TestObsBrowserUserAgent(req);
-            return false;
+            {
+                if (!req.Headers.TryGetValue("referer", out string referer)) return true;
+                return Uri.TryCreate(referer, UriKind.Absolute, out var uri) && TrustedOrigin(uri.GetLeftPart(UriPartial.Authority));
+            }
+            return TrustedOrigin(origin);
         }
 
-        private static bool TestObsBrowserUserAgent(HttpRequest req) =>
-            req.Headers.TryGetValue("user-agent", out string ua) && Regex.IsMatch(ua, @"\bOBS/", RegexOptions.IgnoreCase);
-
-        private static bool TestInstalledDockReferer(HttpRequest req)
+        private static bool TrustedOrigin(string origin)
         {
-            if (!req.Headers.TryGetValue("referer", out string referer)) return false;
-            try
-            {
-                var uri = new Uri(referer);
-                if (!uri.IsFile) return false;
-                string path = Path.GetFullPath(uri.LocalPath);
-                string dockRoot = Path.GetFullPath(AppConfig.GetDockDir()).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
-                string defaultRoot = Path.GetFullPath(AppConfig.GetDefaultDockDir()).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
-                return path.StartsWith(dockRoot, StringComparison.OrdinalIgnoreCase) || path.StartsWith(defaultRoot, StringComparison.OrdinalIgnoreCase);
-            }
-            catch (UriFormatException) { return false; }
+            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
+            return string.Equals(origin, "http://127.0.0.1:" + port, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(origin, "http://localhost:" + port, StringComparison.OrdinalIgnoreCase);
         }
 
         // normalize explorer paths before comparing them. file explorer may report the active tab thru locationurl or thru document.folder, depending on windows version and tab state.
@@ -1738,16 +1728,13 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
                 if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
-                if (UploadState.TestClipHasActiveUploadJob(selected.Name)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Clip is currently being processed" }); return false; }
+                string requestId = UploadState.NewRequestId();
+                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy);
+                if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                 try
                 {
-                    File.Delete(selected.Full);
-                    lock (Server.State.ClipsMetaLock)
-                    {
-                        var db = Clips.ReadClipsDb();
-                        if (db.ContainsKey(selected.Name)) { db.Remove(selected.Name); Clips.SaveClipsDb(db); }
-                        AppConfig.ClearClipsCache();
-                    }
+                    JobCoordinator.Commit(requestId, () => File.Delete(selected.Full));
+                    Clips.UpdateDb(db => db.Remove(selected.Name));
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = selected.Name });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -1885,16 +1872,18 @@ namespace ReplayKitHelper
                 if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
                 string newPath = Path.Combine(AppConfig.GetClipDir(), newName);
                 if (File.Exists(newPath)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
+                string requestId = UploadState.NewRequestId();
+                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath);
+                if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                 try
                 {
-                    File.Move(selected.Full, newPath);
+                    JobCoordinator.Commit(requestId, () => File.Move(selected.Full, newPath));
                     // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
-                    lock (Server.State.ClipsMetaLock)
+                    Clips.UpdateDb(db =>
                     {
-                        var db = Clips.ReadClipsDb();
-                        if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); Clips.SaveClipsDb(db); }
-                        AppConfig.ClearClipsCache();
-                    }
+                        if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
+                        return true;
+                    });
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }

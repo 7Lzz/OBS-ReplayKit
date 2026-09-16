@@ -155,10 +155,7 @@ namespace ReplayKitHelper
         {
             lock (Server.State.ClipsMetaLock)
             {
-                Server.State.ClipsCacheAt = DateTime.MinValue;
-                Server.State.ClipsCacheSig = "";
-                Server.State.ClipsCacheVersion = "";
-                Server.State.ClipsCacheJson = "";
+                Clips.InvalidateCache();
             }
         }
 
@@ -225,10 +222,7 @@ namespace ReplayKitHelper
         {
             lock (Server.State.ClipsMetaLock)
             {
-                Server.State.ClipsCacheAt = DateTime.MinValue;
-                Server.State.ClipsCacheSig = "";
-                Server.State.ClipsCacheVersion = "";
-                Server.State.ClipsCacheJson = "";
+                Clips.InvalidateCache();
                 Server.State.ClipIndexRepairQueued = true;
                 Server.State.ClipIndexRepairAt = DateTime.MinValue;
             }

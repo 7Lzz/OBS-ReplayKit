@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en" style="background:#272A33;color:#FFFFFF;color-scheme:dark">
 <head>
+<script>
+if (location.protocol === "file:") {
+  (function waitForHelper() {
+    fetch("http://127.0.0.1:8767/health", { mode: "no-cors", cache: "no-store" })
+      .then(() => location.replace("http://127.0.0.1:8767/controls_app.html"))
+      .catch(() => setTimeout(waitForHelper, 1000));
+  })();
+}
+</script>
 <meta charset="UTF-8" />
 <meta name="theme-color" content="#272A33" />
 <meta name="color-scheme" content="dark" />

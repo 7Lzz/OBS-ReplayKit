@@ -210,8 +210,10 @@ namespace ReplayKitSetup
         // stable uuid for our custom controls dock entry. repeat applies update the same row instead of stacking duplicates.
         private const string CustomControlsDockUuid = "a59ce0ef-5d6f-4a4f-91d9-c7c3c1d4e2b0";
 
-        // bare windows path (no file:// prefix, backslashes) -- same shape obs writes when the user adds a custom browser dock via the dialog.
-        private static string DockUrl() => System.IO.Path.Combine(Config.DOCK_TARGET, "controls_app.html").Replace("/", "\\");
+        // The controls page must have the helper's loopback origin. A file://
+        // dock cannot call the protected local API after CEF's local-resource
+        // policy is applied, which leaves every control in its offline state.
+        private static string DockUrl() => "http://127.0.0.1:8767/controls_app.html";
 
         private static JObject ManagedDockEntry() => new JObject
         {

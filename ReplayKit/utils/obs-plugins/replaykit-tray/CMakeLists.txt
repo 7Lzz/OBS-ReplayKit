@@ -32,3 +32,8 @@ set_target_properties(replaykit-tray PROPERTIES
     PREFIX ""
     OUTPUT_NAME "replaykit"
 )
+
+if(MSVC)
+    target_compile_options(replaykit-tray PRIVATE /Zi)
+    target_link_options(replaykit-tray PRIVATE /DEBUG:FULL /OPT:REF /OPT:ICF)
+endif()

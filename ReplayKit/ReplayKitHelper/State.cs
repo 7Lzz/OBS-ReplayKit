@@ -18,7 +18,6 @@ namespace ReplayKitHelper
         public const int CLIPS_PAGE_LIMIT_MAX = 500;
         public const int MAX_CLIPS = 0; // 0 = unlimited
         public const int MAX_CONCURRENT_VIDEO_JOBS = 2;
-        public const int CPU_BURST_THRESHOLD_PCT = 40;
         public const long PREVIEW_CHUNK = 4 * 1024 * 1024;
         public const int MAX_PREVIEW_STREAM = 2;
         public const long ANON_SIZE_CAP = 250L * 1024 * 1024;
@@ -29,7 +28,6 @@ namespace ReplayKitHelper
         public const string STREAMABLE_API = "https://api-f.streamable.com";
         public const bool DEFAULT_LOG_ENABLED = false;
 
-        public static readonly int MAX_BURST_CONCURRENT_VIDEO_JOBS = Math.Max(2, Math.Min(4, Environment.ProcessorCount / 4));
         public static readonly int MAX_CONNECTION_THREADS = Math.Max(6, Environment.ProcessorCount);
 
         // directory the running exe lives in -- the compiled equivalent of the ps originals $PSScriptRoot ($script:HelperRoot in local_helper_server.ps1), used to find ffmpeg/ffprobe installed alongside the helper by the setup wizard.
@@ -202,13 +200,8 @@ namespace ReplayKitHelper
         public readonly object LogLock = new object();
         public bool LogEnabled = Constants.DEFAULT_LOG_ENABLED;
 
-        // -- ClipsMetaLock -- a db write and a cache invalidation must be seen as one unit by concurrent readers, so this lock covers all of: cache body/sig/json/version, db cache, index cache, repair state, and the live folder watcher handle.
+        // -- ClipsMetaLock -- snapshot publication, database/index caches, repair state and the folder watcher.
         public readonly object ClipsMetaLock = new object();
-        public DateTime ClipsCacheAt;
-        public List<JObject> ClipsCacheBody;
-        public string ClipsCacheJson;
-        public string ClipsCacheSig;
-        public string ClipsCacheVersion = ""; // a signature string when populated, "" when cleared -- never numeric despite the name
         public JObject ClipsDbCache;
         public string ClipsDbCacheSig;
         public JObject ClipIndexCache;
@@ -229,12 +222,10 @@ namespace ReplayKitHelper
         public readonly object PreviewLock = new object();
         public int ActivePreviews;
 
-        // -- UploadLock -- CpuSamplePercent/At are cache fields only ever touched while UploadLock is already held, no dedicated lock.
+        // -- UploadLock -- job status records; operation ownership lives in JobCoordinator.
         public readonly object UploadLock = new object();
         public UploadJobRecord Upload = new UploadJobRecord { RequestId = "" };
         public readonly Dictionary<string, UploadJobRecord> Jobs = new Dictionary<string, UploadJobRecord>();
-        public double CpuSamplePercent;
-        public DateTime CpuSampleAt;
 
         // -- ThumbQueueLock --
         public readonly object ThumbQueueLock = new object();

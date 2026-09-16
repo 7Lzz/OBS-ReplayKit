@@ -30,6 +30,7 @@ namespace ReplayKitHelper
 
         private static int Main(string[] args)
         {
+            System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
@@ -46,9 +47,10 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 WriteStartupStatus(GetNamedArg(args, "-ConfigPath"), "failed", ex.Message);
-                WriteCrashReport("helper_startup", ex, true);
+                WriteCrashReport("helper_failure", ex, true);
                 return 1;
             }
+            finally { Shutdown(); }
         }
 
         private static void InstallCrashReporter()
@@ -62,7 +64,7 @@ namespace ReplayKitHelper
             };
         }
 
-        private static void WriteCrashReport(string kind, object exception, bool terminating)
+        internal static void WriteCrashReport(string kind, object exception, bool terminating)
         {
             try
             {
@@ -110,25 +112,17 @@ namespace ReplayKitHelper
                 Console.Error.WriteLine("Missing required -ConfigPath argument.");
                 return 1;
             }
+            if (!AcquireSingleton()) return 0;
             WriteStartupStatus(configPath, "starting", "");
             Server.State.ConfigPath = configPath;
             AppConfig.LoadConfig();
             AppConfig.ClearLogsAtStartup();
-
-            if (!AcquireSingleton()) return 0;
 
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
             try { Compression.GetHelperCapabilities(refresh: true); } catch (Exception ex) { Log.Write("GetHelperCapabilities: " + ex.Message); }
 
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
             _listener = BindListener(port);
-            if (_listener == null)
-            {
-                WriteStartupStatus(configPath, "failed", "Could not bind 127.0.0.1:" + port);
-                Log.Write("Could not bind 127.0.0.1:" + port + " after takeover attempt -- giving up.");
-                ReleaseSingleton();
-                return 0;
-            }
             WriteStartupStatus(configPath, "ready", "");
             Log.Write("ReplayKit helper listening on http://" + Constants.HOST_ADDR + ":" + port);
 
@@ -171,7 +165,6 @@ namespace ReplayKitHelper
 
             RunAcceptLoop();
 
-            Shutdown();
             return 0;
         }
 
@@ -189,23 +182,14 @@ namespace ReplayKitHelper
                 catch (AbandonedMutexException) { owned = true; }
                 if (!owned)
                 {
-                    Log.Write("Singleton mutex held by another helper; asking it to /shutdown then retrying.");
-                    TryPostShutdown(Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT);
-                    try { owned = _singletonMutex.WaitOne(3000); }
-                    catch (AbandonedMutexException) { owned = true; }
-                    if (!owned)
-                    {
-                        Log.Write("Singleton mutex still held after 3s; exiting to avoid a second OBS ReplayKit instance.");
-                        return false;
-                    }
-                    Log.Write("Acquired singleton mutex after the prior helper released it.");
+                    Log.Write("Another helper owns the singleton; leaving that instance running.");
+                    return false;
                 }
                 return true;
             }
             catch (Exception ex)
             {
-                Log.Write("Singleton mutex setup failed: " + ex.Message + ". Continuing without singleton protection.");
-                return true;
+                throw new InvalidOperationException("Cannot establish exclusive helper ownership.", ex);
             }
         }
 
@@ -216,21 +200,6 @@ namespace ReplayKitHelper
             try { _singletonMutex.Close(); } catch (ObjectDisposedException) { }
         }
 
-        private static void TryPostShutdown(int port)
-        {
-            try
-            {
-                var req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/shutdown");
-                req.Method = "POST";
-                req.Timeout = 1500;
-                using (var resp = req.GetResponse()) { }
-            }
-            catch (WebException) { } catch (IOException) { }
-        }
-
-        // try to bind the listener. if another helper is already on the port (for example, a previous helper that
-        // did not see /shutdown), post /shutdown to it, wait briefly, then retry. this is what makes a script
-        // reload actually pick up new helper code instead of silently leaving the old one in place.
         private static TcpListener NewListener(int port)
         {
             try
@@ -246,77 +215,14 @@ namespace ReplayKitHelper
             catch (SocketException) { return null; }
         }
 
-        // finds the pid currently bound to the loopback port, if any -- used both to address the /shutdown
-        // post-mortem (so a wedged helper cannot keep us locked out) and to log who we were fighting with.
-        private static int GetPortListenerPid(int port)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "netstat.exe",
-                    Arguments = "-ano -p tcp",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                };
-                using (var proc = Process.Start(psi))
-                {
-                    var stdout = proc.StandardOutput.ReadToEndAsync();
-                    if (!proc.WaitForExit(3000))
-                    {
-                        try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
-                        return 0;
-                    }
-                    string output = stdout.GetAwaiter().GetResult();
-                    foreach (var line in output.Split('\n'))
-                    {
-                        var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length < 5) continue;
-                        if (!string.Equals(parts[0], "TCP", StringComparison.OrdinalIgnoreCase)) continue;
-                        if (!string.Equals(parts[3], "LISTENING", StringComparison.OrdinalIgnoreCase)) continue;
-                        int colonIdx = parts[1].LastIndexOf(':');
-                        if (colonIdx < 0 || !int.TryParse(parts[1].Substring(colonIdx + 1), out int localPort)) continue;
-                        if (localPort != port) continue;
-                        if (int.TryParse(parts[4], out int pid)) return pid;
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
-            {
-                Log.Write("Get-PortListenerPid: " + ex.Message);
-            }
-            return 0;
-        }
-
         private static TcpListener BindListener(int port)
         {
             var listener = NewListener(port);
-            if (listener != null) return listener;
-
-            int stalePid = GetPortListenerPid(port);
-            Log.Write("Port " + port + " busy (PID " + stalePid + ") -- asking the existing helper to shut down.");
-            TryPostShutdown(port);
-            for (int i = 0; i < 8 && listener == null; i++)
-            {
-                Thread.Sleep(250);
-                listener = NewListener(port);
-            }
-            if (listener == null && stalePid > 0 && stalePid != Process.GetCurrentProcess().Id)
-            {
-                // shutdown did not unstick it. force-kill the wedged listener -- we run under the same obs process tree, so we have rights to kill our predecessor.
-                Log.Write("Force-killing wedged helper PID " + stalePid + ".");
-                try { Process.GetProcessById(stalePid).Kill(); }
-                catch (Exception ex) { Log.Write("Stop-Process PID " + stalePid + " failed: " + ex.Message); }
-                for (int i = 0; i < 16 && listener == null; i++)
-                {
-                    Thread.Sleep(250);
-                    listener = NewListener(port);
-                }
-            }
-            if (listener != null) Log.Write("Took over port " + port + " from the previous helper (PID " + stalePid + ").");
+            if (listener == null) throw new IOException("Cannot bind 127.0.0.1:" + port + ". Close the application using that port, then restart ReplayKit.");
             return listener;
         }
+
+        private static readonly SemaphoreSlim ConnectionSlots = new SemaphoreSlim(Constants.MAX_CONNECTION_THREADS);
 
         // single-threaded accept loop; Pending() lets us cooperatively check the shutdown flag every ~50ms instead
         // of blocking in AcceptTcpClient forever. also runs the parent-process watchdog: with the user's
@@ -341,13 +247,17 @@ namespace ReplayKitHelper
                         continue;
                     }
                     var client = _listener.AcceptTcpClient();
-                    // hand the connection off to the thread pool instead of handling it inline -- this is the one line that makes the server multithreaded. Connection.HandleConnection already wraps its own body in try/catch/finally (logs handler errors, always closes the client), so nothing further is needed here to keep one bad connection from taking down the accept loop.
-                    Task.Run(() => Connection.HandleConnection(client));
+                    if (!ConnectionSlots.Wait(0)) { client.Close(); continue; }
+                    Task.Run(() =>
+                    {
+                        try { Connection.HandleConnection(client); }
+                        finally { ConnectionSlots.Release(); }
+                    });
                 }
             }
             catch (Exception ex)
             {
-                Log.Write("accept loop error: " + ex.Message);
+                throw new IOException("Helper accept loop failed.", ex);
             }
         }
 
@@ -508,6 +418,7 @@ namespace ReplayKitHelper
 
         private static void Shutdown()
         {
+            _crashSentinelTimer?.Dispose();
             try { PipeClient.Stop(); } catch { }
             try { AppConfig.StopClipFolderWatcher(); } catch (Exception ex) { Log.Write("StopClipFolderWatcher: " + ex.Message); }
             try { _listener?.Stop(); } catch (SocketException) { }

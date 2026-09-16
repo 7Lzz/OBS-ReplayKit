@@ -563,7 +563,9 @@
   *::-webkit-scrollbar-thumb:active { background-color: var(--white5); }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    /* `min(260px, 100%)` preserves the normal card target while letting the
+       non-virtualized favorites grid fit the same narrow popup as #grid. */
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
     gap: 14px;
     align-items: start;
     overflow-anchor: none;
@@ -578,6 +580,8 @@
     position: absolute;
     left: 0;
     top: 0;
+    min-width: 0;
+    max-width: 100%;
     width: var(--virtual-card-width, 260px);
     transform: translate3d(var(--virtual-card-x, 0px), var(--virtual-card-y, 0px), 0);
   }
@@ -3231,9 +3235,11 @@
   let pendingRenderOnTheaterExit = false;
   let pendingLoadedRenderAfterTheater = false;
   let pendingLoadedRenderAfterRename = false;
-  const GRID_MIN_COL_WIDTH = 260;
+  // 260px is the comfortable card size for multi-column layouts. A narrow
+  // popup still gets one card sized to its available content width; keeping a
+  // hard 260px floor there made the right edge disappear behind overflow-x.
+  const GRID_PREFERRED_COL_WIDTH = 260;
   const GRID_GAP = 14;
-  const GRID_SIDE_PADDING = 28;
   const MAX_RECYCLED_CARDS = 96;
   // rows of cards kept above/below the viewport -- in a maximized CEF popup each row can be 8-10 heavy cards, so keep overscan tight and rely on thumbnail predecode instead of rendering many hidden rows.
   const VIRTUAL_OVERSCAN_ROWS = 1;
@@ -3943,12 +3949,12 @@
   }
 
   function computeVirtualLayout() {
-    const width = Math.max(0, scrollAreaEl.clientWidth - GRID_SIDE_PADDING);
-    const columns = Math.max(1, Math.floor((width + GRID_GAP) / (GRID_MIN_COL_WIDTH + GRID_GAP)));
-    const cardWidth = Math.max(
-      GRID_MIN_COL_WIDTH,
-      Math.floor((width - GRID_GAP * (columns - 1)) / columns)
-    );
+    // gridEl already occupies the scroll area's content box, excluding its
+    // padding and scrollbar. Measuring it avoids a stale hard-coded padding
+    // assumption and guarantees the single column fits a narrow popup.
+    const width = Math.max(1, Math.floor(gridEl.getBoundingClientRect().width));
+    const columns = Math.max(1, Math.floor((width + GRID_GAP) / (GRID_PREFERRED_COL_WIDTH + GRID_GAP)));
+    const cardWidth = Math.max(1, Math.floor((width - GRID_GAP * (columns - 1)) / columns));
     return { columns, cardWidth };
   }
 

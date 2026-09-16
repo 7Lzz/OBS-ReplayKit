@@ -417,10 +417,13 @@ namespace ReplayKitHelper
         // clear the first-run flag once the wizard has written its choices through the normal /settings path.
         public static JObject SetSetupComplete()
         {
-            var settings = ReadSettings();
-            settings["setupWizardPending"] = false;
-            WriteSettings(settings);
-            return new JObject { ["ok"] = true };
+            lock (SettingsStore.Gate)
+            {
+                var settings = ReadSettings();
+                settings["setupWizardPending"] = false;
+                WriteSettings(settings);
+                return new JObject { ["ok"] = true };
+            }
         }
 
         // "default" / "custom" / a bundled preset id / "user/<name>" (an existing saved theme). unknown -> "default".
@@ -551,23 +554,29 @@ namespace ReplayKitHelper
         // read settings, set appIcon to id, persist, and push it live. used by /appearance/delete-icon when the removed icon was the active one.
         public static JObject SetAppIconAndApply(string id)
         {
-            var settings = Normalize(ReadSettings());
-            settings["appIcon"] = id;
-            settings = Normalize(settings);
-            WriteSettings(settings);
-            return ApplyAppIconLive(settings);
+            lock (SettingsStore.Gate)
+            {
+                var settings = Normalize(ReadSettings());
+                settings["appIcon"] = id;
+                settings = Normalize(settings);
+                WriteSettings(settings);
+                return ApplyAppIconLive(settings);
+            }
         }
 
         // set theme to id, persist, write the obs .ovt + user.ini. returns true (obs restart still needed to pick it up).
         // used by /appearance/delete-theme when the removed theme was the active one.
         public static bool SetThemeAndApply(string id)
         {
-            var settings = Normalize(ReadSettings());
-            settings["theme"] = id;
-            settings = Normalize(settings);
-            WriteSettings(settings);
-            try { Themes.ApplyToObs(settings); } catch (Exception ex) { Log.Write("SetThemeAndApply: " + ex.Message); }
-            return true;
+            lock (SettingsStore.Gate)
+            {
+                var settings = Normalize(ReadSettings());
+                settings["theme"] = id;
+                settings = Normalize(settings);
+                WriteSettings(settings);
+                try { Themes.ApplyToObs(settings); } catch (Exception ex) { Log.Write("SetThemeAndApply: " + ex.Message); }
+                return true;
+            }
         }
 
         // what a ReplayKit-branded surface (own windows, toasts, dock favicon) should use right now: the chosen custom/preset icon, or the bundled replaykit .ico when appIcon is "default".
@@ -632,10 +641,13 @@ namespace ReplayKitHelper
 
         public static void WriteSettings(JObject settings)
         {
-            string path = GetSettingsPath();
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            AppConfig.WriteUtf8(path, settings.ToString(Formatting.Indented));
-            SyncClipDirToRuntimeConfig(settings);
+            lock (SettingsStore.Gate)
+            {
+                string path = GetSettingsPath();
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                AppConfig.WriteUtf8(path, settings.ToString(Formatting.Indented));
+                SyncClipDirToRuntimeConfig(settings);
+            }
         }
 
         // the clip listing resolves its folder through AppConfig.GetClipDir, which reads the runtime helper_config -- that config only carries what the lua bootstrap wrote, so a folder chosen in ReplayKit Settings never reached it and the listing silently walked the default folder instead. mirror the saved value across on every write and at startup so Settings is the single source of truth.
@@ -3894,101 +3906,104 @@ namespace ReplayKitHelper
 
         public static JObject OverlayPreviewFromRequest(string body, string mode = "preview")
         {
-            if (mode == "cancel")
+            lock (SettingsStore.Gate)
             {
-                // read the snapshot under a brief lock, then release before RestoreOverlayPreviewLive does its own (possibly several) obs-websocket round trips -- a cancel and a fresh preview tick landing in the same tight window can still race on which baseline is "current", but holding the lock across the whole restore would block every other overlay-preview op for that entire duration, which is worse than this narrow, self-correcting edge case.
-                JObject previewSnapshot;
-                lock (Server.State.OverlayPreviewLock) { previewSnapshot = Server.State.ReplaykitOverlayPreviewState; }
-                var live = RestoreOverlayPreviewLive(previewSnapshot);
-                return new JObject
+                if (mode == "cancel")
                 {
-                    ["ok"] = true, ["settings"] = ReadSettings(), ["applied"] = live["applied"], ["warnings"] = live["warnings"],
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing overlay preview body.");
-            var incoming = JObject.Parse(body);
-            long? previewRevision = GetOverlayPreviewRevision(incoming);
-            if (incoming.Count < 1) throw new InvalidOperationException("Missing overlay preview setting.");
-            var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
-            foreach (var prop in incoming.Properties())
-            {
-                if (!allowedKeys.Contains(prop.Name)) throw new InvalidOperationException("Unknown overlay preview setting: " + prop.Name);
-            }
-            if (mode == "preview" && previewRevision != null)
-            {
-                // read-compare-write on the revision has to be one atomic op -- otherwise two preview ticks racing here could both pass the check and both think they own the latest revision.
-                bool stale = false;
-                lock (Server.State.OverlayPreviewLock)
-                {
-                    if (Server.State.ReplaykitOverlayPreviewRevision >= previewRevision.Value) stale = true;
-                    else Server.State.ReplaykitOverlayPreviewRevision = previewRevision.Value;
-                }
-                if (stale)
-                {
+                    // read the snapshot under a brief lock, then release before RestoreOverlayPreviewLive does its own (possibly several) obs-websocket round trips -- a cancel and a fresh preview tick landing in the same tight window can still race on which baseline is "current", but holding the lock across the whole restore would block every other overlay-preview op for that entire duration, which is worse than this narrow, self-correcting edge case.
+                    JObject previewSnapshot;
+                    lock (Server.State.OverlayPreviewLock) { previewSnapshot = Server.State.ReplaykitOverlayPreviewState; }
+                    var live = RestoreOverlayPreviewLive(previewSnapshot);
                     return new JObject
                     {
-                        ["ok"] = true, ["settings"] = Normalize(ReadSettings()), ["applied"] = new JArray(), ["warnings"] = new JArray(),
-                        ["skipped"] = true, ["restartRequired"] = false, ["restartReason"] = "",
+                        ["ok"] = true, ["settings"] = ReadSettings(), ["applied"] = live["applied"], ["warnings"] = live["warnings"],
+                        ["restartRequired"] = false, ["restartReason"] = "",
                     };
                 }
-            }
+                if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing overlay preview body.");
+                var incoming = JObject.Parse(body);
+                long? previewRevision = GetOverlayPreviewRevision(incoming);
+                if (incoming.Count < 1) throw new InvalidOperationException("Missing overlay preview setting.");
+                var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
+                foreach (var prop in incoming.Properties())
+                {
+                    if (!allowedKeys.Contains(prop.Name)) throw new InvalidOperationException("Unknown overlay preview setting: " + prop.Name);
+                }
+                if (mode == "preview" && previewRevision != null)
+                {
+                    // read-compare-write on the revision has to be one atomic op -- otherwise two preview ticks racing here could both pass the check and both think they own the latest revision.
+                    bool stale = false;
+                    lock (Server.State.OverlayPreviewLock)
+                    {
+                        if (Server.State.ReplaykitOverlayPreviewRevision >= previewRevision.Value) stale = true;
+                        else Server.State.ReplaykitOverlayPreviewRevision = previewRevision.Value;
+                    }
+                    if (stale)
+                    {
+                        return new JObject
+                        {
+                            ["ok"] = true, ["settings"] = Normalize(ReadSettings()), ["applied"] = new JArray(), ["warnings"] = new JArray(),
+                            ["skipped"] = true, ["restartRequired"] = false, ["restartReason"] = "",
+                        };
+                    }
+                }
 
-            var currentJ = ReadSettings();
-            var previous = Normalize(currentJ);
-            var preview = GetOverlayPreviewState(previous);
-            foreach (var prop in incoming.Properties()) currentJ[prop.Name] = prop.Value;
-            var settingsJ = Normalize(currentJ);
-            bool forceColorSync = TestOverlayColorRequest(incoming);
-            var previewSettings = preview["settings"] as JObject;
+                var currentJ = ReadSettings();
+                var previous = Normalize(currentJ);
+                var preview = GetOverlayPreviewState(previous);
+                foreach (var prop in incoming.Properties()) currentJ[prop.Name] = prop.Value;
+                var settingsJ = Normalize(currentJ);
+                bool forceColorSync = TestOverlayColorRequest(incoming);
+                var previewSettings = preview["settings"] as JObject;
 
-            if (mode == "commit")
-            {
-                WriteSettings(settingsJ);
-                var warnings = new List<string>();
-                var applied = new List<string>();
-                var geometryCommit = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
-                applied.AddRange((geometryCommit["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                warnings.AddRange((geometryCommit["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                bool colorChangedCommit = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
+                if (mode == "commit")
+                {
+                    WriteSettings(settingsJ);
+                    var warnings = new List<string>();
+                    var applied = new List<string>();
+                    var geometryCommit = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
+                    applied.AddRange((geometryCommit["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                    warnings.AddRange((geometryCommit["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                    bool colorChangedCommit = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
+                        previewSettings["overlayHueShift"]?.Value<double>() != settingsJ["overlayHueShift"]?.Value<double>() ||
+                        previewSettings["overlayColorMultiply"]?.Value<string>() != settingsJ["overlayColorMultiply"]?.Value<string>() ||
+                        previewSettings["overlayColorAdd"]?.Value<string>() != settingsJ["overlayColorAdd"]?.Value<string>();
+                    if (colorChangedCommit || forceColorSync)
+                    {
+                        var opacity = ApplyOverlayOpacityForStyleLive(settingsJ);
+                        applied.AddRange((opacity["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                        warnings.AddRange((opacity["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                    }
+                    ClearOverlayPreviewState();
+                    return new JObject
+                    {
+                        ["ok"] = warnings.Count == 0, ["settings"] = settingsJ, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+
+                var previewWarnings = new List<string>();
+                var previewApplied = new List<string>();
+                var geometryPreview = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
+                previewApplied.AddRange((geometryPreview["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                previewWarnings.AddRange((geometryPreview["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                bool colorChanged = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
                     previewSettings["overlayHueShift"]?.Value<double>() != settingsJ["overlayHueShift"]?.Value<double>() ||
                     previewSettings["overlayColorMultiply"]?.Value<string>() != settingsJ["overlayColorMultiply"]?.Value<string>() ||
                     previewSettings["overlayColorAdd"]?.Value<string>() != settingsJ["overlayColorAdd"]?.Value<string>();
-                if (colorChangedCommit || forceColorSync)
+                if (colorChanged || forceColorSync)
                 {
                     var opacity = ApplyOverlayOpacityForStyleLive(settingsJ);
-                    applied.AddRange((opacity["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                    warnings.AddRange((opacity["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                    previewApplied.AddRange((opacity["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                    previewWarnings.AddRange((opacity["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 }
-                ClearOverlayPreviewState();
+
                 return new JObject
                 {
-                    ["ok"] = warnings.Count == 0, ["settings"] = settingsJ, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings),
+                    ["ok"] = true, ["settings"] = settingsJ, ["applied"] = new JArray(previewApplied), ["warnings"] = new JArray(previewWarnings),
                     ["restartRequired"] = false, ["restartReason"] = "",
                 };
             }
-
-            var previewWarnings = new List<string>();
-            var previewApplied = new List<string>();
-            var geometryPreview = ApplyOverlayGeometryPreviewLive(preview, settingsJ);
-            previewApplied.AddRange((geometryPreview["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            previewWarnings.AddRange((geometryPreview["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            bool colorChanged = previewSettings["overlayOpacity"]?.Value<int>() != settingsJ["overlayOpacity"]?.Value<int>() ||
-                previewSettings["overlayHueShift"]?.Value<double>() != settingsJ["overlayHueShift"]?.Value<double>() ||
-                previewSettings["overlayColorMultiply"]?.Value<string>() != settingsJ["overlayColorMultiply"]?.Value<string>() ||
-                previewSettings["overlayColorAdd"]?.Value<string>() != settingsJ["overlayColorAdd"]?.Value<string>();
-            if (colorChanged || forceColorSync)
-            {
-                var opacity = ApplyOverlayOpacityForStyleLive(settingsJ);
-                previewApplied.AddRange((opacity["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                previewWarnings.AddRange((opacity["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            }
-
-            return new JObject
-            {
-                ["ok"] = true, ["settings"] = settingsJ, ["applied"] = new JArray(previewApplied), ["warnings"] = new JArray(previewWarnings),
-                ["restartRequired"] = false, ["restartReason"] = "",
-            };
         }
 
         // consumes a persisted preview baseline left by a session that died before commit or cancel -- once obs is answering again, push the pre-preview transforms + opacity filters back so an un-applied live preview cant survive into obss saved scene. runs before the http accept loop, so nothing can be mid-preview yet.
@@ -4496,50 +4511,53 @@ namespace ReplayKitHelper
 
         public static JObject SetSharePreviewEnabled(bool enabled)
         {
-            var previous = ReadSettings();
-            var settings = (JObject)previous.DeepClone();
-            settings["discord_output_mode"] = "projector";
-            settings["shareMode"] = "projector";
-            if (enabled && !TestDiscordScreenshareEnabled(settings))
+            lock (SettingsStore.Gate)
             {
-                settings["discord_projector_enabled"] = false;
+                var previous = ReadSettings();
+                var settings = (JObject)previous.DeepClone();
+                settings["discord_output_mode"] = "projector";
+                settings["shareMode"] = "projector";
+                if (enabled && !TestDiscordScreenshareEnabled(settings))
+                {
+                    settings["discord_projector_enabled"] = false;
+                    settings = Normalize(settings);
+                    WriteSettings(settings);
+                    var live = ApplyDiscordOutputLive(settings);
+                    var warnings = new JArray((live["warnings"] as JArray) ?? new JArray());
+                    warnings.Add("Discord screenshare support is disabled in Advanced settings.");
+                    return new JObject
+                    {
+                        ["ok"] = true, ["enabled"] = false, ["available"] = false, ["settings"] = settings,
+                        ["applied"] = live["applied"], ["warnings"] = warnings, ["message"] = "",
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                settings["discord_projector_enabled"] = enabled;
                 settings = Normalize(settings);
                 WriteSettings(settings);
-                var live = ApplyDiscordOutputLive(settings);
-                var warnings = new JArray((live["warnings"] as JArray) ?? new JArray());
-                warnings.Add("Discord screenshare support is disabled in Advanced settings.");
-                return new JObject
+                var liveResult = ApplyDiscordOutputLive(settings);
+                if (liveResult["ok"]?.Value<bool>() != true)
                 {
-                    ["ok"] = true, ["enabled"] = false, ["available"] = false, ["settings"] = settings,
-                    ["applied"] = live["applied"], ["warnings"] = warnings, ["message"] = "",
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            settings["discord_projector_enabled"] = enabled;
-            settings = Normalize(settings);
-            WriteSettings(settings);
-            var liveResult = ApplyDiscordOutputLive(settings);
-            if (liveResult["ok"]?.Value<bool>() != true)
-            {
-                var warnings = new JArray((liveResult["warnings"] as JArray) ?? new JArray());
-                warnings.Add(liveResult["message"]);
+                    var warnings = new JArray((liveResult["warnings"] as JArray) ?? new JArray());
+                    warnings.Add(liveResult["message"]);
+                    return new JObject
+                    {
+                        ["ok"] = true,
+                        ["enabled"] = TestDiscordScreenshareEnabled(settings) && (settings["discord_projector_enabled"]?.Value<bool>() ?? false),
+                        ["available"] = TestDiscordScreenshareEnabled(settings),
+                        ["settings"] = settings, ["applied"] = liveResult["applied"], ["warnings"] = warnings, ["message"] = "",
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
                 return new JObject
                 {
                     ["ok"] = true,
                     ["enabled"] = TestDiscordScreenshareEnabled(settings) && (settings["discord_projector_enabled"]?.Value<bool>() ?? false),
                     ["available"] = TestDiscordScreenshareEnabled(settings),
-                    ["settings"] = settings, ["applied"] = liveResult["applied"], ["warnings"] = warnings, ["message"] = "",
+                    ["settings"] = settings, ["applied"] = liveResult["applied"], ["warnings"] = liveResult["warnings"], ["message"] = "",
                     ["restartRequired"] = false, ["restartReason"] = "",
                 };
             }
-            return new JObject
-            {
-                ["ok"] = true,
-                ["enabled"] = TestDiscordScreenshareEnabled(settings) && (settings["discord_projector_enabled"]?.Value<bool>() ?? false),
-                ["available"] = TestDiscordScreenshareEnabled(settings),
-                ["settings"] = settings, ["applied"] = liveResult["applied"], ["warnings"] = liveResult["warnings"], ["message"] = "",
-                ["restartRequired"] = false, ["restartReason"] = "",
-            };
         }
 
         public static JObject GetSharePreviewState(bool repairMonitoring = false)
@@ -4997,82 +5015,85 @@ namespace ReplayKitHelper
 
         public static JObject GetSettingsPayload()
         {
-            AppConfig.LoadConfig();
-            var settings = ReadSettings();
-            settings = SyncHotkeysFromObs(settings);
-            settings = SyncReplayBufferSecondsFromObs(settings);
-            if (string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>()) && !string.IsNullOrWhiteSpace(Server.State.Config?["clipDir"]?.Value<string>()))
+            lock (SettingsStore.Gate)
             {
-                settings["clipDir"] = ResolveClipDirSetting(Server.State.Config["clipDir"]?.Value<string>());
-            }
-            var overlayOpacity = GetLiveOverlayOpacityPercent(settings);
-            if (overlayOpacity["ok"]?.Value<bool>() != true) overlayOpacity = GetSceneFileOverlayOpacityPercent(settings);
-            if (overlayOpacity["ok"]?.Value<bool>() == true && settings["overlayOpacity"]?.Value<int>() != overlayOpacity["opacity"]?.Value<int>())
-            {
-                settings["overlayOpacity"] = overlayOpacity["opacity"];
-                WriteSettings(settings);
-            }
-            return new JObject
-            {
-                ["ok"] = true,
-                ["settings"] = settings,
-                ["menuColors"] = ThemeMenuColors(settings),
-                // drives Install vs Uninstall on the Share Preview audio row in the Uninstall box
-                ["shareAudioInstalled"] = IsShareAudioDriverInstalled(),
-                ["options"] = new JObject
+                AppConfig.LoadConfig();
+                var settings = ReadSettings();
+                settings = SyncHotkeysFromObs(settings);
+                settings = SyncReplayBufferSecondsFromObs(settings);
+                if (string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>()) && !string.IsNullOrWhiteSpace(Server.State.Config?["clipDir"]?.Value<string>()))
                 {
-                    ["recordingPresets"] = new JArray(
-                        new JObject { ["value"] = "performance", ["label"] = "Performance", ["blurb"] = "720p30. Lowest load and smaller files." },
-                        new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "1080p60. Recommended for most PCs." },
-                        new JObject { ["value"] = "quality", ["label"] = "Quality", ["blurb"] = "Higher-quality target for high-end PCs." }
-                    ),
-                    ["compressionModes"] = new JArray(
-                        new JObject { ["value"] = "lower_gpu", ["label"] = "Lowest GPU use", ["blurb"] = "Least encoder work. Larger clips." },
-                        new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "Good file size with modest encoder load." },
-                        new JObject { ["value"] = "smaller_files", ["label"] = "Smallest clips", ["blurb"] = "More encoder work for tighter files." }
-                    ),
-                    ["codecs"] = new JArray(
-                        new JObject { ["value"] = "auto", ["label"] = "Auto", ["blurb"] = "ReplayKit picks the best supported encoder." },
-                        new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Largest files, broadest playback support." },
-                        new JObject { ["value"] = "h265", ["label"] = "HEVC", ["blurb"] = "Smaller files on modern GPUs." }
-                    ),
-                    ["recordingScaleModes"] = new JArray(
-                        new JObject { ["value"] = "native", ["label"] = "Native", ["blurb"] = "Record at your monitor's full resolution. Sharpest image, but more GPU load and bigger files." },
-                        new JObject { ["value"] = "downscale", ["label"] = "Downscale", ["blurb"] = "Shrink the recording to the size below. Lighter on the GPU and smaller files, slightly softer." }
-                    ),
-                    ["downscaleResolutions"] = BuildDownscaleResolutionList(),
-                    ["downscaleFilters"] = new JArray(
-                        new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = "Sharpest, 36-sample. Default." },
-                        new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = "16-sample, slightly softer than Lanczos." },
-                        new JObject { ["value"] = "area", ["label"] = "Area", ["blurb"] = "Clean average, no sharpening pass." },
-                        new JObject { ["value"] = "bilinear", ["label"] = "Bilinear", ["blurb"] = "Fastest, softest." }
-                    ),
-                    ["overlays"] = new JArray(
-                        new JObject { ["value"] = "input_overlay", ["label"] = "WASD / mouse", ["blurb"] = "Simple keyboard and mouse overlay." },
-                        new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
-                        new JObject { ["value"] = "off", ["label"] = "Off", ["blurb"] = "No input overlay in the OBS scene." }
-                    ),
-                    ["screenshareCaptureModes"] = new JArray(
-                        new JObject { ["value"] = "hybrid_auto", ["label"] = "Auto", ["blurb"] = "Desktop fallback with fullscreen Game Capture on top." },
-                        new JObject { ["value"] = "desktop", ["label"] = "Desktop", ["blurb"] = "Show the full ReplayKit desktop capture." },
-                        new JObject { ["value"] = "game_auto", ["label"] = "Game only", ["blurb"] = "Use OBS Game Capture for any fullscreen game." },
-                        new JObject { ["value"] = "game_window", ["label"] = "Specific game", ["blurb"] = "Use Window Capture for the selected game window." }
-                    ),
-                    ["screenshareGameWindows"] = new JArray(GetGameWindowCandidates(settings["screenshareGameWindow"]?.Value<string>() ?? "")),
-                    ["discordOutputModes"] = new JArray(
-                        new JObject { ["value"] = "projector", ["label"] = "Projector", ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
-                    ),
-                    ["keybinds"] = new JArray(
-                        new JObject { ["value"] = "f8", ["label"] = "F8", ["blurb"] = "Default ReplayKit save hotkey.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F8" } },
-                        new JObject { ["value"] = "shift_backslash", ["label"] = "Shift + \\", ["blurb"] = "The classic ReplayKit save hotkey.", ["combo"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" } },
-                        new JObject { ["value"] = "ctrl_shift_s", ["label"] = "Ctrl + Shift + S", ["blurb"] = "Easy to remember, uses two modifiers.", ["combo"] = new JObject { ["control"] = true, ["shift"] = true, ["key"] = "OBS_KEY_S" } },
-                        new JObject { ["value"] = "f9", ["label"] = "F9", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F9" } },
-                        new JObject { ["value"] = "f10", ["label"] = "F10", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F10" } }
-                    ),
-                },
-                // resolved default so the clip-dir field can show a real path (with the actual username) as its placeholder.
-                ["defaultClipDir"] = AppConfig.GetDefaultClipDir(),
-            };
+                    settings["clipDir"] = ResolveClipDirSetting(Server.State.Config["clipDir"]?.Value<string>());
+                }
+                var overlayOpacity = GetLiveOverlayOpacityPercent(settings);
+                if (overlayOpacity["ok"]?.Value<bool>() != true) overlayOpacity = GetSceneFileOverlayOpacityPercent(settings);
+                if (overlayOpacity["ok"]?.Value<bool>() == true && settings["overlayOpacity"]?.Value<int>() != overlayOpacity["opacity"]?.Value<int>())
+                {
+                    settings["overlayOpacity"] = overlayOpacity["opacity"];
+                    WriteSettings(settings);
+                }
+                return new JObject
+                {
+                    ["ok"] = true,
+                    ["settings"] = settings,
+                    ["menuColors"] = ThemeMenuColors(settings),
+                    // drives Install vs Uninstall on the Share Preview audio row in the Uninstall box
+                    ["shareAudioInstalled"] = IsShareAudioDriverInstalled(),
+                    ["options"] = new JObject
+                    {
+                        ["recordingPresets"] = new JArray(
+                            new JObject { ["value"] = "performance", ["label"] = "Performance", ["blurb"] = "720p30. Lowest load and smaller files." },
+                            new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "1080p60. Recommended for most PCs." },
+                            new JObject { ["value"] = "quality", ["label"] = "Quality", ["blurb"] = "Higher-quality target for high-end PCs." }
+                        ),
+                        ["compressionModes"] = new JArray(
+                            new JObject { ["value"] = "lower_gpu", ["label"] = "Lowest GPU use", ["blurb"] = "Least encoder work. Larger clips." },
+                            new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "Good file size with modest encoder load." },
+                            new JObject { ["value"] = "smaller_files", ["label"] = "Smallest clips", ["blurb"] = "More encoder work for tighter files." }
+                        ),
+                        ["codecs"] = new JArray(
+                            new JObject { ["value"] = "auto", ["label"] = "Auto", ["blurb"] = "ReplayKit picks the best supported encoder." },
+                            new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Largest files, broadest playback support." },
+                            new JObject { ["value"] = "h265", ["label"] = "HEVC", ["blurb"] = "Smaller files on modern GPUs." }
+                        ),
+                        ["recordingScaleModes"] = new JArray(
+                            new JObject { ["value"] = "native", ["label"] = "Native", ["blurb"] = "Record at your monitor's full resolution. Sharpest image, but more GPU load and bigger files." },
+                            new JObject { ["value"] = "downscale", ["label"] = "Downscale", ["blurb"] = "Shrink the recording to the size below. Lighter on the GPU and smaller files, slightly softer." }
+                        ),
+                        ["downscaleResolutions"] = BuildDownscaleResolutionList(),
+                        ["downscaleFilters"] = new JArray(
+                            new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = "Sharpest, 36-sample. Default." },
+                            new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = "16-sample, slightly softer than Lanczos." },
+                            new JObject { ["value"] = "area", ["label"] = "Area", ["blurb"] = "Clean average, no sharpening pass." },
+                            new JObject { ["value"] = "bilinear", ["label"] = "Bilinear", ["blurb"] = "Fastest, softest." }
+                        ),
+                        ["overlays"] = new JArray(
+                            new JObject { ["value"] = "input_overlay", ["label"] = "WASD / mouse", ["blurb"] = "Simple keyboard and mouse overlay." },
+                            new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
+                            new JObject { ["value"] = "off", ["label"] = "Off", ["blurb"] = "No input overlay in the OBS scene." }
+                        ),
+                        ["screenshareCaptureModes"] = new JArray(
+                            new JObject { ["value"] = "hybrid_auto", ["label"] = "Auto", ["blurb"] = "Desktop fallback with fullscreen Game Capture on top." },
+                            new JObject { ["value"] = "desktop", ["label"] = "Desktop", ["blurb"] = "Show the full ReplayKit desktop capture." },
+                            new JObject { ["value"] = "game_auto", ["label"] = "Game only", ["blurb"] = "Use OBS Game Capture for any fullscreen game." },
+                            new JObject { ["value"] = "game_window", ["label"] = "Specific game", ["blurb"] = "Use Window Capture for the selected game window." }
+                        ),
+                        ["screenshareGameWindows"] = new JArray(GetGameWindowCandidates(settings["screenshareGameWindow"]?.Value<string>() ?? "")),
+                        ["discordOutputModes"] = new JArray(
+                            new JObject { ["value"] = "projector", ["label"] = "Projector", ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
+                        ),
+                        ["keybinds"] = new JArray(
+                            new JObject { ["value"] = "f8", ["label"] = "F8", ["blurb"] = "Default ReplayKit save hotkey.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F8" } },
+                            new JObject { ["value"] = "shift_backslash", ["label"] = "Shift + \\", ["blurb"] = "The classic ReplayKit save hotkey.", ["combo"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" } },
+                            new JObject { ["value"] = "ctrl_shift_s", ["label"] = "Ctrl + Shift + S", ["blurb"] = "Easy to remember, uses two modifiers.", ["combo"] = new JObject { ["control"] = true, ["shift"] = true, ["key"] = "OBS_KEY_S" } },
+                            new JObject { ["value"] = "f9", ["label"] = "F9", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F9" } },
+                            new JObject { ["value"] = "f10", ["label"] = "F10", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F10" } }
+                        ),
+                    },
+                    // resolved default so the clip-dir field can show a real path (with the actual username) as its placeholder.
+                    ["defaultClipDir"] = AppConfig.GetDefaultClipDir(),
+                };
+            }
         }
 
         private static bool TestRestartRequired(JObject previous, JObject settings)
@@ -5322,35 +5343,57 @@ namespace ReplayKitHelper
         // preserved as-is rather than wired up, since it is not clear whether that is a latent bug or deliberate.
         public static JObject SaveSettingsFromRequest(string body, bool restartRequested = false)
         {
-            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing settings body.");
-            var incoming = JObject.Parse(body);
-            var current = ReadSettings();
-            var previous = Normalize(current);
-            foreach (var prop in incoming.Properties())
+            lock (SettingsStore.Gate)
             {
-                if (current[prop.Name] == null) throw new InvalidOperationException("Unknown setting: " + prop.Name);
-                current[prop.Name] = prop.Value;
-            }
-            var settings = Normalize(current);
-            // a fresh "custom" pick -> convert + file it as a saved preset, then carry on as if the user had selected that preset. subsequent saves send the "user/..." id directly and skip this.
-            if ((settings["appIcon"]?.Value<string>() ?? "") == "custom")
-            {
-                string imported = ImportCustomIcon(settings["appIconCustomPath"]?.Value<string>() ?? "");
-                if (imported != null)
+                if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing settings body.");
+                var incoming = JObject.Parse(body);
+                var current = ReadSettings();
+                var previous = Normalize(current);
+                foreach (var prop in incoming.Properties())
                 {
-                    settings["appIcon"] = imported;
-                    settings["appIconCustomPath"] = "";
-                    settings = Normalize(settings);
+                    if (current[prop.Name] == null) throw new InvalidOperationException("Unknown setting: " + prop.Name);
+                    current[prop.Name] = prop.Value;
                 }
-            }
-            // takes effect on this already-running helper the moment settings are saved, not just after the next reload -- Log.Write gates on this flag on every call, so flipping it here is what actually lets someone enable logging, reproduce a bug, and have it show up without restarting obs.
-            Server.State.LogEnabled = settings["debugLoggingEnabled"]?.Value<bool>() ?? false;
-            var hotkeyRelease = EnsureHotkeyCaptureReleased(settings);
-            if (!TestIncomingSettingsChanged(incoming, previous, settings))
-            {
-                if (TestOverlayColorRequest(incoming))
+                var settings = Normalize(current);
+                // a fresh "custom" pick -> convert + file it as a saved preset, then carry on as if the user had selected that preset. subsequent saves send the "user/..." id directly and skip this.
+                if ((settings["appIcon"]?.Value<string>() ?? "") == "custom")
                 {
-                    var live = ApplyOverlayOpacityForStyleLive(settings);
+                    string imported = ImportCustomIcon(settings["appIconCustomPath"]?.Value<string>() ?? "");
+                    if (imported != null)
+                    {
+                        settings["appIcon"] = imported;
+                        settings["appIconCustomPath"] = "";
+                        settings = Normalize(settings);
+                    }
+                }
+                // takes effect on this already-running helper the moment settings are saved, not just after the next reload -- Log.Write gates on this flag on every call, so flipping it here is what actually lets someone enable logging, reproduce a bug, and have it show up without restarting obs.
+                Server.State.LogEnabled = settings["debugLoggingEnabled"]?.Value<bool>() ?? false;
+                var hotkeyRelease = EnsureHotkeyCaptureReleased(settings);
+                if (!TestIncomingSettingsChanged(incoming, previous, settings))
+                {
+                    if (TestOverlayColorRequest(incoming))
+                    {
+                        var live = ApplyOverlayOpacityForStyleLive(settings);
+                        return new JObject
+                        {
+                            ["ok"] = true, ["settings"] = settings,
+                            ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                            ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                            ["restartRequired"] = false, ["restartReason"] = "",
+                        };
+                    }
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = hotkeyRelease["applied"], ["warnings"] = hotkeyRelease["warnings"],
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestScreenshareCaptureOnlyRequest(incoming))
+                {
+                    WriteSettings(settings);
+                    var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
+                    var live = ApplyScreenshareCaptureLive(settings, preset);
                     return new JObject
                     {
                         ["ok"] = true, ["settings"] = settings,
@@ -5359,142 +5402,123 @@ namespace ReplayKitHelper
                         ["restartRequired"] = false, ["restartReason"] = "",
                     };
                 }
-                return new JObject
+                if (TestDiscordOutputOnlyRequest(incoming))
                 {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = hotkeyRelease["applied"], ["warnings"] = hotkeyRelease["warnings"],
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestScreenshareCaptureOnlyRequest(incoming))
-            {
-                WriteSettings(settings);
-                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
-                var live = ApplyScreenshareCaptureLive(settings, preset);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestDiscordOutputOnlyRequest(incoming))
-            {
-                var live = ApplyDiscordOutputLive(settings);
-                if (live["ok"]?.Value<bool>() != true)
-                {
+                    var live = ApplyDiscordOutputLive(settings);
+                    if (live["ok"]?.Value<bool>() != true)
+                    {
+                        return new JObject
+                        {
+                            ["ok"] = false, ["settings"] = previous, ["applied"] = live["applied"], ["warnings"] = live["warnings"],
+                            ["message"] = live["message"], ["restartRequired"] = false, ["restartReason"] = "",
+                        };
+                    }
+                    WriteSettings(settings);
                     return new JObject
                     {
-                        ["ok"] = false, ["settings"] = previous, ["applied"] = live["applied"], ["warnings"] = live["warnings"],
-                        ["message"] = live["message"], ["restartRequired"] = false, ["restartReason"] = "",
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
                     };
                 }
                 WriteSettings(settings);
+                if (TestOnlySleepOverrideChanged(previous, settings))
+                {
+                    var live = ApplySleepOverrideSetting(settings["allowSleepWhileActive"]?.Value<bool>() ?? false);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyMotionBlurChanged(previous, settings))
+                {
+                    var live = ApplyMotionBlurLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyOverlayVisualChanged(previous, settings))
+                {
+                    var live = ApplyOverlayVisualSettingsLive(previous, settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyScreenshareCaptureChanged(previous, settings))
+                {
+                    var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
+                    var live = ApplyScreenshareCaptureLive(settings, preset);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyAppIconChanged(previous, settings))
+                {
+                    var live = ApplyAppIconLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                // theme change -> write the obs .ovt variant + user.ini key now, before ApplyLiveSettings restarts obs to pick it up.
+                string nextTheme = settings["theme"]?.ToString() ?? "default";
+                if (previous["theme"]?.ToString() != nextTheme ||
+                    ((nextTheme == "custom" || nextTheme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])))
+                {
+                    Themes.ApplyToObs(settings);
+                }
+                bool overlayStyleChanged = previous["overlayStyle"]?.Value<string>() != settings["overlayStyle"]?.Value<string>();
+                bool overlayGeometryChanged = !JToken.DeepEquals(previous["overlayPosition"], settings["overlayPosition"]) ||
+                    previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||
+                    previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
+                    previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
+                    previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
+                    previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
+                    previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
+                    previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();
+                bool motionBlurChanged = previous["motionBlurEnabled"]?.Value<bool>() != settings["motionBlurEnabled"]?.Value<bool>() ||
+                    previous["motionBlurStrength"]?.Value<double>() != settings["motionBlurStrength"]?.Value<double>();
+                bool applyOverlay = overlayStyleChanged || overlayGeometryChanged;
+                bool recreateBongo = overlayStyleChanged && settings["overlayStyle"]?.Value<string>() == "bongo_cat";
+                bool restartObs = TestRestartRequired(previous, settings);
+                bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
+                bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
+                bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput);
+                if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
+                    previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
+                    previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())
+                {
+                    var iconLive = ApplyAppIconLive(settings);
+                    liveResult["applied"] = ConcatArrays(liveResult["applied"] as JArray, iconLive["applied"] as JArray);
+                }
                 return new JObject
                 {
                     ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
+                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, liveResult["applied"] as JArray),
+                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, liveResult["warnings"] as JArray),
+                    ["restartRequired"] = liveResult["restartRequired"], ["restartReason"] = liveResult["restartReason"],
                 };
             }
-            WriteSettings(settings);
-            if (TestOnlySleepOverrideChanged(previous, settings))
-            {
-                var live = ApplySleepOverrideSetting(settings["allowSleepWhileActive"]?.Value<bool>() ?? false);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestOnlyMotionBlurChanged(previous, settings))
-            {
-                var live = ApplyMotionBlurLive(settings);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestOnlyOverlayVisualChanged(previous, settings))
-            {
-                var live = ApplyOverlayVisualSettingsLive(previous, settings);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestOnlyScreenshareCaptureChanged(previous, settings))
-            {
-                var preset = GetPresetSpec(settings["recordingPreset"]?.Value<string>() ?? "", settings);
-                var live = ApplyScreenshareCaptureLive(settings, preset);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            if (TestOnlyAppIconChanged(previous, settings))
-            {
-                var live = ApplyAppIconLive(settings);
-                return new JObject
-                {
-                    ["ok"] = true, ["settings"] = settings,
-                    ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
-                    ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
-                    ["restartRequired"] = false, ["restartReason"] = "",
-                };
-            }
-            // theme change -> write the obs .ovt variant + user.ini key now, before ApplyLiveSettings restarts obs to pick it up.
-            string nextTheme = settings["theme"]?.ToString() ?? "default";
-            if (previous["theme"]?.ToString() != nextTheme ||
-                ((nextTheme == "custom" || nextTheme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])))
-            {
-                Themes.ApplyToObs(settings);
-            }
-            bool overlayStyleChanged = previous["overlayStyle"]?.Value<string>() != settings["overlayStyle"]?.Value<string>();
-            bool overlayGeometryChanged = !JToken.DeepEquals(previous["overlayPosition"], settings["overlayPosition"]) ||
-                previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||
-                previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
-                previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
-                previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
-                previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
-                previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
-                previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();
-            bool motionBlurChanged = previous["motionBlurEnabled"]?.Value<bool>() != settings["motionBlurEnabled"]?.Value<bool>() ||
-                previous["motionBlurStrength"]?.Value<double>() != settings["motionBlurStrength"]?.Value<double>();
-            bool applyOverlay = overlayStyleChanged || overlayGeometryChanged;
-            bool recreateBongo = overlayStyleChanged && settings["overlayStyle"]?.Value<string>() == "bongo_cat";
-            bool restartObs = TestRestartRequired(previous, settings);
-            bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
-            bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
-            bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
-            var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput);
-            if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
-                previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
-                previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())
-            {
-                var iconLive = ApplyAppIconLive(settings);
-                liveResult["applied"] = ConcatArrays(liveResult["applied"] as JArray, iconLive["applied"] as JArray);
-            }
-            return new JObject
-            {
-                ["ok"] = true, ["settings"] = settings,
-                ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, liveResult["applied"] as JArray),
-                ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, liveResult["warnings"] as JArray),
-                ["restartRequired"] = liveResult["restartRequired"], ["restartReason"] = liveResult["restartReason"],
-            };
         }
 
     }

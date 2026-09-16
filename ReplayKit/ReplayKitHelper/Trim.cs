@@ -50,7 +50,7 @@ namespace ReplayKitHelper
                         if (long.TryParse(raw, out long value) && value > 0) return value;
                     }
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
                 {
                     Log.Write("Get-VideoBitratePerSec ffprobe failed: " + ex.Message);
                 }
@@ -220,12 +220,18 @@ namespace ReplayKitHelper
 
             var source = Clips.GetSafeClipPath(sourceName);
             if (source == null || !File.Exists(source.Full)) return new TrimResult { Ok = false, Message = "Source clip not found" };
+            string requestId = UploadState.NewRequestId();
+            using var reservation = JobCoordinator.TryReserve(requestId, source.Name, source.Full, "trim", out string busy);
+            if (reservation == null) return new TrimResult { Ok = false, Message = busy };
+            var token = JobCoordinator.Token(requestId);
+
 
             string ffmpeg = Compression.GetHelperCapabilities()["ffmpeg"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "ffmpeg.exe not found in clip folder" };
 
             string ext = Path.GetExtension(source.Name);
             // for overwrite mode, snapshot the sources filesystem timestamps now (before the atomic replace destroys them) so they can be restored after the encode -- same rationale as the compress-overwrite path: keeps the clip in its original sort position rather than jumping to the top of the dock list every time its trimmed.
+            long originalSize = 0;
             DateTime? origLastWriteUtc = null;
             DateTime? origCreationUtc = null;
             if (overwrite)
@@ -235,6 +241,7 @@ namespace ReplayKitHelper
                     var srcInfo = new FileInfo(source.Full);
                     if (srcInfo.Exists)
                     {
+                        originalSize = srcInfo.Length;
                         origLastWriteUtc = srcInfo.LastWriteTimeUtc;
                         origCreationUtc = srcInfo.CreationTimeUtc;
                     }
@@ -297,7 +304,7 @@ namespace ReplayKitHelper
             Log.Write("Trim (" + mode + ", precise=" + precise + ", removeAudio=" + removeAudio + "): " + ffmpeg + " " + string.Join(" ", argv));
             try
             {
-                var result = Compression.InvokeNativeCapture(ffmpeg, argv);
+                var result = Compression.InvokeNativeCapture(ffmpeg, argv, token, 2 * 60 * 60 * 1000);
                 if (result.ExitCode != 0)
                 {
                     string combined = string.Join("\n", result.Output);
@@ -306,13 +313,13 @@ namespace ReplayKitHelper
                     return new TrimResult { Ok = false, Message = "ffmpeg trim failed (exit=" + result.ExitCode + "): " + msg };
                 }
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
             {
                 try { if (File.Exists(outPath)) File.Delete(outPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
                 return new TrimResult { Ok = false, Message = "Trim failed: " + ex.Message };
             }
 
-            if (!File.Exists(outPath)) return new TrimResult { Ok = false, Message = "ffmpeg reported success but the output file is missing" };
+            if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = "ffmpeg reported success but the output file is missing or empty" };
 
             if (!overwrite)
             {
@@ -324,7 +331,7 @@ namespace ReplayKitHelper
                         return new TrimResult { Ok = false, Message = "A clip with that output name already exists" };
                     }
                     // plain File.Move, not an atomic replace -- a new output name colliding with an existing file is a genuine error above, not a case to silently overwrite.
-                    File.Move(tempPath, finalPath);
+                    JobCoordinator.Commit(requestId, () => File.Move(tempPath, finalPath));
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
@@ -337,21 +344,10 @@ namespace ReplayKitHelper
                 // same-volume move is an atomic rename; across volumes its copy-then-delete, which can corrupt the destination on crash. detect and route thru a sidecar on the sources volume when needed, so the final replace is always atomic.
                 try
                 {
-                    string sourceVol = Path.GetPathRoot(source.Full);
-                    string tempVol = Path.GetPathRoot(tempPath);
-                    if (string.Equals(sourceVol, tempVol, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Native.MoveFileReplace(tempPath, source.Full);
-                    }
-                    else
-                    {
-                        string sideTemp = Path.Combine(Path.GetDirectoryName(source.Full), "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + ext);
-                        File.Copy(tempPath, sideTemp, true);
-                        Native.MoveFileReplace(sideTemp, source.Full);
-                        try { File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    }
+                    ClipFiles.Replace(requestId, tempPath, source.Full, originalSize, origLastWriteUtc.GetValueOrDefault());
+                    try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
                 {
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
                     return new TrimResult { Ok = false, Message = "Could not replace original: " + ex.Message };

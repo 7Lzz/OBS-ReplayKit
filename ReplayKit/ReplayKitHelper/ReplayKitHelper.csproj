@@ -22,8 +22,8 @@
     <Copyright>Copyright (c) OBS ReplayKit contributors</Copyright>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
@@ -46,7 +46,7 @@
       <PublishedAssemblies Include="$(PublishDir)$(TargetName)$(TargetExt)" />
       <PublishedAssemblies Include="$(PublishDir)Newtonsoft.Json.dll;$(PublishDir)Microsoft.Web.WebView2.Core.dll;$(PublishDir)Microsoft.Web.WebView2.WinForms.dll" />
     </ItemGroup>
-    <ILRepack Parallel="true" DebugInfo="false" AllowDuplicateResources="false"
+    <ILRepack Parallel="true" DebugInfo="true" AllowDuplicateResources="false"
               InputAssemblies="@(PublishedAssemblies)" TargetKind="SameAsPrimaryAssembly"
               OutputFile="$(PublishDir)$(TargetName)$(TargetExt)" />
     <Delete Files="$(PublishDir)Newtonsoft.Json.dll;$(PublishDir)Microsoft.Web.WebView2.Core.dll;$(PublishDir)Microsoft.Web.WebView2.WinForms.dll;$(PublishDir)Microsoft.Web.WebView2.Wpf.dll;$(PublishDir)$(TargetName)$(TargetExt).config" />

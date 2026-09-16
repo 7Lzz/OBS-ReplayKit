@@ -210,40 +210,35 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
-        // 480x270 jpeg (quality 86) via the shell's registered thumbnail codec, letterboxed on black. wrapped in an 8s timeout since damaged files have taken 13+s and would otherwise freeze the single accept thread.
+        // 480x270 jpeg (quality 86) via the shell's registered thumbnail codec, letterboxed on black. the caller owns the bounded task and its wait deadline.
         public static void SaveThumbnail(string src, string dst)
         {
-            var task = Task.Run(() =>
+            Guid iid = IID_IShellItemImageFactory;
+            SHCreateItemFromParsingName(src, IntPtr.Zero, ref iid, out IShellItemImageFactory factory);
+            IntPtr hbmp = IntPtr.Zero;
+            try
             {
-                Guid iid = IID_IShellItemImageFactory;
-                SHCreateItemFromParsingName(src, IntPtr.Zero, ref iid, out IShellItemImageFactory factory);
-                IntPtr hbmp = IntPtr.Zero;
-                try
+                factory.GetImage(new SIZE { cx = 480, cy = 270 }, SIIGBF_BIGGERSIZEOK, out hbmp);
+                using (var src2 = Image.FromHbitmap(hbmp))
+                using (var canvas = new Bitmap(480, 270))
+                using (var g = Graphics.FromImage(canvas))
                 {
-                    factory.GetImage(new SIZE { cx = 480, cy = 270 }, SIIGBF_BIGGERSIZEOK, out hbmp);
-                    using (var src2 = Image.FromHbitmap(hbmp))
-                    using (var canvas = new Bitmap(480, 270))
-                    using (var g = Graphics.FromImage(canvas))
-                    {
-                        g.Clear(Color.Black);
-                        double scale = Math.Min(480.0 / src2.Width, 270.0 / src2.Height);
-                        int w = Math.Max(1, (int)Math.Round(src2.Width * scale));
-                        int h = Math.Max(1, (int)Math.Round(src2.Height * scale));
-                        g.DrawImage(src2, (480 - w) / 2, (270 - h) / 2, w, h);
-                        var jpegCodec = Array.Find(ImageCodecInfo.GetImageEncoders(), c => c.FormatID == ImageFormat.Jpeg.Guid);
-                        var eps = new EncoderParameters(1);
-                        eps.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 86L);
-                        canvas.Save(dst, jpegCodec, eps);
-                    }
+                    g.Clear(Color.Black);
+                    double scale = Math.Min(480.0 / src2.Width, 270.0 / src2.Height);
+                    int w = Math.Max(1, (int)Math.Round(src2.Width * scale));
+                    int h = Math.Max(1, (int)Math.Round(src2.Height * scale));
+                    g.DrawImage(src2, (480 - w) / 2, (270 - h) / 2, w, h);
+                    var jpegCodec = Array.Find(ImageCodecInfo.GetImageEncoders(), c => c.FormatID == ImageFormat.Jpeg.Guid);
+                    using var eps = new EncoderParameters(1);
+                    eps.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 86L);
+                    canvas.Save(dst, jpegCodec, eps);
                 }
-                finally
-                {
-                    if (hbmp != IntPtr.Zero) DeleteObject(hbmp);
-                    Marshal.ReleaseComObject(factory);
-                }
-            });
-            if (!task.Wait(8000)) throw new TimeoutException("SaveThumbnail timed out after 8s: " + src);
-            if (task.IsFaulted && task.Exception != null) throw task.Exception.InnerException ?? task.Exception;
+            }
+            finally
+            {
+                if (hbmp != IntPtr.Zero) DeleteObject(hbmp);
+                Marshal.ReleaseComObject(factory);
+            }
         }
 
         // enumwindows + exact/prefix/suffix (ordinalignorecase) title match, scoped to obs-family windows when requireOwnerPid != 0. returns count closed.

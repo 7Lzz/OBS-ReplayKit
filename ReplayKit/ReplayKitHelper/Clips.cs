@@ -65,7 +65,7 @@ namespace ReplayKitHelper
             lock (Server.State.ClipsMetaLock)
             {
                 string sig = GetClipsDbCacheSignature();
-                if (Server.State.ClipsDbCache != null && Server.State.ClipsDbCacheSig == sig) return Server.State.ClipsDbCache;
+                if (Server.State.ClipsDbCache != null && Server.State.ClipsDbCacheSig == sig) return (JObject)Server.State.ClipsDbCache.DeepClone();
 
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 var db = new JObject();
@@ -136,27 +136,28 @@ namespace ReplayKitHelper
                 }
                 Server.State.ClipsDbCache = db;
                 Server.State.ClipsDbCacheSig = sig;
-                return db;
+                return (JObject)db.DeepClone();
             }
         }
 
-        public static void SaveClipsDb(JObject db)
+        public static bool UpdateDb(Func<JObject, bool> change)
         {
             lock (Server.State.ClipsMetaLock)
             {
-                AppConfig.WriteUtf8(AppConfig.GetDbPath(), db.ToString(Formatting.Indented));
-                Server.State.ClipsDbCache = db;
-                Server.State.ClipsDbCacheSig = GetClipsDbCacheSignature();
+                bool result = ClipStore.Update(AppConfig.GetDbPath(), change);
+                Server.State.ClipsDbCache = null;
+                Server.State.ClipsDbCacheSig = "";
+                AppConfig.ClearClipsCache();
+                return result;
             }
         }
 
         // shortcode/ready/transcodeStatus/transcodePercent are optional so the upload watcher can stamp the initial "streamable is still processing this" state in the same write that records the url -- the ps original had two separate code paths for this (Mark-Uploaded here, plus a second inline reimplementation in Start-UploadResultWatcher that forgot to preserve the cmp_* fields below); consolidating onto this one, correct path is a real fix, not just a style choice.
         public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null)
         {
-            // holds the lock across the whole read-mutate-save so a concurrent MarkUploaded/MarkCompressed cant interleave between the read and the save -- ReadClipsDb/SaveClipsDb re-enter the same lock internally, which is safe since a c# lock is reentrant per-thread.
-            lock (Server.State.ClipsMetaLock)
+            // UpdateDb coordinates this mutation with detached pollers as well as helper requests.
+            UpdateDb(db =>
             {
-                var db = ReadClipsDb();
                 // tag entries with the retention that applied at upload time so filtering doesnt change retroactively when signing in/out later. anonymous uploads stay short-retention even after signing in.
                 var entry = new JObject
                 {
@@ -178,9 +179,9 @@ namespace ReplayKitHelper
                     if (prev["cmp_ver"] != null) entry["cmp_ver"] = prev["cmp_ver"].Value<int>();
                 }
                 db[name] = entry;
-                SaveClipsDb(db);
-                AppConfig.ClearClipsCache();
-            }
+
+                return true;
+            });
         }
 
         // called once the compress-overwrite encode + atomic replace succeeds. stores the new mode + the freshly-written files mtime as the cache key, plus the timestamp + pre-compress size for ui purposes, so later /clips polls dont need to re-probe the file.
@@ -188,9 +189,8 @@ namespace ReplayKitHelper
         {
             if (string.IsNullOrWhiteSpace(name)) return;
             if (mode != "fast" && mode != "slow") return;
-            lock (Server.State.ClipsMetaLock)
+            UpdateDb(db =>
             {
-                var db = ReadClipsDb();
                 var entry = db[name] as JObject ?? new JObject();
                 entry["cmp_mode"] = mode;
                 entry["cmp_mtime"] = mtimeTicks;
@@ -199,27 +199,25 @@ namespace ReplayKitHelper
                 // cmp_ver = 2 -- written by the v2 (dynamic encoder / size-guarded) compress pipeline. a cache hit is refused without this field, which forces v1-era entries to re-probe their mp4 atom.
                 entry["cmp_ver"] = 2;
                 db[name] = entry;
-                SaveClipsDb(db);
-                AppConfig.ClearClipsCache();
-            }
+
+                return true;
+            });
         }
 
         // drop the streamable link + its transcode state from a clips_db entry (the "remove link" action on a failed / unwanted upload). keeps the cmp_* compress-history fields; removes the whole entry if nothing else was on it. returns false when there was no entry to touch.
         public static bool RemoveLink(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return false;
-            lock (Server.State.ClipsMetaLock)
+            return UpdateDb(db =>
             {
-                var db = ReadClipsDb();
                 if (!(db[name] is JObject entry)) return false;
                 foreach (var k in new[] { "url", "uploaded_at", "retention_days", "shortcode", "ready", "transcode_status", "transcode_percent", "failed", "transcode_error" })
                     entry.Remove(k);
                 if (entry.Count > 0) db[name] = entry;
                 else db.Remove(name);
-                SaveClipsDb(db);
-                AppConfig.ClearClipsCache();
+
                 return true;
-            }
+            });
         }
 
         // copy a clip file to "<name> (copy).<ext>" (or " (copy 2)", " (copy 3)" ...) in the same folder, keeping the source mtime so it sorts right next to the original. the copy starts fresh -- no clips_db entry is carried over, so it has no link / favorite / compress marker.
@@ -234,7 +232,10 @@ namespace ReplayKitHelper
                 string ext = Path.GetExtension(src.Full);
                 string dest = Path.Combine(dir, baseName + " (copy)" + ext);
                 for (int i = 2; File.Exists(dest); i++) dest = Path.Combine(dir, baseName + " (copy " + i + ")" + ext);
-                File.Copy(src.Full, dest);
+                string requestId = UploadState.NewRequestId();
+                using var reservation = JobCoordinator.TryReserve(requestId, src.Name, src.Full, "duplicate", out string busy, dest);
+                if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
+                JobCoordinator.Commit(requestId, () => File.Copy(src.Full, dest));
                 try { File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(src.Full)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 AppConfig.ClearClipsCache();
@@ -672,40 +673,67 @@ namespace ReplayKitHelper
             return sorted;
         }
 
-        public static List<JObject> GetClipsList()
+        private sealed class Snapshot
         {
-            DateTime now = DateTime.UtcNow;
-            string root = AppConfig.GetClipDir();
-            string sig = GetClipsCacheSignature(root);
-            if (Server.State.ClipsCacheBody != null && Server.State.ClipsCacheSig == sig &&
-                (now - Server.State.ClipsCacheAt).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS)
+            internal readonly List<JObject> Body;
+            internal readonly string Json, Signature, Version;
+            internal readonly DateTime Created = DateTime.UtcNow;
+            internal readonly int Linked;
+            private readonly Dictionary<string, List<JObject>> sorted = new Dictionary<string, List<JObject>>();
+
+            internal Snapshot(List<JObject> body, string signature)
             {
-                return Server.State.ClipsCacheBody;
+                Body = body;
+                Signature = signature;
+                Version = Guid.NewGuid().ToString("N");
+                Json = JsonConvert.SerializeObject(body, Formatting.None);
+                Linked = body.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
             }
-            var body = GetClipsListUncached();
-            // the fields below are meant to be seen together as one cache "generation" -- lock the writes so a concurrent fast-path reader (deliberately lock-free above since its the hot per-poll path) never sees, say, a fresh body paired with a stale sig.
-            lock (Server.State.ClipsMetaLock)
+
+            internal List<JObject> Sorted(string sort)
             {
-                Server.State.ClipsCacheBody = body;
-                string json = JsonConvert.SerializeObject(body, Formatting.None);
-                Server.State.ClipsCacheJson = string.IsNullOrWhiteSpace(json) ? "[]" : json;
-                Server.State.ClipsCacheSig = sig;
-                Server.State.ClipsCacheVersion = sig;
-                Server.State.ClipsCacheAt = now;
+                lock (sorted)
+                {
+                    if (!sorted.TryGetValue(sort, out var result)) sorted[sort] = result = SortClipsForPage(Body, sort);
+                    return result;
+                }
             }
-            return body;
         }
 
-        public static string GetClipsListJson()
+        private static Snapshot cached;
+        private static long generation;
+
+        internal static void InvalidateCache()
         {
-            GetClipsList();
-            return string.IsNullOrWhiteSpace(Server.State.ClipsCacheJson) ? "[]" : Server.State.ClipsCacheJson;
+            lock (Server.State.ClipsMetaLock) { generation++; cached = null; }
         }
+
+        private static Snapshot GetSnapshot()
+        {
+            string signature = GetClipsCacheSignature(AppConfig.GetClipDir());
+            long observed;
+            lock (Server.State.ClipsMetaLock)
+            {
+                if (cached != null && cached.Signature == signature &&
+                    (DateTime.UtcNow - cached.Created).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS) return cached;
+                observed = generation;
+            }
+            var snapshot = new Snapshot(GetClipsListUncached(), signature);
+            lock (Server.State.ClipsMetaLock)
+            {
+                if (observed == generation) cached = snapshot;
+            }
+            return snapshot;
+        }
+
+        public static List<JObject> GetClipsList() => GetSnapshot().Body;
+        public static string GetClipsListJson() => GetSnapshot().Json;
 
         public static string GetClipsPageJson(int offset, int limit, string sort = "newest")
         {
             string safeSort = NormalizeClipSort(sort);
-            var items = SortClipsForPage(GetClipsList(), safeSort);
+            var snapshot = GetSnapshot();
+            var items = snapshot.Sorted(safeSort);
             int total = items.Count;
             int safeOffset = Math.Max(0, Math.Min(offset, total));
             int safeLimit = limit > 0 ? Math.Min(limit, Constants.CLIPS_PAGE_LIMIT_MAX) : Math.Min(Math.Max(total, 1), Constants.CLIPS_PAGE_LIMIT_MAX);
@@ -715,10 +743,10 @@ namespace ReplayKitHelper
                 int end = Math.Min(total - 1, safeOffset + safeLimit - 1);
                 page = items.GetRange(safeOffset, end - safeOffset + 1);
             }
-            int linked = items.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
+            int linked = snapshot.Linked;
             var payload = new JObject
             {
-                ["version"] = Server.State.ClipsCacheVersion + "|sort:" + safeSort,
+                ["version"] = snapshot.Version + "|sort:" + safeSort,
                 ["total"] = total,
                 ["linked"] = linked,
                 ["offset"] = safeOffset,
@@ -736,6 +764,7 @@ namespace ReplayKitHelper
 
         public static string GetClipsByNameJson(IEnumerable<string> names, string sort = "newest")
         {
+            var snapshot = GetSnapshot();
             string safeSort = NormalizeClipSort(sort);
             var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var raw in names ?? Enumerable.Empty<string>())
@@ -751,7 +780,7 @@ namespace ReplayKitHelper
             var items = new List<JObject>();
             if (wanted.Count > 0)
             {
-                foreach (var clip in GetClipsList())
+                foreach (var clip in snapshot.Body)
                 {
                     string clipName = clip["name"]?.Value<string>();
                     if (!string.IsNullOrEmpty(clipName) && wanted.Contains(clipName)) items.Add(clip);
@@ -760,7 +789,7 @@ namespace ReplayKitHelper
             var sorted = SortClipsForPage(items, safeSort);
             var payload = new JObject
             {
-                ["version"] = Server.State.ClipsCacheVersion + "|sort:" + safeSort + "|names",
+                ["version"] = snapshot.Version + "|sort:" + safeSort + "|names",
                 ["total"] = sorted.Count,
                 ["sort"] = safeSort,
                 ["clips"] = new JArray(sorted),

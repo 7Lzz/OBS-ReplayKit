@@ -3,10 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace ReplayKitHelper
 {
-    // thumbnails -- cached on disk by sha1(path + size + mtime), serialised via ThumbQueueLock so the popup opening doesnt spawn dozens of simultaneous shell-thumbnail extractors -- plus the dock's placeholder/obs-icon svgs. ported from obs_replaykit helper modules/60_media.ps1.
+    // Thumbnail work is deduplicated by file generation and bounded even when a shell codec hangs.
     internal static class Media
     {
         private static string GetThumbnailName(Clips.SafeClipPath selected, FileInfo fi)
@@ -21,31 +24,66 @@ namespace ReplayKitHelper
             }
         }
 
+        private static readonly Dictionary<string, Task<string>> ThumbnailJobs = new Dictionary<string, Task<string>>();
+        private static readonly Dictionary<string, DateTime> ThumbnailFailures = new Dictionary<string, DateTime>();
+
         public static string GetCachedThumbnail(Clips.SafeClipPath selected, FileInfo fi)
         {
             Directory.CreateDirectory(Constants.THUMB_DIR);
             string outPath = Path.Combine(Constants.THUMB_DIR, GetThumbnailName(selected, fi));
             if (File.Exists(outPath)) return outPath;
-
+            var wait = Stopwatch.StartNew();
+            Task<string> task;
             lock (Server.State.ThumbQueueLock)
             {
-                // re-check after acquiring the lock in case another waiter just made it.
                 if (File.Exists(outPath)) return outPath;
-                string tmp = outPath + "." + Process.GetCurrentProcess().Id + ".tmp.jpg";
-                try
+                if (ThumbnailFailures.ContainsKey(outPath)) return null;
+                if (!ThumbnailJobs.TryGetValue(outPath, out task))
                 {
-                    Native.SaveThumbnail(selected.Full, tmp);
-                    File.Move(tmp, outPath);
-                    return outPath;
-                }
-                catch (Exception ex)
-                {
-                    // thumbnail generation can fail in plenty of ways depending on the codec/shell extension state (com errors, gdi+ errors, timeout) -- best effort, log and report no thumbnail rather than enumerate every possible cause.
-                    Log.Write("thumb failed for " + selected.Name + ": " + ex.Message);
-                    try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                    return null;
+                    // A timed-out shell call still owns a slot until it actually returns.
+                    while (ThumbnailJobs.Count >= 2)
+                    {
+                        int remaining = (int)Math.Max(0, 8000 - wait.ElapsedMilliseconds);
+                        if (remaining == 0 || !Monitor.Wait(Server.State.ThumbQueueLock, remaining)) return null;
+                        if (File.Exists(outPath)) return outPath;
+                        if (ThumbnailFailures.ContainsKey(outPath)) return null;
+                        if (ThumbnailJobs.TryGetValue(outPath, out task)) break;
+                    }
+                    if (task == null)
+                    {
+                        task = Task.Run(() => CreateThumbnail(selected.Full, outPath));
+                        ThumbnailJobs.Add(outPath, task);
+                        task.ContinueWith(done =>
+                        {
+                            lock (Server.State.ThumbQueueLock)
+                            {
+                                ThumbnailJobs.Remove(outPath);
+                                Monitor.PulseAll(Server.State.ThumbQueueLock);
+                                if (done.IsFaulted || done.Result == null)
+                                {
+                                    if (ThumbnailFailures.Count < 1024) ThumbnailFailures[outPath] = DateTime.UtcNow;
+                                    if (done.IsFaulted) Program.WriteCrashReport("thumbnail", done.Exception, false);
+                                }
+                            }
+                        }, TaskScheduler.Default);
+                    }
                 }
             }
+            try { return task.Wait((int)Math.Max(0, 8000 - wait.ElapsedMilliseconds)) ? task.GetAwaiter().GetResult() : null; }
+            catch (Exception ex) { Log.Write("Thumbnail failed: " + ex.Message); return null; }
+        }
+
+        private static string CreateThumbnail(string source, string output)
+        {
+            string temp = output + "." + Guid.NewGuid().ToString("N") + ".tmp.jpg";
+            try
+            {
+                Native.SaveThumbnail(source, temp);
+                File.Move(temp, output);
+                return output;
+            }
+            catch (Exception ex) { Program.WriteCrashReport("thumbnail", ex, false); return null; }
+            finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
         }
 
         // the two fallback images live as files under icons/fallback/ -- that copy is the source of truth; the inline string is only a net for a broken deploy where the file is missing, not a silent behaviour change

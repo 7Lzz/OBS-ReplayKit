@@ -229,7 +229,7 @@ namespace ReplayKitHelper
                 };
                 if (signedIn) { step1Args.Add("-b"); step1Args.Add(jar); }
                 step1Args.Add(url1);
-                var r1 = Curl.Run(step1Args.ToArray(), proc => UploadState.SetUploadState(requestId: requestId, encoderProcess: proc));
+                var r1 = Curl.Run(step1Args.ToArray(), proc => UploadState.SetUploadState(requestId: requestId, encoderProcess: proc), cancelToken);
                 if (r1.ExitCode != 0 || string.IsNullOrWhiteSpace(r1.Stdout))
                 {
                     throw new InvalidOperationException("Step 1 curl failed (exit=" + r1.ExitCode + ").");
@@ -304,7 +304,7 @@ namespace ReplayKitHelper
                 {
                     UploadState.SetUploadState(requestId: requestId, encoderProcess: proc);
                     if (cancelToken.IsCancellationRequested) { try { proc.Kill(); } catch { } }
-                });
+                }, cancelToken);
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
                 if (r3.ExitCode != 0 || string.IsNullOrWhiteSpace(r3.Stdout))
                 {

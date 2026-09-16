@@ -363,6 +363,29 @@ namespace ReplayKitSetup
             return patched;
         }
 
+        // Runtime updates used to leave the existing user.ini alone. That
+        // preserved OBS layout, but also left the managed Controls dock on its
+        // legacy file:// URL after the helper moved to a protected loopback API.
+        // OBS is closed before this runs, so update only that canonical dock row
+        // while Transform preserves every unrelated dock and preference.
+        private static void UpdateControlsDockUrl(Action<string> log)
+        {
+            string path = Path.Combine(Config.OBS_CONFIG, "user.ini");
+            if (!File.Exists(path)) return;
+            try
+            {
+                string current = Config.ReadTextFileFlexible(path);
+                string updated = Transform.ApplyUserIni(current, Prefs.LoadPrefs());
+                if (string.Equals(current, updated, StringComparison.Ordinal)) return;
+                WriteWithRetry(() => File.WriteAllText(path, updated, new System.Text.UTF8Encoding(false)));
+                log?.Invoke("updated Controls dock URL");
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+            {
+                log?.Invoke("warn: Controls dock URL update skipped: " + ex.Message);
+            }
+        }
+
         private sealed class RuntimeChange
         {
             public string Target;
@@ -480,6 +503,7 @@ namespace ReplayKitSetup
 
             int count = 0;
             var changes = new List<RuntimeChange>();
+            bool recoveryComplete = false;
             try
             {
                 foreach (string src in files)
@@ -503,31 +527,44 @@ namespace ReplayKitSetup
                         VerifyFile(dst, change.Backup);
                     }
                     changes.Add(change);
+                    var recovery = new JObject
+                    {
+                        ["target"] = change.Target, ["backup"] = change.Backup, ["existed"] = change.Existed,
+                    };
+                    string manifest = Path.Combine(transactionRoot, "recovery.jsonl");
+                    using (var journal = new FileStream(manifest, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
+                    {
+                        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(recovery.ToString(Newtonsoft.Json.Formatting.None) + "\n");
+                        journal.Write(bytes, 0, bytes.Length);
+                        journal.Flush(true);
+                    }
                     ReplaceFile(staged, dst, transactionId);
                     log?.Invoke("-> " + rel.Replace('\\', '/'));
                     count++;
                 }
 
                 WriteReplaykitVersion(log);
+                recoveryComplete = true;
             }
             catch (Exception installError)
             {
-                try { RollbackRuntimeChanges(changes, transactionId, log); }
+                try { RollbackRuntimeChanges(changes, transactionId, log); recoveryComplete = true; }
                 catch (Exception rollbackError)
                 {
-                    throw new IOException("Runtime update failed: " + installError.Message + " " + rollbackError.Message, installError);
+                    throw new IOException("Runtime update failed: " + installError.Message + " " + rollbackError.Message + " Recovery files retained at: " + transactionRoot, installError);
                 }
                 throw new IOException("Runtime update failed and was rolled back: " + installError.Message, installError);
             }
             finally
             {
-                try { if (Directory.Exists(transactionRoot)) Directory.Delete(transactionRoot, true); }
+                try { if (recoveryComplete && Directory.Exists(transactionRoot)) Directory.Delete(transactionRoot, true); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke("warn: update staging cleanup failed: " + ex.Message); }
             }
 
             CacheSetupExecutable(log);
             CleanupReplaykitLegacyFiles(log);
             RestoreReplaykitUserState(log);
+            UpdateControlsDockUrl(log);
 
             // scene patches and tool refreshes are best-effort -- an exception here must not abort the update, since the runtime files are already on disk and obs will relaunch with them.
             try

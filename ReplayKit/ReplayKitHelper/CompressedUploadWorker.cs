@@ -11,6 +11,8 @@ namespace ReplayKitHelper
     {
         private static void RunFfmpegPass(string ffmpeg, List<string> argv, string phase, int startPercent, int endPercent, double durationSec, string requestId)
         {
+            var token = JobCoordinator.Token(requestId);
+            token.ThrowIfCancellationRequested();
             var withProgress = new List<string>(argv) { "-progress", "pipe:1", "-nostats" };
             var psi = new ProcessStartInfo
             {
@@ -22,6 +24,9 @@ namespace ReplayKitHelper
                 RedirectStandardError = true,
             };
             using (var proc = Process.Start(psi))
+            using (var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromHours(2)))
+            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token))
+            using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
                 // exposes the live ffmpeg process on the job record so UploadState.CancelActiveUpload can kill it directly.
                 UploadState.SetUploadState(requestId: requestId, encoderProcess: proc);
@@ -46,6 +51,8 @@ namespace ReplayKitHelper
                 }
                 proc.WaitForExit();
                 string stderr = stderrTask.Result;
+                token.ThrowIfCancellationRequested();
+                if (deadline.IsCancellationRequested) throw new TimeoutException("Compression exceeded its time limit.");
                 if (!string.IsNullOrEmpty(stderr)) Log.Write("compress-upload " + phase + " stderr: " + stderr, "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: endPercent);
                 if (proc.ExitCode != 0) throw new InvalidOperationException(phase + " failed (exit=" + proc.ExitCode + ")");
@@ -81,7 +88,7 @@ namespace ReplayKitHelper
                 Log.Write("Uploading compressed temp copy (" + Math.Round(fi.Length / 1024.0 / 1024.0, 2) + " MB)", "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "uploading", phase: "uploading", percent: 95);
 
-                return UploadWorker.Run(requestId, tempPath, authJar, requireAuth, 95, 4);
+                return UploadWorker.Run(requestId, tempPath, authJar, requireAuth, 95, 4, false, JobCoordinator.Token(requestId));
             }
             catch (Exception ex)
             {

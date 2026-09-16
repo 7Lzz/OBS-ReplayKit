@@ -29,6 +29,8 @@ namespace ReplayKitHelper
             double durationSec, string mode, long preBytes, JObject caps, string fastEncoder, string smallerEncoder,
             int scaleHeight = 0)
         {
+            var token = JobCoordinator.Token(requestId);
+            token.ThrowIfCancellationRequested();
             int cpuCount = caps?["cpuCount"]?.Value<int>() ?? Environment.ProcessorCount;
             // half-cores per encode for sw codecs. two parallel libx265 jobs split the cpu cleanly with this -- one job grabbing every core context-switches itself silly when a second job lands.
             int swPools = Math.Max(2, cpuCount / 2);
@@ -109,7 +111,11 @@ namespace ReplayKitHelper
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            var proc = Process.Start(psi);
+            token.ThrowIfCancellationRequested();
+            using var proc = Process.Start(psi);
+            using var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromHours(2));
+            using var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
+            using var registration = stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } });
 
             // drop to belownormal so a running encode never starves the users foreground apps (game, browser, obs itself). best-effort: if PriorityClass fails (rare race / weird security context), the encode just runs at normal.
             try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is NotSupportedException) { }
@@ -152,6 +158,8 @@ namespace ReplayKitHelper
 
             proc.WaitForExit();
             string stderr = stderrTask.Result;
+            token.ThrowIfCancellationRequested();
+            if (deadline.IsCancellationRequested) throw new TimeoutException("Compression exceeded its time limit.");
             if (!string.IsNullOrEmpty(stderr)) Log.Write("stderr: " + stderr, "compress", requestId);
             Log.Write("progress lines=" + linesSeen + " lastPct=" + lastReportedPct, "compress", requestId);
 
@@ -185,21 +193,7 @@ namespace ReplayKitHelper
             UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "replacing", percent: 98);
             try
             {
-                // same-volume move is an atomic rename. across volumes its copy-then-delete, which can leave the destination half-written on crash. detect the mismatch and route thru a sidecar on the sources volume so the final replace is always atomic. the sidecar carries the _replaykit_ prefix the clip listing filters out.
-                string sourceVol = Path.GetPathRoot(sourcePath);
-                string tempVol = Path.GetPathRoot(tempPath);
-                if (string.Equals(sourceVol, tempVol, StringComparison.OrdinalIgnoreCase))
-                {
-                    Native.MoveFileReplace(tempPath, sourcePath);
-                }
-                else
-                {
-                    string extOut = Path.GetExtension(sourcePath);
-                    string sideTemp = Path.Combine(Path.GetDirectoryName(sourcePath), "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + extOut);
-                    File.Copy(tempPath, sideTemp, true);
-                    Native.MoveFileReplace(sideTemp, sourcePath);
-                    try { File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                }
+                ClipFiles.Replace(requestId, tempPath, sourcePath, preBytes, origLastWrite.GetValueOrDefault());
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
             {

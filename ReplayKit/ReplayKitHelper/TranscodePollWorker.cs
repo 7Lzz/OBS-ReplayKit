@@ -60,14 +60,6 @@ namespace ReplayKitHelper
             string scratchDir = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch");
             try { Directory.CreateDirectory(scratchDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-            // tmp lands in scratchDir, not next to dbPath, so a crash between the write and the move never leaves a stray .tmp sitting beside clips_db.json. this poller is a genuinely seperate detached process and cant take the helpers in-process ClipsMetaLock -- atomic replace at least keeps a concurrent reader from ever seeing a torn file, even without full mutual exclusion against the helpers other clips_db.json writers.
-            void SaveClipsDbAtomic(JObject db)
-            {
-                string tmp = Path.Combine(scratchDir, Path.GetFileName(dbPath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-                File.WriteAllText(tmp, db.ToString(Formatting.Indented), Utf8NoBom);
-                Native.MoveFileReplace(tmp, dbPath);
-            }
-
             string lastWritten = "";
             while (DateTime.Now < deadline)
             {
@@ -126,26 +118,22 @@ namespace ReplayKitHelper
                     if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
                     continue;
                 }
-                lastWritten = stateKey;
 
                 try
                 {
-                    if (!File.Exists(dbPath)) continue;
-                    var db = JObject.Parse(File.ReadAllText(dbPath));
-                    // user may have deleted the clip while polling -- dont silently resurrect its entry.
-                    if (!(db[clipName] is JObject entry)) { L("entry gone"); break; }
-                    entry["transcode_status"] = status.Value;
-                    entry["transcode_percent"] = percent;
-                    // status: 0/1 = queued/processing, 2 = ready, 3 = failed.
-                    entry["ready"] = status.Value == 2;
-                    entry["failed"] = status.Value == 3;
-                    db[clipName] = entry;
-                    SaveClipsDbAtomic(db);
+                    if (!ClipStore.SetTranscode(dbPath, clipName, shortcode, status.Value, percent))
+                    {
+                        L("upload entry removed or replaced");
+                        return 0;
+                    }
+                    lastWritten = stateKey;
                     L("wrote status=" + status.Value + " percent=" + percent + " ready=" + (status.Value == 2));
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {
                     L("db update failed: " + ex.Message);
+                    Program.WriteCrashReport("transcode_persistence", ex, false);
+                    return 1;
                 }
 
                 if (status.Value >= 2) { if (status.Value == 2) NotifyReady(); break; }
@@ -155,28 +143,14 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    if (File.Exists(dbPath))
-                    {
-                        var db = JObject.Parse(File.ReadAllText(dbPath));
-                        if (db[clipName] is JObject entry)
-                        {
-                            int curStatus = entry["transcode_status"]?.Value<int>() ?? 0;
-                            if (curStatus < 2)
-                            {
-                                entry["transcode_status"] = 4;
-                                entry["ready"] = false;
-                                entry["failed"] = false;
-                                entry["transcode_error"] = "Streamable status check timed out after 30 minutes.";
-                                db[clipName] = entry;
-                                SaveClipsDbAtomic(db);
-                                L("marked status check timed out");
-                            }
-                        }
-                    }
+                    ClipStore.SetTranscode(dbPath, clipName, shortcode, 4, 0);
+                    L("marked status check timed out");
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {
                     L("timeout update failed: " + ex.Message);
+                    Program.WriteCrashReport("transcode_persistence", ex, false);
+                    return 1;
                 }
             }
             L("exit");
