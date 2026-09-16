@@ -324,7 +324,8 @@
     transition: max-height var(--anim_menu) var(--ease_smooth), opacity 120ms ease;
   }
   .clip-sort-group.is-expanded .clip-sort-sub { max-height: 84px; opacity: 1; }
-  .clip-sort-subitem { padding-left: 28px; }
+  /* --rk-row-padding overrides rk-hover-rows own 14px default so its hover nudge starts from this rows real resting indent instead of snapping back to the top-level items -- without it the hover state pulls a subitem 12px to the left instead of nudging it 2px right. */
+  .clip-sort-subitem { padding-left: 28px; --rk-row-padding: 28px; }
   .clip-sort-subitem .clip-sort-label { font-size: 11.5px; }
   /* Compress all is grouped with sorting as a batch action, so the filters stay a single calm segmented control. */
   .tab-action {
@@ -2817,11 +2818,11 @@
             <span class="clip-sort-label">Length</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
           </button>
           <div class="clip-sort-sub" role="group">
-            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
-            </button>
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="longest" role="menuitemradio" aria-checked="false">
               <span class="clip-sort-label">Longest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
             </button>
           </div>
         </div>
@@ -2830,11 +2831,11 @@
             <span class="clip-sort-label">File size</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
           </button>
           <div class="clip-sort-sub" role="group">
-            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
-            </button>
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="biggest" role="menuitemradio" aria-checked="false">
               <span class="clip-sort-label">Biggest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
             </button>
           </div>
         </div>
@@ -2873,7 +2874,7 @@
 
 <script>
   const CLIP_HOVER_PROFILES = {
-    control: ".btn, .tab, .tab-action, .clip-sort-trigger, .bulk-icon-btn, .bulk-clear, .icon-btn, .play-toggle-btn, .volume-btn, .settings-btn, .speed-step-btn, .speed-pill, .compress-mode-card, .trim-info .preview-btn, .icon-mini-btn, .favorite-btn, .select-clip-btn",
+    control: ".btn, .tab, .tab-action, .bulk-icon-btn, .bulk-clear, .icon-btn, .play-toggle-btn, .volume-btn, .settings-btn, .speed-step-btn, .speed-pill, .compress-mode-card, .trim-info .preview-btn, .icon-mini-btn, .favorite-btn, .select-clip-btn",
     row: ".menu-item, .clip-sort-item",
     accent: ".link-menu-item",
     danger: ".delete-menu-item",
@@ -8236,10 +8237,7 @@
       } else {
         syncTrimSnapMode(false);
       }
-      // not awaited: each filmstrip canvas already shows the grid thumbnail as a fallback background until its real
-      // frame lands, so the editor can open as soon as the keyframe probe above settles (the part that actually
-      // looked broken half-finished) while the 12 real frames keep filling in behind it instead of adding their own
-      // sequential wait on top. buildTrimFilmstrip already guards its own loop against a stale/cancelled request.
+      // not awaited: each filmstrip canvas already shows the grid thumbnail as a fallback background until its real frame lands, so the editor can open as soon as the keyframe probe above settles (the part that actually looked broken half-finished) while the 12 real frames keep filling in behind it instead of adding their own sequential wait on top. buildTrimFilmstrip already guards its own loop against a stale/cancelled request.
       filmstripPromise.catch(() => {});
       // the user couldve cancelled (or opened a different clip) while the probe above was in flight -- dont pop the menu open behind them at that point.
       if (trimSourceClip !== clip) return;

@@ -1041,9 +1041,7 @@ void RefreshNotifyBadges()
 			btn->update();
 }
 
-// no dwm attribute exposes the icon/title rect the way DWMWA_CAPTION_BUTTON_BOUNDS exposes the system buttons, so the
-// text width is measured instead: lfCaptionFont from the non-client metrics is the exact font windows draws the
-// title in, and windowTitle() is the same string qt already keeps the native caption in sync with
+// no dwm attribute exposes the icon/title rect the way DWMWA_CAPTION_BUTTON_BOUNDS exposes the system buttons, so the text width is measured instead: lfCaptionFont from the non-client metrics is the exact font windows draws the title in, and windowTitle() is the same string qt already keeps the native caption in sync with
 static QFont CaptionTitleFont()
 {
 	NONCLIENTMETRICSW ncm = {};
@@ -1058,21 +1056,19 @@ static QFont CaptionTitleFont()
 	return f;
 }
 
-// same darker rounded chip as the tray menus own keybind badge (identical rgba fill/ink), and the divider next to it
-// is the same hairline NotifyButton draws next to the system minimize button
+// same darker rounded chip as the tray menus own keybind badge (identical rgba fill/ink), and the divider next to it is the same hairline NotifyButton draws next to the system minimize button
 class TitleKeybindBadge : public QWidget {
 public:
 	static const int kHeight = 20;
 	static const int kChipRadius = 3;
 	static const int kChipPadX = 5;
-	static const int kChipGap = 18;
+	static const int kChipGap = 12;
 	static const int kLabelChipGap = 5;
 	// bigger than plain breathing room needs to be -- also covers CaptionTitleFonts measured title width running a bit short of the real rendered title on the main obs window
 	static const int kDividerGapBefore = 18;
 	static const int kDividerGapAfter = 8;
 	static const int kEdgeMargin = 6;
-	// NotifyButton's own hairline is 16px (its 28px height minus a 6px inset top and bottom) -- kept as the same
-	// absolute length here too, just centered in this widgets own shorter height instead of re-deriving from it
+	// NotifyButtons own hairline is 16px (its 28px height minus a 6px inset top and bottom) -- kept as the same absolute length here too, just centered in this widgets own shorter height instead of re-deriving from it
 	static const int kDividerLength = 16;
 	static const int kIconLeftMargin = 10;
 	static const int kIconTextGap = 8;
@@ -1082,8 +1078,7 @@ public:
 		setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
 		setAttribute(Qt::WA_TranslucentBackground);
 		setAttribute(Qt::WA_ShowWithoutActivating);
-		// click-through like the notification tip -- this only ever displays keybinds, so a press here should drag
-		// the caption underneath instead of getting eaten by this widget
+		// click-through like the notification tip -- this only ever displays keybinds, so a press here should drag the caption underneath instead of getting eaten by this widget
 		setAttribute(Qt::WA_TransparentForMouseEvents);
 		setFixedHeight(kHeight);
 	}
@@ -1137,9 +1132,7 @@ protected:
 		QFontMetrics fm(chipFont);
 		QFontMetrics nameFm(nameFont);
 		qreal x = kDividerGapBefore;
-		// same hairline NotifyButton draws next to the system minimize button -- the 0.5 offset is what it uses to
-		// land a 1px pen on a single pixel column; without it antialiasing splits the stroke across two columns,
-		// which is what made this read as thicker and paler than the source instead of a crisp match
+		// same hairline NotifyButton draws next to the system minimize button -- the 0.5 offset is what it uses to land a 1px pen on a single pixel column; without it antialiasing splits the stroke across two columns, which is what made this read as thicker and paler than the source instead of a crisp match
 		qreal dividerTop = (height() - kDividerLength) / 2.0;
 		p.setPen(QPen(QColor(255, 255, 255, 38), 1.0));
 		p.setBrush(Qt::NoBrush);
@@ -1192,9 +1185,7 @@ QList<QPointer<TitleKeybindBadge>> g_titleKeybindBadges;
 QString g_titleRecordLabel;
 QString g_titleClipLabel;
 
-// mirrors PositionNotifyButton but anchored off the left edge instead of DWMWA_CAPTION_BUTTON_BOUNDS, since nothing
-// analogous exists for the icon/title side -- hides itself whenever the native title (dynamic, sometimes very long
-// on the main obs window) would leave no real room before the bell or the system buttons, rather than overlapping
+// mirrors PositionNotifyButton but anchored off the left edge instead of DWMWA_CAPTION_BUTTON_BOUNDS, since nothing analogous exists for the icon/title side -- hides itself whenever the native title (dynamic, sometimes very long on the main obs window) would leave no real room before the bell or the system buttons, rather than overlapping
 static void PositionTitleKeybindBadge(TitleKeybindBadge *badge)
 {
 	QWidget *target = badge ? badge->target() : nullptr;
@@ -1223,8 +1214,7 @@ static void PositionTitleKeybindBadge(TitleKeybindBadge *badge)
 		return;
 	}
 
-	// stop short of whichever comes first, our own bell or the system buttons, so a long obs title (profile + scene
-	// collection can run long) just drops the badge instead of drawing over either one
+	// stop short of whichever comes first, our own bell or the system buttons, so a long obs title (profile + scene collection can run long) just drops the badge instead of drawing over either one
 	int rightLimit = frame.left + buttons.left;
 	for (auto &btn : g_notifyButtons) {
 		if (btn && btn->target() == target && btn->isVisible())
@@ -1250,8 +1240,7 @@ static void PositionTitleKeybindBadge(TitleKeybindBadge *badge)
 		badge->show();
 }
 
-// same event set as NotifyAnchorFilter, plus WindowTitleChange -- this badges x position depends on the titles own
-// measured width, so a title edit (profile switch, recording state) has to reflow it and not just a move or resize
+// same event set as NotifyAnchorFilter, plus WindowTitleChange -- this badges x position depends on the titles own measured width, so a title edit (profile switch, recording state) has to reflow it and not just a move or resize
 class TitleKeybindAnchorFilter : public QObject {
 public:
 	TitleKeybindAnchorFilter(QObject *parent, TitleKeybindBadge *badge) : QObject(parent), m_badge(badge) {}
@@ -1305,8 +1294,7 @@ static void PositionAllTitleKeybindBadges()
 			PositionTitleKeybindBadge(badge.data());
 }
 
-// same /settings body the hotkey + theme poll already fetches, so this costs no extra request -- recording and
-// clipping are global hotkeys regardless of which window has focus, so every title bar shows the same pair
+// same /settings body the hotkey + theme poll already fetches, so this costs no extra request -- recording and clipping are global hotkeys regardless of which window has focus, so every title bar shows the same pair
 void RefreshTitleKeybindBadges(const std::string &settingsBody)
 {
 	QString recordLabel = QString::fromStdString(KeybindLabelFromSettingsJson(settingsBody, "recordingKeybind"));
@@ -1658,9 +1646,11 @@ void ApplyControlsDockTweaks()
 	auto *main = qobject_cast<QMainWindow *>(mw);
 	QDockWidget *nativeDock = mw->findChild<QDockWidget *>("controlsDock");
 
-	// obs names an extra-browser dock "<title>_extraBrowser" (confirmed in the obs log), not by uuid.
+	// obs names an extra-browser dock "<title>_extraBrowser" (confirmed in the obs log), not by uuid -- nativeDock is excluded explicitly becuase it carries the exact same windowTitle() "Controls" as ourDock once the rename near the bottom of this function has run once, and findChildren()s enumeration order, not anything meaningful, would otherwise decide which of the two this resolves to.
 	QDockWidget *ourDock = nullptr;
 	for (QDockWidget *dock : mw->findChildren<QDockWidget *>()) {
+		if (dock == nativeDock)
+			continue;
 		QString id = dock->objectName();
 		id.remove('-');
 		if (id.toLower() == QLatin1String("a59ce0ef5d6f4a4f91d9c7c3c1d4e2b0") ||
@@ -1672,11 +1662,9 @@ void ApplyControlsDockTweaks()
 		}
 	}
 
-	// safety net: the bundled DockState already puts our dock in the bottom row (assets/obs-studio/user.ini), but if
-	// it landed somewhere else (old install, obs floated it) drop it into the bottom row next to the mixer, once per
-	// session. anchored to mixerDock, not the native Controls dock -- that one is hidden below and unreliable.
-	static bool placed = false;
-	if (main && ourDock && !placed) {
+	// only ever once, on a clean install -- not every obs launch, and not a repeating poll, since some users deliberately move or resize this dock afterward and either would eventually fight that. persisted in window_state.ini instead of an in-memory flag so it survives obs restarts; it only ever resets when a clean reinstall wipes obs-replayKit/ (this file included) and a fresh one gets written.
+	QSettings dockPlacedState(WindowStateIniPath(), QSettings::IniFormat);
+	if (main && ourDock && !dockPlacedState.value("controlsDockPlaced", false).toBool()) {
 		if (ourDock->isFloating() || main->dockWidgetArea(ourDock) != Qt::BottomDockWidgetArea) {
 			ourDock->setFloating(false);
 			QDockWidget *anchor = mw->findChild<QDockWidget *>("mixerDock");
@@ -1688,10 +1676,16 @@ void ApplyControlsDockTweaks()
 				main->addDockWidget(Qt::BottomDockWidgetArea, ourDock);
 			ourDock->show();
 			ourDock->raise();
-			int w = (nativeDock && nativeDock->width() > 60) ? nativeDock->width() : 300;
-			main->resizeDocks({ ourDock }, { w }, Qt::Horizontal);
 		}
-		placed = true;
+		static const int kMinSaneDockWidth = 150;
+		static const int kDefaultDockWidth = 400;
+		if (!ourDock->isFloating() && ourDock->width() < kMinSaneDockWidth) {
+			int before = ourDock->width();
+			int w = (nativeDock && nativeDock->width() >= kMinSaneDockWidth) ? nativeDock->width() : kDefaultDockWidth;
+			main->resizeDocks({ ourDock }, { w }, Qt::Horizontal);
+			blog(LOG_INFO, "[replaykit-tray] Controls dock width was %d on first launch (below the %d floor), resized to %d", before, kMinSaneDockWidth, w);
+		}
+		dockPlacedState.setValue("controlsDockPlaced", true);
 	}
 
 	// hide the native Controls dock (the bundled DockState also hides it; this covers old installs + any re-show)

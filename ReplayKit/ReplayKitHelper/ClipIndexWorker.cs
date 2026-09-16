@@ -178,9 +178,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // returns the names actually (re)probed this pass (not reused from the existing index) -- newest-first, same
-        // order as the enumeration below -- so a caller can proactively warm up just-created clips without also
-        // rescanning every clip already sitting in the folder.
+        // returns the names actually (re)probed this pass (not reused from the existing index) -- newest-first, same order as the enumeration below -- so a caller can proactively warm up just-created clips without also rescanning every clip already sitting in the folder.
         public static List<string> Run(string clipDir, string indexPath, string ffprobe, IEnumerable<string> allowedExts, int maxFiles)
         {
             var freshlyIndexed = new List<string>();

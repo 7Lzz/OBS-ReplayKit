@@ -178,6 +178,65 @@ namespace ReplayKitHelper
             };
         }
 
+        // shared with anything else that wants a small disk cache next to the rest of replaykits config -- not just release lookups.
+        private static string ReplayKitCacheDir() => Path.Combine(Constants.OBS_CONFIG_DIR, "obs-replayKit", "cache");
+        private static string ReleaseCachePath(string version) => Path.Combine(ReplayKitCacheDir(), "update-" + version + ".txt");
+
+        // looks the installed version up as its own release, for a users own "what did I just install" -- separate from GetLatestRelease, which only ever answers for the newest tag. a published releases notes never change once tagged, so the result is cached to disk per-version instead of hitting github again on every open of the notifications panel; tries a v-prefixed tag first (this repos own convention) then the bare version, since a tag scheme is not something worth hard failing over.
+        public static ReleaseInfo GetReleaseForVersion(string version)
+        {
+            string norm = NormalizeVersion(version);
+            string cachePath = ReleaseCachePath(norm);
+            try
+            {
+                if (File.Exists(cachePath))
+                {
+                    var cached = JObject.Parse(File.ReadAllText(cachePath));
+                    return new ReleaseInfo
+                    {
+                        TagName = cached["tagName"]?.Value<string>() ?? "",
+                        LatestVersion = norm,
+                        HtmlUrl = cached["url"]?.Value<string>() ?? "",
+                        Body = cached["notes"]?.Value<string>() ?? "",
+                        Name = cached["name"]?.Value<string>() ?? "",
+                    };
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
+            {
+                WriteUpdateDebug("release cache for " + norm + " unreadable, refetching: " + ex.Message);
+            }
+
+            foreach (string tag in new[] { "v" + norm, norm })
+            {
+                JObject release;
+                try { release = InvokeGitHubApi("https://api.github.com/repos/" + Owner + "/" + Repo + "/releases/tags/" + tag); }
+                catch (InvalidOperationException) { continue; }
+                string tagName = release["tag_name"]?.Value<string>();
+                if (string.IsNullOrEmpty(tagName)) continue;
+                var info = new ReleaseInfo
+                {
+                    TagName = tagName,
+                    LatestVersion = NormalizeVersion(tagName),
+                    HtmlUrl = release["html_url"]?.Value<string>() ?? "",
+                    Body = release["body"]?.Value<string>() ?? "",
+                    Name = release["name"]?.Value<string>() ?? "",
+                };
+                try
+                {
+                    Directory.CreateDirectory(ReplayKitCacheDir());
+                    var toCache = new JObject { ["tagName"] = info.TagName, ["url"] = info.HtmlUrl, ["notes"] = info.Body, ["name"] = info.Name };
+                    AppConfig.WriteUtf8(cachePath, toCache.ToString(Formatting.Indented));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    WriteUpdateDebug("release cache for " + norm + " could not be written: " + ex.Message);
+                }
+                return info;
+            }
+            return null;
+        }
+
         public static JObject GetUpdateStatus()
         {
             try
@@ -186,7 +245,7 @@ namespace ReplayKitHelper
                 var latest = GetLatestRelease();
                 int cmp = CompareVersion(installed, latest.LatestVersion);
                 // every check funnels through here, so this is the one place that has to raise the bell notification. keyed on the version, so the checks that run on each startup refresh the same row instead of stacking duplicates.
-                if (cmp < 0) Notifications.AnnounceUpdate(latest.LatestVersion, latest.Body);
+                if (cmp < 0) Notifications.AnnounceUpdate(latest.LatestVersion, latest.Body, latest.HtmlUrl);
                 return new JObject
                 {
                     ["ok"] = true,

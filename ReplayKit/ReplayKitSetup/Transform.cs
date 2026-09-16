@@ -479,11 +479,7 @@ namespace ReplayKitSetup
         }
 
         // write the runtime settings consumed by the obs dock helper.
-        // _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose
-        // every setting the wizard has no field for (openClipsKeybind and anything added since this list was last
-        // touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by
-        // this transform's own from-scratch object, and anything not listed below reverts as if never set. merging onto
-        // whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
+        // _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose every setting the wizard has no field for (openClipsKeybind and anything added since this list was last touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by this transforms own from-scratch object, and anything not listed below reverts as if never set. merging onto whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
         public static string ApplyReplaykitSettingsJson(string _text, Preferences prefs)
         {
             JObject obj;

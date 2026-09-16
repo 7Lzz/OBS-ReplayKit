@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -723,7 +724,7 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/notifications/read" || path == "/notifications/read-all" ||
+            if (path == "/notifications/read" || path == "/notifications/unread" || path == "/notifications/read-all" ||
                 path == "/notifications/dismiss" || path == "/notifications/clear")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -733,7 +734,22 @@ namespace ReplayKitHelper
                 else if (path == "/notifications/clear") HttpResponse.SendJson(stream, 200, Notifications.Clear());
                 else if (string.IsNullOrWhiteSpace(id)) HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Missing id." });
                 else if (path == "/notifications/read") HttpResponse.SendJson(stream, 200, Notifications.MarkRead(id));
+                else if (path == "/notifications/unread") HttpResponse.SendJson(stream, 200, Notifications.MarkUnread(id));
                 else HttpResponse.SendJson(stream, 200, Notifications.Dismiss(id));
+                return false;
+            }
+
+            if (path == "/notifications/open-link")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                string url = Q("url");
+                // scoped to github release pages on purpose -- this is not a general "open any url/file" primitive, only ever used for the link a notification itself carries
+                bool validUrl = !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                    uri.Scheme == Uri.UriSchemeHttps && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase);
+                if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only a github.com release link can be opened this way." }); return false; }
+                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true }); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
 
@@ -742,6 +758,28 @@ namespace ReplayKitHelper
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
                 if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetUpdateStatus());
+                return false;
+            }
+
+            if (path == "/update/notes")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                try
+                {
+                    string installed = Update.NormalizeVersion(Update.GetInstalledVersion());
+                    var release = Update.GetReleaseForVersion(installed);
+                    if (release == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "No release notes found for version " + installed + "." }); return false; }
+                    // a real, persisted notification (not a throwaway client-side one) so it survives closing the panel or restarting obs same as any other -- keyed on the version so pressing the button again just refreshes the same row instead of stacking a duplicate. marked read immediately: the user asked to see this, it should not also bump the unread badge.
+                    string title = (string.IsNullOrEmpty(release.Name) ? "ReplayKit " + installed : release.Name) + " (installed)";
+                    var snapshot = Notifications.Add("info", "whats-new:" + installed, title, release.Body, release.HtmlUrl);
+                    string addedId = (snapshot["items"] as JArray)?.OfType<JObject>()
+                        .FirstOrDefault(i => i["key"]?.Value<string>() == "whats-new:" + installed)?["id"]?.Value<string>();
+                    if (!string.IsNullOrEmpty(addedId)) snapshot = Notifications.MarkRead(addedId);
+                    snapshot["id"] = addedId;
+                    HttpResponse.SendJson(stream, 200, snapshot);
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
 

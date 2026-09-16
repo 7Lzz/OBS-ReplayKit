@@ -2649,8 +2649,7 @@
     });
   });
 
-  // Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for the overlay drag while the Overlay page is open. settings.html's
-  // keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
+  // Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for the overlay drag while the Overlay page is open. settings.htmls keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || !window.RKOverlayPreview) return;
     if (!document.querySelector('.nav-btn[data-page="overlay"].is-active')) return;

@@ -58,8 +58,9 @@ namespace ReplayKitHelper
 
         // key identifies the thing being announced (an update version, say) so re-announcing it refreshes the existing
         // row. a refresh deliberately leaves `read` alone -- re-checking for an update the user already dismissed must
-        // not light the badge up again.
-        public static JObject Add(string kind, string key, string title, string body)
+        // not light the badge up again. url is optional (a github release page, say) and only used to offer an "open
+        // release page" action -- items without one just skip that menu entry.
+        public static JObject Add(string kind, string key, string title, string body, string url = "")
         {
             if (string.IsNullOrWhiteSpace(title)) return new JObject { ["ok"] = false, ["message"] = "Notification needs a title." };
             lock (Gate)
@@ -72,6 +73,7 @@ namespace ReplayKitHelper
                         if (existing["key"]?.Value<string>() != key) continue;
                         existing["title"] = title;
                         existing["body"] = body ?? "";
+                        existing["url"] = url ?? "";
                         WriteItems(items);
                         return Snapshot(items);
                     }
@@ -83,6 +85,7 @@ namespace ReplayKitHelper
                     ["key"] = key ?? "",
                     ["title"] = title,
                     ["body"] = body ?? "",
+                    ["url"] = url ?? "",
                     ["createdUtc"] = DateTime.UtcNow.ToString("o"),
                     ["read"] = false,
                 });
@@ -101,6 +104,22 @@ namespace ReplayKitHelper
                 {
                     if (item["id"]?.Value<string>() != id) continue;
                     item["read"] = true;
+                    WriteItems(items);
+                    break;
+                }
+                return Snapshot(items);
+            }
+        }
+
+        public static JObject MarkUnread(string id)
+        {
+            lock (Gate)
+            {
+                var items = ReadItems();
+                foreach (var item in items.OfType<JObject>())
+                {
+                    if (item["id"]?.Value<string>() != id) continue;
+                    item["read"] = false;
                     WriteItems(items);
                     break;
                 }
@@ -148,10 +167,10 @@ namespace ReplayKitHelper
 
         // called by every update check that finds a newer release. the release notes become the body, so opening the
         // notification is what shows the patch notes.
-        public static void AnnounceUpdate(string version, string notes)
+        public static void AnnounceUpdate(string version, string notes, string releaseUrl = "")
         {
             if (string.IsNullOrWhiteSpace(version)) return;
-            Add("update", "update:" + version, "Update ReplayKit " + version, notes ?? "");
+            Add("update", "update:" + version, "Update ReplayKit " + version, notes ?? "", releaseUrl ?? "");
         }
     }
 }

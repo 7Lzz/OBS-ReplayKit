@@ -6,8 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# the hand-picked colours this popup shipped with, used whenever the live theme cannot be read -- so a helper hiccup
-# degrades to the old look instead of a blank or half-coloured window.
+# the hand-picked colours this popup shipped with, used whenever the live theme cannot be read -- so a helper hiccup degrades to the old look instead of a blank or half-coloured window.
 $fallbackColors = @{
     Panel    = '#E61D1F26'
     IconWell = '#E015171D'
@@ -29,9 +28,7 @@ function Format-ClipDuration([int]$totalSeconds) {
     return "${minutes}m ${remainder}s"
 }
 
-# pulls the same resolved theme the dock pages and the tray plugin's own popups use, so this one stops being the odd
-# one out with hardcoded colours. per-field fallback (not just one big try/catch) so a single missing token cannot
-# blank the whole popup, and the helper being unreachable just falls back to the original look entirely.
+# pulls the same resolved theme the dock pages and the tray plugins own popups use, so this one stops being the odd one out with hardcoded colours. per-field fallback (not just one big try/catch) so a single missing token cannot blank the whole popup, and the helper being unreachable just falls back to the original look entirely.
 function Get-PopupThemeColors {
     try {
         $settings = Invoke-RestMethod -Uri 'http://127.0.0.1:8767/settings' -TimeoutSec 2 -ErrorAction Stop
@@ -149,11 +146,7 @@ try {
     $textWidth = [Math]::Ceiling($messageText.DesiredSize.Width)
     $targetWidth = 104 + 30 + $textWidth + 40
     $window.Width = [Math]::Min([Math]::Max(360, $targetWidth), $workArea.Width)
-    # the real OS window is placed at its resting spot ONCE and never moved again -- a second monitor sitting to the
-    # left of the primary one lives at negative coordinates in the exact space "off the left edge" would occupy, so
-    # sliding Window.Left across that range drags the window onto the other monitor instead of staying invisible.
-    # the slide instead moves a RenderTransform on the content: the window's own rectangle never leaves the main
-    # monitor, so the content sliding out past its left edge is simply not drawn (a window only paints its own rect).
+    # the real OS window is placed at its resting spot ONCE and never moved again -- a second monitor sitting to the left of the primary one lives at negative coordinates in the exact space "off the left edge" would occupy, so sliding Window.Left across that range drags the window onto the other monitor instead of staying invisible. the slide instead moves a RenderTransform on the content: the windows own rectangle never leaves the main monitor, so the content sliding out past its left edge is simply not drawn (a window only paints its own rect).
     $window.Left = $workArea.Left
     $window.Top = $workArea.Top + 56
     $window.Opacity = 0

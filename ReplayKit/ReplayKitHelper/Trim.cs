@@ -147,9 +147,7 @@ namespace ReplayKitHelper
             return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are still loading", RetryMs = 500 };
         }
 
-        // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one"
-        // one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never
-        // both see "no job yet" and each start their own ffprobe for the same file.
+        // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one" one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never both see "no job yet" and each start their own ffprobe for the same file.
         private static TrimKeyframeJob StartTrimKeyframeWorkerLocked(Clips.SafeClipPath source, string ffprobe, string jobKey, string cacheSig)
         {
             var cts = new CancellationTokenSource();
