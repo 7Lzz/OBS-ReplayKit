@@ -2,18 +2,22 @@
 <html lang="en" style="background:#272A33;color:#FFFFFF;color-scheme:dark">
 <head>
 <script>
-if (location.protocol === "file:") {
-  (function waitForHelper() {
-    fetch("http://127.0.0.1:8767/health", { mode: "no-cors", cache: "no-store" })
-      .then(() => location.replace("http://127.0.0.1:8767/controls_app.html"))
-      .catch(() => setTimeout(waitForHelper, 1000));
+  (function openControls() {
+    if (location.protocol === "http:") {
+      location.replace("controls_app.html");
+      return;
+    }
+    function waitForHelper() {
+      fetch("http://127.0.0.1:8767/health", { mode: "no-cors", cache: "no-store" })
+        .then(() => location.replace("http://127.0.0.1:8767/controls_app.html"))
+        .catch(() => setTimeout(waitForHelper, 1000));
+    }
+    waitForHelper();
   })();
-}
 </script>
 <meta charset="UTF-8" />
 <meta name="theme-color" content="#272A33" />
 <meta name="color-scheme" content="dark" />
-<meta http-equiv="refresh" content="0;url=controls_app.html" />
 <title>Custom Controls</title>
 </head>
 <body style="background:#272A33;color:#FFFFFF">
@@ -44,7 +48,6 @@ if (location.protocol === "file:") {
       }
     }, true);
   })();
-  location.replace("controls_app.html");
 </script>
 </body>
 </html>

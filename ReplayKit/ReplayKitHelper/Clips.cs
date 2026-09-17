@@ -68,71 +68,68 @@ namespace ReplayKitHelper
                 if (Server.State.ClipsDbCache != null && Server.State.ClipsDbCacheSig == sig) return (JObject)Server.State.ClipsDbCache.DeepClone();
 
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                var db = new JObject();
                 string path = AppConfig.GetDbPath();
-                if (File.Exists(path))
+                var db = new JObject();
+                try
                 {
-                    try
+                    var parsed = ClipStore.Read(path, data => data);
+                    foreach (var prop in parsed.Properties())
                     {
-                        var parsed = JObject.Parse(File.ReadAllText(path));
-                        foreach (var prop in parsed.Properties())
+                        if (!(prop.Value is JObject v)) continue;
+
+                        // compress-history cache is independent of streamable upload state -- a clip might be marked as compressed without ever having been uploaded. read those fields first so they survive even when theres no url entry.
+                        JObject cmpEntry = null;
+                        if (v["cmp_mode"] != null)
                         {
-                            if (!(prop.Value is JObject v)) continue;
-
-                            // compress-history cache is independent of streamable upload state -- a clip might be marked as compressed without ever having been uploaded. read those fields first so they survive even when theres no url entry.
-                            JObject cmpEntry = null;
-                            if (v["cmp_mode"] != null)
+                            cmpEntry = new JObject
                             {
-                                cmpEntry = new JObject
+                                ["cmp_mode"] = v["cmp_mode"].Value<string>(),
+                                ["cmp_mtime"] = v["cmp_mtime"]?.Value<long>() ?? 0L,
+                                ["cmp_ts"] = v["cmp_ts"]?.Value<long>() ?? 0L,
+                                ["cmp_pre"] = v["cmp_pre"]?.Value<long>() ?? 0L,
+                                // cmp_ver = 2 marks entries written by the current compression pipeline.
+                                ["cmp_ver"] = v["cmp_ver"]?.Value<int>() ?? 0,
+                            };
+                        }
+
+                        if (v["url"] != null && v["uploaded_at"] != null)
+                        {
+                            long retSec = v["retention_days"] != null ? v["retention_days"].Value<int>() * 86400L : Constants.ANON_RETENTION_DAYS * 86400L;
+                            if ((now - v["uploaded_at"].Value<long>()) < retSec)
+                            {
+                                var entry = new JObject
                                 {
-                                    ["cmp_mode"] = v["cmp_mode"].Value<string>(),
-                                    ["cmp_mtime"] = v["cmp_mtime"]?.Value<long>() ?? 0L,
-                                    ["cmp_ts"] = v["cmp_ts"]?.Value<long>() ?? 0L,
-                                    ["cmp_pre"] = v["cmp_pre"]?.Value<long>() ?? 0L,
-                                    // cmp_ver = 2 marks entries written by the current compression pipeline.
-                                    ["cmp_ver"] = v["cmp_ver"]?.Value<int>() ?? 0,
+                                    ["url"] = v["url"].Value<string>(),
+                                    ["uploaded_at"] = v["uploaded_at"].Value<long>(),
                                 };
-                            }
-
-                            if (v["url"] != null && v["uploaded_at"] != null)
-                            {
-                                long retSec = v["retention_days"] != null ? v["retention_days"].Value<int>() * 86400L : Constants.ANON_RETENTION_DAYS * 86400L;
-                                if ((now - v["uploaded_at"].Value<long>()) < retSec)
+                                if (v["retention_days"] != null) entry["retention_days"] = v["retention_days"].Value<int>();
+                                // preserve transcode-state fields the background poller writes. without this theyd be dropped on read and the dock would never show the "processing on streamable" badge.
+                                if (v["shortcode"] != null) entry["shortcode"] = v["shortcode"].Value<string>();
+                                if (v["ready"] != null) entry["ready"] = v["ready"].Value<bool>();
+                                if (v["transcode_status"] != null) entry["transcode_status"] = v["transcode_status"].Value<int>();
+                                if (v["transcode_percent"] != null) entry["transcode_percent"] = v["transcode_percent"].Value<int>();
+                                if (v["failed"] != null) entry["failed"] = v["failed"].Value<bool>();
+                                if (cmpEntry != null)
                                 {
-                                    var entry = new JObject
-                                    {
-                                        ["url"] = v["url"].Value<string>(),
-                                        ["uploaded_at"] = v["uploaded_at"].Value<long>(),
-                                    };
-                                    if (v["retention_days"] != null) entry["retention_days"] = v["retention_days"].Value<int>();
-                                    // preserve transcode-state fields the background poller writes. without this theyd be dropped on read and the dock would never show the "processing on streamable" badge.
-                                    if (v["shortcode"] != null) entry["shortcode"] = v["shortcode"].Value<string>();
-                                    if (v["ready"] != null) entry["ready"] = v["ready"].Value<bool>();
-                                    if (v["transcode_status"] != null) entry["transcode_status"] = v["transcode_status"].Value<int>();
-                                    if (v["transcode_percent"] != null) entry["transcode_percent"] = v["transcode_percent"].Value<int>();
-                                    if (v["failed"] != null) entry["failed"] = v["failed"].Value<bool>();
-                                    if (cmpEntry != null)
-                                    {
-                                        entry["cmp_mode"] = cmpEntry["cmp_mode"];
-                                        entry["cmp_mtime"] = cmpEntry["cmp_mtime"];
-                                        entry["cmp_ts"] = cmpEntry["cmp_ts"];
-                                        entry["cmp_pre"] = cmpEntry["cmp_pre"];
-                                        entry["cmp_ver"] = cmpEntry["cmp_ver"];
-                                    }
-                                    db[prop.Name] = entry;
+                                    entry["cmp_mode"] = cmpEntry["cmp_mode"];
+                                    entry["cmp_mtime"] = cmpEntry["cmp_mtime"];
+                                    entry["cmp_ts"] = cmpEntry["cmp_ts"];
+                                    entry["cmp_pre"] = cmpEntry["cmp_pre"];
+                                    entry["cmp_ver"] = cmpEntry["cmp_ver"];
                                 }
-                            }
-                            else if (cmpEntry != null)
-                            {
-                                // compress-only entry: clip has never been uploaded but its compress history is known. keep it.
-                                db[prop.Name] = cmpEntry;
+                                db[prop.Name] = entry;
                             }
                         }
+                        else if (cmpEntry != null)
+                        {
+                            // compress-only entry: clip has never been uploaded but its compress history is known. keep it.
+                            db[prop.Name] = cmpEntry;
+                        }
                     }
-                    catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
-                    {
-                        Log.Write("Read-ClipsDb error: " + ex.Message);
-                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("Read-ClipsDb error: " + ex.Message);
                 }
                 Server.State.ClipsDbCache = db;
                 Server.State.ClipsDbCacheSig = sig;

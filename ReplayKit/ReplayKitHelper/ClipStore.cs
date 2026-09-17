@@ -9,7 +9,7 @@ namespace ReplayKitHelper
 {
     internal static class ClipStore
     {
-        public static bool Update(string path, Func<JObject, bool> change)
+        private static T WithLock<T>(string path, Func<string, T> action)
         {
             string full = Path.GetFullPath(path);
             string name;
@@ -23,9 +23,27 @@ namespace ReplayKitHelper
                     try { held = mutex.WaitOne(TimeSpan.FromSeconds(10)); }
                     catch (AbandonedMutexException) { held = true; }
                     if (!held) throw new IOException("Clip database is busy.");
-                    var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
-                    bool result = change(db);
-                    if (!result) return false;
+                    return action(full);
+                }
+                finally { if (held) mutex.ReleaseMutex(); }
+            }
+        }
+
+        public static T Read<T>(string path, Func<JObject, T> read)
+        {
+            return WithLock(path, full =>
+            {
+                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                return read(db);
+            });
+        }
+
+        public static bool Update(string path, Func<JObject, bool> change)
+        {
+            return WithLock(path, full =>
+            {
+                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                if (!change(db)) return false;
                     string temporary = full + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     try
                     {
@@ -39,10 +57,8 @@ namespace ReplayKitHelper
                         else File.Move(temporary, full);
                     }
                     finally { if (File.Exists(temporary)) File.Delete(temporary); }
-                    return result;
-                }
-                finally { if (held) mutex.ReleaseMutex(); }
-            }
+                return true;
+            });
         }
 
         public static bool SetTranscode(string path, string clip, string shortcode, int status, int percent)
