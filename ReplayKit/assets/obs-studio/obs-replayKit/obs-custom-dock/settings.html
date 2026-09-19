@@ -3214,7 +3214,7 @@
     setUpdateStatus("Checking...", "");
     setUpdateReleaseLink("", false);
     try {
-      const data = await helperJson("update/check?t=" + Date.now());
+      const data = await helperJson("update/check?manual=1&t=" + Date.now());
       if (!data.updateAvailable) {
         setUpdateStatus(data.message || ("ReplayKit is up to date" + (data.installedVersion ? " (" + data.installedVersion + ")" : "")), "good");
         return;

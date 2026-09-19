@@ -131,18 +131,19 @@ namespace ReplayKitHelper
             public string Name = "";
         }
 
-        // one github hit per TTL instead of one per check. the startup check, the settings tab and the updater window
-        // all funnel through here, and the release notes only change when a release is published.
+        // one github hit per TTL instead of one per check -- the startup check, auto checks and the updater window share this cache for 30 minutes since release notes only change when a release is published, while the Check for updates button passes manual and only trusts an answer under a minute old because it is effectively a forced refresh; whichever fetch actually runs refreshes the cache for everyone
         private static readonly TimeSpan ReleaseCacheTtl = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan ManualCheckCacheTtl = TimeSpan.FromMinutes(1);
         private static readonly object ReleaseCacheGate = new object();
         private static ReleaseInfo _releaseCache;
         private static DateTime _releaseCacheAtUtc = DateTime.MinValue;
 
-        public static ReleaseInfo GetLatestRelease()
+        public static ReleaseInfo GetLatestRelease(bool manual = false)
         {
+            TimeSpan maxAge = manual ? ManualCheckCacheTtl : ReleaseCacheTtl;
             lock (ReleaseCacheGate)
             {
-                if (_releaseCache != null && DateTime.UtcNow - _releaseCacheAtUtc < ReleaseCacheTtl)
+                if (_releaseCache != null && DateTime.UtcNow - _releaseCacheAtUtc < maxAge)
                     return _releaseCache;
             }
             var fetched = FetchLatestRelease();
@@ -237,12 +238,12 @@ namespace ReplayKitHelper
             return null;
         }
 
-        public static JObject GetUpdateStatus()
+        public static JObject GetUpdateStatus(bool manual = false)
         {
             try
             {
                 string installed = NormalizeVersion(GetInstalledVersion());
-                var latest = GetLatestRelease();
+                var latest = GetLatestRelease(manual);
                 int cmp = CompareVersion(installed, latest.LatestVersion);
                 // every check funnels through here, so this is the one place that has to raise the bell notification. keyed on the version, so the checks that run on each startup refresh the same row instead of stacking duplicates.
                 if (cmp < 0) Notifications.AnnounceUpdate(latest.LatestVersion, latest.Body, latest.HtmlUrl);

@@ -747,7 +747,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
                 if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
-                HttpResponse.SendJson(stream, 200, Update.GetUpdateStatus());
+                HttpResponse.SendJson(stream, 200, Update.GetUpdateStatus(Q("manual") == "1"));
                 return false;
             }
 
