@@ -186,7 +186,7 @@
     display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:12px; color:var(--text);
     cursor:pointer; white-space:nowrap; user-select:none;
   }
-  .ctx-item svg { width:14px; height:14px; fill:currentColor; flex-shrink:0; margin-left:auto; }
+  .ctx-item svg { width:16px; height:16px; fill:currentColor; flex-shrink:0; }
   .ctx-item:hover { background:var(--button_bg_hover); }
   .ctx-item.is-danger { color:var(--red); }
   .ctx-item.is-danger:hover { background:rgba(227, 59, 87, .16); color:var(--red); }
@@ -389,10 +389,10 @@
     resetAllArmedDeleteButtons();
     ctxTargetId = id;
     const parts = [item.read
-      ? '<div class="ctx-item" data-action="unread"><span>Mark as unread</span>' + UNREAD_ICON + "</div>"
-      : '<div class="ctx-item" data-action="read"><span>Mark as read</span>' + READ_ICON + "</div>"];
-    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link"><span>Open release page</span>' + LINK_ICON + "</div>");
-    parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete"><span>Delete</span>' + TRASH_ICON + "</div>");
+      ? '<div class="ctx-item" data-action="unread">' + UNREAD_ICON + "<span>Mark as unread</span></div>"
+      : '<div class="ctx-item" data-action="read">' + READ_ICON + "<span>Mark as read</span></div>"];
+    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>Open release page</span></div>");
+    parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete">' + TRASH_ICON + "<span>Delete</span></div>");
     ctxMenu.innerHTML = parts.join("");
     ctxMenu.classList.add("is-open");
     const width = ctxMenu.offsetWidth || 180;

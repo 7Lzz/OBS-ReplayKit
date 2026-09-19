@@ -1598,6 +1598,16 @@
     transform: translateY(0) scale(1);
     transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
   }
+  /* group labels plus a left icon rail let the eye jump to a group by its name and then to a row by its glyph -- the icons used to sit a whole menu width from the text they described and one row had none, which broke the column; label style matches .clip-sort-heading so the two menus stay related */
+  .menu-heading {
+    padding: 8px 14px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    color: var(--text_muted);
+    user-select: none;
+  }
+  .menu-heading:first-child { padding-top: 5px; }
   .menu-item {
     display: flex;
     align-items: center;
@@ -1610,18 +1620,17 @@
     user-select: none;
   }
   .menu-item svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     fill: currentColor;
     flex-shrink: 0;
   }
   .menu-item:hover { background: var(--button_bg_hover); }
   .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
-  /* Create Link / Copy Link: keep the row text white like every other row, only the icon carries the blue accent. */
-  .menu-item.link-menu-item .menu-item-icon { color: var(--link_accent); }
-  .menu-item.link-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
+  /* the share group (Create Link, Copy to clipboard) carries the blue accent on its icons only, the row text stays white like every other row */
+  .menu-item.share-menu-item .menu-item-icon { color: var(--link_accent); }
+  .menu-item.share-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
   .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--amber); }
-  .menu-item .menu-item-icon { margin-left: auto; }
   .menu-separator {
     height: 1px;
     margin: 4px 0;
@@ -2880,7 +2889,7 @@
   const CLIP_HOVER_PROFILES = {
     control: ".btn, .tab, .tab-action, .bulk-icon-btn, .bulk-clear, .icon-btn, .play-toggle-btn, .volume-btn, .settings-btn, .speed-step-btn, .speed-pill, .compress-mode-card, .trim-info .preview-btn, .icon-mini-btn, .favorite-btn, .select-clip-btn",
     row: ".menu-item, .clip-sort-item",
-    accent: ".link-menu-item",
+    accent: ".share-menu-item",
     danger: ".delete-menu-item",
     surface: ".volume-control",
   };
@@ -3027,6 +3036,9 @@
     CONTENT_COPY: _svgInner(_RKI["action/content-copy"]),
     COMPRESS: _svgInner(_RKI["action/compress"]),
     DUPLICATE: _svgInner(_RKI["action/duplicate"]),
+    CLIPBOARD: _svgInner(_RKI["action/clipboard"]),
+    CHECK_CIRCLE: _svgInner(_RKI["action/check-circle"]),
+    FOLDER_OPEN: _svgInner(_RKI["action/folder-open"]),
     PLAY: _svgInner(_RKI["player/play"]),
     PAUSE: _svgInner(_RKI["player/pause"]),
     FULLSCREEN_EXIT: _svgInner(_RKI["player/fullscreen-exit"]),
@@ -4871,47 +4883,49 @@
                 <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
               </button>
               <div class="menu-dropdown">
-                <div class="menu-item link-menu-item">
-                  <span class="menu-item-label">Create Link</span>
+                <div class="menu-heading">Share</div>
+                <div class="menu-item share-menu-item link-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.LINK}</svg>
+                  <span class="menu-item-label">Create Link</span>
                 </div>
-                <div class="menu-separator"></div>
-                <div class="menu-item favorite-menu-item">
-                  <span class="menu-item-label">Favorite</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.STAR_BORDER}</svg>
-                </div>
-                <div class="menu-item select-menu-item">
-                  <span class="menu-item-label">Select</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.GRID}</svg>
-                </div>
-                <div class="menu-separator"></div>
-                <div class="menu-item rename-menu-item">
-                  <span>Edit name</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
-                </div>
-                <div class="menu-item duplicate-menu-item">
-                  <span>Duplicate</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.DUPLICATE}</svg>
-                </div>
-                <div class="menu-item trim-clip-item">
-                  <span>Edit clip</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
-                </div>
-                <div class="menu-item clipboard-clip-item">
+                <div class="menu-item share-menu-item clipboard-clip-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CLIPBOARD}</svg>
                   <span>Copy to clipboard</span>
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_COPY}</svg>
+                </div>
+                <div class="menu-heading">Edit</div>
+                <div class="menu-item trim-clip-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
+                  <span>Edit clip</span>
+                </div>
+                <div class="menu-item rename-menu-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
+                  <span>Edit name</span>
                 </div>
                 <div class="menu-item compress-clip-item">
-                  <span>Compress&hellip;</span>
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
+                  <span>Compress&hellip;</span>
+                </div>
+                <div class="menu-heading">Organize</div>
+                <div class="menu-item favorite-menu-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.STAR_BORDER}</svg>
+                  <span class="menu-item-label">Favorite</span>
+                </div>
+                <div class="menu-item select-menu-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CHECK_CIRCLE}</svg>
+                  <span class="menu-item-label">Select</span>
+                </div>
+                <div class="menu-item duplicate-menu-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.DUPLICATE}</svg>
+                  <span>Duplicate</span>
                 </div>
                 <div class="menu-item open-folder-item">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.FOLDER_OPEN}</svg>
                   <span>Open file location</span>
                 </div>
                 <div class="menu-separator"></div>
                 <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" title="Delete clip" aria-label="Delete clip">
-                  <span class="menu-item-label">Delete</span>
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
+                  <span class="menu-item-label">Delete</span>
                 </div>
               </div>
             </div>
@@ -5533,6 +5547,7 @@
 
     // The same menu is available from the visible 3-dot button or a right-click anywhere on the clip. Its top-left corner follows the pointer, then clamps to the viewport so every item stays reachable.
     function openCardMenuAtPointer(e) {
+      if (window.RKTooltip) RKTooltip.hide();
       resetAllArmedDeleteButtons();
       document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
         if (d !== menuDropdown) {
@@ -7528,10 +7543,9 @@
   }
   if (bulkClearBtn) bulkClearBtn.addEventListener("click", clearClipSelection);
 
-  // tooltips come from the shared _tooltip partial; the only page-specific rule is that the sort trigger goes quiet
-  // while its own menu is open, since the panel already says what it is.
+  // tooltips come from the shared _tooltip partial; the page-specific rule is that a trigger goes quiet while its own menu is open, since the panel already says what it is -- the 3-dot tip used to sit on top of the menus first row and hide it
   if (window.RKTooltip) {
-    RKTooltip.suppressWhen((btn) => btn === sortButton && sortWrap && sortWrap.classList.contains("is-open"));
+    RKTooltip.suppressWhen((btn) => (btn === sortButton && sortWrap && sortWrap.classList.contains("is-open")) || (btn.classList.contains("menu-btn") && !!btn.closest(".card.menu-open")));
   }
 
   // keep the buttons enabled/disabled state in sync with the current clip list every render.
