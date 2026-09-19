@@ -5545,7 +5545,7 @@
       actionButton.click();
     });
 
-    // The same menu is available from the visible 3-dot button or a right-click anywhere on the clip. Its top-left corner follows the pointer, then clamps to the viewport so every item stays reachable.
+    // The same menu is available from the visible 3-dot button or a right-click anywhere on the clip. Its top-left corner follows the pointer, then clamps to the visible scroll area so every item stays reachable.
     function openCardMenuAtPointer(e) {
       if (window.RKTooltip) RKTooltip.hide();
       resetAllArmedDeleteButtons();
@@ -5555,14 +5555,34 @@
         }
       });
       const rect = card.getBoundingClientRect();
+      // the menu is painted inside .scroll-area, which clips at its own edge minus the scrollbar and starts below the toolbar -- clamping to the window instead let the menu slide under that edge, slicing off its border and rounded corners on the side it pressed against
+      const area = card.closest(".scroll-area");
+      const bounds = area && area.clientWidth > 0 ? area.getBoundingClientRect() : null;
+      const boundsLeft = Math.max(0, bounds ? bounds.left : 0);
+      const boundsTop = Math.max(0, bounds ? bounds.top : 0);
+      const boundsRight = Math.min(window.innerWidth, bounds ? bounds.left + area.clientWidth : window.innerWidth);
+      const boundsBottom = Math.min(window.innerHeight, bounds ? bounds.top + area.clientHeight : window.innerHeight);
+      const edge = 8;
+      // cleared first so a cap from an earlier open does not shrink the measurement below the natural height; a window too short for the whole menu gets a capped height with its own scrollbar instead of a hard cut
+      menuDropdown.style.maxHeight = "";
+      menuDropdown.style.overflowY = "";
       const width = menuDropdown.offsetWidth || 190;
-      const height = menuDropdown.offsetHeight || 280;
-      const minLeft = 8 - rect.left;
-      const maxLeft = window.innerWidth - width - 8 - rect.left;
-      const minTop = 8 - rect.top;
-      const maxTop = window.innerHeight - height - 8 - rect.top;
-      const left = Math.max(minLeft, Math.min(maxLeft, e.clientX - rect.left));
-      const top = Math.max(minTop, Math.min(maxTop, e.clientY - rect.top));
+      const room = boundsBottom - boundsTop - edge * 2;
+      let height = menuDropdown.offsetHeight || 280;
+      if (height > room && room > 0) {
+        height = room;
+        menuDropdown.style.maxHeight = room + "px";
+        menuDropdown.style.overflowY = "auto";
+      }
+      // the menu is positioned against the cards padding box, so the 1px card border has to come off the pointer offset
+      const originX = rect.left + card.clientLeft;
+      const originY = rect.top + card.clientTop;
+      const minLeft = boundsLeft + edge - originX;
+      const maxLeft = boundsRight - width - edge - originX;
+      const minTop = boundsTop + edge - originY;
+      const maxTop = boundsBottom - height - edge - originY;
+      const left = Math.max(minLeft, Math.min(maxLeft, e.clientX - originX));
+      const top = Math.max(minTop, Math.min(maxTop, e.clientY - originY));
       menuDropdown.style.setProperty("--menu-left", left + "px");
       menuDropdown.style.setProperty("--menu-top", top + "px");
       menuDropdown.classList.add("is-open");
