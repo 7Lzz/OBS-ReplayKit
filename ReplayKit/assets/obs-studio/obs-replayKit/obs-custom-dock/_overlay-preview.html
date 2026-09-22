@@ -474,7 +474,7 @@
   // obs owns the real position, so poll it while the section is on screen -- moving the item in the projector shows up here without a reload. skipped mid-drag so it cannot fight the pointer.
   async function pollPosition() {
     if (!running) return;
-    if (!drag && !posDirty && document.visibilityState === "visible" && screenEl.offsetParent !== null) {
+    if (!drag && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
       try {
         var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
         var d = await r.json();

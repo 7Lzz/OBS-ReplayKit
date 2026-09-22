@@ -158,6 +158,7 @@ namespace ReplayKitHelper
             try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { ReplaykitSettings.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
+            try { ReplaykitSettings.EnsureObsVideoMatchesSettingsAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettingsAtStartup: " + ex.Message); }
             try { Upload.ResumeTranscodePollsAtStartup(); } catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: " + ex.Message); }
             try { ToastNotify.EnsureRegistered(Upload.ResolveToastIconPath()); } catch (Exception ex) { Log.Write("ToastNotify.EnsureRegistered: " + ex.Message); }
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }

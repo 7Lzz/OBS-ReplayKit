@@ -299,6 +299,7 @@ namespace ReplayKitSetup
             ["debugLoggingEnabled"] = "debug_logging_enabled",
             ["clipSoundVolume"] = "clip_sound_volume",
             ["recordingSoundVolume"] = "recording_sound_volume",
+            ["micDeviceId"] = "microphone_device_id",
             ["shareMode"] = "share_mode",
             ["discord_screenshare_enabled"] = "discord_screenshare_enabled",
             ["discordScreenshareEnabled"] = "discord_screenshare_enabled",

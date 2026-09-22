@@ -37,6 +37,10 @@
     <Reference Include="System.Security" />
   </ItemGroup>
   <ItemGroup>
+    <!-- the rnnoise network weights, extracted from the copy obs studio ships; Rnnoise/COPYING is the license that goes with them and with Rnnoise.cs. -->
+    <EmbeddedResource Include="Rnnoise\rnnoise_model.bin" LogicalName="ReplayKitHelper.rnnoise_model.bin" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3537.50" />
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.34" PrivateAssets="all" />

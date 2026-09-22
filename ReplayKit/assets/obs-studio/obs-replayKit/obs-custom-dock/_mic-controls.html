@@ -1,0 +1,540 @@
+<!-- shared partial (helper #include target: mic-controls). the microphone control set -- device, noise suppression, a mic test with a level meter, volume, and a discord-style input sensitivity bar -- for the setup wizard and ReplayKit Settings, so both are the same controls. uses the own classes of settings.html (.combo, .check-row, .volume-*, .field-reset, .btn); the css those need is carried here because setup.html does not define it. host: RKMic.init({ get, set, onChange }); RKMic.collect() returns the mic* fields; RKMic.refresh() repaints from the host state; RKMic.setVisible(bool) tells it whether the controls are on screen (the level monitor only runs while they are); RKMic.stopTest() is setVisible(false). the monitor stops when the window is hidden and starts again when it is shown, following RKWindow from the window-state partial (hosts include that one first). the level monitor and the test run in the helper (GET/POST /mic/*) because obs cef cannot open the microphone; the helper runs the audio through noise suppression, the noise gate and the volume like the obs mic chain does, and every control change is pushed to the running session so the preview follows the controls. -->
+<style>
+  /* lifted from settings.html so the slider keeps its quarter tick lines; identical rules in settings.html are harmless */
+  .volume-control { width:100%; display:grid; grid-template-columns:72px minmax(180px,1fr); align-items:center; gap:8px; }
+  .volume-value { background:transparent; border-color:var(--field-solid,var(--field)); text-align:center; padding:0 8px; }
+  .volume-slider-wrap { position:relative; height:32px; min-width:0; }
+  .volume-slider-wrap::before, .sens-wrap::before {
+    content:""; position:absolute; z-index:0; left:0; right:0; top:50%; height:16px; transform:translateY(-50%);
+    background:
+      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
+      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
+    background-repeat:no-repeat; background-size:100% 16px; background-position:center; pointer-events:none;
+  }
+  .volume-slider {
+    position:relative; z-index:1; width:100%; height:32px; margin:0; appearance:none; -webkit-appearance:none;
+    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
+    background-repeat:no-repeat; background-size:100% 4px; background-position:center; border:0; outline:none;
+  }
+  .volume-slider::-webkit-slider-runnable-track { height:32px; background:transparent; border:0; }
+  .volume-slider::-webkit-slider-thumb {
+    appearance:none; -webkit-appearance:none; width:21px; height:10px; border:0; border-radius:5px;
+    background:var(--text); margin-top:11px; box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25); cursor:pointer;
+  }
+  .volume-slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  .field-wrap:has(> .field-reset) > .volume-control { width:auto; flex:1; }
+  .field-reset { flex:none; }
+  .field-reset.is-default { opacity:.4; }
+  .field-reset.is-default:hover { opacity:1; }
+  .form-row.tight { min-height:30px; }
+  /* the hidden attribute otherwise loses to the display:grid on .form-row, and setup.html has no rule for it */
+  .form-row[hidden] { display:none; }
+  /* setup.html standalone .check-row carries its own row padding; inside a form-row the grid already supplies it */
+  .form-row .check-row { padding:0; }
+  .combo.sep-after-first .combo-option:first-child { border-bottom:1px solid var(--line2); border-radius:0; margin-bottom:3px; padding-bottom:3px; }
+
+  /* small i that reveals the note for a control in the shared tooltip; the same rules as settings.html so setup.html gets the identical icon */
+  .info-dot {
+    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
+    display:inline-flex; vertical-align:middle;
+    border:0; background:transparent; color:var(--muted);
+    cursor:help; -webkit-user-select:none; user-select:none;
+    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content:""; width:100%; height:100%; background-color:currentColor;
+    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
+    mask:url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .info-dot:active { transform:scale(.94); }
+  .info-dot:focus { outline:none; }
+  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
+
+  .mic-test { flex:1; min-width:0; display:flex; align-items:center; gap:12px; }
+  .mic-test .btn { flex:none; min-width:104px; }
+  .mic-test .info-dot { margin-left:-4px; }
+  /* thin fixed-width bars whose count follows the row width, so a wider window gets more bars instead of fatter ones; the leftover space is spread across the gaps so the row ends flush. --t is the bar position from 0 to 1 and blends the lit colour from warning to success */
+  .mic-meter { flex:1; min-width:0; height:32px; display:flex; align-items:center; justify-content:space-between; }
+  .mic-meter i { flex:none; width:3px; height:24px; border-radius:2px; background:var(--line); transition:background 70ms linear; }
+  .mic-meter i.is-lit { background:color-mix(in srgb, var(--success,#37D247) calc(var(--t) * 100%), var(--warning,#E2A33B)); }
+  .mic-note { margin-left:0; }
+  .mic-note.is-bad { color:var(--danger); }
+
+  /* input sensitivity: amber left of the handle is cut off, green right of it is recorded, and the faint fill is the live mic level. the handle is the same 21px pill as the other sliders, so every position is offset by half of it to keep the colour split and the level fill lined up with the handle centre */
+  .sens-wrap { position:relative; height:32px; min-width:0; --p:0; --lvl:0; --on:0; }
+  .sens-track {
+    position:absolute; left:0; right:0; top:50%; height:8px; transform:translateY(-50%); border-radius:4px; overflow:hidden;
+    background:linear-gradient(to right,
+      var(--warning,#E2A33B) 0, var(--warning,#E2A33B) calc(var(--p) * (100% - 21px) + 10.5px),
+      var(--success,#37D247) calc(var(--p) * (100% - 21px) + 10.5px), var(--success,#37D247) 100%);
+  }
+  .sens-level { position:absolute; left:0; top:0; bottom:0; width:calc(var(--lvl) * (100% - 21px) + 10.5px * var(--on)); background:rgba(var(--text-rgb),.34); }
+  .sens-slider {
+    position:relative; z-index:1; width:100%; height:32px; margin:0; appearance:none; -webkit-appearance:none;
+    background:transparent; border:0; outline:none; cursor:pointer;
+  }
+  .sens-slider::-webkit-slider-runnable-track { height:32px; background:transparent; border:0; }
+  .sens-slider::-webkit-slider-thumb {
+    appearance:none; -webkit-appearance:none; width:21px; height:10px; border:0; border-radius:5px;
+    background:var(--text); margin-top:11px; box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25); cursor:pointer;
+  }
+  .sens-slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+</style>
+<div class="form-row" data-search="microphone mic input device">
+  <div class="label">Microphone</div>
+  <div class="field-wrap">
+    <div class="combo sep-after-first" data-self-wired id="micDevice" tabindex="0" role="combobox" aria-expanded="false" aria-label="Microphone">
+      <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+      <div class="combo-menu" role="listbox"></div>
+    </div>
+  </div>
+</div>
+<div class="form-row tight" data-search="noise suppression noise removal background noise keyboard fan">
+  <div></div>
+  <label class="check-row"><input type="checkbox" id="micNoise"><span>Noise suppression</span><button class="info-dot" type="button" aria-label="About noise suppression" title="Removes background noise like keyboard clicks and fans from your microphone. Applied by OBS to clips and recordings."></button></label>
+</div>
+<div class="form-row" data-search="mic test hear yourself microphone level meter">
+  <div></div>
+  <div class="field-wrap">
+    <div class="mic-test">
+      <button class="btn is-primary" type="button" id="micTestBtn">Mic Test</button>
+      <button class="info-dot" type="button" aria-label="About the mic test" title="Plays your microphone back with your volume, input sensitivity and noise suppression applied, the same way OBS applies them to clips and recordings. Change any of them while it plays to hear the difference straight away. Use headphones to avoid feedback."></button>
+      <div class="mic-meter" id="micMeter" role="img" aria-label="Microphone level"></div>
+    </div>
+  </div>
+</div>
+<div class="form-row tight" id="micTestErrorRow" hidden>
+  <div></div>
+  <div class="hint mic-note is-bad" id="micTestNote" role="status" aria-live="polite"></div>
+</div>
+<div class="form-row" data-search="microphone volume gain input level">
+  <div class="label">Microphone Volume</div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="micVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Microphone volume">
+      <div class="volume-slider-wrap"><input class="volume-slider" id="micVolume" type="range" min="0" max="200" step="1" aria-label="Microphone volume slider"></div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-mic-reset="micVolume" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row" data-search="input sensitivity noise gate threshold cut off gate microphone">
+  <div class="label">Input Sensitivity <button class="info-dot" type="button" aria-label="About input sensitivity" title="Anything quieter than the handle is cut off. Talk and watch the bar: keep your voice to the right of the handle and background noise to the left. All the way left turns the cut-off off."></button></div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels">
+      <div class="sens-wrap" id="micSenseWrap">
+        <div class="sens-track"><div class="sens-level" id="micSenseLevel"></div></div>
+        <input class="sens-slider" id="micSense" type="range" min="-96" max="0" step="1" aria-label="Input sensitivity slider">
+      </div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<script>
+(function () {
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var DEF = { micDeviceId:"default", micVolume:100, micNoiseSuppression:true, micInputSensitivity:-50 };
+  var VOL_MIN = 0, VOL_MAX = 200, SENS_MIN = -96, SENS_MAX = 0, BAR_WIDTH = 3, BAR_GAP = 3, BARS_MIN = 16, BARS_MAX = 240, POLL_MS = 66, FLOOR_DB = -60;
+  var host = { get:function (k) { return DEF[k]; }, set:function () {}, onChange:function () {} };
+  var st = Object.assign({}, DEF);
+  var devices = [{ value:"default", label:"Default" }];
+
+  // the page states what it wants the helper to be doing (desired) and reconcile() walks the real state (mode) toward it one request at a time: off, a silent level monitor that feeds the sensitivity bar, or the playback test
+  var mode = "off", desired = "off";
+  var opening = false, restartPending = false, polling = false, blocked = false, visible = !("IntersectionObserver" in window);
+  var failures = 0, recoveries = 0, noteError = "";
+  var pollTimer = 0, meterTimer = 0, paramsTimer = 0, sentSig = "";
+  var target = 0, display = 0, lastLit = -1;
+  var senseTarget = 0, senseDisplay = 0, lastSenseLvl = -1;
+
+  var combo = document.getElementById("micDevice");
+  var comboLabel = combo.querySelector(".combo-label"), comboMenu = combo.querySelector(".combo-menu");
+  var noise = document.getElementById("micNoise");
+  var testBtn = document.getElementById("micTestBtn");
+  var meter = document.getElementById("micMeter");
+  var note = document.getElementById("micTestNote"), noteRow = document.getElementById("micTestErrorRow");
+  var slider = document.getElementById("micVolume"), volNum = document.getElementById("micVolumeValue");
+  var resetVol = document.querySelector('[data-mic-reset="micVolume"]');
+  var sens = document.getElementById("micSense"), sensNum = document.getElementById("micSenseValue"), sensWrap = document.getElementById("micSenseWrap");
+  var resetSens = document.querySelector('[data-mic-reset="micInputSensitivity"]');
+  var bars = [];
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+  function clampVol(v) { v = Number(v); return Number.isFinite(v) ? Math.max(VOL_MIN, Math.min(VOL_MAX, Math.round(v))) : DEF.micVolume; }
+  function clampSens(v) { v = Number(v); return Number.isFinite(v) ? Math.max(SENS_MIN, Math.min(SENS_MAX, Math.round(v))) : DEF.micInputSensitivity; }
+  function fire() { host.onChange(); }
+  function setFill(value) { slider.style.setProperty("--fill", Math.max(0, Math.min(100, ((value - VOL_MIN) / (VOL_MAX - VOL_MIN)) * 100)) + "%"); }
+
+  function api(method, path, keepalive) {
+    return fetch(HELPER + "/" + path, { method:method, cache:"no-store", keepalive:!!keepalive }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok || body.ok === false) throw new Error(body.message || ("HTTP " + res.status));
+        return body;
+      });
+    });
+  }
+
+  function deviceOptions() {
+    var opts = devices.slice();
+    var cur = String(st.micDeviceId || "default").toLowerCase();
+    // a saved device that is unplugged still has to show as selected, otherwise the box would claim Default while obs is still pointed at the missing one
+    if (cur !== "default" && !opts.some(function (o) { return o.value.toLowerCase() === cur; }))
+      opts.push({ value:st.micDeviceId, label:"Unavailable device", blurb:"not connected" });
+    return opts;
+  }
+  function renderCombo() {
+    var opts = deviceOptions();
+    var cur = String(st.micDeviceId || "default").toLowerCase();
+    var sel = opts.find(function (o) { return o.value.toLowerCase() === cur; }) || opts[0];
+    comboLabel.textContent = sel.label;
+    var sig = sel.value + "|" + JSON.stringify(opts);
+    // rebuilding the open menu replays the option animation, so only touch it when something actually changed
+    if (comboMenu.dataset.sig === sig) return;
+    comboMenu.dataset.sig = sig;
+    comboMenu.innerHTML = opts.map(function (o) {
+      var blurb = o.blurb ? '<span class="option-blurb">- ' + esc(o.blurb) + "</span>" : "";
+      var on = o === sel;
+      return '<div class="combo-option' + (on ? " is-selected" : "") + '" role="option" aria-selected="' + on + '" data-v="' + esc(o.value) + '"><span>' + esc(o.label) + "</span>" + blurb + "</div>";
+    }).join("");
+  }
+  function loadDevices() {
+    return api("GET", "mic/devices?t=" + Date.now()).then(function (d) {
+      if (Array.isArray(d.devices) && d.devices.length) devices = d.devices;
+      renderCombo();
+    }).catch(function () {});
+  }
+
+  function closeCombo() { combo.classList.remove("is-open"); combo.setAttribute("aria-expanded", "false"); }
+  function openCombo() {
+    // the host page owns other combos and cannot see this click, so shut them here to keep one menu open at a time
+    document.querySelectorAll(".combo.is-open").forEach(function (c) {
+      if (c === combo) return;
+      c.classList.remove("is-open");
+      c.setAttribute("aria-expanded", "false");
+    });
+    combo.classList.add("is-open");
+    combo.setAttribute("aria-expanded", "true");
+    loadDevices();
+  }
+  function choose(value) {
+    if (String(value).toLowerCase() === String(st.micDeviceId).toLowerCase()) return;
+    st.micDeviceId = value;
+    host.set("micDeviceId", value);
+    renderCombo();
+    fire();
+    // whatever is running has to move to the newly chosen device, and a device that failed before deserves another try
+    if (mode !== "off" || opening) restartPending = true;
+    blocked = false;
+    noteError = "";
+    applyVisibility();
+  }
+  combo.querySelector(".combo-button").addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (combo.classList.contains("is-open")) closeCombo(); else openCombo();
+  });
+  comboMenu.addEventListener("click", function (e) {
+    var o = e.target.closest(".combo-option");
+    if (!o) return;
+    choose(o.dataset.v);
+    closeCombo();
+  });
+  combo.addEventListener("keydown", function (e) {
+    var opts = deviceOptions();
+    var cur = Math.max(0, opts.findIndex(function (o) { return o.value.toLowerCase() === String(st.micDeviceId).toLowerCase(); }));
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (combo.classList.contains("is-open")) closeCombo(); else openCombo(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeCombo(); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      choose(opts[(cur + (e.key === "ArrowDown" ? 1 : -1) + opts.length) % opts.length].value);
+    }
+  });
+  document.addEventListener("click", closeCombo);
+
+  noise.addEventListener("change", function () {
+    st.micNoiseSuppression = noise.checked;
+    host.set("micNoiseSuppression", st.micNoiseSuppression);
+    fire();
+    pushParams();
+    // confirm bounce on tick, matching the other checkboxes; only ever fires on a real toggle
+    if (noise.checked && noise.animate) {
+      try { noise.animate([{ transform:"scale(.72)" }, { transform:"scale(1.14)", offset:0.55 }, { transform:"scale(1)" }], { duration:200, easing:"cubic-bezier(.2, .7, .3, 1)" }); } catch (_) {}
+    }
+  });
+
+  function commitVolume(v) {
+    st.micVolume = clampVol(v);
+    slider.value = String(st.micVolume);
+    volNum.value = String(st.micVolume);
+    setFill(st.micVolume);
+    host.set("micVolume", st.micVolume);
+    refreshResets();
+    fire();
+    pushParams();
+  }
+  slider.addEventListener("input", function () { commitVolume(slider.value); });
+  volNum.addEventListener("change", function () { commitVolume(volNum.value); });
+  resetVol.addEventListener("click", function () { commitVolume(DEF.micVolume); });
+
+  // the far left of the bar is the gate being off, so it reads Off instead of a decibel value
+  function sensText(v) { return v <= SENS_MIN ? "Off" : v + " dB"; }
+  function parseSens(text) {
+    var t = String(text).trim().toLowerCase();
+    if (t === "off") return SENS_MIN;
+    var n = parseInt(t.replace(/[^\d-]/g, ""), 10);
+    return Number.isFinite(n) ? clampSens(n) : null;
+  }
+  function paintSens() {
+    sens.value = String(st.micInputSensitivity);
+    sensNum.value = sensText(st.micInputSensitivity);
+    sens.setAttribute("aria-valuetext", sensText(st.micInputSensitivity));
+    sensWrap.style.setProperty("--p", ((st.micInputSensitivity - SENS_MIN) / (SENS_MAX - SENS_MIN)).toFixed(4));
+  }
+  function commitSens(v) {
+    st.micInputSensitivity = clampSens(v);
+    paintSens();
+    host.set("micInputSensitivity", st.micInputSensitivity);
+    refreshResets();
+    fire();
+    pushParams();
+  }
+  sens.addEventListener("input", function () { commitSens(sens.value); });
+  sensNum.addEventListener("change", function () {
+    var v = parseSens(sensNum.value);
+    if (v === null) paintSens(); else commitSens(v);
+  });
+  resetSens.addEventListener("click", function () { commitSens(DEF.micInputSensitivity); });
+  function refreshResets() {
+    resetVol.classList.toggle("is-default", st.micVolume === DEF.micVolume);
+    resetSens.classList.toggle("is-default", st.micInputSensitivity === DEF.micInputSensitivity);
+  }
+
+  // the mic test bars follow the loudest output sample (after noise suppression, the gate and the volume) on a -60..0 dBFS scale; the sensitivity fill follows the loudest sample entering the gate, on the slider own scale, because that is what the obs noise gate compares to its threshold
+  function levelFraction(peak) {
+    var db = 20 * Math.log10(Math.max(Number(peak) || 0, 1e-6));
+    return Math.max(0, Math.min(1, (db - FLOOR_DB) / -FLOOR_DB));
+  }
+  function senseFraction(peak) {
+    var db = 20 * Math.log10(Math.max(Number(peak) || 0, 1e-6));
+    return Math.max(0, Math.min(1, (db - SENS_MIN) / (SENS_MAX - SENS_MIN)));
+  }
+  // bars keep one thin width and the count follows the meter width, so a wider window gets more bars instead of fatter ones; each bar carries its position so css can fade the lit colour from warning to success across the row
+  function buildBars() {
+    var width = meter.clientWidth;
+    var count = width > 0 ? Math.max(BARS_MIN, Math.min(BARS_MAX, Math.floor((width + BAR_GAP) / (BAR_WIDTH + BAR_GAP)))) : BARS_MIN;
+    if (count === bars.length) return;
+    meter.textContent = "";
+    bars = [];
+    for (var i = 0; i < count; i++) {
+      var el = document.createElement("i");
+      el.style.setProperty("--t", (i / (count - 1)).toFixed(4));
+      meter.appendChild(el);
+      bars.push(el);
+    }
+    lastLit = -1;
+    paintMeter(display);
+  }
+  function paintMeter(f) {
+    var lit = Math.round(f * bars.length);
+    if (lit === lastLit) return;
+    for (var i = 0; i < bars.length; i++) bars[i].classList.toggle("is-lit", i < lit);
+    lastLit = lit;
+  }
+  function paintSenseLevel(f) {
+    var q = Math.round(f * 1000);
+    if (q === lastSenseLvl) return;
+    lastSenseLvl = q;
+    sensWrap.style.setProperty("--lvl", (q / 1000).toFixed(3));
+    sensWrap.style.setProperty("--on", q > 2 ? "1" : "0");
+  }
+  // a plain timer rather than requestAnimationFrame, so the meters keep moving in hosts that throttle or skip animation frames; a fast rise and a slow fall keeps them readable
+  function frame() {
+    display = target > display ? target : Math.max(target, display - 0.06);
+    senseDisplay = senseTarget > senseDisplay ? senseTarget : Math.max(senseTarget, senseDisplay - 0.05);
+    paintMeter(display);
+    paintSenseLevel(senseDisplay);
+    if (mode === "off" && display <= 0.002 && senseDisplay <= 0.002 && meterTimer) { clearInterval(meterTimer); meterTimer = 0; }
+  }
+  function kickMeter() { if (!meterTimer) meterTimer = setInterval(frame, 33); }
+
+  function testOn() { return desired === "test" && mode === "test"; }
+  // the guidance lives in the info icons, so this row only appears when something went wrong
+  function renderNote() {
+    note.textContent = noteError;
+    noteRow.hidden = !noteError;
+  }
+  function syncTestUi() {
+    var starting = opening && desired === "test";
+    testBtn.textContent = starting ? "Starting..." : (testOn() ? "Stop Test" : "Mic Test");
+    testBtn.disabled = starting;
+    renderNote();
+  }
+
+  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = 0; } }
+  function startPolling() { stopPolling(); pollTimer = setInterval(poll, POLL_MS); kickMeter(); }
+  function paramQuery() { return "volume=" + st.micVolume + "&gate=" + st.micInputSensitivity + "&ns=" + (st.micNoiseSuppression ? 1 : 0); }
+  function sessionUrl(playback) {
+    return "mic/test/start?device=" + encodeURIComponent(st.micDeviceId) + "&" + paramQuery() + "&playback=" + (playback ? 1 : 0);
+  }
+
+  function reconcile() {
+    if (opening) return;
+    if (desired === "off") { if (mode !== "off") closeSession(false); return; }
+    if (desired === mode && !restartPending) return;
+    openSession(desired === "test");
+  }
+  function openSession(playback) {
+    opening = true;
+    restartPending = false;
+    syncTestUi();
+    sentSig = paramQuery();
+    api("POST", sessionUrl(playback)).then(function () {
+      mode = playback ? "test" : "monitor";
+      failures = 0;
+      startPolling();
+    }).catch(function (e) {
+      // the helper drops the running session before it tries the new one, so a failed open leaves nothing running
+      mode = "off";
+      stopPolling();
+      target = 0;
+      senseTarget = 0;
+      noteError = (e && e.message) || "Could not open the microphone.";
+      // a test that cannot play still leaves the level monitor worth trying; a monitor that cannot open is given up on until the user acts
+      desired = playback ? "monitor" : "off";
+      blocked = !playback;
+      kickMeter();
+    }).then(function () { opening = false; syncTestUi(); reconcile(); pushParams(); });
+  }
+  function closeSession(keepalive) {
+    mode = "off";
+    stopPolling();
+    target = 0;
+    senseTarget = 0;
+    syncTestUi();
+    kickMeter();
+    return api("POST", "mic/test/stop", keepalive).catch(function () {});
+  }
+  function sessionEnded(message) {
+    mode = "off";
+    stopPolling();
+    target = 0;
+    senseTarget = 0;
+    kickMeter();
+    if (message || ++recoveries > 3) {
+      desired = "off";
+      blocked = true;
+      noteError = message || "The microphone stopped unexpectedly.";
+      syncTestUi();
+      return;
+    }
+    // it ended without saying why (the helper restarted, or its keep-alive lapsed) while the page still wants it, so open it again a few times before giving up
+    syncTestUi();
+    reconcile();
+  }
+  function poll() {
+    if (mode === "off" || polling) return;
+    // a hidden window keeps its timers, so it has to notice and stop itself or the microphone would stay open behind a closed window
+    if (!RKWindow.up()) { applyVisibility(); return; }
+    polling = true;
+    api("GET", "mic/test/level?t=" + Date.now()).then(function (d) {
+      failures = 0;
+      if (!d.active) { sessionEnded(d.message || ""); return; }
+      recoveries = 0;
+      senseTarget = senseFraction(d.gatePeak);
+      target = mode === "test" ? levelFraction(d.peak) : 0;
+    }).catch(function () {
+      if (++failures < 3) return;
+      mode = "off";
+      desired = "off";
+      blocked = true;
+      stopPolling();
+      target = 0;
+      senseTarget = 0;
+      noteError = "Lost contact with ReplayKit, so the microphone stopped.";
+      syncTestUi();
+      kickMeter();
+    }).then(function () { polling = false; });
+  }
+
+  // the monitor and the test only run while the controls are on screen and the window is showing; anything else asks for off. gaining visibility clears an old error and tries again.
+  function applyVisibility() {
+    var want = visible && RKWindow.up();
+    if (!want) { blocked = false; desired = "off"; }
+    else if (desired === "off" && !blocked) desired = "monitor";
+    reconcile();
+  }
+  function setVisible(v) {
+    if (v && !visible) noteError = "";
+    visible = !!v;
+    if (visible) buildBars();
+    applyVisibility();
+    syncTestUi();
+  }
+  // the window is hidden rather than destroyed on close, so this page outlives it: the microphone stops the moment the window goes away and the monitor starts again when it comes back
+  RKWindow.onChange(function (up) {
+    if (up) { noteError = ""; recoveries = 0; buildBars(); }
+    applyVisibility();
+    syncTestUi();
+  });
+  buildBars();
+  if ("ResizeObserver" in window) new ResizeObserver(buildBars).observe(meter);
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) { setVisible(entries[entries.length - 1].isIntersecting); }).observe(testBtn);
+  }
+  window.addEventListener("pagehide", function () {
+    desired = "off";
+    if (mode === "off" && !opening) return;
+    mode = "off";
+    stopPolling();
+    api("POST", "mic/test/stop", true).catch(function () {});
+  });
+
+  testBtn.addEventListener("click", function () {
+    blocked = false;
+    noteError = "";
+    desired = testOn() ? "monitor" : "test";
+    syncTestUi();
+    reconcile();
+  });
+  // the running session takes the page values as they are, saved or not, so dragging a slider or ticking the box is heard straight away; a value the session already has is not sent again
+  function pushParams() {
+    if (mode === "off") return;
+    clearTimeout(paramsTimer);
+    paramsTimer = setTimeout(function () {
+      var sig = paramQuery();
+      if (mode === "off" || sig === sentSig) return;
+      sentSig = sig;
+      api("POST", "mic/test/params?" + sig).catch(function () { sentSig = ""; });
+    }, 40);
+  }
+
+  function paintControls() {
+    renderCombo();
+    noise.checked = !!st.micNoiseSuppression;
+    slider.value = String(st.micVolume);
+    volNum.value = String(st.micVolume);
+    setFill(st.micVolume);
+    paintSens();
+    refreshResets();
+  }
+  function pull() {
+    var dev = host.get("micDeviceId");
+    if (typeof dev === "string" && dev) st.micDeviceId = dev;
+    var vol = host.get("micVolume");
+    if (vol !== undefined && vol !== null) st.micVolume = clampVol(vol);
+    var ns = host.get("micNoiseSuppression");
+    if (ns !== undefined && ns !== null) st.micNoiseSuppression = !!ns;
+    var gate = host.get("micInputSensitivity");
+    if (gate !== undefined && gate !== null) st.micInputSensitivity = clampSens(gate);
+  }
+
+  window.RKMic = {
+    init: function (h) { if (h) host = Object.assign(host, h); pull(); paintControls(); loadDevices(); },
+    collect: function () { return { micDeviceId:st.micDeviceId, micVolume:st.micVolume, micNoiseSuppression:st.micNoiseSuppression, micInputSensitivity:st.micInputSensitivity }; },
+    refresh: function () { pull(); paintControls(); pushParams(); },
+    setVisible: setVisible,
+    stopTest: function () { setVisible(false); },
+  };
+})();
+</script>

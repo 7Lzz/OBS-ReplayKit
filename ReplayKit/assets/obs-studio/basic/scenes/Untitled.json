@@ -94,14 +94,40 @@
             "private_settings": {},
             "filters": [
                 {
+                    "prev_ver": 537001986,
+                    "name": "ReplayKit Noise Suppression",
+                    "uuid": "c6a3f0d2-7b1e-4f6a-9d0c-3e5b8a2f1d47",
+                    "id": "noise_suppress_filter",
+                    "versioned_id": "noise_suppress_filter_v2",
+                    "settings": {
+                        "method": "rnnoise"
+                    },
+                    "mixers": 255,
+                    "sync": 0,
+                    "flags": 0,
+                    "volume": 1.0,
+                    "balance": 0.5,
+                    "enabled": true,
+                    "muted": false,
+                    "push-to-mute": false,
+                    "push-to-mute-delay": 0,
+                    "push-to-talk": false,
+                    "push-to-talk-delay": 0,
+                    "hotkeys": {},
+                    "deinterlace_mode": 0,
+                    "deinterlace_field_order": 0,
+                    "monitoring_type": 0,
+                    "private_settings": {}
+                },
+                {
                     "prev_ver": 536936450,
                     "name": "Noise Gate",
                     "uuid": "ff36e5ae-44bd-4c03-b690-faa5d965c1b1",
                     "id": "noise_gate_filter",
                     "versioned_id": "noise_gate_filter",
                     "settings": {
-                        "open_threshold": -30.0,
-                        "close_threshold": -35.0
+                        "open_threshold": -50.0,
+                        "close_threshold": -55.0
                     },
                     "mixers": 255,
                     "sync": 0,
@@ -157,6 +183,9 @@
                     },
                     {
                         "value": "obs-browser-page.exe"
+                    },
+                    {
+                        "value": "OBSReplayKit.exe"
                     }
                 ],
                 "exclude": true

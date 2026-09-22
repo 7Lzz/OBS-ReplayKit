@@ -108,6 +108,7 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint dwFlags);
         [DllImport("user32.dll")] private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+        [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
 
         // dwmapi
         [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int attrValue, int attrSize);
@@ -269,7 +270,8 @@ namespace ReplayKitHelper
             return false;
         }
 
-        public static int CloseWindowsByTitle(string[] titlePrefixes, uint requireOwnerPid)
+        // removeTaskbarTab drops the taskbar button before the close so a window that takes a moment to go does not leave a ghost button behind; it is wrong for a window that is only hidden and shown again later, because ITaskbarList keeps a deleted tab deleted and that window never gets its button back
+        public static int CloseWindowsByTitle(string[] titlePrefixes, uint requireOwnerPid, bool removeTaskbarTab = true)
         {
             int closed = 0;
             foreach (var hWnd in EnumerateTopLevelWindows())
@@ -294,7 +296,7 @@ namespace ReplayKitHelper
                     GetWindowThreadProcessId(hWnd, out uint ownerPid);
                     if (ownerPid != requireOwnerPid && !IsObsFamilyProcess(ownerPid)) continue;
                 }
-                RemoveTaskbarTab(hWnd);
+                if (removeTaskbarTab) RemoveTaskbarTab(hWnd);
                 PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
                 closed++;
             }
@@ -931,6 +933,17 @@ namespace ReplayKitHelper
             SendMessage(hWnd, WM_NCLBUTTONDOWN, new IntPtr(HTCAPTION), IntPtr.Zero);
         }
 
+        // the dpi of the window as a scale factor (1.0 = 96 dpi); GetDpiForWindow needs win10 1607, and builds without it have no per-window dpi to read, so the scale stays 1
+        private static double GetWindowDpiScale(IntPtr hWnd)
+        {
+            try
+            {
+                uint dpi = GetDpiForWindow(hWnd);
+                return dpi > 0 ? dpi / 96.0 : 1.0;
+            }
+            catch (EntryPointNotFoundException) { return 1.0; }
+        }
+
         private static readonly HashSet<long> ResizeTracking = new HashSet<long>();
         private static readonly object ResizeTrackingLock = new object();
         private static bool _resizeBackgroundPrimed;
@@ -946,7 +959,7 @@ namespace ReplayKitHelper
             _resizeBackgroundPrimed = true;
         }
 
-        // spawns a background thread that polls GetAsyncKeyState(VK_LBUTTON) every 15ms (~66fps) and live-setwindowposs while the button stays down, clamped to [min,max]; the corner tracks the cursor at the offset it was grabbed at, so the drag is relative and the window never jumps. deliberately not message-based (WM_NCLBUTTONDOWN) -- that was tried and found unreliable due to cross-process timing races.
+        // spawns a background thread that polls GetAsyncKeyState(VK_LBUTTON) every 15ms (~66fps) and live-setwindowposs while the button stays down, clamped to [min,max] (logical pixels, scaled by the window dpi first); the corner tracks the cursor at the offset it was grabbed at, so the drag is relative and the window never jumps. deliberately not message-based (WM_NCLBUTTONDOWN) -- that was tried and found unreliable due to cross-process timing races.
         public static bool BeginResizeWindow(string needle, int minW, int minH, int maxW, int maxH)
         {
             var hWnd = FindObsWindow(needle);
@@ -958,6 +971,13 @@ namespace ReplayKitHelper
                 ResizeTracking.Add(key);
             }
             PrimeResizeBackground(hWnd);
+
+            // the limits arrive in logical pixels (they mirror the native setMinimumSize calls) while this process works in real pixels, so they are scaled by the dpi of the window being resized
+            double scale = GetWindowDpiScale(hWnd);
+            minW = (int)Math.Round(minW * scale);
+            minH = (int)Math.Round(minH * scale);
+            maxW = (int)Math.Round(maxW * scale);
+            maxH = (int)Math.Round(maxH * scale);
 
             // offset from the cursor to the corner it grabbed, sampled once. without it the first poll sizes the window to cursor-minus-origin, which teleports the corner onto the cursor before the drag has moved anywhere.
             GetCursorPos(out POINT grab);

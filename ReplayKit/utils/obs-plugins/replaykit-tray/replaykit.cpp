@@ -50,6 +50,8 @@
 #include <QCursor>
 #include <QSettings>
 #include <QMoveEvent>
+#include <QShowEvent>
+#include <QHideEvent>
 
 #include "browser-panel.hpp"
 
@@ -475,6 +477,9 @@ void StartWindowGeometryPoll()
 	g_geoPollTimer->start(5000);
 }
 
+// defined further down, once the notify panel and its owning bell both exist -- forward declared here so a window can take its own panel down when it hides, instead of leaving it floating with nothing left under it.
+static void HideNotifyPanelIfOwnedBy(QWidget *target);
+
 // CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore
 // that event after hiding the window so the browser stays usable when a hotkey reopens Clips immediately afterward.
 class ClipsWindow : public QWidget {
@@ -483,6 +488,7 @@ protected:
 	{
 		SaveClipsWindowGeometry(this);
 		hide();
+		HideNotifyPanelIfOwnedBy(this);
 		event->ignore();
 	}
 	// minimize is treated exactly like close -- hide the window instead of leaving a taskbar stub, and drop the WindowMinimized bit so the next ShowClips/ToggleClips brings it back at its normal (or maximized) size rather than still-minimized; deferred one tick since clearing the state mid WindowStateChange fights the window managers own minimize animation.
@@ -492,6 +498,7 @@ protected:
 		if (event->type() == QEvent::WindowStateChange && isMinimized()) {
 			QTimer::singleShot(0, this, [this]() {
 				hide();
+				HideNotifyPanelIfOwnedBy(this);
 				setWindowState(windowState() & ~Qt::WindowMinimized);
 			});
 		}
@@ -508,13 +515,40 @@ protected:
 	}
 };
 
+// cef does not reliably tell a page that its own window was hidden or shown again (clips.html and settings.html both carry fallbacks for that), so the window says it outright as a dom event the page can listen for
+static void TellPageWindowShown(QCefWidget *browser, bool shown)
+{
+	if (!browser)
+		return;
+	browser->executeJavaScript(shown ? "window.dispatchEvent(new CustomEvent('replaykit-window', { detail: { shown: true } }));"
+					 : "window.dispatchEvent(new CustomEvent('replaykit-window', { detail: { shown: false } }));");
+}
+
 // settings + setup host a cef browser the same way clips does, so they share its close rule -- hide, never destroy. destroying a cef-hosting qwidget mid-session trips the obs-browser#353 teardown race: the freed child browser keeps being asked to realise a native window every frame (CreateWindowEx "the parameter is incorrect", on repeat) and pegs the ui thread until obs is force-killed. the real delete is CloseCefWidgetsBeforeShutdown at module unload, the one point cef teardown is safe.
 class CefHostWindow : public QWidget {
+public:
+	// the page this window hosts, set as soon as its browser exists, so show and hide can be told to it
+	QPointer<QCefWidget> browser;
+
 protected:
 	void closeEvent(QCloseEvent *event) override
 	{
 		hide();
+		HideNotifyPanelIfOwnedBy(this);
 		event->ignore();
+	}
+	// a hidden window keeps its page alive, so the page is told when it stops and starts being on screen (minimize and restore count too) and can drop things like the microphone while nobody is looking
+	void showEvent(QShowEvent *event) override
+	{
+		QWidget::showEvent(event);
+		blog(LOG_INFO, "[replaykit-tray] '%s' window shown", windowTitle().toUtf8().constData());
+		TellPageWindowShown(browser, true);
+	}
+	void hideEvent(QHideEvent *event) override
+	{
+		QWidget::hideEvent(event);
+		blog(LOG_INFO, "[replaykit-tray] '%s' window hidden", windowTitle().toUtf8().constData());
+		TellPageWindowShown(browser, false);
 	}
 };
 
@@ -1440,6 +1474,13 @@ static void HideNotificationPanel()
 	PollNotificationCount();
 }
 
+// closing or minimizing a window only hides it, and hiding a window does not cascade to its owned top-level widgets the way minimizing does -- without this, a panel left open when its window closes stays visible with nothing under it; a no-op when the currently open panel belongs to a different window, since only one panel is ever open at once.
+static void HideNotifyPanelIfOwnedBy(QWidget *target)
+{
+	if (g_notifyPanelAnchor && g_notifyPanelAnchor->target() == target && g_notifyPanel && g_notifyPanel->isVisible())
+		HideNotificationPanel();
+}
+
 // the panel is built once and then shown/hidden, never destroyed: a fresh QCefWidget per open repaints white before the
 // page lands, which is the flash. same reason the Clips window only hides on close.
 static void ShowNotificationPanel(NotifyButton *anchor)
@@ -1609,7 +1650,7 @@ void CreateSettingsWindow()
 		return;
 	}
 
-	QWidget *win = new CefHostWindow();
+	CefHostWindow *win = new CefHostWindow();
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
 	win->setWindowTitle("ReplayKit Settings");
 	win->resize(980, 760);
@@ -1620,6 +1661,7 @@ void CreateSettingsWindow()
 	layout->setContentsMargins(0, 0, 0, 0);
 	QCefWidget *browser = g_cef->create_widget(win, "http://127.0.0.1:8767/settings-view", nullptr);
 	layout->addWidget(browser);
+	win->browser = browser;
 
 	ForceTaskbarButton(win);
 	win->show();
@@ -1799,7 +1841,7 @@ void CreateSetupWindow(bool quiet)
 		return;
 	}
 
-	QWidget *win = new CefHostWindow();
+	CefHostWindow *win = new CefHostWindow();
 	win->setAttribute(Qt::WA_DeleteOnClose, false);
 	win->setWindowTitle("ReplayKit Setup");
 	win->resize(820, 640);
@@ -1809,6 +1851,7 @@ void CreateSetupWindow(bool quiet)
 	layout->setContentsMargins(0, 0, 0, 0);
 	QCefWidget *browser = g_cef->create_widget(win, "http://127.0.0.1:8767/setup-view", nullptr);
 	layout->addWidget(browser);
+	win->browser = browser;
 
 	ForceTaskbarButton(win);
 	win->show();
@@ -2020,12 +2063,50 @@ void StopReplayKitCrashReporter()
 	}
 }
 
+// true when the foreground window is clips or a window it owns (the confirm dialog, the bell panel); cef keeps focus on a child hwnd, and windows still reports the top-level clips window as the foreground one
+static bool ClipsWindowIsForeground()
+{
+	if (!g_clipsWindow)
+		return false;
+	HWND foreground = GetForegroundWindow();
+	return foreground && GetAncestor(foreground, GA_ROOTOWNER) == (HWND)g_clipsWindow->winId();
+}
+
+// brings the already open clips window in front of whatever has focus. the keybind counts as input for this process, so the qt calls normally win the foreground; attaching to the input queue of the current foreground thread covers the times windows still refuses
+static void BringClipsForward()
+{
+	if (!g_clipsWindow)
+		return;
+	UnminimizeClips();
+	g_clipsWindow->raise();
+	g_clipsWindow->activateWindow();
+	HWND clips = (HWND)g_clipsWindow->winId();
+	if (GetForegroundWindow() != clips) {
+		HWND foreground = GetForegroundWindow();
+		DWORD foregroundThread = foreground ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+		DWORD thisThread = GetCurrentThreadId();
+		bool attached = foregroundThread && foregroundThread != thisThread && AttachThreadInput(thisThread, foregroundThread, TRUE);
+		BringWindowToTop(clips);
+		SetForegroundWindow(clips);
+		if (attached)
+			AttachThreadInput(thisThread, foregroundThread, FALSE);
+	}
+	blog(LOG_INFO, "[replaykit-tray] clips keybind: window was open without focus, brought forward (%s)",
+	     GetForegroundWindow() == clips ? "focused" : "windows kept the foreground elsewhere");
+}
+
 void ToggleClips()
 {
 	if (g_clipsWindow) {
 		if (g_clipsWindow->isVisible()) {
+			// the keybind only closes a clips window that has focus; one that is open but behind something else is brought forward instead
+			if (!ClipsWindowIsForeground()) {
+				BringClipsForward();
+				return;
+			}
 			SaveClipsWindowGeometry();
 			g_clipsWindow->hide();
+			HideNotifyPanelIfOwnedBy(g_clipsWindow);
 			return;
 		}
 		if (g_clipsBrowser)
@@ -3028,8 +3109,10 @@ protected:
 		// EXIT wont fire on a hide-to-tray, so capture position now.
 		SaveWindowGeometry("obsMainWindow", m_mw);
 		event->ignore();
-		if (m_mw)
+		if (m_mw) {
 			m_mw->hide();
+			HideNotifyPanelIfOwnedBy(m_mw);
+		}
 		return true;
 	}
 

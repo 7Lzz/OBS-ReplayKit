@@ -8,4 +8,11 @@
       </requestedPrivileges>
     </security>
   </trustInfo>
+  <!-- per-monitor v2 so windows hands this process real pixel sizes and positions; without it a scaled display reports a smaller screen to Screen.Bounds, the cursor and window rects. true/pm and PerMonitor are the fallbacks for older windows builds -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
 </assembly>

@@ -858,6 +858,7 @@
 </style>
 <link rel="stylesheet" href="rk-theme.css" />
 <!--#include interaction-states-->
+<!--#include window-state-->
 </head>
 <body>
 <div class="shell">
@@ -1103,7 +1104,39 @@
 
     <section class="page" id="page-audio">
       <div class="box">
+        <div class="box-title">Microphone</div>
+        <!--#include mic-controls-->
+      </div>
+      <div class="box">
         <div class="box-title">Sounds</div>
+        <div class="form-row">
+          <div class="label">Desktop Audio</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="desktopAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Desktop audio volume">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="Desktop audio volume slider">
+              </div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetDesktopAudioVolume" title="Reset to default">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Discord Audio</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="discordAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Discord audio volume">
+              <div class="volume-slider-wrap">
+                <input class="volume-slider" id="discordAudioVolume" type="range" min="0" max="200" step="1" aria-label="Discord audio volume slider">
+              </div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetDiscordAudioVolume" title="Reset to default">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
         <div class="form-row">
           <div class="label">Clipping Sound</div>
           <div class="field-wrap">
@@ -1594,6 +1627,8 @@
   const DEFAULT_SCREENSHARE_CAPTURE_MODE = "hybrid_auto";
   const DEFAULT_CLIP_SOUND_VOLUME = 25;
   const DEFAULT_RECORDING_SOUND_VOLUME = 25;
+  const DEFAULT_DESKTOP_AUDIO_VOLUME = 100;
+  const DEFAULT_DISCORD_AUDIO_VOLUME = 100;
   const state = {};
   let originalState = {};
   let dirty = false;
@@ -1699,6 +1734,10 @@
     clipSoundVolumeValue: document.getElementById("clipSoundVolumeValue"),
     recordingSoundVolume: document.getElementById("recordingSoundVolume"),
     recordingSoundVolumeValue: document.getElementById("recordingSoundVolumeValue"),
+    desktopAudioVolume: document.getElementById("desktopAudioVolume"),
+    desktopAudioVolumeValue: document.getElementById("desktopAudioVolumeValue"),
+    discordAudioVolume: document.getElementById("discordAudioVolume"),
+    discordAudioVolumeValue: document.getElementById("discordAudioVolumeValue"),
     motionBlurEnabled: document.getElementById("motionBlurEnabled"),
     motionBlurStrength: document.getElementById("motionBlurStrength"),
     motionBlurStrengthValue: document.getElementById("motionBlurStrengthValue"),
@@ -2233,6 +2272,11 @@
     return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
   }
 
+  function clampAudioVolume(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(200, n)) : 100;
+  }
+
   function clampOverlayScale(value) {
     const n = parseInt(value, 10);
     return Number.isFinite(n) ? Math.max(50, Math.min(200, n)) : 100;
@@ -2553,8 +2597,13 @@
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 25);
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 25);
+    syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, state.desktopAudioVolume ?? DEFAULT_DESKTOP_AUDIO_VOLUME, clampAudioVolume, 0, 200);
+    syncIntegerRangeControl(els.discordAudioVolume, els.discordAudioVolumeValue, state.discordAudioVolume ?? DEFAULT_DISCORD_AUDIO_VOLUME, clampAudioVolume, 0, 200);
     refreshFieldResetState("clipSoundVolume", DEFAULT_CLIP_SOUND_VOLUME);
     refreshFieldResetState("recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME);
+    refreshFieldResetState("desktopAudioVolume", DEFAULT_DESKTOP_AUDIO_VOLUME);
+    refreshFieldResetState("discordAudioVolume", DEFAULT_DISCORD_AUDIO_VOLUME);
+    if (window.RKMic) RKMic.refresh();
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
@@ -2618,6 +2667,8 @@
     state.recordingNotificationEnabled = els.recordingNotificationEnabled.checked;
     state.clipSoundVolume = clampVolume(els.clipSoundVolume.value);
     state.recordingSoundVolume = clampVolume(els.recordingSoundVolume.value);
+    state.desktopAudioVolume = clampAudioVolume(els.desktopAudioVolume.value);
+    state.discordAudioVolume = clampAudioVolume(els.discordAudioVolume.value);
     state.motionBlurEnabled = els.motionBlurEnabled.checked;
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
@@ -2629,6 +2680,7 @@
 
   function activatePage(name) {
     if (name !== "hotkeys") releaseHotkeyCapture();
+    if (window.RKMic) RKMic.setVisible(name === "audio");
     document.querySelectorAll(".nav-btn").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.page === name);
     });
@@ -2661,7 +2713,8 @@
     else RKOverlayPreview.redo();
   }, true);
 
-  document.querySelectorAll(".combo").forEach((combo) => {
+  // the shared partials wire their own combos (data-self-wired); claiming those here put two toggle handlers on one button, which opened then immediately closed the menu
+  document.querySelectorAll(".combo:not([data-self-wired])").forEach((combo) => {
     combo.querySelector(".combo-button").addEventListener("click", (e) => {
       e.stopPropagation();
       if (combo.classList.contains("is-disabled")) return;
@@ -2731,6 +2784,8 @@
   if (window.RKOverlayPreview) RKOverlayPreview.init(
     () => { try { readUi(); } catch (_) {} return state; },
     (x, y) => { setOverlayPosition(x, y); markDirty(); });
+  // the mic controls write straight into state (the host contract is get/set/onChange), so Apply, Cancel and the dirty check treat them like every other field
+  if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
   {
@@ -2777,6 +2832,40 @@
       if (fieldAtDefault(key, def)) return;
       state[key] = def;
       syncVolumeControl(slider, input, def);
+      refreshFieldResetState(key, def);
+      markDirty();
+    });
+  });
+
+  [
+    [els.desktopAudioVolume, els.desktopAudioVolumeValue, "desktopAudioVolume", clampAudioVolume, 0, 200, DEFAULT_DESKTOP_AUDIO_VOLUME, "resetDesktopAudioVolume"],
+    [els.discordAudioVolume, els.discordAudioVolumeValue, "discordAudioVolume", clampAudioVolume, 0, 200, DEFAULT_DISCORD_AUDIO_VOLUME, "resetDiscordAudioVolume"],
+  ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
+    slider.addEventListener("input", () => {
+      state[key] = clampFn(slider.value);
+      syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      refreshFieldResetState(key, def);
+      markDirty();
+    });
+    input.addEventListener("input", () => {
+      state[key] = clampFn(input.value);
+      slider.value = String(state[key]);
+      setSliderFill(slider, state[key], min, max);
+      refreshFieldResetState(key, def);
+      markDirty();
+    });
+    input.addEventListener("change", () => {
+      state[key] = clampFn(input.value);
+      syncIntegerRangeControl(slider, input, state[key], clampFn, min, max);
+      refreshFieldResetState(key, def);
+      markDirty();
+    });
+    const resetBtn = document.getElementById(resetId);
+    fieldResetBtns[key] = resetBtn;
+    if (resetBtn) resetBtn.addEventListener("click", () => {
+      if (fieldAtDefault(key, def)) return;
+      state[key] = def;
+      syncIntegerRangeControl(slider, input, def, clampFn, min, max);
       refreshFieldResetState(key, def);
       markDirty();
     });
@@ -3179,7 +3268,8 @@
 
   let _externalRefreshInFlight = false;
   async function refreshExternalSettings() {
-    if (_externalRefreshInFlight || externalRefreshBusy()) return;
+    // a hidden window keeps this page alive, so the poll waits until the window is showing again
+    if (_externalRefreshInFlight || externalRefreshBusy() || !RKWindow.up()) return;
     _externalRefreshInFlight = true;
     try {
       const data = await helperJson("settings?t=" + Date.now());

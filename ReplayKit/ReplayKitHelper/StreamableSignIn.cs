@@ -18,16 +18,6 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")]
         private static extern bool IsWindow(IntPtr hWnd);
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
-
-        // win10 1607+; ReplayKitHelper carries no dpi declaration in its manifest (app.manifest), so windows treats
-        // it as system-dpi-aware and virtualises coordinates for every monitor that isnt running the system scale
-        // factor -- the same mismatch already fixed for the desktop colour picker (DesktopColorPicker.cs). without
-        // this, Screen.WorkingArea and the resulting Form.Location land in the wrong coordinate space on a mixed-dpi
-        // multi-monitor rig, which is consistent with the window ending up wherever the user isnt looking.
-        private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
-
         private static readonly object Gate = new object();
         private static bool _windowOpen;
         private static string _lastError = "";
@@ -108,10 +98,6 @@ namespace ReplayKitHelper
         {
             try
             {
-                // set once for this threads whole lifetime -- the thread exists only to host this one window and
-                // exits when it closes, so theres nothing afterward that needs the system-dpi behaviour restored.
-                try { SetThreadDpiAwarenessContext(PerMonitorAwareV2); } catch (EntryPointNotFoundException) { } catch (DllNotFoundException) { }
-
                 Directory.CreateDirectory(ProfileDirectory);
                 Application.EnableVisualStyles();
                 using (var form = new Form { Text = "Sign in to Streamable", Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
@@ -142,8 +128,13 @@ namespace ReplayKitHelper
                     // not. a local function (not the previous static method) so it can close over this without a
                     // field that would need resetting between separate sign-in attempts.
                     string lastCheckedJar = null;
+                    bool checking = false;
+                    bool pollActive = false;
                     async System.Threading.Tasks.Task CheckSession()
                     {
+                        // one check at a time: the timer, navigation and history events can all fire while a slow one is still running
+                        if (checking) return;
+                        checking = true;
                         try
                         {
                             var cookies = await browser.CoreWebView2.CookieManager.GetCookiesAsync("https://streamable.com");
@@ -151,20 +142,30 @@ namespace ReplayKitHelper
                             string jar = ToCookieJar(cookies);
                             if (string.IsNullOrEmpty(jar) || jar == lastCheckedJar) return;
                             lastCheckedJar = jar;
-                            JObject user = AuthCore.InvokeStreamableMe(jar);
-                            if (!IsAuthenticatedUser(user))
+                            // the /me call shells out to curl and blocks until it answers, so it runs off the ui thread -- a blocked ui thread cannot pump window messages, and a drag is one of them
+                            bool signedIn = await System.Threading.Tasks.Task.Run(() =>
+                            {
+                                JObject user = AuthCore.InvokeStreamableMe(jar);
+                                if (!IsAuthenticatedUser(user)) return false;
+                                AuthCore.SaveAuthBlob(jar, user);
+                                AuthCore.ApplyAuth(user, jar);
+                                return true;
+                            });
+                            if (!signedIn)
                             {
                                 Log.Write("Streamable sign-in: cookie jar changed but /me is still not authenticated (" + cookies.Count + " streamable cookie(s)).");
                                 return;
                             }
-                            AuthCore.SaveAuthBlob(jar, user);
-                            AuthCore.ApplyAuth(user, jar);
                             Log.Write("Saved Streamable session from ReplayKit's owned WebView2 profile.");
-                            form.BeginInvoke((Action)(() => form.Close()));
+                            if (!form.IsDisposed) form.BeginInvoke((Action)(() => form.Close()));
                         }
                         catch (Exception ex)
                         {
                             Log.Write("Streamable sign-in session check: " + ex.Message);
+                        }
+                        finally
+                        {
+                            checking = false;
                         }
                     }
 
@@ -191,6 +192,7 @@ namespace ReplayKitHelper
                             browser.CoreWebView2.HistoryChanged += async (s, e) => await CheckSession();
                             browser.CoreWebView2.Navigate("https://streamable.com/login");
                             sessionPoll.Start();
+                            pollActive = true;
                         }
                         catch (Exception ex)
                         {
@@ -208,8 +210,11 @@ namespace ReplayKitHelper
                         Native.FocusHwnd(form.Handle);
                     };
                     sessionPoll.Tick += async (sender, args) => await CheckSession();
+                    // the poll sits out a drag or resize of the window and picks up again when the mouse is released, so nothing competes with the move
+                    form.ResizeBegin += (sender, args) => sessionPoll.Stop();
+                    form.ResizeEnd += (sender, args) => { if (pollActive && !form.IsDisposed) sessionPoll.Start(); };
                     form.Shown += (sender, args) => visibilityWatchdog.Start();
-                    form.FormClosed += (sender, args) => { sessionPoll.Stop(); SetClosed(); };
+                    form.FormClosed += (sender, args) => { pollActive = false; sessionPoll.Stop(); SetClosed(); };
                     Application.Run(form);
                 }
             }

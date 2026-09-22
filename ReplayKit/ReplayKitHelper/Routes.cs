@@ -619,6 +619,59 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // microphone settings: the device list for the combo, and the loopback mic test. the test opens the microphone and plays it back, so every route is origin-gated and the level poll doubles as the keep-alive.
+            if (path == "/mic/devices")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                HttpResponse.SendJson(stream, 200, MicTest.GetDevicesPayload());
+                return false;
+            }
+
+            if (path == "/mic/test/start")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
+                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
+                string noiseFlag = Q("ns");
+                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Noise suppression must be 0 or 1." }); return false; }
+                string playbackFlag = Q("playback", "1");
+                if (playbackFlag != "0" && playbackFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Playback must be 0 or 1." }); return false; }
+                var started = MicTest.Start(Q("device"), volume, noiseFlag == "1", gate, playbackFlag == "1");
+                HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 400, started);
+                return false;
+            }
+
+            if (path == "/mic/test/params")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
+                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
+                string noiseFlag = Q("ns");
+                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Noise suppression must be 0 or 1." }); return false; }
+                var changed = MicTest.SetParams(volume, noiseFlag == "1", gate);
+                HttpResponse.SendJson(stream, changed["ok"]?.Value<bool>() == true ? 200 : 400, changed);
+                return false;
+            }
+
+            if (path == "/mic/test/level")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                HttpResponse.SendJson(stream, 200, MicTest.ReadLevel());
+                return false;
+            }
+
+            if (path == "/mic/test/stop")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                HttpResponse.SendJson(stream, 200, MicTest.Stop());
+                return false;
+            }
+
             if (path == "/share-preview")
             {
                 if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
@@ -1289,7 +1342,8 @@ namespace ReplayKitHelper
                 // the update popup can be hosted by msedge.exe (--app launched from the bootstrap), which is not an obs-family process, so pass 0 for that title so CloseWindowsByTitle finds it by title alone; settings still goes thru the obs-family gate.
                 uint ownerPid = title == "ReplayKit Update" ? 0 : (ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0);
                 int closed = 0;
-                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid); } catch { }
+                // settings and setup are only hidden by the plugin and shown again later, so their taskbar tab has to survive the close; only the update popup really goes away
+                try { closed = Native.CloseWindowsByTitle(new[] { title }, ownerPid, title == "ReplayKit Update"); } catch { }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = closed });
                 return false;
             }
@@ -1935,6 +1989,7 @@ namespace ReplayKitHelper
             {
                 HttpResponse.SendText(stream, 200, "OK", "bye");
                 AppConfig.StopClipFolderWatcher();
+                MicTest.Stop();
                 Server.State.Shutdown = true;
                 return false;
             }

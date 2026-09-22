@@ -224,6 +224,7 @@
 </style>
 <link rel="stylesheet" href="rk-theme.css" />
 <!--#include interaction-states-->
+<!--#include window-state-->
 </head>
 <body>
 <!-- color picker lives outside .shell so its injected style/div/script are not extra grid children of the 3-row shell -->
@@ -235,9 +236,10 @@
       <div class="wiz-seg" data-step="1"><span>Welcome</span></div>
       <div class="wiz-seg" data-step="2"><span>Recording</span></div>
       <div class="wiz-seg" data-step="3"><span>Clip length</span></div>
-      <div class="wiz-seg" data-step="4"><span>Hotkeys</span></div>
-      <div class="wiz-seg" data-step="5"><span>Overlay</span></div>
-      <div class="wiz-seg" data-step="6"><span>Appearance</span></div>
+      <div class="wiz-seg" data-step="4"><span>Microphone</span></div>
+      <div class="wiz-seg" data-step="5"><span>Hotkeys</span></div>
+      <div class="wiz-seg" data-step="6"><span>Overlay</span></div>
+      <div class="wiz-seg" data-step="7"><span>Appearance</span></div>
     </div>
   </div>
 
@@ -282,6 +284,12 @@
     </section>
 
     <section class="panel" data-step="4" hidden>
+      <div class="box-title">Microphone</div>
+      <div class="box-lead">Pick the microphone ReplayKit records and check how you sound. Mic Test lets you hear yourself, and the sensitivity bar shows what gets cut off.</div>
+      <!--#include mic-controls-->
+    </section>
+
+    <section class="panel" data-step="5" hidden>
       <div class="box-title">Hotkeys</div>
       <div class="box-lead">Click a field, then press the key combo you want. These are global OBS hotkeys.</div>
       <div class="hotkey-grid">
@@ -315,7 +323,7 @@
       </div>
     </section>
 
-    <section class="panel" data-step="5" hidden>
+    <section class="panel" data-step="6" hidden>
       <div class="box-title">Overlay</div>
       <div class="box-lead">Pick an input overlay and tune it &mdash; the preview reacts to your keyboard and mouse.</div>
       <div class="form-row is-stacked-row">
@@ -325,7 +333,7 @@
       <!--#include overlay-controls-->
     </section>
 
-    <section class="panel" data-step="6" hidden>
+    <section class="panel" data-step="7" hidden>
       <div class="box-title">Appearance</div>
       <div class="box-lead">Theme the ReplayKit windows and OBS. This window previews live; OBS restarts once at the end.</div>
       <!--#include appearance-panel-->
@@ -372,7 +380,7 @@
   })();
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
-  const TOTAL_STEPS = 6;
+  const TOTAL_STEPS = 7;
   const REPLAY_SECONDS_MIN = 5;
   const REPLAY_SECONDS_MAX = 1200;
   const DEFAULT_CLIP_KEYBIND = { key:"OBS_KEY_F8" };
@@ -411,6 +419,10 @@
     clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
     recordingKeybind: {},
     openClipsKeybind: {},
+    micDeviceId: "default",
+    micVolume: 100,
+    micNoiseSuppression: true,
+    micInputSensitivity: -50,
     overlayStyle: "off",
     overlayFlipH: false,
     overlayOpacity: 100,
@@ -685,7 +697,9 @@
     els.backBtn.disabled = done || n <= 1;
     els.nextBtn.textContent = n === TOTAL_STEPS ? "Finish" : "Next";
     // the fake overlay projector only listens to input + renders while the Overlay step is on screen
-    if (window.RKOverlayPreview) { if (n === 5) { RKOverlayPreview.refresh(); RKOverlayPreview.start(); } else RKOverlayPreview.stop(); }
+    if (window.RKOverlayPreview) { if (n === 6) { RKOverlayPreview.refresh(); RKOverlayPreview.start(); } else RKOverlayPreview.stop(); }
+    // the mic level monitor and any running test only live while this step is on screen, so leaving it ends both
+    if (window.RKMic) RKMic.setVisible(n === 4);
     setStatus("");
   }
   els.backBtn.addEventListener("click", () => { if (typeof step === "number" && step > 1) showStep(step - 1); });
@@ -719,6 +733,7 @@
       recordingKeybind: state.recordingKeybind,
       openClipsKeybind: state.openClipsKeybind,
     };
+    if (window.RKMic) Object.assign(payload, RKMic.collect());
     if (window.RKOverlay) Object.assign(payload, RKOverlay.collect());
     if (window.RKAppearance) {
       const ap = RKAppearance.collect();
@@ -767,10 +782,13 @@
       if (g.recordingKeybind && g.recordingKeybind.key) state.recordingKeybind = g.recordingKeybind;
       if (g.openClipsKeybind && g.openClipsKeybind.key) state.openClipsKeybind = g.openClipsKeybind;
       [
+        "micDeviceId","micVolume","micInputSensitivity",
         "overlayStyle","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
         "theme","themeCustom","appIcon","appIconCustomPath","appIconRecordingDot",
       ].forEach((k) => { if (g[k] !== undefined && g[k] !== null) state[k] = g[k]; });
     } catch (_) {}
+    // noise suppression starts ticked even when obs has no filter yet; finishing the wizard is what applies it
+    state.micNoiseSuppression = true;
 
     fillCombo(els.recordingPreset, opts.recordingPresets || [
       { value:"performance", label:"Performance", blurb:"720p30. Lowest load." },
@@ -785,6 +803,7 @@
 
     const hostGet = (k) => state[k];
     const hostSet = (k, v) => { state[k] = v; };
+    if (window.RKMic) RKMic.init({ get:hostGet, set:hostSet, onChange:() => {} });
     if (window.RKOverlay) RKOverlay.init({ get:hostGet, set:hostSet, onChange:() => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); } });
     // stored per style, becuase the two overlays are nothing alike in size and one shared corner would put the other one off the canvas
     if (window.RKOverlayPreview) RKOverlayPreview.init(() => state, (x, y) => {

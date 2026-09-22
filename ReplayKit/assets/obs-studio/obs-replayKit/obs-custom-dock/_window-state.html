@@ -1,0 +1,27 @@
+<!-- shared partial (helper #include target: window-state). whether the window this page lives in is on screen, for pages that live in a window the plugin hides instead of destroying: closing it leaves the page alive and polling, and cef does not reliably send visibilitychange for the hide or the show. the plugin fires a replaykit-window event (detail.shown) from its own show and hide handlers, and that is trusted once it has spoken; before that, and in a plain browser, the page falls back to document.hidden. host: RKWindow.up() says whether the window is showing, RKWindow.onChange(fn) calls fn(up) whenever that flips. -->
+<script>
+(function () {
+  var spoke = false, shown = true, listeners = [];
+  function up() { return spoke ? shown : !document.hidden; }
+  var last = up();
+  function check() {
+    var now = up();
+    if (now === last) return;
+    last = now;
+    listeners.slice().forEach(function (fn) { try { fn(now); } catch (_) {} });
+  }
+  window.addEventListener("replaykit-window", function (e) {
+    spoke = true;
+    shown = !!(e.detail && e.detail.shown);
+    check();
+  });
+  // input can only reach a window that is showing, so it corrects a show signal that never arrived
+  ["focus", "pointerdown", "pointermove", "keydown", "wheel"].forEach(function (name) {
+    window.addEventListener(name, function () { if (spoke && !shown) { shown = true; check(); } }, true);
+  });
+  document.addEventListener("visibilitychange", check);
+  // covers a visibilitychange that never fires while the page is still trusting document.hidden
+  setInterval(check, 1000);
+  window.RKWindow = { up: up, onChange: function (fn) { if (typeof fn === "function") listeners.push(fn); } };
+})();
+</script>

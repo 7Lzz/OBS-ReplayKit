@@ -20,8 +20,6 @@ namespace ReplayKitHelper
         // css pixels; scaled by the target monitors dpi below. matches update_prompt.html + Update.OpenUpdatePromptWindow.
         private const int ClientCssW = 560, ClientCssH = 336;
 
-        private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
-        [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
         // its own taskbar identity so windows does not group this window under obs64 / the helper and can show its
         // own icon on the button + jump list
         [DllImport("shell32.dll")] private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appId);
@@ -52,11 +50,6 @@ namespace ReplayKitHelper
 
         private static int RunWindow(string version, int port, string bgColor)
         {
-            // set once for this thread -- it exists only to host this one window. mirrors StreamableSignIn, which
-            // hit the same mixed-dpi coordinate virtualisation because the helper carries no dpi manifest entry.
-            try { SetThreadDpiAwarenessContext(PerMonitorAwareV2); }
-            catch (EntryPointNotFoundException) { } catch (DllNotFoundException) { }
-
             try { SetCurrentProcessExplicitAppUserModelID("OBSReplayKit.UpdateWindow"); }
             catch (EntryPointNotFoundException) { } catch (DllNotFoundException) { }
 

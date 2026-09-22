@@ -75,6 +75,14 @@ namespace ReplayKitHelper
                 ["lastUpdatePromptVersion"] = "",
                 ["clipSoundVolume"] = 25,
                 ["recordingSoundVolume"] = 25,
+                // the "Audio Input Capture" obs input: device is an obs wasapi endpoint id or "default", volume is 0-200 mapped onto a dedicated gain filters -30..30 db range (100 = unity, the filter itself is absent until the slider first leaves 100), noise suppression is an rnnoise filter on that input, on by default (the bundled scene ships it enabled) -- and input sensitivity is the noise gate open threshold in db (the bundled scene ships -50 open and -55 close, the floor means the gate is off).
+                ["micDeviceId"] = "default",
+                ["micVolume"] = 100,
+                ["micNoiseSuppression"] = true,
+                ["micInputSensitivity"] = MicTest.SensitivityDefault,
+                // same 0-200-onto-a-gain-filter deal as micVolume, on "Desktop Audio (excl. Discord)" and "Discord Audio (record only)" -- discord audio is an optional source, missing entirely on installs that never added it.
+                ["desktopAudioVolume"] = 100,
+                ["discordAudioVolume"] = 100,
                 ["motionBlurEnabled"] = false,
                 ["motionBlurStrength"] = 0.075,
                 // legacy shareMode is kept only so older settings files dont break parsing; discord output uses the obs windowed projector directly.
@@ -229,6 +237,14 @@ namespace ReplayKitHelper
         private static JObject NormalizeOpenClipsKeybind(JToken value) =>
             NormalizeHotkeyCombo(value, new JObject(), "open clips keybind");
 
+        // a stale or hand-edited id falls back to "default" the way an unknown theme does, rather than failing the whole settings load.
+        private static string NormalizeMicDeviceId(string value)
+        {
+            value = (value ?? "").Trim();
+            if (value.Length == 0 || string.Equals(value, MicDevices.DefaultId, StringComparison.OrdinalIgnoreCase)) return MicDevices.DefaultId;
+            return MicDevices.IsValidId(value) ? value : MicDevices.DefaultId;
+        }
+
         // per-style overlay position: { "<style>": { "x": <canvas fraction>, "y": <canvas fraction> } }. kept per style because the
         // boxes are nothing alike -- bongo is 1280x768, the input overlay group 628x292 -- so one shared corner would shove the other
         // overlay off the canvas. anything unrecognised is dropped rather than repaired, which just falls back to the canonical corner.
@@ -366,6 +382,12 @@ namespace ReplayKitHelper
                 ["lastUpdatePromptVersion"] = GetVersionMarkerSetting(data, "lastUpdatePromptVersion", defaults["lastUpdatePromptVersion"].Value<string>()),
                 ["clipSoundVolume"] = GetIntSetting(data, "clipSoundVolume", defaults["clipSoundVolume"].Value<int>(), 0, 100),
                 ["recordingSoundVolume"] = GetIntSetting(data, "recordingSoundVolume", defaults["recordingSoundVolume"].Value<int>(), 0, 100),
+                ["micDeviceId"] = NormalizeMicDeviceId(data["micDeviceId"]?.ToString()),
+                ["micVolume"] = GetIntSetting(data, "micVolume", defaults["micVolume"].Value<int>(), 0, MicTest.VolumeMax),
+                ["micNoiseSuppression"] = GetBoolSetting(data, "micNoiseSuppression", defaults["micNoiseSuppression"].Value<bool>()),
+                ["micInputSensitivity"] = GetIntSetting(data, "micInputSensitivity", defaults["micInputSensitivity"].Value<int>(), MicTest.SensitivityMin, MicTest.SensitivityMax),
+                ["desktopAudioVolume"] = GetIntSetting(data, "desktopAudioVolume", defaults["desktopAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
+                ["discordAudioVolume"] = GetIntSetting(data, "discordAudioVolume", defaults["discordAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
                 ["motionBlurEnabled"] = GetBoolSetting(data, "motionBlurEnabled", defaults["motionBlurEnabled"].Value<bool>()),
                 ["motionBlurStrength"] = GetFloatSetting(data, "motionBlurStrength", defaults["motionBlurStrength"].Value<double>(), 0.0, 1.0),
                 ["shareMode"] = shareMode,
@@ -734,10 +756,13 @@ namespace ReplayKitHelper
 
         private static JObject ObsResultAsJson(ObsWebSocketResult r) => r.Ok ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = r.Message };
 
-        private static double ScaledRbSizeMb(string presetName, int replaySeconds)
+        // memory cap for the replay buffer: a peak bitrate estimate per preset tier (the tiers assume 720p for performance and 1080p for the others), raised in proportion to the pixel count of the output actually recorded, times the buffer length; a smaller output never lowers it below the tier estimate.
+        private static double ScaledRbSizeMb(string presetName, int replaySeconds, JObject preset)
         {
             double peakMbps = presetName == "performance" ? 8 : presetName == "quality" ? 32 : 20;
-            double mbPerSecond = peakMbps * 1.5 / 8;
+            double referencePixels = presetName == "performance" ? 1280.0 * 720 : 1920.0 * 1080;
+            double outputPixels = (preset?["video"]?["outputWidth"]?.Value<double>() ?? 0) * (preset?["video"]?["outputHeight"]?.Value<double>() ?? 0);
+            double mbPerSecond = peakMbps * Math.Max(1.0, outputPixels / referencePixels) * 1.5 / 8;
             return Math.Max(32, Math.Ceiling(mbPerSecond * replaySeconds));
         }
 
@@ -812,7 +837,7 @@ namespace ReplayKitHelper
             string clipDir = settings["clipDir"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(clipDir)) clipDir = AppConfig.GetDefaultClipDir();
             outputSettings["max_time_sec"] = settings["replaySeconds"]?.Value<int>() ?? 0;
-            outputSettings["max_size_mb"] = ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>(), settings["replaySeconds"]?.Value<int>() ?? 0);
+            outputSettings["max_size_mb"] = ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>(), settings["replaySeconds"]?.Value<int>() ?? 0, preset);
             outputSettings["directory"] = clipDir;
             outputSettings["path"] = clipDir;
 
@@ -3132,11 +3157,12 @@ namespace ReplayKitHelper
             };
         }
 
+        // performance stays capped low no matter the global scale mode -- the preset exists to keep load and file size down; balanced/quality honor recordingScaleMode: native = no downscale (cap 8192), downscale = cap at downscaleHeight.
+        private static int OutputHeightCap(string presetName, string scaleMode, int downscaleHeight) => presetName == "performance" ? 720 : (scaleMode == "downscale" ? downscaleHeight : 8192);
+
         private static JObject GetPresetSpec(string name, int fpsNumerator, int fpsDenominator, string scaleMode, int downscaleHeight, string downscaleFilter)
         {
-            // performance stays capped low no matter the global scale mode -- the preset exists to keep load and file size down.
-            // balanced/quality honor recordingScaleMode: native = no downscale (cap 8192), downscale = cap at downscaleHeight.
-            int cap = name == "performance" ? 720 : (scaleMode == "downscale" ? downscaleHeight : 8192);
+            int cap = OutputHeightCap(name, scaleMode, downscaleHeight);
             string scaleType = string.IsNullOrEmpty(downscaleFilter) ? "lanczos" : downscaleFilter;
             int cqp;
             switch (name)
@@ -4315,7 +4341,7 @@ namespace ReplayKitHelper
         // obs-browser-page.exe is obs's own cef subprocess -- without excluding it, clip audio played back in the
         // dock gets treated as ordinary desktop audio, monitored back out to the discord share, and doubles up
         // with the copy discord already grabs directly from the same process tree.
-        private static readonly string[] DesktopAudioExcludeExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe", "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe" };
+        private static readonly string[] DesktopAudioExcludeExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe", "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe", HelperExeName };
 
         private static JArray GetDesktopAudioExcludeList()
         {
@@ -4725,6 +4751,308 @@ namespace ReplayKitHelper
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
+        // -- microphone: the "Audio Input Capture" input in the replaykit scene. device and volume are plain input properties, noise suppression is an obs noise_suppress_filter (rnnoise) on that same input.
+
+        private const string MicInputName = "Audio Input Capture";
+        private const string MicNoiseFilterName = "ReplayKit Noise Suppression";
+        private const string NoiseSuppressFilterKind = "noise_suppress_filter_v2";
+        private const string HelperExeName = "OBSReplayKit.exe";
+        private const string MicGateFilterName = "ReplayKit Noise Gate";
+        private const string NoiseGateFilterKind = "noise_gate_filter";
+        private const double NoiseGateDefaultOpenDb = -26.0;
+        private const double NoiseGateDefaultCloseDb = -32.0;
+        private const double GateHysteresisDb = 5.0;
+        // every volume slider (mic, desktop, discord) drives its own named gain filter instead of the inputs fader -- matched by this exact name AND kind, never just kind, so a filter the user adds themselves through obs (a different name) is left completely alone rather than adopted.
+        private const string GainFilterKind = "gain_filter";
+        private const double GainDbMin = -30.0;
+        private const double GainDbMax = 30.0;
+        private const string MicGainFilterName = "ReplayKit Mic Volume";
+        private const string DesktopGainFilterName = "ReplayKit Desktop Volume";
+        private const string DiscordGainFilterName = "ReplayKit Discord Volume";
+        private static readonly string[] MicSettingKeys = { "micDeviceId", "micVolume", "micNoiseSuppression", "micInputSensitivity" };
+        private static readonly string[] AudioVolumeKeys = { "desktopAudioVolume", "discordAudioVolume" };
+
+        // every volume slider is 0-200 with 100 as the untouched midpoint, mapped straight onto the gain filters own -30..30 db range so the sliders ends line up exactly with what the filter can actually do.
+        private static double GainVolumeToDb(int percent) => (percent - 100) / 100.0 * GainDbMax;
+        private static int GainVolumeFromDb(double db) => (int)Math.Round(100.0 + db / GainDbMax * 100.0, MidpointRounding.AwayFromZero);
+
+        private static JToken FindGainFilter(JArray filters, string filterName) =>
+            filters.FirstOrDefault(f => (f["filterKind"]?.Value<string>() ?? "") == GainFilterKind && (f["filterName"]?.Value<string>() ?? "") == filterName);
+
+        // the volume a named gain filter currently represents, read from a filter list already fetched for something else -- absent filter reads as 100 (default, no boost or cut).
+        private static int GainVolumeFromFilters(JArray filters, string filterName)
+        {
+            var gain = FindGainFilter(filters, filterName);
+            return gain == null ? 100 : GainVolumeFromDb(gain["filterSettings"]?["db"]?.Value<double>() ?? 0.0);
+        }
+
+        // same as GainVolumeFromFilters but fetches its own filter list -- for a source nothing else already reads the filters of. null means the source itself could not be read (missing input, or obs unreachable).
+        private static int? ReadGainVolumeLive(string sourceName, string filterName)
+        {
+            var list = GetSourceFilterListLive(sourceName);
+            if (list["ok"]?.Value<bool>() != true) return null;
+            return GainVolumeFromFilters((JArray)list["filters"], filterName);
+        }
+
+        // creates the named filter the first time the slider leaves 100 and never removes it again -- back at 100 it is retuned to 0 db (silent, no audible change) instead of deleted, since repeated add/remove of a gain filter is what preceded a real obs freeze once. a source that cannot be read (desktop and discord audio are both allowed to be silently missing, discord audio (record only) most often) is a silent no-op, not a warning.
+        private static void ApplyGainVolumeLive(string sourceName, string filterName, string label, int volumePercent, List<string> applied, List<string> warnings)
+        {
+            var list = GetSourceFilterListLive(sourceName);
+            if (list["ok"]?.Value<bool>() != true) return;
+            var filterArray = (JArray)list["filters"];
+            var existing = FindGainFilter(filterArray, filterName);
+            double db = Math.Max(GainDbMin, Math.Min(GainDbMax, GainVolumeToDb(volumePercent)));
+
+            if (existing == null)
+            {
+                if (volumePercent == 100) return; // nothing has ever touched this slider -- leave the source exactly as obs has it
+                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                {
+                    ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = GainFilterKind,
+                    ["filterSettings"] = new JObject { ["db"] = db },
+                }, 3000);
+                if (!create.Ok) { warnings.Add("Could not set the " + label + ": " + create.Message); return; }
+                // last in the chain, so any other filter already on the source judges the real level rather than the boosted one
+                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filterArray.Count }, 3000);
+                if (!move.Ok) warnings.Add("The " + label + " was set but the filter could not be moved to the end of the chain: " + move.Message);
+                applied.Add(label);
+                return;
+            }
+
+            double current = existing["filterSettings"]?["db"]?.Value<double>() ?? 0.0;
+            if (Math.Abs(current - db) < 0.05) return; // already this close, the filter itself only keeps one decimal
+            var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = new JObject { ["db"] = db }, ["overlay"] = true }, 3000);
+            if (set.Ok) applied.Add(label);
+            else warnings.Add("Could not set the " + label + ": " + set.Message);
+        }
+
+        private static bool AudioVolumeKeysChanged(JObject previous, JObject settings) =>
+            AudioVolumeKeys.Any(key => !JToken.DeepEquals(previous[key], settings[key]));
+
+        private static bool TestOnlyAudioVolumesChanged(JObject previous, JObject settings)
+        {
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (AudioVolumeKeys.Contains(prop.Name)) continue;
+                if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
+            }
+            return AudioVolumeKeysChanged(previous, settings);
+        }
+
+        private static bool MicKeysChanged(JObject previous, JObject settings) =>
+            MicSettingKeys.Any(key => !JToken.DeepEquals(previous[key], settings[key]));
+
+        private static bool TestOnlyMicChanged(JObject previous, JObject settings)
+        {
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (MicSettingKeys.Contains(prop.Name)) continue;
+                if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
+            }
+            return MicKeysChanged(previous, settings);
+        }
+
+        private static List<JToken> FindNoiseSuppressFilters(JArray filters) =>
+            filters.Where(f => (f["filterKind"]?.Value<string>() ?? "").StartsWith("noise_suppress_filter", StringComparison.Ordinal)).ToList();
+
+        private static List<JToken> FindNoiseGateFilters(JArray filters) =>
+            filters.Where(f => (f["filterKind"]?.Value<string>() ?? "") == NoiseGateFilterKind).ToList();
+
+        // the enabled gate open threshold as a slider value; no enabled gate means nothing is being cut, which is the far left of the slider. obs leaves a setting out of the filter json while it is still at its default, so a missing threshold is the obs default.
+        private static int GateSensitivity(List<JToken> gates)
+        {
+            var active = gates.FirstOrDefault(g => g["filterEnabled"]?.Value<bool>() ?? false);
+            if (active == null) return MicTest.SensitivityMin;
+            double open = active["filterSettings"]?["open_threshold"]?.Value<double>() ?? NoiseGateDefaultOpenDb;
+            int rounded = (int)Math.Round(open, MidpointRounding.AwayFromZero);
+            return Math.Max(MicTest.SensitivityMin, Math.Min(MicTest.SensitivityMax, rounded));
+        }
+
+        // what obs actually has on the mic input right now, or null when obs cannot be reached or the input is missing -- callers treat null as "leave the saved values alone".
+        private static JObject ReadMicLive()
+        {
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = MicInputName }, 3000);
+            if (!input.Ok) return null;
+            var filters = GetSourceFilterListLive(MicInputName);
+            if (filters["ok"]?.Value<bool>() != true) return null;
+
+            var filterArray = (JArray)filters["filters"];
+            bool noiseOn = FindNoiseSuppressFilters(filterArray).Any(f => f["filterEnabled"]?.Value<bool>() ?? false);
+            int volume = GainVolumeFromFilters(filterArray, MicGainFilterName);
+            return new JObject
+            {
+                ["micDeviceId"] = NormalizeMicDeviceId(input.Data?["inputSettings"]?["device_id"]?.Value<string>()),
+                ["micVolume"] = Math.Max(0, Math.Min(MicTest.VolumeMax, volume)),
+                ["micNoiseSuppression"] = noiseOn,
+                ["micInputSensitivity"] = GateSensitivity(FindNoiseGateFilters(filterArray)),
+            };
+        }
+
+        // obs is the source of truth for the mic -- the mixer fader and the source properties get edited there directly, so the page follows what obs really has instead of a stale saved copy.
+        private static JObject SyncMicFromObs(JObject settings)
+        {
+            var live = ReadMicLive();
+            if (live == null) return settings;
+            bool changed = false;
+            foreach (var key in MicSettingKeys)
+            {
+                if (JToken.DeepEquals(settings[key], live[key])) continue;
+                settings[key] = live[key];
+                changed = true;
+            }
+            if (changed) WriteSettings(settings);
+            return settings;
+        }
+
+        // brings the mic input in line with the saved settings, touching only what differs from obs right now.
+        private static JObject ApplyMicLive(JObject settings)
+        {
+            var applied = new List<string>();
+            var warnings = new List<string>();
+            string deviceId = settings["micDeviceId"]?.Value<string>() ?? MicDevices.DefaultId;
+            int volume = settings["micVolume"]?.Value<int>() ?? 100;
+            bool noise = settings["micNoiseSuppression"]?.Value<bool>() ?? false;
+            int sensitivity = settings["micInputSensitivity"]?.Value<int>() ?? MicTest.SensitivityDefault;
+
+            var live = ReadMicLive();
+            if (live == null)
+            {
+                warnings.Add("Microphone settings were saved, but OBS could not be reached or has no \"" + MicInputName + "\" input. Restart OBS and try again.");
+                return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+            }
+
+            if (live["micDeviceId"].Value<string>() != deviceId)
+            {
+                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = MicInputName, ["inputSettings"] = new JObject { ["device_id"] = deviceId }, ["overlay"] = true }, 3000);
+                if (set.Ok) applied.Add("microphone device");
+                else warnings.Add("Could not switch the microphone: " + set.Message);
+            }
+            if (live["micVolume"].Value<int>() != volume) ApplyGainVolumeLive(MicInputName, MicGainFilterName, "microphone volume", volume, applied, warnings);
+            if (live["micNoiseSuppression"].Value<bool>() != noise) ApplyMicNoiseSuppressionLive(noise, applied, warnings);
+            if (live["micInputSensitivity"].Value<int>() != sensitivity) ApplyMicGateLive(sensitivity, applied, warnings);
+
+            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        // an existing noise suppression filter is only ever toggled, never replaced or moved, so a filter built in obs keeps its own settings and position.
+        private static void ApplyMicNoiseSuppressionLive(bool enabled, List<string> applied, List<string> warnings)
+        {
+            var list = GetSourceFilterListLive(MicInputName);
+            if (list["ok"]?.Value<bool>() != true) { warnings.Add("Could not read the microphone filters: " + list["message"]); return; }
+            var existing = FindNoiseSuppressFilters((JArray)list["filters"]);
+
+            if (existing.Count == 0)
+            {
+                if (!enabled) return;
+                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                {
+                    ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterKind"] = NoiseSuppressFilterKind,
+                    ["filterSettings"] = new JObject { ["method"] = "rnnoise" },
+                }, 3000);
+                if (!create.Ok) { warnings.Add("Could not add noise suppression: " + create.Message); return; }
+                // obs runs filters top to bottom, so suppression goes ahead of the noise gate and the gate judges the cleaned signal.
+                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterIndex"] = 0 }, 3000);
+                if (!move.Ok) warnings.Add("Noise suppression was added but could not be moved ahead of the noise gate: " + move.Message);
+                applied.Add("microphone noise suppression on");
+                return;
+            }
+
+            // turning on only needs one of them enabled; turning off has to catch every one or the mic stays suppressed.
+            var targets = enabled ? existing.Take(1) : existing.Where(f => f["filterEnabled"]?.Value<bool>() ?? false);
+            foreach (var filter in targets)
+            {
+                var toggle = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = filter["filterName"]?.Value<string>(), ["filterEnabled"] = enabled }, 3000);
+                if (toggle.Ok) applied.Add(enabled ? "microphone noise suppression on" : "microphone noise suppression off");
+                else warnings.Add("Could not change noise suppression: " + toggle.Message);
+            }
+        }
+
+        // the slider drives the open threshold of the mic noise gate and the far left turns the gate off. an existing gate keeps its attack, hold and release and its own open-to-close gap; one is only created when the mic has none.
+        private static void ApplyMicGateLive(int sensitivity, List<string> applied, List<string> warnings)
+        {
+            var list = GetSourceFilterListLive(MicInputName);
+            if (list["ok"]?.Value<bool>() != true) { warnings.Add("Could not read the microphone filters: " + list["message"]); return; }
+            var gates = FindNoiseGateFilters((JArray)list["filters"]);
+
+            if (sensitivity <= MicTest.SensitivityMin)
+            {
+                foreach (var gate in gates.Where(g => g["filterEnabled"]?.Value<bool>() ?? false))
+                {
+                    var off = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = gate["filterName"]?.Value<string>(), ["filterEnabled"] = false }, 3000);
+                    if (off.Ok) applied.Add("microphone input sensitivity off");
+                    else warnings.Add("Could not turn the noise gate off: " + off.Message);
+                }
+                return;
+            }
+
+            var existing = gates.FirstOrDefault(g => g["filterEnabled"]?.Value<bool>() ?? false) ?? gates.FirstOrDefault();
+            double gap = GateHysteresisDb;
+            if (existing != null)
+            {
+                double oldOpen = existing["filterSettings"]?["open_threshold"]?.Value<double>() ?? NoiseGateDefaultOpenDb;
+                double oldClose = existing["filterSettings"]?["close_threshold"]?.Value<double>() ?? NoiseGateDefaultCloseDb;
+                if (oldOpen > oldClose) gap = oldOpen - oldClose;
+            }
+            var thresholds = new JObject { ["open_threshold"] = (double)sensitivity, ["close_threshold"] = Math.Max(sensitivity - gap, MicTest.SensitivityMin) };
+
+            if (existing == null)
+            {
+                var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
+                {
+                    ["sourceName"] = MicInputName, ["filterName"] = MicGateFilterName, ["filterKind"] = NoiseGateFilterKind, ["filterSettings"] = thresholds,
+                }, 3000);
+                if (create.Ok) applied.Add("microphone input sensitivity");
+                else warnings.Add("Could not add the noise gate: " + create.Message);
+                return;
+            }
+
+            string name = existing["filterName"]?.Value<string>();
+            var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterSettings"] = thresholds, ["overlay"] = true }, 3000);
+            if (!set.Ok) { warnings.Add("Could not set the input sensitivity: " + set.Message); return; }
+            if (!(existing["filterEnabled"]?.Value<bool>() ?? false))
+            {
+                var on = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterEnabled"] = true }, 3000);
+                if (!on.Ok) { warnings.Add("The input sensitivity was set but the noise gate could not be turned on: " + on.Message); return; }
+            }
+            applied.Add("microphone input sensitivity");
+        }
+
+        private const string DesktopAudioInputName = "Desktop Audio (excl. Discord)";
+        private const string DiscordAudioInputName = "Discord Audio (record only)";
+
+        private static JObject ApplyAudioVolumesLive(JObject settings)
+        {
+            var applied = new List<string>();
+            var warnings = new List<string>();
+            ApplyGainVolumeLive(DesktopAudioInputName, DesktopGainFilterName, "desktop audio volume", settings["desktopAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
+            ApplyGainVolumeLive(DiscordAudioInputName, DiscordGainFilterName, "discord audio volume", settings["discordAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
+            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        // obs is the source of truth here too, same reasoning as SyncMicFromObs -- a source that does not exist (discord audio, most often) just leaves the saved value alone instead of resetting it.
+        private static JObject SyncAudioVolumesFromObs(JObject settings)
+        {
+            bool changed = false;
+            int? desktop = ReadGainVolumeLive(DesktopAudioInputName, DesktopGainFilterName);
+            if (desktop.HasValue && settings["desktopAudioVolume"]?.Value<int>() != desktop.Value) { settings["desktopAudioVolume"] = desktop.Value; changed = true; }
+            int? discord = ReadGainVolumeLive(DiscordAudioInputName, DiscordGainFilterName);
+            if (discord.HasValue && settings["discordAudioVolume"]?.Value<int>() != discord.Value) { settings["discordAudioVolume"] = discord.Value; changed = true; }
+            if (changed) WriteSettings(settings);
+            return settings;
+        }
+
+        // the mic test plays from the helper process, which desktop audio capture would otherwise record as an echo in every clip saved during the test -- the exclusion list is normally written on apply, so make sure it is there right before a test plays.
+        internal static void EnsureHelperExcludedFromDesktopAudio()
+        {
+            const string inputName = "Desktop Audio (excl. Discord)";
+            var current = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = inputName }, 3000);
+            if (!current.Ok) return;
+            var excluded = current.Data?["inputSettings"]?["executable_list"] as JArray;
+            if (excluded != null && excluded.Any(e => string.Equals(e["value"]?.Value<string>(), HelperExeName, StringComparison.OrdinalIgnoreCase))) return;
+            var result = SetDesktopAudioCaptureSettingsLive(inputName);
+            if (result["ok"]?.Value<bool>() != true) Log.Write("EnsureHelperExcludedFromDesktopAudio: " + result["message"]);
+        }
+
         // -- hotkey capture + sync-from-obs: lets the dock's "press a key to bind" ui temporarily blank obs's
         // native hotkeys while listening, and detects when the user rebinds a hotkey through obs's own Settings
         // dialog instead of the dock, so the dock does not silently fight/revert that edit.
@@ -4854,7 +5182,7 @@ namespace ReplayKitHelper
         // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
         // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
         // preserve that asymmetry, it is not an oversight to fix.
-        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true)
+        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -4898,7 +5226,7 @@ namespace ReplayKitHelper
             int replaySeconds = settings["replaySeconds"]?.Value<int>() ?? 0;
             profileUpdates.Add(new[] { "AdvOut", "RecRB", "true" });
             profileUpdates.Add(new[] { "AdvOut", "RecRBTime", replaySeconds.ToString() });
-            profileUpdates.Add(new[] { "AdvOut", "RecRBSize", ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>() ?? "", replaySeconds).ToString(CultureInfo.InvariantCulture) });
+            profileUpdates.Add(new[] { "AdvOut", "RecRBSize", ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>() ?? "", replaySeconds, preset).ToString(CultureInfo.InvariantCulture) });
             profileUpdates.Add(new[] { "AdvOut", "RecEncoder", encoder["id"]?.Value<string>() ?? "" });
             profileUpdates.Add(new[] { "Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject) });
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject);
@@ -4967,6 +5295,20 @@ namespace ReplayKitHelper
                 }
             }
 
+            if (applyMic)
+            {
+                var mic = ApplyMicLive(settings);
+                applied.AddRange((mic["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((mic["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
+
+            if (applyAudioVolumes)
+            {
+                var audio = ApplyAudioVolumesLive(settings);
+                applied.AddRange((audio["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((audio["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
+
             string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, theme, or overlay changes require OBS to restart." : "";
 
             return new JObject
@@ -5021,6 +5363,8 @@ namespace ReplayKitHelper
                 var settings = ReadSettings();
                 settings = SyncHotkeysFromObs(settings);
                 settings = SyncReplayBufferSecondsFromObs(settings);
+                settings = SyncMicFromObs(settings);
+                settings = SyncAudioVolumesFromObs(settings);
                 if (string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>()) && !string.IsNullOrWhiteSpace(Server.State.Config?["clipDir"]?.Value<string>()))
                 {
                     settings["clipDir"] = ResolveClipDirSetting(Server.State.Config["clipDir"]?.Value<string>());
@@ -5124,7 +5468,8 @@ namespace ReplayKitHelper
 
         private static bool TestReplayBufferOutputChanged(JObject previous, JObject settings)
         {
-            foreach (var key in new[] { "recordingPreset", "replaySeconds", "clipDir" })
+            // the memory cap follows the recorded size, so a resolution change re-applies the buffer output too
+            foreach (var key in new[] { "recordingPreset", "replaySeconds", "clipDir", "recordingScaleMode", "downscaleHeight" })
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
@@ -5286,6 +5631,106 @@ namespace ReplayKitHelper
             });
         }
 
+        // self-heal: obs can end up recording at a different size or fps than the saved settings say -- the installer re-seeding the profile, an apply that failed after the settings file was already written, a change made inside obs -- and nothing compared the two, so it stayed that way unnoticed. once per helper start this checks the live video settings against the saved recording resolution and fps and applies the saved ones when they differ; only the output size and fps move (the base canvas is left alone) and a recording or stream in progress is never stopped for it.
+        public static void EnsureObsVideoMatchesSettingsAtStartup()
+        {
+            Task.Run(() =>
+            {
+                try { ReconcileObsVideoWithSettings(); }
+                catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettings: " + ex.Message); }
+            });
+        }
+
+        private static void ReconcileObsVideoWithSettings()
+        {
+            // obs answers its websocket a beat after it starts and the script load starts the replay buffer, so wait for both -- the stop, reset and start below then never land while obs is still starting up
+            bool answered = false;
+            for (int i = 0; i < 45 && !answered; i++)
+            {
+                answered = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000).Ok;
+                if (!answered) Thread.Sleep(1000);
+            }
+            if (!answered) { Log.Write("EnsureObsVideoMatchesSettings: OBS did not answer in time, nothing checked."); return; }
+            for (int i = 0; i < 15; i++)
+            {
+                var buffer = ObsWebSocket.InvokeRequest("GetReplayBufferStatus", null, 3000);
+                if (buffer.Ok && (buffer.Data?["outputActive"]?.Value<bool>() ?? false)) break;
+                Thread.Sleep(1000);
+            }
+            Thread.Sleep(2000);
+
+            // read again under the settings lock so a save that landed while waiting is respected, and so a user apply cannot interleave with this one
+            lock (SettingsStore.Gate)
+            {
+                var settings = Normalize(ReadSettings());
+                string presetName = settings["recordingPreset"]?.Value<string>() ?? "";
+                var wantedFps = GetPresetSpec(presetName, settings)["video"];
+                int fpsNumerator = wantedFps["fpsNumerator"].Value<int>(), fpsDenominator = wantedFps["fpsDenominator"].Value<int>();
+
+                var now = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+                if (!now.Ok || !(now.Data is JObject live)) { Log.Write("EnsureObsVideoMatchesSettings: could not read the OBS video settings: " + now.Message); return; }
+                int baseWidth = live["baseWidth"]?.Value<int>() ?? 0, baseHeight = live["baseHeight"]?.Value<int>() ?? 0;
+                if (baseWidth < 2 || baseHeight < 2) { Log.Write("EnsureObsVideoMatchesSettings: OBS reported no base canvas size, nothing changed."); return; }
+
+                // the output is worked out from the live base canvas rather than the detected monitor size, since only the output size is being reconciled here
+                var output = GetScaledEvenSize(baseWidth, baseHeight, 8192, OutputHeightCap(presetName, settings["recordingScaleMode"]?.Value<string>(), settings["downscaleHeight"]?.Value<int>() ?? 1080));
+                int outputWidth = output["width"].Value<int>(), outputHeight = output["height"].Value<int>();
+                bool sizeDiffers = live["outputWidth"]?.Value<int>() != outputWidth || live["outputHeight"]?.Value<int>() != outputHeight;
+                bool fpsDiffers = live["fpsNumerator"]?.Value<int>() != fpsNumerator || live["fpsDenominator"]?.Value<int>() != fpsDenominator;
+                bool videoDiffers = sizeDiffers || fpsDiffers;
+
+                // the replay buffer memory cap follows the recorded size; the stored profile value is what gets compared, since that is what this code writes, so the check settles once it has been applied
+                var wanted = new JObject
+                {
+                    ["video"] = new JObject
+                    {
+                        ["baseWidth"] = baseWidth, ["baseHeight"] = baseHeight, ["outputWidth"] = outputWidth, ["outputHeight"] = outputHeight,
+                        ["fpsNumerator"] = fpsNumerator, ["fpsDenominator"] = fpsDenominator,
+                    },
+                };
+                int wantedBufferMb = (int)ScaledRbSizeMb(presetName, settings["replaySeconds"]?.Value<int>() ?? 0, wanted);
+                var storedBuffer = GetObsProfileParameterValue("AdvOut", "RecRBSize");
+                bool bufferDiffers = storedBuffer["ok"]?.Value<bool>() == true &&
+                    !(double.TryParse(storedBuffer["value"]?.Value<string>(), NumberStyles.Float, CultureInfo.InvariantCulture, out double storedBufferMb) && (int)storedBufferMb == wantedBufferMb);
+                if (!videoDiffers && !bufferDiffers) return;
+
+                // fail closed: if obs cannot say whether it is recording or streaming, leave it alone
+                var record = ObsWebSocket.InvokeRequest("GetRecordStatus", null, 3000);
+                var stream = ObsWebSocket.InvokeRequest("GetStreamStatus", null, 3000);
+                if (!record.Ok || !stream.Ok) { Log.Write("EnsureObsVideoMatchesSettings: could not tell whether OBS is recording or streaming, left alone."); return; }
+                if ((record.Data?["outputActive"]?.Value<bool>() ?? false) || (stream.Data?["outputActive"]?.Value<bool>() ?? false))
+                {
+                    Log.Write("EnsureObsVideoMatchesSettings: OBS is recording or streaming, left alone until the next helper start.");
+                    return;
+                }
+
+                Log.Write("EnsureObsVideoMatchesSettings: OBS is at " + live["outputWidth"] + "x" + live["outputHeight"] + " " + live["fpsNumerator"] + "/" + live["fpsDenominator"] + " with a replay buffer cap of " + storedBuffer["value"] +
+                    " MB, saved settings want " + outputWidth + "x" + outputHeight + " " + fpsNumerator + "/" + fpsDenominator + " and " + wantedBufferMb + " MB; applying.");
+                // the values go into the profile first so the next launch starts right even if the live changes below do not take
+                var profileWrites = new List<string[]>();
+                if (videoDiffers)
+                {
+                    profileWrites.Add(new[] { "Video", "OutputCX", outputWidth.ToString() });
+                    profileWrites.Add(new[] { "Video", "OutputCY", outputHeight.ToString() });
+                }
+                if (bufferDiffers) profileWrites.Add(new[] { "AdvOut", "RecRBSize", wantedBufferMb.ToString() });
+                foreach (var write in profileWrites)
+                {
+                    var written = SetObsProfileParameterSafe(write[0], write[1], write[2]);
+                    if (!written.Ok) Log.Write("EnsureObsVideoMatchesSettings: OBS did not accept " + write[0] + "." + write[1] + ": " + written.Message);
+                }
+                var applied = ApplyRuntimeOutputsLive(settings, wanted, restartObs: false, applyVideoSettings: videoDiffers, applyReplayBufferOutput: true);
+                foreach (var warning in applied["warnings"] as JArray ?? new JArray()) Log.Write("EnsureObsVideoMatchesSettings: " + warning);
+
+                var after = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
+                bool videoMatches = after.Ok && after.Data is JObject result && result["outputWidth"]?.Value<int>() == outputWidth && result["outputHeight"]?.Value<int>() == outputHeight &&
+                    result["fpsNumerator"]?.Value<int>() == fpsNumerator && result["fpsDenominator"]?.Value<int>() == fpsDenominator;
+                var bufferAfter = ObsWebSocket.InvokeRequest("GetOutputSettings", new JObject { ["outputName"] = "Replay Buffer" }, 3000);
+                Log.Write("EnsureObsVideoMatchesSettings: " + (videoMatches ? "OBS now records at " + outputWidth + "x" + outputHeight + " " + fpsNumerator + "/" + fpsDenominator + "." : "OBS did not take the saved video settings.") +
+                    " The replay buffer cap is " + (bufferAfter.Ok ? bufferAfter.Data?["outputSettings"]?["max_size_mb"]?.ToString() : "unknown") + " MB.");
+            }
+        }
+
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
         {
             var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
@@ -5445,6 +5890,28 @@ namespace ReplayKitHelper
                         ["restartRequired"] = false, ["restartReason"] = "",
                     };
                 }
+                if (TestOnlyMicChanged(previous, settings))
+                {
+                    var live = ApplyMicLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyAudioVolumesChanged(previous, settings))
+                {
+                    var live = ApplyAudioVolumesLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
                 if (TestOnlyOverlayVisualChanged(previous, settings))
                 {
                     var live = ApplyOverlayVisualSettingsLive(previous, settings);
@@ -5503,7 +5970,7 @@ namespace ReplayKitHelper
                 bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
                 bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
                 bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
-                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput);
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings));
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
                     previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())

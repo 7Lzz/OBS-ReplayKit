@@ -449,6 +449,8 @@ namespace ReplayKitSetup
             "obs64.exe", "obs32.exe", "obs.exe",
             // obss cef subprocess -- excluded so clip playback audio in the dock isnt captured as desktop audio and monitored back into the discord share, doubling the copy discord already grabs from the same process tree.
             "obs-browser-page.exe",
+            // the helper plays the settings mic test back through the speakers, and desktop audio capture would otherwise record that echo into clips.
+            "OBSReplayKit.exe",
         };
         private static readonly Dictionary<string, string> MotionBlurSourceUuids = new Dictionary<string, string>
         {

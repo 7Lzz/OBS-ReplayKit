@@ -46,7 +46,7 @@
   }
   .cpick-eyedrop:hover:not(:disabled) { background:var(--line2); }
   .cpick-eyedrop:disabled { opacity:.5; cursor:default; }
-  .cpick-eyedrop svg { width:14px; height:14px; fill:currentColor; }
+  .cpick-eyedrop svg { width:20px; height:20px; fill:currentColor; }
   .cpick-status { min-height:14px; color:var(--muted); font-size:11px; line-height:1.3; }
   .cpick-status.is-bad { color:var(--danger); }
   .cpick-foot { display:flex; justify-content:flex-end; gap:7px; padding:0 10px 10px; }
@@ -63,7 +63,7 @@
     <div class="cpick-row">
       <span class="cpick-swatch" id="cpickSwatch"></span>
       <input class="cpick-hex" id="cpickHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex color">
-      <button class="cpick-eyedrop" type="button" id="cpickEyedrop" data-tooltip="Pick a color from anywhere on screen" aria-label="Pick a color from anywhere on screen"><svg data-i="action/color-picker" viewBox="0 0 32 32" aria-hidden="true"></svg></button>
+      <button class="cpick-eyedrop" type="button" id="cpickEyedrop" data-tooltip="Pick a color from anywhere on screen" aria-label="Pick a color from anywhere on screen"><svg data-i="action/color-picker" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
     </div>
     <div class="cpick-status" id="cpickStatus"></div>
   </div>
