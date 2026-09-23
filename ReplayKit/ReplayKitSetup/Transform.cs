@@ -299,6 +299,9 @@ namespace ReplayKitSetup
             return m.Success ? m.Groups[1].Value : null;
         }
 
+        // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that.
+        private static readonly string[] FreshInstallOnlyBasicWindowKeys = { "ShowListboxToolbars", "ShowStatusBar" };
+
         // write one canonical custom controls dock entry and reset stale dock layout state.
         public static string ApplyUserIni(string text, Preferences prefs)
         {
@@ -312,10 +315,16 @@ namespace ReplayKitSetup
                 if (liveValue.Length > 0 && liveValue != seed) seed = CombineExtraBrowserDocks(seed, liveValue);
                 string merged = MergeExtraBrowserDocksValue(seed);
                 text = sectionRe.Replace(text, mm => m.Groups[1].Value + "ExtraBrowserDocks=" + merged, 1);
-                return SetIniValue(text, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
             }
-
-            text = SetIniValue(text, "BasicWindow", "ExtraBrowserDocks", ExtraBrowserDocksValue());
+            else
+            {
+                text = SetIniValue(text, "BasicWindow", "ExtraBrowserDocks", ExtraBrowserDocksValue());
+            }
+            foreach (string key in FreshInstallOnlyBasicWindowKeys)
+            {
+                string live = ReadLiveUserIniValue(key);
+                if (live != null) text = SetIniValue(text, "BasicWindow", key, live);
+            }
             return SetIniValue(text, "General", "ConfirmOnExit", ConfirmOnExitValue(prefs));
         }
 

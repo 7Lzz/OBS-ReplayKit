@@ -126,7 +126,7 @@
       <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels">
       <div class="sens-wrap" id="micSenseWrap">
         <div class="sens-track"><div class="sens-level" id="micSenseLevel"></div></div>
-        <input class="sens-slider" id="micSense" type="range" min="-96" max="0" step="1" aria-label="Input sensitivity slider">
+        <input class="sens-slider" id="micSense" type="range" min="-100" max="0" step="1" aria-label="Input sensitivity slider">
       </div>
     </div>
     <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
@@ -137,6 +137,8 @@
   var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
   var DEF = { micDeviceId:"default", micVolume:100, micNoiseSuppression:true, micInputSensitivity:-50 };
   var VOL_MIN = 0, VOL_MAX = 200, SENS_MIN = -96, SENS_MAX = 0, BAR_WIDTH = 3, BAR_GAP = 3, BARS_MIN = 16, BARS_MAX = 240, POLL_MS = 66, FLOOR_DB = -60;
+  // the real gate range obs supports is -96..0 (matches noise_gate_filters own VOL_MIN/VOL_MAX), which does not put -50 at the middle -- SENS_VMIN only widens where the handle can visually sit, four units of dead zone below the real floor, so the default lands dead center without changing what actually reaches obs
+  var SENS_VMIN = -100;
   var host = { get:function (k) { return DEF[k]; }, set:function () {}, onChange:function () {} };
   var st = Object.assign({}, DEF);
   var devices = [{ value:"default", label:"Default" }];
@@ -285,21 +287,37 @@
     var n = parseInt(t.replace(/[^\d-]/g, ""), 10);
     return Number.isFinite(n) ? clampSens(n) : null;
   }
-  function paintSens() {
-    sens.value = String(st.micInputSensitivity);
+  function paintSensText() {
     sensNum.value = sensText(st.micInputSensitivity);
     sens.setAttribute("aria-valuetext", sensText(st.micInputSensitivity));
-    sensWrap.style.setProperty("--p", ((st.micInputSensitivity - SENS_MIN) / (SENS_MAX - SENS_MIN)).toFixed(4));
   }
-  function commitSens(v) {
+  // reads the handles own current dom value rather than the committed one, so this stays correct both mid drag (where the handle can sit in the dead zone below the real floor) and right after a snap (where sens.value has just been set to the committed value)
+  function paintSensVisual() {
+    sensWrap.style.setProperty("--p", ((Number(sens.value) - SENS_VMIN) / (SENS_MAX - SENS_VMIN)).toFixed(4));
+  }
+  // full repaint, including the handles own dom position -- everywhere except a live drag, so a reset or an external sync always settles the handle exactly on the real values spot
+  function paintSens() {
+    sens.value = String(st.micInputSensitivity);
+    paintSensText();
+    paintSensVisual();
+  }
+  // updates the real value, the text and the track fill, but deliberately leaves the handles own dom position alone -- called on every input tick during a drag, so the handle keeps following the pointer through the dead zone instead of the commit snapping it back on every tick
+  function applySensValue(v) {
     st.micInputSensitivity = clampSens(v);
-    paintSens();
+    paintSensText();
+    paintSensVisual();
     host.set("micInputSensitivity", st.micInputSensitivity);
     refreshResets();
     fire();
     pushParams();
   }
-  sens.addEventListener("input", function () { commitSens(sens.value); });
+  function commitSens(v) {
+    applySensValue(v);
+    sens.value = String(st.micInputSensitivity);
+    paintSensVisual();
+  }
+  sens.addEventListener("input", function () { applySensValue(sens.value); });
+  sens.addEventListener("change", function () { commitSens(sens.value); });
   sensNum.addEventListener("change", function () {
     var v = parseSens(sensNum.value);
     if (v === null) paintSens(); else commitSens(v);
@@ -317,7 +335,7 @@
   }
   function senseFraction(peak) {
     var db = 20 * Math.log10(Math.max(Number(peak) || 0, 1e-6));
-    return Math.max(0, Math.min(1, (db - SENS_MIN) / (SENS_MAX - SENS_MIN)));
+    return Math.max(0, Math.min(1, (db - SENS_VMIN) / (SENS_MAX - SENS_VMIN)));
   }
   // bars keep one thin width and the count follows the meter width, so a wider window gets more bars instead of fatter ones; each bar carries its position so css can fade the lit colour from warning to success across the row
   function buildBars() {

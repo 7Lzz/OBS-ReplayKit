@@ -29,6 +29,11 @@ namespace ReplayKitHelper
         // -- the border is the dwm system default (see Native.EnableDwmRounding).
         private static readonly Color DefaultBg = ColorTranslator.FromHtml("#1D1F26");
 
+        // the window stays fully transparent until the page has real content painted (webview2 is blank white for a beat while its own process spins up, then the page still has to fetch and lay out the real update status -- showing any of that is the "flash and build" this exists to hide); RevealTimeoutMs is a backstop in case the page never posts ready (helper unreachable, a script error) so the window is never silently stuck invisible.
+        private const int RevealTimeoutMs = 2500;
+        private const int RevealFadeStepMs = 16;
+        private const double RevealFadeStep = 0.18;
+
         private static Color ParseColor(string hex, Color fallback)
         {
             try { if (!string.IsNullOrWhiteSpace(hex)) return ColorTranslator.FromHtml(hex.Trim()); }
@@ -62,13 +67,36 @@ namespace ReplayKitHelper
 
                 using (var form = BuildForm(bgColor))
                 using (var web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = ParseColor(bgColor, DefaultBg) })
+                using (var revealDeadline = new System.Windows.Forms.Timer { Interval = RevealTimeoutMs })
+                using (var revealFade = new System.Windows.Forms.Timer { Interval = RevealFadeStepMs })
                 {
                     form.Controls.Add(web);
+                    bool revealed = false;
+
+                    // fades the already-rendered page in instead of popping it in at once -- the same short linear ramp NotifyButtons own hover fade uses in replaykit.cpp, for the same reason.
+                    void Reveal()
+                    {
+                        if (revealed || form.IsDisposed) return;
+                        revealed = true;
+                        revealDeadline.Stop();
+                        try { Native.FocusHwnd(form.Handle); } catch (Exception ex) { WriteDebug("focus: " + ex.Message); }
+                        revealFade.Tick += (s, e) =>
+                        {
+                            // the window can close mid-fade (the update can finish before the ~90ms ramp does)
+                            if (form.IsDisposed) { revealFade.Stop(); return; }
+                            double next = form.Opacity + RevealFadeStep;
+                            if (next >= 1.0) { form.Opacity = 1.0; revealFade.Stop(); return; }
+                            form.Opacity = next;
+                        };
+                        revealFade.Start();
+                    }
+                    revealDeadline.Tick += (s, e) => Reveal();
+
                     form.Shown += async (sender, args) =>
                     {
                         try
                         {
-                            try { Native.FocusHwnd(form.Handle); } catch (Exception ex) { WriteDebug("focus: " + ex.Message); }
+                            revealDeadline.Start();
 
                             var environment = await CoreWebView2Environment.CreateAsync(null, profileDir);
                             await web.EnsureCoreWebView2Async(environment);
@@ -80,13 +108,14 @@ namespace ReplayKitHelper
 
                             // window.close() from the page (closeWindow() in update_prompt.html) lands here
                             core.WindowCloseRequested += (s, e) => CloseForm(form);
-                            // no -webkit-app-region in webview2: the page posts "drag" on mousedown over the shell
+                            // no -webkit-app-region in webview2: the page posts "drag" on mousedown over the shell; "ready" is the page telling us it has real content painted, not the pre-navigation blank frame.
                             core.WebMessageReceived += (s, e) =>
                             {
                                 string message = null;
                                 try { message = e.TryGetWebMessageAsString(); } catch (Exception ex) { WriteDebug("web message: " + ex.Message); }
                                 if (message == "drag") { try { Native.StartWindowDrag(form.Handle); } catch (Exception ex) { WriteDebug("drag: " + ex.Message); } }
                                 else if (message == "close") CloseForm(form);
+                                else if (message == "ready") Reveal();
                             };
 
                             string url = "http://127.0.0.1:" + port + "/update-prompt";
@@ -95,6 +124,7 @@ namespace ReplayKitHelper
                         }
                         catch (Exception ex)
                         {
+                            // never got as far as a page to show -- close it invisible rather than flash an empty window; revealDeadline would have caught it anyway if this fell through instead
                             WriteDebug("webview init failed: " + ex.Message);
                             CloseForm(form);
                         }
@@ -121,6 +151,8 @@ namespace ReplayKitHelper
                 ShowInTaskbar = true,
                 // pre-paint colour only -- dwm draws the border, the page paints the rest
                 BackColor = ParseColor(bgColor, DefaultBg),
+                // invisible until Reveal() fades it in -- see RevealTimeoutMs above
+                Opacity = 0,
             };
 
             // bundled ico only -- this standalone process has no settings loaded, so the appearance-tab icon override

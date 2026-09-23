@@ -148,6 +148,7 @@
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
   const els = {
+    heroArt: document.getElementById("heroArt"),
     title: document.getElementById("title"),
     line1: document.getElementById("line1"),
     line2: document.getElementById("line2"),
@@ -167,6 +168,19 @@
     document.addEventListener("mousedown", (e) => {
       if (e.button === 0 && !e.target.closest("button, a, input")) window.chrome.webview.postMessage("drag");
     });
+  }
+
+  // the host keeps the window invisible until this fires, so the user never sees the blank webview2 startup frame, the placeholder text swap to the real status, or the hero art popping in after the text -- gated on both setHero having run (real status text) and the art having actually loaded (art is same-origin and almost always already there by the time the update check answers, but this does not assume that; a load error still counts as ready, a missing image should not hold the window hostage); double rAF then waits for that DOM change to reach a real paint before telling the host it is safe to reveal, not just for the change to have been queued.
+  let readySent = false, statusReady = false;
+  let heroArtReady = els.heroArt.complete;
+  if (!heroArtReady) {
+    els.heroArt.addEventListener("load", () => { heroArtReady = true; notifyReady(); });
+    els.heroArt.addEventListener("error", () => { heroArtReady = true; notifyReady(); });
+  }
+  function notifyReady() {
+    if (readySent || !statusReady || !heroArtReady || !window.chrome || !window.chrome.webview) return;
+    readySent = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => window.chrome.webview.postMessage("ready")));
   }
 
   async function helperJson(path, options) {
@@ -189,11 +203,14 @@
     }, 25);
   }
 
+  // every call here is real, final-for-now copy (never placeholder junk), so this is also the signal the window is worth showing
   function setHero(title, first, second, bad) {
     els.title.textContent = title;
     els.title.classList.toggle("is-bad", !!bad);
     els.line1.textContent = first || "";
     els.line2.textContent = second || "";
+    statusReady = true;
+    notifyReady();
   }
 
   // percent < 0 leaves the bar where it is -- used by the stages that have no measurable total
