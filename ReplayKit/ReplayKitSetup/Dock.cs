@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // post-install sanity check that the replaykit browser html landed. ported from obs_replaykit/dock.py.
+    // post-install sanity check that the replaykit browser html landed
     public static class Dock
     {
         // canonical files we expect under DOCK_TARGET. anything else the walker copies is fine; this is just the sanity-check set.

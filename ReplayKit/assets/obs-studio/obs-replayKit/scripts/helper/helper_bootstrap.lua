@@ -1,4 +1,4 @@
-﻿-- helper_bootstrap.lua low-lag obs entrypoint that launches the ReplayKit helper and forwards hotkey/menu requests to it. obs should not host clip browsing, video preview streaming, or upload-state polling on its lua/ui thread, so this script only starts the external helper -- it serves the obs dock ui on 127.0.0.1 from a seperate powershell process.
+﻿-- launches the ReplayKit helper (OBSReplayKit.exe), keeps it running, and forwards hotkey/menu requests to it. clip browsing, preview streaming and uploads stay out of obs, since lua timers run on the obs graphics thread
 
 local obs = obslua
 local ffi = require("ffi")
@@ -87,7 +87,17 @@ ffi.cdef[[
     unsigned long inet_addr(const char *cp);
     int send(SOCKET s, const char *buf, int len, int flags);
     int recv(SOCKET s, char *buf, int len, int flags);
-    int setsockopt(SOCKET s, int level, int optname, const char *optval, int optlen);
+    int ioctlsocket(SOCKET s, long cmd, unsigned long *argp);
+    int WSAGetLastError(void);
+    typedef struct {
+        unsigned int fd_count;
+        SOCKET fd_array[64];
+    } fd_set;
+    struct timeval {
+        long tv_sec;
+        long tv_usec;
+    };
+    int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timeval *timeout);
 ]]
 
 local kernel32 = ffi.load("kernel32")
@@ -101,14 +111,17 @@ local AF_INET              = 2
 local SOCK_STREAM          = 1
 local IPPROTO_TCP          = 6
 local INVALID_SOCKET       = ffi.cast("SOCKET", -1)
-local SOL_SOCKET           = 0xFFFF
-local SO_RCVTIMEO          = 0x1006
+-- FIONBIO (0x8004667E) as the signed long ioctlsocket takes
+local FIONBIO              = -2147195266
+local WSAEWOULDBLOCK       = 10035
 
 local HTTP_PORT = 8767
 local HELPER_START_WAIT_MS = 3000
 local HELPER_WATCHDOG_MS = 10000
 local HELPER_RESTART_COOLDOWN_MS = 15000
--- global streamable helper logging switch. keep false for production. flip this one constant to true when debugging lua/helper/upload/compress logs.
+local HELPER_PROBE_POLL_MS = 100
+local HELPER_PROBE_TIMEOUT_MS = 2000
+-- developer override for lua and helper logging, off in releases; the debug logging setting turns it on per user
 local REPLAYKIT_LOGGING_ENABLED = false
 local hotkey_id = obs.OBS_INVALID_HOTKEY_ID
 local helper_watchdog_started = false
@@ -172,35 +185,76 @@ local function helper_port_open()
     return ok
 end
 
--- a raw connect() only proves the helper has bound the port, not that its single request-handling thread can still answer -- thats how a past hang went undetected, with helper_port_open() reporting healthy while the servicing thread was stuck, so this does a real http round trip with a short recv timeout instead.
-local function helper_responds_ok(timeout_ms)
+-- the health probe is a real http round trip, since a bound port alone does not prove the helper still answers. it runs on a non-blocking socket polled from a short timer: lua timers run on the obs graphics thread, and a probe that waited on a slow helper would stall rendering
+local probe = nil
+
+-- "ready", "pending" or "error" for one socket, without waiting
+local function socket_state(sock, for_write)
+    local wanted = ffi.new("fd_set")
+    wanted.fd_count = 1
+    wanted.fd_array[0] = sock
+    local failed = ffi.new("fd_set")
+    failed.fd_count = 1
+    failed.fd_array[0] = sock
+    local now = ffi.new("struct timeval")
+    local n
+    if for_write then
+        n = ws2_32.select(0, nil, wanted, failed, now)
+    else
+        n = ws2_32.select(0, wanted, nil, failed, now)
+    end
+    if n < 0 or failed.fd_count > 0 then return "error" end
+    if wanted.fd_count > 0 then return "ready" end
+    return "pending"
+end
+
+local function start_probe()
     if not ensure_winsock() then return false end
     local s = ws2_32.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
     if s == INVALID_SOCKET then return false end
-
-    local tmo = ffi.new("DWORD[1]", timeout_ms)
-    ws2_32.setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, ffi.cast("const char*", tmo), ffi.sizeof("DWORD"))
-
+    local nonblocking = ffi.new("unsigned long[1]", 1)
+    if ws2_32.ioctlsocket(s, FIONBIO, nonblocking) ~= 0 then
+        ws2_32.closesocket(s)
+        return false
+    end
     local addr = ffi.new("struct sockaddr_in")
     addr.sin_family = AF_INET
     addr.sin_port = ws2_32.htons(HTTP_PORT)
     addr.sin_addr.s_addr = ws2_32.inet_addr("127.0.0.1")
-    if ws2_32.connect(s, ffi.cast("const struct sockaddr*", addr), ffi.sizeof(addr)) ~= 0 then
+    if ws2_32.connect(s, ffi.cast("const struct sockaddr*", addr), ffi.sizeof(addr)) ~= 0 and ws2_32.WSAGetLastError() ~= WSAEWOULDBLOCK then
         ws2_32.closesocket(s)
         return false
     end
+    probe = { sock = s, started = now_ms(), sent = false }
+    return true
+end
 
-    local req = "GET /status HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
-    if ws2_32.send(s, req, #req, 0) <= 0 then
-        ws2_32.closesocket(s)
-        return false
+-- one step of the running probe: nil while it waits, true or false once the helper answered or did not
+local function step_probe()
+    if now_ms() - probe.started > HELPER_PROBE_TIMEOUT_MS then return false end
+    if not probe.sent then
+        local state = socket_state(probe.sock, true)
+        if state == "pending" then return nil end
+        if state == "error" then return false end
+        local req = "GET /status HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+        if ws2_32.send(probe.sock, req, #req, 0) ~= #req then return false end
+        probe.sent = true
+        return nil
     end
-
+    local state = socket_state(probe.sock, false)
+    if state == "pending" then return nil end
+    if state == "error" then return false end
     local buf = ffi.new("char[?]", 64)
-    local n = ws2_32.recv(s, buf, 64, 0)
-    ws2_32.closesocket(s)
+    local n = ws2_32.recv(probe.sock, buf, 64, 0)
     if n <= 0 then return false end
     return ffi.string(buf, n):find("HTTP/1.1 200", 1, true) ~= nil
+end
+
+local function finish_probe()
+    if probe then
+        ws2_32.closesocket(probe.sock)
+        probe = nil
+    end
 end
 
 local function wait_for_helper_port(timeout_ms)
@@ -243,8 +297,7 @@ local function spawn_hidden(cmdline)
     ffi.copy(buf, cmdline)
     local flags = CREATE_NO_WINDOW + CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS
     local ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, flags, nil, nil, si, pi)
-    -- Some restrictive job policies deny breakaway. The compiled helper still
-    -- works in that case, so retry with the ordinary launch flags.
+    -- some restrictive job policies deny breakaway. The compiled helper still works in that case, so retry with the ordinary launch flags.
     if ok == 0 then
         buf = ffi.new("char[?]", #cmdline + 1)
         ffi.copy(buf, cmdline)
@@ -275,20 +328,30 @@ local function read_text(path)
     return text
 end
 
--- the settings.html "Enable debug logging" toggle writes into replaykit_settings.json (one level up from this script), not into helper_config.json directly -- orred with REPLAYKIT_LOGGING_ENABLED below so a users toggle and a devs hardcoded override both work independently.
+-- the replaykit folder, two levels above this script; the settings and the saved state are plain files straight in it
+local function replaykit_dir()
+    local dir = script_dir():gsub("[\\/]+$", "")
+    local scripts_dir = dir:match("^(.*)[\\/][^\\/]+$") or dir
+    local root = scripts_dir:match("^(.*)[\\/][^\\/]+$") or scripts_dir
+    return root .. "\\"
+end
+
+-- the settings.html "Enable debug logging" toggle writes into replaykit_settings.json (in the replaykit folder), not into helper_config.json directly -- orred with REPLAYKIT_LOGGING_ENABLED below so a users toggle and a devs hardcoded override both work independently. an install from before the settings moved there keeps the file in scripts until the helper has moved it
 local function read_debug_logging_enabled()
-    local text = read_text(script_dir() .. "../replaykit_settings.json")
+    local text = read_text(replaykit_dir() .. "replaykit_settings.json") or read_text(script_dir() .. "../replaykit_settings.json")
     if not text or text == "" then return false end
     if not text:find('"debugLoggingEnabled"%s*:') then return false end
     local data = obs.obs_data_create_from_json(text)
     if data == nil then return false end
     local enabled = obs.obs_data_get_bool(data, "debugLoggingEnabled")
+    -- logging is a development setting now; a file from before development mode has no key for it and keeps its logging
+    if enabled and text:find('"developmentMode"%s*:') then enabled = obs.obs_data_get_bool(data, "developmentMode") end
     obs.obs_data_release(data)
     return enabled
 end
 
 local function helper_config_path()
-    return script_dir() .. "helper_config.json"
+    return replaykit_dir() .. "helper_config.json"
 end
 
 local function helper_path()
@@ -313,14 +376,15 @@ local function write_helper_config()
     f:write("  \"loggingEnabled\": " .. tostring(REPLAYKIT_LOGGING_ENABLED or read_debug_logging_enabled()) .. "\n")
     f:write("}\n")
     f:close()
+    -- the copy this file had beside the helper before it moved is not read by anything now
+    os.remove(script_dir() .. "helper_config.json")
     return true
 end
 
 -- set to true once weve successfully launched the helper this session. re-spawn attempts are skipped while its true (the os port-bind would just fail anyway). stays false if the launch errored so the next helper_request() retries after a failed helper launch.
 local helper_started = false
 
--- Runs the update startup check in the compiled helper. This keeps the prompt
--- available while OBS is minimized without launching PowerShell.
+-- runs the startup update check in the compiled helper, so the prompt also appears while obs is minimized
 local update_bootstrap_started = false
 local function start_update_bootstrap()
     if update_bootstrap_started then return true end
@@ -339,13 +403,8 @@ local function start_update_bootstrap()
     return true
 end
 
-local function start_helper()
-    if helper_started then
-        if helper_port_open() then return true end
-        helper_started = false
-    end
-
-    -- the helper is a full compiled c# app (OBSReplayKit.exe, the ReplayKitHelper project) -- it replaced the PowerShell implementation this bootstrap used to spawn (either directly, or in-process via a thin branded launcher exe hosting System.Management.Automation), so there is no PowerShell fallback left to spawn instead; a missing exe here is a hard install error, re-run the ReplayKit setup/apply flow to restore it.
+-- writes the config and starts the helper exe; true once the process was created. a missing exe is a broken install, re-running the ReplayKit setup restores it
+local function spawn_helper()
     local helper = helper_path()
     if not file_exists(helper) then
         log(obs.LOG_ERROR, "Missing helper: " .. helper)
@@ -359,6 +418,15 @@ local function start_helper()
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
         return false
     end
+    return true
+end
+
+local function start_helper()
+    if helper_started then
+        if helper_port_open() then return true end
+        helper_started = false
+    end
+    if not spawn_helper() then return false end
     if not wait_for_helper_port(HELPER_START_WAIT_MS) then
         helper_started = false
         log(obs.LOG_ERROR, "ReplayKit helper did not bind port " .. HTTP_PORT .. " after launch")
@@ -369,12 +437,12 @@ local function start_helper()
     return true
 end
 
--- a busy-but-alive helper can legitimately take a couple seconds to answer under real load, so that alone isnt "dead" -- requiring a run of failures before acting is what tells the two apart, since a single bad check firing start_helper() lets even a losing redundant instance post /shutdown at the healthy one on its way out, turning "helper was briefly slow" into "helper gets kicked every ~20s".
+-- a helper under real load can take a couple of seconds to answer, so only a run of failed probes counts as down. a new helper only takes over once the old process is gone: while it still runs, the singleton mutex makes the new one quit at once
 local helper_consecutive_fails = 0
 local HELPER_UNHEALTHY_THRESHOLD = 3
 
-local function helper_watchdog()
-    if helper_responds_ok(2000) then
+local function on_helper_health(ok)
+    if ok then
         helper_started = true
         helper_consecutive_fails = 0
         return
@@ -388,9 +456,30 @@ local function helper_watchdog()
         helper_started = false
         helper_last_restart_ms = now
         helper_consecutive_fails = 0
-        -- start_helper() just spawns a fresh OBSReplayKit.exe; that processs own startup notices the port is taken, posts /shutdown, and force-kills whatever didnt respond, so this actually replaces a wedged helper rather than leaving a second one competing for the port -- gated behind 3 consecutive failures since a losing redundant instance posts that same /shutdown even when the survivor isnt actually dead.
-        start_helper()
+        -- not waited for here; the next probe sees whether it came up
+        if spawn_helper() then start_update_bootstrap() end
     end
+end
+
+local function helper_probe_poll()
+    if not probe then
+        obs.remove_current_callback()
+        return
+    end
+    local result = step_probe()
+    if result == nil then return end
+    finish_probe()
+    obs.remove_current_callback()
+    on_helper_health(result)
+end
+
+local function helper_watchdog()
+    if probe then return end
+    if not start_probe() then
+        on_helper_health(false)
+        return
+    end
+    obs.timer_add(helper_probe_poll, HELPER_PROBE_POLL_MS)
 end
 
 local function start_helper_watchdog()
@@ -539,6 +628,10 @@ function script_unload()
     if helper_watchdog_started then
         obs.timer_remove(helper_watchdog)
         helper_watchdog_started = false
+    end
+    if probe then
+        obs.timer_remove(helper_probe_poll)
+        finish_probe()
     end
     spawn_hidden("curl.exe -s --max-time 1 -X POST " ..
         win_quote("http://127.0.0.1:" .. HTTP_PORT .. "/shutdown"))

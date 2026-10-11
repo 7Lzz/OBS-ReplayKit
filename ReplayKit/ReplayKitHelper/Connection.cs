@@ -13,9 +13,12 @@ namespace ReplayKitHelper
         public Dictionary<string, string> Query = new Dictionary<string, string>();
         public Dictionary<string, string> Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public string Body = "";
+        // an upload keeps its body on the wire: the number of bytes it announced and the reader to take them from, which is for the route to read
+        public long UploadLength = -1;
+        public StreamReader UploadReader;
     }
 
-    // per-connection http/1.1 request parsing and the accept-loop's per-socket handler: read one request, dispatch it, and (for /file/ range requests only) keep the socket open for a short idle window so a video element's next range request reuses it instead of paying a fresh tcp handshake per chunk. ported from obs_replaykit helper modules/80_connection.ps1.
+    // per-connection http/1.1 request parsing and the per-socket handler of the accept loop: read one request, dispatch it, and keep the socket open only for /file/ range requests so a video elements next range request reuses it instead of paying a fresh tcp handshake per chunk
     internal static class Connection
     {
         internal static readonly Encoding WireEncoding = Encoding.GetEncoding(28591);
@@ -76,6 +79,11 @@ namespace ReplayKitHelper
             if (headers.ContainsKey("transfer-encoding"))
                 throw new InvalidDataException("Transfer-Encoding is not supported.");
 
+            int qIdx = rawPath.IndexOf('?');
+            string path = qIdx >= 0 ? rawPath.Substring(0, qIdx) : rawPath;
+            // a file sent by the editor is far past what a body may hold in memory, so its route reads it off the wire itself and sets its own limit
+            bool upload = method == "POST" && path == AudioImports.UploadPath;
+
             string body = "";
             int bodyLen = 0;
             if (headers.TryGetValue("content-length", out string clStr))
@@ -85,13 +93,13 @@ namespace ReplayKitHelper
                     HttpResponse.SendText(stream, 400, "Bad Request", "Invalid Content-Length");
                     return null;
                 }
-                if (bodyLen > 1024 * 1024)
+                if (bodyLen > 1024 * 1024 && !upload)
                 {
                     HttpResponse.SendText(stream, 413, "Payload Too Large", "Request body too large");
                     return null;
                 }
             }
-            if (bodyLen > 0)
+            if (bodyLen > 0 && !upload)
             {
                 var buf = new char[bodyLen];
                 int read = 0;
@@ -101,12 +109,10 @@ namespace ReplayKitHelper
                     if (n <= 0) throw new InvalidDataException("Incomplete HTTP body.");
                     read += n;
                 }
-                // Content-Length counts bytes; the wire reader maps each byte to one character.
+                // content-Length counts bytes; the wire reader maps each byte to one character.
                 body = BodyEncoding.GetString(WireEncoding.GetBytes(buf, 0, read));
             }
 
-            int qIdx = rawPath.IndexOf('?');
-            string path = qIdx >= 0 ? rawPath.Substring(0, qIdx) : rawPath;
             string queryString = qIdx >= 0 ? rawPath.Substring(qIdx + 1) : "";
             var query = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(queryString))
@@ -129,7 +135,28 @@ namespace ReplayKitHelper
                 Query = query,
                 Headers = headers,
                 Body = body,
+                UploadLength = upload ? bodyLen : -1,
+                UploadReader = upload ? reader : null,
             };
+        }
+
+        // moves the body of an upload from the wire into a stream, as bytes, while a hash reads them too; the length it announced is what is taken, and a body that ends short is an error
+        public static void CopyUploadBody(HttpRequest req, Stream destination, System.Security.Cryptography.HashAlgorithm hash)
+        {
+            var chars = new char[65536];
+            var bytes = new byte[65536];
+            long left = req.UploadLength;
+            while (left > 0)
+            {
+                int n = req.UploadReader.Read(chars, 0, (int)Math.Min(chars.Length, left));
+                if (n <= 0) throw new InvalidDataException("Incomplete upload.");
+                // the wire reader maps each byte to one character, so this gives the bytes back as they came
+                int count = WireEncoding.GetBytes(chars, 0, n, bytes, 0);
+                destination.Write(bytes, 0, count);
+                hash.TransformBlock(bytes, 0, count, null, 0);
+                left -= n;
+            }
+            hash.TransformFinalBlock(new byte[0], 0, 0);
         }
 
         public static void HandleConnection(TcpClient client)
@@ -138,18 +165,21 @@ namespace ReplayKitHelper
             {
                 client.NoDelay = true;
                 client.ReceiveTimeout = 5000;
-                // a write that stalls (client not draining its receive window) blocks this connection's pool thread for the full timeout before .net aborts it -- nothing on localhost legitimately needs anywhere near that long, and a stuck client shouldnt tie up a pool slot repeatedly.
+                // a write that stalls (client not draining its receive window) blocks this connections pool thread for the full timeout before .net aborts it -- nothing on localhost legitimately needs anywhere near that long, and a stuck client shouldnt tie up a pool slot repeatedly.
                 client.SendTimeout = 3000;
                 var stream = client.GetStream();
                 using (var reader = new StreamReader(stream, WireEncoding, false, 8192, true))
                 {
-                    // every route answers once and closes (Connection: close from GetNoStoreHeaders) except /file/, which can ask to keep going so a video element's next range request reuses this socket instead of paying a fresh tcp handshake per chunk.
+                    // every route answers once and closes (Connection: close from GetNoStoreHeaders) except /file/, which can ask to keep going so a video elements next range request reuses this socket instead of paying a fresh tcp handshake per chunk.
+                    bool keptAlive = false;
                     while (true)
                     {
                         HttpRequest req;
                         using (var deadline = new System.Threading.Timer(_ => client.Close(), null, 10000, System.Threading.Timeout.Infinite))
                         {
-                            req = ReadHttpRequest(stream, reader);
+                            try { req = ReadHttpRequest(stream, reader); }
+                            // a kept-alive socket that stays quiet past its short read timeout is the normal end of it, not an error
+                            catch (IOException) when (keptAlive) { req = null; }
                             using (var drained = new System.Threading.ManualResetEvent(false))
                             {
                                 if (deadline.Dispose(drained)) drained.WaitOne();
@@ -159,7 +189,8 @@ namespace ReplayKitHelper
                         bool keepAlive = Routes.DispatchRequest(stream, req);
                         if (!keepAlive) break;
 
-                        // Read buffered requests first; polling the socket misses StreamReader's read-ahead.
+                        // the next request is read through the same reader, so one already held by its read-ahead is not missed
+                        keptAlive = true;
                         client.ReceiveTimeout = 500;
                     }
                 }

@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // persisted user preferences for OBS ReplayKit. ported from obs_replaykit/prefs.py. json property names are a cross-language contract with existing users prefs.json files and the powershell helpers runtime settings -- keep them exactly snake_case matching the python field names, never the c# PascalCase property names.
+    // persisted user preferences for OBS ReplayKit. the json property names are a contract with existing prefs.json files and the helpers runtime settings -- keep them snake_case, never the c# PascalCase property names
     public sealed class Preferences
     {
         [JsonProperty("recording_preset")] public string RecordingPreset { get; set; } = Prefs.DEFAULT_RECORDING_PRESET;
@@ -54,7 +55,7 @@ namespace ReplayKitSetup
         [JsonProperty("motion_blur_enabled")] public bool MotionBlurEnabled { get; set; } = Prefs.DEFAULT_MOTION_BLUR;
         [JsonProperty("motion_blur_strength")] public double MotionBlurStrength { get; set; } = Prefs.DEFAULT_MOTION_BLUR_STRENGTH;
 
-        // encoding.utf8 writes a bom by default; python's encoding="utf-8" never does, and anything else that reads this file (the python side during the transition, the powershell helper) expects bom-less utf-8.
+        // written as bom-less utf-8, which is what every reader of this file expects
         private static readonly System.Text.Encoding Utf8NoBom = new System.Text.UTF8Encoding(false);
 
         public void Save()
@@ -68,14 +69,15 @@ namespace ReplayKitSetup
     {
         private static string PrefsDir()
         {
-            // an exe launched directly (not via dotnet run/build) always reports its own real directory here -- no frozen-vs-source-mode distinction like pyinstaller needed.
+            // an exe launched directly (not via dotnet run/build) always reports its own real directory here.
             return AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
         }
 
         public static readonly string PREFS_DIR = PrefsDir();
         public static readonly string PREFS_FILE = Path.Combine(PREFS_DIR, "prefs.json");
         public static readonly string SETUP_CACHE_PREFS_FILE = Path.Combine(Config.REPLAYKIT_SETUP_CACHE, "prefs.json");
-        public static readonly string RUNTIME_SETTINGS_FILE = Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "replaykit_settings.json");
+        // the settings file of the helper: straight in the replaykit folder, or in scripts while an install from before that move has not been migrated yet
+        public static string RUNTIME_SETTINGS_FILE => StateLayout.Resolve(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile);
 
         // defaults match the bundled config so an unconfigured run produces the same install the previous version did.
         public const string DEFAULT_RECORDING_PRESET = "balanced";
@@ -106,6 +108,8 @@ namespace ReplayKitSetup
         public const bool DEFAULT_CLIP_NOTIFICATION = true;
         public const bool DEFAULT_RECORDING_NOTIFICATION = true;
         public const bool DEFAULT_TRIM_PRECISE = false;
+        // the pc audio, discord and the microphone as tracks of their own in every recording, next to the mixed track 1; on for a new install, and DefaultsMigration turns it on once for an install that existed before
+        public const bool DEFAULT_SEPARATE_AUDIO_TRACKS = true;
         public const int DEFAULT_CLIP_SOUND_VOLUME = 25;
         public const int DEFAULT_RECORDING_SOUND_VOLUME = 25;
         public const string DEFAULT_SHARE_MODE = "projector";
@@ -157,7 +161,7 @@ namespace ReplayKitSetup
             return Path.Combine(Config.USERPROFILE, "Videos").Replace('\\', '/');
         }
 
-        // newtonsoft deserializes a nested json object inside a Dictionary<string,object> as a JObject wrapper, not a native dictionary -- normalize before doing anything else so callers only ever see native types, same as python json.loads always would.
+        // newtonsoft deserializes a nested json object inside a Dictionary<string,object> as a JObject wrapper, not a native dictionary -- normalize before doing anything else so callers only ever see native types.
         private static Dictionary<string, object> AsNativeDict(object value)
         {
             if (value is Newtonsoft.Json.Linq.JObject jobj) return jobj.ToObject<Dictionary<string, object>>();
@@ -366,7 +370,7 @@ namespace ReplayKitSetup
 
         private static string ReadUtf8SigText(string path)
         {
-            // matches pythons "utf-8-sig": strip a leading bom if present, otherwise plain utf-8.
+            // strips a leading bom if present, otherwise plain utf-8
             byte[] bytes = File.ReadAllBytes(path);
             var enc = new System.Text.UTF8Encoding(false);
             if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)

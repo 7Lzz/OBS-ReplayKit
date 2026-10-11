@@ -1,0 +1,16 @@
+ReplayKit patch 2 of 4 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+Build metadata only, no code change: the obs log line "[win-capture-audio] Version 2.3.4 (...)" names the upstream
+commit and the revision of the replaykit patch set (rk2) this binary was built from, so the running dll can be traced to its source.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -99,7 +99,7 @@
+ # Version header
+ # ---------------------------------------------------------------------------------
+ 
+-set(GIT_HASH "unknown")
++set(GIT_HASH "d11b381+rk2")
+ find_package(Git QUIET)
+ if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+     execute_process(

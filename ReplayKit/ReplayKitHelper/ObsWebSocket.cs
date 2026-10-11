@@ -20,7 +20,7 @@ namespace ReplayKitHelper
         public JToken Data;
     }
 
-    // thin obs-websocket v5 json-rpc client: connects (or reuses a cached connection), sends one request, matches the response by requestId. ported from obs_replaykit helper modules/61_obs_websocket.ps1 -- a near 1:1 translation, since PS 5.1 on .NET Framework 4.x already had direct access to System.Net.WebSockets.ClientWebSocket.
+    // thin obs-websocket v5 json-rpc client: connects (or reuses the cached connection), sends one request, and matches the response by requestId
     internal static class ObsWebSocket
     {
         private sealed class SettingsResult
@@ -100,7 +100,7 @@ namespace ReplayKitHelper
             if (socket == null) return;
             Server.State.ObsWebSocket = null;
             Server.State.ObsWebSocketPort = 0;
-            // Cleanup must not wait for a peer's close handshake while holding the request lock.
+            // cleanup must not wait for a peers close handshake while holding the request lock.
             socket.Abort();
             socket.Dispose();
         }

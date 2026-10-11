@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // dispatches a local compress-overwrite job (CompressOverwriteWorker) and reacts once it finishes -- the "watcher" from the ps original, now a plain Task continuation instead of a second [powershell] runspace blocked on EndInvoke. ported from obs_replaykit helper modules/42_compress_overwrite.ps1s Start-CompressOverwriteFile / Start-CompressOverwriteResultWatcher.
+    // starts a local compress-overwrite job (CompressOverwriteWorker) and resolves the job state once it finishes
     internal static class CompressOverwrite
     {
         public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0)
@@ -43,7 +43,7 @@ namespace ReplayKitHelper
                 UploadState.SetUploadState(
                     requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
                     startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "compressing",
-                    percent: 1, kind: "compress-overwrite", tempPath: tempPath);
+                    percent: 1, kind: "compress-overwrite");
 
                 Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration + " scaleHeight=" + scaleHeight, "compress", requestId);
 
@@ -60,7 +60,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // runs once the worker task finishes: reads its result, resolves the shared job state to idle/error, and cleans up the temp encode file. mirrors Start-CompressOverwriteResultWatcher, minus the clips-cache invalidation (CompressOverwriteWorker.Run already does that via Clips.MarkCompressed on success) and the status-file read (the worker reports thru UploadState.SetUploadState directly, so theres nothing left to read back).
+        // runs once the worker task finishes: resolves the job to idle or error and removes the temp encode; the worker already wrote the compress marker on success
         private static void OnCompressOverwriteComplete(Task<CompressOverwriteResult> task, string requestId, string tempPath)
         {
             bool workerThrew = task.IsFaulted;
@@ -85,14 +85,14 @@ namespace ReplayKitHelper
             if (success)
             {
                 // no url to set -- the clip card just goes back to its normal state once /clips picks up the new mtime/size.
-                UploadState.SetUploadState(requestId: requestId, state: "idle", active: false, error: "", phase: "", percent: 0, url: "", tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "idle", active: false, error: "", phase: "", percent: 0, url: "");
             }
             else
             {
                 string msg = !workerThrew && !string.IsNullOrEmpty(task.Result.Message)
                     ? task.Result.Message
                     : workerThrew ? "Compress failed: " + workerThrewMessage : "Compress finished without success (worker exited)";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error", percent: 0, tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error", percent: 0);
             }
 
             try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }

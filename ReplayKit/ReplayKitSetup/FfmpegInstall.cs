@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace ReplayKitSetup
 {
-    // install ffmpeg.exe + ffprobe.exe into the helper dir. ported from obs_replaykit/ffmpeg_install.py.
+    // install ffmpeg.exe + ffprobe.exe into the helper dir
     public static class FfmpegInstall
     {
         // next to OBSReplayKit.exe (the ReplayKitHelper server) under the consolidated obs-replayKit/ tree; Compression.FindToolInClipDirs probes Constants.HelperRoot first.
@@ -216,7 +216,7 @@ namespace ReplayKitSetup
                             return false;
                         }
 
-                        // python's Path.replace() atomically overwrites the destination; File.Move needs it gone first.
+                        // File.Move does not overwrite, so the old file goes first
                         if (File.Exists(dst)) File.Delete(dst);
                         File.Move(tmp, dst);
                         tmpPaths.Remove(tmp);

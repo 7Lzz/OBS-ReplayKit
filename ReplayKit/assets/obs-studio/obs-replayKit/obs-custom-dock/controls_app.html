@@ -102,19 +102,20 @@ if (location.protocol === "file:") {
     gap: var(--spacing_outer);
     overflow-y: auto;
   }
-  /* obs yami-style pill scrollbar -- same rules as clips.html so the dock matches the sources / mixer panels. the thumb is narrower than the track becuase the border is transparent + the background is clipped to padding-box, giving the floating-capsule look. */
-  *::-webkit-scrollbar        { width: 14px; height: 14px; background: transparent; }
-  *::-webkit-scrollbar-track  { background: transparent; }
+  /* the scrollbar of the other dock pages (see _scrollbar.html): a 12px outline track and a thumb inset 3px from its edges, one grey step lighter on hover and again while it is held. the default theme is the fallback of each grey */
+  *::-webkit-scrollbar { width: 12px; height: 12px; background: transparent; }
+  *::-webkit-scrollbar-track { background: transparent; border: 1px solid var(--grey6, #272A33); border-radius: 4px; }
   *::-webkit-scrollbar-corner { background: transparent; }
   *::-webkit-scrollbar-thumb {
-    background-color: var(--grey3);
-    border-radius: 7px;
-    border: 4px solid transparent;
+    background-color: var(--grey4, #3C404D);
+    border: 3px solid transparent;
+    border-radius: 5px;
     background-clip: padding-box;
-    min-height: 30px;
+    min-height: 32px;
+    min-width: 32px;
   }
-  *::-webkit-scrollbar-thumb:hover  { background-color: var(--grey1); }
-  *::-webkit-scrollbar-thumb:active { background-color: var(--white5); }
+  *::-webkit-scrollbar-thumb:hover { background-color: var(--grey3, #464B59); }
+  *::-webkit-scrollbar-thumb:active { background-color: var(--grey2, #505666); }
   .btn {
     display: flex;
     align-items: center;
@@ -350,16 +351,13 @@ if (location.protocol === "file:") {
 <link rel="stylesheet" href="rk-theme.css" id="rk-theme-link" />
 <!--#include interaction-states-->
 
-<!-- inlined verbatim copy of _tooltip.html. the other dock pages get it through a helper-side include; this dock
-     loads from a file url so includes are never expanded here. keep it in step with _tooltip.html by hand. -->
+<!-- inlined copy of _tooltip.html: the other dock pages get it through a helper-side include and this dock loads from a file url, so includes are never expanded here; keep it in step with _tooltip.html by hand, the only difference is the override at the end of the style that wraps every tip because this panel is narrow -->
 <style>
   #rk-tip {
     position: fixed;
     z-index: 300;
     padding: 5px 8px;
     border-radius: 3px;
-    background: var(--grey8);
-    background: color-mix(in srgb, var(--grey8) 88%, transparent);
     color: var(--text);
     font-family: var(--font_family, var(--font, "Segoe UI", system-ui, sans-serif));
     font-size: 11px;
@@ -373,16 +371,16 @@ if (location.protocol === "file:") {
     transition: opacity 100ms linear, transform var(--anim_press, 130ms) var(--ease_pop, ease);
   }
   #rk-tip.is-shown { opacity: 1; transform: translateY(0) scale(1); }
-  #rk-tip::before {
-    content: "";
-    position: absolute;
-    bottom: 100%;
-    left: var(--tip-arrow, 50%);
-    transform: translateX(-50%);
-    border: 5px solid transparent;
-    border-bottom-color: var(--grey8);
-    border-bottom-color: color-mix(in srgb, var(--grey8) 88%, transparent);
+  /* over the control, with the arrow under the body, when there is no room under the control: the pop starts from the edge the arrow is on */
+  #rk-tip.tip-over { transform: translateY(-3px) scale(.96); transform-origin: bottom center; }
+  #rk-tip.tip-over.is-shown { transform: translateY(0) scale(1); }
+  #rk-tip .rk-tip-shape { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+  #rk-tip .rk-tip-fill {
+    fill: var(--grey8);
+    fill: color-mix(in srgb, var(--grey8) 88%, transparent);
   }
+  #rk-tip .rk-tip-edge { fill: none; stroke: rgba(var(--text-rgb, 255, 255, 255), .16); stroke-width: 1; stroke-linejoin: miter; }
+  #rk-tip .rk-tip-text { position: relative; }
   #rk-tip.tip-rich {
     white-space: normal;
     max-width: 264px;
@@ -403,6 +401,21 @@ if (location.protocol === "file:") {
   var tip = document.createElement("div");
   tip.id = "rk-tip";
   tip.setAttribute("role", "tooltip");
+  // the outline and the text are the only children, and the text has a span of its own so setting it never removes the outline
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var shape = document.createElementNS(SVG_NS, "svg");
+  shape.setAttribute("class", "rk-tip-shape");
+  shape.setAttribute("aria-hidden", "true");
+  var fillPath = document.createElementNS(SVG_NS, "path");
+  fillPath.setAttribute("class", "rk-tip-fill");
+  var edgePath = document.createElementNS(SVG_NS, "path");
+  edgePath.setAttribute("class", "rk-tip-edge");
+  shape.appendChild(fillPath);
+  shape.appendChild(edgePath);
+  var label = document.createElement("span");
+  label.className = "rk-tip-text";
+  tip.appendChild(shape);
+  tip.appendChild(label);
   var current = null;
   var suppress = function () { return false; };
 
@@ -411,6 +424,43 @@ if (location.protocol === "file:") {
   }
   if (document.body) attach();
   else document.addEventListener("DOMContentLoaded", attach);
+
+  // body and arrow as one outline, w by h with the arrow on the top edge at x, or on the bottom edge when over is set: the fill covers all of it, and the edge is the same outline pulled in half a pixel so its one pixel line lies inside it, the way a css border does
+  function drawShape(w, h, x, over) {
+    var r = 3;
+    var a = 5;
+    var i = 0.5;
+    var ri = r - i;
+    var cut = i * (Math.SQRT2 - 1);
+    var apex = i * Math.SQRT2 - a;
+    if (over) {
+      fillPath.setAttribute("d",
+        "M" + r + " 0H" + (w - r) +
+        "A" + r + " " + r + " 0 0 1 " + w + " " + r + "V" + (h - r) +
+        "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + h + "H" + (x + a) + "L" + x + " " + (h + a) + "L" + (x - a) + " " + h + "H" + r +
+        "A" + r + " " + r + " 0 0 1 0 " + (h - r) + "V" + r +
+        "A" + r + " " + r + " 0 0 1 " + r + " 0Z");
+      edgePath.setAttribute("d",
+        "M" + r + " " + i + "H" + (w - r) +
+        "A" + ri + " " + ri + " 0 0 1 " + (w - i) + " " + r + "V" + (h - r) +
+        "A" + ri + " " + ri + " 0 0 1 " + (w - r) + " " + (h - i) + "H" + (x + a - cut) + "L" + x + " " + (h - apex) + "L" + (x - a + cut) + " " + (h - i) + "H" + r +
+        "A" + ri + " " + ri + " 0 0 1 " + i + " " + (h - r) + "V" + r +
+        "A" + ri + " " + ri + " 0 0 1 " + r + " " + i + "Z");
+      return;
+    }
+    fillPath.setAttribute("d",
+      "M" + r + " 0H" + (x - a) + "L" + x + " " + (-a) + "L" + (x + a) + " 0H" + (w - r) +
+      "A" + r + " " + r + " 0 0 1 " + w + " " + r + "V" + (h - r) +
+      "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + h + "H" + r +
+      "A" + r + " " + r + " 0 0 1 0 " + (h - r) + "V" + r +
+      "A" + r + " " + r + " 0 0 1 " + r + " 0Z");
+    edgePath.setAttribute("d",
+      "M" + r + " " + i + "H" + (x - a + cut) + "L" + x + " " + apex + "L" + (x + a - cut) + " " + i + "H" + (w - r) +
+      "A" + ri + " " + ri + " 0 0 1 " + (w - i) + " " + r + "V" + (h - r) +
+      "A" + ri + " " + ri + " 0 0 1 " + (w - r) + " " + (h - i) + "H" + r +
+      "A" + ri + " " + ri + " 0 0 1 " + i + " " + (h - r) + "V" + r +
+      "A" + ri + " " + ri + " 0 0 1 " + r + " " + i + "Z");
+  }
 
   function reposition() {
     if (!current) return;
@@ -421,10 +471,12 @@ if (location.protocol === "file:") {
     var gap = 8;
     var centre = b.left + b.width / 2;
     var left = Math.max(edge, Math.min(centre - tw / 2, window.innerWidth - tw - edge));
-    var top = Math.max(edge, Math.min(b.bottom + gap, window.innerHeight - th - edge));
+    var over = window.innerHeight - b.bottom - gap - edge < th && b.top - gap - edge > window.innerHeight - b.bottom - gap - edge;
+    var top = Math.max(edge, Math.min(over ? b.top - gap - th : b.bottom + gap, window.innerHeight - th - edge));
+    tip.classList.toggle("tip-over", over);
     tip.style.left = Math.round(left) + "px";
     tip.style.top = Math.round(top) + "px";
-    tip.style.setProperty("--tip-arrow", Math.round(Math.max(10, Math.min(centre - left, tw - 10))) + "px");
+    drawShape(tw, th, Math.round(Math.max(10, Math.min(centre - left, tw - 10))), over);
   }
 
   function show(el) {
@@ -432,7 +484,7 @@ if (location.protocol === "file:") {
     if (suppress(el)) return;
     attach();
     current = el;
-    tip.textContent = el.dataset.tooltip;
+    label.textContent = el.dataset.tooltip;
     tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
     tip.classList.add("is-shown");
     reposition();
@@ -446,7 +498,7 @@ if (location.protocol === "file:") {
   var observer = new MutationObserver(function () {
     if (!current) return;
     if (current.offsetParent === null || !current.dataset.tooltip) { observer.disconnect(); hide(); return; }
-    tip.textContent = current.dataset.tooltip;
+    label.textContent = current.dataset.tooltip;
     reposition();
   });
 
@@ -635,8 +687,7 @@ if (location.protocol === "file:") {
     return body;
   }
 
-  // native confirm dialog, drawn by the tray plugin over the whole dimmed OBS window (a CEF dock can only paint its
-  // own panel). the plugin runs the follow-up action itself on OK, so nothing comes back here.
+  // native confirm dialog, drawn by the native plugin over the whole dimmed OBS window (a CEF dock can only paint its own panel). the plugin runs the follow-up action itself on OK, so nothing comes back here.
   function rkNativeConfirm(kind) {
     return helperJson("ui-confirm", {
       method: "POST",
@@ -670,7 +721,7 @@ if (location.protocol === "file:") {
     return await helperJson("save-replay", { method: "POST" });
   }
 
-  // Start / Stop Clipping = OBS replay buffer. save-clip is only useful while it is running.
+  // start / Stop Clipping = OBS replay buffer. save-clip is only useful while it is running.
   function renderClipState() {
     if (!clipActionInFlight) clipToggleBtn.textContent = replayBufferActive ? "Stop Clipping" : "Start Clipping";
     clipToggleBtn.classList.toggle("is-on", replayBufferActive && !clipActionInFlight);
@@ -774,9 +825,7 @@ if (location.protocol === "file:") {
     }, UPDATE_STARTUP_CHECK_DELAY_MS);
   }
 
-  // first-run setup wizard: the installer arms setupWizardPending on a genuine first install, and the dock opens the
-  // tray-plugin-owned wizard window once, the first time obs is on screen after that. same visibility gating as the
-  // update popup so it isnt fired while obs is still booting hidden.
+  // first-run setup wizard: the installer arms setupWizardPending on a genuine first install, and the dock opens the plugin-owned wizard window once, the first time obs is on screen after that. same visibility gating as the update popup so it isnt fired while obs is still booting hidden.
   let firstRunPending = false;
   let firstRunHandled = false;
 
@@ -807,12 +856,12 @@ if (location.protocol === "file:") {
   window.addEventListener("focus", () => { tryOpenPendingUpdate(); });
 
   settingsBtn.addEventListener("click", () => {
-    // the tray plugin owns the reusable Settings host; sending the same command here keeps the dock button and tray row on one open/focus path, and avoids a window.open popup that cef hands to the real browser.
+    // the native plugin owns the reusable Settings host; sending the same command here keeps the dock button and tray row on one open/focus path, and avoids a window.open popup that cef hands to the real browser.
     helperJson("open-settings-window", { method: "POST" }).catch(() => {});
   });
 
   viewClipsBtn.addEventListener("click", () => {
-    // the tray plugin owns the reusable Clips host; sending the same command here keeps the dock button and tray row on one open/focus/reset path.
+    // the native plugin owns the reusable Clips host; sending the same command here keeps the dock button and tray row on one open/focus/reset path.
     helperJson("open-clips-window", { method:"POST" }).catch(() => {});
   });
 
@@ -888,8 +937,7 @@ if (location.protocol === "file:") {
     }
   });
 
-  // Share Preview is off because the audio cable + hidden projector were never set up. the plugin draws the confirm
-  // over the whole OBS window and, on OK, runs the install (closes OBS, installs, turns Share Preview on).
+  // share Preview is off because the audio cable + hidden projector were never set up. the plugin draws the confirm over the whole OBS window and, on OK, runs the install (closes OBS, installs, turns Share Preview on).
   async function promptInstallSharePreview() {
     if (sharePreviewActionInFlight) return;
     try {
@@ -1012,8 +1060,7 @@ if (location.protocol === "file:") {
   }
   function closeMenu() { authMenu.classList.remove("is-open"); }
 
-  // Sign-in is hosted in ReplayKit's own persistent WebView2 profile. It never reads
-  // cookies or encryption keys from Chrome, Edge, OBS CEF, or any other browser.
+  // sign-in is hosted in ReplayKits own persistent WebView2 profile. It never reads cookies or encryption keys from Chrome, Edge, OBS CEF, or any other browser.
   let importPollTimer = null;
   let popupCloseTimer = null;
   let loginTimeoutTimer = null;
@@ -1064,13 +1111,7 @@ if (location.protocol === "file:") {
     fetch(HELPER_HTTP_URL + "close-signin-windows", { method: "POST", cache: "no-store" }).catch(() => {});
   }
 
-  // one sequenced poller drives the whole flow -- there used to be two independent, uncoordinated fetches (a
-  // fire-and-forget "&start=1" call and a separate immediate status check racing right behind it). the status
-  // check could reach the helper and see pending:false *before* the start=1 call had actually flipped it true
-  // server-side, which the close-detection added for the stuck-button fix then misread as "closed without
-  // signing in" and reset the button within a fraction of a second of the very click that opened it -- looking
-  // like the button "let you press it again" when the window was, in fact, still opening. sawWindowOpen is what
-  // tells a real close (seen pending:true, now false) apart from that startup race (never confirmed open yet).
+  // one sequenced poller drives the whole flow -- there used to be two independent, uncoordinated fetches (a fire-and-forget "&start=1" call and a separate immediate status check racing right behind it). the status check could reach the helper and see pending:false *before* the start=1 call had actually flipped it true server-side, which the close-detection added for the stuck-button fix then misread as "closed without signing in" and reset the button within a fraction of a second of the very click that opened it -- looking like the button "let you press it again" when the window was, in fact, still opening. sawWindowOpen is what tells a real close (seen pending:true, now false) apart from that startup race (never confirmed open yet).
   function openLoginPopup() {
     clearLoginTimers(); // wipe any stale timers from a previous attempt
     loginFlowActive = true;
@@ -1103,7 +1144,7 @@ if (location.protocol === "file:") {
     pollStatus(true); // opens the window (or focuses the existing one) and seeds status in the same call
     importPollTimer = setInterval(() => pollStatus(false), LOGIN_IMPORT_POLL_MS);
 
-    // Hard timeout: leave the user a usable sign-in button if the window was closed.
+    // hard timeout: leave the user a usable sign-in button if the window was closed.
     loginTimeoutTimer = setTimeout(() => {
       cleanupLoginFlow();
     }, LOGIN_TIMEOUT_MS);
@@ -1122,8 +1163,7 @@ if (location.protocol === "file:") {
   authForce.addEventListener("click", async (e) => {
     e.stopPropagation();
     closeMenu();
-    // the plugin draws the confirm over the dimmed OBS window and, on OK, hits /restart-obs-clean itself (kill obs,
-    // wait for the cookies file to unlock, drop streamable.com rows, relaunch obs as admin).
+    // the plugin draws the confirm over the dimmed OBS window and, on OK, hits /restart-obs-clean itself (kill obs, wait for the cookies file to unlock, drop streamable.com rows, relaunch obs as admin).
     try { await rkNativeConfirm("streamable-relogin"); } catch { /* helper unreachable -- nothing to do */ }
   });
 

@@ -5,7 +5,7 @@ namespace ReplayKitHelper
 {
     internal static class SettingsStore
     {
-        // Acquire before OBS apply/preview locks; keep a save and its live application ordered.
+        // acquire before OBS apply/preview locks; keep a save and its live application ordered.
         internal static readonly object Gate = new object();
 
         public static void Update(Action<JObject> change)

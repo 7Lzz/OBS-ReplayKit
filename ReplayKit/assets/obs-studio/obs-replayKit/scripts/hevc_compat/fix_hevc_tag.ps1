@@ -27,8 +27,9 @@ function Write-FixLog([string]$msg) {
 function Get-ClipDirFromHelperConfig {
     # mirrors the helpers own Get-ClipDir (same json, same defualt); reading it directly here avoids dot-sourcing the whole module chain for one string.
     $default = Join-Path $env:USERPROFILE 'Videos'
-    $cfgPath = Join-Path $scriptDir '..\helper\helper_config.json'
-    $cfgPath = [System.IO.Path]::GetFullPath($cfgPath)
+    # the config sits in the replaykit folder, two levels above this script; an install from before that move keeps it beside the helper
+    $cfgPath = [System.IO.Path]::GetFullPath((Join-Path $scriptDir '..\..\helper_config.json'))
+    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = [System.IO.Path]::GetFullPath((Join-Path $scriptDir '..\helper\helper_config.json')) }
     if (-not (Test-Path -LiteralPath $cfgPath)) { return $default }
     try {
         $cfg = Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
@@ -122,7 +123,8 @@ function Repair-OneFile([string]$file) {
     $tmp = Join-Path $scratchDir ([System.IO.Path]::GetFileName($file) + '.hvc1fix.' + [Guid]::NewGuid().ToString('N') + $ext)
     try { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } catch {}
 
-    & $script:Ffmpeg -y -hide_banner -loglevel error -i $file -c copy -tag:v hvc1 -movflags +faststart -- $tmp 2>$null
+    # the first video stream and every audio stream are mapped, since a clip recorded with separate audio tracks would otherwise keep only one of them
+    & $script:Ffmpeg -y -hide_banner -loglevel error -i $file -map 0:v:0 -map '0:a?' -c copy -tag:v hvc1 -movflags +faststart -- $tmp 2>$null
     $ok = $LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $tmp)
     if ($ok) {
         # sanity check before committing: a truncated remux is worse than a hev1-tagged original.

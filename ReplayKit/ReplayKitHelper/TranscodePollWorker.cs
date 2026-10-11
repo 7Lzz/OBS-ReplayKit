@@ -1,19 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // polls streamables /api/v1/videos/<shortcode> until status reaches 2 (ready) or 30 minutes pass, writing transcode_status/transcode_percent/ready into clips_db.json as they change. spawned DETACHED (Native.SpawnDetached, CREATE_BREAKAWAY_FROM_JOB) from Upload.cs specifically so this survives an obs/helper restart mid-poll -- a normal child process dies with the helper the instant obs closes, which is what used to leave clips permanently stuck showing "processing" even after streamable had long since finished, since nothing ever resumed a killed poll. runs as a hidden CLI mode of this same exe (Program.cs --transcode-poll) rather than a Task, since outliving the helper process itself is the entire point -- unlike every other worker in this port, this one genuinely cannot run in-process. self-contained: never touches Server.State, since a truly detached process cant share it. ported from obs_replaykit helper transcode_poll_worker.ps1.
+    // polls streamables /api/v1/videos/<shortcode> until status reaches 2 (ready) or 30 minutes pass, writing transcode_status/transcode_percent/ready into clips_db.json. it runs detached (--transcode-poll) so a poll survives an obs or helper restart, and never touches Server.State since it is a process of its own
     internal static class TranscodePollWorker
     {
-        private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
-
-        public static int Run(string shortcode, string clipName, string dbPath, string api, string logPath, string cookieJar, bool quiet = false)
+        public static int Run(string shortcode, string clipName, string dbPath, string api, string logPath, string cookieJar, bool quiet = false, bool copyLink = true, bool notify = true)
         {
             void L(string m)
             {
@@ -31,29 +28,42 @@ namespace ReplayKitHelper
             L("start clip='" + clipName + "' quiet=" + quiet);
 
             bool readyNotified = false;
-            // fires once when streamable reports the video watchable (status 2): copies the link + shows the "clip ready" balloon. this is where the copy/toast live now -- the upload flow no longer does it, so a not-yet-playable link never lands on the clipboard. skipped for quiet (bulk / resumed-after-restart) polls.
+            // fires once when streamable reports the video watchable (status 2): copies the link + shows the "clip ready" balloon, each only when its setting is on. this is where the copy/toast live now -- the upload flow no longer does it, so a not-yet-playable link never lands on the clipboard. skipped for quiet (bulk / resumed-after-restart) polls.
             void NotifyReady()
             {
                 if (quiet || readyNotified) return;
                 readyNotified = true;
                 string url = "https://streamable.com/" + shortcode;
-                try { StaRunner.Run(() => System.Windows.Forms.Clipboard.SetText(url)); }
-                catch (Exception ex) { L("clipboard copy failed: " + ex.Message); }
+                bool copied = false;
+                if (copyLink)
+                {
+                    try
+                    {
+                        StaRunner.Run(() => System.Windows.Forms.Clipboard.SetText(url));
+                        copied = true;
+                    }
+                    catch (Exception ex) { L("clipboard copy failed: " + ex.Message); }
+                }
+                if (!notify)
+                {
+                    L("ready -> link copied=" + copied + ", notification off");
+                    return;
+                }
                 // hand the toast to the running helper -- it has the settings loaded so the replaykit / custom icon resolves, and a real message pump. only fall back to a self-hosted balloon if the helper is gone (obs closed mid-transcode).
                 bool handed = false;
                 try
                 {
                     var r = Curl.Run("-s", "-S", "--max-time", "5", "-X", "POST",
-                        "http://127.0.0.1:8767/internal/clip-ready?url=" + Uri.EscapeDataString(url) + "&name=" + Uri.EscapeDataString(clipName ?? ""));
+                        "http://127.0.0.1:8767/internal/clip-ready?url=" + Uri.EscapeDataString(url) + "&name=" + Uri.EscapeDataString(clipName ?? "") + "&copied=" + (copied ? "1" : "0"));
                     handed = r.ExitCode == 0 && (r.Stdout + r.Stderr).IndexOf("\"ok\":true", StringComparison.Ordinal) >= 0;
                 }
                 catch (Exception ex) { L("clip-ready POST failed: " + ex.Message); }
                 if (!handed)
                 {
-                    try { Upload.ShowUploadToast(url, clipName); }
+                    try { Upload.ShowUploadToast(url, clipName, copied); }
                     catch (Exception ex) { L("fallback toast failed: " + ex.Message); }
                 }
-                L("ready -> link copied, toast handed=" + handed);
+                L("ready -> link copied=" + copied + ", toast handed=" + handed);
             }
 
             DateTime deadline = DateTime.Now.AddMinutes(30);

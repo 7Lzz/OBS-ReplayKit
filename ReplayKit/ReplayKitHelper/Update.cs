@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
-using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -12,7 +11,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // self-update: checks github releases, downloads + sha256-verifies the installer, then launches it in --update mode (ReplayKitSetup/Update.cs is the receiving end of that launch -- a seperate, already-complete project, not duplicated logic). ported from obs_replaykit helper modules/63_update.ps1. uses HttpClient instead of Invoke-RestMethod/Invoke-WebRequest for the same reliability reason curl.exe is used for the streamable api elsewhere in this port (PowerShell 5.1s http cmdlets can hang under proxy auto-detect) -- HttpClient doesnt share that specific failure mode, so unlike the streamable api calls this doesnt need a subprocess.
+    // self-update: checks github releases, downloads and sha256-verifies the installer, then starts it in --update mode (ReplayKitSetup/Update.cs is the receiving end)
     internal static class Update
     {
         private const string Owner = "7Lzz";
@@ -100,7 +99,6 @@ namespace ReplayKitHelper
 
         private static JObject InvokeGitHubApi(string url)
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             var response = Http.GetAsync(url).GetAwaiter().GetResult();
             string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
@@ -316,7 +314,7 @@ namespace ReplayKitHelper
 
         public static JObject GetStartupUpdateStatus()
         {
-            WriteUpdateDebug("GetStartupUpdateStatus invoked (alreadyChecked=" + Server.State.ReplaykitStartupUpdateChecked + " admin=" + BrowserCookies.TestIsAdmin() + ")");
+            WriteUpdateDebug("GetStartupUpdateStatus invoked (alreadyChecked=" + Server.State.ReplaykitStartupUpdateChecked + " admin=" + Elevation.IsAdmin() + ")");
             // check-and-claim has to be one atomic op, or two concurrent callers at startup could both see "not checked yet" and both fire the github api call below.
             bool alreadyClaimed;
             lock (Server.State.UpdateCheckLock)
@@ -344,7 +342,7 @@ namespace ReplayKitHelper
                 var disabled = new JObject
                 {
                     ["ok"] = true, ["prompt"] = false, ["startupCheck"] = true,
-                    ["admin"] = BrowserCookies.TestIsAdmin(), ["autoUpdateEnabled"] = false,
+                    ["admin"] = Elevation.IsAdmin(), ["autoUpdateEnabled"] = false,
                     ["message"] = "Automatic update prompts are disabled in settings.",
                 };
                 WriteUpdateDebug("autoUpdateEnabled=false; returning prompt=false");
@@ -353,12 +351,11 @@ namespace ReplayKitHelper
 
             var status = GetUpdateStatus();
             status["startupCheck"] = true;
-            status["admin"] = BrowserCookies.TestIsAdmin();
+            status["admin"] = Elevation.IsAdmin();
             status["autoUpdateEnabled"] = true;
             status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && (status["updateAvailable"]?.Value<bool>() ?? false) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
 
-            // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a
-            // fresh update window stacked on the one still showing them why the last attempt failed.
+            // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a fresh update window stacked on the one still showing them why the last attempt failed.
             if (status["prompt"]?.Value<bool>() ?? false)
             {
                 string suppress = StartupPromptSuppressedBecause(status["latestVersion"]?.Value<string>());
@@ -375,12 +372,10 @@ namespace ReplayKitHelper
             return status;
         }
 
-        // how long a failed attempt keeps the startup prompt quiet. long enough to cover the restart the failure
-        // itself causes, short enough that the next real session still offers the update.
+        // how long a failed attempt keeps the startup prompt quiet. long enough to cover the restart the failure itself causes, short enough that the next real session still offers the update.
         private static readonly TimeSpan FailureQuietPeriod = TimeSpan.FromMinutes(10);
 
-        // null when the prompt should show. the update window is its own browser process, so it survives the OBS
-        // restart a failed update triggers -- opening a second one on top of it is the loop the user sees.
+        // null when the prompt should show. the update window is its own browser process, so it survives the OBS restart a failed update triggers -- opening a second one on top of it is the loop the user sees.
         private static string StartupPromptSuppressedBecause(string latestVersion)
         {
             try
@@ -423,8 +418,7 @@ namespace ReplayKitHelper
         // written by the detached installer on its way out (ReplayKitSetup/Update.cs WriteResult). the popup polls this so a failed install shows its real reason instead of sitting on its last progress stage until the watchdog gives up.
         private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, "update_result.json");
 
-        // the detached installer records its own pid here (ReplayKitSetup DetachedSpawn.WriteOwnPid) -- the process
-        // the helper starts is only a launcher and exits immediately, so watching that pid would read as "died".
+        // the detached installer records its own pid here (ReplayKitSetup DetachedSpawn.WriteOwnPid) -- the process the helper starts is only a launcher and exits immediately, so watching that pid would read as "died".
         private static string InstallPidPath() => Path.Combine(Constants.LOG_DIR, "update_pid");
 
         public static JObject GetInstallResult()
@@ -444,8 +438,7 @@ namespace ReplayKitHelper
                 result["version"] = data["version"]?.Value<string>() ?? "";
                 result["finishedAt"] = data["finishedAt"]?.Value<string>() ?? "";
                 result["releaseUrl"] = data["releaseUrl"]?.Value<string>() ?? ReleasePage;
-                // "seen" means the update window has actually shown this verdict to the user. closing that window
-                // with the X runs no script at all, so a result can otherwise be written and never read by anyone.
+                // "seen" means the update window has actually shown this verdict to the user. closing that window with the X runs no script at all, so a result can otherwise be written and never read by anyone.
                 result["seen"] = data["seen"]?.Value<bool>() ?? false;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
@@ -455,8 +448,7 @@ namespace ReplayKitHelper
             return result;
         }
 
-        // stamped by the update window once it has displayed the verdict. until then the verdict counts as unseen and
-        // the next startup check reopens the window to show it, rather than the outcome being silently swallowed.
+        // stamped by the update window once it has displayed the verdict. until then the verdict counts as unseen and the next startup check reopens the window to show it, rather than the outcome being silently swallowed.
         public static JObject MarkInstallResultSeen()
         {
             try
@@ -484,11 +476,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // opens the update window as its own detached process (OBSReplayKit.exe --update-window, handled in
-        // UpdatePromptWindow.cs). it has to outlive this helper: an update closes obs, the helper follows obs down,
-        // and the installer only copies files once the helper pid is gone -- a window hosted in-process would vanish
-        // mid-install. SpawnDetached breaks it out of the helpers kill-on-close job so that chain never reaches it.
-        // same window whether the startup check or the Settings button opened it.
+        // opens the update window as its own detached process (OBSReplayKit.exe --update-window, handled in UpdatePromptWindow.cs). it has to outlive this helper: an update closes obs, the helper follows obs down, and the installer only copies files once the helper pid is gone -- a window hosted in-process would vanish mid-install. SpawnDetached breaks it out of the helpers kill-on-close job so that chain never reaches it. same window whether the startup check or the Settings button opened it.
         public static JObject OpenUpdatePromptWindow(string version)
         {
             // one window is enough -- bring the existing one forward rather than stacking another.
@@ -507,8 +495,7 @@ namespace ReplayKitHelper
             string exe = Process.GetCurrentProcess().MainModule.FileName;
             var argList = new List<string> { "--update-window", "-Port", port.ToString() };
             if (!string.IsNullOrWhiteSpace(version)) { argList.Add("-Version"); argList.Add(version); }
-            // the window process has no settings loaded -- hand it the active theme's window colour so the pre-paint
-            // frame (before the page renders) matches the Appearance tab; the border is the dwm system default
+            // the window process has no settings loaded -- hand it the active themes window colour so the pre-paint frame (before the page renders) matches the Appearance tab; the border is the dwm system default
             try
             {
                 var theme = Themes.Resolve(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
@@ -530,8 +517,6 @@ namespace ReplayKitHelper
             }
         }
 
-        public static string GetUpdateTempDir() => Constants.UPDATE_DIR;
-
         private static void AssertSafeUpdateTemp(string path)
         {
             string root = Path.GetFullPath(Constants.REPLAYKIT_TEMP_ROOT).TrimEnd('\\');
@@ -543,7 +528,25 @@ namespace ReplayKitHelper
                 throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
         }
 
-        private static string CreateUpdateTemp()
+        // an update that was cut short, or whose cleanup ran while a process still used its folder, leaves the download folder and the watchdog copy behind in %TEMP%\ReplayKit; anything younger than a day may still belong to an update in progress
+        public static void ClearStaleUpdateFolders()
+        {
+            string root = Constants.REPLAYKIT_TEMP_ROOT;
+            if (!Directory.Exists(root)) return;
+            DateTime cutoff = DateTime.UtcNow.AddDays(-1);
+            foreach (string dir in Directory.GetDirectories(root))
+            {
+                if (!Regex.IsMatch(Path.GetFileName(dir), @"^(update|watchdog)-[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
+                try
+                {
+                    if (Directory.GetLastWriteTimeUtc(dir) > cutoff) continue;
+                    Directory.Delete(dir, true);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+        }
+
+        internal static string CreateUpdateTemp()
         {
             Directory.CreateDirectory(Constants.REPLAYKIT_TEMP_ROOT);
             string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "update-" + Guid.NewGuid().ToString("N"));
@@ -552,14 +555,13 @@ namespace ReplayKitHelper
             return path;
         }
 
-        // live progress for the updater window. it installs on its own now, so the bar has to be real numbers rather
-        // than a timer -- stage plus byte counts plus the speed derived from them, exactly what the window renders.
+        // live progress for the updater window. it installs on its own now, so the bar has to be real numbers rather than a timer -- stage plus byte counts plus the speed derived from them, exactly what the window renders.
         private static readonly object ProgressGate = new object();
         private static string _progressStage = "";
         private static long _progressDone, _progressTotal;
         private static DateTime _progressStartUtc = DateTime.UtcNow;
 
-        private static void SetProgressStage(string stage)
+        internal static void SetProgressStage(string stage)
         {
             lock (ProgressGate)
             {
@@ -694,8 +696,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // The watchdog is a detached copy of this C# helper. Keeping it native avoids
-        // hidden PowerShell, execution-policy bypasses, and encoded commands.
+        // the watchdog is a detached copy of this helper exe, since the installer replaces the one in scripts\helper while it runs
         private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl)
         {
             string source = Process.GetCurrentProcess().MainModule.FileName;
@@ -734,7 +735,7 @@ namespace ReplayKitHelper
             if (!string.IsNullOrWhiteSpace(obsPath)) { argList.Add("--relaunch-obs"); argList.Add(obsPath); }
             if (waitPid > 0) { argList.Add("--wait-pid"); argList.Add(waitPid.ToString()); }
 
-            if (BrowserCookies.TestIsAdmin())
+            if (Elevation.IsAdmin())
             {
                 // helper is already elevated -- spawn detached with create_breakaway_from_job so the installer is NOT inside the helpers kill-on-close job, otherwise installer taskkills obs64, obs dies, the helpers parent-watchdog exits, the job closes, and the installer gets killed mid-copy (version.json never updates, obs never relaunches) -- this was a real bug; SpawnDetached is the same primitive used elsewhere in this port for exactly this reason.
                 string cmdLine = ProcessArgs.Quote(installerPath) + " " + ProcessArgs.Join(argList.ToArray());
@@ -757,9 +758,45 @@ namespace ReplayKitHelper
                 WindowStyle = ProcessWindowStyle.Hidden,
             };
             WriteUpdateDebug("StartUpdater (non-admin, runas): " + installerPath);
-            var proc = Process.Start(psi);
-            StartUpdateWatchdog(proc.Id, obsPath, targetVersion, releaseUrl);
-            return new JObject { ["ok"] = true, ["processId"] = proc.Id };
+            int pid;
+            using (var proc = Process.Start(psi))
+            {
+                if (proc == null) throw new InvalidOperationException("The installer did not start.");
+                pid = proc.Id;
+            }
+            StartUpdateWatchdog(pid, obsPath, targetVersion, releaseUrl);
+            return new JObject { ["ok"] = true, ["processId"] = pid };
+        }
+
+        // downloads the release installer and its sha256 sidecar into tempDir, checks the hash and the size floor, and returns the path of the verified installer. any failure removes tempDir. the updater and the repair of the cached setup exe both go thru here, so they trust a download on the same terms; incompleteHint is what the updater adds when the file is too small
+        internal static string DownloadVerifiedInstaller(ReleaseInfo release, string tempDir, string incompleteHint = "")
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(release.ChecksumsUrl)) throw new InvalidOperationException("The release is missing " + ChecksumsAsset + ".");
+                string installerPath = Path.Combine(tempDir, InstallerAsset);
+                string checksumsPath = Path.Combine(tempDir, ChecksumsAsset);
+                SetProgressStage("download");
+                SaveUrlFile(release.InstallerUrl, installerPath, true);
+                SaveUrlFile(release.ChecksumsUrl, checksumsPath);
+                SetProgressStage("verify");
+
+                var checksums = ParseChecksums(File.ReadAllText(checksumsPath));
+                if (!checksums.TryGetValue(InstallerAsset, out string expectedInstallerHash))
+                    throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + InstallerAsset + ".");
+                if (!VerifySha256(installerPath, expectedInstallerHash))
+                    throw new InvalidOperationException("Downloaded installer hash did not match the release hash.");
+
+                long installerBytes = new FileInfo(installerPath).Length;
+                if (installerBytes < MinInstallerBytes)
+                    throw new InvalidOperationException("The " + release.LatestVersion + " installer is incomplete (" + (installerBytes / (1024 * 1024)) + " MB) -- it was published without its bundled ReplayKit files." + incompleteHint);
+                return installerPath;
+            }
+            catch
+            {
+                try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                throw;
+            }
         }
 
         public static JObject ApplyUpdate()
@@ -791,36 +828,18 @@ namespace ReplayKitHelper
                 if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException("Latest release is missing " + ChecksumsAsset + ".");
 
                 string tempDir = CreateUpdateTemp();
-
-                string installerPath = Path.Combine(tempDir, InstallerAsset);
-                string checksumsPath = Path.Combine(tempDir, ChecksumsAsset);
-                SetProgressStage("download");
-                SaveUrlFile(latest.InstallerUrl, installerPath, true);
-                SaveUrlFile(latest.ChecksumsUrl, checksumsPath);
-                SetProgressStage("verify");
-
-                var checksums = ParseChecksums(File.ReadAllText(checksumsPath));
-                if (!checksums.TryGetValue(InstallerAsset, out string expectedInstallerHash))
-                {
-                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + InstallerAsset + ".");
-                }
-                if (!VerifySha256(installerPath, expectedInstallerHash))
-                {
-                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    throw new InvalidOperationException("Downloaded installer hash did not match the release hash.");
-                }
-
-                long installerBytes = new FileInfo(installerPath).Length;
-                if (installerBytes < MinInstallerBytes)
-                {
-                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    throw new InvalidOperationException("The " + latest.LatestVersion + " installer is incomplete (" + (installerBytes / (1024 * 1024)) + " MB) -- it was published without its bundled ReplayKit files. OBS was left running; try again once a fixed release is out.");
-                }
+                string installerPath = DownloadVerifiedInstaller(latest, tempDir, " OBS was left running; try again once a fixed release is out.");
 
                 ClearInstallResult();
                 SetProgressStage("install");
-                var started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
+                JObject started;
+                try { started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl); }
+                catch
+                {
+                    // the installer never started (a declined uac prompt, a failed spawn), so its download goes
+                    try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                    throw;
+                }
                 return new JObject
                 {
                     ["ok"] = true, ["updateAvailable"] = true, ["installing"] = true,

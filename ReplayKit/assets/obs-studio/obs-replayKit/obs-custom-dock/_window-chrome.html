@@ -1,35 +1,115 @@
-<!-- Shared resize corner. Bind it with RKWindowChrome.bindResizeGrip({ title, beforeStart, onFailure }). -->
+<!-- shared partial (helper #include target: window-chrome). answers whether the page is embedded in the obs window (the clean layout loads it with ?embedded=1): RKEmbedded is true then and html gets .rk-embedded, and there is no window of its own to restyle or close; the resize grip belongs to the obs window itself, not to any page. embedded, the browser fullscreen api is replaced by a top-layer stand-in with the same surface (requestFullscreen, exitFullscreen, fullscreenElement, fullscreenchange), because the page is an iframe of the shell page and the fullscreen of the embedded browser is not something the page can count on; the element goes to the top layer as a manual popover, so it fills the viewport exactly like a fullscreen element without moving in the dom or pausing its video, and the plugin widens the browser over the whole obs window when the page reports the change. the widening takes a moment, and an element that shows its video in that moment is a clip filling the obs window before it fills the monitor, so the element is covered in black from the first frame until the browser has grown and the cover then fades away -->
 <style>
-  .rk-resize-grip { position: fixed; right: 2px; bottom: 2px; width: 18px; height: 18px; opacity: .95; cursor: nwse-resize; pointer-events: auto; z-index: 30; }
-  .rk-resize-grip span { position: absolute; width: 2px; height: 2px; background: var(--text); border-radius: 50%; }
-  .rk-resize-grip span:nth-child(1) { right: 0; bottom: 0; }
-  .rk-resize-grip span:nth-child(2) { right: 3px; bottom: 0; }
-  .rk-resize-grip span:nth-child(3) { right: 6px; bottom: 0; }
-  .rk-resize-grip span:nth-child(4) { right: 0; bottom: 3px; }
-  .rk-resize-grip span:nth-child(5) { right: 3px; bottom: 3px; }
-  .rk-resize-grip span:nth-child(6) { right: 0; bottom: 6px; }
+  .rk-fs {
+    position: fixed !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+    max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important;
+    border: 0 !important; border-radius: 0 !important; box-sizing: border-box !important;
+    overflow: hidden !important; background: #000 !important; transform: none !important; translate: none !important; contain: none !important;
+  }
+  .rk-fs-cover {
+    position: absolute; inset: 0; z-index: 2147483000; background: #000; opacity: 1; pointer-events: none;
+    transition: opacity 170ms ease-out;
+  }
+  .rk-fs-cover.is-off { opacity: 0; }
 </style>
-<div class="rk-resize-grip" data-rk-resize-grip aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
 <script>
 (function () {
-  function bindResizeGrip(options) {
-    options = options || {};
-    var root = options.root || document;
-    var grip = root.querySelector("[data-rk-resize-grip]");
-    if (!grip || !options.title || grip.dataset.rkResizeBound) return;
-    grip.dataset.rkResizeBound = "1";
-    grip.addEventListener("pointerdown", function (event) {
-      event.preventDefault();
-      if (typeof options.beforeStart === "function") options.beforeStart();
-      fetch((options.helper || "http://127.0.0.1:8767") + "/window/resize?title=" + encodeURIComponent(options.title) + "&t=" + Date.now(), {
-        method: "POST", cache: "no-store",
-      }).then(function (response) { return response.json(); }).then(function (result) {
-        if (!result || result.resizing !== true) throw new Error("Resize could not start.");
-      }).catch(function () {
-        if (typeof options.onFailure === "function") options.onFailure();
+  var embedded = false;
+  try { embedded = new URLSearchParams(location.search).get("embedded") === "1"; } catch (_) {}
+  window.RKEmbedded = embedded;
+  if (embedded) document.documentElement.classList.add("rk-embedded");
+  if (!embedded || typeof HTMLElement.prototype.showPopover !== "function") return;
+
+  var current = null;
+  var watch = 0;
+  var cover = null;
+  var coverTimers = [];
+  function dropCover() {
+    coverTimers.forEach(clearTimeout);
+    coverTimers = [];
+    if (cover) { try { cover.remove(); } catch (_) {} cover = null; }
+  }
+  // black over the element until the browser has grown to its new size: the first resize of the page that makes it bigger is the signal, with a short wait as the way out for a window that is already as big as it gets (and for a plugin that never answers)
+  function coverUntilGrown(el) {
+    dropCover();
+    if (!el || el.tagName === "VIDEO") return;
+    var mine = document.createElement("div");
+    mine.className = "rk-fs-cover";
+    el.appendChild(mine);
+    cover = mine;
+    var startW = window.innerWidth;
+    var startH = window.innerHeight;
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      window.removeEventListener("resize", onResize);
+      // two frames after the resize the first frame at the new size is on screen
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (cover !== mine) return;
+          mine.classList.add("is-off");
+          coverTimers.push(setTimeout(function () { if (cover === mine) dropCover(); }, 240));
+        });
       });
+    }
+    function onResize() {
+      if (window.innerWidth > startW + 8 || window.innerHeight > startH + 8) finish();
+    }
+    window.addEventListener("resize", onResize);
+    var full = window.screen && startW >= window.screen.width - 8 && startH >= window.screen.height - 8;
+    coverTimers.push(setTimeout(finish, full ? 60 : 420));
+    // whatever happens, the video is never left under the cover
+    coverTimers.push(setTimeout(function () { finish(); if (cover === mine) dropCover(); }, 1500));
+  }
+  function fire(target) {
+    ["fullscreenchange", "webkitfullscreenchange"].forEach(function (type) {
+      target.dispatchEvent(new Event(type, { bubbles: true }));
     });
   }
-  window.RKWindowChrome = { bindResizeGrip: bindResizeGrip };
+  function enter(el) {
+    if (!el || current === el) return Promise.resolve();
+    if (current) leave();
+    current = el;
+    el.setAttribute("popover", "manual");
+    el.classList.add("rk-fs");
+    coverUntilGrown(el);
+    try { el.showPopover(); } catch (_) {}
+    // an element that leaves the document takes fullscreen with it in a real browser, so this watches for that too
+    watch = setInterval(function () { if (current && !current.isConnected) leave(); }, 250);
+    fire(el);
+    return Promise.resolve();
+  }
+  function leave() {
+    var el = current;
+    if (!el) return Promise.resolve();
+    current = null;
+    clearInterval(watch);
+    dropCover();
+    try { el.hidePopover(); } catch (_) {}
+    el.removeAttribute("popover");
+    el.classList.remove("rk-fs");
+    fire(el.isConnected ? el : document);
+    return Promise.resolve();
+  }
+  function define(name, getter) {
+    try { Object.defineProperty(document, name, { configurable: true, get: getter }); } catch (_) {}
+  }
+  define("fullscreenElement", function () { return current; });
+  define("webkitFullscreenElement", function () { return current; });
+  define("fullscreenEnabled", function () { return true; });
+  define("webkitFullscreenEnabled", function () { return true; });
+  document.exitFullscreen = leave;
+  document.webkitExitFullscreen = leave;
+  Element.prototype.requestFullscreen = function () { return enter(this); };
+  Element.prototype.webkitRequestFullscreen = Element.prototype.requestFullscreen;
+  // a browser keeps escape for itself while something is fullscreen, so the page never sees it
+  document.addEventListener("keydown", function (e) {
+    if (current && (e.key === "Escape" || e.code === "Escape")) {
+      e.preventDefault();
+      e.stopPropagation();
+      leave();
+    }
+  }, true);
 })();
 </script>

@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // install the input-overlay plugin from its raw bundled files and extract its preset pack. downloads the vc++ redist on demand if missing. ported from obs_replaykit/input_overlay.py.
+    // install the input-overlay plugin from its raw bundled files and extract its preset pack. downloads the vc++ redist on demand if missing
     public static class InputOverlay
     {
         // canonical install paths -- same locations the official inno setup installer used to write, so nothing downstream (obs, cli.cs) needed to change.

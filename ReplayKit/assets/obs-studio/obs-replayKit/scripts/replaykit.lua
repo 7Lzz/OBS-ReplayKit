@@ -104,8 +104,13 @@ local function read_text(path)
     return text
 end
 
+-- the settings file sits in the replaykit folder, one level above this script; an install from before that move keeps it beside the script until the helper has moved it
+local function read_runtime_settings_text()
+    return read_text(SCRIPT_ROOT .. "../replaykit_settings.json") or read_text(SCRIPT_ROOT .. "replaykit_settings.json")
+end
+
 local function read_disable_obs_close_warning()
-    local text = read_text(SCRIPT_ROOT .. "replaykit_settings.json")
+    local text = read_runtime_settings_text()
     if not text or text == "" then return true end
     if not text:find('"disableObsCloseWarning"%s*:') then return true end
 

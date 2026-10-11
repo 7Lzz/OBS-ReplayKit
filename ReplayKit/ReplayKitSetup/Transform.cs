@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // splice user prefs into bundled obs config files (basic.ini, recordencoder.json, scenes json, user.ini, global.ini). ported from obs_replaykit/transform.py.
+    // splice user prefs into bundled obs config files (basic.ini, recordencoder.json, scenes json, user.ini, global.ini)
     public static class Transform
     {
         // targeted regex over configparser becuase obss basic.ini has formatting we want byte-identical (no spaces around =, blank lines, base64 blobs in geometry=).
@@ -120,6 +120,8 @@ namespace ReplayKitSetup
                 foreach (var item in items) text = SetIniValue(text, kv.Key, item.Key, item.Value);
             }
 
+            text = SetIniValue(text, "AdvOut", "RecTracks", RuntimeFlag("recordingSeparateAudioTracks", Prefs.DEFAULT_SEPARATE_AUDIO_TRACKS) ? "15" : "1");
+
             // advout.recencoder must match the encoder whose settings we write into recordencoder.json.
             var encoder = ResolveEncoder(prefs);
             text = SetIniValue(text, "AdvOut", "RecEncoder", encoder.ObsEncoderId);
@@ -210,9 +212,7 @@ namespace ReplayKitSetup
         // stable uuid for our custom controls dock entry. repeat applies update the same row instead of stacking duplicates.
         private const string CustomControlsDockUuid = "a59ce0ef-5d6f-4a4f-91d9-c7c3c1d4e2b0";
 
-        // The controls page must have the helper's loopback origin. A file://
-        // dock cannot call the protected local API after CEF's local-resource
-        // policy is applied, which leaves every control in its offline state.
+        // the controls page must have the helpers loopback origin. A file:// dock cannot call the protected local API after CEFs local-resource policy is applied, which leaves every control in its offline state.
         private static string DockUrl() => "http://127.0.0.1:8767/controls_app.html";
 
         private static JObject ManagedDockEntry() => new JObject
@@ -299,8 +299,10 @@ namespace ReplayKitSetup
             return m.Success ? m.Groups[1].Value : null;
         }
 
-        // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that.
-        private static readonly string[] FreshInstallOnlyBasicWindowKeys = { "ShowListboxToolbars", "ShowStatusBar" };
+        // basicwindow toggles that only ever take the bundled seed on a genuine fresh install (no live user.ini yet) -- a later run of this (an update, a repair, re-running setup) leaves whatever the user has now alone, same idea as ExtraBrowserDocks below; covers the View menu Toolbars + Status Bar checkboxes, off by default for a cleaner first look, and a user who turns either back on keeps that. DockState and geometry belong here too: the bundle carries the dock layout and window position of the machine it was made on, and the plugin folds the scenes, sources and mixer panels away only once per layout (layoutDocksApplied in window_state.ini), so a bundled DockState put back over a live one left those panels showing under the clean shell. -- SysTrayWhenStarted is here too since replaykit mirrors it as the start minimized setting, so an update must not put the bundled value back over the one the user chose set for a clean re-install, which is meant to behave like a first install: the two view toggles then take the bundled off state again, while DockState and geometry still stay with the live window so the plugin layout marker keeps matching
+        public static bool CleanReinstall;
+
+        private static readonly string[] FreshInstallOnlyBasicWindowKeys = { "ShowListboxToolbars", "ShowStatusBar", "DockState", "geometry", "SysTrayWhenStarted" };
 
         // write one canonical custom controls dock entry and reset stale dock layout state.
         public static string ApplyUserIni(string text, Preferences prefs)
@@ -322,6 +324,7 @@ namespace ReplayKitSetup
             }
             foreach (string key in FreshInstallOnlyBasicWindowKeys)
             {
+                if (CleanReinstall && (key == "ShowListboxToolbars" || key == "ShowStatusBar")) continue;
                 string live = ReadLiveUserIniValue(key);
                 if (live != null) text = SetIniValue(text, "BasicWindow", key, live);
             }
@@ -356,7 +359,7 @@ namespace ReplayKitSetup
             return JsonConvert.SerializeObject(combined).Replace("\\", "\\\\");
         }
 
-        // recursively sorts object keys so json comparison matches pythons json.dumps(item, sort_keys=True) semantics.
+        // recursively sorts object keys so two json values compare equal regardless of key order
         private static JToken SortKeysDeep(JToken token)
         {
             if (token is JObject obj)
@@ -491,8 +494,7 @@ namespace ReplayKitSetup
             settings["recording_sound_volume"] = prefs.RecordingSoundVolume;
         }
 
-        // write the runtime settings consumed by the obs dock helper.
-        // _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose every setting the wizard has no field for (openClipsKeybind and anything added since this list was last touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by this transforms own from-scratch object, and anything not listed below reverts as if never set. merging onto whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
+        // write the runtime settings consumed by the obs dock helper. _text is the bundled template being mirrored in, not the users live file -- merging onto that would still lose every setting the wizard has no field for (openClipsKeybind and anything added since this list was last touched), which is exactly what was happening on Update: the live file has real user values, gets replaced by this transforms own from-scratch object, and anything not listed below reverts as if never set. merging onto whatever is actually live on disk instead means only a genuine first install (no live file yet) starts empty.
         public static string ApplyReplaykitSettingsJson(string _text, Preferences prefs)
         {
             JObject obj;
@@ -548,7 +550,7 @@ namespace ReplayKitSetup
             obj["screenshareAutoGameKeepFocused"] = prefs.ScreenshareAutoGameKeepFocused;
             obj["motionBlurEnabled"] = prefs.MotionBlurEnabled;
             obj["motionBlurStrength"] = prefs.MotionBlurStrength;
-            return obj.ToString(Formatting.Indented); // matches pythons json.dumps({...}, indent=2) -- newtonsofts default indent width is also 2
+            return obj.ToString(Formatting.Indented);
         }
 
         private static string ReplaykitScriptPath() => System.IO.Path.Combine(Config.OBS_CONFIG, ReplaykitScriptRelpath.Replace('/', System.IO.Path.DirectorySeparatorChar)).Replace('\\', '/');
@@ -865,12 +867,52 @@ namespace ReplayKitSetup
             sources.Add(NewBongoSource());
         }
 
+        // the mouse cursor choice for one kind of capture as the settings file of the helper holds it; on when the file or the key is not there, like the default of the helper
+        private static bool CursorSetting(string key) => RuntimeFlag(key, true);
+
+        // one on or off setting of the settings file of the helper; the given value stands in when the file or the key is not there
+        private static bool RuntimeFlag(string key, bool fallback)
+        {
+            try
+            {
+                if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return fallback;
+                return JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE))[key]?.Value<bool>() ?? fallback;
+            }
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException)
+            {
+                return fallback;
+            }
+        }
+
+        // track 1 of a recording is the mix players use; with separate audio tracks on, the pc audio, discord and the microphone also get track 2, 3 and 4 of their own
+        private static void ApplyAudioMixers(JObject source)
+        {
+            if (!RuntimeFlag("recordingSeparateAudioTracks", Prefs.DEFAULT_SEPARATE_AUDIO_TRACKS)) return;
+            ApplySeparateTrackMixers(source);
+        }
+
+        // puts one of the three recording audio sources on its own track whatever the setting says, and returns whether that changed anything; the defaults migration uses it on the scene of an install that already exists
+        internal static bool ApplySeparateTrackMixers(JObject source)
+        {
+            int mixers;
+            switch (source.Value<string>("name"))
+            {
+                case DesktopAudioSourceName: mixers = 1 | 2; break;
+                case "Discord Audio (record only)": mixers = 1 | 4; break;
+                case "Audio Input Capture": mixers = 1 | 8; break;
+                default: return false;
+            }
+            bool changed = source.Value<int?>("mixers") != mixers;
+            source["mixers"] = mixers;
+            return changed;
+        }
+
         private static JObject WindowCaptureInputSettings(Preferences prefs) => new JObject
         {
             ["window"] = prefs.ScreenshareGameWindow ?? "",
             ["method"] = 2,
             ["priority"] = 0,
-            ["cursor"] = true,
+            ["cursor"] = CursorSetting("showCursorWindowCapture"),
             ["client_area"] = true,
             ["compatibility"] = false,
             ["force_sdr"] = false,
@@ -1283,7 +1325,7 @@ namespace ReplayKitSetup
             ["capture_audio"] = false,
             ["hook_rate"] = GameCaptureHookRateFast,
             ["limit_framerate"] = true,
-            ["capture_cursor"] = false,
+            ["capture_cursor"] = CursorSetting("showCursorGameCapture"),
             ["capture_overlays"] = false,
             ["anti_cheat_hook"] = true,
             ["capture_mode"] = "any_fullscreen",
@@ -1356,7 +1398,7 @@ namespace ReplayKitSetup
                 {
                     if (!(src["settings"] is JObject monSettings)) { monSettings = new JObject(); src["settings"] = monSettings; }
                     monSettings["monitor_id"] = primary.DeviceId;
-                    monSettings["capture_cursor"] = false;
+                    monSettings["capture_cursor"] = CursorSetting("showCursorDisplayCapture");
                 }
 
                 ApplyGameCaptureDefaults(src, prefs);
@@ -1368,6 +1410,7 @@ namespace ReplayKitSetup
                     foreach (var prop in WindowCaptureInputSettings(prefs).Properties()) wcSettings[prop.Name] = prop.Value;
                 }
                 ApplyDesktopAudioExclusions(src);
+                ApplyAudioMixers(src);
 
                 if (MotionBlurSourceUuids.ContainsKey(src.Value<string>("name") ?? "\0"))
                 {
@@ -1484,7 +1527,7 @@ namespace ReplayKitSetup
             return ToIndented4(data);
         }
 
-        // JToken.ToString(Formatting.Indented) defaults to a 2-space indent; matches pythons json.dumps(data, indent=4).
+        // the four-space indent the file is written with; JToken.ToString(Formatting.Indented) would use two
         private static string ToIndented4(JToken token)
         {
             var sb = new System.Text.StringBuilder();
@@ -1502,7 +1545,7 @@ namespace ReplayKitSetup
             ["basic/profiles/Untitled/basic.ini"] = ApplyBasicIni,
             ["basic/profiles/Untitled/recordEncoder.json"] = ApplyRecordEncoderJson,
             ["basic/scenes/Untitled.json"] = ApplyScenesJson,
-            ["obs-replayKit/scripts/replaykit_settings.json"] = ApplyReplaykitSettingsJson,
+            ["obs-replayKit/replaykit_settings.json"] = ApplyReplaykitSettingsJson,
             ["user.ini"] = ApplyUserIni,
             ["global.ini"] = ApplyGlobalIni,
         };

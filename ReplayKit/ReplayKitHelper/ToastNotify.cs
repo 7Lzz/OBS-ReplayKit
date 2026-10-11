@@ -12,8 +12,7 @@ namespace ReplayKitHelper
     {
         internal const string Aumid = "OBS.ReplayKit.Clips";
         private const string DisplayName = "OBS ReplayKit";
-        // earlier versions dropped a distinct "OBS ReplayKit" Start Menu entry here just to carry the AUMID; it now
-        // rides on OBS Studio's own shortcut instead, and this name is only kept so the migration can delete the old one.
+        // earlier versions dropped a distinct "OBS ReplayKit" Start Menu entry here just to carry the AUMID; it now rides on OBS Studios own shortcut instead, and this name is only kept so the migration can delete the old one.
         private const string LegacyShortcutName = "OBS ReplayKit.lnk";
         private static readonly string AppLogoPngPath = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "toast-icon.png");
 
@@ -36,9 +35,7 @@ namespace ReplayKitHelper
                 if (!string.IsNullOrEmpty(userPrograms)) TryDeleteFile(Path.Combine(userPrograms, LegacyShortcutName));
                 if (!string.IsNullOrEmpty(commonPrograms)) TryDeleteFile(Path.Combine(commonPrograms, LegacyShortcutName));
 
-                // the toast api only needs SOME start-menu .lnk carrying our AUMID. ride on OBS Studio's own shortcut so
-                // the start menu shows a single "OBS Studio"; a same-named user-scope copy is the fallback when OBS's is
-                // absent or not writable (helper is not always elevated -- the installer step handles the all-users one).
+                // the toast api only needs SOME start-menu .lnk carrying our AUMID. ride on OBS Studios own shortcut so the start menu shows a single "OBS Studio"; a same-named user-scope copy is the fallback when OBSs is absent or not writable (helper is not always elevated -- the installer step handles the all-users one).
                 bool stamped = false;
                 foreach (var progs in new[] { commonPrograms, userPrograms })
                 {
@@ -126,8 +123,7 @@ namespace ReplayKitHelper
             catch (Exception) { }
         }
 
-        // add our AppUserModelID to an existing .lnk (OBS Studio's shortcut). false if it is not writable (e.g. the
-        // all-users shortcut when this helper is not elevated) -- caller then writes a user-scope copy instead.
+        // add our AppUserModelID to an existing .lnk (OBS Studios shortcut). false if it is not writable (e.g. the all-users shortcut when this helper is not elevated) -- caller then writes a user-scope copy instead.
         private const uint STGM_READWRITE = 0x00000002; // STGM_READ is refused for .lnk property edits (STG_E_ACCESSDENIED)
         private static bool TryStampAumid(string lnkPath)
         {
@@ -142,7 +138,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("ToastNotify: stamp " + lnkPath + ": " + ex.Message, "upload"); return false; }
         }
 
-        // fallback shortcut: target obs64.exe, OBS's own icon, our AUMID. named "OBS Studio.lnk" so it merges with OBS's.
+        // fallback shortcut: target obs64.exe, OBSs own icon, our AUMID. named "OBS Studio.lnk" so it merges with OBSs.
         private static void WriteLauncherShortcut(string lnkPath, string target)
         {
             try

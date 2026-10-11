@@ -3,10 +3,11 @@ using System.IO;
 using System.Security;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // logging -- disabled by defualt for production, driven by the loggingEnabled key in the shared helper config so the lua entrypoint, this helper, and the upload/compress work it does in-process all agree on one setting. ported from obs_replaykit helper modules/20_config.ps1.
+    // logging, off by default and driven by loggingEnabled in the shared helper config so the lua side and this helper agree on one setting
     internal static class Log
     {
         private static string GetLogPath(string area)
@@ -105,7 +106,7 @@ namespace ReplayKitHelper
         }
 
         public static string GetScriptDir() => Server.State.Config?["scriptDir"]?.Value<string>();
-        // the folder picked in ReplayKit Settings wins over helper_config's clipDir, which only ever carried the old Tools > Scripts value and is empty on installs that never set it there. without this a custom folder was saved and shown in Settings but the listing still walked the default folder and reported no clips. cached on the settings file mtime because the clip listing calls this per request.
+        // the folder picked in ReplayKit Settings wins over helper_configs clipDir, which only ever carried the old Tools > Scripts value and is empty on installs that never set it there. without this a custom folder was saved and shown in Settings but the listing still walked the default folder and reported no clips. cached on the settings file mtime because the clip listing calls this per request.
         private static readonly object ClipDirSettingLock = new object();
         private static string _clipDirSetting;
         private static DateTime _clipDirSettingMTime = DateTime.MinValue;
@@ -140,8 +141,10 @@ namespace ReplayKitHelper
             return ResolveDir(Server.State.Config?["clipDir"]?.Value<string>(), GetDefaultClipDir());
         }
         public static string GetDockDir() => GetDefaultDockDir();
-        public static string GetDbPath() => Path.Combine(GetScriptDir(), "clips_db.json");
-        public static string GetClipIndexPath() => Path.Combine(GetScriptDir(), "clips_index.json");
+        // the obs-replayKit folder, two levels above the helper folder that helper_config.json names; the settings and the saved state are files straight in it, see StateLayout
+        public static string GetReplayKitRoot() => Update.GetReplayKitRootDir();
+        public static string GetDbPath() => StateLayout.Resolve(GetReplayKitRoot(), StateLayout.ClipsDbFile);
+        public static string GetClipIndexPath() => StateLayout.Resolve(GetReplayKitRoot(), StateLayout.ClipsIndexFile);
 
         public static string GetReplayKitUserStateDir()
         {
@@ -183,7 +186,7 @@ namespace ReplayKitHelper
             try { root = Path.GetFullPath(root); }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException || ex is SecurityException) { return; }
 
-            // Stop-ClipFolderWatcher below re-enters the same lock -- Monitor (what `lock` compiles to) is reentrant per-thread so this nests safely.
+            // stop-ClipFolderWatcher below re-enters the same lock -- Monitor (what `lock` compiles to) is reentrant per-thread so this nests safely.
             lock (Server.State.ClipsMetaLock)
             {
                 if (Server.State.ClipWatcher != null && Server.State.ClipWatcherPath == root) return;

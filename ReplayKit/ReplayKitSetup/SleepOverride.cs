@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace ReplayKitSetup
 {
-    // drop obs power requests so windows idle monitor/system sleep can still run. ported from obs_replaykit/sleep_override.py.
+    // drop obs power requests so windows idle monitor/system sleep can still run
     public static class SleepOverride
     {
         private const string ObsExeName = "obs64.exe";

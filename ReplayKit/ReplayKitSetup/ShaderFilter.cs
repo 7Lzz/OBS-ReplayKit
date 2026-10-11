@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 
 namespace ReplayKitSetup
 {
-    // install the bundled obs shaderfilter plugin used by replaykit motion blur. ported from obs_replaykit/shaderfilter.py.
+    // install the bundled obs shaderfilter plugin used by replaykit motion blur
     public static class ShaderFilter
     {
         private const string PluginDllRel = "obs-plugins/64bit/obs-shaderfilter.dll";

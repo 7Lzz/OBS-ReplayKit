@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // detect the users gpu(s) and classify them for encoder selection. reads the display-adapter class keys under HKLM and parses the adapter name to tag the architecture tier (the registry doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. ported from obs_replaykit/gpu.py.
+    // detect the users gpu(s) and classify them for encoder selection. reads the display-adapter class keys under HKLM and parses the adapter name to tag the architecture tier (the registry doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present.
     public enum Vendor { Nvidia, Amd, Intel, Unknown }
 
     // coarse nvenc capability tiers.
@@ -44,7 +44,7 @@ namespace ReplayKitSetup
 
     public static class Gpu
     {
-        // one row per installed display adapter, read from the registry instead of Win32_VideoController -- System.Management is not trim-safe (WmiNetUtilsHelper throws under the linker) and this project publishes trimmed. DriverDesc is the same marketing string wmi's Name returns; qwMemorySize (REG_QWORD, newer drivers) or MemorySize (older) is the vram. returns [] on any failure.
+        // one row per installed display adapter, read from the registry instead of Win32_VideoController -- System.Management is not trim-safe (WmiNetUtilsHelper throws under the linker) and this project publishes trimmed. DriverDesc is the same marketing string wmis Name returns; qwMemorySize (REG_QWORD, newer drivers) or MemorySize (older) is the vram. returns [] on any failure.
         private static List<JObject> QueryVideoControllers()
         {
             var result = new List<JObject>();

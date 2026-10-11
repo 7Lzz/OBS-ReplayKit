@@ -46,7 +46,7 @@
 <div class="ovp-wrap">
   <div class="ovp-hint">
     <span class="ovp-hint-text">Drag to position</span>
-    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag the overlay to move it. It snaps to the canvas edges and centre &mdash; hold Shift while dragging to place it freely, or Ctrl+Z to undo a move. The move is applied in OBS when you press Apply."></button>
+    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag the overlay to move it. It snaps to the edges and the center of the video. Hold Shift to place it anywhere, and press Ctrl+Z to undo a move. The new spot is applied when you press Apply."></button>
   </div>
   <div class="ovp-screen" id="ovpScreen">
     <div class="ovp-off" id="ovpOff" hidden>Input overlay is off</div>
@@ -90,9 +90,9 @@
     img.onerror = function () { backdropSet = false; };
     img.src = url;
   }
-  // the overlay's top-left as canvas fractions -- null means "use the corner the helper transforms compute". seeded from obs, updated by dragging. posDirty means the user has dragged since the last apply, so the obs poll must not snap their edit back.
+  // the overlays top-left as canvas fractions -- null means "use the corner the helper transforms compute". seeded from obs, updated by dragging. posDirty means the user has dragged since the last apply, so the obs poll must not snap their edit back.
   var posOverride = null, stageRect = null, posTimer = 0, posDirty = false;
-  // the item's real rect on the canvas as reported by obs, so the preview draws the same box the projector does
+  // the items real rect on the canvas as reported by obs, so the preview draws the same box the projector does
   var liveRect = null;
   var running = false, wired = false;
   var mode = "input_overlay";
@@ -100,7 +100,7 @@
   var wasdSize = { w: 568, h: 394 }, mouseSize = { w: 285, h: 421 };
 
   var BLANK_PX = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-  // gap between an element's released sprite and the pressed one directly below it, measured on both preset sheets
+  // gap between an elements released sprite and the pressed one directly below it, measured on both preset sheets
   var SPRITE_GUTTER = 3;
 
   // KeyboardEvent.code -> element id in wasd-minimal.json (it only carries these 9)
@@ -116,7 +116,7 @@
     KeyQ:"q", KeyE:"e", KeyR:"r", Space:"space", KeyA:"a", KeyD:"d", KeyS:"s", KeyW:"w",
   };
 
-  // starting guess only (basic.ini BaseCX/BaseCY) -- the position poll replaces both with the projector's real resolution as soon as obs answers.
+  // starting guess only (basic.ini BaseCX/BaseCY) -- the position poll replaces both with the projectors real resolution as soon as obs answers.
   var CANVAS_W = 2560, CANVAS_H = 1440;
   var REF = CANVAS_H / 1080;
 
@@ -229,7 +229,7 @@
       bh = Math.max(r.wasd.y + r.wasd.h, r.mouse.y + r.mouse.h) - by;
     } else { applyStyle(); return; }
     var localW = bw, localH = bh, localX0 = bx, localY0 = by;
-    // obs is authoritative for the item's real box -- take its size too, not just its corner, or the drawn box is the right shape in the wrong place (the overlay reads as floating above the canvas bottom when obs has it flush)
+    // obs is authoritative for the items real box -- take its size too, not just its corner, or the drawn box is the right shape in the wrong place (the overlay reads as floating above the canvas bottom when obs has it flush)
     if (liveRect) {
       bx = liveRect.x * CANVAS_W; by = liveRect.y * CANVAS_H;
       bw = liveRect.w * CANVAS_W; bh = liveRect.h * CANVAS_H;
@@ -264,8 +264,7 @@
 
   // ---- drag to reposition ----
   var drag = null;
-  // committed drag positions so ctrl+z steps back. each entry is a {x,y} canvas-fraction override, or null meaning
-  // "back to the corner obs / the saved setting produces". a fresh drag clears the redo stack.
+  // committed drag positions so ctrl+z steps back. each entry is a {x,y} canvas-fraction override, or null meaning "back to the corner obs / the saved setting produces". a fresh drag clears the redo stack.
   var moveUndo = [], moveRedo = [], MOVE_HISTORY_MAX = 60;
   function clearMoveHistory() { moveUndo.length = 0; moveRedo.length = 0; }
   function onStageDown(ev) {
@@ -480,7 +479,7 @@
         var d = await r.json();
         if (d && d.ok && !drag && !posDirty) {
           var changed = false;
-          // mirror the projector's own resolution so the fake screen has the same aspect and the overlay covers the same fraction of it. reported even when the item cannot be resolved, so the box stays true while the overlay is off.
+          // mirror the projectors own resolution so the fake screen has the same aspect and the overlay covers the same fraction of it. reported even when the item cannot be resolved, so the box stays true while the overlay is off.
           if (d.canvasWidth > 0 && d.canvasHeight > 0 && (d.canvasWidth !== CANVAS_W || d.canvasHeight !== CANVAS_H)) {
             CANVAS_W = d.canvasWidth; CANVAS_H = d.canvasHeight;
             REF = CANVAS_H / 1080;
@@ -527,8 +526,7 @@
     // exposed so settings.html can also drive undo/redo -- its keyboard handling is the reliable one in the CEF host
     undo: function () { undoMove(); },
     redo: function () { redoMove(); },
-    // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until
-    // Apply updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
+    // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until Apply updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
     resetPosition: function () {
       liveRect = null;
       posOverride = null;

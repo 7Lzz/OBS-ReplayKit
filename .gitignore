@@ -1,56 +1,44 @@
-# python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# dotnet build outputs (ReplayKitSetup and ReplayKitHelper, the c# ports)
+# dotnet build outputs
 ReplayKit/ReplayKitSetup/bin/
 ReplayKit/ReplayKitSetup/obj/
 ReplayKit/ReplayKitHelper/bin/
 ReplayKit/ReplayKitHelper/obj/
 
-# build outputs (build.bat publishes ReplayKitSetup into the repo root as a single merged exe, same spot the old pyinstaller build used; publish_helper_tmp is the equivalent scratch dir for the ReplayKitHelper step, normally self-cleaned but ignored too in case a build fails partway through)
+# build.bat output: the release exe and its checksum land in build/, publish_tmp is its scratch folder (self-cleaned, ignored in case a build fails partway)
 build/
-dist/
-publish_tmp/
-publish_helper_tmp/
-/OBSReplayKit.exe
-/OBSReplayKit.exe.sha256
+ReplayKit/publish_tmp/
+# prefs the installer writes next to itself when it runs from a checkout
 /prefs.json
-/test_update_mode.bat
-*.spec
 
-# private pyinstaller build with a locally-compiled bootloader, see build.bat -- rebuilt once per
-# machine from pypi source, not committed, and never touches the shared global python environment
-/ReplayKit/utils/pyinstaller_local/
-
-# regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time -- not tracked so a version bump only ever touches VersionInfo.cs
+# regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time, so a version bump only ever touches VersionInfo.cs
 /ReplayKit/assets/obs-studio/obs-replayKit/version.json
-# same regeneration, feeds the Win32 version resource (FileVersion/AssemblyVersion) into both csproj files
+# same regeneration, feeds the win32 version resource of both csproj files
 /ReplayKit/Version.props
 
-# one-off smoke / scratch scripts
-_smoke_test.py
-scratch_*.py
-
-# runtime state written by the installer or helper -- these live in the users appdata, but in case someone copies them into the repo by mistake, ignore them so credentials/cookie stores/per-user paths can never accidentally be committed.
+# runtime state the installer and helper write into the users appdata; ignored in case a live folder is ever copied into the repo, so credentials, cookies and per-user paths can never be committed
 helper_config.json
 clips_db.json
-auth.jar
-cookies.txt
+clips_index.json
+edit_drafts.json
+notifications.json
+window_state.ini
 hotkey_capture_signal.json
+auth.dat
+auth.jar
+auth_cookies.txt
+cookies.txt
 *.session
 .env
 .env.local
 
-# custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder -- per-user, not repo content
+# custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder
 ReplayKit/assets/obs-studio/obs-replayKit/icons/user/
-# custom themes the user saves at runtime -- per-user
+# custom themes the user saves at runtime
 ReplayKit/assets/obs-studio/obs-replayKit/themes-user/
-# theme stylesheet the helper generates for the file:// dock -- runtime, per-user
+# theme stylesheet the helper generates for the file:// dock
 ReplayKit/assets/obs-studio/obs-replayKit/obs-custom-dock/rk-theme.css
 
-# backups created by the installer + cleanup script
+# backups created by the installer + cleanup
 obs-studio.bak.*/
 obs-custom-dock.bak.*/
 

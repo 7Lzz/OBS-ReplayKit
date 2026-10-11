@@ -1,4 +1,4 @@
--- keep the replaykit update prompt out of discord style screenshare pickers and out of desktop captures. clips and settings are left visible to capture on purpose. setwindowdisplayaffinity only works from the process that owns the window, which is why this runs as obs lua instead of in the powershell helper: the cef popups are top level windows of this obs process.
+-- keep the replaykit update prompt out of discord style screenshare pickers and out of desktop captures. clips and settings are left visible to capture on purpose. setwindowdisplayaffinity only works from the process that owns the window, which is why this runs as obs lua instead of in the helper: the cef popups are top level windows of this obs process.
 
 obs = obslua
 local ffi = require("ffi")
@@ -11,7 +11,7 @@ ffi.cdef[[
     DWORD    GetCurrentProcessId();
     DWORD    GetWindowThreadProcessId(HWND hWnd, DWORD* lpdwProcessId);
     BOOL     IsWindowVisible(HWND hWnd);
-    int      GetWindowTextA(HWND hWnd, char* lpString, int nMaxCount);
+    int      InternalGetWindowText(HWND hWnd, unsigned short* lpString, int nMaxCount);
     HWND     FindWindowExA(HWND hWndParent, HWND hWndChildAfter, const char* lpszClass, const char* lpszWindow);
     BOOL     GetWindowDisplayAffinity(HWND hWnd, DWORD* pdwAffinity);
     BOOL     SetWindowDisplayAffinity(HWND hWnd, DWORD dwAffinity);
@@ -37,11 +37,25 @@ local function title_matches(title)
     return false
 end
 
+-- the caption is read straight from the window and never asked of its thread: gettext on a window of this process is sent to the obs ui thread and waits for it, and that thread can be waiting for the lock of this script, which froze the whole of obs when a recording started. a missing export leaves the shield idle
+local found_reader, internal_get_text = pcall(function() return ffi.C.InternalGetWindowText end)
+if not found_reader then
+    print("[PopupShield] InternalGetWindowText is not available, the shield stays idle")
+    internal_get_text = nil
+end
+
 local function get_title(hwnd)
-    local buf = ffi.new("char[?]", MAX_TITLE)
-    local len = ffi.C.GetWindowTextA(hwnd, buf, MAX_TITLE)
+    if internal_get_text == nil then return nil end
+    local buf = ffi.new("unsigned short[?]", MAX_TITLE)
+    local len = internal_get_text(hwnd, buf, MAX_TITLE)
     if len <= 0 then return nil end
-    return ffi.string(buf, len)
+    -- the titles looked for are plain ascii, anything wider is kept as a question mark
+    local chars = {}
+    for i = 0, len - 1 do
+        local c = buf[i]
+        chars[#chars + 1] = c < 128 and string.char(c) or "?"
+    end
+    return table.concat(chars)
 end
 
 local function shield_window(hwnd, title)
@@ -61,7 +75,7 @@ local function shield_window(hwnd, title)
     end
 end
 
--- walk top level windows without an enumwindows callback; findwindowex chaining avoids ffi callback slots. pid filter first becuase reading titles of foreign windows can block on hung apps, and the affinity call would fail for them anyway.
+-- walk top level windows without an enumwindows callback; findwindowex chaining avoids ffi callback slots. pid filter first becuase the affinity call fails for windows of other processes anyway.
 function shield_pass()
     local my_pid = ffi.C.GetCurrentProcessId()
     local pid = ffi.new("DWORD[1]", 0)

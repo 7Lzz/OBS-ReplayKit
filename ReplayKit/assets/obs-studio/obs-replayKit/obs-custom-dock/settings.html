@@ -56,18 +56,6 @@
   }
   button,input { font:inherit; }
   button { user-select:none; }
-  *::-webkit-scrollbar { width:14px; height:14px; background:transparent; }
-  *::-webkit-scrollbar-track { background:transparent; }
-  *::-webkit-scrollbar-corner { background:transparent; }
-  *::-webkit-scrollbar-thumb {
-    background-color:var(--line);
-    border-radius:7px;
-    border:4px solid transparent;
-    background-clip:padding-box;
-    min-height:30px;
-  }
-  *::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
-  *::-webkit-scrollbar-thumb:active { background-color:var(--muted); }
   .shell {
     width:100vw;
     height:100vh;
@@ -144,6 +132,8 @@
     overflow:auto;
     padding:0 10px 10px 0;
   }
+  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it */
+  html.rk-embedded .main { --sb-end:26px; }
   .page { display:none; }
   .page.is-active { display:block; }
   body.is-searching .page { display:block; }
@@ -162,6 +152,36 @@
   .nav-btn.search-match {
     border-color:var(--selected2);
   }
+  /* the tabs with nothing in them fade back while a search is on, the same 0.38 the list of the obs settings uses */
+  .nav-btn { transition:opacity 120ms linear; }
+  body.is-searching .nav-btn:not(.search-match) { opacity:.38; }
+  /* inside the obs window the list is drawn flat with section labels, and the obs settings draw the same list natively in the same column, so going from one to the other reads as one settings window. the classic popup keeps its own look */
+  .nav-group, .nav-switch, .nav-foot, .nav-rule { display:none; }
+  /* the column is the 214px list of the obs settings plus the 8px margin of the panel, so the panel keeps its size when going over to them */
+  html.rk-embedded .shell { grid-template-columns:222px 1fr; }
+  html.rk-embedded .sidebar { border-radius:8px; margin:0 8px 8px 0; padding-bottom:4px; overflow-y:auto; }
+  html.rk-embedded .nav-group { display:block; padding:16px 12px 6px; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); flex:0 0 auto; }
+  html.rk-embedded .nav-group.is-first { padding-top:6px; }
+  html.rk-embedded .nav-btn, html.rk-embedded .nav-switch { display:flex; width:100%; height:36px; margin-bottom:2px; border:0; border-radius:8px; background:transparent; color:rgba(var(--text-rgb),.86); align-items:center; gap:10px; padding:0 12px; cursor:pointer; text-align:left; font-size:14px; font-weight:500; flex:0 0 auto; }
+  html.rk-embedded .nav-btn:hover, html.rk-embedded .nav-switch:hover { background:rgba(var(--text-rgb),.07); }
+  html.rk-embedded .nav-btn.is-active { background:rgba(var(--text-rgb),.13); color:var(--text); font-weight:600; }
+  html.rk-embedded .nav-btn svg { display:block; width:17px; height:17px; fill:currentColor; flex:0 0 auto; opacity:.72; }
+  html.rk-embedded .nav-btn:hover svg, html.rk-embedded .nav-btn.is-active svg { opacity:1; }
+  html.rk-embedded .nav-btn span, html.rk-embedded .nav-switch span { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  /* the version and the link sit on a rule at the bottom of the list, and under the rule is the way over to the obs settings, at the same place the way back sits on the obs side; the footer is what pushes itself and the foot down */
+  html.rk-embedded .nav-foot { display:block; flex:0 0 auto; }
+  html.rk-embedded .nav-rule { display:block; height:1px; margin:0 10px; background:rgba(var(--text-rgb),.10); flex:0 0 auto; }
+  html.rk-embedded .nav-foot .nav-group { height:22px; margin:5px 0 8px; padding:0 12px; line-height:22px; }
+  html.rk-embedded .nav-switch span { flex:1 1 auto; }
+  html.rk-embedded .nav-switch { padding-right:11px; }
+  html.rk-embedded .nav-logo { display:block; width:17px; height:17px; object-fit:contain; flex:0 0 auto; }
+  /* the chevron is stroked like the one on the way back of the obs settings: thin, round ends, pointing on */
+  html.rk-embedded .nav-chev { display:block; width:10px; height:12px; flex:0 0 auto; fill:none; stroke:rgba(var(--text-rgb),.62); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  html.rk-embedded .sidebar-footer { padding:0 10px 6px; }
+  /* the shared hover nudge of a tab button is 3px sideways; here it is 1px, and the press shrinks less, so it reads as a hint rather than a slide */
+  html.rk-embedded .rk-hover-nav:hover { transform:translateX(1px); }
+  html.rk-embedded .rk-hover-nav:active { transform:translateX(1px) scale(.985); }
+  html.rk-embedded .nav-btn.search-match { box-shadow:inset 0 0 0 1px var(--selected2); }
   .box {
     background:var(--panel);
     border-radius:4px;
@@ -193,6 +213,7 @@
     line-height:1.25;
   }
   .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
+  .field-wrap.obs-menu-buttons { flex-wrap:wrap; }
   .field-wrap.is-stacked {
     flex-direction:column;
     align-items:stretch;
@@ -360,37 +381,37 @@
     align-items:center;
     gap:4px;
   }
+  /* the auto game list is drawn like the recording audio list: one row per game with its icon, the name, what it was matched on, and a remove button that comes up on hover */
   .game-rule-table {
     width:100%;
     min-height:30px;
     border:1px solid var(--line);
     border-radius:4px;
     overflow:hidden;
-    background:var(--field-dark);
+    background:rgba(var(--text-rgb),.035);
   }
-  .game-rule-empty,
+  .game-rule-empty { padding:14px 14px; color:var(--muted); font-size:12px; line-height:1.5; }
   .game-rule-row {
-    min-height:30px;
     display:grid;
+    grid-template-columns:24px minmax(0,1fr) 28px;
     align-items:center;
+    column-gap:12px;
+    min-height:50px;
+    padding:0 8px 0 14px;
+    transition:background 120ms linear;
   }
-  .game-rule-empty {
-    padding:0 9px;
-    color:var(--muted);
-  }
-  .game-rule-row {
-    grid-template-columns:minmax(0,1fr) 28px;
-    gap:6px;
-    padding:0 5px 0 9px;
-    border-top:1px solid var(--line);
-  }
-  .game-rule-row:first-child { border-top:0; }
+  .game-rule-row + .game-rule-row { border-top:1px solid var(--line); }
+  .game-rule-row:hover { background:rgba(var(--text-rgb),.06); }
+  .game-rule-ic { width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--text); }
+  .game-rule-ic svg, .game-rule-ic img { width:22px; height:22px; object-fit:contain; }
+  .game-rule-text { min-width:0; }
   .game-rule-main,
   .game-rule-sub {
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
   }
+  .game-rule-main { font-weight:600; }
   .game-rule-sub {
     color:var(--muted);
     font-size:12px;
@@ -398,7 +419,7 @@
   }
   .form-row.is-disabled .game-rule-table {
     border-color:var(--field2);
-    background:var(--field-dark);
+    opacity:.6;
   }
   .projector-action-row {
     width:100%;
@@ -408,6 +429,9 @@
     gap:6px;
   }
   .projector-action-row .btn { width:100%; }
+  .account-line { min-height:20px; display:flex; align-items:center; color:var(--text); }
+  .account-line.is-off { color:var(--muted); }
+  .account-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .text-input { padding:0 9px; }
   .volume-control {
     width:100%;
@@ -480,6 +504,30 @@
   .volume-slider:focus-visible::-webkit-slider-thumb {
     box-shadow:0 0 0 2px var(--selected2);
   }
+  /* recording audio in the audio tab: the mode of the list on a row of its own, then one row per source, and under the game audio section one row per program */
+  /* the list stands in the column of the fields, under the dropdown that decides what it shows: 8px of the row, the 180px label column and the 8px gap */
+  .ra-list { margin:6px 8px 0 196px; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:rgba(var(--text-rgb),.035); }
+  .ra-row { display:grid; grid-template-columns:42px 26px minmax(110px,1fr) minmax(170px,300px) 46px; align-items:center; column-gap:12px; min-height:54px; padding:0 14px; --sw-w:34px; --sw-h:20px; }
+  .ra-row + .ra-row { border-top:1px solid var(--line); }
+  /* the whole row is the button, so it shows a pointer and a hover fill; the slider keeps its own cursor */
+  .ra-row { cursor:pointer; user-select:none; transition:background 120ms linear; }
+  .ra-row:hover, .ra-row.is-app:hover { background:rgba(var(--text-rgb),.06); }
+  .ra-row .volume-slider-wrap { cursor:default; }
+  .ra-row .check-row { min-height:0; width:auto; justify-content:center; }
+  .ra-row .check-row input[type=checkbox] { margin:0; }
+  .ra-row.is-section .ra-name { font-weight:700; }
+  .ra-row.is-app { min-height:46px; padding-left:36px; background:rgba(var(--text-rgb),.02); }
+  .ra-empty { padding:14px 14px 14px 36px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; line-height:1.5; }
+  .ra-ic { width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--text); transition:opacity 120ms linear; }
+  .ra-ic svg, .ra-ic img { width:22px; height:22px; object-fit:contain; }
+  .ra-name { font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:opacity 120ms linear; }
+  .ra-pct { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; transition:opacity 120ms linear; }
+  .ra-slider-note { color:var(--muted); font-size:12px; transition:opacity 120ms linear; }
+  .ra-row .volume-slider-wrap { transition:opacity 120ms linear; }
+  .ra-row.is-off .ra-ic, .ra-row.is-off .ra-name, .ra-row.is-off .ra-pct, .ra-row.is-off .ra-slider-note { opacity:.5; }
+  .ra-row.is-off .volume-slider-wrap { opacity:.4; }
+  /* the microphone volume is the slider of the recording audio list in this tab, so the row of the shared microphone controls is not drawn a second time; its control stays on the page and follows the list */
+  #page-audio .form-row:has(#micVolume) { display:none; }
   .color-control {
     width:100%;
     display:grid;
@@ -532,39 +580,17 @@
   .spin-btn:hover { background:var(--button-hover); }
   .spin-btn + .spin-btn { border-top:1px solid var(--panel-solid,var(--panel)); }
   .spin-btn svg { width:9px; height:9px; fill:currentColor; }
+  /* the switch and the rows it sits in come from the shared _switch partial; the base of a row of text and a switch is here */
   .check-row {
-    min-height:28px;
+    min-height:32px;
+    width:100%;
+    max-width:440px;
     display:flex;
     align-items:center;
-    gap:7px;
+    gap:8px;
     color:var(--text);
-    cursor:pointer;
   }
-  .check-row input {
-    appearance:none;
-    -webkit-appearance:none;
-    position:relative;
-    width:14px;
-    height:14px;
-    flex:0 0 14px;
-    margin:0;
-    border:1px solid var(--muted);
-    border-radius:2px;
-    background:transparent;
-  }
-  /* no fill -- just the tick, painted in --text so it flips dark on the light theme (a fixed white check vanished there) */
-  .check-row input:checked::after {
-    content:"";
-    position:absolute;
-    inset:0;
-    background:var(--text);
-    -webkit-mask:url(/icons/ui/check.svg) center / 12px 12px no-repeat;
-    mask:url(/icons/ui/check.svg) center / 12px 12px no-repeat;
-  }
-  .check-row input:focus-visible {
-    outline:2px solid var(--selected2);
-    outline-offset:1px;
-  }
+  .form-row.is-disabled .check-row input { opacity:.45; cursor:default; }
   .hotkey-grid {
     border:1px solid var(--line);
     border-radius:4px;
@@ -667,6 +693,12 @@
   .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
   .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
   .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
+  /* layout picker: each tile draws a tiny wireframe of the main window in that layout */
+  .layout-tile { width:120px; padding:9px 6px 8px; }
+  .layout-sw { position:relative; display:block; width:100px; height:62px; overflow:hidden; border-radius:5px; background:var(--field-dark); border:1px solid var(--line); }
+  .layout-sw i { position:absolute; display:block; border-radius:2px; background:rgba(var(--text-rgb),.28); }
+  .layout-sw i.pv { background:rgba(var(--text-rgb),.12); }
+  .layout-sw i.ac { background:var(--selected2); }
   /* theme tile swatch */
   .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
   .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
@@ -842,7 +874,9 @@
   }
   @media (max-width:760px) {
     .shell { grid-template-columns:154px 1fr; }
+    html.rk-embedded .shell { grid-template-columns:176px 1fr; }
     .form-row { grid-template-columns:130px minmax(180px,1fr); }
+    .ra-list { margin-left:146px; }
     .hotkey-row { grid-template-columns:180px minmax(180px,1fr) auto; }
   }
 
@@ -857,7 +891,9 @@
   .page.is-active { animation:rk-page-in 190ms var(--ease_smooth) both; }
 </style>
 <link rel="stylesheet" href="rk-theme.css" />
+<!--#include scrollbar-->
 <!--#include interaction-states-->
+<!--#include switch-->
 <!--#include window-state-->
 </head>
 <body>
@@ -866,11 +902,8 @@
     <div class="search-wrap">
       <input class="text-input search-input" id="settingsSearch" type="search" placeholder="Search settings" spellcheck="false" autocomplete="off">
     </div>
-    <button class="nav-btn is-active" type="button" data-page="general">
-      <svg data-i="nav/tab-general" viewBox="0 0 16 16" aria-hidden="true"></svg>
-      <span>General</span>
-    </button>
-    <button class="nav-btn" type="button" data-page="output">
+    <div class="nav-group is-first">ReplayKit</div>
+    <button class="nav-btn is-active" type="button" data-page="output">
       <svg data-i="nav/tab-output" viewBox="0 0 16 16" aria-hidden="true"></svg>
       <span>Output</span>
     </button>
@@ -890,9 +923,25 @@
       <svg data-i="nav/tab-overlay" viewBox="0 0 16 16" aria-hidden="true"></svg>
       <span>Overlay</span>
     </button>
+    <button class="nav-btn" type="button" data-page="editor">
+      <svg data-i="nav/tab-editor" viewBox="0 0 16 16" aria-hidden="true"></svg>
+      <span>Video Editor</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="notifications">
+      <svg data-i="nav/tab-notifications" viewBox="0 0 16 16" aria-hidden="true"></svg>
+      <span>Notifications</span>
+    </button>
     <button class="nav-btn" type="button" data-page="appearance">
       <svg data-i="nav/tab-appearance" viewBox="0 0 16 16" aria-hidden="true"></svg>
       <span>Appearance</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="storage">
+      <svg data-i="nav/tab-storage" viewBox="0 0 16 16" aria-hidden="true"></svg>
+      <span>Storage</span>
+    </button>
+    <button class="nav-btn" type="button" data-page="windows">
+      <svg data-i="nav/tab-windows" viewBox="0 0 16 16" aria-hidden="true"></svg>
+      <span>Windows OS</span>
     </button>
     <button class="nav-btn" type="button" data-page="advanced">
       <svg data-i="nav/tab-advanced" viewBox="0 0 16 16" aria-hidden="true"></svg>
@@ -904,81 +953,31 @@
         <svg data-i="brand/github" viewBox="0 0 16 16" aria-hidden="true"></svg>
       </a>
     </div>
+    <div class="nav-foot">
+      <div class="nav-rule" aria-hidden="true"></div>
+      <div class="nav-group">OBS Studio</div>
+      <button class="nav-switch" type="button" id="openObsSettings">
+        <img class="nav-logo" id="obsSwitchIcon" alt="" width="17" height="17">
+        <span>OBS Settings</span>
+        <svg class="nav-chev" viewBox="0 0 10 12" aria-hidden="true"><polyline points="3 1 8 6 3 11"/></svg>
+      </button>
+    </div>
   </aside>
 
   <main class="main">
     <div class="search-empty" id="searchEmpty">No matching settings</div>
-    <section class="page is-active" id="page-general">
+    <section class="page is-active" id="page-output">
       <div class="box">
-        <div class="box-title">General</div>
+        <div class="box-title">Clipping</div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="obsStartupEnabled">
-            <span>Start OBS when Windows starts</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="runObsAsAdmin">
-            <span>Run OBS and ReplayKit as administrator</span>
-            <button class="info-dot" type="button" aria-label="About running as administrator" title="Launches OBS and ReplayKit with administrator rights on the next OBS launch. Rarely needed and adds a UAC prompt every time. Not recommended."></button>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="disableObsCloseWarning">
-            <span>Do not warn when closing OBS with active outputs</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="disableObsCrashPopup">
-            <span>Disable the OBS "crash detected / safe mode" popup after an unclean shutdown</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="closeToTray">
-            <span>Closing the OBS window minimizes it to the tray instead of quitting</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="allowSleepWhileActive">
-            <span>Allow monitor and PC sleep while OBS is active</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="pinObsTrayIcon">
-            <span>Keep the OBS tray icon pinned next to the clock</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="clipNotificationEnabled">
-            <span>Show clip saved popup</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="recordingNotificationEnabled">
-            <span>Show recording started/stopped popup</span>
-          </label>
+          <div class="check-row">
+            <input type="checkbox" id="liveClipping" disabled aria-label="Enable clipping">
+            <span>Enable clipping</span>
+            <button class="info-dot" type="button" aria-label="About clipping" title="Keeps the last moments of your screen ready, so the clip hotkey or the Clip button can save them. Turn it off and nothing is kept for clips."></button>
+          </div>
         </div>
       </div>
-    </section>
-
-    <section class="page" id="page-output">
       <div class="box">
         <div class="box-title">Recording</div>
         <div class="form-row">
@@ -1045,6 +1044,33 @@
           </div>
         </div>
       </div>
+      <div class="box">
+        <div class="box-title">Mouse Cursor <button class="info-dot" type="button" aria-label="About the mouse cursor" title="Choose when your mouse cursor shows up in recordings and clips."></button></div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="showCursorDisplayCapture" aria-label="Desktop Capture">
+            <span>Desktop Capture</span>
+            <button class="info-dot" type="button" aria-label="About the mouse cursor in Desktop Capture" title="Shows your mouse cursor when you record your whole screen."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="showCursorGameCapture" aria-label="Game Capture">
+            <span>Game Capture</span>
+            <button class="info-dot" type="button" aria-label="About the mouse cursor in Game Capture" title="Shows your mouse cursor when you record a game in fullscreen."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="showCursorWindowCapture" aria-label="Window Capture">
+            <span>Window Capture</span>
+            <button class="info-dot" type="button" aria-label="About the mouse cursor in Window Capture" title="Shows your mouse cursor when you record a single game window (picked on the Screenshare page)."></button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="page-screenshare">
@@ -1074,10 +1100,10 @@
         </div>
         <div class="form-row tight" id="screenshareAutoGameKeepFocusedRow">
           <div></div>
-          <div class="field-wrap"><label class="check-row"><input type="checkbox" id="screenshareAutoGameKeepFocused"><span>Keep Game Focus</span><button class="info-dot" type="button" aria-label="About Keep Game Focus" title="Keeps the screenshare locked on the matched game through brief tab-outs (for example to Discord or this Settings window) instead of switching to Desktop Capture."></button></label></div>
+          <div class="check-row"><input type="checkbox" id="screenshareAutoGameKeepFocused" aria-label="Keep Game Focus"><span>Keep Game Focus</span><button class="info-dot" type="button" aria-label="About Keep Game Focus" title="When this is on and a game from your list is detected, ReplayKit shares only that game, even if you switch to another window like Discord, until the game is no longer detected."></button></div>
         </div>
         <div class="form-row" id="screenshareSwitchDelayRow">
-          <div class="label">Switch Speed <button class="info-dot" type="button" aria-label="About Switch Speed" title="How long ReplayKit waits after you tab out of a game or window before switching back to Desktop Capture, in seconds. Lower reacts faster; higher avoids flicker on brief alt-tabs."></button></div>
+          <div class="label">Switch Speed <button class="info-dot" type="button" aria-label="About Switch Speed" title="How many seconds ReplayKit waits after you leave a game before it goes back to your whole screen. A short wait is quicker. A longer wait avoids flickering when you switch windows for a moment."></button></div>
           <div class="field-wrap">
             <div class="volume-control">
               <input class="text-input volume-value" id="screenshareSwitchDelayValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Capture switch delay in seconds">
@@ -1104,23 +1130,48 @@
 
     <section class="page" id="page-audio">
       <div class="box">
-        <div class="box-title">Microphone</div>
-        <!--#include mic-controls-->
-      </div>
-      <div class="box">
-        <div class="box-title">Sounds</div>
-        <div class="form-row">
-          <div class="label">Desktop Audio</div>
+        <div class="box-title">Recording Audio</div>
+        <div class="form-row" data-search="recording audio audio processes all pc audio all apps specific apps programs game audio pc audio desktop audio microphone mute">
+          <div class="label">Audio Processes<button class="info-dot" type="button" id="raInfo" aria-label="About the audio that is recorded"></button></div>
+          <div class="field-wrap"><div class="combo" id="recordingAudioMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="ra-list" id="raList"></div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="recordingSeparateAudioTracks" aria-label="Save separate audio tracks">
+            <span>Save separate audio tracks</span>
+            <button class="info-dot" type="button" aria-label="About separate audio tracks" title="Saves PC audio, Discord, and your microphone as separate tracks, along with the normal mixed track. You can change each one in the clip editor. Needs an OBS restart."></button>
+          </div>
+        </div>
+        <!-- the two mutes of the list: the switches in the rows are the other way round of these, and these carry the queue that waits for Apply -->
+        <input type="checkbox" id="liveMuteMic" disabled hidden>
+        <input type="checkbox" id="liveMuteDesktop" disabled hidden>
+        <!-- the pc audio volume is the slider of the PC Audio row and of the Game Audio section; this row only carries the control the page reads and writes -->
+        <div class="form-row" hidden>
+          <div class="label">PC Audio</div>
           <div class="field-wrap">
             <div class="volume-control">
-              <input class="text-input volume-value" id="desktopAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Desktop audio volume">
+              <input class="text-input volume-value" id="desktopAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="PC audio volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="Desktop audio volume slider">
+                <input class="volume-slider" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="PC audio volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetDesktopAudioVolume" title="Reset to default">
               <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
+          </div>
+        </div>
+      </div>
+      <!-- discord audio is a background input that only keeps the users own voice out of the share preview, so it is never shown; the controls stay in the markup because the page code reads and writes their values -->
+      <div class="box" hidden>
+        <div class="box-title">Discord</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="liveMuteDiscord" disabled aria-label="Mute Discord audio">
+            <span>Mute Discord audio</span>
+            <button class="info-dot" type="button" aria-label="About muting" title="Mutes or unmutes this sound in OBS. The change is applied when you press Apply or OK."></button>
           </div>
         </div>
         <div class="form-row">
@@ -1137,6 +1188,13 @@
             </button>
           </div>
         </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Microphone</div>
+        <!--#include mic-controls-->
+      </div>
+      <div class="box">
+        <div class="box-title">Sounds</div>
         <div class="form-row">
           <div class="label">Clipping Sound</div>
           <div class="field-wrap">
@@ -1228,16 +1286,16 @@
           <div class="label" style="line-height:32px">Preview</div>
           <div class="field-wrap" style="flex-direction:column; align-items:stretch"><!--#include live2d-bongo--><!--#include overlay-preview--></div>
         </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="overlayFlipH" aria-label="Flip horizontally">
+            <span>Flip horizontally</span>
+          </div>
+        </div>
         <div class="form-row">
           <div class="label">Overlay</div>
           <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="overlayFlipH">
-            <span>Flip horizontally</span>
-          </label>
         </div>
         <div class="form-row">
           <div class="label">Opacity</div>
@@ -1310,10 +1368,10 @@
         <div class="box-title">Capture Effects</div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="motionBlurEnabled">
+          <div class="check-row">
+            <input type="checkbox" id="motionBlurEnabled" aria-label="Enable motion blur on capture sources">
             <span>Enable motion blur on capture sources</span>
-          </label>
+          </div>
         </div>
         <div class="form-row">
           <div class="label">Strength</div>
@@ -1332,59 +1390,249 @@
       </div>
     </section>
 
-    <section class="page" id="page-advanced">
+    <section class="page" id="page-editor">
       <div class="box">
-        <div class="box-title">Advanced</div>
+        <div class="box-title">Trimming</div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="trimPreciseDefault">
+          <div class="check-row">
+            <input type="checkbox" id="trimPreciseDefault" aria-label="Enable frame-accurate trim by default">
             <span>Enable frame-accurate trim by default</span>
-            <button class="info-dot" type="button" aria-label="About frame-accurate trim" title="Not recommended. Off: trims instantly without re-encoding, but cuts snap to the previous keyframe. On: re-encodes the video so the cut lands exactly where you placed the handles, which takes much longer."></button>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="showCodecTags">
-            <span>Show codec tags on clips</span>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="debugLoggingEnabled">
-            <span>Enable debug logging</span>
-            <button class="info-dot" type="button" aria-label="About debug logging" title="Writes helper activity (Share Preview, clips, uploads) to %TEMP%\ReplayKit\logs for troubleshooting. Leave off unless asked to turn it on."></button>
-          </label>
-        </div>
-        <div class="form-row tight" id="autoDeleteLogsOnLaunchRow">
-          <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="autoDeleteLogsOnLaunch">
-            <span>Automatically delete logs on next launch</span>
-            <button class="info-dot" type="button" aria-label="About auto-deleting logs" title="Clears the logs above at the start of each OBS launch so they do not fill up disk space over time. Recommended to leave on unless you need to keep logs from a previous session."></button>
-          </label>
-        </div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="field-wrap">
-            <button class="btn" type="button" id="openLogFolderBtn">Open log folder</button>
+            <button class="info-dot" type="button" aria-label="About frame-accurate trim" title="Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it's off, cuts are instant, but a clip may start slightly earlier than you chose."></button>
           </div>
         </div>
         <div class="form-row tight">
           <div></div>
-          <div class="inline-status" id="logFolderStatusLine"></div>
+          <div class="check-row">
+            <input type="checkbox" id="trimGpuEncode" aria-label="Use the graphics card to encode edits">
+            <span>Use the graphics card to encode edits</span>
+            <button class="info-dot" type="button" aria-label="About graphics card encoding for edits" title="Uses your graphics card to save edited videos much faster, like exact cuts, black sections, and speed changes. It also keeps your game running smoothly. If your PC can't do this, ReplayKit uses your processor instead."></button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Playback</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="editorAutoplay" aria-label="Start playing when the editor opens">
+            <span>Start playing when the editor opens</span>
+            <button class="info-dot" type="button" aria-label="About starting playback" title="Plays the clip as soon as the editor opens, instead of waiting for you to press play."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="editorLoopPreview" aria-label="Loop the selected part">
+            <span>Loop the selected part</span>
+            <button class="info-dot" type="button" aria-label="About looping the selected part" title="Plays the part between the two handles again and again until you pause it."></button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Arrow key skip <button class="info-dot" type="button" aria-label="About the arrow key skip" title="How far the left and right arrow keys jump through the clip in the editor."></button></div>
+          <div class="field-wrap"><div class="combo" id="editorSeekStep" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Rendering</div>
+        <div class="form-row">
+          <div class="label">Anti-aliasing <button class="info-dot" type="button" aria-label="About anti-aliasing" title="Smooths rough, jagged edges when a clip plays big, like in theater view, full screen, or the editor. FXAA is fast and softens edges. MSAA uses more power but calms flickering when a clip is shown smaller than it was recorded."></button></div>
+          <div class="field-wrap is-stacked"><div class="combo" id="clipAntialiasing" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+            <div class="hint" id="clipAntialiasingHint" hidden>Needs graphics acceleration in the OBS browser, which is not available here.</div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Preview</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="editorWheelZoom" aria-label="Zoom the video with the mouse wheel">
+            <span>Zoom the video with the mouse wheel</span>
+            <button class="info-dot" type="button" aria-label="About zooming with the mouse wheel" title="Lets you zoom into the video by scrolling over it in the editor, up to 4 times, to see small details. When it's off, scrolling does nothing there."></button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Zoomed-in video <button class="info-dot" type="button" aria-label="About the zoomed-in video" title="How the video looks when you zoom in. Smooth blends the pixels together. Sharp pixels keeps each pixel crisp, which makes small details easier to see. Videos that aren't zoomed in look the same either way."></button></div>
+          <div class="field-wrap"><div class="combo" id="editorZoomScaling" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-storage">
+      <div class="box">
+        <div class="box-title">Storage</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="compressSkipFavorites" aria-label="Leave favorites out of Compress Clips">
+            <span>Leave favorites out of Compress Clips</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Storage limit</div>
+          <div class="field-wrap"><div class="combo" id="storageLimit" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="storageLimitCustomRow" hidden>
+          <div class="label">Custom limit</div>
+          <div class="field-wrap is-stacked">
+            <input class="text-input" id="storageLimitGb" type="number" min="1" max="1000000" step="1" inputmode="numeric" autocomplete="off">
+            <div class="hint">Size in GB.</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="label">Free-up Space</div>
+          <div class="field-wrap">
+            <button class="btn" type="button" id="openStorageCard">Open Free-up Space</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-notifications">
+      <div class="box">
+        <div class="box-title">Popups</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="clipNotificationEnabled" aria-label="Show clip saved popup">
+            <span>Show clip saved popup</span>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="recordingNotificationEnabled" aria-label="Show recording started/stopped popup">
+            <span>Show recording started/stopped popup</span>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="hideNotificationsFromCapture" aria-label="Hide popups from screenshots and screen recordings">
+            <span>Hide popups from screenshots and screen recordings</span>
+            <button class="info-dot" type="button" aria-label="About hiding popups from capture" title="Keeps ReplayKit's pop-up messages, like 'clip saved', out of screenshots and recordings. They never show up in your clips or streams."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="linkNotificationEnabled" aria-label="Show a notification when a link is ready">
+            <span>Show a notification when a link is ready</span>
+            <button class="info-dot" type="button" aria-label="About the link notification" title="Shows a Windows notification when a clip you shared is ready to watch. The link is copied by the Automatically copy link setting."></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-windows">
+      <div class="box">
+        <div class="box-title">Startup</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="obsStartupEnabled" aria-label="Automatic startup">
+            <span>Automatic startup</span>
+            <button class="info-dot" type="button" aria-label="About automatic startup" title="Opens OBS and ReplayKit when you sign in to Windows."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="startMinimized" aria-label="Start minimized">
+            <span>Start minimized</span>
+            <button class="info-dot" type="button" aria-label="About starting minimized" title="OBS starts in the system tray instead of opening its window."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="runObsAsAdmin" aria-label="Always run as administrator">
+            <span>Always run as administrator</span>
+            <button class="info-dot" type="button" aria-label="About running as administrator" title="Opens OBS with administrator rights the next time it starts. Windows will ask for your permission every time. Most people don't need this."></button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">While OBS runs</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="disableSleeping" aria-label="Disable sleeping">
+            <span>Disable sleeping</span>
+            <button class="info-dot" type="button" aria-label="About disabling sleep" title="Keeps your screen and PC awake while OBS is running."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="quitOnClose" aria-label="Quit on close">
+            <span>Quit on close</span>
+            <button class="info-dot" type="button" aria-label="About quitting on close" title="Choose what the close button does. Off: OBS keeps running in the system tray. On: OBS closes completely."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="pinObsTrayIcon" aria-label="Keep the OBS tray icon pinned next to the clock">
+            <span>Keep the OBS tray icon pinned next to the clock</span>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="disableObsCloseWarning" aria-label="Do not warn when closing OBS with active outputs">
+            <span>Do not warn when closing OBS with active outputs</span>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="disableObsCrashPopup" aria-label="Disable the OBS &quot;crash detected / safe mode&quot; popup after an unclean shutdown">
+            <span>Disable the OBS "crash detected / safe mode" popup after an unclean shutdown</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-advanced">
+      <div class="box">
+        <div class="box-title">General</div>
+        <div class="form-row">
+          <div class="label">Streamable account</div>
+          <div class="field-wrap is-stacked">
+            <div class="account-line is-off" id="streamableStatus">Checking...</div>
+            <div class="account-actions">
+              <button class="btn" type="button" id="streamableSignIn" hidden>Sign in</button>
+              <button class="btn" type="button" id="streamableSignOut" hidden>Sign out</button>
+              <button class="btn" type="button" id="streamableForce" hidden>Reset sign-in</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="autoCopyLink" aria-label="Automatically copy link">
+            <span>Automatically copy link</span>
+            <button class="info-dot" type="button" aria-label="About copying links" title="Copies the Streamable link for you as soon as your clip is ready to watch. Turn it off if you'd rather copy the link yourself."></button>
+          </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="showCodecTags" aria-label="Show codec tags on clips">
+            <span>Show codec tags on clips</span>
+          </div>
         </div>
       </div>
       <div class="box">
         <div class="box-title">Updates</div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="autoUpdateEnabled">
+          <div class="check-row">
+            <input type="checkbox" id="autoUpdateEnabled" aria-label="Prompt when ReplayKit updates are available">
             <span>Prompt when ReplayKit updates are available</span>
-          </label>
+          </div>
         </div>
         <div class="form-row">
           <div class="label">ReplayKit</div>
@@ -1401,7 +1649,94 @@
         </div>
       </div>
       <div class="box">
+        <div class="box-title">OBS menu</div>
+        <div class="form-row" data-search="obs menu bar file edit view docks profile scene collection tools help">
+          <div class="label">Menu bar</div>
+          <div class="field-wrap">
+            <button class="btn" type="button" id="obsMenuToggle" aria-expanded="false" aria-controls="obsMenuButtons">Show OBS menus</button>
+            <button class="info-dot" type="button" aria-label="About the OBS menus" title="The OBS menus (File, Edit, View, and more) live here now. Press Show OBS menus, then click one to open it."></button>
+          </div>
+        </div>
+        <div class="form-row tight" id="obsMenuButtons" hidden>
+          <div></div>
+          <div class="field-wrap obs-menu-buttons">
+            <button class="btn" type="button" data-obs-menu="0">File</button>
+            <button class="btn" type="button" data-obs-menu="1">Edit</button>
+            <button class="btn" type="button" data-obs-menu="2">View</button>
+            <button class="btn" type="button" data-obs-menu="3">Docks</button>
+            <button class="btn" type="button" data-obs-menu="4">Profile</button>
+            <button class="btn" type="button" data-obs-menu="5">Scene Collection</button>
+            <button class="btn" type="button" data-obs-menu="6">Tools</button>
+            <button class="btn" type="button" data-obs-menu="7">Help</button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Development</div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="developmentMode" aria-label="Development mode">
+            <span>Development mode</span>
+            <button class="info-dot" type="button" aria-label="About development mode" title="Shows extra settings for troubleshooting and for developers. Most people never need them."></button>
+          </div>
+        </div>
+        <div id="developmentSettings" hidden>
+          <div class="form-row tight">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="debugLoggingEnabled" aria-label="Enable debug logging">
+              <span>Enable debug logging</span>
+            </div>
+          </div>
+          <div class="form-row tight">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="logInterfaceEvents" aria-label="Log interface events">
+              <span>Log interface events</span>
+            </div>
+          </div>
+          <div class="form-row tight" id="autoDeleteLogsOnLaunchRow">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="autoDeleteLogsOnLaunch" aria-label="Automatically delete logs on next launch">
+              <span>Automatically delete logs on next launch</span>
+              <button class="info-dot" type="button" aria-label="About auto-deleting logs" title="Deletes the old logs each time OBS starts, so they don't pile up. Leave this on unless you want to keep logs from an earlier session."></button>
+            </div>
+          </div>
+          <div class="form-row tight">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="sdkMode" aria-label="SDK mode">
+              <span>SDK mode</span>
+            </div>
+          </div>
+          <div class="form-row tight">
+            <div></div>
+            <div class="field-wrap">
+              <button class="btn" type="button" id="openLogFolderBtn">Open log folder</button>
+            </div>
+          </div>
+          <div class="form-row tight">
+            <div></div>
+            <div class="inline-status" id="logFolderStatusLine"></div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
         <div class="box-title">Uninstall</div>
+        <div class="form-row tight" id="setupFileRow" hidden>
+          <div class="label">Setup file</div>
+          <div class="action-row">
+            <span id="setupFileText"></span>
+            <button class="info-dot" type="button" aria-label="About the setup file" title="The Uninstall and Install buttons on this page run it. Download again fetches it from GitHub and checks it before it is used."></button>
+            <button class="btn" type="button" id="setupFileRepairBtn">Download again</button>
+          </div>
+        </div>
+        <div class="form-row tight" id="setupFileStatusRow" hidden>
+          <div></div>
+          <div class="inline-status" id="setupFileStatusLine"></div>
+        </div>
         <div class="form-row">
           <div class="label">ReplayKit</div>
           <div class="field-wrap">
@@ -1410,27 +1745,28 @@
         </div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="uninstallKeepSettings" checked>
+          <div class="check-row">
+            <input type="checkbox" id="uninstallKeepSettings" checked aria-label="Keep user settings for next install">
             <span>Keep user settings for next install</span>
-          </label>
+          </div>
         </div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="uninstallRemoveObs">
+          <div class="check-row">
+            <input type="checkbox" id="uninstallRemoveObs" aria-label="Also uninstall OBS Studio">
             <span>Also uninstall OBS Studio</span>
-          </label>
+          </div>
         </div>
         <div class="form-row tight">
           <div></div>
           <div class="inline-status" id="uninstallStatusLine"></div>
         </div>
-        <div class="form-row">
-          <div class="label">Discord screenshare / Share Preview audio</div>
-          <div class="field-wrap">
+        <div class="form-row tight">
+          <div></div>
+          <div class="action-row">
+            <span>Discord screenshare / Share Preview audio</span>
+            <button class="info-dot" type="button" id="discordScreenshareInfoDot" aria-label="About Share Preview audio" title="Removes the audio driver that Share Preview needs. The rest of ReplayKit stays installed."></button>
             <button class="btn is-danger" type="button" id="uninstallDiscordScreenshareBtn">Uninstall</button>
-            <button class="info-dot" type="button" id="discordScreenshareInfoDot" aria-label="About Share Preview audio" title="Removes the OBS Stream Audio virtual audio driver that Share Preview depends on. Keeps the rest of ReplayKit installed."></button>
           </div>
         </div>
         <div class="form-row tight">
@@ -1442,7 +1778,7 @@
 
     <section class="page" id="page-appearance">
       <div class="box">
-        <div class="box-title">Theme <button class="info-dot" type="button" aria-label="About themes" title="Restyles the ReplayKit dock, Clips and Settings windows and OBS itself. ReplayKit updates instantly; OBS restarts to pick up its side. Pick a preset, or build a Custom one and save it."></button></div>
+        <div class="box-title">Theme</div>
         <div class="form-row">
           <div class="label">Theme</div>
           <div class="field-wrap is-stacked">
@@ -1456,7 +1792,7 @@
           <div class="label">Custom theme</div>
           <div class="field-wrap is-stacked">
             <div class="theme-section">
-              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a swatch to open the floating editor."></button></span></div>
+              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a color square to change that color."></button></span></div>
               <div class="theme-editor" id="themeEditor">
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
@@ -1465,12 +1801,13 @@
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color"></button><span>Accent</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color"></button><span>Border</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color"></button><span>Danger</span></div>
+                <div class="theme-pick" data-tooltip="Title bar and sidebar"><button class="color-picker" type="button" data-k="bar" aria-label="Title bar and sidebar color"></button><span>Bars</span></div>
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Give any surface a gradient instead of a flat color."></button></span></div>
+              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Lets an area fade between colors instead of using one solid color."></button></span></div>
               <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
-              <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></label>
+              <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></div>
               <div class="gradient-editor" id="themeGradientEditor" hidden>
                 <div class="gradient-top">
                   <div class="combo" id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
@@ -1492,7 +1829,7 @@
             </div>
             <div class="theme-section">
               <div class="theme-section-title"><span>Window behavior</span></div>
-              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off for light themes. It changes native OBS controls that swatches cannot restyle."></button></label>
+              <div class="check-row"><input type="checkbox" id="themeCustomDark" aria-label="Use dark icons, menus and native controls"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light."></button></div>
             </div>
             <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
               <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
@@ -1503,7 +1840,7 @@
         </div>
       </div>
       <div class="box">
-        <div class="box-title">App Icon <button class="info-dot" type="button" aria-label="About the app icon" title="Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly, no restart or admin. Default restores OBS's own icon. Drop more .ico or .png files into obs-replayKit\icons\ to add presets."></button></div>
+        <div class="box-title">App Icon</div>
         <div class="form-row">
           <div class="label">Icon</div>
           <div class="field-wrap is-stacked">
@@ -1521,10 +1858,43 @@
         </div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="appIconRecordingDot">
-            <span>Show a red recording dot on a custom icon while recording</span>
-          </label>
+          <div class="check-row">
+            <input type="checkbox" id="appIconRecordingDot" aria-label="Show recording dot">
+            <span>Show recording dot</span>
+            <button class="info-dot" type="button" aria-label="About the recording dot" title="Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere."></button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-title">Interface</div>
+        <div class="form-row">
+          <div class="label">Layout</div>
+          <div class="field-wrap is-stacked">
+            <div class="icon-grid" id="layoutGrid">
+              <button class="icon-tile layout-tile" type="button" data-id="clean">
+                <span class="layout-sw" aria-hidden="true">
+                  <i style="left:4px;top:4px;bottom:4px;width:24px"></i>
+                  <i class="ac" style="left:7px;top:11px;width:18px;height:5px"></i>
+                  <i class="pv" style="left:7px;top:20px;width:18px;height:5px"></i>
+                  <i class="pv" style="left:7px;top:30px;width:18px;height:3px"></i>
+                  <i class="pv" style="left:7px;top:36px;width:18px;height:3px"></i>
+                  <i class="pv" style="left:7px;top:42px;width:18px;height:3px"></i>
+                  <i class="pv" style="left:32px;top:4px;right:4px;bottom:4px"></i>
+                </span>
+                <span class="icon-tile-label">Clean</span>
+              </button>
+              <button class="icon-tile layout-tile" type="button" data-id="classic">
+                <span class="layout-sw" aria-hidden="true">
+                  <i class="pv" style="left:4px;top:4px;right:4px;height:34px"></i>
+                  <i style="left:4px;top:42px;width:22px;height:16px"></i>
+                  <i style="left:28px;top:42px;width:22px;height:16px"></i>
+                  <i style="left:52px;top:42px;width:22px;height:16px"></i>
+                  <i class="ac" style="left:76px;top:42px;width:20px;height:16px"></i>
+                </span>
+                <span class="icon-tile-label">Classic</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1543,6 +1913,7 @@
           Type <span class="confirm-word">confirm</span><button class="btn copy-confirm-btn" type="button" id="copyUninstallConfirmBtn">Copy</button> to remove ReplayKit from OBS.
         </div>
         <div class="modal-text" id="uninstallRemoveObsWarn" hidden><strong>OBS Studio itself will also be uninstalled.</strong> Your scenes and profiles in AppData are left in place.</div>
+        <div class="modal-text" id="uninstallSetupNote" hidden></div>
         <input class="text-input" id="uninstallConfirmInput" type="text" autocomplete="off" spellcheck="false" aria-label="Uninstall confirmation">
       </div>
       <div class="modal-actions">
@@ -1564,15 +1935,17 @@
     </div>
   </div>
   <!--#include window-chrome-->
+  <!--#include shell-nav-->
 </div>
 
 <!--#include color-picker-->
 <!--#include tooltip-->
+<!--#include hotkey-keys-->
 
 <script>
   if (window.RKHover) RKHover.apply(document, {
     control: ".btn, .icon-btn, .copy-confirm-btn, .sidebar-github",
-    nav: ".nav-btn",
+    nav: ".nav-btn, .nav-switch",
   });
 
   // fill the <svg data-i="..."> placeholders from the helper-injected window.RK_ICONS map
@@ -1611,6 +1984,7 @@
   })();
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const { comboToLabel, keyLabel, obsKeyFromEvent } = window.RKHotkeys;
   const REPLAY_SECONDS_MIN = 5;
   const REPLAY_SECONDS_MAX = 1200;
   const FPS_MIN = 1;
@@ -1632,10 +2006,19 @@
   const state = {};
   let originalState = {};
   let dirty = false;
+  // changes that act on obs itself (clipping, the two mutes) wait here until Apply, keyed by switch with the value that was asked for, and only while it differs from what obs reports
+  const pendingLive = {};
+  // the recording audio list of the audio tab. all pc audio: the pc audio and the microphone. specific apps: the microphone, then a game audio section, which is the same pc audio source once it only takes the ticked programs, with a row for each program the helper found; the icons of programs are fetched once and kept as object urls
+  const RA_DESKTOP = { kind:"desktop", name:"PC Audio", icon:"audio/desktop", volumeKey:"desktopAudioVolume" };
+  const RA_GAME = { kind:"desktop", name:"Game Audio", icon:"audio/game", volumeKey:"desktopAudioVolume", section:true };
+  const RA_MIC = { kind:"mic", name:"Microphone", icon:"audio/microphone", volumeKey:"micVolume" };
+  const raState = { apps:[], obsAnswered:true, timer:0, html:"", dragging:false, renderAfterDrag:false };
+  let activePage = "output";
+  const raIcons = new Map();
+  const raIconTried = {};
   // set when the user drags the overlay in the projector; obs owns that position so it is not part of state
   let projectorActionInFlight = false;
-  // from the /settings payload -- drives Install vs Uninstall on the Share Preview audio row. assume installed until the
-  // first load answers, so the row never briefly offers to install something that is already there.
+  // from the /settings payload -- drives Install vs Uninstall on the Share Preview audio row. assume installed until the first load answers, so the row never briefly offers to install something that is already there.
   let shareAudioInstalled = true;
 
   const compressionByPreset = {
@@ -1643,9 +2026,8 @@
     balanced:"balanced",
     quality:"smaller_files",
   };
-  // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings.
-  // recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "theme", "themeCustom"]);
+  // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings. recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "recordingSeparateAudioTracks", "theme", "themeCustom", "interfaceLayout"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
@@ -1694,6 +2076,7 @@
     appIconCustomRow: document.getElementById("appIconCustomRow"),
     appIconCustomPath: document.getElementById("appIconCustomPath"),
     appIconRecordingDot: document.getElementById("appIconRecordingDot"),
+    layoutGrid: document.getElementById("layoutGrid"),
     themeGrid: document.getElementById("themeGrid"),
     themeCustomRow: document.getElementById("themeCustomRow"),
     themeEditor: document.getElementById("themeEditor"),
@@ -1725,8 +2108,20 @@
     runObsAsAdmin: document.getElementById("runObsAsAdmin"),
     disableObsCloseWarning: document.getElementById("disableObsCloseWarning"),
     disableObsCrashPopup: document.getElementById("disableObsCrashPopup"),
-    closeToTray: document.getElementById("closeToTray"),
-    allowSleepWhileActive: document.getElementById("allowSleepWhileActive"),
+    quitOnClose: document.getElementById("quitOnClose"),
+    disableSleeping: document.getElementById("disableSleeping"),
+    startMinimized: document.getElementById("startMinimized"),
+    autoCopyLink: document.getElementById("autoCopyLink"),
+    linkNotificationEnabled: document.getElementById("linkNotificationEnabled"),
+    compressSkipFavorites: document.getElementById("compressSkipFavorites"),
+    storageLimit: document.getElementById("storageLimit"),
+    storageLimitCustomRow: document.getElementById("storageLimitCustomRow"),
+    storageLimitGb: document.getElementById("storageLimitGb"),
+    openStorageCard: document.getElementById("openStorageCard"),
+    developmentMode: document.getElementById("developmentMode"),
+    developmentSettings: document.getElementById("developmentSettings"),
+    sdkMode: document.getElementById("sdkMode"),
+    logInterfaceEvents: document.getElementById("logInterfaceEvents"),
     pinObsTrayIcon: document.getElementById("pinObsTrayIcon"),
     clipNotificationEnabled: document.getElementById("clipNotificationEnabled"),
     recordingNotificationEnabled: document.getElementById("recordingNotificationEnabled"),
@@ -1738,10 +2133,24 @@
     desktopAudioVolumeValue: document.getElementById("desktopAudioVolumeValue"),
     discordAudioVolume: document.getElementById("discordAudioVolume"),
     discordAudioVolumeValue: document.getElementById("discordAudioVolumeValue"),
+    recordingAudioMode: document.getElementById("recordingAudioMode"),
+    recordingSeparateAudioTracks: document.getElementById("recordingSeparateAudioTracks"),
     motionBlurEnabled: document.getElementById("motionBlurEnabled"),
     motionBlurStrength: document.getElementById("motionBlurStrength"),
     motionBlurStrengthValue: document.getElementById("motionBlurStrengthValue"),
     trimPreciseDefault: document.getElementById("trimPreciseDefault"),
+    trimGpuEncode: document.getElementById("trimGpuEncode"),
+    editorAutoplay: document.getElementById("editorAutoplay"),
+    editorLoopPreview: document.getElementById("editorLoopPreview"),
+    editorSeekStep: document.getElementById("editorSeekStep"),
+    editorWheelZoom: document.getElementById("editorWheelZoom"),
+    editorZoomScaling: document.getElementById("editorZoomScaling"),
+    clipAntialiasing: document.getElementById("clipAntialiasing"),
+    clipAntialiasingHint: document.getElementById("clipAntialiasingHint"),
+    hideNotificationsFromCapture: document.getElementById("hideNotificationsFromCapture"),
+    showCursorDisplayCapture: document.getElementById("showCursorDisplayCapture"),
+    showCursorGameCapture: document.getElementById("showCursorGameCapture"),
+    showCursorWindowCapture: document.getElementById("showCursorWindowCapture"),
     showCodecTags: document.getElementById("showCodecTags"),
     debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
     autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
@@ -1778,16 +2187,37 @@
     discordScreenshareConfirmText: document.getElementById("discordScreenshareConfirmText"),
     discordScreenshareConfirmOkBtn: document.getElementById("discordScreenshareConfirmOkBtn"),
     discordScreenshareConfirmCancelBtn: document.getElementById("discordScreenshareConfirmCancelBtn"),
+    uninstallSetupNote: document.getElementById("uninstallSetupNote"),
+    setupFileRow: document.getElementById("setupFileRow"),
+    setupFileText: document.getElementById("setupFileText"),
+    setupFileRepairBtn: document.getElementById("setupFileRepairBtn"),
+    setupFileStatusRow: document.getElementById("setupFileStatusRow"),
+    setupFileStatusLine: document.getElementById("setupFileStatusLine"),
     resizeGrip: document.querySelector(".resize-grip"),
   };
 
   // seeded here rather than with the other bindings: applyThemeCustomToEditor can run first, and selecting into an unfilled combo would quietly land on Linear.
   fillCombo(els.themeGradientType, [{ value:"linear", label:"Linear" }, { value:"radial", label:"Radial" }]);
+  // the limits of the storage card, in GB; anything else is typed in through Custom
+  const STORAGE_LIMITS = [{ value:"0", label:"No limit" }, { value:"25", label:"25 GB" }, { value:"50", label:"50 GB" }, { value:"100", label:"100 GB" }, { value:"250", label:"250 GB" }, { value:"500", label:"500 GB" }, { value:"1024", label:"1 TB" }, { value:"custom", label:"Custom..." }];
+  fillCombo(els.storageLimit, STORAGE_LIMITS);
+  fillCombo(els.editorSeekStep, [{ value:"1", label:"1 second" }, { value:"2", label:"2 seconds" }, { value:"5", label:"5 seconds" }, { value:"10", label:"10 seconds" }, { value:"15", label:"15 seconds" }, { value:"30", label:"30 seconds" }]);
+  fillCombo(els.editorZoomScaling, [{ value:"smooth", label:"Smooth" }, { value:"sharp", label:"Sharp pixels" }]);
+  fillCombo(els.clipAntialiasing, [{ value:"none", label:"None" }, { value:"msaa", label:"MSAA" }, { value:"fxaa", label:"FXAA" }]);
+  // the filters run as a shader in the browser of obs, so the choice says so when that browser has no graphics acceleration
+  try {
+    const probe = document.createElement("canvas").getContext("webgl2");
+    const gpu = probe && probe.getExtension("WEBGL_debug_renderer_info");
+    const renderer = gpu ? String(probe.getParameter(gpu.UNMASKED_RENDERER_WEBGL) || "") : "";
+    if (!probe || /swiftshader|llvmpipe|software/i.test(renderer)) els.clipAntialiasingHint.hidden = false;
+    if (probe) { const lose = probe.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext(); }
+  } catch (e) { els.clipAntialiasingHint.hidden = false; }
   let overlayPreviewTouched = false;
   let uninstallConfirmResolve = null;
   let discordScreenshareConfirmResolve = null;
 
   function styleNativeChrome() {
+    if (window.RKEmbedded) return;
     fetch(HELPER + "/style-window?title=ReplayKit%20Settings&taskbar=1&t=" + Date.now(), { cache:"no-store" }).catch(() => {});
   }
   styleNativeChrome();
@@ -1836,6 +2266,59 @@
     els.uninstallDiscordScreenshareStatusLine.classList.toggle("bad", kind === "bad");
   }
 
+  // the setup file that Uninstall and the Discord screenshare button run. the helper looks at it when this page loads, and downloads it again from the latest release, checked against the published hash, when asked here or when one of those buttons needs it
+  let setupFileOk = true;
+  const SETUP_FILE_NOTE = "The ReplayKit setup file is missing, so it is downloaded again from GitHub first (about 26 MB, checked before it is used).";
+
+  function setSetupFileStatus(text, kind) {
+    els.setupFileStatusLine.textContent = text || "";
+    els.setupFileStatusLine.classList.toggle("good", kind === "good");
+    els.setupFileStatusLine.classList.toggle("bad", kind === "bad");
+    els.setupFileStatusRow.hidden = !text;
+  }
+
+  async function refreshSetupFile() {
+    try {
+      const data = await helperJson("setup/status?t=" + Date.now());
+      setupFileOk = data.valid !== false;
+      els.setupFileRow.hidden = setupFileOk;
+      if (!setupFileOk) els.setupFileText.textContent = "ReplayKit's setup file is " + (data.state === "missing" ? "missing." : "damaged.");
+    } catch (e) {
+      // every other call on this page reaches the same helper, so a failure here would only repeat what they show
+    }
+  }
+
+  // while a request that may download the setup file is out, the bytes of that download are read from the helper and shown as the status
+  async function withSetupProgress(show, run) {
+    const timer = setInterval(async () => {
+      try {
+        const p = await helperJson("update/progress?t=" + Date.now());
+        if (p.stage === "download" && p.total > 0 && p.done < p.total) {
+          show("Downloading the setup file... " + (p.done / 1048576).toFixed(1) + " of " + (p.total / 1048576).toFixed(1) + " MB");
+        }
+      } catch (e) {}
+    }, 400);
+    try {
+      return await run();
+    } finally {
+      clearInterval(timer);
+    }
+  }
+
+  async function repairSetupFile() {
+    els.setupFileRepairBtn.disabled = true;
+    setSetupFileStatus("Downloading the setup file...", "");
+    try {
+      const data = await withSetupProgress((text) => setSetupFileStatus(text, ""), () => helperJson("setup/repair", { method:"POST" }));
+      setSetupFileStatus(data.message || "The setup file is back.", "good");
+    } catch (e) {
+      setSetupFileStatus("Could not download it: " + (e.message || e), "bad");
+    } finally {
+      els.setupFileRepairBtn.disabled = false;
+      await refreshSetupFile();
+    }
+  }
+
   function searchText(el) {
     const parts = [el.textContent || "", el.dataset.search || "", el.dataset.hotkeyName || ""];
     el.querySelectorAll("[aria-label], [title], input").forEach((child) => {
@@ -1861,7 +2344,7 @@
     if (!searching) {
       els.searchEmpty.classList.remove("is-visible");
       const active = document.querySelector(".nav-btn.is-active");
-      const pageName = active ? active.dataset.page : "general";
+      const pageName = active ? active.dataset.page : "output";
       document.querySelectorAll(".page").forEach((page) => {
         page.classList.toggle("is-active", page.id === "page-" + pageName);
       });
@@ -1876,6 +2359,8 @@
     document.querySelectorAll(".page").forEach((page) => {
       let pageMatched = false;
       page.querySelectorAll(".form-row,.hotkey-row").forEach((row) => {
+        // a row inside a hidden box or row is not on screen, so it cannot be a match
+        if (row.closest("[hidden]")) return;
         const hit = searchText(row).includes(query);
         row.classList.toggle("search-hidden-row", !hit);
         row.classList.toggle("search-hit", hit);
@@ -1885,7 +2370,8 @@
         }
       });
       page.querySelectorAll(".box").forEach((box) => {
-        const rows = Array.from(box.querySelectorAll(".form-row"));
+        if (box.hidden) return;
+        const rows = Array.from(box.querySelectorAll(".form-row")).filter((row) => !row.closest("[hidden]"));
         const boxMatched = rows.length ? rows.some((row) => !row.classList.contains("search-hidden-row")) : searchText(box).includes(query);
         box.classList.toggle("search-hidden-row", !boxMatched);
         if (boxMatched) pageMatched = true;
@@ -1903,6 +2389,27 @@
     els.searchEmpty.classList.toggle("is-visible", matches === 0);
     setStatus(matches ? matches + " matching setting" + (matches === 1 ? "" : "s") : "No matching settings", matches ? "" : "bad");
   }
+
+  // the query is shared with the search box of the obs settings, through the helper, so both lists of tabs answer the same question: a change here is sent after a short pause, and the other side is read again whenever this page comes back on screen
+  const searchSync = (function () {
+    let sendTimer = 0;
+    return {
+      send() {
+        clearTimeout(sendTimer);
+        sendTimer = setTimeout(() => { fetch(HELPER + "/settings/search?q=" + encodeURIComponent(els.settingsSearch.value || ""), { method:"POST", cache:"no-store" }).catch(() => {}); }, 250);
+      },
+      async pull() {
+        try {
+          const data = await helperJson("settings/search?t=" + Date.now());
+          const shared = String(data.q || "");
+          if (shared !== (els.settingsSearch.value || "")) {
+            els.settingsSearch.value = shared;
+            applySettingsSearch();
+          }
+        } catch (e) { /* helper offline, the box keeps what it has */ }
+      },
+    };
+  })();
 
   function escapeHtml(s) {
     return String(s)
@@ -1929,9 +2436,7 @@
     return settingValueChanged("overlayStyle") || Array.from(restartSettingKeys).some(settingValueChanged);
   }
 
-  // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live
-  // (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can
-  // deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
+  // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
   let applyInFlight = false;
 
   function updateApplyButton() {
@@ -1942,7 +2447,7 @@
   }
 
   function markDirty() {
-    dirty = JSON.stringify(state) !== JSON.stringify(originalState);
+    dirty = JSON.stringify(state) !== JSON.stringify(originalState) || Object.keys(pendingLive).length > 0;
     updateApplyButton();
   }
 
@@ -2045,9 +2550,7 @@
     const value = comboValue(combo);
     const option = options.find((o) => o.value === value) || options[0] || { label:"" };
     combo.querySelector(".combo-label").textContent = option.label || "";
-    // rebuild the option list only when it actually changed. re-setting innerHTML recreates every .combo-option,
-    // which restarts the rk-option-in entrance animation -- refreshExternalSettings re-fills combos every 2s, so an
-    // open menu would visibly re-animate on a loop. value + options json fully determines the rendered markup.
+    // rebuild the option list only when it actually changed. re-setting innerHTML recreates every .combo-option, which restarts the rk-option-in entrance animation -- refreshExternalSettings re-fills combos every 2s, so an open menu would visibly re-animate on a loop. value + options json fully determines the rendered markup.
     const menu = combo.querySelector(".combo-menu");
     const sig = value + "|" + (combo.dataset.options || "");
     if (menu.dataset.sig === sig) return;
@@ -2099,6 +2602,11 @@
 
   function closeWindow() {
     releaseHotkeyCapture();
+    if (window.RKEmbedded) {
+      // embedded in the obs window: nothing to close, the plugin just switches back to the home view
+      fetch(HELPER + "/close-window?title=ReplayKit%20Settings&embedded=1&t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+      return;
+    }
     fetch(HELPER + "/close-window?title=ReplayKit%20Settings&t=" + Date.now(), {
       method:"POST",
       cache:"no-store",
@@ -2186,57 +2694,6 @@
     return setHotkeyCapture(false, keepalive !== false);
   }
 
-
-  function comboToLabel(combo) {
-    combo = combo || {};
-    if (!combo.key) return "";
-    const parts = [];
-    if (combo.control) parts.push("Ctrl");
-    if (combo.alt) parts.push("Alt");
-    if (combo.shift) parts.push("Shift");
-    if (combo.command) parts.push("Win");
-    parts.push(keyLabel(combo.key));
-    return parts.join(" + ");
-  }
-
-  function keyLabel(obsKey) {
-    const named = {
-      OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space",
-      OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc", OBS_KEY_TAB:"Tab",
-      OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
-      OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
-    };
-    if (named[obsKey]) return named[obsKey];
-    if (obsKey.startsWith("OBS_KEY_")) return obsKey.slice(8).replace(/_/g, " ");
-    return obsKey;
-  }
-
-  function obsKeyFromEvent(e) {
-    const k = e.key;
-    if (!k || ["Shift","Control","Alt","Meta"].includes(k)) return "";
-    const byCode = {
-      Backslash:"OBS_KEY_BACKSLASH", Slash:"OBS_KEY_SLASH",
-      Minus:"OBS_KEY_MINUS", Equal:"OBS_KEY_EQUAL",
-      BracketLeft:"OBS_KEY_BRACKETLEFT", BracketRight:"OBS_KEY_BRACKETRIGHT",
-      Semicolon:"OBS_KEY_SEMICOLON", Quote:"OBS_KEY_APOSTROPHE",
-      Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
-    };
-    if (byCode[e.code]) return byCode[e.code];
-    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
-    if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
-    if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
-    const byKey = {
-      "\\":"OBS_KEY_BACKSLASH", "|":"OBS_KEY_BACKSLASH", "/":"OBS_KEY_SLASH", "?":"OBS_KEY_SLASH", " ":"OBS_KEY_SPACE",
-      "Enter":"OBS_KEY_RETURN", "Escape":"OBS_KEY_ESCAPE", "Tab":"OBS_KEY_TAB",
-      "Delete":"OBS_KEY_DELETE", "Backspace":"OBS_KEY_BACKSPACE",
-      "ArrowUp":"OBS_KEY_UP", "ArrowDown":"OBS_KEY_DOWN",
-      "ArrowLeft":"OBS_KEY_LEFT", "ArrowRight":"OBS_KEY_RIGHT",
-      "-":"OBS_KEY_MINUS", "=":"OBS_KEY_EQUAL", "[":"OBS_KEY_BRACKETLEFT",
-      "]":"OBS_KEY_BRACKETRIGHT", ";":"OBS_KEY_SEMICOLON", "'":"OBS_KEY_APOSTROPHE",
-      ",":"OBS_KEY_COMMA", ".":"OBS_KEY_PERIOD", "`":"OBS_KEY_QUOTELEFT",
-    };
-    return byKey[k] || "";
-  }
 
   function syncHotkeyField(fieldName) {
     const field = hotkeyFields[fieldName];
@@ -2394,13 +2851,15 @@
   function renderScreenshareGameOverrides() {
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     if (!state.screenshareGameOverrides.length) {
-      els.screenshareGameOverrideList.innerHTML = '<div class="game-rule-empty">No games added</div>';
+      els.screenshareGameOverrideList.innerHTML = '<div class="game-rule-empty">No games added yet. Pick one above and press + to have the screenshare switch to it while you play it.</div>';
       return;
     }
     els.screenshareGameOverrideList.innerHTML = state.screenshareGameOverrides.map((item, index) => {
       const sub = item.className ? item.className : item.exeName;
+      raLoadIcon(item.exeName);
       return '<div class="game-rule-row" data-index="' + index + '">' +
-        '<div><div class="game-rule-main">' + escapeHtml(item.label) + '</div>' +
+        '<span class="game-rule-ic">' + raIconHtml(item.exeName, "audio/game") + '</span>' +
+        '<div class="game-rule-text"><div class="game-rule-main">' + escapeHtml(item.label) + '</div>' +
         '<div class="game-rule-sub">' + escapeHtml(sub) + '</div></div>' +
         '<button class="icon-btn game-rule-remove" type="button" title="Remove game" data-index="' + index + '">' +
         '<svg viewBox="0 0 16 16" aria-hidden="true">' + ((window.RK_ICONS || {})["action/backspace"] || "").replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "") + '</svg>' +
@@ -2503,6 +2962,27 @@
     els.autoDeleteLogsOnLaunch.disabled = !enabled;
   }
 
+  // the limit is one of the steps of the list, or typed in when it is none of them
+  function syncStorageLimit() {
+    const limit = Math.max(0, Number(state.storageLimitGb) || 0);
+    const step = STORAGE_LIMITS.some((o) => o.value === String(limit));
+    setComboValue(els.storageLimit, step ? String(limit) : "custom", false);
+    if (!step) els.storageLimitGb.value = String(limit);
+    els.storageLimitCustomRow.hidden = comboValue(els.storageLimit) !== "custom";
+  }
+
+  function readStorageLimit() {
+    const picked = comboValue(els.storageLimit);
+    if (picked !== "custom") return Number(picked) || 0;
+    const typed = Math.round(Number(els.storageLimitGb.value));
+    return Number.isFinite(typed) && typed >= 1 ? Math.min(1000000, typed) : Math.max(1, Number(state.storageLimitGb) || 1);
+  }
+
+  // the development settings only show while development mode is on
+  function syncDevelopmentFields() {
+    els.developmentSettings.hidden = !els.developmentMode.checked;
+  }
+
   function clampFps(value) {
     const n = Number.parseInt(value, 10);
     if (!Number.isFinite(n)) return 60;
@@ -2515,8 +2995,7 @@
     return Math.max(240, Math.min(4320, n));
   }
 
-  // downscale target + filter stay visible but grey out on Native; the custom-height row only shows when the
-  // target dropdown is on "Custom" AND we're downscaling.
+  // downscale target + filter stay visible but grey out on Native; the custom-height row only shows when the target dropdown is on "Custom" AND were downscaling.
   function syncDownscaleFields() {
     const on = comboValue(els.recordingScaleMode) === "downscale";
     const custom = comboValue(els.downscaleTarget) === "custom";
@@ -2583,6 +3062,7 @@
     els.appIconCustomPath.value = state.appIconCustomPath || "";
     els.appIconRecordingDot.checked = state.appIconRecordingDot !== false;
     paintAppIconSelection();
+    paintLayoutSelection();
     if (state.themeCustom) fillThemeEditor(state.themeCustom);
     paintThemeSelection();
     applyThemePreview();
@@ -2590,11 +3070,14 @@
     els.runObsAsAdmin.checked = !!state.runObsAsAdmin;
     els.disableObsCloseWarning.checked = state.disableObsCloseWarning !== false;
     els.disableObsCrashPopup.checked = state.disableObsCrashPopup !== false;
-    els.closeToTray.checked = state.closeToTray !== false;
-    els.allowSleepWhileActive.checked = state.allowSleepWhileActive !== false;
+    // the two settings are stored the other way round, as the ones that keep the old behaviour when they are on
+    els.quitOnClose.checked = state.closeToTray === false;
+    els.disableSleeping.checked = state.allowSleepWhileActive === false;
+    els.startMinimized.checked = !!state.startMinimized;
     els.pinObsTrayIcon.checked = state.pinObsTrayIcon !== false;
     els.clipNotificationEnabled.checked = !!state.clipNotificationEnabled;
     els.recordingNotificationEnabled.checked = state.recordingNotificationEnabled !== false;
+    els.hideNotificationsFromCapture.checked = state.hideNotificationsFromCapture !== false;
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, state.clipSoundVolume ?? 25);
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, state.recordingSoundVolume ?? 25);
     syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, state.desktopAudioVolume ?? DEFAULT_DESKTOP_AUDIO_VOLUME, clampAudioVolume, 0, 200);
@@ -2603,16 +3086,38 @@
     refreshFieldResetState("recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME);
     refreshFieldResetState("desktopAudioVolume", DEFAULT_DESKTOP_AUDIO_VOLUME);
     refreshFieldResetState("discordAudioVolume", DEFAULT_DISCORD_AUDIO_VOLUME);
+    setComboValue(els.recordingAudioMode, state.recordingAudioMode === "specific" ? "specific" : "all", false);
+    els.recordingSeparateAudioTracks.checked = !!state.recordingSeparateAudioTracks;
+    renderRecordingAudio();
+    updateRecordingAudioPolling();
     if (window.RKMic) RKMic.refresh();
     els.motionBlurEnabled.checked = !!state.motionBlurEnabled;
+    els.showCursorDisplayCapture.checked = state.showCursorDisplayCapture !== false;
+    els.showCursorGameCapture.checked = state.showCursorGameCapture !== false;
+    els.showCursorWindowCapture.checked = state.showCursorWindowCapture !== false;
     syncMotionBlurControl(state.motionBlurStrength ?? 0.075);
     refreshFieldResetState("motionBlurStrength", DEFAULT_MOTION_BLUR_STRENGTH);
     els.trimPreciseDefault.checked = !!state.trimPreciseDefault;
+    els.trimGpuEncode.checked = state.trimGpuEncode !== false;
+    els.editorAutoplay.checked = !!state.editorAutoplay;
+    els.editorLoopPreview.checked = !!state.editorLoopPreview;
+    setComboValue(els.editorSeekStep, String(state.editorSeekStep || 5), false);
+    els.editorWheelZoom.checked = state.editorWheelZoom !== false;
+    setComboValue(els.editorZoomScaling, state.editorZoomScaling === "sharp" ? "sharp" : "smooth", false);
+    setComboValue(els.clipAntialiasing, state.clipAntialiasing === "msaa" || state.clipAntialiasing === "fxaa" ? state.clipAntialiasing : "none", false);
     els.showCodecTags.checked = !!state.showCodecTags;
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
     els.autoDeleteLogsOnLaunch.checked = state.autoDeleteLogsOnLaunch !== false;
     syncDebugLoggingFields();
     els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
+    els.autoCopyLink.checked = state.autoCopyLink !== false;
+    els.linkNotificationEnabled.checked = state.linkNotificationEnabled !== false;
+    els.compressSkipFavorites.checked = state.compressSkipFavorites !== false;
+    els.developmentMode.checked = !!state.developmentMode;
+    els.sdkMode.checked = !!state.sdkMode;
+    els.logInterfaceEvents.checked = !!state.logInterfaceEvents;
+    syncStorageLimit();
+    syncDevelopmentFields();
     syncHotkeyFields();
     markDirty();
     if ((els.settingsSearch.value || "").trim()) applySettingsSearch();
@@ -2660,27 +3165,50 @@
     state.runObsAsAdmin = els.runObsAsAdmin.checked;
     state.disableObsCloseWarning = els.disableObsCloseWarning.checked;
     state.disableObsCrashPopup = els.disableObsCrashPopup.checked;
-    state.closeToTray = els.closeToTray.checked;
-    state.allowSleepWhileActive = els.allowSleepWhileActive.checked;
+    state.closeToTray = !els.quitOnClose.checked;
+    state.allowSleepWhileActive = !els.disableSleeping.checked;
+    state.startMinimized = els.startMinimized.checked;
     state.pinObsTrayIcon = els.pinObsTrayIcon.checked;
     state.clipNotificationEnabled = els.clipNotificationEnabled.checked;
     state.recordingNotificationEnabled = els.recordingNotificationEnabled.checked;
+    state.hideNotificationsFromCapture = els.hideNotificationsFromCapture.checked;
     state.clipSoundVolume = clampVolume(els.clipSoundVolume.value);
     state.recordingSoundVolume = clampVolume(els.recordingSoundVolume.value);
     state.desktopAudioVolume = clampAudioVolume(els.desktopAudioVolume.value);
     state.discordAudioVolume = clampAudioVolume(els.discordAudioVolume.value);
+    state.recordingAudioMode = comboValue(els.recordingAudioMode) === "specific" ? "specific" : "all";
+    state.recordingSeparateAudioTracks = els.recordingSeparateAudioTracks.checked;
     state.motionBlurEnabled = els.motionBlurEnabled.checked;
+    state.showCursorDisplayCapture = els.showCursorDisplayCapture.checked;
+    state.showCursorGameCapture = els.showCursorGameCapture.checked;
+    state.showCursorWindowCapture = els.showCursorWindowCapture.checked;
     state.motionBlurStrength = clampMotionBlurStrength(els.motionBlurStrength.value);
     state.trimPreciseDefault = els.trimPreciseDefault.checked;
+    state.trimGpuEncode = els.trimGpuEncode.checked;
+    state.editorAutoplay = els.editorAutoplay.checked;
+    state.editorLoopPreview = els.editorLoopPreview.checked;
+    state.editorSeekStep = parseInt(comboValue(els.editorSeekStep), 10) || 5;
+    state.editorWheelZoom = els.editorWheelZoom.checked;
+    state.editorZoomScaling = comboValue(els.editorZoomScaling) === "sharp" ? "sharp" : "smooth";
+    state.clipAntialiasing = ["msaa", "fxaa"].includes(comboValue(els.clipAntialiasing)) ? comboValue(els.clipAntialiasing) : "none";
     state.showCodecTags = els.showCodecTags.checked;
     state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
     state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
+    state.autoCopyLink = els.autoCopyLink.checked;
+    state.linkNotificationEnabled = els.linkNotificationEnabled.checked;
+    state.compressSkipFavorites = els.compressSkipFavorites.checked;
+    state.developmentMode = els.developmentMode.checked;
+    state.sdkMode = els.sdkMode.checked;
+    state.logInterfaceEvents = els.logInterfaceEvents.checked;
+    state.storageLimitGb = readStorageLimit();
   }
 
   function activatePage(name) {
     if (name !== "hotkeys") releaseHotkeyCapture();
     if (window.RKMic) RKMic.setVisible(name === "audio");
+    activePage = name;
+    updateRecordingAudioPolling();
     document.querySelectorAll(".nav-btn").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.page === name);
     });
@@ -2696,12 +3224,13 @@
       if (els.settingsSearch.value) {
         els.settingsSearch.value = "";
         applySettingsSearch();
+        searchSync.send();
       }
       activatePage(btn.dataset.page);
     });
   });
 
-  // Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for the overlay drag while the Overlay page is open. settings.htmls keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
+  // ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for the overlay drag while the Overlay page is open. settings.htmls keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || !window.RKOverlayPreview) return;
     if (!document.querySelector('.nav-btn[data-page="overlay"].is-active')) return;
@@ -2760,7 +3289,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -2778,6 +3307,10 @@
         resetOverlayPosition(state.overlayStyle);
         if (window.RKOverlayPreview) RKOverlayPreview.resetPosition();
       }
+      if (combo === els.storageLimit) {
+        els.storageLimitCustomRow.hidden = comboValue(els.storageLimit) !== "custom";
+        if (!els.storageLimitCustomRow.hidden) els.storageLimitGb.focus();
+      }
       markDirty();
     });
   });
@@ -2789,7 +3322,7 @@
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
   els.addScreenshareGameOverride.addEventListener("click", addScreenshareGameOverride);
   {
-    // Capture Source dropdown reset -- setComboValue(..., true) fires combochange, which readUi()s the new value into state and re-syncs the dependent rows.
+    // capture Source dropdown reset -- setComboValue(..., true) fires combochange, which readUi()s the new value into state and re-syncs the dependent rows.
     const resetBtn = document.getElementById("resetScreenshareCaptureMode");
     fieldResetBtns.screenshareCaptureMode = resetBtn;
     if (resetBtn) resetBtn.addEventListener("click", () => {
@@ -2798,7 +3331,7 @@
     });
   }
 
-  [els.replaySeconds, els.fps, els.downscaleHeight, els.clipDir].forEach((input) => {
+  [els.replaySeconds, els.fps, els.downscaleHeight, els.clipDir, els.storageLimitGb].forEach((input) => {
     input.addEventListener("input", () => { readUi(); markDirty(); });
     input.addEventListener("change", () => { readUi(); syncUi(); });
   });
@@ -3042,25 +3575,20 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.closeToTray, els.allowSleepWhileActive, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.overlayFlipH, els.motionBlurEnabled, els.trimPreciseDefault, els.showCodecTags, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimPreciseDefault, els.trimGpuEncode, els.showCodecTags, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
-      // confirm bounce on tick, via the web animations api so it only ever fires on a real user toggle -- syncUi() setting .checked programmatically never dispatches change.
-      if (input.checked && input.animate) {
-        try {
-          input.animate(
-            [{ transform: "scale(.72)" }, { transform: "scale(1.14)", offset: 0.55 }, { transform: "scale(1)" }],
-            { duration: 200, easing: "cubic-bezier(.2, .7, .3, 1)" }
-          );
-        } catch (_) {}
-      }
     });
   });
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
+  els.developmentMode.addEventListener("change", syncDevelopmentFields);
+  els.openStorageCard.addEventListener("click", () => { fetch(HELPER + "/storage/open", { method:"POST", cache:"no-store" }).catch(() => {}); });
   // flip is a live overlay preview, not a save-on-apply toggle -- ride the same preview/commit/cancel path the sliders use so it shows instantly and reverts if the user closes or cancels without applying. runs after the generic checkbox handler above, so readUi() has already put the new value in state.
   els.overlayFlipH.addEventListener("change", () => queueOverlayPreview(true));
-  els.settingsSearch.addEventListener("input", applySettingsSearch);
+  els.settingsSearch.addEventListener("input", () => { applySettingsSearch(); searchSync.send(); });
+  RKWindow.onChange((up) => { if (up) searchSync.pull(); });
+  searchSync.pull();
 
   document.querySelectorAll("[data-spin]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -3122,13 +3650,6 @@
   document.getElementById("clearRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
   document.getElementById("resetOpenClipsHotkey").addEventListener("click", () => resetHotkey("openClipsKeybind"));
   document.getElementById("clearOpenClipsHotkey").addEventListener("click", () => clearHotkey("openClipsKeybind"));
-  if (window.RKWindowChrome) RKWindowChrome.bindResizeGrip({
-    title: "ReplayKit Settings",
-    helper: HELPER,
-    beforeStart: closeCombos,
-    onFailure: () => setStatus("Resize could not start from this OBS window.", "bad"),
-  });
-
   async function loadSettings() {
     setStatus("Loading settings...", "");
     els.applyBtn.disabled = true;
@@ -3149,8 +3670,10 @@
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       fillCombo(els.overlayStyle, data.options.overlays || []);
       if (data.defaultClipDir) els.clipDir.placeholder = data.defaultClipDir;
+      clearLivePending();
       acceptSettings(data.settings || {});
       setStatus("Settings loaded", "good");
+      refreshSetupFile();
     } catch (e) {
       setStatus("Could not load settings: " + (e.message || e), "bad");
     }
@@ -3172,6 +3695,10 @@
 
   async function runSaveSettings(closeAfter) {
     readUi();
+    // the queued switches go to obs first, in the order they were flipped: they are quick, and a restart that the settings ask for would take them down with it
+    const queued = Object.keys(pendingLive).length;
+    const liveFailed = queued ? await applyLiveChanges() : [];
+    markDirty();
     let committedOverlayPreview = false;
     try {
       committedOverlayPreview = await commitOverlayPreview();
@@ -3182,7 +3709,7 @@
     }
     if (!dirty) {
       if (closeAfter) closeWindow();
-      else setStatus(committedOverlayPreview ? "Settings applied" : "No settings changed", "good");
+      else setStatus(committedOverlayPreview || queued ? "Settings applied" : "No settings changed", "good");
       return;
     }
     await autoSaveCustomTheme();
@@ -3202,19 +3729,19 @@
       renderAppIconGrid();
       renderThemeGrid();
       applyThemePreview();
-      const warnings = data.warnings || [];
+      const warnings = (data.warnings || []).concat(liveFailed.map((name) => "Could not change " + name + "."));
       if (warnings.length) setStatus(warnings.join(" "), "bad");
       else setStatus(restartAfterApply ? "Settings saved. OBS is restarting..." : "Settings applied", "good");
-      if (closeAfter) closeWindow();
+      // a switch that obs refused stays queued, so the button offers to try it again
+      markDirty();
+      if (closeAfter && !liveFailed.length) closeWindow();
     } catch (e) {
       setStatus("Apply failed: " + (e.message || e), "bad");
       markDirty();
     }
   }
 
-  // applying while still on the anonymous "Custom" slot would leave the palette there, where the next custom
-  // edit silently overwrites it. so it is filed as a real preset first -- preset_1, preset_2, ... taking the
-  // next free number. runs only on a dirty apply, so pressing Apply with nothing changed never spawns one.
+  // applying while still on the anonymous "Custom" slot would leave the palette there, where the next custom edit silently overwrites it. so it is filed as a real preset first -- preset_1, preset_2, ... taking the next free number. runs only on a dirty apply, so pressing Apply with nothing changed never spawns one.
   async function autoSaveCustomTheme() {
     if (state.theme !== "custom") return;
     let highest = 0;
@@ -3240,13 +3767,12 @@
     }
   }
 
-  // the settings window is hidden (not destroyed) on close, so a reopen re-shows this same JS -- Cancel and a plain
-  // close both have to drop every unsaved edit here in the page. state back to the last saved snapshot, repaint, clear
-  // dirty, and reset the in-page overlay preview (drag position + its undo history).
+  // the settings window is hidden (not destroyed) on close, so a reopen re-shows this same JS -- Cancel and a plain close both have to drop every unsaved edit here in the page. state back to the last saved snapshot, repaint, clear dirty, and reset the in-page overlay preview (drag position + its undo history).
   function revertLocalEdits() {
     Object.keys(state).forEach((k) => { delete state[k]; });
     Object.assign(state, clone(originalState));
     overlayPreviewTouched = false;
+    clearLivePending();
     dirty = false;
     closeCombos();
     syncUi();
@@ -3273,8 +3799,7 @@
     _externalRefreshInFlight = true;
     try {
       const data = await helperJson("settings?t=" + Date.now());
-      // re-check: the user may have opened a dropdown or started editing during the fetch. clobbering their
-      // in-progress choice here is the "select native, it jumps back to downscale" race.
+      // re-check: the user may have opened a dropdown or started editing during the fetch. clobbering their in-progress choice here is the "select native, it jumps back to downscale" race.
       if (externalRefreshBusy()) return;
       const next = data.settings || {};
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
@@ -3286,9 +3811,7 @@
     finally { _externalRefreshInFlight = false; }
   }
 
-  // there is deliberately no Install button here. this box used to POST /update/apply itself, which skipped the update window entirely -- so there was no download progress, no stage labels, and nothing watching for the verdict the installer writes. checking hands off to that window instead, so an update started from Settings behaves exactly like the one offered at launch.
-  // the helper spawns this window, not window.open: this page runs inside OBS's CEF, where window.open escapes to
-  // the users real browser and the update prompt lands as an ordinary tab there.
+  // there is deliberately no Install button here. this box used to POST /update/apply itself, which skipped the update window entirely -- so there was no download progress, no stage labels, and nothing watching for the verdict the installer writes. checking hands off to that window instead, so an update started from Settings behaves exactly like the one offered at launch. the helper spawns this window, not window.open: this page runs inside OBSs CEF, where window.open escapes to the users real browser and the update prompt lands as an ordinary tab there.
   async function openUpdatePrompt(version) {
     try {
       await helperJson("update/open-prompt?version=" + encodeURIComponent(version || ""), { method:"POST" });
@@ -3339,6 +3862,8 @@
     if (uninstallConfirmResolve) return Promise.resolve(false);
     els.uninstallConfirmInput.value = "";
     els.uninstallRemoveObsWarn.hidden = !els.uninstallRemoveObs.checked;
+    els.uninstallSetupNote.textContent = SETUP_FILE_NOTE;
+    els.uninstallSetupNote.hidden = setupFileOk;
     els.uninstallConfirmModal.classList.add("is-visible");
     els.uninstallConfirmModal.setAttribute("aria-hidden", "false");
     setTimeout(() => els.uninstallConfirmInput.focus(), 0);
@@ -3378,9 +3903,9 @@
     els.discordScreenshareConfirmTitle.textContent = installing
       ? "Install Discord screenshare / Share Preview audio?"
       : "Remove Discord screenshare / Share Preview audio?";
-    els.discordScreenshareConfirmText.textContent = installing
+    els.discordScreenshareConfirmText.textContent = (installing
       ? "This closes OBS and installs the OBS Stream Audio virtual audio driver, then turns Share Preview on. The rest of ReplayKit stays as it is."
-      : "This closes OBS and uninstalls the OBS Stream Audio virtual audio driver. The rest of ReplayKit stays installed.";
+      : "This closes OBS and uninstalls the OBS Stream Audio virtual audio driver. The rest of ReplayKit stays installed.") + (setupFileOk ? "" : " " + SETUP_FILE_NOTE);
     els.discordScreenshareConfirmOkBtn.textContent = installing ? "Install" : "Uninstall";
     els.discordScreenshareConfirmOkBtn.classList.toggle("is-danger", !installing);
     els.discordScreenshareConfirmModal.classList.add("is-visible");
@@ -3409,7 +3934,7 @@
     setDiscordScreenshareUninstallStatus(installing ? "Starting install..." : "Starting removal...", "");
     setStatus(busy, "");
     try {
-      const data = await helperJson(installing ? "install-discord-screenshare" : "uninstall-discord-screenshare", { method:"POST" });
+      const data = await withSetupProgress((text) => { setDiscordScreenshareUninstallStatus(text, ""); setStatus(text, ""); }, () => helperJson(installing ? "install-discord-screenshare" : "uninstall-discord-screenshare", { method:"POST" }));
       const done = data.message || (installing
         ? "Installing Discord screenshare support. OBS will close."
         : "Removing Discord screenshare support. OBS will close.");
@@ -3421,6 +3946,7 @@
       updateApplyButton();
       setDiscordScreenshareUninstallStatus(fail + (e.message || e), "bad");
       setStatus(fail + (e.message || e), "bad");
+      refreshSetupFile();
     }
   }
 
@@ -3440,7 +3966,7 @@
     setUninstallStatus("Starting uninstall...", "");
     setStatus("Starting ReplayKit uninstall...", "");
     try {
-      const data = await helperJson("uninstall", {
+      const data = await withSetupProgress((text) => { setUninstallStatus(text, ""); setStatus(text, ""); }, () => helperJson("uninstall", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({
@@ -3448,7 +3974,7 @@
           keepUserSettings:!!els.uninstallKeepSettings.checked,
           removeObs:!!els.uninstallRemoveObs.checked,
         }),
-      });
+      }));
       setUninstallStatus(data.message || "Uninstall started. OBS will close.", "good");
       setStatus(data.message || "Uninstall started. OBS will close.", "good");
     } catch (e) {
@@ -3457,6 +3983,7 @@
       updateApplyButton();
       setUninstallStatus("Uninstall failed: " + (e.message || e), "bad");
       setStatus("Uninstall failed: " + (e.message || e), "bad");
+      refreshSetupFile();
     }
   }
 
@@ -3476,6 +4003,7 @@
   els.checkUpdateBtn.addEventListener("click", checkForUpdates);
   els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
   els.uninstallDiscordScreenshareBtn.addEventListener("click", toggleDiscordScreenshare);
+  els.setupFileRepairBtn.addEventListener("click", repairSetupFile);
   els.discordScreenshareConfirmCancelBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(false));
   els.discordScreenshareConfirmOkBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(true));
   els.discordScreenshareConfirmModal.addEventListener("keydown", (e) => {
@@ -3533,9 +4061,7 @@
     themeLiveStyle.id = "rk-theme-live";
     document.head.appendChild(themeLiveStyle);
   }
-  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves
-  // background-color transitions that resolve through var() half-finished when the custom props change,
-  // freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
+  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves background-color transitions that resolve through var() half-finished when the custom props change, freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
   const themeSwapFreeze = document.createElement("style");
   themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
   document.head.appendChild(themeSwapFreeze);
@@ -3555,8 +4081,7 @@
   }, 4000);
   window.addEventListener("pagehide", clearThemePreview);
 
-  // gradients are per surface. only these four: text, border and danger are colour roles that end up in
-  // border-color / color and in the helper's colour arithmetic, where a gradient value paints nothing.
+  // gradients are per surface. only these four: text, border and danger are colour roles that end up in border-color / color and in the helpers colour arithmetic, where a gradient value paints nothing.
   const GRADIENT_TARGETS = [
     { key:"bg", label:"Background" },
     { key:"panel", label:"Panel" },
@@ -3568,13 +4093,14 @@
   function blankGradient() {
     return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
   }
-  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what
-  // decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
+  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
   let gradientByTarget = {};
   GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
 
   function currentGradient() { return gradientByTarget[gradientTarget] || blankGradient(); }
 
+  // the colours of the theme that the editor does not show (the quieter text, the stronger border, the second accent), as steps from what the helper works out from the ones it does show; a custom theme made from a preset carries the steps of that preset, so it starts out as an exact copy of it
+  let customOffsets = null;
   function themeCustomState() {
     const o = {};
     els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => { o[button.dataset.k] = button.dataset.value; });
@@ -3595,10 +4121,11 @@
     // the helper still reads this legacy field when a theme predates per-token gradients; keep it pointed at bg.
     o.gradient = gradients.bg ? gradients.bg.stops[gradients.bg.stops.length - 1].color : "";
     o.dark = els.themeCustomDark.checked;
+    if (customOffsets) o.offsets = customOffsets;
     return o;
   }
 
-  // pulls the live editor controls back into the selected target's spec, so nothing is lost on tab switch or save.
+  // pulls the live editor controls back into the selected targets spec, so nothing is lost on tab switch or save.
   function captureGradientEditor() {
     const spec = gradientByTarget[gradientTarget];
     if (!spec) return;
@@ -3633,7 +4160,7 @@
     });
   }
 
-  // pushes the selected target's spec into the shared editor controls.
+  // pushes the selected targets spec into the shared editor controls.
   function loadGradientEditor() {
     const spec = currentGradient();
     const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
@@ -3657,9 +4184,11 @@
     themePreviewTimer = setTimeout(async () => {
       const id = state.theme || "default";
       let url = HELPER + "/appearance/theme.css?t=" + Date.now();
-      // mid-edit the preset's saved css is stale -- preview whatever the editor currently holds
+      // mid-edit the presets saved css is stale -- preview whatever the editor currently holds
       if (id === "custom" || editingThemeId) url += "&custom=" + encodeURIComponent(JSON.stringify(themeCustomState()));
       else url += "&theme=" + encodeURIComponent(id);
+      // the native title bar, rail and menus of the clean layout show the same candidate
+      url += "&preview=1";
       try {
         const r = await fetch(url, { cache: "no-store" });
         const css = r.ok ? await r.text() : "";
@@ -3667,7 +4196,7 @@
         themeLiveStyle.textContent = css;
         publishThemePreview(css);
         // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
-        // rewriting this node's text alone doesnt always make CEF redo the cascade tie-break, so move it back
+        // rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back
         // to last to guarantee the preview wins.
         document.head.appendChild(themeLiveStyle);
         void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
@@ -3781,8 +4310,7 @@
     });
     updateGradientPreview();
   }
-  // a fresh gradient for a surface starts from that surface's own colour so turning it on is a soft change
-  // rather than a jump to some unrelated pair.
+  // a fresh gradient for a surface starts from that surfaces own colour so turning it on is a soft change rather than a jump to some unrelated pair.
   function seedStopsFor(targetKey, c) {
     const base = cleanHexColor(c[targetKey === "bg" ? "bg" : targetKey], null)
       || cleanHexColor(c.bg, "#161617");
@@ -3800,6 +4328,7 @@
   }
   function fillThemeEditor(c) {
     c = c || {};
+    customOffsets = c.offsets && typeof c.offsets === "object" ? c.offsets : null;
     els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
       setColorButton(button, c[button.dataset.k] || "#000000", "#000000");
     });
@@ -3906,7 +4435,7 @@
     const theme = themesCache.find((item) => item.id === id);
     if (!theme || !theme.seed) return;
     editingThemeId = id;
-    // stay on the preset being edited -- the editor is changing that preset's contents, not forking it into Custom
+    // stay on the preset being edited -- the editor is changing that presets contents, not forking it into Custom
     state.theme = id;
     state.themeCustom = Object.assign({}, theme.seed);
     fillThemeEditor(state.themeCustom);
@@ -3959,7 +4488,7 @@
     const spec = gradientByTarget[gradientTarget];
     if (spec) {
       spec.enabled = els.themeGradientEnabled.checked;
-      // turning it on with nothing stored yet seeds from the surface's own colour, so the first frame is subtle
+      // turning it on with nothing stored yet seeds from the surfaces own colour, so the first frame is subtle
       if (spec.enabled && spec.stops.length < 2) spec.stops = seedStopsFor(gradientTarget, themeCustomState());
     }
     els.themeGradientEditor.hidden = !els.themeGradientEnabled.checked;
@@ -4105,6 +4634,10 @@
     }
     await renderAppIconGrid();
   }
+  // the way over to the obs settings wears the same app icon as the title bar of the window: the one saved in the Appearance tab, or the obs mark
+  const obsSwitchIcon = document.getElementById("obsSwitchIcon");
+  function setObsSwitchIcon(url) { if (obsSwitchIcon) obsSwitchIcon.src = HELPER + url; }
+  setObsSwitchIcon("/obs-icon.svg?v=4");
   async function renderAppIconGrid() {
     let data;
     try { data = await helperJson("appearance/icons"); } catch (e) { return; }
@@ -4113,8 +4646,22 @@
       els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
     els.appIconGrid.appendChild(appIconTile("custom", "Custom…", "", "＋", false));
     paintAppIconSelection();
+    const saved = (data.icons || []).find((ic) => ic.id === data.selected);
+    setObsSwitchIcon(saved && saved.url ? saved.url : "/obs-icon.svg?v=4");
   }
   renderAppIconGrid();
+
+  // appearance tab: interface layout picker, saved with Apply like everything else; the native plugin builds the window once per launch, so a change restarts obs
+  function paintLayoutSelection() {
+    const sel = state.interfaceLayout === "classic" ? "classic" : "clean";
+    els.layoutGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
+  }
+  els.layoutGrid.querySelectorAll(".icon-tile").forEach((t) => t.addEventListener("click", () => {
+    state.interfaceLayout = t.dataset.id;
+    paintLayoutSelection();
+    markDirty();
+  }));
+
   els.appIconCustomPath.addEventListener("input", () => {
     state.appIconCustomPath = unquote(els.appIconCustomPath.value);
     if (state.appIconCustomPath && state.appIcon !== "custom") { state.appIcon = "custom"; paintAppIconSelection(); }
@@ -4144,20 +4691,406 @@
     if (p) { els.appIconCustomPath.value = p; els.appIconCustomPath.dispatchEvent(new Event("input")); }
   });
 
+  // clipping and the two mutes act on obs rather than on the settings file, but they wait for Apply like everything else: a switch only queues its change, Apply or OK sends the queue to obs in the order it was made, Cancel drops it. liveState is what obs reports right now and pendingLive holds what was asked for wherever that differs
+  const liveEls = { clipping: document.getElementById("liveClipping"), mic: document.getElementById("liveMuteMic"), desktop: document.getElementById("liveMuteDesktop"), discord: document.getElementById("liveMuteDiscord") };
+  const liveLabels = { clipping: "clipping", mic: "the microphone mute", desktop: "the PC audio mute", discord: "the Discord audio mute" };
+  const liveState = { clipping: null, mic: null, desktop: null, discord: null };
+  function paintLiveControls() {
+    Object.keys(liveEls).forEach((key) => {
+      const el = liveEls[key];
+      const value = liveState[key];
+      // null means obs has no such output / input right now, so the switch stays greyed out instead of pretending
+      el.disabled = typeof value !== "boolean";
+      if (typeof value === "boolean") el.checked = key in pendingLive ? pendingLive[key] : value;
+    });
+    // the rows of the recording audio list show the same switches the other way round
+    renderRecordingAudio();
+  }
+  function clearLivePending() {
+    Object.keys(pendingLive).forEach((key) => { delete pendingLive[key]; });
+    paintLiveControls();
+  }
+  // controls-state asks obs five things in a row and can take seconds while obs is busy, so one poll is out at a time, and an answer that started before an apply finished is dropped since it can predate what the apply did
+  let liveBusy = false;
+  let liveEpoch = 0;
+  async function refreshLiveControls() {
+    if (!RKWindow.up() || liveBusy) return;
+    liveBusy = true;
+    const epoch = liveEpoch;
+    let s;
+    try { s = await helperJson("controls-state?t=" + Date.now()); } catch (e) { return; } finally { liveBusy = false; }
+    if (epoch !== liveEpoch) return;
+    liveState.clipping = s.replayBufferActive;
+    liveState.mic = s.micMuted;
+    liveState.desktop = s.desktopMuted;
+    liveState.discord = s.discordMuted;
+    // a change that obs has caught up with on its own (a hotkey, another window) is no longer a change
+    let caughtUp = false;
+    Object.keys(pendingLive).forEach((key) => { if (pendingLive[key] === liveState[key]) { delete pendingLive[key]; caughtUp = true; } });
+    paintLiveControls();
+    if (caughtUp) markDirty();
+  }
+  // sends the queue to obs. whatever obs refuses stays queued so the next Apply tries it again, and the names of those come back for the status line
+  async function applyLiveChanges() {
+    liveEpoch++;
+    const failed = [];
+    for (const key of Object.keys(pendingLive)) {
+      const want = pendingLive[key];
+      try {
+        if (key === "clipping") await helperJson("obs/replay-buffer?state=" + (want ? "on" : "off"), { method:"POST" });
+        else await helperJson("audio-mute", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ input:key, muted:want }) });
+        liveState[key] = want;
+        delete pendingLive[key];
+      } catch (e) { failed.push(liveLabels[key]); }
+    }
+    liveEpoch++;
+    paintLiveControls();
+    return failed;
+  }
+  Object.keys(liveEls).forEach((key) => {
+    liveEls[key].addEventListener("change", () => {
+      const want = liveEls[key].checked;
+      if (want === liveState[key]) delete pendingLive[key];
+      else pendingLive[key] = want;
+      markDirty();
+    });
+  });
+  refreshLiveControls();
+  setInterval(refreshLiveControls, 3000);
+  RKWindow.onChange((up) => { if (up) refreshLiveControls(); });
+
+  // recording audio in the audio tab: what goes into the recorded sound. the pc audio, game audio and microphone rows are the mute switches and volumes of obs seen the other way round (ticked = not muted); in specific apps mode the rows under the game audio section are the programs that play sound, each one in the pc audio or out of it. programs have no volume of their own, they follow the game audio volume
+  function raChoices() {
+    return state.recordingAudioApps && typeof state.recordingAudioApps === "object" ? state.recordingAudioApps : {};
+  }
+
+  function raSpecific() {
+    return state.recordingAudioMode === "specific";
+  }
+
+  function raChoiceKey(exe) {
+    const lower = exe.toLowerCase();
+    return Object.keys(raChoices()).find((key) => key.toLowerCase() === lower);
+  }
+
+  // the choice made for a program, and off for one nobody has chosen about
+  function raEnabled(exe) {
+    const key = raChoiceKey(exe);
+    const value = key === undefined ? undefined : raChoices()[key];
+    return typeof value === "boolean" ? value : false;
+  }
+
+  function raIconHtml(exe, fallback) {
+    const url = exe ? raIcons.get(exe.toLowerCase()) : null;
+    if (url) return '<img alt="" src="' + url + '">';
+    return (window.RK_ICONS && RK_ICONS[fallback]) || "";
+  }
+
+  // undefined = never asked, null = the answer is on its way, false = the helper has no icon (asked again after a minute, the program may not have been running before)
+  function raLoadIcon(exe) {
+    const key = exe.toLowerCase();
+    const known = raIcons.get(key);
+    if (known === null || typeof known === "string") return;
+    if (known === false && Date.now() - (raIconTried[key] || 0) < 60000) return;
+    raIcons.set(key, null);
+    raIconTried[key] = Date.now();
+    fetch(HELPER + "/audio/app-icon?exe=" + encodeURIComponent(exe), { cache:"no-store" })
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        raIcons.set(key, blob ? URL.createObjectURL(blob) : false);
+        renderRecordingAudio();
+        // the auto game list shows the same icons
+        renderScreenshareGameOverrides();
+      })
+      .catch(() => { raIcons.set(key, false); });
+  }
+
+  function raSliderHtml(key, volume, name) {
+    return '<div class="volume-slider-wrap"><input class="volume-slider" type="range" min="0" max="200" step="1" value="' + volume + '" data-vol="' + key +
+      '" style="--fill:' + (volume / 2) + '%" aria-label="' + escapeHtml(name) + ' volume"></div>';
+  }
+
+  function raFixedRowHtml(row) {
+    const volume = clampAudioVolume(state[row.volumeKey] ?? 100);
+    const known = typeof liveState[row.kind] === "boolean";
+    const muted = row.kind in pendingLive ? pendingLive[row.kind] : liveState[row.kind];
+    const on = known && muted === false;
+    return '<div class="ra-row' + (row.section ? " is-section" : "") + (on ? "" : " is-off") + '">' +
+      '<label class="check-row"><input type="checkbox" data-live="' + row.kind + '"' + (on ? " checked" : "") + (known ? "" : " disabled") + ' aria-label="Record ' + escapeHtml(row.name) + '"></label>' +
+      '<span class="ra-ic">' + raIconHtml(null, row.icon) + '</span>' +
+      '<span class="ra-name">' + escapeHtml(row.name) + '</span>' +
+      raSliderHtml(row.volumeKey, volume, row.name) +
+      '<span class="ra-pct">' + volume + '%</span></div>';
+  }
+
+  function raAppRowHtml(app) {
+    const on = raEnabled(app.exe);
+    raLoadIcon(app.exe);
+    return '<div class="ra-row is-app' + (on ? "" : " is-off") + '">' +
+      '<label class="check-row"><input type="checkbox" data-app="' + escapeHtml(app.exe) + '"' + (on ? " checked" : "") + ' aria-label="Record ' + escapeHtml(app.name) + '"></label>' +
+      '<span class="ra-ic">' + raIconHtml(app.exe, "audio/app") + '</span>' +
+      '<span class="ra-name" title="' + escapeHtml(app.exe) + (app.active ? " - playing sound now" : "") + '">' + escapeHtml(app.name) + '</span>' +
+      '<span class="ra-slider-note">' + (app.active ? "Playing now" : "Uses the Game Audio volume") + '</span><span class="ra-pct"></span></div>';
+  }
+
+  function raBuildHtml() {
+    if (!raSpecific()) return raFixedRowHtml(RA_DESKTOP) + raFixedRowHtml(RA_MIC);
+    const apps = raState.apps.length
+      ? raState.apps.map(raAppRowHtml).join("")
+      : '<div class="ra-empty">Programs that play sound show up here while they play. Tick the ones to record.</div>';
+    return raFixedRowHtml(RA_MIC) + raFixedRowHtml(RA_GAME) + apps;
+  }
+
+  function renderRecordingAudio() {
+    const list = document.getElementById("raList");
+    if (!list) return;
+    // a list rebuilt under a slider that is being dragged would drop the drag, so the rebuild waits for the end of it
+    if (raState.dragging) { raState.renderAfterDrag = true; return; }
+    const html = raBuildHtml();
+    if (html !== raState.html) {
+      raState.html = html;
+      list.innerHTML = html;
+    }
+    // what the list means sits behind the info dot next to the dropdown, and follows the mode
+    const info = document.getElementById("raInfo");
+    const text = !raSpecific()
+      ? "Records all the sound your PC plays."
+      : !raState.obsAnswered
+        ? "ReplayKit can't read the list of apps from OBS right now, so it's showing the apps it already knew about."
+        : "Only the apps you turn on are recorded. New apps that play sound show up here turned off.";
+    if (info && info.dataset.tooltip !== text) info.dataset.tooltip = text;
+  }
+
+  async function loadRecordingAudioApps() {
+    try {
+      const data = await helperJson("audio/apps?t=" + Date.now());
+      raState.apps = Array.isArray(data.apps) ? data.apps : [];
+      raState.obsAnswered = data.obs === true;
+      renderRecordingAudio();
+    } catch (e) {}
+  }
+
+  // the list of programs is only read while the audio tab is showing and the list is the one with programs in it
+  function setRecordingAudioPolling(on) {
+    clearInterval(raState.timer);
+    raState.timer = 0;
+    if (!on) return;
+    loadRecordingAudioApps();
+    raState.timer = setInterval(() => { if (RKWindow.up()) loadRecordingAudioApps(); }, 4000);
+  }
+
+  function updateRecordingAudioPolling() {
+    setRecordingAudioPolling(activePage === "audio" && raSpecific());
+  }
+
+  fillCombo(els.recordingAudioMode, [{ value:"all", label:"All PC Audio" }, { value:"specific", label:"Specific apps" }]);
+  els.recordingAudioMode.addEventListener("combochange", () => {
+    state.recordingAudioMode = comboValue(els.recordingAudioMode) === "specific" ? "specific" : "all";
+    markDirty();
+    renderRecordingAudio();
+    updateRecordingAudioPolling();
+  });
+
+  (function wireRecordingAudioList() {
+    const list = document.getElementById("raList");
+    // the whole row is the button, not just the switch at its left: a click anywhere on it but the slider flips the switch
+    list.addEventListener("click", (e) => {
+      const row = e.target.closest(".ra-row");
+      if (!row || e.target.closest(".volume-slider-wrap, .check-row, input")) return;
+      const box = row.querySelector('input[type="checkbox"]');
+      if (!box || box.disabled) return;
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event("change", { bubbles:true }));
+    });
+    list.addEventListener("change", (e) => {
+      const box = e.target.closest('input[type="checkbox"]');
+      if (!box) return;
+      if (box.dataset.live) {
+        // the same switch as the one in the audio tab, the other way round: ticked = recorded = not muted
+        const el = liveEls[box.dataset.live];
+        if (el && !el.disabled) {
+          el.checked = !box.checked;
+          el.dispatchEvent(new Event("change"));
+        }
+        renderRecordingAudio();
+        return;
+      }
+      if (box.dataset.app) {
+        const next = Object.assign({}, raChoices());
+        const key = raChoiceKey(box.dataset.app);
+        next[key === undefined ? box.dataset.app : key] = box.checked;
+        state.recordingAudioApps = next;
+        markDirty();
+        renderRecordingAudio();
+      }
+    });
+    list.addEventListener("input", (e) => {
+      const slider = e.target.closest("input.volume-slider");
+      if (!slider || !slider.dataset.vol) return;
+      const key = slider.dataset.vol;
+      const value = clampAudioVolume(slider.value);
+      state[key] = value;
+      setSliderFill(slider, value, 0, 200);
+      const pct = slider.closest(".ra-row").querySelector(".ra-pct");
+      if (pct) pct.textContent = value + "%";
+      // the same volume in the audio tab
+      if (key === "desktopAudioVolume") {
+        syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, value, clampAudioVolume, 0, 200);
+        refreshFieldResetState(key, DEFAULT_DESKTOP_AUDIO_VOLUME);
+      } else if (key === "micVolume" && window.RKMic) {
+        RKMic.refresh();
+      }
+      // the markup the list was built from has to follow the sliders too, or the next rebuild would jump them back
+      raState.html = raBuildHtml();
+      markDirty();
+    });
+    const endDrag = () => {
+      if (!raState.dragging) return;
+      raState.dragging = false;
+      if (raState.renderAfterDrag) { raState.renderAfterDrag = false; renderRecordingAudio(); }
+    };
+    list.addEventListener("pointerdown", (e) => { if (e.target.closest("input.volume-slider")) raState.dragging = true; });
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("blur", endDrag);
+  })();
+
+  // the obs settings live in this same window: the plugin brings the dialog up over this page and this page keeps whatever is still unsaved in it
+  document.getElementById("openObsSettings").addEventListener("click", () => {
+    helperJson("open-obs-settings", { method:"POST" }).catch((error) => setStatus("Could not open the OBS settings: " + (error.message || error), "bad"));
+  });
+
+  // the menus of the obs menu bar, which the title bar no longer carries: the section opens on a click, and each button drops one of the real menus open at the pointer
+  (function initObsMenu() {
+    const toggle = document.getElementById("obsMenuToggle");
+    const buttons = document.getElementById("obsMenuButtons");
+    if (!toggle || !buttons) return;
+    toggle.addEventListener("click", () => {
+      const opening = buttons.hidden;
+      buttons.hidden = !opening;
+      toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+      toggle.textContent = opening ? "Hide OBS menus" : "Show OBS menus";
+    });
+    buttons.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-obs-menu]");
+      if (!button) return;
+      helperJson("obs-menu?index=" + encodeURIComponent(button.dataset.obsMenu), { method:"POST" }).catch((error) => setStatus("Could not open the OBS menu: " + (error.message || error), "bad"));
+    });
+  })();
+
+  // streamable account: sign-in is cookie-based, the helper opens its own sign-in window and imports the session, and this box just follows /me
+  const acct = { status: document.getElementById("streamableStatus"), signIn: document.getElementById("streamableSignIn"), signOut: document.getElementById("streamableSignOut"), force: document.getElementById("streamableForce") };
+  let authState = { signedIn:false, username:"", plan:"", retentionDays:2 };
+  let loginFlowActive = false;
+  let loginPollTimer = null;
+  let loginTimeoutTimer = null;
+  const LOGIN_TIMEOUT_MS = 120000;
+  const LOGIN_POLL_MS = 500;
+
+  function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : "Free"; }
+  function renderAuth(busyText) {
+    if (busyText) {
+      acct.status.textContent = busyText;
+      acct.status.classList.remove("is-off");
+      acct.signIn.hidden = true; acct.signOut.hidden = true; acct.force.hidden = true;
+      return;
+    }
+    if (authState.signedIn) {
+      acct.status.textContent = "Signed in as " + (authState.username || "your account") + " - " + planLabel(authState.plan) + " - " + authState.retentionDays + "d retention";
+      acct.status.classList.remove("is-off");
+    } else {
+      acct.status.textContent = "Not signed in";
+      acct.status.classList.add("is-off");
+    }
+    acct.signIn.hidden = authState.signedIn;
+    acct.signOut.hidden = !authState.signedIn;
+    acct.force.hidden = !authState.signedIn;
+  }
+  function applyAuthData(data) {
+    authState = {
+      signedIn: !!data.signedIn,
+      username: data.maskedUsername || data.displayName || data.username || "",
+      plan: data.plan || "",
+      retentionDays: Number(data.retentionDays) || 2,
+    };
+    renderAuth();
+  }
+  async function fetchMe() {
+    try { applyAuthData(await helperJson("me?t=" + Date.now())); } catch (e) { /* helper offline, the box keeps its last state */ }
+  }
+  function clearLoginTimers() {
+    if (loginPollTimer) { clearInterval(loginPollTimer); loginPollTimer = null; }
+    if (loginTimeoutTimer) { clearTimeout(loginTimeoutTimer); loginTimeoutTimer = null; }
+  }
+  function finishLoginFlow() {
+    clearLoginTimers();
+    loginFlowActive = false;
+    // any sign-in window still open (ours or one streamable spawned) is closed from the helper side, which js cannot do across origins
+    fetch(HELPER + "/close-signin-windows", { method:"POST", cache:"no-store" }).catch(() => {});
+    renderAuth();
+  }
+  // one poller drives the whole flow: the first call opens the window and every later one only reads its state, so a status read can never race ahead of the open and be mistaken for "closed without signing in"
+  function startLoginFlow() {
+    if (loginFlowActive) return;
+    clearLoginTimers();
+    loginFlowActive = true;
+    let sawWindowOpen = false;
+    renderAuth("Opening Streamable...");
+    async function poll(isStart) {
+      if (!loginFlowActive) return;
+      let res, data;
+      try {
+        res = await fetch(HELPER + "/import-session?source=owned" + (isStart ? "&start=1" : ""), { method:"POST", cache:"no-store" });
+        data = await res.json().catch(() => ({}));
+      } catch (e) { return; }
+      if (!loginFlowActive || !res.ok) return;
+      if (data.signedIn) { applyAuthData(data); finishLoginFlow(); return; }
+      if (data.pending === true) { sawWindowOpen = true; renderAuth("Sign in in the Streamable window..."); return; }
+      if (sawWindowOpen) { finishLoginFlow(); return; }
+      renderAuth("Opening Streamable...");
+    }
+    poll(true);
+    loginPollTimer = setInterval(() => poll(false), LOGIN_POLL_MS);
+    loginTimeoutTimer = setTimeout(finishLoginFlow, LOGIN_TIMEOUT_MS);
+  }
+  acct.signIn.addEventListener("click", startLoginFlow);
+  acct.signOut.addEventListener("click", () => {
+    authState = { signedIn:false, username:"", plan:"", retentionDays:2 };
+    renderAuth();
+    fetch(HELPER + "/logout", { method:"POST", cache:"no-store" }).catch(() => {});
+  });
+  // the plugin draws this confirm over the dimmed OBS window and runs the follow-up itself (restart obs, drop the streamable cookies, relaunch)
+  acct.force.addEventListener("click", () => {
+    helperJson("ui-confirm", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ kind:"streamable-relogin" }) }).catch(() => {});
+  });
+  fetchMe();
+  RKWindow.onChange((up) => { if (up && !loginFlowActive) fetchMe(); });
+
+  // the clip button in the title bar opens this page on the tab that holds the clipping switch
+  window.__rkGoToPage = (name) => {
+    if (document.getElementById("page-" + name)) activatePage(name);
+  };
+
   loadSettings();
   setInterval(refreshExternalSettings, 2000);
 
-  // hidden-not-destroyed window: a reopen just re-shows this page, so re-fetch settings and drop any uncommitted edits
-  // to behave like a fresh open. mirrors clips.html's re-show reset (visibilitychange, plus a focus fallback for CEF
-  // hosts that don't deliver visibilitychange on their own hide()/show()).
+  // hidden-not-destroyed window: a reopen just re-shows this page, so re-fetch settings and drop any uncommitted edits to behave like a fresh open. mirrors clips.htmls re-show reset (visibilitychange, plus a focus fallback for CEF hosts that dont deliver visibilitychange on their own hide()/show()).
   let settingsWasHidden = false;
   function reinitSettingsOnShow() {
     loadSettings().then(() => {
       if (window.RKOverlayPreview) { RKOverlayPreview.resetPosition(); RKOverlayPreview.refresh(); }
     });
   }
+  // embedded in the obs window this page is one view among several, not a window that was closed: going to another view and coming back keeps its edits, and OK / Cancel already reset it themselves, so none of the reset-on-show paths apply there
   document.addEventListener("visibilitychange", () => {
+    if (window.RKEmbedded) return;
     if (document.hidden) { settingsWasHidden = true; return; }
+    if (settingsWasHidden) { settingsWasHidden = false; reinitSettingsOnShow(); }
+  });
+  // in its own window the plugin hides and shows this page without cef ever sending visibilitychange or focus, so its own show / hide event drives the same reset
+  RKWindow.onChange((up) => {
+    if (window.RKEmbedded) return;
+    if (!up) { settingsWasHidden = true; return; }
     if (settingsWasHidden) { settingsWasHidden = false; reinitSettingsOnShow(); }
   });
   window.addEventListener("focus", () => {

@@ -11,8 +11,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // Owns the only browser profile ReplayKit may use for Streamable authentication.
-    // It never inspects another application's cookies, encryption keys, or databases.
+    // owns the only browser profile ReplayKit may use for Streamable authentication. It never inspects another applications cookies, encryption keys, or databases.
     internal static class StreamableSignIn
     {
         [DllImport("user32.dll")]
@@ -40,10 +39,7 @@ namespace ReplayKitHelper
                 }
                 else
                 {
-                    // already open -- bring it forward instead of silently doing nothing, so clicking the dock
-                    // button again when the window is just buried behind something actually does what it looks
-                    // like it should. FocusHwnd is a plain hwnd operation (restore-if-minimized + the thread-input-
-                    // attach dance for reliable foreground activation), safe to call from any thread or process.
+                    // already open -- bring it forward instead of silently doing nothing, so clicking the dock button again when the window is just buried behind something actually does what it looks like it should. FocusHwnd is a plain hwnd operation (restore-if-minimized + the thread-input-attach dance for reliable foreground activation), safe to call from any thread or process.
                     IntPtr hWnd = _formHandle;
                     if (hWnd != IntPtr.Zero) { try { Native.FocusHwnd(hWnd); } catch (Exception ex) { Log.Write("focus existing sign-in window: " + ex.Message); } }
                 }
@@ -102,17 +98,9 @@ namespace ReplayKitHelper
                 Application.EnableVisualStyles();
                 using (var form = new Form { Text = "Sign in to Streamable", Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
                 using (var browser = new WebView2 { Dock = DockStyle.Fill })
-                // one-shot watchdog: if the form is somehow still not visible a moment after Shown, force it. this
-                // is a self-healing backstop, not the primary fix -- it exists because a hidden top-level window with
-                // no error logged anywhere is otherwise undiagnosable from the outside.
+                // one-shot watchdog: if the form is somehow still not visible a moment after Shown, force it. this is a self-healing backstop, not the primary fix -- it exists because a hidden top-level window with no error logged anywhere is otherwise undiagnosable from the outside.
                 using (var visibilityWatchdog = new System.Windows.Forms.Timer { Interval = 800 })
-                // streamable's login does not reliably raise NavigationCompleted -- a normal email/password submit
-                // is an xhr/fetch call that sets the session cookie, followed by a client-side route change
-                // (history.pushState) to the dashboard, never a full page navigation. HistoryChanged below catches
-                // that specific case, but rather than track every mechanism a frontend redesign might use next,
-                // this timer just re-checks on a plain interval for as long as the window is open -- it is the one
-                // check that cannot miss regardless of how the page gets the cookie set. CheckSession below is a
-                // no-op when there is nothing new to capture, so polling it costs nothing extra.
+                // streamables login does not reliably raise NavigationCompleted -- a normal email/password submit is an xhr/fetch call that sets the session cookie, followed by a client-side route change (history.pushState) to the dashboard, never a full page navigation. HistoryChanged below catches that specific case, but rather than track every mechanism a frontend redesign might use next, this timer just re-checks on a plain interval for as long as the window is open -- it is the one check that cannot miss regardless of how the page gets the cookie set. CheckSession below is a no-op when there is nothing new to capture, so polling it costs nothing extra.
                 using (var sessionPoll = new System.Windows.Forms.Timer { Interval = 1500 })
                 {
                     var workArea = ResolveTargetScreen().WorkingArea;
@@ -121,12 +109,7 @@ namespace ReplayKitHelper
                         workArea.Top + (workArea.Height - form.Height) / 2);
                     form.Controls.Add(browser);
 
-                    // last streamable-domain cookie jar seen, so the poll timer below can skip the network round
-                    // trip (InvokeStreamableMe shells out to curl.exe) when nothing has actually changed since the
-                    // previous check -- GetCookiesAsync itself is a cheap local call, so checking it every tick is
-                    // fine, but hitting streamable's real api that often for the whole time the window sits open is
-                    // not. a local function (not the previous static method) so it can close over this without a
-                    // field that would need resetting between separate sign-in attempts.
+                    // last streamable-domain cookie jar seen, so the poll timer below can skip the network round trip (InvokeStreamableMe shells out to curl.exe) when nothing has actually changed since the previous check -- GetCookiesAsync itself is a cheap local call, so checking it every tick is fine, but hitting streamables real api that often for the whole time the window sits open is not. a local function (not the previous static method) so it can close over this without a field that would need resetting between separate sign-in attempts.
                     string lastCheckedJar = null;
                     bool checking = false;
                     bool pollActive = false;
@@ -175,20 +158,13 @@ namespace ReplayKitHelper
                         {
                             form.Show();
                             _formHandle = form.Handle;
-                            // plain SetForegroundWindow from here reliably lost to windows' anti-focus-stealing
-                            // heuristic -- this thread never received the input event that triggered it (the click
-                            // happened in obs's dock, over http, not in this process), which is exactly the case
-                            // that heuristic exists to block. Native.FocusHwnd does the attach-thread-input dance
-                            // that actually works around it; its the same call already used to bring an existing
-                            // window forward on a repeat click, so both paths now behave the same way.
+                            // plain SetForegroundWindow from here reliably lost to windows' anti-focus-stealing heuristic -- this thread never received the input event that triggered it (the click happened in obss dock, over http, not in this process), which is exactly the case that heuristic exists to block. Native.FocusHwnd does the attach-thread-input dance that actually works around it; its the same call already used to bring an existing window forward on a repeat click, so both paths now behave the same way.
                             Native.FocusHwnd(form.Handle);
                             ApplyTheme(form.Handle);
                             var environment = await CoreWebView2Environment.CreateAsync(null, ProfileDirectory);
                             await browser.EnsureCoreWebView2Async(environment);
                             browser.CoreWebView2.NavigationCompleted += async (s, e) => await CheckSession();
-                            // catches a client-side route change (history.pushState/replaceState) after login,
-                            // which does not raise NavigationCompleted at all -- see the sessionPoll comment above
-                            // for why the interval timer below is still kept as a backstop alongside this.
+                            // catches a client-side route change (history.pushState/replaceState) after login, which does not raise NavigationCompleted at all -- see the sessionPoll comment above for why the interval timer below is still kept as a backstop alongside this.
                             browser.CoreWebView2.HistoryChanged += async (s, e) => await CheckSession();
                             browser.CoreWebView2.Navigate("https://streamable.com/login");
                             sessionPoll.Start();
@@ -225,12 +201,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // the monitor to center the sign-in window on. GetForegroundWindow() used to drive this, but it reports
-        // whatever window has os-level focus at the exact instant this stas thread runs -- often not obs at all
-        // (any other app stealing focus around the click puts the window on a monitor the user isnt even looking
-        // at), which is what earlier attempts misread as "no window pops up" and "closes itself". the tray plugin
-        // publishes obs's own main-window hwnd over the ipc pipe specifically because its authoritative -- same
-        // read pattern as Native.CloseObsMainWindow.
+        // the monitor to center the sign-in window on. GetForegroundWindow() used to drive this, but it reports whatever window has os-level focus at the exact instant this stas thread runs -- often not obs at all (any other app stealing focus around the click puts the window on a monitor the user isnt even looking at), which is what earlier attempts misread as "no window pops up" and "closes itself". the native plugin publishes obss own main-window hwnd over the ipc pipe specifically because its authoritative -- same read pattern as Native.CloseObsMainWindow.
         private static Screen ResolveTargetScreen()
         {
             long hwndVal;
@@ -240,15 +211,11 @@ namespace ReplayKitHelper
                 IntPtr hWnd = new IntPtr(hwndVal);
                 if (IsWindow(hWnd)) return Screen.FromHandle(hWnd);
             }
-            // obs hasnt published its main window yet (helper started before the plugin connected) -- the cursor
-            // is a better guess than the system foreground window, which could be any unrelated app.
+            // obs hasnt published its main window yet (helper started before the plugin connected) -- the cursor is a better guess than the system foreground window, which could be any unrelated app.
             return Screen.FromPoint(Cursor.Position);
         }
 
-        // dark title bar + the active themes caption/border/text colours + app icon, same treatment every other
-        // replaykit-owned window gets. this form is created by the helper directly, so it goes straight through
-        // Native.ApplyWindowTheme on its own hwnd rather than the needle-matched /style-window route, which only
-        // ever finds obs-family windows and would never match this one (see Native.IsObsFamilyProcess).
+        // dark title bar + the active themes caption/border/text colours + app icon, same treatment every other replaykit-owned window gets. this form is created by the helper directly, so it goes straight through Native.ApplyWindowTheme on its own hwnd rather than the needle-matched /style-window route, which only ever finds obs-family windows and would never match this one (see Native.IsObsFamilyProcess).
         private static void ApplyTheme(IntPtr hWnd)
         {
             try

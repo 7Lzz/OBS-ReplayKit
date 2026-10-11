@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // detect windows displays in the format obss monitor_capture source uses (\\?\DISPLAY#<edid-model>#...#{class-guid}). produced by EnumDisplayDevicesW with EDD_GET_DEVICE_INTERFACE_NAME against the adapter device name from GetMonitorInfoExW. ported from obs_replaykit/display.py.
+    // detect windows displays in the format obss monitor_capture source uses (\\?\DISPLAY#<edid-model>#...#{class-guid}). produced by EnumDisplayDevicesW with EDD_GET_DEVICE_INTERFACE_NAME against the adapter device name from GetMonitorInfoExW.
     public sealed class DisplayInfo
     {
         public bool IsPrimary { get; set; }

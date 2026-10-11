@@ -40,8 +40,7 @@ namespace ReplayKitSetup
         // the flag the relaunched copy carries so it knows it is already detached and does the work instead of relaunching again.
         public const string DetachedFlag = "--detached";
 
-        // where the detached copy records its own pid. the helper watches THIS rather than the process it started,
-        // because the process it started is only the launcher and exits within a second of handing off.
+        // where the detached copy records its own pid. the helper watches THIS rather than the process it started, because the process it started is only the launcher and exits within a second of handing off.
         public static string PidFilePath() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_pid");
 
         public static void WriteOwnPid()
@@ -55,9 +54,7 @@ namespace ReplayKitSetup
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }
 
-        // returns the new pid, or 0 when the relaunch could not be made. a breakaway is refused when the job we are
-        // in does not permit it, so that failure is retried without the flag -- losing job independence but keeping
-        // the detached console, which is still better than running inline.
+        // returns the new pid, or 0 when the relaunch could not be made. a breakaway is refused when the job we are in does not permit it, so that failure is retried without the flag -- losing job independence but keeping the detached console, which is still better than running inline.
         public static int Relaunch(string[] args)
         {
             string exe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;

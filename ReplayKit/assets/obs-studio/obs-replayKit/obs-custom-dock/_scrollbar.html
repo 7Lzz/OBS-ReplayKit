@@ -1,0 +1,24 @@
+<!-- shared partial (helper #include target: scrollbar). the scrollbar every dock page draws, the same as the obs docks (Yami) and the ReplayKit settings: a 12px track that is only an outline in the panel grey with a 4px corner, and a thumb inset 3px from the edges with a 2px corner, one grey step lighter on hover and lighter again while it is held. the greys are the same variables the obs theme is generated from, with the default theme as the fallback for a page that does not define one. a page drawn on the panel grey sets --sb-outline to a lighter step, or the outline would be the colour of the surface and never show. the rules apply to every scroller of the page, so a host needs nothing but the include; the controls dock is loaded from a file and carries its own copy of them. the track stops short of both ends of its scroller by the empty buttons below, so the outline never touches the bar above a scroller or the edge under it; a scroller that ends in the bottom corner of the obs window, where the resize grip sits over the last 18px, asks for more room at that end with --sb-end -->
+<style>
+  *::-webkit-scrollbar { width:12px; height:12px; background:transparent; }
+  *::-webkit-scrollbar-track { background:transparent; border:1px solid var(--sb-outline, var(--grey6, #272A33)); border-radius:4px; }
+  *::-webkit-scrollbar-corner { background:transparent; }
+  *::-webkit-scrollbar-button:vertical:start:decrement { display:block; width:12px; height:var(--sb-start, 8px); background:transparent; }
+  *::-webkit-scrollbar-button:vertical:end:increment { display:block; width:12px; height:var(--sb-end, 8px); background:transparent; }
+  *::-webkit-scrollbar-button:horizontal:start:decrement { display:block; height:12px; width:var(--sb-start, 8px); background:transparent; }
+  *::-webkit-scrollbar-button:horizontal:end:increment { display:block; height:12px; width:var(--sb-end, 8px); background:transparent; }
+  *::-webkit-scrollbar-button:vertical:start:increment,
+  *::-webkit-scrollbar-button:vertical:end:decrement,
+  *::-webkit-scrollbar-button:horizontal:start:increment,
+  *::-webkit-scrollbar-button:horizontal:end:decrement { display:none; }
+  *::-webkit-scrollbar-thumb {
+    background-color:var(--grey4, #3C404D);
+    border:3px solid transparent;
+    border-radius:5px;
+    background-clip:padding-box;
+    min-height:32px;
+    min-width:32px;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color:var(--grey3, #464B59); }
+  *::-webkit-scrollbar-thumb:active { background-color:var(--grey2, #505666); }
+</style>

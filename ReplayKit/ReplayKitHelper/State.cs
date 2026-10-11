@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // constants + shared mutable server state, ported from obs_replaykit helper modules/00_state.ps1. the ps original seeds these into every pooled runspace via a hand-maintained allowlist (PooledConstantNames) since dot-sourced script state doesn't otherwise cross runspace boundaries -- that whole mechanism is a workaround for powershell's runspace model and has no equivalent here: a compiled assembly's static fields and a shared State instance are already visible from every thread by construction.
+    // constants and the shared mutable server state that every connection handler and background task reaches through Server.State
     internal static class Constants
     {
         public const string HOST_ADDR = "127.0.0.1";
@@ -30,13 +30,13 @@ namespace ReplayKitHelper
 
         public static readonly int MAX_CONNECTION_THREADS = Math.Max(6, Environment.ProcessorCount);
 
-        // directory the running exe lives in -- the compiled equivalent of the ps originals $PSScriptRoot ($script:HelperRoot in local_helper_server.ps1), used to find ffmpeg/ffprobe installed alongside the helper by the setup wizard.
+        // the folder the running exe lives in, where the setup puts ffmpeg/ffprobe next to the helper
         public static readonly string HelperRoot = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
         // bundled next to the helper exe by the setup wizard, not extracted from obs64.exe at runtime -- Icon.ExtractAssociatedIcon only ever returns a single low-res frame, so dock/toast/window icons would look blurry next to the real multi-resolution icon the setup exe uses.
         public static readonly string OBS_ICON_PATH = Path.Combine(HelperRoot, "obs-replaykit.ico");
         // bundled preset icons for the Appearance tab -- HelperRoot is ...\obs-replayKit\scripts\helper, so this is ...\obs-replayKit\icons, mirrored from assets/ by the installer. drop-in extensible: any .ico/.png here shows in the picker.
         public static readonly string APP_ICONS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "icons"));
-        // custom icons the user has picked -- converted to .ico and saved here so they become deletable presets. kept out of APP_ICONS_DIR so the installer's assets/ mirror never touches them and so "delete" can be gated to this dir only.
+        // custom icons the user has picked -- converted to .ico and saved here so they become deletable presets. kept out of APP_ICONS_DIR so the installers assets/ mirror never touches them and so "delete" can be gated to this dir only.
         public static readonly string USER_ICONS_DIR = Path.Combine(APP_ICONS_DIR, "user");
         // %APPDATA%\obs-studio -- APP_ICONS_DIR is ...\obs-replayKit\icons, so up two.
         public static readonly string OBS_CONFIG_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", ".."));
@@ -51,7 +51,8 @@ namespace ReplayKitHelper
         public static readonly string COMPRESS_LOG_PATH = Path.Combine(LOG_DIR, "compress.log");
         public static readonly string COMPRESS_TMP_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "compressed");
         public static readonly string SCRATCH_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "scratch");
-        public static readonly string UPDATE_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "update");
+        // what makes a clip quick to open in the editor again, see ClipCache
+        public static readonly string CACHE_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "cache");
 
         public static readonly string AUTH_DIR = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OBS Streamable Helper");
         public static readonly string AUTH_FILE = Path.Combine(AUTH_DIR, "auth.dat");
@@ -63,15 +64,6 @@ namespace ReplayKitHelper
             [".mkv"] = "video/x-matroska",
             [".mov"] = "video/quicktime",
         };
-
-        // eagerly create the temp tree at process start, matching the ps original.
-        public static void EnsureTempDirs()
-        {
-            foreach (var dir in new[] { REPLAYKIT_TEMP_ROOT, THUMB_DIR, LOG_DIR, COMPRESS_TMP_DIR, SCRATCH_DIR, UPDATE_DIR })
-            {
-                Directory.CreateDirectory(dir);
-            }
-        }
 
         // env vars -> parent process -> running obs64/obs32/obs processes -> registry app paths -> default program files locations.
         public static string ResolveObsExe()
@@ -181,13 +173,13 @@ namespace ReplayKitHelper
         }
     }
 
-    // process-wide access point for the one ServerState instance, mirroring the ps originals $script:State -- every module reaches shared state through Server.State the same way the scripts reached it through $script:State.
+    // process-wide access point for the one ServerState instance
     internal static class Server
     {
         public static readonly ServerState State = new ServerState();
     }
 
-    // one shared mutable-state instance, referenced by every connection handler and background task -- the c# equivalent of the ps original's single [hashtable]::Synchronized() seeded once into every pooled runspace. fields are grouped by the lock that protects them, matching the ps original's granularity (and its documented lock-ordering rule: ConfigLock before ClipsMetaLock, never the reverse) rather than redesigning the concurrency model, since a wrong redesign is a worse risk than keeping the same shape.
+    // one shared mutable-state instance; fields are grouped by the lock that protects them, and ConfigLock is always taken before ClipsMetaLock, never the reverse
     internal sealed class ServerState
     {
         // -- ConfigLock --
@@ -233,8 +225,7 @@ namespace ReplayKitHelper
         // written from both the accept loop and route handlers; read by the accept loop every iteration.
         public volatile bool Shutdown;
 
-        // written by route handlers, read once by the shutdown path -- single write-then-read-once, no dedicated lock (matches the ps original's reliance on happens-before at process-exit time).
-        // null means no restart pending; a non-null value is the obs executable path to relaunch once this process exits (the legacy fallback path used only when the detached relauncher in Routes.cs cant be started).
+        // written by route handlers and read once by the shutdown path, so it needs no lock of its own null means no restart pending; a non-null value is the obs executable path to relaunch once this process exits (the legacy fallback path used only when the detached relauncher in Routes.cs cant be started).
         public volatile string RestartAfterCleanObsPath;
 
         // -- AuthLock --
@@ -262,13 +253,11 @@ namespace ReplayKitHelper
         // null means "no open attempt pending"; non-null (even an empty list) is the hwnd snapshot taken before the current pending OpenVideoMixProjector call, reused across retries so a slow-to-appear window isnt wrongly read as pre-existing.
         public List<long> ReplaykitDiscordProjectorPendingBaseline;
 
-        // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs
-        // cycle. concurrent obs_reset_video calls deadlock obs's video graph -- 2026-08-28 a user hard-froze obs by
-        // rapidly re-applying the downscale resolution.
+        // -- VideoApplyLock -- serializes the stop-outputs / SetVideoSettings (obs_reset_video) / restart-outputs cycle. concurrent obs_reset_video calls deadlock obss video graph -- 2026-08-28 a user hard-froze obs by rapidly re-applying the downscale resolution.
         public readonly object VideoApplyLock = new object();
         public DateTime LastVideoApplyDoneUtc = DateTime.MinValue;
 
-        // -- IpcLock -- streamed in from the native plugin (replaykit.cpp) over the OBSReplayKitIpc named pipe, replacing the old scratch-file handoff.
+        // -- IpcLock -- streamed in from the native plugin (core/ipc_pipe.cpp) over the OBSReplayKitIpc named pipe, replacing the old scratch-file handoff.
         public readonly object IpcLock = new object();
         public bool IpcClientConnected;
         public long ObsMainWindowHwnd;           // 0 until the plugin sends MAINWIN
@@ -285,15 +274,13 @@ namespace ReplayKitHelper
         public bool ReplaykitStartupUpdateChecked;
         // set by the startup check when a newer release is waiting. the first-run wizard defers to it -- setting obs up against a build that is about to be replaced wastes the users time, and the install restarts obs out from under the wizard anyway.
         public bool StartupUpdatePending;
-        // set the moment anything opens the first-run wizard. the helper opens it on its first pipe connect (which
-        // covers a launch straight to the tray) and the dock asks again once obs is on screen -- without this the
-        // second ask re-raises the window and reads as the wizard popping up a second time.
+        // set the moment anything opens the first-run wizard. the helper opens it on its first pipe connect (which covers a launch straight to the tray) and the dock asks again once obs is on screen -- without this the second ask re-raises the window and reads as the wizard popping up a second time.
         public bool SetupWizardOpened;
         public bool UpdateApplyInProgress;
 
     }
 
-    // one upload/compress/trim-overwrite job. StartedAt/UpdatedAt are unix milliseconds (the exact shape the frontends /status json expects), not DateTime -- matches New-UploadJobRecord/Copy-UploadJobForJson in the ps original exactly. Cts/EncoderProcess/TempPath are internal-only (never serialized to the frontend, same as the ps originals now-eliminated processId/statusPath were) -- they replace those cross-process coordination handles with direct in-process ones now that upload/compress/trim run as Tasks in this same process instead of spawned children a status file had to bridge to.
+    // one upload/compress/trim-overwrite job as the /status json shows it; StartedAt/UpdatedAt are unix milliseconds, the shape the pages expect. cancellation lives in JobCoordinator, not here
     internal sealed class UploadJobRecord
     {
         public string State = "idle";
@@ -309,10 +296,6 @@ namespace ReplayKitHelper
         public string RequestId = "";
         public string Kind = "";
         public bool CancelRequested;
-
-        public System.Threading.CancellationTokenSource Cts;
-        public Process EncoderProcess;
-        public string TempPath;
     }
 
     internal sealed class AuthState
@@ -324,7 +307,7 @@ namespace ReplayKitHelper
         public int RetentionDays;
     }
 
-    // an in-flight keyframe scan. the ps original tracked a spawned processs pid + a json status file it polled for; running the scan as an in-process Task replaces both with a direct Task<KeyframeScanResult> and a CancellationTokenSource that reproduces the same 5-minute hung-worker kill switch (see TrimKeyframeWorkerTimeoutMs in Trim.cs).
+    // an in-flight keyframe scan; Cts is the kill switch for a hung scan (see TrimKeyframeWorkerTimeoutMs in Trim.cs)
     internal sealed class TrimKeyframeJob
     {
         public string Key;

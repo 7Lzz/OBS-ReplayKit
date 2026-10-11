@@ -5,10 +5,11 @@ using System.Linq;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // install bundled obs config into %appdata%/obs-studio/. walks assets/obs-studio/ as a 1:1 mirror, pipes text files thru RewriteUserPaths + ApplyPreferences before writing. ported from obs_replaykit/installer.py.
+    // install bundled obs config into %appdata%/obs-studio/. walks assets/obs-studio/ as a 1:1 mirror, pipes text files thru RewriteUserPaths + ApplyPreferences before writing
     public static class Installer
     {
         // top-level entries backed up before overwriting. obs-replayKit/ covers the whole replaykit-managed tree (lua scripts, dock html, presets); global.ini is merged not overwritten but cheap to back up anyway.
@@ -45,7 +46,7 @@ namespace ReplayKitSetup
         }
 
         // retry a write for a while on a locked file -- during an update, the outgoing helper process can still hold its own exe file open for a moment after obs exits, since it notices obs is gone and self-exits asynchronously rather than at that same instant. an update-initiating caller may also be racing this on its own, so this retry is the backstop that holds regardless of what triggered the update. normally the old process is gone in well under a second; 20s is padding for a loaded system, not the expected case.
-        private static void WriteWithRetry(Action writeFn)
+        internal static void WriteWithRetry(Action writeFn)
         {
             var deadline = DateTime.UtcNow.AddSeconds(20.0);
             while (true)
@@ -95,9 +96,7 @@ namespace ReplayKitSetup
             return path;
         }
 
-        // arm the in-obs first-run wizard by flipping setupWizardPending in the runtime settings file. the installer
-        // calls this only on a genuine first install; an update or a re-run leaves whatever the user already has, so a
-        // completed wizard never comes back.
+        // arm the in-obs first-run wizard by flipping setupWizardPending in the runtime settings file. the installer calls this only on a genuine first install; an update or a re-run leaves whatever the user already has, so a completed wizard never comes back.
         public static void MarkSetupWizardPending(Action<string> log = null)
         {
             string path = Prefs.RUNTIME_SETTINGS_FILE;
@@ -115,32 +114,8 @@ namespace ReplayKitSetup
             }
         }
 
-        public static bool CacheSetupExecutable(Action<string> log = null)
-        {
-            string source = Path.Combine(Config.BUNDLE_ROOT, "OBSReplayKit.exe");
-            if (!File.Exists(source))
-            {
-                log?.Invoke("warn: setup executable was not cached for in-app cleanup");
-                return false;
-            }
-            string target = Config.REPLAYKIT_SETUP_EXE;
-            try
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(target));
-                if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Copy(source, target, true);
-                }
-                // self-contained single-file exe (see ReplayKitSetup.csproj) -- the cached copy runs standalone, no sibling assemblies to carry across.
-                log?.Invoke($"cached setup executable -> {target}");
-                return true;
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            {
-                log?.Invoke($"warn: setup executable cache failed: {ex.Message}");
-                return false;
-            }
-        }
+        // the verified copy of this exe the in-app uninstall and the discord screenshare buttons run; a failure is a warning line the setup window lists as needing attention
+        public static bool CacheSetupExecutable(Action<string> log = null) => SetupCache.Provision(log);
 
         // mirror assets/obs-studio/ into %appdata%/obs-studio/. returns the file count.
         public static int InstallObsConfig(Preferences prefs, Action<string> log = null)
@@ -152,6 +127,8 @@ namespace ReplayKitSetup
             }
 
             MigrateLegacyStreamableState(log);
+            // before anything is written: the settings of the setup are merged into the existing settings file, which has to be the one in the new place by then
+            MigrateStateLayout(log);
 
             int count = 0;
             foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
@@ -171,9 +148,9 @@ namespace ReplayKitSetup
 
         private static readonly HashSet<string> RuntimePreserveRels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            Path.Combine("obs-replayKit", "scripts", "replaykit_settings.json"),
-            Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
-            Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
+            Path.Combine("obs-replayKit", StateLayout.SettingsFile),
+            Path.Combine("obs-replayKit", StateLayout.ClipsDbFile),
+            Path.Combine("obs-replayKit", StateLayout.ClipsIndexFile),
         };
 
         private static readonly string[] RuntimeDeleteRels =
@@ -181,22 +158,34 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "scripts", "replay_buffer", "replay_buffer_saved.mp3"),
             Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
             Path.Combine("obs-replayKit", "scripts", "helper", "replaykit_update_bootstrap.ps1"),
+            Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
         };
 
-        private static readonly string[] RuntimeStateRels =
-        {
-            Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
-            Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
-        };
+        // the clip state that is kept across an uninstall and put back by a reinstall
+        private static readonly string[] RuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
         private static readonly string LegacyStreamableDirRel = Path.Combine("obs-replayKit", "scripts", "streamable");
         private static readonly Dictionary<string, string> LegacyStreamableStateRels = new Dictionary<string, string>
         {
-            ["clips_db.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "clips_db.json"),
-            ["clips_index.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "clips_index.json"),
-            ["helper_config.json"] = Path.Combine("obs-replayKit", "scripts", "helper", "helper_config.json"),
+            [StateLayout.ClipsDbFile] = Path.Combine("obs-replayKit", StateLayout.ClipsDbFile),
+            [StateLayout.ClipsIndexFile] = Path.Combine("obs-replayKit", StateLayout.ClipsIndexFile),
+            [StateLayout.HelperConfigFile] = Path.Combine("obs-replayKit", StateLayout.HelperConfigFile),
         };
+
+        // the settings and the saved state moved out of scripts\ and scripts\helper\ into the replaykit folder itself; this moves what an older install still has in the old places, and a file that cannot be moved yet stays where it is and keeps being used
+        private static void MigrateStateLayout(Action<string> log)
+        {
+            try
+            {
+                var result = StateLayout.Run(Config.REPLAYKIT_CONFIG, log);
+                if (result.Moved > 0) log?.Invoke($"state files moved into the replaykit folder: {result.Moved}");
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke("warn: could not move the settings into the replaykit folder: " + ex.Message);
+            }
+        }
 
         // one-time migration for installs made before the streamable/ directory was renamed to helper/: carries the live clip db/index/helper-config forward to their new path, then removes the old directory tree. no-ops once the old directory is gone, so its safe to call on every install.
         private static void MigrateLegacyStreamableState(Action<string> log = null)
@@ -208,7 +197,7 @@ namespace ReplayKitSetup
             {
                 string oldFile = Path.Combine(oldDir, kv.Key);
                 string newFile = Path.Combine(Config.OBS_CONFIG, kv.Value);
-                if (File.Exists(oldFile) && !File.Exists(newFile))
+                if (File.Exists(oldFile) && !File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, kv.Key)))
                 {
                     try
                     {
@@ -275,21 +264,22 @@ namespace ReplayKitSetup
         public static int RestoreReplaykitUserState(Action<string> log = null)
         {
             int restored = 0;
-            foreach (var rel in RuntimeStateRels)
+            foreach (var file in RuntimeStateFiles)
             {
-                string source = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, Path.GetFileName(rel));
-                string target = Path.Combine(Config.OBS_CONFIG, rel);
-                if (!File.Exists(source) || File.Exists(target)) continue;
+                string source = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, file);
+                // a file that is still in the old place counts as present: it is the real one and gets moved
+                if (!File.Exists(source) || File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, file))) continue;
+                string target = StateLayout.PathFor(Config.REPLAYKIT_CONFIG, file);
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
                     File.Copy(source, target, true);
                     restored++;
-                    log?.Invoke("restored state: " + rel.Replace('\\', '/'));
+                    log?.Invoke("restored state: " + file);
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    log?.Invoke($"warn: could not restore state {rel.Replace('\\', '/')}: {ex.Message}");
+                    log?.Invoke($"warn: could not restore state {file}: {ex.Message}");
                 }
             }
             return restored;
@@ -363,11 +353,7 @@ namespace ReplayKitSetup
             return patched;
         }
 
-        // Runtime updates used to leave the existing user.ini alone. That
-        // preserved OBS layout, but also left the managed Controls dock on its
-        // legacy file:// URL after the helper moved to a protected loopback API.
-        // OBS is closed before this runs, so update only that canonical dock row
-        // while Transform preserves every unrelated dock and preference.
+        // runtime updates used to leave the existing user.ini alone. That preserved OBS layout, but also left the managed Controls dock on its legacy file:// URL after the helper moved to a protected loopback API. OBS is closed before this runs, so update only that canonical dock row while Transform preserves every unrelated dock and preference.
         private static void UpdateControlsDockUrl(Action<string> log)
         {
             string path = Path.Combine(Config.OBS_CONFIG, "user.ini");
@@ -470,8 +456,8 @@ namespace ReplayKitSetup
         // the runtime tree an update installs from. exposed so the updater can preflight it before it closes obs, against the same path InstallReplaykitRuntimeUpdate walks.
         public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
 
-        // refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies SceneSourcePatches to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies.
-        public static int InstallReplaykitRuntimeUpdate(Action<string> log = null)
+        // refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies SceneSourcePatches to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies. problems, when given, collects the parts that could not be brought up to date (the plugin, the audio plugin), so the caller can put them in the verdict of the update
+        public static int InstallReplaykitRuntimeUpdate(Action<string> log = null, List<string> problems = null)
         {
             string runtimeSrc = GetRuntimeAssetsDir();
             if (!Directory.Exists(runtimeSrc)) throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}");
@@ -512,7 +498,8 @@ namespace ReplayKitSetup
                     string rel = Path.Combine("obs-replayKit", fileRel);
                     string staged = Path.Combine(stageRoot, fileRel);
                     string dst = Path.Combine(Config.OBS_CONFIG, rel);
-                    if (RuntimePreserveRels.Contains(rel) && File.Exists(dst))
+                    // a file that is still in its old place counts as present: the copy in the bundle must not become a second, empty settings file next to real data that has not been moved yet
+                    if (RuntimePreserveRels.Contains(rel) && File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, Path.GetFileName(rel))))
                     {
                         log?.Invoke("preserve: " + rel.Replace('\\', '/'));
                         continue;
@@ -561,6 +548,8 @@ namespace ReplayKitSetup
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke("warn: update staging cleanup failed: " + ex.Message); }
             }
 
+            // after the copy has gone through, never before: a copy that is rolled back puts the old helper and scripts back, and those look for the settings in the old places
+            MigrateStateLayout(log);
             CacheSetupExecutable(log);
             CleanupReplaykitLegacyFiles(log);
             RestoreReplaykitUserState(log);
@@ -577,9 +566,20 @@ namespace ReplayKitSetup
                 log?.Invoke($"warn: scene patch pass failed: {ex.Message}");
             }
 
+            // the defaults this build ships, once per install -- see DefaultsMigration
             try
             {
-                RunUpdateDriverRefresh(log);
+                DefaultsMigration.Run(log);
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: default settings pass failed: {ex.Message}");
+            }
+
+            try
+            {
+                var notUpdated = RunUpdateDriverRefresh(log);
+                if (problems != null) problems.AddRange(notUpdated);
             }
             catch (Exception ex)
             {
@@ -589,18 +589,25 @@ namespace ReplayKitSetup
             return count;
         }
 
-        // re-run idempotent installer functions during an auto-update; each one short-circuits when its target is already present (ffmpeg checks file hashes, elevation task checks schtasks), so new releases can plug in additional plugin installs here and existing users pick them up next auto-update.
-        public static void RunUpdateDriverRefresh(Action<string> log = null)
+        // re-run idempotent installer functions during an auto-update; each one short-circuits when its target is already present (ffmpeg checks file hashes, elevation task checks schtasks), so new releases can plug in additional plugin installs here and existing users pick them up next auto-update. returns what the update could not bring up to date among the parts that change how replaykit behaves (the plugin and the audio plugin), so the verdict of the update can say so instead of a warning line that nobody reads
+        public static List<string> RunUpdateDriverRefresh(Action<string> log = null)
         {
+            var problems = new List<string>();
             try { InstallObsFfmpeg(log); }
             catch (Exception ex) { log?.Invoke($"warn: ffmpeg refresh skipped: {ex.Message}"); }
 
             try { ShaderFilter.InstallReplaykitMotionBlurPlugin(log); }
             catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh skipped: {ex.Message}"); }
 
-            // the tray plugin was missing from this refresh entirely, so an updating install kept whatever replaykit.dll it already had and never picked up plugin-side changes -- and never dropped the pre-unification replaykit-tray.dll, which obs then loaded alongside the new one and injected every tray menu item twice. safe to copy here because the update flow has already closed obs.
-            try { TrayPlugin.InstallReplaykitTrayPlugin(log); }
-            catch (Exception ex) { log?.Invoke($"warn: tray plugin refresh skipped: {ex.Message}"); }
+            // the native plugin was missing from this refresh entirely, so an updating install kept whatever replaykit.dll it already had and never picked up plugin-side changes -- and never dropped the pre-unification replaykit-tray.dll, which obs then loaded alongside the new one and injected every tray menu item twice. safe to copy here because the update flow has already closed obs.
+            try { NativePlugin.InstallReplaykitPlugin(log); }
+            catch (Exception ex) { log?.Invoke($"warn: plugin refresh skipped: {ex.Message}"); }
+            if (NativePlugin.IsBundled() && !NativePlugin.IsCurrent()) problems.Add("the ReplayKit plugin");
+
+            // the desktop audio plugin was only ever put in by a full setup, so an updating install kept the 2022 build with its known crash and never got a fix to the build replaykit ships. it compares the installed dll with the bundled one and does nothing when they match; obs is closed here
+            try { WinCapture.InstallWinCaptureAudio(log); }
+            catch (Exception ex) { log?.Invoke($"warn: desktop audio plugin refresh skipped: {ex.Message}"); }
+            if (WinCapture.IsExpected() && !WinCapture.IsCurrent()) problems.Add("the desktop audio plugin");
 
             try { RemoveObsElevationTask(log); }
             catch (Exception ex) { log?.Invoke($"warn: elevation task cleanup skipped: {ex.Message}"); }
@@ -619,6 +626,7 @@ namespace ReplayKitSetup
                 else TrayPin.UnpinObsTrayIcon(log);
             }
             catch (Exception ex) { log?.Invoke($"warn: tray icon pin refresh skipped: {ex.Message}"); }
+            return problems;
         }
 
         // copy the users current obs config to obs-studio.bak.<timestamp>. returns the backup path, or null if there was nothing to back up.
@@ -690,13 +698,10 @@ namespace ReplayKitSetup
         // download + drop ffmpeg.exe and ffprobe.exe next to the helper. obs ships only obs-ffmpeg-mux.exe; compress/trim need the full pair. idempotent.
         public static bool InstallObsFfmpeg(Action<string> log = null) => FfmpegInstall.InstallFfmpeg(log);
 
-        // Configure authenticated OBS WebSocket access for the helper.
+        // configure authenticated OBS WebSocket access for the helper.
         public static bool ConfigureObsWebsocket(Action<string> log = null) => WebSocketConfig.InstallWebsocketConfig(log);
 
-        // clip-ready toasts (from the helper) need SOME Start Menu shortcut carrying the app's AppUserModelID -- windows'
-        // rule for an unpackaged app. instead of a separate "OBS ReplayKit" entry, stamp that id onto OBS Studio's own
-        // shortcut (this runs elevated so the all-users .lnk is writable); fall back to a same-named user-scope copy only
-        // if OBS's is missing. also removes the old distinct "OBS ReplayKit.lnk" from earlier versions.
+        // clip-ready toasts (from the helper) need SOME Start Menu shortcut carrying the apps AppUserModelID -- windows' rule for an unpackaged app. instead of a separate "OBS ReplayKit" entry, stamp that id onto OBS Studios own shortcut (this runs elevated so the all-users .lnk is writable); fall back to a same-named user-scope copy only if OBSs is missing. also removes the old distinct "OBS ReplayKit.lnk" from earlier versions.
         public static bool RegisterClipNotificationShortcut(Action<string> log = null)
         {
             string aumid = Shortcuts.ClipNotifyAumid;
@@ -734,12 +739,12 @@ namespace ReplayKitSetup
         public static bool InstallObsSleepOverride(bool allowSleep = true, Action<string> log = null) =>
             allowSleep ? SleepOverride.InstallSleepOverride(log) : SleepOverride.RemoveSleepOverride(log);
 
-        // the helper (OBSReplayKit.exe under scripts/helper/) is a full compiled C# app (ReplayKitHelper), built by build.bat straight into assets/ the same way replaykit.dll is a prebuilt native plugin -- there is no lightweight on-the-fly compile step for it the way the old thin PowerShell-hosting launcher had (this one needs the .NET SDK, NuGet restore, and an ILRepack merge, all done at repo build time); this just confirms the bundle actually shipped it, since helper_bootstrap.lua has no fallback if it's missing.
+        // the helper (OBSReplayKit.exe under scripts/helper/) is a full compiled C# app (ReplayKitHelper), built by build.bat straight into assets/ the same way replaykit.dll is a prebuilt native plugin -- there is no lightweight on-the-fly compile step for it the way the old thin PowerShell-hosting launcher had (this one needs the .NET SDK, NuGet restore, and an ILRepack merge, all done at repo build time); this just confirms the bundle actually shipped it, since helper_bootstrap.lua has no fallback if its missing.
         public static bool EnsureLauncherBuilt(Action<string> log = null)
         {
             string launcherPath = Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit", "scripts", "helper", "OBSReplayKit.exe");
             if (File.Exists(launcherPath)) return true;
-            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defender's wmi threat log to name Defender specifically -- dropped with System.Management for the trimmed build; the generic pointer covers Defender's Protection History too.
+            // "re-run build.bat" used to be here, which only makes sense to a dev with the source checked out -- an end user hitting this has no build.bat. the file was unpacked from the bundle successfully (AssetBundle.ExtractTo would have failed the whole install otherwise); it going missing right after almost always means antivirus quarantined it the moment it landed on disk as a fresh, unsigned exe. used to read Defenders wmi threat log to name Defender specifically -- dropped with System.Management for the trimmed build; the generic pointer covers Defenders Protection History too.
             log?.Invoke($"warn: helper launcher missing at {launcherPath} -- your antivirus likely quarantined it right after install. check its quarantine or history (Windows Security > Protection History for Defender), restore or exclude the ReplayKit temp folder, then reinstall.");
             return false;
         }

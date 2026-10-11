@@ -180,15 +180,14 @@
 
     function send(obj) { if (host) host.postMessage(JSON.stringify(obj)); }
 
-    // existing install -> the primary button updates in place; Re-Install wipes ReplayKit's saved settings first.
+    // existing install -> the primary button updates in place; Re-Install wipes ReplayKits saved settings first.
     if (SETUP.installed) {
       els.installBtn.textContent = "Update";
       els.reinstallBtn.hidden = false;
       els.line1.textContent = "Updates the ReplayKit files and keeps your current settings.";
       els.line2.hidden = true;
     }
-    // pre-check the Discord opt-in when the audio cable is already on the machine (or the current install has it on) --
-    // a fresh machine with no cable stays unchecked. unchecking it before Update / Re-Install removes the cable.
+    // pre-check the Discord opt-in when the audio cable is already on the machine (or the current install has it on) -- a fresh machine with no cable stays unchecked. unchecking it before Update / Re-Install removes the cable.
     els.discord.checked = !!(SETUP.cable || SETUP.screenshare);
 
     function startFlow(mode) {
@@ -241,8 +240,7 @@
         case "done":
           els.spinner.hidden = true;
           els.statLine.classList.remove("is-bad");
-          // never surface a warning count here -- benign per-step notes (audio default restore, an optional plugin
-          // skipped) read as "something is broken" to a user watching the installer finish.
+          // never surface a warning count here -- benign per-step notes (audio default restore, an optional plugin skipped) read as "something is broken" to a user watching the installer finish.
           els.statLine.textContent = "Done. OBS is starting…";
           els.statDetail.textContent = "";
           els.statPct.textContent = "";

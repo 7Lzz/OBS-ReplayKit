@@ -5,7 +5,7 @@ using Microsoft.Win32;
 
 namespace ReplayKitSetup
 {
-    // enumerate windows audio devices. obs stores endpoint ids in mmdevice format -- {0.0.1.00000000}.<endpoint-guid> for capture, {0.0.0.00000000}.<endpoint-guid> for render. friendly names live under each endpoints properties subkey. ported from obs_replaykit/audio.py.
+    // enumerate windows audio devices. obs stores endpoint ids in mmdevice format -- {0.0.1.00000000}.<endpoint-guid> for capture, {0.0.0.00000000}.<endpoint-guid> for render. friendly names live under each endpoints properties subkey.
     public static class Audio
     {
         // pkey_device_friendlyname in the mmdevices property store.
@@ -66,7 +66,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // obs-format render device id matching friendlyName (case-insensitive exact). used to write the fresh obs stream audio id straight into basic.ini so obs picks the right monitoring sink on first launch. unlike ActiveEndpoints, an endpoint whose friendly name cant be read is skipped rather than matched by its raw guid -- matches the python originals continue-on-failure behavior exactly.
+        // obs-format render device id matching friendlyName (case-insensitive exact). used to write the fresh obs stream audio id straight into basic.ini so obs picks the right monitoring sink on first launch. unlike ActiveEndpoints, an endpoint whose friendly name cant be read is skipped rather than matched by its raw guid.
         public static string FindRenderEndpoint(string friendlyName)
         {
             string needle = friendlyName.ToLowerInvariant();

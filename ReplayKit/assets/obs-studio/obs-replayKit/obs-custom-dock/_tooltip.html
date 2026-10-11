@@ -1,18 +1,10 @@
-<!-- shared partial (helper #include target: tooltip). the modern hover tooltip every dock page uses: one js-positioned
-     element rather than a css ::before, so it clamps into the viewport and slides its arrow to keep pointing at the
-     control. self-wires to any [data-tooltip] element, delegated so controls created later (virtualized clip cards)
-     are covered too. host: nothing required; optionally RKTooltip.suppressWhen(fn) to mute it for a control whose own
-     menu is open, and RKTooltip.hide() / .reposition() for manual control.
-     the tray plugin paints a native twin of this for the title-bar bell (NotifyTip in replaykit.cpp) -- when the
-     numbers below change, change them there too. -->
+<!-- shared partial (helper #include target: tooltip). the modern hover tooltip every dock page uses: one js-positioned element rather than a css ::before, so it clamps into the viewport and its arrow slides to keep pointing at the control; self-wires to any [data-tooltip] element, delegated so controls created later (virtualized clip cards) are covered too; host: nothing required, optionally RKTooltip.suppressWhen(fn) to mute it for a control whose own menu is open, and RKTooltip.hide() / .reposition() for manual control; the native plugin paints the same tip for the rail and the title bar (NotifyTip in notify/notify_tip.cpp) and controls_app.html carries an inlined copy, so a change to the numbers below goes into all three -->
 <style>
   #rk-tip {
     position: fixed;
     z-index: 300;
     padding: 5px 8px;
     border-radius: 3px;
-    background: var(--grey8);
-    background: color-mix(in srgb, var(--grey8) 88%, transparent);
     color: var(--text);
     font-family: var(--font_family, var(--font, "Segoe UI", system-ui, sans-serif));
     font-size: 11px;
@@ -27,16 +19,18 @@
     transition: opacity 100ms linear, transform var(--anim_press, 130ms) var(--ease_pop, ease);
   }
   #rk-tip.is-shown { opacity: 1; transform: translateY(0) scale(1); }
-  #rk-tip::before {
-    content: "";
-    position: absolute;
-    bottom: 100%;
-    left: var(--tip-arrow, 50%);
-    transform: translateX(-50%);
-    border: 5px solid transparent;
-    border-bottom-color: var(--grey8);
-    border-bottom-color: color-mix(in srgb, var(--grey8) 88%, transparent);
+  /* over the control, with the arrow under the body, when there is no room under the control: the pop starts from the edge the arrow is on */
+  #rk-tip.tip-over { transform: translateY(-3px) scale(.96); transform-origin: bottom center; }
+  #rk-tip.tip-over.is-shown { transform: translateY(0) scale(1); }
+  /* the ground and the hairline are one drawn outline, body and arrow together (drawShape below), so a see-through ground is laid down once and the hairline runs from the body up the arrow and back down with no seam */
+  #rk-tip .rk-tip-shape { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+  #rk-tip .rk-tip-fill {
+    fill: var(--grey8);
+    fill: color-mix(in srgb, var(--grey8) 88%, transparent);
   }
+  /* the hairline is the text colour at low alpha, white on a dark theme */
+  #rk-tip .rk-tip-edge { fill: none; stroke: rgba(var(--text-rgb, 255, 255, 255), .16); stroke-width: 1; stroke-linejoin: miter; }
+  #rk-tip .rk-tip-text { position: relative; }
   /* multi-line variant for the info-dot notes -- same ground, shadow, arrow and pop, just wraps. */
   #rk-tip.tip-rich {
     white-space: normal;
@@ -51,6 +45,21 @@
   var tip = document.createElement("div");
   tip.id = "rk-tip";
   tip.setAttribute("role", "tooltip");
+  // the outline and the text are the only children, and the text has a span of its own so setting it never removes the outline
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var shape = document.createElementNS(SVG_NS, "svg");
+  shape.setAttribute("class", "rk-tip-shape");
+  shape.setAttribute("aria-hidden", "true");
+  var fillPath = document.createElementNS(SVG_NS, "path");
+  fillPath.setAttribute("class", "rk-tip-fill");
+  var edgePath = document.createElementNS(SVG_NS, "path");
+  edgePath.setAttribute("class", "rk-tip-edge");
+  shape.appendChild(fillPath);
+  shape.appendChild(edgePath);
+  var label = document.createElement("span");
+  label.className = "rk-tip-text";
+  tip.appendChild(shape);
+  tip.appendChild(label);
   var current = null;
   var suppress = function () { return false; };
 
@@ -59,6 +68,43 @@
   }
   if (document.body) attach();
   else document.addEventListener("DOMContentLoaded", attach);
+
+  // body and arrow as one outline, w by h with the arrow on the top edge at x, or on the bottom edge when over is set: the fill covers all of it, and the edge is the same outline pulled in half a pixel so its one pixel line lies inside it, the way a css border does
+  function drawShape(w, h, x, over) {
+    var r = 3;
+    var a = 5;
+    var i = 0.5;
+    var ri = r - i;
+    var cut = i * (Math.SQRT2 - 1);
+    var apex = i * Math.SQRT2 - a;
+    if (over) {
+      fillPath.setAttribute("d",
+        "M" + r + " 0H" + (w - r) +
+        "A" + r + " " + r + " 0 0 1 " + w + " " + r + "V" + (h - r) +
+        "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + h + "H" + (x + a) + "L" + x + " " + (h + a) + "L" + (x - a) + " " + h + "H" + r +
+        "A" + r + " " + r + " 0 0 1 0 " + (h - r) + "V" + r +
+        "A" + r + " " + r + " 0 0 1 " + r + " 0Z");
+      edgePath.setAttribute("d",
+        "M" + r + " " + i + "H" + (w - r) +
+        "A" + ri + " " + ri + " 0 0 1 " + (w - i) + " " + r + "V" + (h - r) +
+        "A" + ri + " " + ri + " 0 0 1 " + (w - r) + " " + (h - i) + "H" + (x + a - cut) + "L" + x + " " + (h - apex) + "L" + (x - a + cut) + " " + (h - i) + "H" + r +
+        "A" + ri + " " + ri + " 0 0 1 " + i + " " + (h - r) + "V" + r +
+        "A" + ri + " " + ri + " 0 0 1 " + r + " " + i + "Z");
+      return;
+    }
+    fillPath.setAttribute("d",
+      "M" + r + " 0H" + (x - a) + "L" + x + " " + (-a) + "L" + (x + a) + " 0H" + (w - r) +
+      "A" + r + " " + r + " 0 0 1 " + w + " " + r + "V" + (h - r) +
+      "A" + r + " " + r + " 0 0 1 " + (w - r) + " " + h + "H" + r +
+      "A" + r + " " + r + " 0 0 1 0 " + (h - r) + "V" + r +
+      "A" + r + " " + r + " 0 0 1 " + r + " 0Z");
+    edgePath.setAttribute("d",
+      "M" + r + " " + i + "H" + (x - a + cut) + "L" + x + " " + apex + "L" + (x + a - cut) + " " + i + "H" + (w - r) +
+      "A" + ri + " " + ri + " 0 0 1 " + (w - i) + " " + r + "V" + (h - r) +
+      "A" + ri + " " + ri + " 0 0 1 " + (w - r) + " " + (h - i) + "H" + r +
+      "A" + ri + " " + ri + " 0 0 1 " + i + " " + (h - r) + "V" + r +
+      "A" + ri + " " + ri + " 0 0 1 " + r + " " + i + "Z");
+  }
 
   function reposition() {
     if (!current) return;
@@ -69,11 +115,14 @@
     var gap = 8;    // vertical gap between control and tip
     var centre = b.left + b.width / 2;
     var left = Math.max(edge, Math.min(centre - tw / 2, window.innerWidth - tw - edge));
-    var top = Math.max(edge, Math.min(b.bottom + gap, window.innerHeight - th - edge));
+    // under the control, or over it when there is no room under it and more room over it; clamping is only what is left for a window too small for either
+    var over = window.innerHeight - b.bottom - gap - edge < th && b.top - gap - edge > window.innerHeight - b.bottom - gap - edge;
+    var top = Math.max(edge, Math.min(over ? b.top - gap - th : b.bottom + gap, window.innerHeight - th - edge));
+    tip.classList.toggle("tip-over", over);
     tip.style.left = Math.round(left) + "px";
     tip.style.top = Math.round(top) + "px";
     // arrow rides the control centre, clamped so it stays on the tip body
-    tip.style.setProperty("--tip-arrow", Math.round(Math.max(10, Math.min(centre - left, tw - 10))) + "px");
+    drawShape(tw, th, Math.round(Math.max(10, Math.min(centre - left, tw - 10))), over);
   }
 
   function show(el) {
@@ -81,7 +130,7 @@
     if (suppress(el)) return;
     attach();
     current = el;
-    tip.textContent = el.dataset.tooltip;
+    label.textContent = el.dataset.tooltip;
     tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
     tip.classList.add("is-shown");
     reposition();
@@ -92,17 +141,15 @@
     tip.classList.remove("is-shown");
   }
 
-  // controls that rewrite their own label (Upload -> "Stop uploads (3 / 8)") update the visible tip instead of making
-  // the user re-hover. only the hovered one is watched, so this costs nothing when nothing is tipped.
+  // controls that rewrite their own label (Upload -> "Stop uploads (3 / 8)") update the visible tip instead of making the user re-hover. only the hovered one is watched, so this costs nothing when nothing is tipped.
   var observer = new MutationObserver(function () {
     if (!current) return;
     if (current.offsetParent === null || !current.dataset.tooltip) { observer.disconnect(); hide(); return; }
-    tip.textContent = current.dataset.tooltip;
+    label.textContent = current.dataset.tooltip;
     reposition();
   });
 
-  // delegated: card controls are created and recycled as a grid virtualizes, so anything wired once at load would miss
-  // every one built afterwards. mouseover/mouseout bubble, mouseenter/mouseleave do not.
+  // delegated: card controls are created and recycled as a grid virtualizes, so anything wired once at load would miss every one built afterwards. mouseover/mouseout bubble, mouseenter/mouseleave do not.
   document.addEventListener("mouseover", function (e) {
     var el = e.target.closest("[data-tooltip]");
     // menu rows carry the same labels for a11y but already show their text, so they never get a tip
@@ -117,8 +164,7 @@
     observer.disconnect();
     hide();
   });
-  // info-dots also answer to the focus a tab hands them, and to a click (swallowed so a dot inside a label never
-  // toggles its checkbox).
+  // info-dots also answer to the focus a tab hands them, and to a click (swallowed so a dot inside a label never toggles its checkbox).
   document.addEventListener("focusin", function (e) {
     var dot = e.target.closest(".info-dot[data-tooltip]");
     if (dot) show(dot);
@@ -132,8 +178,7 @@
     e.preventDefault();
     show(dot);
   });
-  // hide on any click EXCEPT one on the tipped control itself -- clicking it is about to change its tooltip, and the
-  // observer will swap the text live.
+  // hide on any click EXCEPT one on the tipped control itself -- clicking it is about to change its tooltip, and the observer will swap the text live.
   document.addEventListener("mousedown", function (e) {
     if (current && current.contains(e.target)) return;
     hide();
@@ -141,8 +186,7 @@
   window.addEventListener("resize", reposition);
   window.addEventListener("scroll", hide, true);
 
-  // pulls native title= attributes onto data-tooltip so an existing page gets the modern tip without every element
-  // being rewritten by hand, and keeps doing it for markup added later.
+  // pulls native title= attributes onto data-tooltip so an existing page gets the modern tip without every element being rewritten by hand, and keeps doing it for markup added later.
   function adopt(root) {
     var nodes = [];
     if (root && root.nodeType === 1 && root.hasAttribute("title")) nodes.push(root);

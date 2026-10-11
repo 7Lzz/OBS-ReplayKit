@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // Configure authenticated OBS WebSocket access for the local helper.
+    // configure authenticated OBS WebSocket access for the local helper.
     public static class WebSocketConfig
     {
         public static readonly string WEBSOCKET_CONFIG_PATH = Path.Combine(Config.OBS_CONFIG, "plugin_config", "obs-websocket", "config.json");
@@ -56,7 +56,7 @@ namespace ReplayKitSetup
             return null;
         }
 
-        // Preserve existing settings; unreadable configuration must not be overwritten.
+        // preserve existing settings; unreadable configuration must not be overwritten.
         private static JObject LoadExisting()
         {
             if (!File.Exists(WEBSOCKET_CONFIG_PATH)) return new JObject();
@@ -70,7 +70,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // Called with OBS closed so port availability can be checked before configuration is written.
+        // called with OBS closed so port availability can be checked before configuration is written.
         public static bool InstallWebsocketConfig(Action<string> log = null)
         {
             var existing = LoadExisting();

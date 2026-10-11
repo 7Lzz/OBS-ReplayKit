@@ -50,8 +50,13 @@ local function read_text(path)
     return text
 end
 
+-- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it
 local function runtime_settings_path()
-    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+    local scripts_dir = parent_dir(script_path())
+    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
+    local f = io.open(current, "rb")
+    if f then f:close() return current end
+    return join_path(scripts_dir, "replaykit_settings.json")
 end
 
 local function file_exists(path)

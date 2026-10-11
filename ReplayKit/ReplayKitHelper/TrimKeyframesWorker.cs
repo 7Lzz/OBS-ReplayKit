@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // scans a clips keyframe (i-frame) timestamps with ffprobe, for the trim uis snap-to-keyframe markers. two strategies: a fast packet-flags pass first, falling back to a slower full frame decode pass when the fast pass comes back empty (some containers/codecs dont expose keyframe flags on the packet stream). runs as an in-process Task from Trim.StartTrimKeyframeScan instead of a spawned child process writing a json status file -- the caller reads Task.Result directly, so Write-Result/the status-file round-trip from the ps original has no equivalent here. ported from obs_replaykit helper trim_keyframes_worker.ps1.
+    // scans a clips keyframe (i-frame) timestamps with ffprobe, for the trim uis snap-to-keyframe markers. two strategies: a fast packet-flags pass first, falling back to a slower full frame decode pass when the fast pass comes back empty (some containers/codecs dont expose keyframe flags on the packet stream). runs as an in-process task from Trim.StartTrimKeyframeScan and returns its result directly.
     internal static class TrimKeyframesWorker
     {
         private static void AddKeyframeTime(List<double> times, string raw)

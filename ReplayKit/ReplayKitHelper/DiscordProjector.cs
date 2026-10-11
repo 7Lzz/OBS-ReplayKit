@@ -11,7 +11,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // discord "share preview" via an obs windowed projector: finds/opens/parks it hidden-but-discoverable in a corner (so discord's own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or closes it when disabled. every find/open/park/close sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other -- see the comment on Repark below, which documents a real concurrency bug this fixed. ported from obs_replaykit helper modules/64_discord_projector.ps1 (the orchestration half; ProjectorNative.cs is the embedded win32 layer from the same file).
+    // discord "share preview" via an obs windowed projector: finds/opens/parks it hidden-but-discoverable in a corner (so discords own screen picker lists it) when enabled, or shows it centered for a user-triggered visual check ("inspect"), or closes it when disabled. every find/open/park/close sequence runs under ProjectorLock so Repark/Inspect/Disable/the keep-alive tick can never interleave with each other -- see the comment on Repark below, which documents a real concurrency bug this fixed. ProjectorNative.cs is the win32 layer underneath.
     internal static class DiscordProjector
     {
         public static string GetProjectorTitle(JObject settings)
@@ -339,8 +339,8 @@ namespace ReplayKitHelper
 
         private const int ProjectorHandoffMaxAgeSeconds = 2;
 
-        // the plugin (replaykit.cpp) streams the hwnds obs itself marked with isOBSProjectorWindow over the OBSReplayKitIpc pipe every 250ms -- the actual authoritative signal obs uses internally. PipeClient caches the latest snapshot in Server.State. returns null (not an empty list) when the pipe isnt connected or no snapshot has landed in the last couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back to the window-heuristic scan -- an empty list here would silently collapse those two very different situations into one.
-        private static List<long> GetProjectorHwndsFromTrayPlugin()
+        // the native plugin (core/ipc_pipe.cpp) streams the hwnds obs itself marked with isOBSProjectorWindow over the OBSReplayKitIpc pipe every 250ms -- the actual authoritative signal obs uses internally. PipeClient caches the latest snapshot in Server.State. returns null (not an empty list) when the pipe isnt connected or no snapshot has landed in the last couple publish cycles, so the caller can tell "confirmed no projectors exist" apart from "the plugin isnt running or obs is mid-shutdown, this genuinely doesnt know" and fall back to the window-heuristic scan -- an empty list here would silently collapse those two very different situations into one.
+        private static List<long> GetProjectorHwndsFromPlugin()
         {
             lock (Server.State.IpcLock)
             {
@@ -350,11 +350,11 @@ namespace ReplayKitHelper
             }
         }
 
-        // the tray-plugin signal above is authoritative when available -- prefer it. FindAllObsWindows (window class + no-owner heuristic) is the fallback for an older bundle without the tray plugin update, or the brief window before the tray plugins first publish after obs startup.
+        // the plugin signal above is authoritative when available -- prefer it. FindAllObsWindows (window class + no-owner heuristic) is the fallback for an older bundle without the native plugin update, or the brief window before the native plugins first publish after obs startup.
         private static List<long> GetObsWindowCandidates()
         {
-            var fromTray = GetProjectorHwndsFromTrayPlugin();
-            if (fromTray != null) return fromTray;
+            var fromPlugin = GetProjectorHwndsFromPlugin();
+            if (fromPlugin != null) return fromPlugin;
             return new List<long>(ProjectorNative.FindAllObsWindows());
         }
 
@@ -470,7 +470,7 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        // finds/opens/parks the projector hidden in a screen corner (topmost + alpha-0 layered, so its click-thru and invisible but still discoverable in discords screen picker). runs the whole find/open/park sequence under ProjectorLock -- confirmed via a real user log (in the ps original) that without this, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
+        // finds/opens/parks the projector hidden in a screen corner (topmost + alpha-0 layered, so its click-thru and invisible but still discoverable in discords screen picker). runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
         public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
         {
             if (settings == null) settings = ReplaykitSettings.ReadSettings();
@@ -764,7 +764,7 @@ namespace ReplayKitHelper
         // this tick runs on the main accept-loop thread (see Runtime.cs), never a pool thread, and must stay that way -- the win32 reposition call underneath it can block waiting on obss own ui thread if obs is busy, which on the pooled model only briefly delays the next new connection being accepted, not any in-flight request.
         private const int KeepAliveSeconds = 30;
         private static int _keepAliveFailures;
-        // open-if-missing has no upper bound tighter than a 5s websocket call plus a 6s find-poll, and that whole sequence runs on this same main thread while holding ProjectorLock -- confirmed via a real user log (in the ps original) that on a machine where the projector genuinely fails to appear, every single 30s tick re-attempts and re-blocks the entire helper for the full open+poll duration, starving every other connection. capping the backoff here so a persistently-broken projector gets retried every few minutes instead of every 30s forever, once its clearly not a one-off miss.
+        // open-if-missing has no upper bound tighter than a 5s websocket call plus a 6s find-poll, and that whole sequence runs on this same main thread while holding ProjectorLock -- on a machine where the projector genuinely fails to appear, every single 30s tick re-attempts and re-blocks the entire helper for the full open+poll duration, starving every other connection. capping the backoff here so a persistently-broken projector gets retried every few minutes instead of every 30s forever, once its clearly not a one-off miss.
         private const int KeepAliveMaxBackoffSeconds = 300;
 
         public static void KeepAlive()

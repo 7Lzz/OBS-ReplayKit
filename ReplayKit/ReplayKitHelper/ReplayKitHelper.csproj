@@ -6,7 +6,7 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
     <RootNamespace>ReplayKitHelper</RootNamespace>
-    <!-- must stay OBSReplayKit; helper_bootstrap.lua looks for this exact filename next to local_helper_server.ps1 and launches it with -ConfigPath if present, falling back to powershell.exe only when it's missing. matching the name means the lua side needs zero changes. -->
+    <!-- must stay OBSReplayKit: helper_bootstrap.lua launches scripts\helper\OBSReplayKit.exe by that exact name -->
     <AssemblyName>OBSReplayKit</AssemblyName>
     <Nullable>disable</Nullable>
     <!-- runs at whatever privilege obs itself launched at; never elevate. this is also why the http listener is a raw TcpListener, not HttpListener/http.sys, which needs a urlacl reservation or admin rights to bind even loopback-only. -->
@@ -39,6 +39,10 @@
   <ItemGroup>
     <!-- the rnnoise network weights, extracted from the copy obs studio ships; Rnnoise/COPYING is the license that goes with them and with Rnnoise.cs. -->
     <EmbeddedResource Include="Rnnoise\rnnoise_model.bin" LogicalName="ReplayKitHelper.rnnoise_model.bin" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- one source file for where the settings and the saved state live, shared with the setup so the two can never disagree about it. -->
+    <Compile Include="..\ReplayKitSetup\StateLayout.cs" Link="StateLayout.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

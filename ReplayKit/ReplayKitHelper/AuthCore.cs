@@ -8,13 +8,13 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // auth storage (dpapi). saves the streamable session cookie + the user info json, encrypted with the current windows users dpapi master key -- so its tied to this account, never leaves disk readable, and survives reboots without us needing to store a password. ported from obs_replaykit helper modules/10_auth_core.ps1.
+    // auth storage (dpapi). saves the streamable session cookie + the user info json, encrypted with the current windows users dpapi master key -- so its tied to this account, never leaves disk readable, and survives reboots without us needing to store a password.
     internal static class AuthCore
     {
         // path to the curl cookie jar handed to the in-process upload orchestration (Upload.cs) whenever the user is signed in. ApplyAuth rewrites it from the decrypted blob, so the cookies live on disk in plaintext only while a session is active.
         public static string GetAuthCookieJarPath() => Path.Combine(Constants.AUTH_DIR, "auth_cookies.txt");
 
-        // persists a curl cookie jar (imported from a chromium browsers streamable.com session) encrypted with the current users dpapi key, so the session never lives on disk in plain text.
+        // persists a curl cookie jar (the session of the streamable sign-in window) encrypted with the current users dpapi key, so the session never lives on disk in plain text.
         public static void SaveAuthBlob(string cookieFileContent, JObject user)
         {
             Directory.CreateDirectory(Constants.AUTH_DIR);

@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // clip listing, the clips db (streamable url + compression history per filename), the ffprobe metadata index, favorites/sort ui state, and filename/path safety checks. ported from obs_replaykit helper modules/40_clips.ps1. clip_index_worker.ps1's repair pass is ClipIndexWorker.cs, run as an in-process Task from StartClipIndexRepairIfNeeded below instead of a spawned child process -- the Task gives a real completion callback, so the ps originals poll-based Update-ClipIndexRepairState (checking a childs pid on every call) has no equivalent here; ContinueWith replaces it directly.
+    // clip listing, the clips db (streamable url + compression history per filename), the ffprobe metadata index, favorites/sort ui state, and filename/path safety checks; the index repair runs as an in-process task (ClipIndexWorker)
     internal static class Clips
     {
         public static string GetSafeFilename(string raw)
@@ -42,6 +42,34 @@ namespace ReplayKitHelper
             return new SafeClipPath { Name = name, Full = full };
         }
 
+        public sealed class DeleteResult
+        {
+            // the http status the delete route answers with: 200 deleted, 404 not there, 409 another operation holds the clip, 500 the delete failed
+            public int Status;
+            public string Name;
+            public string Message = "";
+        }
+
+        // deletes one clip for good, the way the clips page does, so the storage card can delete a list of them with the same checks: the name has to resolve inside the clip folder, and a clip that an upload, trim or compression holds is left alone
+        public static DeleteResult DeleteClip(string rawName)
+        {
+            var selected = GetSafeClipPath(rawName);
+            if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = "Clip not found" };
+            string requestId = UploadState.NewRequestId();
+            using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy))
+            {
+                if (reservation == null) return new DeleteResult { Status = 409, Name = selected.Name, Message = busy };
+                try
+                {
+                    JobCoordinator.Commit(requestId, () => File.Delete(selected.Full));
+                    UpdateDb(db => db.Remove(selected.Name));
+                    EditDrafts.Forget(selected.Name);
+                    return new DeleteResult { Status = 200, Name = selected.Name };
+                }
+                catch (Exception ex) { return new DeleteResult { Status = 500, Name = selected.Name, Message = ex.Message }; }
+            }
+        }
+
         // clips db (filename -> {url, uploaded_at, ...}) with retention expiry.
         public static string GetClipsDbCacheSignature()
         {
@@ -59,7 +87,7 @@ namespace ReplayKitHelper
             return string.Join("|", parts);
         }
 
-        // Read-ClipsDb/Save-ClipsDb lock their whole body, not just the file i/o -- a cache-hit read returns the live cached JObject, so two callers touching it at once would be concurrent unsynchronized mutation, not just a stale-read risk.
+        // read-ClipsDb/Save-ClipsDb lock their whole body, not just the file i/o -- a cache-hit read returns the live cached JObject, so two callers touching it at once would be concurrent unsynchronized mutation, not just a stale-read risk.
         public static JObject ReadClipsDb()
         {
             lock (Server.State.ClipsMetaLock)
@@ -149,7 +177,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // shortcode/ready/transcodeStatus/transcodePercent are optional so the upload watcher can stamp the initial "streamable is still processing this" state in the same write that records the url -- the ps original had two separate code paths for this (Mark-Uploaded here, plus a second inline reimplementation in Start-UploadResultWatcher that forgot to preserve the cmp_* fields below); consolidating onto this one, correct path is a real fix, not just a style choice.
+        // the transcode fields are optional so an upload records its url and the initial still-processing state in one write, keeping the cmp_* fields
         public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null)
         {
             // UpdateDb coordinates this mutation with detached pollers as well as helper requests.
@@ -424,6 +452,16 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             });
+            // the film strip and the audio tracks of the editor as well, at a low priority so a game running meanwhile does not notice; a clip written to a moment ago is still being recorded, and what is made of it now would be of no use once it is finished
+            try
+            {
+                if ((DateTime.UtcNow - File.GetLastWriteTimeUtc(source.Full)).TotalSeconds > 30)
+                {
+                    ClipFilmstrip.Describe(name, true);
+                    ClipAudioTracks.Describe(name, true);
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }
 
         public static string NormalizeClipSort(string sort)
@@ -504,6 +542,47 @@ namespace ReplayKitHelper
             return safe;
         }
 
+        // the numbers the home page shows next to its recent clips row: how many clips there are, how much space they take, which days this week they were saved on, and how much room is left on the drive they live on. built from the same cached snapshot the clips list serves, so polling it is cheap.
+        public static JObject GetHomeSummaryPayload()
+        {
+            var clips = GetClipsList();
+            long bytes = 0;
+            DateTime today = DateTime.Now.Date;
+            int todayIndex = ((int)today.DayOfWeek + 6) % 7;
+            DateTime monday = today.AddDays(-todayIndex);
+            var week = new int[7];
+            foreach (var clip in clips)
+            {
+                bytes += clip["size"]?.Value<long>() ?? 0;
+                long mtime = clip["mtime"]?.Value<long>() ?? 0;
+                if (mtime <= 0) continue;
+                int dayOffset = (int)(DateTimeOffset.FromUnixTimeSeconds(mtime).LocalDateTime.Date - monday).TotalDays;
+                if (dayOffset >= 0 && dayOffset < 7) week[dayOffset]++;
+            }
+            string root = AppConfig.GetClipDir();
+            // -1 = unknown (a network path, or a drive that is not ready); the page hides the free-space line instead of showing a made-up number
+            long freeBytes = -1;
+            string drive = "";
+            try
+            {
+                var info = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(root)));
+                freeBytes = info.AvailableFreeSpace;
+                drive = info.Name.TrimEnd('\\');
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException) { }
+            return new JObject
+            {
+                ["ok"] = true,
+                ["clipCount"] = clips.Count,
+                ["clipBytes"] = bytes,
+                ["freeBytes"] = freeBytes,
+                ["drive"] = drive,
+                ["clipDirExists"] = Directory.Exists(root),
+                ["week"] = new JArray(week),
+                ["todayIndex"] = todayIndex,
+            };
+        }
+
         public static JObject GetClipUiStatePayload()
         {
             string path = AppConfig.GetClipUiStatePath();
@@ -535,7 +614,7 @@ namespace ReplayKitHelper
             return (duration != null && duration.Value<double>() > 0) ? duration.Value<double>() : 0.0;
         }
 
-        // matches powershells default Sort-Object string comparison for the name tie-breaker: culture-aware, case-insensitive.
+        // culture-aware, case-insensitive name tie-breaker
         private static readonly StringComparer NameComparer = StringComparer.CurrentCultureIgnoreCase;
 
         public static List<JObject> SortClipsForPage(List<JObject> items, string sort)
@@ -662,7 +741,7 @@ namespace ReplayKitHelper
                 }
             } // ClipsMetaLock released here
 
-            // deliberately called after ClipsMetaLock is released -- a c# lock is reentrant per-thread, so nesting the call inside the block above would not free the lock for other threads while this claims-under-lock-then-spawns-outside-it function does its slow work. doing that once in the ps original silently pinned a whole ffprobe.exe launch behind ClipsMetaLock, blocking every other pool thread that needed it for as long as the spawn took.
+            // called after ClipsMetaLock is released -- the lock is reentrant, so calling this inside the block above would keep every other thread waiting while it resolves ffprobe and starts the repair
             StartClipIndexRepairIfNeeded(eligibleFiles, index);
 
             var sorted = items.OrderByDescending(i => i["mtime"].Value<long>()).ThenBy(i => i["name"].Value<string>(), NameComparer).ToList();
@@ -682,8 +761,10 @@ namespace ReplayKitHelper
             {
                 Body = body;
                 Signature = signature;
-                Version = Guid.NewGuid().ToString("N");
                 Json = JsonConvert.SerializeObject(body, Formatting.None);
+                // the same list has the same version whenever it was rebuilt, so a page that keeps what it read does not take a rebuild for a change and start over
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                    Version = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Json))).Replace("-", "").ToLowerInvariant();
                 Linked = body.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
             }
 
@@ -754,10 +835,13 @@ namespace ReplayKitHelper
                     ["running"] = Server.State.ClipIndexRepairRunning,
                     ["queued"] = Server.State.ClipIndexRepairQueued,
                 },
-                ["clips"] = new JArray(page),
+                ["clips"] = SerializeShared(page),
             };
             return payload.ToString(Formatting.None);
         }
+
+        // the clip objects belong to the shared snapshot that other requests read at the same time; putting them into a JArray would re-parent them, so they are written out as json instead
+        private static JRaw SerializeShared(List<JObject> clips) => new JRaw(JsonConvert.SerializeObject(clips, Formatting.None));
 
         public static string GetClipsByNameJson(IEnumerable<string> names, string sort = "newest")
         {
@@ -789,7 +873,7 @@ namespace ReplayKitHelper
                 ["version"] = snapshot.Version + "|sort:" + safeSort + "|names",
                 ["total"] = sorted.Count,
                 ["sort"] = safeSort,
-                ["clips"] = new JArray(sorted),
+                ["clips"] = SerializeShared(sorted),
             };
             return payload.ToString(Formatting.None);
         }

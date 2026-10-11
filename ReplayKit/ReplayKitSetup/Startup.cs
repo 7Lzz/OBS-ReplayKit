@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // windows startup integration for launching obs with replaykit. ported from obs_replaykit/startup.py (the already-fixed version -- plain temp .ps1 invoked with -File, not the base64-encoded -EncodedCommand pattern that AV heuristics flag).
+    // windows startup integration for launching obs with replaykit; any script it runs is a plain temp .ps1 started with -File, since the base64 -EncodedCommand shape is what av heuristics flag
     public static class Startup
     {
         private const string ValueName = "OBS ReplayKit";
@@ -45,7 +45,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // wscript.shell is late-bound com; InvokeMember routes through IDispatch at runtime and needs no managed metadata, so the trimmer's warnings here are moot -- it never removes anything this path depends on.
+        // wscript.shell is late-bound com; InvokeMember routes through IDispatch at runtime and needs no managed metadata, so the trimmers warnings here are moot -- it never removes anything this path depends on.
         [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "com idispatch dispatch, no trimmable managed members")]
         [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
         private static bool CreateStartupShortcut(Action<string> log)

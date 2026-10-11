@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -18,7 +16,7 @@ namespace ReplayKitHelper
         public string Message;
     }
 
-    // uploads a clip to streamable using the same anonymous flow streamable.com itself uses (no account needed): curl get /api/v1/uploads/shortcode?size=n (cookie jar) -> curl post <s3 url> multipart-form with the aws fields + file -> curl post /api/v1/transcode/<shortcode> (cookie jar). runs as an in-process Task from Upload.StartStreamableUpload instead of a spawned "powershell.exe -File upload_worker.ps1" child -- progress/status that worker wrote to a json file for the main helper to poll now go straight into UploadState.SetUploadState, since theres no process boundary left to cross. ported from obs_replaykit helper upload_worker.ps1.
+    // uploads a clip to streamable the way streamable.com does it: get a shortcode and a presigned s3 form (cookie jar), post the file to s3, then trigger the transcode (cookie jar)
     internal static class UploadWorker
     {
         private static string[] TransportArgs() => new[]
@@ -27,7 +25,7 @@ namespace ReplayKitHelper
             "--connect-timeout", "15", "--retry", "2", "--retry-delay", "1", "--retry-all-errors",
         };
 
-        // mirrors upload_worker.ps1s Write-Status: percent is this workers own 0-100 local progress; progressBase/progressSpan remap that into whatever sub-range the caller reserved (compress-then-upload hands this the tail of its own job, e.g. 95-99). state=error forces 0, state=done forces 100 -- everything else clamps to [0,99] so a rounding blip can never read as "done" early. the local scale is deliberately transfer-dominated: prep/step1 pin at 8, the s3 byte transfer owns 8..100, and the post-transfer steps (phase "finalizing"/"copying link") hold at the top -- so the bar tracks bytes-on-the-wire and the dock swaps to a "Finalizing..." text state once phase leaves "uploading".
+        // percent is this workers own 0-100 progress, remapped into the sub-range the caller reserved (compress-then-upload hands it 95-99); error forces 0, done forces 100 and everything else clamps to 99 so a rounding blip never reads as done. the s3 byte transfer owns 8..100 and the steps after it hold at the top while the phase tells the page to show finalizing
         private static void WriteStatus(string requestId, int progressBase, int progressSpan, string state, string phase, int percent, string message = "", string url = null)
         {
             int finalPercent;
@@ -41,11 +39,7 @@ namespace ReplayKitHelper
             UploadState.SetUploadState(requestId: requestId, state: state, phase: phase, percent: finalPercent, message: message, url: url);
         }
 
-        // streamed multipart POST of the clip to the presigned s3 url, counting real bytes-on-the-wire for progress
-        // instead of scraping curl's ~1hz stderr meter. returns the response body; sets statusCode. throws
-        // WebException with no .Response for a pure connection failure (caller retries); returns the body + a 4xx/5xx
-        // statusCode for a real s3 rejection (caller turns that into an error). settings mirror the two curl steps:
-        // direct connection (no wpad proxy auto-detect), tls 1.2+, no auto-redirect, explicit Content-Length.
+        // streamed multipart POST of the clip to the presigned s3 url, counting real bytes-on-the-wire for progress instead of scraping curls ~1hz stderr meter. returns the response body; sets statusCode. throws WebException with no .Response for a pure connection failure (caller retries); returns the body + a 4xx/5xx statusCode for a real s3 rejection (caller turns that into an error). settings mirror the two curl steps: direct connection (no wpad proxy auto-detect), tls 1.2+, no auto-redirect, explicit Content-Length.
         private static string UploadFileToS3WithProgress(string url, JObject fields, string filePath, string requestId,
             int progressBase, int progressSpan, int startPercent, int endPercent,
             CancellationToken cancelToken, out int statusCode)
@@ -70,7 +64,6 @@ namespace ReplayKitHelper
             byte[] headBytes = Encoding.UTF8.GetBytes(head.ToString());
             byte[] tailBytes = Encoding.UTF8.GetBytes("\r\n--" + boundary + "--\r\n");
 
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
             var request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = "multipart/form-data; boundary=" + boundary;
@@ -182,12 +175,27 @@ namespace ReplayKitHelper
             string jar = tempPrefix + ".cookies.txt";
             string transcodeBodyPath = tempPrefix + ".transcode_body.json";
             var tempFiles = new[] { jar, transcodeBodyPath };
+            string mixOnlyDir = null;
 
             WriteStatus(requestId, progressBase, progressSpan, "uploading", "preparing", 8);
             try
             {
                 if (!File.Exists(clipPath)) throw new InvalidOperationException("Clip not found: " + clipPath);
                 var clipItem = new FileInfo(clipPath);
+                // a clip with separate audio tracks goes up as a copy with the mix only, so the site gets exactly one audio track whatever it does with extra ones; the copy is a stream copy and takes seconds
+                if (Mp4Tracks.CountAudio(clipPath) > 1)
+                {
+                    string ffmpeg = Compression.GetHelperCapabilities()["ffmpeg"]?.Value<string>();
+                    if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found, so the clip could not be prepared for upload.");
+                    // the copy keeps the name of the clip, in a folder of its own, since the name of the file is what the site receives
+                    mixOnlyDir = tempPrefix + ".mix";
+                    Directory.CreateDirectory(mixOnlyDir);
+                    string mixOnlyCopy = Path.Combine(mixOnlyDir, Path.GetFileName(clipPath));
+                    WriteStatus(requestId, progressBase, progressSpan, "uploading", "preparing", 8);
+                    var copy = Compression.InvokeNativeCapture(ffmpeg, new[] { "-y", "-hide_banner", "-loglevel", "error", "-i", clipPath, "-map", "0:v:0", "-map", "0:a:0", "-c", "copy", "-movflags", "+faststart", mixOnlyCopy }, cancelToken, 30 * 60 * 1000);
+                    if (copy.ExitCode != 0 || !File.Exists(mixOnlyCopy)) throw new InvalidOperationException("The clip could not be prepared for upload (ffmpeg exit " + copy.ExitCode + ").");
+                    clipItem = new FileInfo(mixOnlyCopy);
+                }
                 long size = clipItem.Length;
                 Log.Write("Uploading " + clipItem.Name + " (" + Math.Round(size / 1024.0 / 1024.0, 2) + " MB)", "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "preparing", 8);
@@ -195,7 +203,7 @@ namespace ReplayKitHelper
                 // cookie jar shared between step 1 (which sets the session cookie) and step 3 (which needs it -- transcode returns 403 without it).
                 try { if (File.Exists(jar)) File.Delete(jar); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-                // if given a signed-in cookie jar, seed the session jar with its contents so step 1 goes out authenticated. its copied rather than just -b'd so curl can still -c into it (streamable issues additional session cookies during upload).
+                // if given a signed-in cookie jar, seed the session jar with its contents so step 1 goes out authenticated. its copied rather than just -bd so curl can still -c into it (streamable issues additional session cookies during upload).
                 bool signedIn = false;
                 if (requireAuth && (string.IsNullOrWhiteSpace(authJar) || !File.Exists(authJar)))
                     throw new InvalidOperationException("Signed-in Streamable session is unavailable. Sign out and sign in again.");
@@ -229,7 +237,7 @@ namespace ReplayKitHelper
                 };
                 if (signedIn) { step1Args.Add("-b"); step1Args.Add(jar); }
                 step1Args.Add(url1);
-                var r1 = Curl.Run(step1Args.ToArray(), proc => UploadState.SetUploadState(requestId: requestId, encoderProcess: proc), cancelToken);
+                var r1 = Curl.Run(step1Args.ToArray(), cancelToken);
                 if (r1.ExitCode != 0 || string.IsNullOrWhiteSpace(r1.Stdout))
                 {
                     throw new InvalidOperationException("Step 1 curl failed (exit=" + r1.ExitCode + ").");
@@ -242,9 +250,7 @@ namespace ReplayKitHelper
 
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
 
-                // step 2: streamed multipart POST of the clip to the presigned s3 url. field order matters -- every
-                // policy field first, "file" last -- and the json property order already matches what streamable.com
-                // sends. HttpWebRequest, not curl, so progress is real bytes-on-the-wire (see UploadFileToS3WithProgress).
+                // step 2: streamed multipart POST of the clip to the presigned s3 url. field order matters -- every policy field first, "file" last -- and the json property order already matches what streamable.com sends. HttpWebRequest, not curl, so progress is real bytes-on-the-wire (see UploadFileToS3WithProgress).
                 Log.Write("Step 2: uploading to S3...", "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "uploading", 8);
                 string s3Url = data["url"]?.Value<string>();
@@ -300,11 +306,7 @@ namespace ReplayKitHelper
                     "--data", "@" + transcodeBodyPath,
                     "https://api-f.streamable.com/api/v1/transcode/" + shortcode,
                 };
-                var r3 = Curl.Run(step3Args.ToArray(), proc =>
-                {
-                    UploadState.SetUploadState(requestId: requestId, encoderProcess: proc);
-                    if (cancelToken.IsCancellationRequested) { try { proc.Kill(); } catch { } }
-                }, cancelToken);
+                var r3 = Curl.Run(step3Args.ToArray(), cancelToken);
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
                 if (r3.ExitCode != 0 || string.IsNullOrWhiteSpace(r3.Stdout))
                 {
@@ -331,8 +333,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                // a cancel mid-curl surfaces here as a curl-failed exception -- report it as a clean cancellation
-                // instead of an error toast, and leave the "cancelled" state /cancel-upload already wrote.
+                // a cancel mid-curl surfaces here as a curl-failed exception -- report it as a clean cancellation instead of an error toast, and leave the "cancelled" state /cancel-upload already wrote.
                 if (cancelToken.IsCancellationRequested)
                 {
                     Log.Write("upload cancelled during step: " + ex.Message, "upload", requestId);
@@ -348,6 +349,7 @@ namespace ReplayKitHelper
                 {
                     try { if (File.Exists(f)) File.Delete(f); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
+                try { if (mixOnlyDir != null && Directory.Exists(mixOnlyDir)) Directory.Delete(mixOnlyDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
         }
     }

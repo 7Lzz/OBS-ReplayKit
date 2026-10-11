@@ -8,12 +8,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace ReplayKitHelper
 {
-    // consolidated win32/com interop for window management, job objects, thumbnail extraction, sqlite (browser cookie reads), and aes-gcm (cookie decryption).
-    // ported from obs_replaykit helper modules/30_native.ps1, which itself compiled three separate overlapping Add-Type blocks (ReplayKitNative, a second copy inside modules/64_discord_projector.ps1, and a third inside trim_keyframes_worker.ps1-adjacent code) -- collapsed into one class here since a compiled assembly has no reason to duplicate P/Invoke declarations per file the way dot-sourced scripts did.
+    // consolidated win32/com interop for window management, job objects, processes, files, thumbnails and icons
     internal static class Native
     {
         [StructLayout(LayoutKind.Sequential)]
@@ -63,6 +61,7 @@ namespace ReplayKitHelper
         private static extern void SHCreateItemFromParsingName(string pszPath, IntPtr pbc, ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory ppv);
         private static readonly Guid IID_IShellItemImageFactory = new Guid("BCC18B79-BA16-442F-80C4-8A59C30C463B");
         private const int SIIGBF_BIGGERSIZEOK = 0x0001;
+        private const int SIIGBF_THUMBNAILONLY = 0x0008;
 
         // ITaskbarList (original 5-method interface, not ITaskbarList2/3)
         [ComImport, Guid("56FDF342-FD6D-11d0-958A-006097C9A090"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -140,10 +139,9 @@ namespace ReplayKitHelper
         private const int BORDER_COLOR = 0x004D403C;
         private const int TEXT_COLOR = 0x00FFFFFF;
         private const int SM_CXSCREEN = 0, SM_CYSCREEN = 1;
-        private const int GWL_STYLE = -16, GWL_EXSTYLE = -20, GWLP_HWNDPARENT = -8, GCLP_HBRBACKGROUND = -10;
-        private const int WS_EX_APPWINDOW = 0x00040000, WS_EX_TOOLWINDOW = 0x00000080;
+        private const int GWL_STYLE = -16, GWL_EXSTYLE = -20, GCLP_HBRBACKGROUND = -10;
         private const long WS_CAPTION = 0x00C00000L, WS_THICKFRAME = 0x00040000L, WS_MINIMIZEBOX = 0x00020000L, WS_MAXIMIZEBOX = 0x00010000L, WS_SYSMENU = 0x00080000L;
-        private const uint RDW_INVALIDATE = 0x0001, RDW_UPDATENOW = 0x0100, RDW_FRAME = 0x0400, RDW_NOCHILDREN = 0x0040;
+        private const uint RDW_INVALIDATE = 0x0001, RDW_UPDATENOW = 0x0100, RDW_FRAME = 0x0400;
         private const uint WM_SETICON = 0x0080, WM_NCACTIVATE = 0x0086, WM_THEMECHANGED = 0x031A, WM_CLOSE = 0x0010, WM_NCLBUTTONDOWN = 0x00A1;
         private const int HTCAPTION = 2;
         private const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020, SWP_SHOWWINDOW = 0x0040;
@@ -211,7 +209,7 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
-        // 480x270 jpeg (quality 86) via the shell's registered thumbnail codec, letterboxed on black. the caller owns the bounded task and its wait deadline.
+        // 480x270 jpeg (quality 86) via the shell thumbnail handler, letterboxed on black; thumbnail only, since a video the shell cannot read yet comes back as the generic file icon otherwise and that was kept as the picture. the caller owns the bounded task and its wait deadline.
         public static void SaveThumbnail(string src, string dst)
         {
             Guid iid = IID_IShellItemImageFactory;
@@ -219,7 +217,7 @@ namespace ReplayKitHelper
             IntPtr hbmp = IntPtr.Zero;
             try
             {
-                factory.GetImage(new SIZE { cx = 480, cy = 270 }, SIIGBF_BIGGERSIZEOK, out hbmp);
+                factory.GetImage(new SIZE { cx = 480, cy = 270 }, SIIGBF_BIGGERSIZEOK | SIIGBF_THUMBNAILONLY, out hbmp);
                 using (var src2 = Image.FromHbitmap(hbmp))
                 using (var canvas = new Bitmap(480, 270))
                 using (var g = Graphics.FromImage(canvas))
@@ -242,10 +240,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // enumwindows + exact/prefix/suffix (ordinalignorecase) title match, scoped to obs-family windows when requireOwnerPid != 0. returns count closed.
-        // is a visible top-level window with this exact title already up? used to avoid stacking a second update
-        // window on top of one the user is already looking at -- the update popup is its own browser process, so it
-        // outlives the OBS restart that a failed update triggers.
+        // enumwindows + exact/prefix/suffix (ordinalignorecase) title match, scoped to obs-family windows when requireOwnerPid != 0. returns count closed. is a visible top-level window with this exact title already up? used to avoid stacking a second update window on top of one the user is already looking at -- the update popup is its own browser process, so it outlives the OBS restart that a failed update triggers.
         public static bool WindowWithTitleExists(string title)
         {
             if (string.IsNullOrEmpty(title)) return false;
@@ -257,8 +252,7 @@ namespace ReplayKitHelper
             return false;
         }
 
-        // focus a top-level window by exact title regardless of owning process -- for a helper-owned window (the
-        // update window) that FindObsWindow's obs-family gate would never match.
+        // focus a top-level window by exact title regardless of owning process -- for a helper-owned window (the update window) that FindObsWindows obs-family gate would never match.
         public static bool FocusWindowByExactTitle(string title)
         {
             if (string.IsNullOrEmpty(title)) return false;
@@ -303,7 +297,7 @@ namespace ReplayKitHelper
             return closed;
         }
 
-        // the plugin (replaykit.cpp, out of scope here) hands obs's real main-window hwnd over the OBSReplayKitIpc pipe; PipeClient caches it in Server.State. window-title matching alone cant tell obs's own main window from a projector, so the plugin -- which has the authoritative Qt-side isOBSProjectorWindow check -- sends it directly. returns false (caller force-kills) if the pipe never delivered one.
+        // the native plugin (core/main_window.cpp, out of scope here) hands obss real main-window hwnd over the OBSReplayKitIpc pipe; PipeClient caches it in Server.State. window-title matching alone cant tell obss own main window from a projector, so the plugin -- which has the authoritative Qt-side isOBSProjectorWindow check -- sends it directly. returns false (caller force-kills) if the pipe never delivered one.
         public static bool CloseObsMainWindow(uint requireOwnerPid)
         {
             long hwndVal;
@@ -320,7 +314,7 @@ namespace ReplayKitHelper
             return true;
         }
 
-        // enumerates windows matching google/streamable/loader/about:blank title heuristics for the sign-in popup flow; hand-builds json (matches the ps original's manual-escape approach rather than pulling in a serializer for one caller).
+        // enumerates windows matching google/streamable/loader/about:blank title heuristics for the sign-in popup flow and hand-builds the json for its one caller
         public static string ListSignInWindows(uint requireOwnerPid, bool hideGoogle, bool overlayGoogle)
         {
             IntPtr googleHwnd = IntPtr.Zero, streamableHwnd = IntPtr.Zero;
@@ -370,7 +364,7 @@ namespace ReplayKitHelper
 
         private static string JsonEscape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
 
-        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cef's non-client repaint race. returns match count.
+        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cefs non-client repaint race. returns match count.
         private static IntPtr _styleOwnedSmall, _styleOwnedBig;
 
         public static int StyleWindow(string needle, string iconPath, bool taskbar)
@@ -394,9 +388,7 @@ namespace ReplayKitHelper
             return matched;
         }
 
-        // same styling StyleWindow applies to an obs-family window found by title, but for a window the helper
-        // already holds an hwnd for directly -- no enumeration or IsObsFamilyProcess ownership check, since a window
-        // this process created itself (e.g. the streamable sign-in form) is never going to be an obs-family process.
+        // same styling StyleWindow applies to an obs-family window found by title, but for a window the helper already holds an hwnd for directly -- no enumeration or IsObsFamilyProcess ownership check, since a window this process created itself (e.g. the streamable sign-in form) is never going to be an obs-family process.
         public static void ApplyWindowTheme(IntPtr hWnd, string iconPath, bool taskbar)
         {
             IntPtr hIcon16, hIcon32;
@@ -437,10 +429,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm
-        // attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cef's
-        // non-client repaint race. harmless (just extra redundant calls) on a plain win32/winforms window that
-        // never had that race to begin with, so one sequence serves both callers.
+        // dark-mode dwm attrs + custom title/border/text colors + WM_SETICON, forcing a themechanged -> reapply dwm attrs -> ncactivate toggle -> setwindowpos(framechanged) -> redrawwindow sequence to defeat cefs non-client repaint race. harmless (just extra redundant calls) on a plain win32/winforms window that never had that race to begin with, so one sequence serves both callers.
         private static void ApplyWindowThemeCore(IntPtr hWnd, IntPtr hIcon16, IntPtr hIcon32, bool taskbar,
             int themeCaption, int themeBorder, int themeText, int themeDark)
         {
@@ -500,9 +489,7 @@ namespace ReplayKitHelper
             lock (_signInStyledTitles) _signInStyledTitles.Clear();
         }
 
-        // -- live app-icon swap (Appearance tab) -- WM_SETICON on obs's real main window (taskbar button + title bar)
-        // and replaykit's own helper-hosted windows. no restart, no admin: a window message in-session, same
-        // approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the tray plugin.
+        // -- live app-icon swap (Appearance tab) -- WM_SETICON on obss real main window (taskbar button + title bar) and replaykits own helper-hosted windows. no restart, no admin: a window message in-session, same approach Voidstrap uses for the roblox window. the obs tray icon is done separately by the native plugin.
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMs, out IntPtr result);
@@ -517,9 +504,7 @@ namespace ReplayKitHelper
         private static IntPtr _obsOwnedSmall, _obsOwnedBig;
         private static IntPtr _rkOwnedSmall, _rkOwnedBig;
 
-        // writes srcPath (png/jpg/bmp/ico) as a multi-resolution .ico so every downstream consumer -- LoadIconPair,
-        // StyleWindow, the dock favicon -- which all go through System.Drawing.Icon and only read .ico, can use it.
-        // 16..64 as 32bpp BMP frames, 128/256 as PNG frames (the modern .ico layout GDI+ reads fine on vista+).
+        // writes srcPath (png/jpg/bmp/ico) as a multi-resolution .ico so every downstream consumer -- LoadIconPair, StyleWindow, the dock favicon -- which all go through System.Drawing.Icon and only read .ico, can use it. 16..64 as 32bpp BMP frames, 128/256 as PNG frames (the modern .ico layout GDI+ reads fine on vista+).
         public static void ConvertImageToIco(string srcPath, string destPath)
         {
             int[] sizes = { 16, 24, 32, 48, 64, 128, 256 };
@@ -663,7 +648,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // hwnd of the open "ReplayKit Settings" popup, or Zero -- used to parent the browse dialogs so they're modal over it.
+        // hwnd of the open "ReplayKit Settings" popup, or Zero -- used to parent the browse dialogs so theyre modal over it.
         public static IntPtr FindReplayKitSettingsWindow()
         {
             foreach (var hWnd in EnumerateTopLevelWindows())
@@ -676,9 +661,7 @@ namespace ReplayKitHelper
             return IntPtr.Zero;
         }
 
-        // replaykit-owned popups the TRAY PLUGIN does not manage itself -- i.e. "ReplayKit Update". the plugin owns
-        // the icon (title bar + win11 taskbar button) for its own "Clips" and "ReplayKit Settings" windows, so those
-        // are skipped here to avoid a WM_SETICON tug-of-war. iconPath "" -> the bundled replaykit .ico.
+        // replaykit-owned popups the TRAY PLUGIN does not manage itself -- i.e. "ReplayKit Update". the plugin owns the icon (title bar + win11 taskbar button) for its own "Clips" and "ReplayKit Settings" windows, so those are skipped here to avoid a WM_SETICON tug-of-war. iconPath "" -> the bundled replaykit .ico.
         public static void SetReplayKitWindowIcons(string iconPath)
         {
             lock (IconGate)
@@ -698,7 +681,7 @@ namespace ReplayKitHelper
                     string title = GetTitle(hWnd);
                     if (string.IsNullOrEmpty(title) || title.IndexOf("ReplayKit", StringComparison.OrdinalIgnoreCase) < 0)
                         continue;
-                    // the tray plugin owns these two -- leave them alone.
+                    // the native plugin owns these two -- leave them alone.
                     if (title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
                         title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase))
                         continue;
@@ -725,7 +708,6 @@ namespace ReplayKitHelper
             if (!IsWindow(hWnd)) return false;
             if (IsZoomed(hWnd)) ShowWindowAsync(hWnd, SW_RESTORE); else ShowWindow(hWnd, SW_RESTORE);
 
-            uint targetThread = GetWindowThreadProcessId(hWnd, out _);
             uint currentThread = GetCurrentThreadId();
             IntPtr fgWnd = GetForegroundWindow();
             uint fgThread = fgWnd != IntPtr.Zero ? GetWindowThreadProcessId(fgWnd, out _) : 0;
@@ -745,9 +727,7 @@ namespace ReplayKitHelper
             return GetForegroundWindow() == hWnd;
         }
 
-        // a browse dialog opened from PickPath can land behind OBS -- the helper is a separate process with no foreground
-        // rights, so the shell just flashes the taskbar. this runs on a watcher thread (the picker thread is blocked in
-        // the modal Show()): poll for our own dialog by its caption and force it foreground with the FocusHwnd dance.
+        // a browse dialog opened from PickPath can land behind OBS -- the helper is a separate process with no foreground rights, so the shell just flashes the taskbar. this runs on a watcher thread (the picker thread is blocked in the modal Show()): poll for our own dialog by its caption and force it foreground with the FocusHwnd dance.
         public static void RaiseOwnDialog(string titleContains, int timeoutMs = 4000)
         {
             uint myPid = GetCurrentProcessId();
@@ -909,12 +889,7 @@ namespace ReplayKitHelper
         private const int DWMWCP_ROUND = 2;
         private const int DWMWA_COLOR_DEFAULT = unchecked((int)0xFFFFFFFF);
 
-        // win11 anti-aliased rounded corners + the standard system border for a frameless window the helper owns (the
-        // update window -- UpdatePromptWindow.cs, which keeps WS_THICKFRAME so dwm treats it as roundable). replaces a
-        // CreateRoundRectRgn clip: window regions are never anti-aliased and opt a window out of dwm rounding entirely
-        // (see MS "apply rounded corners" docs). the border is dwm-drawn at DWMWA_COLOR_DEFAULT -- the exact call
-        // chrome makes -- so it follows the rounded corners; a self-drawn (form-padding) border is rectangular and
-        // gets chopped at those corners.
+        // win11 anti-aliased rounded corners + the standard system border for a frameless window the helper owns (the update window -- UpdatePromptWindow.cs, which keeps WS_THICKFRAME so dwm treats it as roundable). replaces a CreateRoundRectRgn clip: window regions are never anti-aliased and opt a window out of dwm rounding entirely (see MS "apply rounded corners" docs). the border is dwm-drawn at DWMWA_COLOR_DEFAULT -- the exact call chrome makes -- so it follows the rounded corners; a self-drawn (form-padding) border is rectangular and gets chopped at those corners.
         public static void EnableDwmRounding(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return;
@@ -924,8 +899,7 @@ namespace ReplayKitHelper
             DwmSetWindowAttribute(hWnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
         }
 
-        // starts a native window move for a frameless window that has no caption to grab -- the webview2-hosted page
-        // posts a "drag" message on mousedown and we hand the drag to the window manager from here.
+        // starts a native window move for a frameless window that has no caption to grab -- the webview2-hosted page posts a "drag" message on mousedown and we hand the drag to the window manager from here.
         public static void StartWindowDrag(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return;
@@ -1010,7 +984,7 @@ namespace ReplayKitHelper
             return true;
         }
 
-        // creates a job object with kill-on-close, assigns the current process to it. called once at startup; every child process spawned afterward without CREATE_BREAKAWAY_FROM_JOB inherits the job automatically (win8+) and dies when this process's last job handle closes.
+        // creates a job object with kill-on-close, assigns the current process to it. called once at startup; every child process spawned afterward without CREATE_BREAKAWAY_FROM_JOB inherits the job automatically (win8+) and dies when this processs last job handle closes.
         public static IntPtr CreateKillOnCloseJob()
         {
             IntPtr job = CreateJobObject(IntPtr.Zero, null);
@@ -1067,11 +1041,11 @@ namespace ReplayKitHelper
 
         private const uint MOVEFILE_REPLACE_EXISTING = 0x1;
 
-        // atomic same-volume rename-with-overwrite. net48s File.Move has no overwrite option (unlike .NET Core), and a manual delete-then-move reopens the crash/race window the atomic-write callers are specifically trying to close.
+        // atomic same-volume rename-with-overwrite. net48s File.Move has no overwrite option, and a manual delete-then-move reopens the crash/race window the atomic-write callers are trying to close; fails as an IOException like the managed file apis so the callers file-error handling covers it
         public static void MoveFileReplace(string src, string dest)
         {
             if (!MoveFileEx(src, dest, MOVEFILE_REPLACE_EXISTING))
-                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                throw new IOException(new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message + " (" + Path.GetFileName(dest) + ")");
         }
 
         // same-volume ntfs hard link -- shares the underlying file content, no extra disk, an in-place update to the target is picked up automatically. net48 has no managed api for this (unlike New-Item -ItemType HardLink in PS, which is really just this same syscall).

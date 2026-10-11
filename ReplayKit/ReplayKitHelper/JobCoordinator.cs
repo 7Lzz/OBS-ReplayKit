@@ -30,7 +30,7 @@ namespace ReplayKitHelper
                 var job = new Reservation(requestId, paths);
                 Jobs.Add(requestId, job);
                 UploadState.SetUploadState(requestId: requestId, state: "preparing", active: true,
-                    clipName: name, kind: kind, cts: job.Source);
+                    clipName: name, kind: kind);
                 message = "";
                 return job;
             }
@@ -128,8 +128,6 @@ namespace ReplayKitHelper
                             record.Active = false;
                             if (record.State == "preparing") record.State = "idle";
                             record.UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                            record.Cts = null;
-                            record.EncoderProcess = null;
                         }
                     }
                     lock (Gate) { Jobs.Remove(id); }

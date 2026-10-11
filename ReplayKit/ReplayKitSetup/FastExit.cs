@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // fast process exit helpers for the console setup app. ported from obs_replaykit/fast_exit.py. the python original also hunts down and kills a "pyinstaller onefile bootstrap parent" process on exit -- that concept does not exist for a compiled .net exe (no separate bootstrap/child process split the way pyinstaller onefile has), so that step is simply gone here, not carried over as dead code.
+    // fast process exit helpers for the setup app
     public static class FastExit
     {
         [DllImport("kernel32.dll")]

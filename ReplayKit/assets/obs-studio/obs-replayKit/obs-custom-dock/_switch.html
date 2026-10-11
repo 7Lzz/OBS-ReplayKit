@@ -1,0 +1,71 @@
+<!-- the switch every ReplayKit page uses for a yes or no setting: a checkbox inside .check-row, or one with .rk-switch, is drawn as a switch. the colours are theme tokens only -- the accent for the track that is on, the on-accent colour for its knob, the text colour at low alpha for the rest -- so it follows every preset and the custom theme. a page can size it with --sw-w and --sw-h -->
+<style>
+  .check-row > span, .action-row > span { order:1; min-width:0; }
+  .check-row > .info-dot, .action-row > .info-dot { order:2; }
+  .action-row > .btn { order:3; margin:0 0 0 auto; flex:0 0 auto; }
+  .check-row input[type=checkbox], input[type=checkbox].rk-switch {
+    order:3;
+    appearance:none;
+    -webkit-appearance:none;
+    position:relative;
+    flex:0 0 auto;
+    width:var(--sw-w,40px);
+    height:var(--sw-h,22px);
+    margin:0 0 0 auto;
+    padding:0;
+    border:0;
+    border-radius:999px;
+    background:rgba(var(--text-rgb,255,255,255),.2);
+    cursor:pointer;
+    transition:background-color 220ms ease, filter 120ms linear, transform var(--anim_press,130ms) var(--ease_pop,ease);
+  }
+  .check-row input[type=checkbox]::before, input[type=checkbox].rk-switch::before {
+    content:"";
+    position:absolute;
+    left:3px;
+    top:3px;
+    width:calc(var(--sw-h,22px) - 6px);
+    height:calc(var(--sw-h,22px) - 6px);
+    border-radius:50%;
+    background:rgba(var(--text-rgb,255,255,255),.82);
+    box-shadow:0 1px 3px rgba(0,0,0,.3);
+    transition:transform 300ms cubic-bezier(.34,1.45,.5,1), width 160ms var(--ease_pop,ease), background-color 220ms ease;
+  }
+  .check-row input[type=checkbox]:checked, input[type=checkbox].rk-switch:checked { background:var(--selected-solid,#5865f2); }
+  .check-row input[type=checkbox]:checked::before, input[type=checkbox].rk-switch:checked::before {
+    transform:translateX(calc(var(--sw-w,40px) - var(--sw-h,22px)));
+    background:var(--on-accent,#ffffff);
+  }
+  .check-row input[type=checkbox]:not(:checked):not(:disabled):hover, input[type=checkbox].rk-switch:not(:checked):not(:disabled):hover { background:rgba(var(--text-rgb,255,255,255),.3); }
+  .check-row input[type=checkbox]:checked:not(:disabled):hover, input[type=checkbox].rk-switch:checked:not(:disabled):hover { filter:brightness(1.1); }
+  .check-row input[type=checkbox]:not(:disabled):hover, input[type=checkbox].rk-switch:not(:disabled):hover { transform:scale(var(--hover_grow,1.04)); }
+  /* pressed: the switch shrinks a little like every button and the knob stretches, and on a switch that is on it stretches back toward the middle so it stays inside */
+  .check-row input[type=checkbox]:not(:disabled):active, input[type=checkbox].rk-switch:not(:disabled):active { transform:scale(var(--press_shrink,.96)); }
+  .check-row input[type=checkbox]:not(:disabled):active::before, input[type=checkbox].rk-switch:not(:disabled):active::before { width:calc(var(--sw-h,22px) - 1px); }
+  .check-row input[type=checkbox]:checked:not(:disabled):active::before, input[type=checkbox].rk-switch:checked:not(:disabled):active::before { transform:translateX(calc(var(--sw-w,40px) - var(--sw-h,22px) - 5px)); }
+  .check-row input[type=checkbox]:disabled, input[type=checkbox].rk-switch:disabled { opacity:.45; cursor:default; }
+  .check-row input[type=checkbox]:focus-visible, input[type=checkbox].rk-switch:focus-visible { outline:2px solid var(--selected2,#476BD7); outline-offset:2px; }
+
+  /* a setting that is a switch, or a line with a button at its end, sits in a row in the column of the fields, level with the dropdowns above and below it: the name and its info icon on the left and the switch or the button at the end of a row that stops at a width where the two still read as one thing. nothing is drawn behind the row and the switch or the button is the only thing in it that takes a click. a hairline goes above such a row wherever another row comes before it, and under the last of a run where an ordinary row follows */
+  .action-row { display:flex; align-items:center; gap:8px; color:var(--text); }
+  .form-row:has(> :is(.check-row, .action-row)) { min-height:0; padding-top:0; padding-bottom:0; }
+  .form-row > :is(.check-row, .action-row) {
+    grid-column:2;
+    width:100%;
+    max-width:440px;
+    min-height:44px;
+    padding:8px 0;
+    line-height:1.3;
+    font-weight:500;
+  }
+  :not(.box-title) + .form-row:has(> :is(.check-row, .action-row)) > :is(.check-row, .action-row) { border-top:1px solid var(--hairline,rgba(255,255,255,.08)); }
+  :not(.box-title, .form-row:has(> :is(.check-row, .action-row))) + .form-row:has(> :is(.check-row, .action-row)) { margin-top:6px; }
+  /* the hairline under a run of such rows is drawn at the top of the ordinary row that follows it, in the column of the fields and as wide as the rows above, since a selector cannot reach back from a row to the one before it. a page that has another label column or side padding sets --rk-label-col and --rk-row-pad */
+  .form-row:has(> :is(.check-row, .action-row)) + .form-row:not([hidden]):not(:has(> :is(.check-row, .action-row, .inline-status))) {
+    padding-top:8px;
+    background-image:linear-gradient(var(--hairline,rgba(255,255,255,.08)), var(--hairline,rgba(255,255,255,.08)));
+    background-repeat:no-repeat;
+    background-position:calc(var(--rk-row-pad,8px) + var(--rk-label-col,180px) + 8px) 0;
+    background-size:min(440px, calc(100% - var(--rk-row-pad,8px) * 2 - var(--rk-label-col,180px) - 8px)) 1px;
+  }
+</style>

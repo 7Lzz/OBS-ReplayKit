@@ -1,0 +1,212 @@
+ReplayKit patch 3 of 4 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+A program that dies while it is captured can make the audio service take the capture buffer away in the middle of a
+read. The copy of the packet out of that buffer (Mixer::SubmitPacket) then faults inside the capture thread, an access
+violation that nothing in the plugin catches, and obs goes down with it: the crash report of 2026-10-06 shows exactly
+that, memmove under SubmitPacket under ForwardPacket, in the capture thread of the plugin. The copy is now made behind a
+handler that takes only a fault inside the buffer being read (any other fault, in memory that is not the engine buffer,
+stays the crash it is, so real memory damage is never hidden), a packet that could not be read ends the capture so it
+starts over on a fresh client, a success code that carries no buffer is no longer read as a packet, and no exception of
+any kind can leave the capture thread or the worker of the mixer.
+
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+index ee7821f..a5002d0 100644
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -139,12 +139,16 @@ bool AudioCaptureHelper::UnRegisterMixer(Mixer *mixer)
+ 	return mixers.size() == 0;
+ }
+ 
+-void AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames)
++bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames)
+ {
+ 	auto lock = mixers_section.lock();
+ 
++	// every mixer gets its try, even when an earlier one failed
++	bool forwarded = true;
+ 	for (auto *mixer : mixers)
+-		mixer->SubmitPacket(qpc_position, reinterpret_cast<float *>(data), num_frames);
++		forwarded = mixer->SubmitPacket(qpc_position, reinterpret_cast<float *>(data), num_frames) && forwarded;
++
++	return forwarded;
+ }
+ 
+ void AudioCaptureHelper::ForwardPacket()
+@@ -153,21 +157,26 @@ void AudioCaptureHelper::ForwardPacket()
+ 	THROW_IF_FAILED(capture_client->GetNextPacketSize(&num_frames));
+ 
+ 	while (num_frames > 0) {
+-		BYTE *new_data;
+-		DWORD flags;
+-		UINT64 qpc_position;
++		BYTE *new_data = nullptr;
++		DWORD flags = 0;
++		UINT64 qpc_position = 0;
++
++		auto hr = capture_client->GetBuffer(&new_data, &num_frames, &flags, NULL, &qpc_position);
++		THROW_IF_FAILED(hr);
+ 
+-		THROW_IF_FAILED(capture_client->GetBuffer(&new_data, &num_frames, &flags, NULL,
+-							  &qpc_position));
++		// a success code that hands back no buffer: there is nothing to read and nothing to release
++		if (hr == AUDCLNT_S_BUFFER_EMPTY || num_frames == 0)
++			return;
+ 
+-		if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
++		bool forwarded;
++		if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
+ 			// Forward explicit silence instead of a gap: the mixer keeps a
+ 			// continuous timeline and OBS never sees the stream stall.
+ 			silence_buffer.assign((std::size_t)num_frames * format.nChannels, 0.0f);
+-			ForwardToMixers(qpc_position, reinterpret_cast<BYTE *>(silence_buffer.data()),
+-					num_frames);
++			forwarded = ForwardToMixers(qpc_position, reinterpret_cast<BYTE *>(silence_buffer.data()),
++						    num_frames);
+ 		} else {
+-			ForwardToMixers(qpc_position, new_data, num_frames);
++			forwarded = ForwardToMixers(qpc_position, new_data, num_frames);
+ 		}
+ 
+ 		if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
+@@ -177,6 +186,11 @@ void AudioCaptureHelper::ForwardPacket()
+ 			warn("timestamp error flag set");
+ 
+ 		THROW_IF_FAILED(capture_client->ReleaseBuffer(num_frames));
++
++		// the audio service took the buffer away in the middle of the read, which is what a program that exits or a device that changes does; this client is done for, so the capture starts over on a fresh one
++		if (!forwarded)
++			THROW_HR(AUDCLNT_E_DEVICE_INVALIDATED);
++
+ 		THROW_IF_FAILED(capture_client->GetNextPacketSize(&num_frames));
+ 	}
+ }
+@@ -248,6 +262,10 @@ void AudioCaptureHelper::CaptureSafe()
+ 			// OBS; keep the net as wide as the session monitor's.
+ 			last_error = E_FAIL;
+ 			error("capture failed for pid %lu: %s", pid, e.what());
++		} catch (...) {
++			// replaykit: nothing at all may leave this thread, whatever it was
++			last_error = E_FAIL;
++			error("capture failed for pid %lu: unknown error", pid);
+ 		}
+ 
+ 		// A capture that ran for a while before dying is a fresh failure
+diff --git a/src/audio-capture-helper.hpp b/src/audio-capture-helper.hpp
+index 0306128..17ae59d 100644
+--- a/src/audio-capture-helper.hpp
++++ b/src/audio-capture-helper.hpp
+@@ -88,7 +88,8 @@ private:
+ 	void InitClient();
+ 	void InitCapture();
+ 
+-	void ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames);
++	// false when a mixer could not read the packet out of the buffer of the audio engine
++	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames);
+ 	void ForwardPacket();
+ 
+ 	void Capture();
+diff --git a/src/mixer.cpp b/src/mixer.cpp
+index e647ee1..493bba6 100644
+--- a/src/mixer.cpp
++++ b/src/mixer.cpp
+@@ -4,6 +4,8 @@
+ #include "wil/result_macros.h"
+ #include <algorithm>
+ #include <basetsd.h>
++#include <cstring>
++#include <exception>
+ #include <memory>
+ #include <processthreadsapi.h>
+ #include <threadpoollegacyapiset.h>
+@@ -195,20 +197,62 @@ void Mixer::Run()
+ 			break;
+ 
+ 		case MixerEvents::Tick:
+-			Tick();
++			// an exception that left this thread would take all of obs down with it, so a tick that fails is skipped
++			try {
++				Tick();
++			} catch (const std::exception &e) {
++				if (tick_failures++ % 1000 == 0)
++					error("tick failed: %s", e.what());
++			}
+ 			break;
+ 		}
+ 	}
+ }
+ 
+-void Mixer::SubmitPacket(UINT64 timestamp, float *data, UINT32 num_frames)
++// the buffer of a capture client belongs to the audio service, which can take it away in the middle of a read when the captured program dies or the device changes; that is an access violation in the reading thread, and left alone it takes obs down with it. only a fault inside the buffer being read is taken here, so memory trouble anywhere else still shows up as the crash it is
++static int EngineBufferFault(const EXCEPTION_POINTERS *info, const void *begin, const void *end)
+ {
+-	auto lock = input_section.lock();
++	const EXCEPTION_RECORD *record = info->ExceptionRecord;
++
++	if (record->ExceptionCode != EXCEPTION_ACCESS_VIOLATION && record->ExceptionCode != EXCEPTION_IN_PAGE_ERROR)
++		return EXCEPTION_CONTINUE_SEARCH;
++
++	if (record->NumberParameters < 2)
++		return EXCEPTION_CONTINUE_SEARCH;
++
++	auto address = record->ExceptionInformation[1];
++	if (address < reinterpret_cast<ULONG_PTR>(begin) || address >= reinterpret_cast<ULONG_PTR>(end))
++		return EXCEPTION_CONTINUE_SEARCH;
++
++	return EXCEPTION_EXECUTE_HANDLER;
++}
++
++// nothing with a destructor may stand between the read and this handler: the plugin is not built with /EHa, so a frame in between would not be unwound
++static bool CopyFromEngineBuffer(void *dst, const void *src, std::size_t bytes)
++{
++	__try {
++		memcpy(dst, src, bytes);
++		return true;
++	} __except (EngineBufferFault(GetExceptionInformation(), src, static_cast<const char *>(src) + bytes)) {
++		return false;
++	}
++}
+ 
+-	auto &[_, buffer] = input_queue.emplace(timestamp, 0);
+-	buffer.assign(data, data + num_frames * format.nChannels);
++bool Mixer::SubmitPacket(UINT64 timestamp, float *data, UINT32 num_frames)
++{
++	// the copy is made before the lock is taken: reading the buffer of the audio service is the slow part, and the part that can fail
++	std::vector<float> buffer(static_cast<std::size_t>(num_frames) * format.nChannels);
++	if (buffer.empty())
++		return true;
+ 
++	if (!CopyFromEngineBuffer(buffer.data(), data, buffer.size() * sizeof(float)))
++		return false;
++
++	auto lock = input_section.lock();
++	input_queue.emplace(timestamp, std::move(buffer));
+ 	lock.reset();
++
++	return true;
+ }
+ 
+ static void CALLBACK post_tick(PVOID param, BOOLEAN)
+diff --git a/src/mixer.hpp b/src/mixer.hpp
+index cc355b5..7238d9d 100644
+--- a/src/mixer.hpp
++++ b/src/mixer.hpp
+@@ -64,6 +64,9 @@ private:
+ 	void ProcessInput(UINT64 input_timestamp, std::vector<float> &input_buffer);
+ 	void ProcessInput();
+ 
++	// ticks that failed, so a failure that repeats every 10 ms is written to the log once in a while and not a hundred times a second
++	std::size_t tick_failures = 0;
++
+ 	void Tick();
+ 	void Run();
+ 
+@@ -86,7 +89,8 @@ public:
+ 		}
+ 	}
+ 
+-	void SubmitPacket(UINT64 timestamp, float *data, UINT32 num_frames);
++	// false when the packet could not be read out of the buffer it came in, which the caller takes as a capture that has to start over
++	bool SubmitPacket(UINT64 timestamp, float *data, UINT32 num_frames);
+ 
+ 	Mixer(obs_source_t *source, WAVEFORMATEX format);
+ 	~Mixer();

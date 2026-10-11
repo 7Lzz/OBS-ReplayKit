@@ -11,7 +11,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // updater mode for OBS ReplayKit release installers. ported from obs_replaykit/update.py.
+    // the headless modes of the release installer: --update (run by the helper), --cleanup, --uninstall and the discord screenshare install/removal
     public static class Update
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -96,19 +96,15 @@ namespace ReplayKitSetup
             try { target = Path.GetFullPath(path); }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
 
-            // the helper downloads into %temp%\ReplayKit\update; test_update_mode.bat still uses the flat %temp%\ReplayKitUpdate. only those two shapes are accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder -- the nested one used to fall through this name check, which is why every update so far left its downloaded installer behind in %temp%.
+            // the helper downloads into %temp%\ReplayKit\update-<guid>, and only that shape is accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder
             var dir = new DirectoryInfo(target);
             string name = dir.Name ?? "";
             bool uniqueUpdate = name.StartsWith("update-", StringComparison.OrdinalIgnoreCase) &&
-                                Guid.TryParseExact(name.Substring(7), "N", out Guid ignored);
-            bool named = string.Equals(name, "ReplayKitUpdate", StringComparison.Ordinal) ||
-                         (uniqueUpdate && string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal));
-            if (!named) return null;
+                                Guid.TryParseExact(name.Substring(7), "N", out _);
+            if (!uniqueUpdate || !string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal)) return null;
             if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
             return target;
         }
-
-        private static string PsSingleQuote(string value) => "'" + value.Replace("'", "''") + "'";
 
         // cant rmdir this update dir while this exe is still running from inside it, so hand the delete to a detached cmd that outlives us by a few seconds -- used to copy this exe under a new name and launch that copy with --cleanup-update-dir instead, but a self-duplicating renamed executable is exactly the shape av heuristics flag as a dropper, and it was doing that on every single update; target only ever comes from SafeCleanupDir, which limits it to our own temp-path shapes, so plain quoting is safe here since windows paths cannot contain a literal quote character.
         private static void ScheduleCleanup(string path)
@@ -141,23 +137,9 @@ namespace ReplayKitSetup
                 log?.Invoke("OBS executable was not found for relaunch.");
                 return false;
             }
-            try
-            {
-                var psi = new ProcessStartInfo(obs, Obs.OBS_START_ARGS)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = Path.GetDirectoryName(obs),
-                };
-                Process.Start(psi);
-                log?.Invoke("relaunched OBS: " + obs);
-                return true;
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("OBS relaunch failed: " + exc.Message);
-                return false;
-            }
+            bool started = Obs.LaunchObsAt(obs, log);
+            log?.Invoke(started ? "relaunched OBS: " + obs : "OBS relaunch failed");
+            return started;
         }
 
         // run a non-interactive repair/update install from a downloaded release exe.
@@ -202,15 +184,15 @@ namespace ReplayKitSetup
 
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
-                // stage markers: a process that is killed leaves no exception behind, so the last line in the log is
-                // the only thing that says where it got to.
+                // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
                     throw new IOException("The old ReplayKit helper could not be stopped, so no files were changed.");
                 Log("stage: helper gone, clearing crash flags");
                 Obs.CleanupCrashFlags(LogBoth);
                 Log("stage: copying runtime files");
-                int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth);
+                var problems = new List<string>();
+                int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
                 installed = true;
 
@@ -223,7 +205,9 @@ namespace ReplayKitSetup
                         return 1;
                     }
                 }
-                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).", releaseUrl);
+                // the files are in and obs is back, so this is still a success; the parts that could not be updated are named so the verdict does not claim more than happened
+                string notUpdated = problems.Count == 0 ? "" : " Not updated: " + string.Join(", ", problems) + ". Run the installer again as administrator to finish.";
+                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s))." + notUpdated, releaseUrl);
                 return 0;
             }
             catch (Exception exc)
@@ -299,8 +283,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // headless discord-screenshare install from the settings dock share preview audio row -- close obs, install the
-        // virtual audio cable, flip the prefs on. the helper already flipped replaykit_settings.json before spawning us.
+        // headless discord-screenshare install from the settings dock share preview audio row -- close obs, install the virtual audio cable, flip the prefs on. the helper already flipped replaykit_settings.json before spawning us.
         public static int RunInstallDiscordScreenshareMode(int startDelayMs = 0)
         {
             try
@@ -358,8 +341,7 @@ namespace ReplayKitSetup
             {
                 bool removeUserSettings = argv.Contains("--remove-user-settings");
                 bool removeObs = argv.Contains("--remove-obs");
-                // relaunch detached first: the "Close OBS" step kills the helper that started us and, with it, the job
-                // we were created inside -- both decided at CreateProcess time and unsheddable. same as --update.
+                // relaunch detached first: the "Close OBS" step kills the helper that started us and, with it, the job we were created inside -- both decided at CreateProcess time and unsheddable. same as --update.
                 if (!argv.Contains(DetachedSpawn.DetachedFlag))
                 {
                     int pid = DetachedSpawn.Relaunch(argv);
@@ -390,9 +372,7 @@ namespace ReplayKitSetup
             }
             if (!argv.Contains("--update")) return null;
 
-            // hand the whole job to a copy of ourselves that owns no console and belongs to no job object, then get
-            // out of the way. everything this process inherited from the helper dies with OBS moments from now; the
-            // detached copy inherits none of it, so killing OBS cannot reach it. see DetachedSpawn.
+            // hand the whole job to a copy of ourselves that owns no console and belongs to no job object, then get out of the way. everything this process inherited from the helper dies with OBS moments from now; the detached copy inherits none of it, so killing OBS cannot reach it. see DetachedSpawn.
             if (!argv.Contains(DetachedSpawn.DetachedFlag))
             {
                 int detachedPid = DetachedSpawn.Relaunch(argv);
@@ -401,8 +381,7 @@ namespace ReplayKitSetup
                     Log("relaunched detached as pid " + detachedPid + "; this launcher is done");
                     return 0;
                 }
-                // could not detach -- carry on inline rather than skipping the update, and say so, so a failure right
-                // after OBS closes is recognisable instead of looking like a silent death.
+                // could not detach -- carry on inline rather than skipping the update, and say so, so a failure right after OBS closes is recognisable instead of looking like a silent death.
                 Log("warn: could not relaunch detached, running inline (an OBS teardown may kill this process)");
             }
             else

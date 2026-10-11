@@ -1,0 +1,151 @@
+ReplayKit patch 4 of 4 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+The objects wasapi calls back into (the notification clients of the session monitor) were value members of the
+watchers that registered them, although they are COM objects that the audio service holds by pointer and counts
+references on. When a program ends, the service reports it on its own thread while the monitor thread unregisters and
+destroys the watcher, so a callback or a release that is still on its way reaches the freed member and writes into the
+heap. That is the kind of damage that ends in a heap corruption fast fail some minutes later (exception 0xc0000374, seen
+on 2026-10-06 in the same obs session as the crash that patch 3 handles). The objects are now made with Make<>() and held
+in ComPtr, so they live as long as wasapi still has a reference and are freed by the last release.
+
+diff --git a/src/session-monitor.cpp b/src/session-monitor.cpp
+index 73c32d2..d82e840 100644
+--- a/src/session-monitor.cpp
++++ b/src/session-monitor.cpp
+@@ -30,12 +30,14 @@ DeviceWatcher::DeviceWatcher(std::wstring device_id, wil::com_ptr<IMMDevice> dev
+ 	: device_id{device_id},
+ 	  device{device},
+ 	  worker_tid{worker_tid},
+-	  session_notification_client{worker_tid}
++	  session_notification_client{Make<SessionNotificationClient>(worker_tid)}
+ {
++	THROW_IF_NULL_ALLOC(session_notification_client.Get());
++
+ 	THROW_IF_FAILED(device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, NULL,
+ 					 manager2.put_void()));
+ 
+-	THROW_IF_FAILED(manager2->RegisterSessionNotification(&session_notification_client));
++	THROW_IF_FAILED(manager2->RegisterSessionNotification(session_notification_client.Get()));
+ 
+ 	// From here on a throw must undo the registration above, or WASAPI keeps
+ 	// calling into a callback whose owner was never fully constructed (the
+@@ -65,14 +67,14 @@ DeviceWatcher::DeviceWatcher(std::wstring device_id, wil::com_ptr<IMMDevice> dev
+ 			}
+ 		}
+ 	} catch (...) {
+-		manager2->UnregisterSessionNotification(&session_notification_client);
++		manager2->UnregisterSessionNotification(session_notification_client.Get());
+ 		throw;
+ 	}
+ }
+ 
+ DeviceWatcher::~DeviceWatcher()
+ {
+-	manager2->UnregisterSessionNotification(&session_notification_client);
++	manager2->UnregisterSessionNotification(session_notification_client.Get());
+ }
+ 
+ static std::string WideToUtf8(const wchar_t *wide)
+@@ -149,10 +151,10 @@ SessionWatcher::SessionWatcher(DWORD worker_tid,
+ 
+ 	THROW_IF_FAILED(GetSessionControl2()->GetProcessId(&pid));
+ 
+-	notification_client.emplace(worker_tid, SessionKey(pid, session_id));
++	notification_client = Make<SessionEventNotificationClient>(worker_tid, SessionKey(pid, session_id));
++	THROW_IF_NULL_ALLOC(notification_client.Get());
+ 
+-	THROW_IF_FAILED(
+-		session_control->RegisterAudioSessionNotification(&notification_client.value()));
++	THROW_IF_FAILED(session_control->RegisterAudioSessionNotification(notification_client.Get()));
+ 
+ 	executable = ResolveExecutable();
+ 	debug("registered new session: [%d] %s", pid, executable.c_str());
+@@ -160,15 +162,17 @@ SessionWatcher::SessionWatcher(DWORD worker_tid,
+ 
+ SessionWatcher::~SessionWatcher()
+ {
+-	session_control->UnregisterAudioSessionNotification(&notification_client.value());
++	session_control->UnregisterAudioSessionNotification(notification_client.Get());
+ 	debug("session expired: [%d] %s", pid, executable.c_str());
+ }
+ 
+ void SessionMonitor::Init()
+ {
++	THROW_IF_NULL_ALLOC(device_notification_client.Get());
++
+ 	enumerator = wil::CoCreateInstance<MMDeviceEnumerator, IMMDeviceEnumerator>();
+ 	THROW_IF_FAILED(
+-		enumerator->RegisterEndpointNotificationCallback(&device_notification_client));
++		enumerator->RegisterEndpointNotificationCallback(device_notification_client.Get()));
+ 
+ 	wil::com_ptr<IMMDeviceCollection> collection;
+ 	THROW_IF_FAILED(
+@@ -193,7 +197,7 @@ void SessionMonitor::UnInit()
+ 	// Non-throwing on purpose: this runs on failure paths and at shutdown, where
+ 	// the enumerator may not exist or the callback may never have registered.
+ 	if (enumerator)
+-		enumerator->UnregisterEndpointNotificationCallback(&device_notification_client);
++		enumerator->UnregisterEndpointNotificationCallback(device_notification_client.Get());
+ }
+ 
+ void SessionMonitor::DrainQueue()
+@@ -358,7 +362,8 @@ void SessionMonitor::Run()
+ 	// Written here rather than in the constructor so it is guaranteed visible
+ 	// before any COM callback can post to us.
+ 	worker_tid = GetCurrentThreadId();
+-	device_notification_client.SetWorkerThreadId(worker_tid);
++	if (device_notification_client)
++		device_notification_client->SetWorkerThreadId(worker_tid);
+ 
+ 	// Force message queue creation
+ 	MSG msg;
+diff --git a/src/session-monitor.hpp b/src/session-monitor.hpp
+index 95f8b3b..00b3f8c 100644
+--- a/src/session-monitor.hpp
++++ b/src/session-monitor.hpp
+@@ -173,13 +173,13 @@ private:
+ 	wil::com_ptr<IAudioSessionManager2> manager2;
+ 	wil::com_ptr<IAudioSessionEnumerator> enumerator;
+ 
+-	SessionNotificationClient session_notification_client;
++	// replaykit: a COM object that wasapi holds by pointer and may still call or release after this watcher is gone, so it is heap allocated and reference counted; as a member it died with its owner and a late call or release landed in freed memory
++	ComPtr<SessionNotificationClient> session_notification_client;
+ 
+ public:
+ 	DeviceWatcher(std::wstring device_id, wil::com_ptr<IMMDevice> device, DWORD worker_tid);
+ 
+-	// The notification client member is registered with WASAPI by address, so
+-	// this object must never be copied or moved.
++	// Owns a registration with WASAPI, which a copy would unregister twice.
+ 	DeviceWatcher(const DeviceWatcher &) = delete;
+ 	DeviceWatcher &operator=(const DeviceWatcher &) = delete;
+ 
+@@ -189,7 +189,8 @@ public:
+ class SessionWatcher {
+ private:
+ 	wil::com_ptr<IAudioSessionControl> session_control;
+-	std::optional<SessionEventNotificationClient> notification_client;
++	// replaykit: heap allocated and reference counted for the same reason as the notification client of the device watcher
++	ComPtr<SessionEventNotificationClient> notification_client;
+ 
+ 	DWORD pid;
+ 	std::wstring session_id;
+@@ -200,7 +201,7 @@ private:
+ public:
+ 	SessionWatcher(DWORD worker_tid, const wil::com_ptr<IAudioSessionControl> &session_control);
+ 
+-	// Registered with WASAPI by address; must never be copied or moved.
++	// Owns a registration with WASAPI, which a copy would unregister twice.
+ 	SessionWatcher(const SessionWatcher &) = delete;
+ 	SessionWatcher &operator=(const SessionWatcher &) = delete;
+ 
+@@ -229,7 +230,8 @@ private:
+ 	DWORD worker_tid;
+ 	wil::unique_event worker_ready{wil::EventOptions::ManualReset};
+ 
+-	DeviceNotificationClient device_notification_client;
++	// replaykit: heap allocated and reference counted, the callbacks of the device enumerator may still be on their way when this object goes
++	ComPtr<DeviceNotificationClient> device_notification_client = Make<DeviceNotificationClient>();
+ 	wil::com_ptr<IMMDeviceEnumerator> enumerator;
+ 
+ 	std::unordered_map<std::wstring, DeviceWatcher> device_watchers;

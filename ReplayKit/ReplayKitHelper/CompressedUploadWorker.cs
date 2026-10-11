@@ -6,7 +6,7 @@ using System.IO;
 
 namespace ReplayKitHelper
 {
-    // two-pass, bitrate-targeted libx264 encode of a temp copy (the original clip is never touched), then hands the compressed copy straight to UploadWorker -- the size-constrained sibling of CompressOverwriteWorker (which is quality-targeted and replaces the original in place). runs as an in-process Task from Compression.StartCompressedStreamableUpload. ported from the embedded worker script inside obs_replaykit helper modules/52_compression.ps1s Start-CompressedStreamableUpload -- that script spawned a seperate "powershell.exe -EncodedCommand" process which itself spawned upload_worker.ps1 on success; here the encode and the upload are just two steps of the same Task, so theres no second process to hand off to. progress is read via -progress pipe:1 (stdout), not the embedded scripts original -progress <file> polling -- the same pipe-based approach CompressOverwriteWorker already uses, for the same documented reason (a file goes thru the os page cache and can lag arbitrarily on windows; a pipe doesnt).
+    // two-pass, bitrate-targeted libx264 encode of a temp copy (the clip itself is never touched) that then goes to UploadWorker -- the size-constrained sibling of CompressOverwriteWorker. progress comes from -progress pipe:1, since a progress file goes through the page cache and can lag
     internal static class CompressedUploadWorker
     {
         private static void RunFfmpegPass(string ffmpeg, List<string> argv, string phase, int startPercent, int endPercent, double durationSec, string requestId)
@@ -28,8 +28,6 @@ namespace ReplayKitHelper
             using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token))
             using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
-                // exposes the live ffmpeg process on the job record so UploadState.CancelActiveUpload can kill it directly.
-                UploadState.SetUploadState(requestId: requestId, encoderProcess: proc);
                 var stderrTask = proc.StandardError.ReadToEndAsync();
                 double durationUs = Math.Max(1.0, durationSec * 1000000.0);
                 int lastPct = -1;

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace ReplayKitSetup
 {
-    // rewrite hardcoded C:\Users\<name> paths to the current user. ported from obs_replaykit/pathrewrite.py.
+    // rewrite hardcoded C:\Users\<name> paths to the current user
     public static class PathRewrite
     {
         // shared/system accounts we never want to rewrite.

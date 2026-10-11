@@ -4,9 +4,7 @@ using System.IO;
 
 namespace ReplayKitSetup
 {
-    // shared shape for a running install/cleanup progress view. the WinForms installer window (InstallerProgress),
-    // Update.CleanupProgress (headless --cleanup) and RunUninstallDiscordScreenshareMode all implement this so the
-    // apply flow and Cleanup.RunCleanup run from any caller.
+    // shared shape for a running install/cleanup progress view. the WinForms installer window (InstallerProgress), Update.CleanupProgress (headless --cleanup) and RunUninstallDiscordScreenshareMode all implement this so the apply flow and Cleanup.RunCleanup run from any caller.
     public interface IInstallProgress
     {
         int TotalSteps { get; set; }
@@ -14,16 +12,14 @@ namespace ReplayKitSetup
         void Render(int completed, string title, string detail, string state);
         void LogLine(string message);
         void AddIssue(string message);
-        // fine-grained progress inside the step currently being rendered, fraction 0..1 -- lets the bar move during the
-        // one long step (the OBS download) instead of sitting still. no-op for the headless reporters.
+        // fine-grained progress inside the step currently being rendered, fraction 0..1 -- lets the bar move during the one long step (the OBS download) instead of sitting still. no-op for the headless reporters.
         void SubProgress(double fraction, string detail);
     }
 
     // headless installer flow: make sure OBS is present, write the ReplayKit setup, launch OBS. the only interactive choice, discord screenshare, comes from the setup window.
     public static class Apply
     {
-        // shared step-runner for the apply flow and Cleanup.RunCleanup. renders "working" before the action and "done"
-        // after; a thrown action rethrows (so the caller stops the flow) after logging, a false result just adds an issue.
+        // shared step-runner for the apply flow and Cleanup.RunCleanup. renders "working" before the action and "done" after; a thrown action rethrows (so the caller stops the flow) after logging, a false result just adds an issue.
         public static void RunApplyStep(IInstallProgress progress, int index, string title, string detail, Func<object> action)
         {
             progress.Render(index - 1, title, detail, "working");
@@ -46,17 +42,14 @@ namespace ReplayKitSetup
             System.Threading.Thread.Sleep(120);
         }
 
-        // build + run every apply step against the given progress sink. rethrows if a step throws; otherwise returns the
-        // accumulated non-fatal issues. discordScreenshare is the one user choice -- null means "leave it as loaded"
-        // (the live settings for an update; the default after cleanInstall wiped them). cleanInstall drops the preserved
-        // ReplayKit settings/prefs first so the run rebuilds from the bundle + defaults, like a first install.
+        // build + run every apply step against the given progress sink. rethrows if a step throws; otherwise returns the accumulated non-fatal issues. discordScreenshare is the one user choice -- null means "leave it as loaded" (the live settings for an update; the default after cleanInstall wiped them). cleanInstall drops the preserved ReplayKit settings/prefs first so the run rebuilds from the bundle + defaults, like a first install.
         public static List<string> RunInstallFlow(bool? discordScreenshare, IInstallProgress progress, bool cleanInstall = false)
         {
+            Transform.CleanReinstall = cleanInstall;
             if (cleanInstall) WipePreservedReplaykitState(progress);
 
             var prefs = Prefs.LoadPrefs();
-            // the setup checkbox is a single on/off for the whole Share Preview feature: enable -> cable + hidden
-            // projector both on; disable -> both off. null (headless) leaves whatever was loaded.
+            // the setup checkbox is a single on/off for the whole Share Preview feature: enable -> cable + hidden projector both on; disable -> both off. null (headless) leaves whatever was loaded.
             if (discordScreenshare.HasValue)
             {
                 prefs.DiscordScreenshareEnabled = discordScreenshare.Value;
@@ -64,15 +57,13 @@ namespace ReplayKitSetup
             }
             if (!prefs.DiscordScreenshareEnabled) prefs.DiscordProjectorEnabled = false;
 
-            // capture before any step runs -- a genuine first install has no runtime settings file yet, and that is the
-            // only case that should arm the in-obs first-run wizard. a clean re-install just deleted it, so it counts too.
+            // capture before any step runs -- a genuine first install has no runtime settings file yet, and that is the only case that should arm the in-obs first-run wizard. a clean re-install just deleted it, so it counts too.
             bool firstInstall = !File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
 
             var steps = new List<(string Title, string Detail, Func<object> Action)>();
             void Add(string title, string detail, Func<object> action) => steps.Add((title, detail, action));
 
-            // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through
-            // as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
+            // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
             Add("Install OBS Studio", "Downloads OBS if it's missing.", () =>
             {
                 string existing = Obs.FindObsExe();
@@ -85,8 +76,7 @@ namespace ReplayKitSetup
             Add("Close OBS", "Stops OBS to write settings.", () => (object)Obs.CloseObs(progress.LogLine));
             Add("Back up current OBS settings", "Saves a restore copy first.", () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
             Add("Prepare OBS settings folder", "Creates the config folder.", () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
-            // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old
-            // behaviour where a false here only added a "needs attention" line while the rest ran anyway.
+            // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old behaviour where a false here only added a "needs attention" line while the rest ran anyway.
             Add("Build ReplayKit helper", "Prepares the local helper.", () =>
             {
                 if (Installer.EnsureLauncherBuilt(progress.LogLine)) return (object)true;
@@ -95,8 +85,7 @@ namespace ReplayKitSetup
             if (prefs.DiscordScreenshareEnabled)
                 Add("Enable Discord screenshare", "Installs the audio cable driver.", () =>
                 {
-                    // no double install: if the cable is already there and its endpoint is renamed, EnsureVbcable would
-                    // only re-bounce audiosrv for nothing.
+                    // no double install: if the cable is already there and its endpoint is renamed, EnsureVbcable would only re-bounce audiosrv for nothing.
                     if (VbCable.IsShareAudioReady())
                     {
                         progress.LogLine("OBS Stream Audio already set up -- nothing to install.");
@@ -104,8 +93,7 @@ namespace ReplayKitSetup
                     }
                     return (object)VbCable.EnsureVbcable(progress.LogLine);
                 });
-            // user explicitly unticked the box (not headless) and the cable is on the machine -- take it back off, so the
-            // checkbox is a real on/off for the whole feature on Update and Re-Install too.
+            // user explicitly unticked the box (not headless) and the cable is on the machine -- take it back off, so the checkbox is a real on/off for the whole feature on Update and Re-Install too.
             else if (discordScreenshare == false && VbCable.IsVbcableInstalled())
                 Add("Remove Discord screenshare", "Uninstalls the audio cable driver.", () => (object)VbCable.UninstallVbcable(progress.LogLine));
             else
@@ -116,9 +104,10 @@ namespace ReplayKitSetup
                 if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
                 return (object)ok;
             });
+            Add("Apply default settings", "Turns on the defaults this version ships with.", () => { DefaultsMigration.Run(progress.LogLine); return (object)true; });
             Add("Enable OBS WebSocket", "Enables the local OBS WebSocket.", () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
             Add("Install Custom Controls and Clips", "Adds the dock and Clips files.", () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
-            Add("Install tray plugin", "Adds the ReplayKit tray menu.", () => (object)TrayPlugin.InstallReplaykitTrayPlugin(progress.LogLine));
+            Add("Install ReplayKit plugin", "Adds the ReplayKit window, notifications and tray menu.", () => (object)NativePlugin.InstallReplaykitPlugin(progress.LogLine));
             Add("Register clip notifications", "Lets clip-ready notifications show up as OBS in the Action Center.", () => (object)Installer.RegisterClipNotificationShortcut(progress.LogLine));
             Add("Remove legacy launcher task", "Removes the old launcher task.", () => (object)Installer.RemoveObsElevationTask(progress.LogLine));
             if (prefs.AllowSleepWhileActive)
@@ -150,8 +139,7 @@ namespace ReplayKitSetup
             return progress.Issues;
         }
 
-        // clean re-install: drop the ReplayKit settings + prefs the normal flow would preserve, so everything is rebuilt
-        // from the bundle and defaults and the in-obs first-run wizard re-arms. clip history (clips_db/index) is left alone.
+        // clean re-install: drop the ReplayKit settings + prefs the normal flow would preserve, so everything is rebuilt from the bundle and defaults and the in-obs first-run wizard re-arms. clip history (clips_db/index) is left alone.
         private static void WipePreservedReplaykitState(IInstallProgress progress)
         {
             var targets = new[]
@@ -159,6 +147,7 @@ namespace ReplayKitSetup
                 Prefs.RUNTIME_SETTINGS_FILE,
                 Prefs.PREFS_FILE,
                 Prefs.SETUP_CACHE_PREFS_FILE,
+                DefaultsMigration.MarkerPath,
             };
             foreach (var path in targets)
             {

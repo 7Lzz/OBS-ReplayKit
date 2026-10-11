@@ -140,10 +140,7 @@
     }, true);
   })();
 
-  // DEV PREVIEW -- set to true to watch this whole screen (hero, progress bar, live speed/size, every stage, the
-  // completion state) without downloading or installing anything. nothing else in the product reads it, and the page
-  // is a static asset, so flipping it needs no rebuild: edit, copy to the live obs-custom-dock, reopen the window.
-  // leave it false for real use, or the updater will never actually update.
+  // DEV PREVIEW -- set to true to watch this whole screen (hero, progress bar, live speed/size, every stage, the completion state) without downloading or installing anything. nothing else in the product reads it, and the page is a static asset, so flipping it needs no rebuild: edit, copy to the live obs-custom-dock, reopen the window. leave it false for real use, or the updater will never actually update.
   const PREVIEW_ONLY = false;
 
   const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
@@ -162,8 +159,7 @@
   };
   let latest = null;
 
-  // the host (UpdatePromptWindow.cs) is a borderless webview2 form, so there is no title bar to grab and
-  // -webkit-app-region does nothing here -- post a message on mousedown and the host starts the window move.
+  // the host (UpdatePromptWindow.cs) is a borderless webview2 form, so there is no title bar to grab and -webkit-app-region does nothing here -- post a message on mousedown and the host starts the window move.
   if (window.chrome && window.chrome.webview) {
     document.addEventListener("mousedown", (e) => {
       if (e.button === 0 && !e.target.closest("button, a, input")) window.chrome.webview.postMessage("drag");
@@ -254,8 +250,7 @@
   }
   function stopProgressPolling() { clearInterval(progressTimer); progressTimer = 0; }
 
-  // the installer runs detached and takes obs (and this helper) down with it, so "helper stopped answering" is an
-  // expected stage here, not a failure. done when the new helper is back up and reports a verdict.
+  // the installer runs detached and takes obs (and this helper) down with it, so "helper stopped answering" is an expected stage here, not a failure. done when the new helper is back up and reports a verdict.
   function watchInstall(onComplete, onFail) {
     const started = Date.now();
     let percent = 82;
@@ -319,8 +314,7 @@
     }
   }
 
-  // walks the real setHero/setStatus paths on a timer so the preview exercises the same visuals as a live install,
-  // just with invented numbers. deliberately does not auto-close at the end, so the finished state can be looked at.
+  // walks the real setHero/setStatus paths on a timer so the preview exercises the same visuals as a live install, just with invented numbers. deliberately does not auto-close at the end, so the finished state can be looked at.
   async function runPreview() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const total = 24 * 1024 * 1024;
@@ -347,7 +341,7 @@
 
   async function start() {
     if (PREVIEW_ONLY) { runPreview(); return; }
-    // a verdict written while no window was open (X'd out mid-install, or the watchdog aborted) is reported once
+    // a verdict written while no window was open (Xd out mid-install, or the watchdog aborted) is reported once
     try {
       const prev = await helperJson("update/install-result?t=" + Date.now());
       if (prev.present && !prev.seen) {

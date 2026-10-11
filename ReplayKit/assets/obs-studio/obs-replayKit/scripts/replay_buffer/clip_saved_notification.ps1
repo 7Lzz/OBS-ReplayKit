@@ -1,7 +1,8 @@
 param(
     [ValidateSet('clip', 'recording-started', 'recording-stopped')][string]$Kind = 'clip',
     [ValidateRange(1, 1200)][int]$Seconds = 90,
-    [ValidateRange(500, 10000)][int]$DurationMs = 3200
+    [ValidateRange(500, 10000)][int]$DurationMs = 3200,
+    [ValidateRange(0, 1)][int]$HideFromCapture = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,7 +29,7 @@ function Format-ClipDuration([int]$totalSeconds) {
     return "${minutes}m ${remainder}s"
 }
 
-# pulls the same resolved theme the dock pages and the tray plugins own popups use, so this one stops being the odd one out with hardcoded colours. per-field fallback (not just one big try/catch) so a single missing token cannot blank the whole popup, and the helper being unreachable just falls back to the original look entirely.
+# pulls the same resolved theme the dock pages and the native plugins own popups use, so this one stops being the odd one out with hardcoded colours. per-field fallback (not just one big try/catch) so a single missing token cannot blank the whole popup, and the helper being unreachable just falls back to the original look entirely.
 function Get-PopupThemeColors {
     try {
         $settings = Invoke-RestMethod -Uri 'http://127.0.0.1:8767/settings' -TimeoutSec 2 -ErrorAction Stop
@@ -192,6 +193,14 @@ try {
             [System.Windows.Threading.DispatcherPriority]::Background
         )
     })
+
+    # the display affinity has to be set by the process that owns the window, so it is done here before the window shows; when windows refuses it the popup is not shown at all rather than shown where a recording could catch it
+    if ($HideFromCapture -eq 1) {
+        Add-Type -Namespace ReplayKit -Name PopupCapture -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);'
+        $handle = [System.Windows.Interop.WindowInteropHelper]::new($window).EnsureHandle()
+        # 0x11 is WDA_EXCLUDEFROMCAPTURE, the flag obs uses for its own hide from capture option
+        if (-not [ReplayKit.PopupCapture]::SetWindowDisplayAffinity($handle, 0x11)) { exit 0 }
+    }
 
     [void]$window.Show()
     $window.BeginAnimation([System.Windows.Window]::OpacityProperty, $fadeIn)

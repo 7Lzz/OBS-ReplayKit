@@ -4,9 +4,7 @@ using System.Text;
 
 namespace ReplayKitSetup
 {
-    // append-only file log for the windowed installer / uninstaller. the interactive flow otherwise only pushed progress
-    // to the webview page, so a step that failed quietly (the OBS download did, once) left nothing on disk to diagnose.
-    // the headless --update/--cleanup paths keep their own OBSReplayKitUpdate.log; this is the missing half.
+    // append-only file log for the windowed installer / uninstaller. the interactive flow otherwise only pushed progress to the webview page, so a step that failed quietly (the OBS download did, once) left nothing on disk to diagnose. the headless --update/--cleanup paths keep their own OBSReplayKitUpdate.log; this is the missing half.
     internal static class SetupLog
     {
         private static readonly object Gate = new object();

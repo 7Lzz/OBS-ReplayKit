@@ -36,9 +36,11 @@
   .field-reset.is-default { opacity:.4; }
   .field-reset.is-default:hover { opacity:1; }
   .form-row.tight { min-height:30px; }
-  /* setup.html's standalone .check-row carries its own row padding; inside a form-row the grid already supplies it */
-  .form-row .check-row { padding:0; }
 </style>
+<div class="form-row tight">
+  <div></div>
+  <div class="check-row"><input type="checkbox" id="ovcFlip" aria-label="Flip horizontally"><span>Flip horizontally</span></div>
+</div>
 <div class="form-row">
   <div class="label">Overlay</div>
   <div class="field-wrap">
@@ -47,10 +49,6 @@
       <div class="combo-menu" role="listbox"></div>
     </div>
   </div>
-</div>
-<div class="form-row tight">
-  <div></div>
-  <label class="check-row"><input type="checkbox" id="ovcFlip"><span>Flip horizontally</span></label>
 </div>
 <div class="form-row">
   <div class="label">Opacity</div>

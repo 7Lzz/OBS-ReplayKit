@@ -10,7 +10,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // http response writers. everything goes to a NetworkStream held open until the underlying TcpClient is closed (see Connection.cs). ported from obs_replaykit helper modules/70_http_response.ps1.
+    // http response writers; everything goes to the NetworkStream of a connection that Connection.cs closes
     internal static class HttpResponse
     {
         public static Dictionary<string, string> GetNoStoreHeaders(Dictionary<string, string> extra = null)
@@ -94,8 +94,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // splice the active theme's :root override in right before </head> so every dock page loads themed. no-op on
-        // the default theme and if the markup has no </head>.
+        // splice the active themes :root override in right before </head> so every dock page loads themed. no-op on the default theme and if the markup has no </head>.
         private static byte[] InjectThemeStyle(byte[] html)
         {
             try
@@ -146,8 +145,7 @@ namespace ReplayKitHelper
 
         private static readonly Regex _partialRe = new Regex(@"<!--#include ([a-z][a-z0-9-]{0,40})-->", RegexOptions.Compiled);
 
-        // splice shared dock fragments in: every "<!--#include NAME-->" becomes the contents of obs-custom-dock/_NAME.html.
-        // runs before InjectThemeStyle/InjectDockIcons so a partial's own data-i / RK_ICONS references still get picked up.
+        // splice shared dock fragments in: every "<!--#include NAME-->" becomes the contents of obs-custom-dock/_NAME.html. runs before InjectThemeStyle/InjectDockIcons so a partials own data-i / RK_ICONS references still get picked up.
         private static byte[] InjectPartials(byte[] html)
         {
             try
@@ -188,7 +186,7 @@ namespace ReplayKitHelper
             catch { return html; }
         }
 
-        public static void ServeHtml(Stream stream, string filename)
+        public static void ServeHtml(Stream stream, string filename, bool sameOriginFrame = false)
         {
             var candidates = new[]
             {
@@ -207,6 +205,8 @@ namespace ReplayKitHelper
                         bytes = InjectThemeStyle(bytes);
                         bytes = InjectDockIcons(bytes);
                         var h = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
+                        // only the pages the obs window frames inside its own shell page get this, and it still refuses every other origin; everything else keeps the DENY
+                        if (sameOriginFrame) h["X-Frame-Options"] = "SAMEORIGIN";
                         SendBytes(stream, 200, "OK", h, bytes);
                         return;
                     }
@@ -216,28 +216,33 @@ namespace ReplayKitHelper
             SendText(stream, 404, "Not Found", filename + " not found");
         }
 
+        // scrubbing fires a burst of overlapping range requests that each abort the last, so a slot usually frees within milliseconds and a short wait clears almost all of them; the check and the claim happen under one lock so a burst can never pass the cap together
+        private static bool TryTakePreviewSlot(out int waitedMs, out int active)
+        {
+            waitedMs = 0;
+            while (true)
+            {
+                lock (Server.State.PreviewLock)
+                {
+                    active = Server.State.ActivePreviews;
+                    if (active < Constants.MAX_PREVIEW_STREAM)
+                    {
+                        active = ++Server.State.ActivePreviews;
+                        return true;
+                    }
+                }
+                if (waitedMs >= 300) return false;
+                Thread.Sleep(15);
+                waitedMs += 15;
+            }
+        }
+
         // serves one range chunk of a clip and reports whether the connection is worth keeping open -- playback at high speed multipliers needs a new chunk far more often than realtime, and a fresh tcp handshake per chunk (plain connection:close) couldnt keep up and showed up as buffering; returning true lets Connection.HandleConnection reuse the socket for the next range request.
         public static bool ServePreview(Stream stream, HttpRequest req, string rawName)
         {
             // reqId lets start/end/error log lines for the same call be matched up -- this function otherwise writes nothing on a fast/happy path, so a stuck or failed preview would leave no trace at all.
             string reqId = Guid.NewGuid().ToString("N").Substring(0, 8);
             var sw = Stopwatch.StartNew();
-            if (Server.State.ActivePreviews >= Constants.MAX_PREVIEW_STREAM)
-            {
-                // scrubbing/seeking fires a burst of overlapping range requests that each abort the last -- normal <video> behavior, not a bug, so briefly overlapping here is routine, not the sustained overload this cap exists for. a slot typically frees in single-digit ms, so a short bounded wait clears almost every one of these instead of hard-failing a request a video element cant retry on its own.
-                int busyWaitedMs = 0;
-                while (Server.State.ActivePreviews >= Constants.MAX_PREVIEW_STREAM && busyWaitedMs < 300)
-                {
-                    Thread.Sleep(15);
-                    busyWaitedMs += 15;
-                }
-                if (Server.State.ActivePreviews >= Constants.MAX_PREVIEW_STREAM)
-                {
-                    Log.Write("Serve-Preview[" + reqId + "] BUSY name=" + rawName + " active=" + Server.State.ActivePreviews + " cap=" + Constants.MAX_PREVIEW_STREAM + " waitedMs=" + busyWaitedMs);
-                    SendText(stream, 503, "Service Unavailable", "Preview busy");
-                    return false;
-                }
-            }
             var selected = Clips.GetSafeClipPath(rawName);
             if (selected == null)
             {
@@ -264,17 +269,17 @@ namespace ReplayKitHelper
                 {
                     string lo = m.Groups[1].Value;
                     string hi = m.Groups[2].Value;
+                    bool parsed;
                     if (lo == "")
                     {
-                        long suffix = string.IsNullOrEmpty(hi) ? 0 : long.Parse(hi);
-                        if (suffix <= 0) { SendText(stream, 416, "Range Not Satisfiable", ""); return false; }
-                        start = Math.Max(fileSize - suffix, 0);
+                        parsed = long.TryParse(hi, out long suffix) && suffix > 0;
+                        if (parsed) start = Math.Max(fileSize - suffix, 0);
                     }
                     else
                     {
-                        start = long.Parse(lo);
-                        if (hi != "") end = long.Parse(hi);
+                        parsed = long.TryParse(lo, out start) && (hi == "" || long.TryParse(hi, out end));
                     }
+                    if (!parsed) { SendText(stream, 416, "Range Not Satisfiable", ""); return false; }
                 }
             }
             if (start < 0 || start >= fileSize || end < start)
@@ -289,8 +294,13 @@ namespace ReplayKitHelper
             req.Headers.TryGetValue("connection", out string connHeader);
             bool clientWantsClose = (connHeader ?? "").Trim().ToLowerInvariant() == "close";
 
-            lock (Server.State.PreviewLock) { Server.State.ActivePreviews++; }
-            Log.Write("Serve-Preview[" + reqId + "] START name=" + selected.Name + " range=" + range + " start=" + start + " end=" + end + " length=" + length + " keepAliveReq=" + !clientWantsClose + " active=" + Server.State.ActivePreviews);
+            if (!TryTakePreviewSlot(out int busyWaitedMs, out int active))
+            {
+                Log.Write("Serve-Preview[" + reqId + "] BUSY name=" + selected.Name + " active=" + active + " cap=" + Constants.MAX_PREVIEW_STREAM + " waitedMs=" + busyWaitedMs);
+                SendText(stream, 503, "Service Unavailable", "Preview busy");
+                return false;
+            }
+            Log.Write("Serve-Preview[" + reqId + "] START name=" + selected.Name + " range=" + range + " start=" + start + " end=" + end + " length=" + length + " keepAliveReq=" + !clientWantsClose + " active=" + active);
             bool sentFully = false;
             try
             {
@@ -306,7 +316,7 @@ namespace ReplayKitHelper
                 var head = FormatHttpResponse(206, "Partial Content", h, length);
                 stream.Write(head, 0, head.Length);
 
-                // explicit FileShare.Delete -- FileStream's defualt share mode (read only) blocks any concurrent delete/rename/replace-on-top of this file for as long as this handle is open, and /delete can land on a different pool thread while this one is mid-stream. Delete share doesnt affect what gets read here: windows keeps this handles view of the data valid even if the file gets unlinked out from under it mid-read.
+                // explicit FileShare.Delete -- FileStreams defualt share mode (read only) blocks any concurrent delete/rename/replace-on-top of this file for as long as this handle is open, and /delete can land on a different pool thread while this one is mid-stream. Delete share doesnt affect what gets read here: windows keeps this handles view of the data valid even if the file gets unlinked out from under it mid-read.
                 using (var fs = new FileStream(selected.Full, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
                 {
                     fs.Seek(start, SeekOrigin.Begin);
@@ -338,6 +348,62 @@ namespace ReplayKitHelper
             return sentFully && !clientWantsClose;
         }
 
+        // one cut out audio track for the editor, with byte ranges so the audio element can seek; the files are small and made by this helper
+        public static bool ServeAudioTrack(Stream stream, HttpRequest req, string key, string index) => ServeAudioFile(stream, req, ClipAudioTracks.PathFor(key, index));
+
+        // any audio file the cache made, an imported one included; null is a file that is not there
+        public static bool ServeAudioFile(Stream stream, HttpRequest req, string path)
+        {
+            if (path == null) { SendText(stream, 404, "Not Found", "Track not found"); return false; }
+            long size = new FileInfo(path).Length;
+            long start = 0;
+            long end = size - 1;
+            bool partial = false;
+            req.Headers.TryGetValue("range", out string range);
+            if (!string.IsNullOrEmpty(range))
+            {
+                var m = Regex.Match(range, @"^bytes=(\d*)-(\d*)$");
+                if (m.Success && (m.Groups[1].Value != "" || m.Groups[2].Value != ""))
+                {
+                    partial = true;
+                    bool parsed;
+                    if (m.Groups[1].Value == "")
+                    {
+                        parsed = long.TryParse(m.Groups[2].Value, out long suffix) && suffix > 0;
+                        start = Math.Max(size - (parsed ? suffix : 0), 0);
+                    }
+                    else
+                    {
+                        parsed = long.TryParse(m.Groups[1].Value, out start);
+                        if (parsed && m.Groups[2].Value != "") parsed = long.TryParse(m.Groups[2].Value, out end);
+                    }
+                    if (!parsed) { SendText(stream, 416, "Range Not Satisfiable", ""); return false; }
+                }
+            }
+            if (start < 0 || start >= size || end < start) { SendText(stream, 416, "Range Not Satisfiable", ""); return false; }
+            end = Math.Min(end, size - 1);
+            long length = end - start + 1;
+            var headers = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "audio/mp4", ["Accept-Ranges"] = "bytes", ["Connection"] = "close" });
+            if (partial) headers["Content-Range"] = "bytes " + start + "-" + end + "/" + size;
+            var head = FormatHttpResponse(partial ? 206 : 200, partial ? "Partial Content" : "OK", headers, length);
+            stream.Write(head, 0, head.Length);
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+            {
+                fs.Seek(start, SeekOrigin.Begin);
+                var buf = new byte[65536];
+                long remaining = length;
+                while (remaining > 0)
+                {
+                    int n = fs.Read(buf, 0, (int)Math.Min(buf.Length, remaining));
+                    if (n <= 0) break;
+                    stream.Write(buf, 0, n);
+                    remaining -= n;
+                }
+            }
+            stream.Flush();
+            return false;
+        }
+
         public static void ServeThumbnail(Stream stream, string rawName)
         {
             var selected = Clips.GetSafeClipPath(rawName);
@@ -363,6 +429,12 @@ namespace ReplayKitHelper
                     return;
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+            // a clip that was written a moment ago may still be being finished by OBS and has no picture yet: the page is told to ask again, and shows the clip as processing, instead of getting the grey tile
+            if (DateTime.UtcNow - fi.LastWriteTimeUtc < TimeSpan.FromMinutes(3))
+            {
+                SendText(stream, 404, "Not Found", "Thumbnail not ready");
+                return;
             }
             var h2 = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" });
             SendBytes(stream, 200, "OK", h2, Media.GetPlaceholderThumbnail());

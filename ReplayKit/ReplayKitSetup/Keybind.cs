@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // parse human-typed key combos ("shift+\\", "ctrl+f10") into the qt-flavored json obs persists for hotkeys (OBS_KEY_<x> + shift/control/alt/command booleans). ported from obs_replaykit/keybind.py. the combo shape (lowercase shift/control/alt/command/key fields) is a cross-language contract with the powershell helpers settings json -- keep field names and json field order exactly matched to the python original, not just the parsed meaning.
+    // parse human-typed key combos ("shift+\\", "ctrl+f10") into the qt-flavored json obs persists for hotkeys (OBS_KEY_<x> + shift/control/alt/command booleans). the combo shape (lowercase shift/control/alt/command/key fields, in that order) is a contract with the helpers settings json
     public static class Keybind
     {
         // OBS_KEY_ identifiers from libobs/obs-hotkey.h. only the subset a human is likely to type for a clip keybind: letters, digits, function keys, common symbol keys on a us layout, navigation, numpad.
@@ -267,8 +267,7 @@ namespace ReplayKitSetup
             if (!(obj["ReplayBuffer.Save"] is JArray binds) || binds.Count == 0) return null;
             if (!(binds[0] is JObject first) || first["key"]?.Type != JTokenType.String) return null;
 
-            // flatten to the Dictionary<string, object> the rest of Keybind works with -- bool for the modifier
-            // flags, string for key, matching what JavaScriptSerializer used to hand back.
+            // flatten to the Dictionary<string, object> the rest of Keybind works with -- bool for the modifier flags, string for key, matching what JavaScriptSerializer used to hand back.
             var combo = new Dictionary<string, object>();
             foreach (var prop in first.Properties())
             {

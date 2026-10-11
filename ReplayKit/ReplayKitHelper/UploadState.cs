@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // shared job-tracking primitives for uploads, compress-then-upload, and compress-overwrite: the job dictionary, concurrency-limiting start decision, cancellation, and stale-temp-file sweeping. ported from obs_replaykit helper modules/50_upload_state.ps1 -- the status-file plumbing from that file (Get-UploadStatusPath, Update-UploadStateFromStatusFile) has no equivalent here, since that existed only to bridge state back from a separate powershell.exe/runspace worker that could not see $script:State directly; the c# workers run as Tasks in this same process and call SetUploadState directly as they progress. Start-UploadResultWatcher/Start-CompressOverwriteResultWatcher (the completion handlers, "watcher" runspaces in the original) live in Upload.cs/CompressOverwrite.cs instead, next to the Task they continue from.
+    // the job status records behind /status for uploads, compress-then-upload and compress-overwrite, the cancel entry point, and the sweep of temp files a stopped job left behind. the workers report progress here directly; their completion handlers live next to them in Upload.cs and CompressOverwrite.cs
     internal static class UploadState
     {
         public static string NewRequestId() => Guid.NewGuid().ToString("N");
@@ -60,12 +58,11 @@ namespace ReplayKitHelper
             foreach (var key in toRemove) Server.State.Jobs.Remove(key);
         }
 
-        // merges only the parameters actually passed (matches the ps originals hashtable-merge semantics: a key absent from @{...} leaves the field untouched). requestId null/blank falls back to the current Upload jobs id, same as the original.
+        // merges only the parameters actually passed; a field left out keeps its value. a null or blank requestId falls back to the current job
         public static void SetUploadState(
             string requestId = null, string state = null, bool? active = null, string clipName = null,
             long? startedAt = null, string url = null, string error = null, string message = null,
-            string phase = null, int? percent = null, string kind = null, bool? cancelRequested = null,
-            CancellationTokenSource cts = null, Process encoderProcess = null, string tempPath = null)
+            string phase = null, int? percent = null, string kind = null, bool? cancelRequested = null)
         {
             void ApplyFields(UploadJobRecord target)
             {
@@ -80,9 +77,6 @@ namespace ReplayKitHelper
                 if (percent.HasValue) target.Percent = percent.Value;
                 if (kind != null) target.Kind = kind;
                 if (cancelRequested.HasValue) target.CancelRequested = cancelRequested.Value;
-                if (cts != null) target.Cts = cts;
-                if (encoderProcess != null) target.EncoderProcess = encoderProcess;
-                if (tempPath != null) target.TempPath = tempPath;
             }
 
             lock (Server.State.UploadLock)
@@ -172,18 +166,16 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return Enumerable.Empty<string>(); }
         }
 
-        public static void ClearStaleCompressedTempFiles()
+        // the files a finished or crashed upload, trim or compression can leave behind. the startup sweep deletes them and the storage card counts them; the bare %temp% root only matters for leftovers from before everything moved under %temp%\ReplayKit, so only the sweep looks there
+        public static List<string> EnumerateStaleTempFiles(bool includeLegacyTempRoot)
         {
+            var found = new List<string>();
             string root = Path.GetFullPath(Constants.COMPRESS_TMP_DIR);
             if (root.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) && Directory.Exists(root))
-            {
-                foreach (var file in SafeEnumerateFiles(root))
-                {
-                    try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                }
-            }
+                found.AddRange(SafeEnumerateFiles(root));
             // sweeps the current scratch dir plus bare %temp% root -- the latter only matters for leftovers from before everything moved under %temp%\ReplayKit (or from a pre-c# install that still wrote status files), and stays harmless once those are gone.
-            foreach (var sweepRoot in new[] { Constants.SCRATCH_DIR, Path.GetTempPath() })
+            var sweepRoots = includeLegacyTempRoot ? new[] { Constants.SCRATCH_DIR, Path.GetTempPath() } : new[] { Constants.SCRATCH_DIR };
+            foreach (var sweepRoot in sweepRoots)
             {
                 if (!Directory.Exists(sweepRoot)) continue;
                 foreach (var file in SafeEnumerateFiles(sweepRoot))
@@ -192,19 +184,12 @@ namespace ReplayKitHelper
                     if (name.StartsWith("streamable_upload_status_", StringComparison.OrdinalIgnoreCase) ||
                         name.StartsWith("replaykit_compress_", StringComparison.OrdinalIgnoreCase) ||
                         name.StartsWith("replaykit_trim_", StringComparison.OrdinalIgnoreCase))
-                    {
-                        try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    }
+                        found.Add(file);
                 }
             }
             // every atomic-write .tmp sidecar (clips_db.json, clips_index.json, replaykit_settings.json, obss own ini/json, ...) lands in scratch, not next to its real file -- catch anything a crash left behind mid-write with one broad sweep, scoped to just this ReplayKit-owned dir.
             if (Directory.Exists(Constants.SCRATCH_DIR))
-            {
-                foreach (var file in SafeEnumerateFiles(Constants.SCRATCH_DIR, "*.tmp"))
-                {
-                    try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                }
-            }
+                found.AddRange(SafeEnumerateFiles(Constants.SCRATCH_DIR, "*.tmp"));
             // sweep the clip folder for crashed-worker leftovers (sidecars from cross-volume finalize + older naming patterns).
             try
             {
@@ -217,13 +202,20 @@ namespace ReplayKitHelper
                         if (name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) ||
                             name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) ||
                             name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase))
-                        {
-                            try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                        }
+                            found.Add(file);
                     }
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            return found.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        public static void ClearStaleCompressedTempFiles()
+        {
+            foreach (var file in EnumerateStaleTempFiles(true))
+            {
+                try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
         }
     }
 }

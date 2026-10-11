@@ -9,17 +9,15 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // in-menu cleanup for OBS ReplayKit installs. ported from obs_replaykit/cleanup.py.
+    // cleanup for OBS ReplayKit installs, used by the uninstall window and the headless --cleanup mode
     public static class Cleanup
     {
-        private static readonly string[] ReplaykitRuntimeStateRels =
-        {
-            "obs-replayKit/scripts/helper/clips_db.json",
-            "obs-replayKit/scripts/helper/clips_index.json",
-        };
+        // the clip state that is kept across an uninstall; it is looked up with StateLayout.Resolve, so an install that has not been moved to the new layout yet is kept too
+        private static readonly string[] ReplaykitRuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile };
 
         private static (int ExitCode, string Stdout, string Stderr) RunHidden(string fileName, string arguments, int timeoutMs = 30000)
         {
@@ -129,7 +127,7 @@ namespace ReplayKitSetup
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-shaderfilter.dll"),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-shaderfilter.pdb"),
                 Path.Combine(obsRoot, "data", "obs-plugins", "obs-shaderfilter"),
-                Config.REPLAYKIT_TRAY_PLUGIN_DIR,
+                Config.REPLAYKIT_PLUGIN_DIR,
             };
             bool ok = true;
             foreach (var target in targets)
@@ -148,15 +146,12 @@ namespace ReplayKitSetup
                     log?.Invoke("warn: could not remove " + target + ": " + exc.Message);
                 }
             }
-            // a broken/phantom C:\Program Files\obs-studio (no obs64.exe, just our plugins + stale uninstaller stubs) is
-            // what seeds the "installer wrote plugins into a dead folder" bug on the next run. drop it here even on a
-            // keep-OBS uninstall -- RemoveBrokenObsInstallDir never touches a real install.
+            // a broken/phantom C:\Program Files\obs-studio (no obs64.exe, just our plugins + stale uninstaller stubs) is what seeds the "installer wrote plugins into a dead folder" bug on the next run. drop it here even on a keep-OBS uninstall -- RemoveBrokenObsInstallDir never touches a real install.
             RemoveBrokenObsInstallDir(Config.PROGRAMFILES_OBS_DIR, log);
             return ok;
         }
 
-        // remove C:\Program Files\obs-studio ONLY when it holds no working OBS (no bin\64bit\obs64.exe). a real install is
-        // left for OBS's own uninstaller; a phantom folder is force-removed so the next install starts clean.
+        // remove C:\Program Files\obs-studio ONLY when it holds no working OBS (no bin\64bit\obs64.exe). a real install is left for OBSs own uninstaller; a phantom folder is force-removed so the next install starts clean.
         private static bool RemoveBrokenObsInstallDir(string dir, Action<string> log)
         {
             if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return true;
@@ -252,11 +247,11 @@ if (Test-Path ""C:\IddSampleDriver"") {
             {
                 Directory.CreateDirectory(Config.REPLAYKIT_USER_STATE_CACHE);
                 int kept = 0;
-                foreach (var rel in ReplaykitRuntimeStateRels)
+                foreach (var file in ReplaykitRuntimeStateFiles)
                 {
-                    string source = Path.Combine(Config.OBS_CONFIG, rel.Replace('/', Path.DirectorySeparatorChar));
+                    string source = StateLayout.Resolve(Config.REPLAYKIT_CONFIG, file);
                     if (!File.Exists(source)) continue;
-                    string target = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, Path.GetFileName(rel));
+                    string target = Path.Combine(Config.REPLAYKIT_USER_STATE_CACHE, file);
                     File.Copy(source, target, true);
                     kept++;
                 }
@@ -331,6 +326,13 @@ if (Test-Path ""C:\IddSampleDriver"") {
 
             // the cached uninstaller -- usually the exe this process is running from, so it is locked; fall back to a session-manager delete-on-reboot, queued before the folder below so the folder is empty by the time that entry runs
             string exe = Config.REPLAYKIT_SETUP_EXE;
+            string exeMeta = SetupCache.MetaPath(exe);
+            if (File.Exists(exeMeta))
+            {
+                try { File.Delete(exeMeta); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { log?.Invoke("warn: could not remove " + exeMeta + ": " + ex.Message); }
+            }
             if (File.Exists(exe))
             {
                 try { File.Delete(exe); log?.Invoke("removed " + Path.GetFileName(exe)); }
@@ -357,9 +359,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return ok;
         }
 
-        // ReplayKit's fingerprints inside OBS's OWN config -- WipeObsConfig only deletes the obs-replayKit/ folder, so
-        // without this the scene collection keeps listing replaykit.lua ("Error opening file: (null)" every launch), the
-        // All-In-One scene + its sources, the Custom Controls browser dock, and the generated obs theme all stay behind.
+        // ReplayKits fingerprints inside OBSs OWN config -- WipeObsConfig only deletes the obs-replayKit/ folder, so without this the scene collection keeps listing replaykit.lua ("Error opening file: (null)" every launch), the All-In-One scene + its sources, the Custom Controls browser dock, and the generated obs theme all stay behind.
         public static bool RemoveReplaykitFromObsConfig(Action<string> log = null)
         {
             bool ok = true;
@@ -372,8 +372,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return ok;
         }
 
-        // source/scene names ReplayKit's bundled collection ships. the generic ones ("Display Capture" etc.) are only
-        // pulled when nothing the user kept still references them -- see the orphan check in ScrubSceneCollections.
+        // source/scene names ReplayKits bundled collection ships. the generic ones ("Display Capture" etc.) are only pulled when nothing the user kept still references them -- see the orphan check in ScrubSceneCollections.
         private static readonly HashSet<string> ReplaykitSceneNames = new HashSet<string>(StringComparer.Ordinal) { "All-In-One" };
 
         private static bool LooksLikeReplaykitSource(JObject src)
@@ -420,7 +419,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
                     if (kept.Count != scriptsTool.Count) { root["modules"]["scripts-tool"] = kept; changed = true; }
                 }
 
-                // 2. remove ReplayKit's scene(s); keep the first shell in case the collection ends up empty
+                // 2. remove ReplayKits scene(s); keep the first shell in case the collection ends up empty
                 JObject shell = null;
                 var rkItemNames = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var scene in sources.OfType<JObject>()
@@ -443,7 +442,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
                     foreach (var it in (scene["settings"]?["items"] as JArray ?? new JArray()))
                     { var n = it?["name"]?.Value<string>(); if (!string.IsNullOrEmpty(n)) sceneRefs.Add(n); }
 
-                // 3b. drop ReplayKit groups first -- one no surviving scene lists and that is ReplayKit's or came from the removed scene
+                // 3b. drop ReplayKit groups first -- one no surviving scene lists and that is ReplayKits or came from the removed scene
                 foreach (var g in groups.OfType<JObject>().ToList())
                 {
                     string name = g.Value<string>("name") ?? "";
@@ -536,7 +535,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
                 text = Regex.Replace(text, @"(\[BasicWindow\][^\[]*?\r?\nExtraBrowserDocks=)([^\r\n]*)",
                     m => m.Groups[1].Value + StripReplaykitDock(m.Groups[2].Value), RegexOptions.Singleline);
 
-                // [BasicWindow] DockState -- the tray plugin hid OBS's native "Controls" dock and OBS persisted that
+                // [BasicWindow] DockState -- the native plugin hid OBSs native "Controls" dock and OBS persisted that
                 // into this blob. it is an opaque QMainWindow::saveState() so there is no clean way to flip one dock;
                 // drop the whole line and OBS rebuilds its default layout (Controls dock visible) on next launch. the
                 // .bak beside this file keeps the old layout if the user wants it.
@@ -562,7 +561,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return ok;
         }
 
-        // the ExtraBrowserDocks value with the ReplayKit "Custom Controls" entry removed, re-escaped for obs's ini parser (\ -> \\).
+        // the ExtraBrowserDocks value with the ReplayKit "Custom Controls" entry removed, re-escaped for obss ini parser (\ -> \\).
         private static string StripReplaykitDock(string iniValue)
         {
             JArray docks;
@@ -603,11 +602,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return ok;
         }
 
-        // remove OBS Studio the way its own installer would: run the registered uninstaller silently (QuietUninstallString
-        // from the Uninstall key -- OBS writes it under WOW6432Node even for the 64-bit build -- else <obs>\uninstall.exe
-        // /S), wait for obs64.exe to go, then clear what it leaves behind (install dir, Start Menu shortcuts, a dangling
-        // Uninstall row). a broken/partial OBS has no working uninstaller, so the dir is force-removed when no obs64.exe
-        // remains. scenes + profiles under %APPDATA%\obs-studio are kept -- that matches a normal OBS uninstall.
+        // remove OBS Studio the way its own installer would: run the registered uninstaller silently (QuietUninstallString from the Uninstall key -- OBS writes it under WOW6432Node even for the 64-bit build -- else <obs>\uninstall.exe /S), wait for obs64.exe to go, then clear what it leaves behind (install dir, Start Menu shortcuts, a dangling Uninstall row). a broken/partial OBS has no working uninstaller, so the dir is force-removed when no obs64.exe remains. scenes + profiles under %APPDATA%\obs-studio are kept -- that matches a normal OBS uninstall.
         public static bool UninstallObsStudio(Action<string> log = null)
         {
             string obsDir = Config.PROGRAMFILES_OBS_DIR;
@@ -666,8 +661,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return ok;
         }
 
-        // undo RegisterClipNotificationShortcut / the helper's ToastNotify: delete our own Start Menu shortcuts and the
-        // HKCU header registration, and un-stamp our AppUserModelID from OBS Studio's own shortcut (left pristine).
+        // undo RegisterClipNotificationShortcut / the helpers ToastNotify: delete our own Start Menu shortcuts and the HKCU header registration, and un-stamp our AppUserModelID from OBS Studios own shortcut (left pristine).
         public static bool RemoveClipNotificationShortcut(Action<string> log = null)
         {
             bool ok = true;
@@ -687,7 +681,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             string userObs = Path.Combine(Shortcuts.UserPrograms, "OBS Studio.lnk");
             if (Shortcuts.HasAumid(userObs, aumid)) DeleteIfPresent(userObs);
 
-            // OBS's own all-users shortcut: never delete it here, only clear our property
+            // OBSs own all-users shortcut: never delete it here, only clear our property
             string allObs = Path.Combine(Shortcuts.AllUsersPrograms, "OBS Studio.lnk");
             if (Shortcuts.HasAumid(allObs, aumid)) Shortcuts.ClearAumid(allObs, log);
 

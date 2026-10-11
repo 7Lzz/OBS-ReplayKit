@@ -10,7 +10,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // rebuilds clips_index.json (per-clip ffprobe metadata cache: duration/width/height/fps/codec) for whatever in the clip folder isnt already indexed at its current size+mtime. runs as an in-process background task kicked off by Clips.StartClipIndexRepairIfNeeded -- the ps original was a standalone die-with-parent child process for the same reason this stays self-contained (no Server.State access): keep slow ffprobe work off the request-handling path without needing its own locking story. ported from obs_replaykit helper clip_index_worker.ps1.
+    // rebuilds clips_index.json (per-clip ffprobe metadata cache: duration/width/height/fps/codec) for whatever in the clip folder isnt already indexed at its current size+mtime. runs as an in-process background task kicked off by Clips.StartClipIndexRepairIfNeeded; it stays self-contained (no Server.State access) so the slow ffprobe work needs no locking of its own
     internal static class ClipIndexWorker
     {
         private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false);
@@ -171,7 +171,7 @@ namespace ReplayKitHelper
             {
                 Native.MoveFileReplace(tmp, path);
             }
-            catch (System.ComponentModel.Win32Exception)
+            catch (IOException)
             {
                 try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 throw;
@@ -211,6 +211,9 @@ namespace ReplayKitHelper
                         entries[file.Name] = old;
                         continue;
                     }
+                    // a clip with several audio tracks gets its track flags put right before anything reads it; a file obs still holds open stays out of the index so the next pass looks at it again
+                    if (Mp4Tracks.NormalizeAudio(file.FullName) == Mp4Tracks.Fix.Busy) continue;
+                    file.Refresh();
                     var metadata = ReadFfprobeMetadata(ffprobe, file.FullName);
                     entries[file.Name] = NewIndexEntry(file, metadata);
                     freshlyIndexed.Add(file.Name);

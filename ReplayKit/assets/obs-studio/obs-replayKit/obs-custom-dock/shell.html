@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit</title>
+<style>
+  :root { --window:#1D1F26; --panel:#272A33; --text:#ffffff; --text-rgb:255, 255, 255; }
+  html, body { width:100%; height:100%; margin:0; overflow:hidden; background:var(--window); }
+  /* a page that is not showing is transparent and not hidden, so it keeps its layers and is painted the moment it comes back, and nothing of it shows through the page that comes in */
+  iframe { position:absolute; left:0; top:0; width:100%; height:100%; border:0; z-index:0; opacity:0; pointer-events:none; background:transparent; }
+  iframe.on { z-index:2; opacity:1; pointer-events:auto; }
+
+  /* what the page that is leaving fades into. fading the frame itself to nothing shows the frames stacked under it, which is how the settings page used to flash up for a moment before the preview came on; the pages are covered by the colour of the stage instead, over the whole of the stage and under the skeleton and the veil */
+  .dip { position:fixed; inset:0; z-index:3; background:var(--window); opacity:0; pointer-events:none; }
+  .dip.on { opacity:1; transition:opacity 100ms ease-out; }
+  /* the cover of a swap between two pages comes off with a fade, which is how the new page comes in */
+  .dip.soft { transition:opacity 180ms ease-out; }
+
+  /* what stands in for a page that is still loading, so a click on a tab is answered at once. it is drawn only after a short moment, so a page that loads fast never shows it */
+  .skel { position:fixed; inset:0; z-index:4; display:none; padding:26px 28px; background:var(--window); opacity:0; pointer-events:none; }
+  .skel.on { display:block; animation:skel-in 140ms ease both; pointer-events:auto; }
+  .skel.out { animation:skel-out 160ms ease both; pointer-events:none; }
+  .skel-bar { height:14px; border-radius:7px; background:rgba(var(--text-rgb), .08); }
+  .skel-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-top:26px; }
+  .skel-tile { aspect-ratio:16 / 9; border-radius:10px; background:rgba(var(--text-rgb), .06); animation:skel-pulse 1.4s ease-in-out infinite; }
+  .skel-tile:nth-child(2n) { animation-delay:.15s; }
+  .skel-tile:nth-child(3n) { animation-delay:.3s; }
+  @keyframes skel-in { from { opacity:0; } to { opacity:1; } }
+  @keyframes skel-out { from { opacity:1; } to { opacity:0; } }
+  @keyframes skel-pulse { 50% { opacity:.55; } }
+
+  /* over the page for as long as a native window is being built, which holds the window thread for a while; this browser keeps drawing meanwhile, so the spinner keeps turning */
+  .veil { position:fixed; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; background:rgba(0, 0, 0, .45); opacity:0; pointer-events:none; transition:opacity 160ms ease; }
+  .veil.on { opacity:1; pointer-events:auto; }
+  .veil-box { display:flex; align-items:center; gap:12px; padding:12px 18px 12px 14px; border-radius:10px; background:var(--panel); box-shadow:0 8px 28px rgba(0, 0, 0, .4); font:14px "Segoe UI", system-ui, sans-serif; color:var(--text); }
+  .veil-spin { width:18px; height:18px; border-radius:50%; border:2px solid rgba(var(--text-rgb), .22); border-top-color:var(--text); animation:veil-spin .8s linear infinite; }
+  @keyframes veil-spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="dip" id="dip"></div>
+<div class="skel" id="skel"><div class="skel-bar" style="width:180px"></div><div class="skel-bar" style="width:320px;margin-top:12px;height:10px;opacity:.7"></div><div class="skel-grid"><div class="skel-tile"></div><div class="skel-tile"></div><div class="skel-tile"></div><div class="skel-tile"></div><div class="skel-tile"></div><div class="skel-tile"></div></div></div>
+<div class="veil" id="veil"><div class="veil-box"><span class="veil-spin"></span><span id="veil-text"></span></div></div>
+<script>
+// the one browser the clean layout keeps inside the obs window. every view (home, clips, settings, setup) is a same-origin iframe that stays loaded and laid out, and they are simply stacked: the one showing is on top and opaque, so switching is a z-order flip inside a single compositor frame and no native window is hidden or shown, which is what used to flash. a page that is not showing is covered, never hidden, because the browser stops running animation frames for a hidden or transparent frame, and a page that cannot draw while it waits would be revealed empty. the plugin drives it through RKShell and hears back through /shell/shown once the wanted page is really on screen.
+(function () {
+  "use strict";
+
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  // home is the clips page in its reduced form: the newest clips under a header
+  var VIEWS = { home: "/clips-view?home=1", clips: "/clips-view", settings: "/settings-view", setup: "/setup-view" };
+  var frames = {};
+  // the view a show() is still waiting on, so a page that loads late does not steal the screen from a later choice
+  var wanted = "";
+  // the view whose page is told it is on screen; none while the preview or the obs settings cover this browser
+  var active = "";
+  var windowUp = true;
+  var settingsPage = "";
+  var skelTimer = 0;
+  var dipTimer = 0;
+  var softTimer = 0;
+  // a native view covered this browser until now: the page that comes back waits, out of sight, for the plugin to say the browser is on top again, and only then settles in
+  var parked = false;
+  var entering = "";
+  var enterTimer = 0;
+  // when each page was asked for, loaded and shown, in ms since this page started, for looking at where a slow first open goes
+  var marks = {};
+  var t0 = performance.now();
+  function mark(key) { if (!(key in marks)) marks[key] = Math.round(performance.now() - t0); }
+
+  function dispatch(f) {
+    if (!f.loaded) return;
+    var shown = windowUp && f.name === active;
+    try {
+      var w = f.el.contentWindow;
+      w.dispatchEvent(new w.CustomEvent("replaykit-window", { detail: { shown: shown } }));
+    } catch (_) {}
+  }
+  function dispatchAll() { Object.keys(frames).forEach(function (k) { dispatch(frames[k]); }); }
+
+  function ensure(name) {
+    var f = frames[name];
+    if (f) return f;
+    var el = document.createElement("iframe");
+    el.setAttribute("title", name);
+    el.inert = true;
+    f = frames[name] = { name: name, el: el, loaded: false, waiters: [] };
+    mark(name + "Requested");
+    el.addEventListener("load", function () {
+      f.loaded = true;
+      mark(name + "Loaded");
+      // a page that loaded behind the scenes must not start polling as if it were showing
+      dispatch(f);
+      f.waiters.splice(0).forEach(function (fn) { fn(); });
+    });
+    el.src = VIEWS[name] + (VIEWS[name].indexOf("?") < 0 ? "?" : "&") + "embedded=1";
+    document.body.appendChild(el);
+    return f;
+  }
+
+  function ack(name) {
+    fetch(HELPER + "/shell/shown?view=" + encodeURIComponent(name), { method: "POST", cache: "no-store" }).catch(function () {});
+  }
+  // two frames later whatever was just put on screen has been presented, which is the moment the plugin may put this browser above the preview; the timer only covers a browser that is not producing frames while it sits under the preview
+  function ackSoon(name) {
+    var sent = false;
+    var send = function () { if (!sent) { sent = true; ack(name); } };
+    requestAnimationFrame(function () { requestAnimationFrame(send); });
+    setTimeout(send, 150);
+  }
+
+  function showSkeleton() {
+    var el = document.getElementById("skel");
+    clearTimeout(skelTimer);
+    skelTimer = setTimeout(function () { el.classList.remove("out"); el.classList.add("on"); }, 90);
+  }
+  // true when the placeholder was on screen and is now fading away over the page that replaced it, which then needs no entrance of its own
+  function hideSkeleton(fade) {
+    var el = document.getElementById("skel");
+    clearTimeout(skelTimer);
+    if (!el.classList.contains("on")) return false;
+    if (!fade) { el.classList.remove("on", "out"); return true; }
+    el.classList.add("out");
+    setTimeout(function () { if (el.classList.contains("out")) el.classList.remove("on", "out"); }, 170);
+    return true;
+  }
+  // nothing has been on screen yet at the start, and the curtain of the plugin covers that wait already
+  function anyShown() { return Object.keys(frames).some(function (k) { return frames[k].shownOnce; }); }
+
+  // the very first reveal of a page waits for the page to say its first round of data is in (window.__rkReady), so what shows first is the finished page and not its loading state; later reveals flip at once
+  function apply(name) {
+    var f = frames[name];
+    var ready = null;
+    if (!f.revealed) {
+      f.revealed = true;
+      try { ready = f.el.contentWindow.__rkReady; } catch (_) {}
+    }
+    if (!ready) { reveal(name); return; }
+    var patience = new Promise(function (resolve) { setTimeout(resolve, 1500); });
+    Promise.race([ready, patience]).then(function () { if (wanted === name) reveal(name); });
+  }
+
+  function settle(el) {
+    // the page that comes in fades in over the one it replaces, on the compositor, so it costs nothing even while the page behind it is busy. nothing moves: a page that rose into place read as a bounce
+    if (!el.animate) return;
+    try { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: "cubic-bezier(.2, .7, .3, 1)" }); } catch (_) {}
+  }
+
+  // a page that replaces another one is not faded over it: the one that shows fades into the stage colour, and the new one comes up out of it, the way the preview and the pages do through the plugin. the two are never on screen together and nothing moves
+  function dipSwap(name) {
+    var dip = document.getElementById("dip");
+    clearTimeout(dipTimer);
+    clearTimeout(softTimer);
+    dip.classList.remove("soft");
+    dip.classList.add("on");
+    dipTimer = setTimeout(function () {
+      if (wanted !== name) { undip(false); return; }
+      flip(name, active, false, false, true);
+    }, 90);
+  }
+
+  function reveal(name) {
+    var before = active;
+    var comingBack = parked;
+    parked = false;
+    // a page that was held back and never let in must not stay invisible the next time it is asked for
+    entering = "";
+    clearTimeout(enterTimer);
+    var covered = hideSkeleton(true);
+    frames[name].shownOnce = true;
+    if (!comingBack && !covered && before && before !== name && windowUp) {
+      dipSwap(name);
+      return;
+    }
+    flip(name, before, comingBack, covered, false);
+  }
+
+  // the page itself goes on top; viaDip says the cover of a swap is up and comes off now, which is the page coming in
+  function flip(name, before, comingBack, covered, viaDip) {
+    undip(viaDip);
+    Object.keys(frames).forEach(function (k) {
+      frames[k].el.classList.toggle("on", k === name);
+      frames[k].el.style.opacity = "";
+      // an inactive page can neither be focused nor read out, while it keeps drawing
+      frames[k].el.inert = k !== name;
+    });
+    active = name;
+    mark(name + "Shown");
+    dispatchAll();
+    var f = frames[name];
+    if (comingBack && !covered) {
+      // the preview or the obs settings were on top, so this browser is under them: the page stays out of sight until enter() says it is on top, since a fade nobody can see is no fade. the timer only exists so a plugin that never says it cannot leave the page invisible
+      f.el.style.opacity = "0";
+      entering = name;
+      clearTimeout(enterTimer);
+      enterTimer = setTimeout(enter, 900);
+    } else if (!covered && !viaDip && before && before !== name) {
+      settle(f.el);
+    }
+    try {
+      if (name === "settings" && settingsPage) f.el.contentWindow.__rkGoToPage(settingsPage);
+      f.el.contentWindow.focus();
+    } catch (_) {}
+    if (name === "settings") settingsPage = "";
+    ackSoon(name);
+  }
+
+  function show(name, page) {
+    if (!VIEWS[name]) return;
+    wanted = name;
+    if (name === "settings" && page) settingsPage = String(page);
+    var f = ensure(name);
+    if (f.loaded) { apply(name); return; }
+    // the page is still on its way: a placeholder answers the click meanwhile, and the browser can already be lifted over the preview
+    if (anyShown()) {
+      showSkeleton();
+      ackSoon(name);
+    }
+    f.waiters.push(function () { if (wanted === name) apply(name); });
+  }
+
+  // the browser is on top of the stage now, so the page that was held back comes in
+  function enter() {
+    clearTimeout(enterTimer);
+    if (!entering) return;
+    var f = frames[entering];
+    entering = "";
+    if (!f) return;
+    settle(f.el);
+    f.el.style.opacity = "";
+  }
+
+  // the preview is about to take the stage: the page on it fades into the stage colour here first, so what the preview replaces is the stage colour and not a page that vanishes
+  function leave() {
+    var dip = document.getElementById("dip");
+    clearTimeout(softTimer);
+    dip.classList.remove("soft");
+    if (active && frames[active]) dip.classList.add("on");
+  }
+
+  // the cover comes off without a fade, the next thing on screen is the page that was asked for; with soft it fades away over the page that has just been put under it
+  function undip(soft) {
+    var dip = document.getElementById("dip");
+    clearTimeout(dipTimer);
+    clearTimeout(softTimer);
+    if (soft) {
+      dip.classList.add("soft");
+      dip.classList.remove("on");
+      softTimer = setTimeout(function () { dip.classList.remove("soft"); }, 220);
+      return;
+    }
+    dip.classList.remove("soft");
+    dip.classList.remove("on");
+  }
+
+  // the preview or the obs settings now cover this browser: the displayed page stays as it is, but nothing is told it is on screen
+  function park() {
+    wanted = "";
+    active = "";
+    parked = true;
+    // the preview is on top of this browser now, and the page it left comes back under no cover
+    undip();
+    if (entering && frames[entering]) frames[entering].el.style.opacity = "";
+    entering = "";
+    clearTimeout(enterTimer);
+    hideSkeleton(false);
+    dispatchAll();
+    // focus leaves the hidden page, or its focus event would tell it that it is showing again
+    try { window.focus(); } catch (_) {}
+  }
+
+  function windowShown(up) {
+    windowUp = !!up;
+    dispatchAll();
+  }
+
+  // a veil with a spinner over whatever page is showing, for as long as the plugin builds a native window; false takes it away
+  function busy(text) {
+    var veil = document.getElementById("veil");
+    if (!text) { veil.classList.remove("on"); return; }
+    document.getElementById("veil-text").textContent = String(text);
+    veil.classList.add("on");
+  }
+
+  // the rail was pressed on the page that already shows: the page may have a way back of its own, and the editor of the clips view takes it
+  function reselect(name) {
+    var f = frames[name];
+    if (!f || !f.loaded || name !== active) return;
+    try {
+      var w = f.el.contentWindow;
+      if (typeof w.__rkReselect === "function") w.__rkReselect();
+    } catch (_) {}
+  }
+
+  // the plugin asks now and then whether this page still runs, and the answer goes through the helper; a page whose renderer died stays silent, and the plugin reloads it
+  function ping(n) {
+    fetch(HELPER + "/shell/ping?n=" + encodeURIComponent(n), { method: "POST", cache: "no-store" }).catch(function () {});
+  }
+
+  // the window is leaving fullscreen on its own (another view, a close), so a clip playing fullscreen inside a page is told too
+  function leaveFullscreen() {
+    Object.keys(frames).forEach(function (k) {
+      try {
+        var d = frames[k].el.contentDocument;
+        if (d && d.fullscreenElement) d.exitFullscreen();
+      } catch (_) {}
+    });
+  }
+
+  // the plugin has put the keyboard on this browser, and the page that shows is given it, so its keys work without a click on it
+  function focusActive() {
+    var f = frames[active];
+    try { if (f) f.el.contentWindow.focus(); } catch (_) {}
+  }
+
+  window.RKShell = { show: show, park: park, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
+
+  // home is the landing page; the rest load one after another behind it so the first click on any of them finds a painted page. each starts the moment the one before it has loaded, with no fixed waits in between, since the first click can come right after the window opens
+  show("home");
+  var home = ensure("home");
+  home.waiters.push(function () {
+    var clips = ensure("clips");
+    var toSettings = function () { setTimeout(function () { ensure("settings"); }, 50); };
+    if (clips.loaded) toSettings(); else clips.waiters.push(toSettings);
+  });
+})();
+</script>
+<!--#include shell-nav-->
+</body>
+</html>

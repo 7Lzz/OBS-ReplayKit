@@ -199,7 +199,7 @@
           <div class="label">Custom theme</div>
           <div class="field-wrap is-stacked">
             <div class="theme-section">
-              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a swatch to open the floating editor."></button></span></div>
+              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a color square to change that color."></button></span></div>
               <div class="theme-editor" id="themeEditor">
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
@@ -208,12 +208,13 @@
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color"></button><span>Accent</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color"></button><span>Border</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color"></button><span>Danger</span></div>
+                <div class="theme-pick" data-tooltip="Title bar and sidebar"><button class="color-picker" type="button" data-k="bar" aria-label="Title bar and sidebar color"></button><span>Bars</span></div>
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Give any surface a gradient instead of a flat color."></button></span></div>
+              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Lets an area fade between colors instead of using one solid color."></button></span></div>
               <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
-              <label class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></label>
+              <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></div>
               <div class="gradient-editor" id="themeGradientEditor" hidden>
                 <div class="gradient-top">
                   <div class="combo" data-self-wired id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
@@ -235,7 +236,7 @@
             </div>
             <div class="theme-section">
               <div class="theme-section-title"><span>Window behavior</span></div>
-              <label class="check-row"><input type="checkbox" id="themeCustomDark"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off for light themes. It changes native OBS controls that swatches cannot restyle."></button></label>
+              <div class="check-row"><input type="checkbox" id="themeCustomDark" aria-label="Use dark icons, menus and native controls"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light."></button></div>
             </div>
             <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
               <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
@@ -246,7 +247,7 @@
         </div>
       </div>
       <div class="box">
-        <div class="box-title">App Icon <button class="info-dot" type="button" aria-label="About the app icon" title="Swaps the icon on the OBS window, its taskbar button and the system tray, plus ReplayKit's own windows. Applies instantly, no restart or admin. Default restores OBS's own icon. Drop more .ico or .png files into obs-replayKit\icons\ to add presets."></button></div>
+        <div class="box-title">App Icon</div>
         <div class="form-row">
           <div class="label">Icon</div>
           <div class="field-wrap is-stacked">
@@ -264,10 +265,11 @@
         </div>
         <div class="form-row tight">
           <div></div>
-          <label class="check-row">
-            <input type="checkbox" id="appIconRecordingDot">
-            <span>Show a red recording dot on a custom icon while recording</span>
-          </label>
+          <div class="check-row">
+            <input type="checkbox" id="appIconRecordingDot" aria-label="Show recording dot">
+            <span>Show recording dot</span>
+            <button class="info-dot" type="button" aria-label="About the recording dot" title="Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere."></button>
+          </div>
         </div>
       </div>
 <script>
@@ -365,9 +367,7 @@
     themeLiveStyle.id = "rk-theme-live";
     document.head.appendChild(themeLiveStyle);
   }
-  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves
-  // background-color transitions that resolve through var() half-finished when the custom props change,
-  // freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
+  // kills transitions/animations for one frame while the preview swaps -- this CEF build otherwise leaves background-color transitions that resolve through var() half-finished when the custom props change, freezing elements on the old accent. real (post-Apply) theme changes reload the dock so dont need this.
   const themeSwapFreeze = document.createElement("style");
   themeSwapFreeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
   document.head.appendChild(themeSwapFreeze);
@@ -387,8 +387,7 @@
   }, 4000);
   window.addEventListener("pagehide", clearThemePreview);
 
-  // gradients are per surface. only these four: text, border and danger are colour roles that end up in
-  // border-color / color and in the helper's colour arithmetic, where a gradient value paints nothing.
+  // gradients are per surface. only these four: text, border and danger are colour roles that end up in border-color / color and in the helpers colour arithmetic, where a gradient value paints nothing.
   const GRADIENT_TARGETS = [
     { key:"bg", label:"Background" },
     { key:"panel", label:"Panel" },
@@ -400,13 +399,14 @@
   function blankGradient() {
     return { enabled:false, type:"linear", angle:135, centerX:50, centerY:50, stops:[] };
   }
-  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what
-  // decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
+  // every target always has an entry, so switching tabs never has to guard for a missing one; `enabled` is what decides whether it is written out, which keeps a half-built gradient around while you flip between surfaces.
   let gradientByTarget = {};
   GRADIENT_TARGETS.forEach((entry) => { gradientByTarget[entry.key] = blankGradient(); });
 
   function currentGradient() { return gradientByTarget[gradientTarget] || blankGradient(); }
 
+  // the colours of the theme that the editor does not show (the quieter text, the stronger border, the second accent), as steps from what the helper works out from the ones it does show; a custom theme made from a preset carries the steps of that preset, so it starts out as an exact copy of it
+  let customOffsets = null;
   function themeCustomState() {
     const o = {};
     els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => { o[button.dataset.k] = button.dataset.value; });
@@ -427,10 +427,11 @@
     // the helper still reads this legacy field when a theme predates per-token gradients; keep it pointed at bg.
     o.gradient = gradients.bg ? gradients.bg.stops[gradients.bg.stops.length - 1].color : "";
     o.dark = els.themeCustomDark.checked;
+    if (customOffsets) o.offsets = customOffsets;
     return o;
   }
 
-  // pulls the live editor controls back into the selected target's spec, so nothing is lost on tab switch or save.
+  // pulls the live editor controls back into the selected targets spec, so nothing is lost on tab switch or save.
   function captureGradientEditor() {
     const spec = gradientByTarget[gradientTarget];
     if (!spec) return;
@@ -465,7 +466,7 @@
     });
   }
 
-  // pushes the selected target's spec into the shared editor controls.
+  // pushes the selected targets spec into the shared editor controls.
   function loadGradientEditor() {
     const spec = currentGradient();
     const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
@@ -489,7 +490,7 @@
     themePreviewTimer = setTimeout(async () => {
       const id = state.theme || "default";
       let url = HELPER + "/appearance/theme.css?t=" + Date.now();
-      // mid-edit the preset's saved css is stale -- preview whatever the editor currently holds
+      // mid-edit the presets saved css is stale -- preview whatever the editor currently holds
       if (id === "custom" || editingThemeId) url += "&custom=" + encodeURIComponent(JSON.stringify(themeCustomState()));
       else url += "&theme=" + encodeURIComponent(id);
       try {
@@ -499,7 +500,7 @@
         themeLiveStyle.textContent = css;
         publishThemePreview(css);
         // when a non-default theme is saved the helper injects its own <style id="rk-theme"> before </head>;
-        // rewriting this node's text alone doesnt always make CEF redo the cascade tie-break, so move it back
+        // rewriting this nodes text alone doesnt always make CEF redo the cascade tie-break, so move it back
         // to last to guarantee the preview wins.
         document.head.appendChild(themeLiveStyle);
         void document.documentElement.offsetHeight; // flush the swap under the freeze before re-enabling motion
@@ -613,8 +614,7 @@
     });
     updateGradientPreview();
   }
-  // a fresh gradient for a surface starts from that surface's own colour so turning it on is a soft change
-  // rather than a jump to some unrelated pair.
+  // a fresh gradient for a surface starts from that surfaces own colour so turning it on is a soft change rather than a jump to some unrelated pair.
   function seedStopsFor(targetKey, c) {
     const base = cleanHexColor(c[targetKey === "bg" ? "bg" : targetKey], null)
       || cleanHexColor(c.bg, "#161617");
@@ -632,6 +632,7 @@
   }
   function fillThemeEditor(c) {
     c = c || {};
+    customOffsets = c.offsets && typeof c.offsets === "object" ? c.offsets : null;
     els.themeEditor.querySelectorAll("button[data-k]").forEach((button) => {
       setColorButton(button, c[button.dataset.k] || "#000000", "#000000");
     });
@@ -738,7 +739,7 @@
     const theme = themesCache.find((item) => item.id === id);
     if (!theme || !theme.seed) return;
     editingThemeId = id;
-    // stay on the preset being edited -- the editor is changing that preset's contents, not forking it into Custom
+    // stay on the preset being edited -- the editor is changing that presets contents, not forking it into Custom
     state.theme = id;
     state.themeCustom = Object.assign({}, theme.seed);
     fillThemeEditor(state.themeCustom);
@@ -791,7 +792,7 @@
     const spec = gradientByTarget[gradientTarget];
     if (spec) {
       spec.enabled = els.themeGradientEnabled.checked;
-      // turning it on with nothing stored yet seeds from the surface's own colour, so the first frame is subtle
+      // turning it on with nothing stored yet seeds from the surfaces own colour, so the first frame is subtle
       if (spec.enabled && spec.stops.length < 2) spec.stops = seedStopsFor(gradientTarget, themeCustomState());
     }
     els.themeGradientEditor.hidden = !els.themeGradientEnabled.checked;

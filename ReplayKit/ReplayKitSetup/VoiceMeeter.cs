@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace ReplayKitSetup
 {
-    // voicemeeter remote api helpers used to preserve hardware inputs. ported from obs_replaykit/voicemeeter.py. the vb-audio sdk header declares these functions __stdcall, not the .net-default cdecl, so every delegate below is explicitly StdCall.
+    // voicemeeter remote api helpers used to preserve hardware inputs. the vb-audio sdk header declares these functions __stdcall, not the .net-default cdecl, so every delegate below is explicitly StdCall
     public sealed class VoicemeeterDeviceChoice
     {
         public string Name { get; }

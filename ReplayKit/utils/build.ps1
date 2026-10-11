@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-# the release exe + checksums land in build\ at the actual git root, one level above ReplayKit\; publish_tmp stays
-# under $repoRoot since ClearPublishDirectory's guard requires it there.
+# the release exe + checksums land in build\ at the actual git root, one level above ReplayKit\; publish_tmp stays under $repoRoot since ClearPublishDirectorys guard requires it there.
 $buildDir = Join-Path (Split-Path -Parent $repoRoot) 'build'
 $publishDir = Join-Path $repoRoot 'publish_tmp'
 
@@ -19,9 +18,12 @@ Write-Host '[1/4] Syncing version...'
 Write-Host '[2/4] Building helper...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot 'build_helper.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Helper build failed.' }
-Write-Host '[3/4] Building tray plugin...'
-& powershell -NoProfile -File (Join-Path $PSScriptRoot 'obs-plugins\replaykit-tray\build.ps1')
-if ($LASTEXITCODE -ne 0) { throw 'Tray plugin build failed.' }
+Write-Host '[3/4] Building OBS plugin...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'obs-plugins\replaykit\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'OBS plugin build failed.' }
+Write-Host '[3b/4] Building win-capture-audio...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'obs-plugins\win-capture-audio\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'win-capture-audio build failed.' }
 Write-Host '[4/4] Publishing installer...'
 ClearPublishDirectory
 try {

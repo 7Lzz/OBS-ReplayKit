@@ -6,8 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // triggers the setup exe's windowed --uninstall mode from the settings dock uninstall button -- a progress window
-    // (twin of the setup window) removes everything, then boots OBS back up. ported from obs_replaykit helper modules/65_uninstall.ps1.
+    // starts the windowed --uninstall mode of the setup exe from the settings uninstall button; that window (twin of the setup window) removes everything, then boots OBS back up
     internal static class Uninstall
     {
         public static string GetSetupCacheDir()
@@ -45,14 +44,14 @@ namespace ReplayKitHelper
             string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
             if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Invalid setup executable path.");
-            if (!File.Exists(setupExe))
-                throw new InvalidOperationException("ReplayKit setup executable is missing. Re-run the installer once, then uninstall from Advanced.");
+            // a missing or damaged copy is downloaded again, checked against the release hash, before anything is started
+            SetupExe.Ensure(true);
 
             var argList = new List<string> { "--uninstall" };
             if (!keepUserSettings) argList.Add("--remove-user-settings");
             if (removeObs) argList.Add("--remove-obs");
 
-            if (BrowserCookies.TestIsAdmin())
+            if (Elevation.IsAdmin())
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int uninstallPid = Native.SpawnDetached(cmdLine, cacheDir);
@@ -75,8 +74,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = "Uninstall started. Follow the progress window." };
         }
 
-        // narrower siblings of StartCleanupFromSettings -- install / remove just the OBS Stream Audio virtual cable
-        // instead of touching the whole ReplayKit install, for the Share Preview audio row next to the main uninstall.
+        // narrower siblings of StartCleanupFromSettings -- install / remove just the OBS Stream Audio virtual cable instead of touching the whole ReplayKit install, for the Share Preview audio row next to the main uninstall.
         public static JObject StartDiscordScreenshareInstall() => RunDiscordScreenshareMode(true);
 
         public static JObject StartDiscordScreenshareRemoval() => RunDiscordScreenshareMode(false);
@@ -88,11 +86,9 @@ namespace ReplayKitHelper
             string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
             if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Invalid setup executable path.");
-            if (!File.Exists(setupExe))
-                throw new InvalidOperationException("ReplayKit setup executable is missing. Re-run the installer once, then try again.");
+            SetupExe.Ensure(true);
 
-            // flip the runtime setting now so Share Preview is really on/off after the OBS relaunch -- the setup exe only
-            // writes its own prefs.json, and the helper reads discord_screenshare_enabled from replaykit_settings.json.
+            // flip the runtime setting now so Share Preview is really on/off after the OBS relaunch -- the setup exe only writes its own prefs.json, and the helper reads discord_screenshare_enabled from replaykit_settings.json.
             try
             {
                 SettingsStore.Update(settings =>
@@ -108,7 +104,7 @@ namespace ReplayKitHelper
             string message = install ? "Installing Discord screenshare support. OBS will close." : "Removing Discord screenshare support. OBS will close.";
             var argList = new List<string> { verb, "--start-delay-ms", "900" };
 
-            if (BrowserCookies.TestIsAdmin())
+            if (Elevation.IsAdmin())
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int pid = Native.SpawnDetached(cmdLine, cacheDir);

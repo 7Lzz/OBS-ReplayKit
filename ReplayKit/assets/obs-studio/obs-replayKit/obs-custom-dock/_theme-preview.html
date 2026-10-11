@@ -1,0 +1,40 @@
+<!-- shared partial (helper #include target: theme-preview). shows the theme the Settings Appearance tab is editing before it is applied, on any page that themes itself from the injected :root override. host: nothing required. -->
+<script>
+(function themePreviewListener() {
+  // settings publishes on a BroadcastChannel and stamps localStorage every 4s; the stale check is what stops a settings window that was killed instead of closed from leaving this page themed forever. #rk-theme-live goes last so it wins over the committed style the helper injects
+  let liveStyle = null;
+  const freeze = document.createElement("style");
+  // this CEF build leaves background-color transitions that resolve through var() half finished when the custom properties change, which strands elements on the old accent, so transitions are off for the one frame of the swap
+  freeze.textContent = "html.rk-theme-swapping *,html.rk-theme-swapping *::before,html.rk-theme-swapping *::after{transition:none!important;animation-duration:0s!important;}";
+  document.head.appendChild(freeze);
+
+  function applyCss(css) {
+    if (!css) {
+      if (liveStyle) liveStyle.textContent = "";
+      return;
+    }
+    if (!liveStyle) {
+      liveStyle = document.createElement("style");
+      liveStyle.id = "rk-theme-live";
+      document.head.appendChild(liveStyle);
+    }
+    document.documentElement.classList.add("rk-theme-swapping");
+    liveStyle.textContent = css;
+    requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("rk-theme-swapping")));
+  }
+
+  try {
+    const record = JSON.parse(localStorage.getItem("replaykit-theme-preview") || "null");
+    if (record && record.css && Date.now() - record.time <= 15000) applyCss(record.css);
+  } catch (_) {}
+
+  try {
+    const channel = new BroadcastChannel("replaykit-theme-preview");
+    channel.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.reset) applyCss("");
+      else if (typeof data.css === "string") applyCss(data.css);
+    };
+  } catch (_) {}
+})();
+</script>

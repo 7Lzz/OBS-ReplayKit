@@ -44,19 +44,19 @@ namespace ReplayKitHelper
             {
                 var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
                 if (!change(db)) return false;
-                    string temporary = full + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                    try
+                string temporary = full + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try
+                {
+                    using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
                     {
-                        using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
-                        {
-                            byte[] bytes = new UTF8Encoding(false).GetBytes(db.ToString(Newtonsoft.Json.Formatting.Indented));
-                            file.Write(bytes, 0, bytes.Length);
-                            file.Flush(true);
-                        }
-                        if (File.Exists(full)) File.Replace(temporary, full, null);
-                        else File.Move(temporary, full);
+                        byte[] bytes = new UTF8Encoding(false).GetBytes(db.ToString(Newtonsoft.Json.Formatting.Indented));
+                        file.Write(bytes, 0, bytes.Length);
+                        file.Flush(true);
                     }
-                    finally { if (File.Exists(temporary)) File.Delete(temporary); }
+                    // a plain rename over the old file -- File.Replace leaves a ~RF<hex>.TMP backup behind whenever another process still has the old file open
+                    Native.MoveFileReplace(temporary, full);
+                }
+                finally { if (File.Exists(temporary)) File.Delete(temporary); }
                 return true;
             });
         }

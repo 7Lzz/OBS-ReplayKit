@@ -5,13 +5,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // ffmpeg/ffprobe discovery, hardware/software encoder capability probing, and video metadata reads. ported from obs_replaykit helper modules/52_compression.ps1 -- this file covers that modules capability-detection half; the compress-then-upload orchestration (Start-CompressedStreamableUpload, a full embedded worker script in the ps original) lands here once Upload.cs exists, since it hands off to the same upload-finalization path a plain upload uses.
+    // ffmpeg/ffprobe discovery, hardware/software encoder capability probing, video metadata reads, and the compress-then-upload entry point
     internal static class Compression
     {
         private static string FindOnPath(string exeName)
@@ -54,7 +53,7 @@ namespace ReplayKitHelper
             return "";
         }
 
-        // create / reuse a same-volume hard link from ffmpeg.exe to a branded filename so task manager shows our naming when the process is running. hard link shares the underlying ntfs file content -- no extra disk, no stale copy to manage; an in-place ffmpeg.exe update is automatically picked up. falls back to the original path if the alias cant be created (cross-volume, fat/exfat, permissions, etc.). the icon and pe filedescription stay ffmpegs (the gpl'd binarys resources cant be modified) -- only the visible process name changes.
+        // create / reuse a same-volume hard link from ffmpeg.exe to a branded filename so task manager shows our naming when the process is running. hard link shares the underlying ntfs file content -- no extra disk, no stale copy to manage; an in-place ffmpeg.exe update is automatically picked up. falls back to the original path if the alias cant be created (cross-volume, fat/exfat, permissions, etc.). the icon and pe filedescription stay ffmpegs (the gpld binarys resources cant be modified) -- only the visible process name changes.
         public static string EnsureFfmpegAlias(string ffmpegPath)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return ffmpegPath;
@@ -82,16 +81,24 @@ namespace ReplayKitHelper
             }
         }
 
+        // the encoders of a machine do not change while obs runs, so a probe that found ffmpeg is kept for hours and nobody waits for the probe again in the middle of a session; one that found nothing is repeated soon, since ffmpeg may have been put there since
+        private static bool CapabilitiesFresh(DateTime now)
+        {
+            if (Server.State.Capabilities == null) return false;
+            bool found = !string.IsNullOrEmpty(Server.State.Capabilities["ffmpeg"]?.Value<string>());
+            return (now - Server.State.CapabilitiesAt).TotalMinutes < (found ? 360 : 10);
+        }
+
         public static JObject GetHelperCapabilities(bool refresh = false)
         {
             DateTime now = DateTime.UtcNow;
-            if (!refresh && Server.State.Capabilities != null && (now - Server.State.CapabilitiesAt).TotalMinutes < 10)
+            if (!refresh && CapabilitiesFresh(now))
                 return Server.State.Capabilities;
 
             // CapabilitiesLock nests outside ConfigLock/ClipsMetaLock (LoadConfig below acquires those internally), never the reverse, so this cant deadlock -- double-checked since a concurrent cache-miss caller may have already refreshed by the time this gets the lock.
             lock (Server.State.CapabilitiesLock)
             {
-                if (!refresh && Server.State.Capabilities != null && (now - Server.State.CapabilitiesAt).TotalMinutes < 10)
+                if (!refresh && CapabilitiesFresh(now))
                     return Server.State.Capabilities;
 
                 AppConfig.LoadConfig();
@@ -226,8 +233,8 @@ namespace ReplayKitHelper
             public List<string> Output = new List<string>();
         }
 
-        // reads both streams concurrently before WaitForExit so a chatty child cant deadlock against an unread, full pipe buffer; stdout then stderr, matching the ps originals 2>&1 merge closely enough for the regex/line scans every caller does over the result. an optional cancellation token kills the child outright -- used by callers (keyframe scanning) that need to reproduce the ps originals external kill-a-hung-worker timeout now that theres no separate process to Stop-Process by pid.
-        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000)
+        // reads both streams concurrently before WaitForExit so a chatty child cant deadlock on a full pipe buffer, then joins stdout and stderr for the line scans the callers do; the optional token kills the child outright
+        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000, bool lowPriority = false)
         {
             var psi = new ProcessStartInfo
             {
@@ -248,6 +255,12 @@ namespace ReplayKitHelper
                 catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
             }))
             {
+                // work done ahead of time runs behind whatever else the machine is doing, a game most of all
+                if (lowPriority)
+                {
+                    try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; }
+                    catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
+                }
                 var stdoutTask = proc.StandardOutput.ReadToEndAsync();
                 var stderrTask = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
@@ -255,6 +268,48 @@ namespace ReplayKitHelper
                 cancellationToken.ThrowIfCancellationRequested();
                 if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
                 return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = combined.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };
+            }
+        }
+
+        // like InvokeNativeCapture, but stdout is read line by line while the child runs so a caller can follow the -progress output of ffmpeg as it is written; only stderr comes back in Output, since the progress block is no part of an error message
+        public static NativeCaptureResult InvokeNativeProgress(string exe, IEnumerable<string> arguments, Action<string> onStdoutLine, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = exe,
+                Arguments = ProcessArgs.Join(arguments.ToArray()),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            cancellationToken.ThrowIfCancellationRequested();
+            using (var proc = Process.Start(psi))
+            using (var deadline = new System.Threading.CancellationTokenSource(timeoutMs))
+            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
+            using (stopping.Token.Register(() =>
+            {
+                try { if (!proc.HasExited) proc.Kill(); }
+                catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+            }))
+            {
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+                try
+                {
+                    string line;
+                    while ((line = proc.StandardOutput.ReadLine()) != null)
+                    {
+                        // a callback that throws must not leave the encode running with nobody reading it
+                        try { onStdoutLine(line); }
+                        catch (Exception ex) { Log.Write("progress callback failed: " + ex.Message); }
+                    }
+                }
+                catch (IOException ex) { Log.Write("progress read ended: " + ex.Message); }
+                proc.WaitForExit();
+                string errText = stderrTask.Result;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
+                return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = errText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };
             }
         }
 
@@ -353,7 +408,7 @@ namespace ReplayKitHelper
             return result;
         }
 
-        // compresses a temp copy down to a target size derived from the effective upload cap, then uploads that copy -- unlike CompressOverwrite this never touches the original file. dispatches CompressedUploadWorker as an in-process Task and reuses Upload.HandleUploadCompletion for the finish line (clips_db write, toast, transcode poll), since the ps original routed both plain uploads and compress-then-upload thru the same Start-UploadResultWatcher. ported from obs_replaykit helper modules/52_compression.ps1s Start-CompressedStreamableUpload.
+        // compresses a temp copy down to a size that fits the upload cap, then uploads that copy; the original is never touched, and the finish goes through Upload.HandleUploadCompletion like a plain upload
         public static JObject StartCompressedStreamableUpload(Clips.SafeClipPath selected)
         {
             AppConfig.LoadConfig();
@@ -434,7 +489,7 @@ namespace ReplayKitHelper
                 UploadState.SetUploadState(
                     requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
                     startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "analyzing",
-                    percent: 1, kind: "compress-upload", tempPath: tempOut);
+                    percent: 1, kind: "compress-upload");
 
                 Log.Write("Start-CompressedStreamableUpload clip=" + selected.Name + " ffmpeg=" + ffmpeg + " ffprobe=" + ffprobe +
                     " metadata=" + metadata.Source + " targetKbps=" + totalKbps + " videoKbps=" + videoKbps + " audioKbps=" + audioKbps, "compress", requestId);

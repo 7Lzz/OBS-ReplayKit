@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // detect the users gpu(s) and classify them for encoder selection. pulls win32_videocontroller via wmi and parses the adapter name to tag the architecture tier (registry/wmi doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. this is the exact same detection logic as ReplayKitSetup/Gpu.cs (the fresh-install path) -- copied rather than re-derived from obs_replaykit helper modules/62_replaykit_settings.ps1s Get-ReplayKitPrimaryGpu so both the installer and the live settings dock agree on the same classification, and so a bug fixed in one doesnt need re-fixing in the other by hand. only real change: QueryVideoControllers queries WMI directly instead of spawning powershell.exe, since this project already references System.Management (ReplayKitSetup didnt, historically).
+    // detect the users gpu(s) and classify them for encoder selection. pulls win32_videocontroller via wmi and parses the adapter name to tag the architecture tier (registry/wmi doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. this is the exact same detection logic as ReplayKitSetup/Gpu.cs (the fresh-install path), so the installer and the live settings agree on the same classification. only real change: QueryVideoControllers queries WMI directly instead of spawning powershell.exe, since this project already references System.Management (ReplayKitSetup didnt, historically).
     public enum Vendor { Nvidia, Amd, Intel, Unknown }
 
     // coarse nvenc capability tiers.

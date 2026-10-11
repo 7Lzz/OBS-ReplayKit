@@ -1,0 +1,69 @@
+<script>
+  // key naming shared by the pages that record a hotkey: the hotkeys tab of the settings and the menu that hangs off the clip and record badges of the title bar
+  window.RKHotkeys = (function () {
+    function comboToLabel(combo) {
+      combo = combo || {};
+      if (!combo.key) return "";
+      const parts = [];
+      if (combo.control) parts.push("Ctrl");
+      if (combo.alt) parts.push("Alt");
+      if (combo.shift) parts.push("Shift");
+      if (combo.command) parts.push("Win");
+      parts.push(keyLabel(combo.key));
+      return parts.join(" + ");
+    }
+
+    function keyLabel(obsKey) {
+      const named = {
+        OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space",
+        OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc", OBS_KEY_TAB:"Tab",
+        OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
+        OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
+      };
+      if (named[obsKey]) return named[obsKey];
+      if (obsKey.startsWith("OBS_KEY_")) return obsKey.slice(8).replace(/_/g, " ");
+      return obsKey;
+    }
+
+    function obsKeyFromEvent(e) {
+      const k = e.key;
+      if (!k || ["Shift","Control","Alt","Meta"].includes(k)) return "";
+      const byCode = {
+        Backslash:"OBS_KEY_BACKSLASH", Slash:"OBS_KEY_SLASH",
+        Minus:"OBS_KEY_MINUS", Equal:"OBS_KEY_EQUAL",
+        BracketLeft:"OBS_KEY_BRACKETLEFT", BracketRight:"OBS_KEY_BRACKETRIGHT",
+        Semicolon:"OBS_KEY_SEMICOLON", Quote:"OBS_KEY_APOSTROPHE",
+        Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
+      };
+      if (byCode[e.code]) return byCode[e.code];
+      if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
+      if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
+      if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
+      const byKey = {
+        "\\":"OBS_KEY_BACKSLASH", "|":"OBS_KEY_BACKSLASH", "/":"OBS_KEY_SLASH", "?":"OBS_KEY_SLASH", " ":"OBS_KEY_SPACE",
+        "Enter":"OBS_KEY_RETURN", "Escape":"OBS_KEY_ESCAPE", "Tab":"OBS_KEY_TAB",
+        "Delete":"OBS_KEY_DELETE", "Backspace":"OBS_KEY_BACKSPACE",
+        "ArrowUp":"OBS_KEY_UP", "ArrowDown":"OBS_KEY_DOWN",
+        "ArrowLeft":"OBS_KEY_LEFT", "ArrowRight":"OBS_KEY_RIGHT",
+        "-":"OBS_KEY_MINUS", "=":"OBS_KEY_EQUAL", "[":"OBS_KEY_BRACKETLEFT",
+        "]":"OBS_KEY_BRACKETRIGHT", ";":"OBS_KEY_SEMICOLON", "'":"OBS_KEY_APOSTROPHE",
+        ",":"OBS_KEY_COMMA", ".":"OBS_KEY_PERIOD", "`":"OBS_KEY_QUOTELEFT",
+      };
+      return byKey[k] || "";
+    }
+
+    // the combo a keydown stands for, in the shape the settings keep it in, or null while only modifiers are down
+    function comboFromEvent(e) {
+      const key = obsKeyFromEvent(e);
+      if (!key) return null;
+      const combo = { key:key };
+      if (e.ctrlKey) combo.control = true;
+      if (e.altKey) combo.alt = true;
+      if (e.shiftKey) combo.shift = true;
+      if (e.metaKey) combo.command = true;
+      return combo;
+    }
+
+    return { comboToLabel:comboToLabel, keyLabel:keyLabel, obsKeyFromEvent:obsKeyFromEvent, comboFromEvent:comboFromEvent };
+  })();
+</script>

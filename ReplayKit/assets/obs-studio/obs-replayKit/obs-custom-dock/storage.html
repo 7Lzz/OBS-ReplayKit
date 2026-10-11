@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Storage</title>
+<style>
+  /* fallbacks only -- the helper injects the real theme tokens above this block */
+  :root {
+    --window:#1D1F26;
+    --grey2:#464B59;
+    --grey3:#464B59;
+    --grey4:#3C404D;
+    --grey5:#2F323C;
+    --grey6:#272A33;
+    --grey8:#131419;
+    --line2:#5B6273;
+    --primary:#284CB8;
+    --primary_light:#476BD7;
+    --text:#ffffff;
+    --text_muted:#969696;
+    --red:#e33b57;
+    --warning:#E2A33B;
+    --button_bg_hover:#464B59;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --anim_press:130ms;
+    --sb-outline:var(--grey5);
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:var(--grey6); color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; color:inherit; }
+
+  /* the window is the card: the plugin gives it round corners and a border through the system, so the page only fills it */
+  .card { position:absolute; inset:0; display:flex; flex-direction:column; background:var(--grey6); }
+  .card.is-opening { animation:rk-open 240ms ease-out; }
+  @keyframes rk-open { from { opacity:0; } to { opacity:1; } }
+  .scroll { flex:1; min-height:0; overflow-y:auto; padding:0 24px 12px; display:flex; flex-direction:column; }
+  /* the limit row is the foot of the card, so what is left over sits between it and the compress list instead of under everything */
+  .scroll > .sec:last-of-type { margin-top:auto; }
+
+  .top { position:relative; padding:16px 0 12px; text-align:center; }
+  .top h1 { margin:0 0 4px; font-size:18px; font-weight:700; }
+  .sub { margin:0; font-size:12px; color:var(--text_muted); }
+  .sub b { color:var(--text); font-weight:600; }
+  .sub .sep { display:inline-block; width:1px; height:11px; margin:0 8px -1px; background:var(--grey3); }
+  .x {
+    position:absolute; top:12px; right:-10px; width:30px; height:30px; padding:0; border:0; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; background:var(--grey3); color:var(--text); cursor:pointer;
+    transition:background-color 90ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  .x:hover { background:var(--line2); }
+  .x:active { transform:scale(.94); }
+  .x svg { width:14px; height:14px; }
+
+  .sec { padding:10px 0; border-top:1px solid var(--grey3); }
+  .sec-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .sec-head + * { margin-top:10px; }
+  h2 { margin:0; font-size:14px; font-weight:700; display:flex; align-items:center; }
+  .link { border:0; background:transparent; padding:2px 0; color:var(--primary_light); font-size:12.5px; font-weight:600; cursor:pointer; }
+  .link:hover { text-decoration:underline; }
+  .hint { color:var(--text_muted); font-size:12px; }
+  .hint b { color:var(--text); font-weight:600; }
+
+  /* small "i" that reveals the note of a section in the shared tooltip, the same one the replaykit settings use */
+  .info-dot {
+    flex:none; margin-left:6px; padding:0; width:15px; height:15px;
+    display:inline-flex; vertical-align:middle;
+    border:0; background:transparent; color:var(--text_muted);
+    cursor:help; -webkit-user-select:none; user-select:none;
+    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content:""; width:100%; height:100%; background-color:currentColor;
+    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
+    mask:url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .info-dot:active { transform:scale(.94); }
+  .info-dot:focus { outline:none; }
+  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--primary_light); }
+
+  .bar { display:flex; height:22px; border-radius:4px; overflow:hidden; background:var(--window); border:1px solid var(--grey3); }
+  .seg { height:100%; min-width:0; transition:width 260ms var(--ease_smooth); }
+  .seg + .seg { border-left:1px solid var(--grey6); }
+  .seg.clips { background:var(--primary_light); }
+  .seg.temp { background:var(--primary); }
+  .seg.thumbs { background:var(--line2); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 18px; margin:8px 0 0; padding:0; list-style:none; font-size:12px; color:var(--text_muted); }
+  .legend li { display:flex; align-items:center; gap:6px; }
+  .legend i { width:11px; height:11px; border-radius:3px; flex:none; }
+  .legend .clips { background:var(--primary_light); }
+  .legend .temp { background:var(--primary); }
+  .legend .thumbs { background:var(--line2); }
+  .legend .clear-temp { margin-left:2px; padding:0 2px; border:0; background:none; color:var(--primary_light); font:inherit; cursor:pointer; border-radius:3px; }
+  .legend .clear-temp:hover { color:var(--text); text-decoration:underline; }
+  .legend .clear-temp:disabled { color:var(--text_muted); cursor:default; text-decoration:none; }
+
+  .row { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+
+  .dd { position:relative; flex:none; }
+  .dd-btn {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:132px; height:34px; padding:0 10px 0 12px;
+    border:1px solid var(--grey3); border-radius:6px; background:var(--window); font-size:12.5px; font-weight:600; cursor:pointer;
+    transition:border-color 90ms linear;
+  }
+  .dd-btn:hover, .dd.is-open .dd-btn { border-color:var(--line2); }
+  .dd-btn svg { width:12px; height:12px; flex:none; fill:currentColor; opacity:.7; transition:transform 200ms var(--ease_smooth); }
+  .dd.is-open .dd-btn svg { transform:rotate(180deg); }
+  .dd-menu {
+    position:absolute; right:0; z-index:5; min-width:100%; padding:4px 0; border:1px solid var(--grey3); border-radius:6px;
+    background:var(--grey5); box-shadow:0 8px 20px rgba(0, 0, 0, .45); overflow-y:auto;
+    opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-6px);
+    transition:opacity 130ms ease, transform 200ms var(--ease_smooth), visibility 0s linear 200ms;
+  }
+  .dd-menu.is-up { bottom:calc(100% + 4px); transform:translateY(6px); }
+  .dd-menu.is-down { top:calc(100% + 4px); }
+  .dd.is-open .dd-menu { opacity:1; visibility:visible; pointer-events:auto; transform:none; transition:opacity 110ms ease, transform 200ms var(--ease_smooth); }
+  .dd-item { display:block; width:100%; padding:7px 14px; border:0; background:transparent; text-align:left; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+  .dd-item:hover { background:var(--button_bg_hover); }
+  .dd-item.is-current { font-weight:700; }
+
+  .custom { display:none; align-items:center; gap:8px; margin-top:12px; }
+  .custom.is-shown { display:flex; }
+  .custom input {
+    width:96px; height:32px; padding:0 10px; border:1px solid var(--grey3); border-radius:6px; background:var(--window);
+    color:var(--text); font:inherit; user-select:text; -webkit-user-select:text; outline:0;
+  }
+  .custom input:focus { border-color:var(--primary_light); }
+  .custom .unit { color:var(--text_muted); font-size:12.5px; }
+
+  .btn {
+    height:32px; padding:0 14px; border:1px solid var(--grey3); border-radius:6px; background:var(--window);
+    font-size:12.5px; font-weight:600; cursor:pointer;
+    transition:border-color 90ms linear, background-color 90ms linear, color 90ms linear, opacity 90ms linear;
+  }
+  .btn:hover:not(:disabled) { border-color:var(--line2); }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .btn.is-danger { border-color:var(--red); color:var(--red); background:transparent; }
+  .btn.is-danger:hover:not(:disabled) { background:rgba(227, 59, 87, .14); border-color:var(--red); }
+  .btn.is-solid { background:var(--red); border-color:var(--red); color:#fff; }
+  .btn.is-solid:hover:not(:disabled) { background:var(--red); filter:brightness(1.1); border-color:var(--red); }
+  .btn.is-primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+  .btn.is-primary:hover:not(:disabled) { background:var(--primary_light); border-color:var(--primary_light); }
+
+  .over { display:none; margin-top:10px; padding:10px 12px; border:1px solid var(--red); border-radius:6px; background:rgba(227, 59, 87, .08); }
+  .over.is-shown { display:block; }
+  .over p { margin:0 0 10px; font-size:12.5px; line-height:1.5; }
+  .over p b { font-weight:700; }
+  .over .actions { display:flex; gap:8px; }
+  .status { margin:8px 0 0; font-size:12px; color:var(--text_muted); }
+  .status:empty { display:none; }
+  .status.is-error { color:var(--red); }
+
+  /* compress clips: the biggest clips, the ones to keep out of it, and the run itself */
+  .switch { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+  .switch .sw-hit { position:relative; display:flex; flex:none; cursor:pointer; }
+  .switch input { position:absolute; opacity:0; pointer-events:none; }
+  /* the same switch as the rest of ReplayKit (see _switch.html), built on a span because the input here is hidden */
+  .switch .sw { position:relative; flex:none; width:34px; height:19px; border-radius:999px; background:rgba(var(--text-rgb,255,255,255),.2); transition:background-color 220ms ease, transform var(--anim_press) var(--ease_pop); }
+  .switch .sw::after { content:""; position:absolute; top:3px; left:3px; width:13px; height:13px; border-radius:50%; background:rgba(var(--text-rgb,255,255,255),.82); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform 300ms cubic-bezier(.34,1.45,.5,1), width 160ms var(--ease_pop), background-color 220ms ease; }
+  .switch .sw-hit:hover input:not(:checked) + .sw { background:rgba(var(--text-rgb,255,255,255),.3); }
+  .switch input:checked + .sw { background:var(--selected-solid,var(--primary)); }
+  .switch input:checked + .sw::after { transform:translateX(15px); background:var(--on-accent,#fff); }
+  .switch .sw-hit:active .sw { transform:scale(.96); }
+  .switch .sw-hit:active .sw::after { width:18px; }
+  .switch .sw-hit:active input:checked + .sw::after { transform:translateX(10px); }
+  .switch input:focus-visible + .sw { outline:2px solid var(--selected2,var(--primary_light)); outline-offset:2px; }
+  .cmp-list { border:1px solid var(--grey3); border-radius:6px; background:var(--window); overflow-x:hidden; overflow-y:auto; max-height:172px; --sb-outline:transparent; --sb-start:4px; --sb-end:4px; }
+  /* the list is a card inside the card, so its scrollbar is only a slim thumb in the edge of it, with no outline drawn around the track like the one the pages have */
+  .cmp-list::-webkit-scrollbar { width:10px; }
+  .cmp-list::-webkit-scrollbar-thumb { background-color:rgba(var(--text-rgb,255,255,255),.16); border:2px solid transparent; border-radius:6px; }
+  .cmp-list::-webkit-scrollbar-thumb:hover { background-color:rgba(var(--text-rgb,255,255,255),.28); }
+  .cmp-list::-webkit-scrollbar-thumb:active { background-color:rgba(var(--text-rgb,255,255,255),.38); }
+  .cmp-tools { display:flex; align-items:center; gap:16px; margin:6px 0 0; }
+  .cmp-more { margin-left:auto; }
+  .cmp-row { position:relative; display:flex; align-items:center; gap:10px; height:34px; padding:0 12px; cursor:pointer; transition:background-color 90ms linear; }
+  .cmp-row + .cmp-row { border-top:1px solid var(--grey3); }
+  .cmp-row:hover { background:rgba(255, 255, 255, .04); }
+  .cmp-row input { position:absolute; opacity:0; pointer-events:none; }
+  .cmp-row .cb { flex:none; width:16px; height:16px; border:1px solid var(--line2); border-radius:4px; display:flex; align-items:center; justify-content:center; transition:background-color 90ms linear, border-color 90ms linear; }
+  .cmp-row .cb::after { content:""; width:8px; height:4px; margin-top:-2px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg) scale(0); transition:transform 110ms var(--ease_pop); }
+  .cmp-row input:checked + .cb { background:var(--primary_light); border-color:var(--primary_light); }
+  .cmp-row input:checked + .cb::after { transform:rotate(-45deg) scale(1); }
+  .cmp-row input:focus-visible + .cb { box-shadow:0 0 0 2px var(--primary_light); }
+  .cmp-row .nm { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12.5px; }
+  .cmp-row .sz { flex:none; font-size:12px; color:var(--text_muted); font-variant-numeric:tabular-nums; }
+  .cmp-empty { padding:14px 12px; font-size:12.5px; color:var(--text_muted); border:1px solid var(--grey3); border-radius:6px; background:var(--window); }
+  .cmp-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+  .callout { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--warning); border-radius:6px; background:rgba(226, 163, 59, .09); font-size:12.5px; line-height:1.5; }
+  .callout .bang { flex:none; width:18px; height:18px; margin-top:1px; border-radius:50%; background:var(--warning); color:#1b1b1f; font-weight:800; font-size:12px; line-height:18px; text-align:center; }
+  .callout p { margin:0; }
+  .cmp-actions { display:flex; gap:8px; margin-top:12px; }
+  .cmp-run { display:flex; align-items:center; gap:22px; padding:6px 4px 2px; }
+  .ring { position:relative; flex:none; width:88px; height:88px; }
+  .ring svg { width:100%; height:100%; display:block; }
+  .ring .trk { fill:none; stroke:var(--grey4); stroke-width:7; }
+  .ring .arc { fill:none; stroke:var(--primary_light); stroke-width:7; stroke-linecap:round; stroke-dasharray:219.9; stroke-dashoffset:219.9; transition:stroke-dashoffset 500ms var(--ease_smooth); }
+  .ring .pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:700; color:var(--primary_light); }
+  .run-txt { flex:1; min-width:0; }
+  .run-title { font-size:14px; font-weight:700; }
+  .run-sub { margin-top:4px; font-size:12px; color:var(--text_muted); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .run-sub b { color:var(--text); font-weight:600; }
+  [hidden] { display:none !important; }
+</style>
+<!--#include scrollbar-->
+<!--#include interaction-states-->
+<!--#include tooltip-->
+</head>
+<body>
+<div class="card is-opening" id="card">
+  <div class="scroll">
+    <header class="top">
+      <h1>Free-up Space</h1>
+      <button class="x" type="button" id="close" aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <p class="sub" id="sub">&nbsp;</p>
+    </header>
+
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Storage Analysis</h2>
+        <button class="link" type="button" id="library">Go to Library</button>
+      </div>
+      <div class="bar" id="bar"><span class="seg clips"></span><span class="seg temp"></span><span class="seg thumbs"></span></div>
+      <ul class="legend" id="legend"></ul>
+    </section>
+
+    <section class="sec" id="cmpSec">
+      <div class="sec-head">
+        <h2>Compress Clips<button class="info-dot" type="button" aria-label="About compressing clips" title="Makes your biggest clips smaller, with very little loss in quality. Each smaller clip replaces the original. Clips that can't get any smaller aren't shown."></button></h2>
+        <div class="switch" id="cmpFavSwitch">
+          <label class="sw-hit"><input type="checkbox" id="cmpSkipFav" checked aria-label="Skip favorites"><span class="sw"></span></label>
+          <span>Skip favorites<button class="info-dot" type="button" aria-label="About skipping favorites" title="Hides your favorite clips from this list so they're never changed. Turn it off to see them too."></button></span>
+        </div>
+      </div>
+
+      <div id="cmpPick">
+        <div id="cmpEmpty" class="cmp-empty" hidden>Nothing worth compressing right now. Your biggest clips are small already or as compressed as they can get.</div>
+        <div id="cmpList" class="cmp-list" hidden></div>
+        <div class="cmp-tools" id="cmpTools" hidden>
+          <button class="link" type="button" id="cmpAll">Select all</button>
+          <button class="link" type="button" id="cmpNone">Clear</button>
+          <button class="link cmp-more" type="button" id="cmpMore" hidden>Show more clips</button>
+        </div>
+        <div class="cmp-foot" id="cmpFoot" hidden>
+          <span class="hint"><span id="cmpPicked"></span><button class="info-dot" type="button" id="cmpEstInfo" aria-label="About the estimate"></button></span>
+          <button class="btn is-primary" type="button" id="cmpGo">Compress</button>
+        </div>
+      </div>
+
+      <div id="cmpConfirm" hidden>
+        <p class="hint" id="cmpConfirmSum" style="margin:0 0 10px"></p>
+        <div class="callout">
+          <span class="bang" aria-hidden="true">!</span>
+          <p>Compressing works your PC hard. Avoid gaming or other demanding tasks until it finishes, and expect everything to feel a little slower. It keeps going if you close this window, and each clip is replaced by its smaller version.</p>
+        </div>
+        <div class="cmp-actions">
+          <button class="btn is-primary" type="button" id="cmpStart">Start compressing</button>
+          <button class="btn" type="button" id="cmpBack">Cancel</button>
+        </div>
+      </div>
+
+      <div id="cmpRun" hidden>
+        <div class="cmp-run">
+          <div class="ring" id="cmpRing">
+            <svg viewBox="0 0 88 88" aria-hidden="true"><circle class="trk" cx="44" cy="44" r="35"/><circle class="arc" id="cmpArc" cx="44" cy="44" r="35" transform="rotate(-90 44 44)"/></svg>
+            <span class="pct" id="cmpPct">0%</span>
+          </div>
+          <div class="run-txt">
+            <div class="run-title" id="cmpTitle">Compressing</div>
+            <div class="run-sub" id="cmpCurrent"></div>
+            <div class="run-sub" id="cmpSaved"></div>
+            <div class="cmp-actions"><button class="btn" type="button" id="cmpStop">Stop</button></div>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:14px">
+          <span class="bang" aria-hidden="true">!</span>
+          <p>Avoid gaming or other demanding tasks until this finishes. Your PC may feel a little slower meanwhile.</p>
+        </div>
+      </div>
+
+      <div id="cmpDone" hidden>
+        <p class="run-title" id="cmpDoneText"></p>
+        <div class="cmp-actions"><button class="btn" type="button" id="cmpOk">Done</button></div>
+      </div>
+      <p class="status" id="cmpStatus"></p>
+    </section>
+
+    <section class="sec">
+      <div class="row">
+        <h2>Set a Storage Limit<button class="info-dot" type="button" aria-label="About the storage limit" title="Pick how much space your clips can use. If you go over, ReplayKit offers to delete your oldest clips. You always confirm first, and favorites are never deleted."></button></h2>
+        <div class="dd" id="dd">
+          <button class="dd-btn" type="button" id="ddBtn"><span id="ddLabel">No Limit</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </button>
+          <div class="dd-menu is-up" id="ddMenu"></div>
+        </div>
+      </div>
+      <div class="custom" id="custom">
+        <input id="customGb" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Storage limit in GB">
+        <span class="unit">GB</span>
+        <button class="btn" type="button" id="customSet">Set limit</button>
+        <button class="btn" type="button" id="customCancel">Cancel</button>
+      </div>
+      <div class="over" id="over">
+        <p id="overText"></p>
+        <div class="actions" id="overActions"></div>
+      </div>
+      <p class="status" id="limitStatus"></p>
+    </section>
+
+  </div>
+</div>
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  // 1 TB is written out in GB since the setting is in GB; anything else is typed in through Custom
+  const PRESETS = [[25, "25 GB"], [50, "50 GB"], [100, "100 GB"], [250, "250 GB"], [500, "500 GB"], [1024, "1 TB"]];
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    card:$("card"), sub:$("sub"), bar:$("bar"), legend:$("legend"), library:$("library"), close:$("close"),
+    dd:$("dd"), ddBtn:$("ddBtn"), ddLabel:$("ddLabel"), ddMenu:$("ddMenu"), custom:$("custom"), customGb:$("customGb"), customSet:$("customSet"), customCancel:$("customCancel"),
+    over:$("over"), overText:$("overText"), overActions:$("overActions"), limitStatus:$("limitStatus"),
+    skipFav:$("cmpSkipFav"), pick:$("cmpPick"), empty:$("cmpEmpty"), list:$("cmpList"), foot:$("cmpFoot"), picked:$("cmpPicked"), go:$("cmpGo"),
+    tools:$("cmpTools"), all:$("cmpAll"), none:$("cmpNone"), more:$("cmpMore"), estInfo:$("cmpEstInfo"), confirmSum:$("cmpConfirmSum"),
+    confirm:$("cmpConfirm"), start:$("cmpStart"), back:$("cmpBack"),
+    run:$("cmpRun"), arc:$("cmpArc"), pct:$("cmpPct"), runTitle:$("cmpTitle"), runCurrent:$("cmpCurrent"), runSaved:$("cmpSaved"), stop:$("cmpStop"),
+    done:$("cmpDone"), doneText:$("cmpDoneText"), ok:$("cmpOk"), cmpStatus:$("cmpStatus"),
+  };
+  let summary = null;
+  let shown = true;
+  let busy = false;
+  let pollTimer = 0;
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + path, { cache:"no-store", ...(options || {}) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      const err = new Error(body.message || ("HTTP " + res.status));
+      err.body = body;
+      throw err;
+    }
+    return body;
+  }
+
+  function limitName(gb) {
+    if (!gb) return "No Limit";
+    const preset = PRESETS.find((p) => p[0] === gb);
+    if (preset) return preset[1];
+    return gb >= 1024 && gb % 1024 === 0 ? (gb / 1024) + " TB" : gb + " GB";
+  }
+
+  function setStatus(el, text, isError) {
+    el.textContent = text || "";
+    el.classList.toggle("is-error", !!isError);
+  }
+
+  function renderSub(s) {
+    const parts = ["Used: <b>" + s.usedText + "</b> / <b>" + (s.limitGb ? limitName(s.limitGb) : "no limit") + "</b>"];
+    if (s.freeBytes >= 0) parts.push("Free: <b>" + s.freeText + "</b>" + (s.drive ? " (" + s.drive + ")" : ""));
+    els.sub.innerHTML = parts.join('<span class="sep"></span>');
+  }
+
+  function renderBar(s) {
+    const items = [["clips", s.clipBytes, "Clips", s.usedText], ["temp", s.tempBytes, "Temporary files", s.tempText], ["thumbs", s.thumbBytes, "Thumbnails", s.thumbText]];
+    const total = items.reduce((n, i) => n + Math.max(0, i[1]), 0);
+    const segs = els.bar.children;
+    items.forEach((item, i) => {
+      // a segment that exists is never thinner than a few pixels, so it can still be seen next to a library of many gigabytes
+      const pct = total > 0 ? (item[1] / total) * 100 : 0;
+      segs[i].style.width = item[1] > 0 ? "max(" + pct.toFixed(3) + "%, 4px)" : "0";
+    });
+    // the temporary files include what is kept to open clips quickly in the editor, which is made again from the clips whenever one is opened, so they can be emptied from here
+    els.legend.innerHTML = items.map((i) => '<li><i class="' + i[0] + '"></i>' + i[2] + " " + i[3] + (i[0] === "temp" && i[1] > 0 ? ' <button class="clear-temp" type="button" data-clear-temp title="Delete the temporary files. The ones kept to open clips quickly are made again the next time a clip is opened.">Clear</button>' : "") + "</li>").join("");
+  }
+
+  els.legend.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-clear-temp]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try { await helperJson("/storage/clear-temp", { method:"POST" }); } catch (_) {}
+    refresh(true);
+  });
+
+  function renderLimit(s) {
+    els.ddLabel.textContent = limitName(s.limitGb);
+    els.ddMenu.innerHTML = '<button class="dd-item' + (!s.limitGb ? " is-current" : "") + '" type="button" data-gb="0">No Limit</button>' +
+      PRESETS.map((p) => '<button class="dd-item' + (s.limitGb === p[0] ? " is-current" : "") + '" type="button" data-gb="' + p[0] + '">' + p[1] + "</button>").join("") +
+      '<button class="dd-item" type="button" data-gb="custom">Custom...</button>';
+    if (s.state === "over" && !plan) {
+      els.over.classList.add("is-shown");
+      els.overText.innerHTML = "Your library is <b>" + s.overText + "</b> over the limit.";
+      els.overActions.innerHTML = '<button class="btn" type="button" id="review">Review the oldest clips</button>';
+      $("review").addEventListener("click", reviewPlan);
+    } else if (s.state !== "over") {
+      els.over.classList.remove("is-shown");
+      plan = null;
+    }
+  }
+
+  function render(s) {
+    summary = s;
+    renderSub(s);
+    renderBar(s);
+    renderLimit(s);
+  }
+
+  async function refresh(fresh) {
+    try { render(await helperJson("/storage/summary?" + (fresh ? "fresh=1&" : "") + "t=" + Date.now())); } catch (_) {}
+  }
+
+  function closeMenu() { els.dd.classList.remove("is-open"); }
+
+  els.ddBtn.addEventListener("click", () => {
+    if (els.dd.classList.contains("is-open")) { closeMenu(); return; }
+    // opens on the side with more room and is never taller than that room, so no item is cut off by the edge of the card
+    const rect = els.ddBtn.getBoundingClientRect();
+    const roomDown = window.innerHeight - rect.bottom - 12;
+    const roomUp = rect.top - 12;
+    const natural = els.ddMenu.scrollHeight + 2;
+    const up = roomDown < natural && roomUp > roomDown;
+    els.ddMenu.style.maxHeight = Math.min(natural, Math.max(120, up ? roomUp : roomDown)) + "px";
+    els.ddMenu.classList.toggle("is-up", up);
+    els.ddMenu.classList.toggle("is-down", !up);
+    els.dd.classList.add("is-open");
+  });
+  document.addEventListener("pointerdown", (e) => { if (!els.dd.contains(e.target)) closeMenu(); }, true);
+
+  async function saveLimit(gb) {
+    setStatus(els.limitStatus, "");
+    try {
+      await helperJson("/settings", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ storageLimitGb: gb }) });
+      plan = null;
+      els.custom.classList.remove("is-shown");
+      await refresh(false);
+    } catch (err) {
+      setStatus(els.limitStatus, "Could not save the limit.", true);
+    }
+  }
+
+  els.ddMenu.addEventListener("click", (e) => {
+    const item = e.target.closest(".dd-item");
+    if (!item) return;
+    closeMenu();
+    if (item.dataset.gb === "custom") {
+      els.custom.classList.add("is-shown");
+      els.customGb.value = summary && summary.limitGb ? String(summary.limitGb) : "";
+      els.customGb.focus();
+      els.customGb.select();
+      return;
+    }
+    els.custom.classList.remove("is-shown");
+    saveLimit(parseInt(item.dataset.gb, 10) || 0);
+  });
+
+  function applyCustom() {
+    const gb = parseInt(els.customGb.value, 10);
+    if (!Number.isFinite(gb) || gb < 1 || gb > 1000000) { setStatus(els.limitStatus, "Enter a size in GB, at least 1.", true); return; }
+    saveLimit(gb);
+  }
+  els.customSet.addEventListener("click", applyCustom);
+  els.customCancel.addEventListener("click", () => { els.custom.classList.remove("is-shown"); setStatus(els.limitStatus, ""); });
+  els.customGb.addEventListener("keydown", (e) => { if (e.key === "Enter") applyCustom(); });
+  els.customGb.addEventListener("input", () => { els.customGb.value = els.customGb.value.replace(/[^0-9]/g, ""); });
+
+  // the review of the oldest clips: what would go, shown before anything does
+  let plan = null;
+  async function reviewPlan() {
+    setStatus(els.limitStatus, "");
+    try {
+      plan = await helperJson("/storage/trim-plan?t=" + Date.now());
+    } catch (err) {
+      setStatus(els.limitStatus, "Could not read your library.", true);
+      return;
+    }
+    if (!plan.count) {
+      els.overText.innerHTML = "Every clip that could go is a favorite, so <b>nothing can be deleted</b> for you. Pick a higher limit or delete clips by hand.";
+      els.overActions.innerHTML = "";
+      return;
+    }
+    els.overText.innerHTML = "ReplayKit will delete your <b>" + plan.count + " oldest clip" + (plan.count === 1 ? "" : "s") + "</b> (<b>" + plan.bytesText + "</b>). Favorites are kept." +
+      (plan.insufficient ? " That is still not enough to get under the limit, because your favorites take the rest." : "");
+    els.overActions.innerHTML = '<button class="btn is-solid" type="button" id="confirmTrim">Delete ' + plan.count + " clip" + (plan.count === 1 ? "" : "s") + '</button><button class="btn" type="button" id="cancelTrim">Keep them</button>';
+    $("confirmTrim").addEventListener("click", applyPlan);
+    $("cancelTrim").addEventListener("click", () => { plan = null; if (summary) render(summary); });
+  }
+
+  async function applyPlan() {
+    if (!plan || busy) return;
+    busy = true;
+    $("confirmTrim").disabled = true;
+    $("confirmTrim").textContent = "Deleting...";
+    try {
+      const done = await helperJson("/storage/trim-apply?token=" + encodeURIComponent(plan.token), { method:"POST" });
+      plan = null;
+      setStatus(els.limitStatus, "Deleted " + done.deleted + " clip" + (done.deleted === 1 ? "" : "s") + ", freed " + done.freedText + (done.failed ? " (" + done.failed + " could not be deleted)" : "") + ".", !!done.failed);
+    } catch (err) {
+      plan = null;
+      setStatus(els.limitStatus, err.message || "Could not delete the clips.", true);
+    } finally {
+      busy = false;
+      await refresh(true);
+      loadCandidates();
+    }
+  }
+
+  // compress clips. phase is what the section shows: the list to pick from, the note before it starts, the run, or its result limit is how many of the biggest clips are listed, more come a page at a time; a clip that shows up after the first page starts unticked, so a long list is never picked by accident
+  const CMP_PAGE = 8;
+  const CMP_MAX = 50;
+  const cmp = { phase:"pick", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, eligible:0, loadedOnce:false, basis:null };
+  const RING = 219.9;
+
+  function showPhase(phase) {
+    cmp.phase = phase;
+    els.pick.hidden = phase !== "pick";
+    els.confirm.hidden = phase !== "confirm";
+    els.run.hidden = phase !== "run";
+    els.done.hidden = phase !== "done";
+    els.skipFav.disabled = phase === "run" || phase === "confirm";
+    $("cmpFavSwitch").style.opacity = els.skipFav.disabled ? ".5" : "";
+  }
+
+  function pickedBytes() {
+    return cmp.clips.reduce((n, c) => n + (cmp.picked.has(c.name) ? c.size : 0), 0);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    let v = bytes / 1024;
+    if (v < 1024) return Math.round(v) + " KB";
+    v /= 1024;
+    if (v < 1024) return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + " MB";
+    v /= 1024;
+    return (Math.round(v * 10) / 10) + " GB";
+  }
+
+  function renderPick() {
+    const has = cmp.clips.length > 0;
+    els.empty.hidden = has;
+    els.list.hidden = !has;
+    els.foot.hidden = !has;
+    els.tools.hidden = !has;
+    const left = Math.min(cmp.eligible, CMP_MAX) - cmp.clips.length;
+    els.more.hidden = !has || left <= 0;
+    els.more.textContent = left > 0 ? "Show " + Math.min(CMP_PAGE, left) + " more clip" + (Math.min(CMP_PAGE, left) === 1 ? "" : "s") + (cmp.eligible <= CMP_MAX ? " (" + left + " left)" : "") : "";
+    els.list.textContent = "";
+    cmp.clips.forEach((clip) => {
+      const row = document.createElement("label");
+      row.className = "cmp-row";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = cmp.picked.has(clip.name);
+      box.addEventListener("change", () => {
+        if (box.checked) cmp.picked.add(clip.name); else cmp.picked.delete(clip.name);
+        renderPickedFoot();
+      });
+      const mark = document.createElement("span");
+      mark.className = "cb";
+      const name = document.createElement("span");
+      name.className = "nm";
+      name.textContent = clip.name;
+      name.title = clip.name;
+      const size = document.createElement("span");
+      size.className = "sz";
+      size.textContent = clip.sizeText;
+      row.append(box, mark, name, size);
+      els.list.appendChild(row);
+    });
+    renderPickedFoot();
+  }
+
+  // what the picked clips are expected to give back, from the estimate the helper attached to each clip
+  function pickedEstimate() {
+    return cmp.clips.reduce((n, c) => n + (cmp.picked.has(c.name) ? (c.estimateBytes || 0) : 0), 0);
+  }
+
+  function renderPickedFoot() {
+    const count = cmp.picked.size;
+    const estimate = pickedEstimate();
+    els.picked.innerHTML = count ? "<b>" + count + "</b> selected, " + formatBytes(pickedBytes()) + (estimate ? ", could save about <b>" + formatBytes(estimate) + "</b>" : "") : "Pick the clips to compress";
+    els.estInfo.hidden = !count || !estimate;
+    if (cmp.basis) {
+      const share = Math.round(cmp.basis.fraction * 100);
+      els.estInfo.dataset.tooltip = cmp.basis.history
+        ? "This is a guess based on your earlier compressions, which saved about " + share + "% on average across " + cmp.basis.samples + " clip" + (cmp.basis.samples === 1 ? "" : "s") + ". Every clip is different, so the real savings can vary."
+        : "This is a guess. You haven't compressed any clips yet, so it assumes about half. The real savings depend on the clip, and game footage often shrinks even more.";
+    }
+    els.go.disabled = count === 0 || !!(summary && summary.busy);
+    els.go.textContent = count ? "Compress " + count + " clip" + (count === 1 ? "" : "s") : "Compress";
+  }
+
+  async function loadCandidates() {
+    if (cmp.phase !== "pick") return;
+    try {
+      const data = await helperJson("/storage/compress-candidates?favorites=" + (els.skipFav.checked ? "0" : "1") + "&limit=" + cmp.limit + "&t=" + Date.now());
+      const previous = new Set(cmp.clips.map((c) => c.name));
+      const firstPage = !cmp.loadedOnce;
+      cmp.loadedOnce = true;
+      cmp.clips = Array.isArray(data.clips) ? data.clips : [];
+      cmp.eligible = data.eligible || 0;
+      cmp.basis = { fraction:data.savedFraction || 0.5, history:!!data.estimateFromHistory, samples:data.estimateSamples || 0 };
+      // the first page starts ticked; a clip that was listed before keeps its tick, and one that only shows up now (more clips, favorites let back in) starts unticked
+      const kept = new Set();
+      cmp.clips.forEach((c) => { if (firstPage || (previous.has(c.name) && cmp.picked.has(c.name))) kept.add(c.name); });
+      cmp.picked = kept;
+      renderPick();
+    } catch (_) {}
+  }
+  els.skipFav.addEventListener("change", () => { setStatus(els.cmpStatus, ""); loadCandidates(); });
+  els.more.addEventListener("click", () => { cmp.limit = Math.min(CMP_MAX, cmp.limit + CMP_PAGE); loadCandidates(); });
+  els.all.addEventListener("click", () => { cmp.picked = new Set(cmp.clips.map((c) => c.name)); renderPick(); });
+  els.none.addEventListener("click", () => { cmp.picked = new Set(); renderPick(); });
+
+  els.go.addEventListener("click", () => {
+    if (!cmp.picked.size) return;
+    setStatus(els.cmpStatus, "");
+    const estimate = pickedEstimate();
+    els.confirmSum.innerHTML = "Compressing <b>" + cmp.picked.size + "</b> clip" + (cmp.picked.size === 1 ? "" : "s") + " (" + formatBytes(pickedBytes()) + ")" + (estimate ? " should free about <b>" + formatBytes(estimate) + "</b>." : ".");
+    showPhase("confirm");
+  });
+  els.back.addEventListener("click", () => showPhase("pick"));
+
+  els.start.addEventListener("click", async () => {
+    if (cmp.starting || !cmp.picked.size) return;
+    cmp.starting = true;
+    els.start.disabled = true;
+    setStatus(els.cmpStatus, "");
+    try {
+      await helperJson("/storage/compress-start", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ names:Array.from(cmp.picked) }) });
+      showPhase("run");
+      paintRun({ running:true, percent:0, done:0, failed:0, total:cmp.picked.size, current:"", savedText:"0 B" });
+      pollCompress(true);
+    } catch (err) {
+      showPhase("pick");
+      setStatus(els.cmpStatus, err.message || "Could not start compressing.", true);
+    } finally {
+      cmp.starting = false;
+      els.start.disabled = false;
+    }
+  });
+
+  els.stop.addEventListener("click", async () => {
+    els.stop.disabled = true;
+    els.stop.textContent = "Stopping...";
+    try { await helperJson("/storage/compress-cancel", { method:"POST" }); } catch (_) {}
+  });
+
+  els.ok.addEventListener("click", () => {
+    cmp.ackedId = cmp.lastId;
+    // the clips that were compressed are smaller now, so the list starts over with the biggest ones again
+    cmp.limit = CMP_PAGE;
+    cmp.loadedOnce = false;
+    cmp.picked = new Set();
+    showPhase("pick");
+    refresh(true);
+    loadCandidates();
+  });
+
+  function paintRun(st) {
+    const percent = Math.max(0, Math.min(100, st.percent || 0));
+    els.arc.style.strokeDashoffset = String(RING * (1 - percent / 100));
+    els.pct.textContent = percent + "%";
+    const position = Math.min(st.total || 0, (st.done || 0) + (st.failed || 0) + 1);
+    els.runTitle.textContent = "Compressing " + position + " of " + (st.total || 0);
+    els.runCurrent.textContent = st.current || "";
+    els.runSaved.innerHTML = "Freed so far: <b>" + (st.savedText || "0 B") + "</b>";
+    if (!st.cancelled) { els.stop.disabled = false; els.stop.textContent = "Stop"; }
+  }
+
+  function paintDone(st) {
+    const clips = (st.done || 0) + " clip" + (st.done === 1 ? "" : "s");
+    let text = st.cancelled ? "Stopped after " + clips + ", freed " + st.savedText + "." : "Compressed " + clips + " and freed " + st.savedText + ".";
+    if (st.failed) text += " " + st.failed + " could not be compressed" + (st.error ? " (" + st.error + ")" : "") + ".";
+    if (!st.done && !st.cancelled && st.failed && st.error) text = "Nothing was compressed: " + st.error;
+    els.doneText.textContent = text;
+  }
+
+  // one read of the run: the ring follows it while it goes, and the result shows once when it ends
+  async function pollCompress(keepGoing) {
+    let st;
+    try { st = await helperJson("/storage/compress-status?t=" + Date.now()); } catch (_) { st = null; }
+    clearTimeout(cmp.timer);
+    cmp.timer = 0;
+    if (!st || !st.started) { if (cmp.phase === "run") showPhase("pick"); return; }
+    cmp.lastId = st.id;
+    if (st.running) {
+      if (cmp.phase !== "run") showPhase("run");
+      paintRun(st);
+      if (shown) cmp.timer = setTimeout(() => pollCompress(true), 1000);
+      return;
+    }
+    // it ended: what this page watched run, or a result that is minutes old, is shown until it is acknowledged
+    const fresh = st.finishedAgo >= 0 && st.finishedAgo < 90;
+    if ((cmp.phase === "run" || (fresh && cmp.ackedId !== st.id && cmp.phase === "pick")) && st.id !== cmp.ackedId) {
+      paintDone(st);
+      showPhase("done");
+      refresh(true);
+    }
+  }
+
+  function closeCard() {
+    fetch(HELPER + "/storage/close?t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+  }
+  els.close.addEventListener("click", closeCard);
+  els.library.addEventListener("click", () => {
+    fetch(HELPER + "/open-clips-window?t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+    closeCard();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (els.dd.classList.contains("is-open")) { closeMenu(); return; }
+    closeCard();
+  });
+
+  // the window is reused, so the plugin calls these when it opens and closes: an open re-reads everything and replays the fade in, a close stops the polling
+  window.__replaykitShowStorage = function () {
+    shown = true;
+    plan = null;
+    setStatus(els.limitStatus, "");
+    setStatus(els.cmpStatus, "");
+    els.custom.classList.remove("is-shown");
+    closeMenu();
+    els.card.classList.remove("is-opening");
+    void els.card.offsetWidth;
+    els.card.classList.add("is-opening");
+    // every open starts with the biggest clips again, all ticked
+    cmp.limit = CMP_PAGE;
+    cmp.loadedOnce = false;
+    cmp.picked = new Set();
+    if (cmp.phase === "confirm") showPhase("pick");
+    // favorites start out of the list the way the storage settings say, and the switch only changes it for this visit
+    refresh(true).then(() => { els.skipFav.checked = !summary || summary.skipFavorites !== false; pollCompress(true); loadCandidates(); });
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => { if (shown && !busy) refresh(false); }, 5000);
+  };
+  window.__replaykitHideStorage = function () {
+    shown = false;
+    clearInterval(pollTimer);
+    pollTimer = 0;
+    clearTimeout(cmp.timer);
+    cmp.timer = 0;
+  };
+
+  // the window is activated when it opens; if the call above never got through, this still wakes the polling and reads the numbers again
+  window.addEventListener("focus", () => {
+    shown = true;
+    if (!pollTimer) pollTimer = setInterval(() => { if (shown && !busy) refresh(false); }, 5000);
+    refresh(false);
+    if (!cmp.timer) pollCompress(true);
+  });
+
+  if (window.RKHover) RKHover.apply(document, { control:".btn" });
+  if (window.RKTooltip) RKTooltip.watch(document.body);
+  showPhase("pick");
+  window.__replaykitShowStorage();
+</script>
+</body>
+</html>

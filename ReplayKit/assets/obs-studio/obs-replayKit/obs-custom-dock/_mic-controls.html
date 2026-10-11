@@ -30,8 +30,6 @@
   .form-row.tight { min-height:30px; }
   /* the hidden attribute otherwise loses to the display:grid on .form-row, and setup.html has no rule for it */
   .form-row[hidden] { display:none; }
-  /* setup.html standalone .check-row carries its own row padding; inside a form-row the grid already supplies it */
-  .form-row .check-row { padding:0; }
   .combo.sep-after-first .combo-option:first-child { border-bottom:1px solid var(--line2); border-radius:0; margin-bottom:3px; padding-bottom:3px; }
 
   /* small i that reveals the note for a control in the shared tooltip; the same rules as settings.html so setup.html gets the identical icon */
@@ -91,16 +89,12 @@
     </div>
   </div>
 </div>
-<div class="form-row tight" data-search="noise suppression noise removal background noise keyboard fan">
-  <div></div>
-  <label class="check-row"><input type="checkbox" id="micNoise"><span>Noise suppression</span><button class="info-dot" type="button" aria-label="About noise suppression" title="Removes background noise like keyboard clicks and fans from your microphone. Applied by OBS to clips and recordings."></button></label>
-</div>
 <div class="form-row" data-search="mic test hear yourself microphone level meter">
   <div></div>
   <div class="field-wrap">
     <div class="mic-test">
       <button class="btn is-primary" type="button" id="micTestBtn">Mic Test</button>
-      <button class="info-dot" type="button" aria-label="About the mic test" title="Plays your microphone back with your volume, input sensitivity and noise suppression applied, the same way OBS applies them to clips and recordings. Change any of them while it plays to hear the difference straight away. Use headphones to avoid feedback."></button>
+      <button class="info-dot" type="button" aria-label="About the mic test" title="Plays your microphone back to you, with your volume, sensitivity, and noise settings applied."></button>
       <div class="mic-meter" id="micMeter" role="img" aria-label="Microphone level"></div>
     </div>
   </div>
@@ -120,7 +114,7 @@
   </div>
 </div>
 <div class="form-row" data-search="input sensitivity noise gate threshold cut off gate microphone">
-  <div class="label">Input Sensitivity <button class="info-dot" type="button" aria-label="About input sensitivity" title="Anything quieter than the handle is cut off. Talk and watch the bar: keep your voice to the right of the handle and background noise to the left. All the way left turns the cut-off off."></button></div>
+  <div class="label">Input Sensitivity</div>
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels">
@@ -131,6 +125,10 @@
     </div>
     <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
+</div>
+<div class="form-row tight" data-search="noise suppression noise removal background noise keyboard fan">
+  <div></div>
+  <div class="check-row"><input type="checkbox" id="micNoise" aria-label="Noise suppression"><span>Noise suppression</span><button class="info-dot" type="button" aria-label="About noise suppression" title="Reduces background noise like keyboard clicks and fans from your microphone."></button></div>
 </div>
 <script>
 (function () {

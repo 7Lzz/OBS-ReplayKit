@@ -1,0 +1,317 @@
+<!-- shared partial (helper #include target: video-fx). anti-aliasing for clips: while a clip plays large, in the theater view, full screen or the editor, a canvas over the video shows the same frames through a shader, either MSAA style multi sample downscaling or FXAA. host: RKVideoFx.setMode("none" | "msaa" | "fxaa") -->
+<style>
+  .rk-fx-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+</style>
+<script>
+(function () {
+  var mode = "none";
+  var attached = new Map();
+  var scanTimer = 0;
+  var supported = null;
+  var renderer = "";
+  // a video smaller than this on screen is a preview in the grid, and stays as it is
+  var MIN_WIDTH = 420;
+  var MIN_HEIGHT = 236;
+
+  var VERTEX = [
+    "#version 300 es",
+    "out vec2 vUv;",
+    "void main() {",
+    "  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));",
+    "  vUv = p;",
+    "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);",
+    "}",
+  ].join("\n");
+
+  // draws the video into the box it is shown in, then either takes one filtered sample per pixel or four samples spread over the pixel; uRect is where the picture sits in the box, uPixel one pixel of the box in uv
+  var RESOLVE = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uTex;",
+    "uniform vec4 uRect;",
+    "uniform vec2 uPixel;",
+    "uniform float uLod;",
+    "uniform int uMulti;",
+    "in vec2 vUv;",
+    "out vec4 o;",
+    "void main() {",
+    "  vec2 s = (vUv - uRect.xy) / uRect.zw;",
+    "  if (s.x < 0.0 || s.y < 0.0 || s.x > 1.0 || s.y > 1.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }",
+    "  if (uMulti == 0) { o = vec4(textureLod(uTex, s, uLod).rgb, 1.0); return; }",
+    "  vec2 px = uPixel / uRect.zw;",
+    "  vec3 c = textureLod(uTex, s + px * vec2(-0.375, -0.125), uLod).rgb",
+    "         + textureLod(uTex, s + px * vec2( 0.125, -0.375), uLod).rgb",
+    "         + textureLod(uTex, s + px * vec2( 0.375,  0.125), uLod).rgb",
+    "         + textureLod(uTex, s + px * vec2(-0.125,  0.375), uLod).rgb;",
+    "  o = vec4(c * 0.25, 1.0);",
+    "}",
+  ].join("\n");
+
+  // fast approximate anti-aliasing: finds the direction of an edge from the luma around a pixel and blurs along it, only where that does not leave the range of the neighbours
+  var FXAA = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uTex;",
+    "uniform vec2 uPixel;",
+    "in vec2 vUv;",
+    "out vec4 o;",
+    "float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }",
+    "void main() {",
+    "  vec2 uv = vUv;",
+    "  vec3 rgbNW = texture(uTex, uv + vec2(-1.0, -1.0) * uPixel).rgb;",
+    "  vec3 rgbNE = texture(uTex, uv + vec2( 1.0, -1.0) * uPixel).rgb;",
+    "  vec3 rgbSW = texture(uTex, uv + vec2(-1.0,  1.0) * uPixel).rgb;",
+    "  vec3 rgbSE = texture(uTex, uv + vec2( 1.0,  1.0) * uPixel).rgb;",
+    "  vec3 rgbM = texture(uTex, uv).rgb;",
+    "  float lNW = luma(rgbNW); float lNE = luma(rgbNE); float lSW = luma(rgbSW); float lSE = luma(rgbSE); float lM = luma(rgbM);",
+    "  float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));",
+    "  float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));",
+    "  vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));",
+    "  float reduce = max((lNW + lNE + lSW + lSE) * (0.25 * (1.0 / 8.0)), 1.0 / 128.0);",
+    "  float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);",
+    "  dir = min(vec2(8.0), max(vec2(-8.0), dir * rcp)) * uPixel;",
+    "  vec3 rgbA = 0.5 * (texture(uTex, uv + dir * (1.0 / 3.0 - 0.5)).rgb + texture(uTex, uv + dir * (2.0 / 3.0 - 0.5)).rgb);",
+    "  vec3 rgbB = rgbA * 0.5 + 0.25 * (texture(uTex, uv + dir * -0.5).rgb + texture(uTex, uv + dir * 0.5).rgb);",
+    "  float lB = luma(rgbB);",
+    "  o = vec4((lB < lMin || lB > lMax) ? rgbA : rgbB, 1.0);",
+    "}",
+  ].join("\n");
+
+  function compile(gl, type, source) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || "shader");
+    return shader;
+  }
+
+  function program(gl, fragment) {
+    var p = gl.createProgram();
+    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, VERTEX));
+    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fragment));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || "program");
+    return p;
+  }
+
+  function texture(gl, mips) {
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mips ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+    return t;
+  }
+
+  function build(canvas) {
+    var gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
+    if (!gl) return null;
+    var info = gl.getExtension("WEBGL_debug_renderer_info");
+    if (info) renderer = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "");
+    // a shader run on the processor would cost more than the picture gains, so a browser without graphics acceleration does not draw
+    if (/swiftshader|llvmpipe|software/i.test(renderer)) {
+      var lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+      return null;
+    }
+    var g = {
+      gl: gl,
+      resolve: program(gl, RESOLVE),
+      fxaa: program(gl, FXAA),
+      video: texture(gl, true),
+      target: texture(gl, false),
+      frame: gl.createFramebuffer(),
+      vao: gl.createVertexArray(),
+      width: 0,
+      height: 0,
+    };
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    return g;
+  }
+
+  function resizeTarget(g, width, height) {
+    var gl = g.gl;
+    gl.bindTexture(gl.TEXTURE_2D, g.target);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, g.frame);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, g.target, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    g.width = width;
+    g.height = height;
+  }
+
+  // where the picture sits inside the box, in uv of the box, the way object-fit puts it
+  function pictureRect(video, width, height) {
+    var vw = video.videoWidth;
+    var vh = video.videoHeight;
+    var fit = getComputedStyle(video).objectFit;
+    if (fit === "fill") return [0, 0, 1, 1];
+    var sx = width / vw;
+    var sy = height / vh;
+    var s = fit === "cover" ? Math.max(sx, sy) : Math.min(sx, sy);
+    var w = (vw * s) / width;
+    var h = (vh * s) / height;
+    return [(1 - w) / 2, (1 - h) / 2, w, h];
+  }
+
+  function draw(state) {
+    var video = state.video;
+    var canvas = state.canvas;
+    // a frame asked for in the middle of a seek is not there yet, and the seeked event that follows draws it
+    if (!state.alive || !video.videoWidth || video.readyState < 2 || video.seeking) return;
+    // zoomed in, the video itself is shown, since a picture drawn at the size of the box would only be enlarged
+    var zoomed = !!video.style.transform;
+    canvas.style.visibility = zoomed ? "hidden" : "visible";
+    if (zoomed) return;
+
+    var dpr = window.devicePixelRatio || 1;
+    var width = Math.max(2, Math.round(canvas.clientWidth * dpr));
+    var height = Math.max(2, Math.round(canvas.clientHeight * dpr));
+    var g = state.g;
+    var gl = g.gl;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    if (g.width !== width || g.height !== height) resizeTarget(g, width, height);
+
+    var rect = pictureRect(video, width, height);
+    var ratio = Math.max(video.videoWidth / (rect[2] * width), video.videoHeight / (rect[3] * height));
+    var lod = ratio > 1 ? Math.min(8, Math.log2(ratio)) : 0;
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, g.video);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    if (lod > 0) gl.generateMipmap(gl.TEXTURE_2D);
+    gl.bindVertexArray(g.vao);
+
+    var multi = mode === "msaa";
+    // the multi sample resolve reads a finer level of the video, since four samples cover each pixel
+    var level = multi ? Math.max(0, lod - 1) : lod;
+    var first = g.resolve;
+    gl.useProgram(first);
+    gl.uniform1i(gl.getUniformLocation(first, "uTex"), 0);
+    gl.uniform4f(gl.getUniformLocation(first, "uRect"), rect[0], rect[1], rect[2], rect[3]);
+    gl.uniform2f(gl.getUniformLocation(first, "uPixel"), 1 / width, 1 / height);
+    gl.uniform1f(gl.getUniformLocation(first, "uLod"), level);
+    gl.uniform1i(gl.getUniformLocation(first, "uMulti"), multi ? 1 : 0);
+    if (multi) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, width, height);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      return;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, g.frame);
+    gl.viewport(0, 0, width, height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
+    gl.bindTexture(gl.TEXTURE_2D, g.target);
+    gl.useProgram(g.fxaa);
+    gl.uniform1i(gl.getUniformLocation(g.fxaa, "uTex"), 0);
+    gl.uniform2f(gl.getUniformLocation(g.fxaa, "uPixel"), 1 / width, 1 / height);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function attach(video) {
+    // the drawing follows the frames the video presents, so a browser that cannot report them cannot use it
+    if (typeof video.requestVideoFrameCallback !== "function") { supported = false; return; }
+    var canvas = document.createElement("canvas");
+    canvas.className = "rk-fx-canvas";
+    var g;
+    try { g = build(canvas); } catch (e) { g = null; }
+    if (!g) { supported = false; return; }
+    supported = true;
+    canvas.style.borderRadius = getComputedStyle(video).borderRadius;
+    video.insertAdjacentElement("afterend", canvas);
+    var state = { video: video, canvas: canvas, g: g, alive: true, handle: 0, observer: null, redraw: null, late: 0 };
+    // a paused video gets no frame callbacks, so a draw made by an event is repeated a moment later in case the frame had not arrived yet
+    state.redraw = function () {
+      draw(state);
+      clearTimeout(state.late);
+      state.late = setTimeout(function () { draw(state); }, 150);
+    };
+    var loop = function () {
+      if (!state.alive) return;
+      draw(state);
+      state.handle = video.requestVideoFrameCallback(loop);
+    };
+    canvas.addEventListener("webglcontextlost", function (event) { event.preventDefault(); detach(video); });
+    ["seeked", "loadeddata", "resize", "pause", "play"].forEach(function (name) { video.addEventListener(name, state.redraw); });
+    state.observer = new ResizeObserver(state.redraw);
+    state.observer.observe(canvas);
+    attached.set(video, state);
+    state.handle = video.requestVideoFrameCallback(loop);
+    draw(state);
+  }
+
+  function detach(video) {
+    var state = attached.get(video);
+    if (!state) return;
+    state.alive = false;
+    clearTimeout(state.late);
+    attached.delete(video);
+    try { video.cancelVideoFrameCallback(state.handle); } catch (e) { /* the callback already ran */ }
+    ["seeked", "loadeddata", "resize", "pause", "play"].forEach(function (name) { video.removeEventListener(name, state.redraw); });
+    if (state.observer) state.observer.disconnect();
+    var lose = state.g.gl.getExtension("WEBGL_lose_context");
+    if (lose) lose.loseContext();
+    state.canvas.remove();
+  }
+
+  function fullscreenHolds(video) {
+    var element = document.fullscreenElement || document.webkitFullscreenElement;
+    return !!(element && element.contains(video));
+  }
+
+  function eligible(video) {
+    if (!video.isConnected || video.readyState < 2 || !video.videoWidth || video.offsetParent === null) return false;
+    var box = video.getBoundingClientRect();
+    if (box.width < MIN_WIDTH || box.height < MIN_HEIGHT) return false;
+    var card = video.closest(".card");
+    if (card && !card.classList.contains("is-theater-card") && !video.closest(".rk-fs") && !fullscreenHolds(video)) return false;
+    return true;
+  }
+
+  function scan() {
+    if (mode === "none") { attached.forEach(function (state, video) { detach(video); }); return; }
+    if (supported === false) return;
+    document.querySelectorAll("video").forEach(function (video) {
+      var has = attached.has(video);
+      var wanted = eligible(video);
+      if (wanted && !has) attach(video);
+      else if (!wanted && has) detach(video);
+    });
+    attached.forEach(function (state, video) { if (!video.isConnected) detach(video); });
+  }
+
+  function setMode(next) {
+    next = next === "msaa" || next === "fxaa" ? next : "none";
+    if (next === mode) return;
+    mode = next;
+    // the drawing follows the mode, so the videos that are already drawn start over with it
+    attached.forEach(function (state, video) { detach(video); });
+    if (mode === "none") {
+      if (scanTimer) { clearInterval(scanTimer); scanTimer = 0; }
+      return;
+    }
+    if (!scanTimer) scanTimer = setInterval(scan, 400);
+    scan();
+  }
+
+  window.RKVideoFx = {
+    setMode: setMode,
+    status: function () { return { mode: mode, attached: attached.size, supported: supported, renderer: renderer }; },
+  };
+})();
+</script>

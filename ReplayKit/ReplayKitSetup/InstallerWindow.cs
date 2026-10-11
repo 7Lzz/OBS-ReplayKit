@@ -118,7 +118,7 @@ namespace ReplayKitSetup
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-        // for the borderless uninstall window's page-driven drag: ReleaseCapture then WM_NCLBUTTONDOWN/HTCAPTION.
+        // for the borderless uninstall windows page-driven drag: ReleaseCapture then WM_NCLBUTTONDOWN/HTCAPTION.
         [DllImport("user32.dll")]
         public static extern bool ReleaseCapture();
 

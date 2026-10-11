@@ -2,7 +2,7 @@ using System.Text;
 
 namespace ReplayKitHelper
 {
-    // win32 CommandLineToArgvW-compliant argument quoting. net48s ProcessStartInfo.Arguments is a single string (no ArgumentList until .NET Core 2.1+), so every child process invocation (curl.exe, ffmpeg.exe, explorer.exe, a relaunch of ourselves) needs this to pass arguments safely. ported from the identical Quote-Arg implementations duplicated across obs_replaykit helper upload_worker.ps1 and modules/71_routes.ps1 -- one shared copy here instead of two that could drift apart.
+    // CommandLineToArgvW-compliant argument quoting; net48 has no ProcessStartInfo.ArgumentList, so every child process command line is built here
     internal static class ProcessArgs
     {
         public static string Quote(string arg)

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Threading;
 
 namespace ReplayKitHelper
 {
-    // Thumbnail work is deduplicated by file generation and bounded even when a shell codec hangs.
+    // thumbnail work is deduplicated by file generation and bounded even when a shell codec hangs.
     internal static class Media
     {
         private static string GetThumbnailName(Clips.SafeClipPath selected, FileInfo fi)
@@ -37,7 +38,12 @@ namespace ReplayKitHelper
             lock (Server.State.ThumbQueueLock)
             {
                 if (File.Exists(outPath)) return outPath;
-                if (ThumbnailFailures.ContainsKey(outPath)) return null;
+                // the picture of a clip that was only just written can fail while the file is still being finished, so a recent clip is tried again a few seconds after a failure; the failure of an older clip stays
+                if (ThumbnailFailures.TryGetValue(outPath, out DateTime failedAt))
+                {
+                    if (DateTime.UtcNow - fi.LastWriteTimeUtc > TimeSpan.FromMinutes(5) || (DateTime.UtcNow - failedAt).TotalSeconds < 8) return null;
+                    ThumbnailFailures.Remove(outPath);
+                }
                 if (!ThumbnailJobs.TryGetValue(outPath, out task))
                 {
                     // A timed-out shell call still owns a slot until it actually returns.
@@ -81,6 +87,12 @@ namespace ReplayKitHelper
                 Native.SaveThumbnail(source, temp);
                 File.Move(temp, output);
                 return output;
+            }
+            catch (COMException ex)
+            {
+                // the shell has no picture of the file: still being written, or a codec it cannot read. not a crash; the caller gets null and the page asks again or shows the placeholder
+                Log.Write("Thumbnail: no picture from the shell for " + Path.GetFileName(source) + " (0x" + ex.ErrorCode.ToString("X8") + ")");
+                return null;
             }
             catch (Exception ex) { Program.WriteCrashReport("thumbnail", ex, false); return null; }
             finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { } }

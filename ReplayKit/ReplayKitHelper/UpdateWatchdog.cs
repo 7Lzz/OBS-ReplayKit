@@ -43,7 +43,7 @@ namespace ReplayKitHelper
                     {
                         UseShellExecute = true,
                         WorkingDirectory = Path.GetDirectoryName(obsPath),
-                    });
+                    })?.Dispose();
                 }
                 catch (Exception ex) { Log.Write("Update watchdog could not relaunch OBS: " + ex.Message); }
             }

@@ -7,16 +7,11 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // entry point: normal launch binds the loopback listener and runs the accept loop; a hidden --transcode-poll
-    // mode instead runs a single detached poll worker (see TranscodePollWorker) and exits. ported from
-    // obs_replaykit helper local_helper_server.ps1 + modules/90_runtime.ps1. the ps original's elaborate
-    // runspace-pool/InitialSessionState setup (register every dot-sourced function + read-only constant into a
-    // pool so a brand-new runspace can call Handle-Connection without re-dot-sourcing 21 files per connection) has
-    // no equivalent here -- this process is already a real multithreaded .net app, so each accepted connection is
-    // simply Task.Run onto the thread pool.
+    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check and --update-window modes run one job and exit
     internal static class Program
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -101,7 +96,10 @@ namespace ReplayKitHelper
             string logPath = GetNamedArg(args, "-LogPath");
             string cookieJar = GetNamedArg(args, "-CookieJar");
             bool quiet = GetNamedArg(args, "-Quiet") == "1";
-            return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar, quiet);
+            // a poll started by an older helper knows nothing of these two, and does what it always did
+            bool copyLink = GetNamedArg(args, "-CopyLink") != "0";
+            bool notify = GetNamedArg(args, "-Notify") != "0";
+            return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar, quiet, copyLink, notify);
         }
 
         private static int RunServer(string[] args)
@@ -118,7 +116,12 @@ namespace ReplayKitHelper
             AppConfig.LoadConfig();
             AppConfig.ClearLogsAtStartup();
 
+            // the settings and the saved state moved out of scripts\ into the replaykit folder itself; an install that still has them in the old places gets them moved before anything reads them, and until then the old copies keep being used
+            try { StateLayout.Run(AppConfig.GetReplayKitRoot(), message => Log.Write(message)); }
+            catch (Exception ex) { Log.Write("StateLayout.Run: " + ex.Message); }
+
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
+            try { Update.ClearStaleUpdateFolders(); } catch (Exception ex) { Log.Write("ClearStaleUpdateFolders: " + ex.Message); }
             try { Compression.GetHelperCapabilities(refresh: true); } catch (Exception ex) { Log.Write("GetHelperCapabilities: " + ex.Message); }
 
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
@@ -126,19 +129,17 @@ namespace ReplayKitHelper
             WriteStartupStatus(configPath, "ready", "");
             Log.Write("ReplayKit helper listening on http://" + Constants.HOST_ADDR + ":" + port);
 
-            // client half of the ipc pipe with the native plugin -- main-window + projector hwnds in, open-clips + allow-close out. connects when the plugin's server is up and reconnects on its own; every consumer degrades gracefully while it isn't.
+            // client half of the ipc pipe with the native plugin -- main-window + projector hwnds in, open-clips + allow-close out. connects when the plugins server is up and reconnects on its own; every consumer degrades gracefully while it isnt.
             try { PipeClient.Start(); } catch (Exception ex) { Log.Write("PipeClient.Start: " + ex.Message); }
 
-            // surface admin / parent-process info at startup so it's trivial to diagnose "vss not admin" later. with an elevation script that auto-relaunches obs, the lua can spawn the helper twice -- once under the pre-elevation non-admin obs (which then exits), and once under the post-elevation admin obs. the non-admin one can win port races and stick around as a useless orphan; the parent-process watchdog below kills the orphan when its obs goes away.
+            // surface admin / parent-process info at startup so its trivial to diagnose "vss not admin" later. with an elevation script that auto-relaunches obs, the lua can spawn the helper twice -- once under the pre-elevation non-admin obs (which then exits), and once under the post-elevation admin obs. the non-admin one can win port races and stick around as a useless orphan; the parent-process watchdog below kills the orphan when its obs goes away.
             bool isAdmin = false;
-            try { isAdmin = BrowserCookies.TestIsAdmin(); } catch (Exception ex) { Log.Write("TestIsAdmin: " + ex.Message); }
+            try { isAdmin = Elevation.IsAdmin(); } catch (Exception ex) { Log.Write("Elevation.IsAdmin: " + ex.Message); }
             ParentWatchdog.Resolve();
             Log.Write("Helper PID=" + Process.GetCurrentProcess().Id + " admin=" + isAdmin + " parent=" + ParentWatchdog.ParentPid +
                 " (" + ParentWatchdog.ParentName + ", started " + ParentWatchdog.ParentStartTime + ")");
 
-            // Parent identity is diagnostic only. OBS can launch scripts through a
-            // short-lived child process, so treating a parent-handle failure as a
-            // reason to exit causes the local server to disappear after launch.
+            // the parent handle is diagnostic only -- obs can host the lua through a short-lived child process, so a failed open must not make the helper exit
             ParentWatchdog.OpenHandle();
 
             try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
@@ -159,20 +160,20 @@ namespace ReplayKitHelper
             try { ReplaykitSettings.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
             try { ReplaykitSettings.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
             try { ReplaykitSettings.EnsureObsVideoMatchesSettingsAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettingsAtStartup: " + ex.Message); }
+            try { ReplaykitSettings.EnsureRecordingAudioProgramsAtStartup(); } catch (Exception ex) { Log.Write("EnsureRecordingAudioProgramsAtStartup: " + ex.Message); }
+            try { ReplaykitSettings.CheckBongoCatAtStartup(); } catch (Exception ex) { Log.Write("CheckBongoCatAtStartup: " + ex.Message); }
             try { Upload.ResumeTranscodePollsAtStartup(); } catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: " + ex.Message); }
             try { ToastNotify.EnsureRegistered(Upload.ResolveToastIconPath()); } catch (Exception ex) { Log.Write("ToastNotify.EnsureRegistered: " + ex.Message); }
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
+            try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
 
             RunAcceptLoop();
 
             return 0;
         }
 
-        // named system mutex held for this process's lifetime so a second helper bails out immediately instead of
-        // fighting over the port -- Tools -> Scripts reload occasionally leaves the old helper alive (blocked on a
-        // slow operation when /shutdown arrives, or com-apartment cleanup keeps the launcher process around after
-        // the hosted process already exited). the os releases the mutex automatically on process exit either way.
+        // named system mutex held for this processs lifetime so a second helper bails out immediately instead of fighting over the port -- Tools -> Scripts reload occasionally leaves the old helper alive (blocked on a slow operation when /shutdown arrives, or com-apartment cleanup keeps the launcher process around after the hosted process already exited). the os releases the mutex automatically on process exit either way.
         private static bool AcquireSingleton()
         {
             try
@@ -225,10 +226,7 @@ namespace ReplayKitHelper
 
         private static readonly SemaphoreSlim ConnectionSlots = new SemaphoreSlim(Constants.MAX_CONNECTION_THREADS);
 
-        // single-threaded accept loop; Pending() lets us cooperatively check the shutdown flag every ~50ms instead
-        // of blocking in AcceptTcpClient forever. also runs the parent-process watchdog: with the user's
-        // auto-elevation flow we can end up spawned by a non-admin obs that then exits when its elevated
-        // replacement takes over -- without this, the orphan helper happily holds the port forever.
+        // single-threaded accept loop; Pending() lets us cooperatively check the shutdown flag every ~50ms instead of blocking in AcceptTcpClient forever. also runs the parent-process watchdog: with the users auto-elevation flow we can end up spawned by a non-admin obs that then exits when its elevated replacement takes over -- without this, the orphan helper happily holds the port forever.
         private static void RunAcceptLoop()
         {
             try
@@ -269,7 +267,7 @@ namespace ReplayKitHelper
             catch { return true; }
         }
 
-        // obs's "did not properly shut down" prompt fires from a leftover .sentinel\run_* before any module or this helper loads, so the current launch cant be caught -- but sweeping the file while we run means a hard crash / power loss leaves nothing behind and the NEXT launch is clean. obs writes its sentinel once at startup and never recreates it, so the 30s repeat is just insurance for a helper that started before obs wrote the file.
+        // obss "did not properly shut down" prompt fires from a leftover .sentinel\run_* before any module or this helper loads, so the current launch cant be caught -- but sweeping the file while we run means a hard crash / power loss leaves nothing behind and the NEXT launch is clean. obs writes its sentinel once at startup and never recreates it, so the 30s repeat is just insurance for a helper that started before obs wrote the file.
         private static void StartCrashSentinelSweep()
         {
             try { if (CrashPopupSuppressed()) ClearObsCrashSentinel(); }
@@ -281,11 +279,7 @@ namespace ReplayKitHelper
             }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         }
 
-        // obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes every lingering
-        // one during its own shutdown handler on a clean exit -- a killed/crashed obs never reaches that code, so
-        // the leftover file is what makes the next launch show the "crash detected" prompt. clearing it ourselves
-        // the moment we know obs is actually gone heads that off regardless of how obs went down, including a raw
-        // task manager "end task" that our own restart flow never gets a chance to see.
+        // obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes every lingering one during its own shutdown handler on a clean exit -- a killed/crashed obs never reaches that code, so the leftover file is what makes the next launch show the "crash detected" prompt. clearing it ourselves the moment we know obs is actually gone heads that off regardless of how obs went down, including a raw task manager "end task" that our own restart flow never gets a chance to see.
         private static void ClearObsCrashSentinel()
         {
             string sentinelDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", ".sentinel");
@@ -309,7 +303,9 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(configPath)) return;
             try
             {
-                string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(configPath)), "helper_startup_status.json");
+                // diagnosis only and read by nothing, so it lives with the logs and not in the install folder
+                Directory.CreateDirectory(Constants.LOG_DIR);
+                string path = Path.Combine(Constants.LOG_DIR, "helper_startup_status.json");
                 var data = new JObject
                 {
                     ["state"] = state,
@@ -386,14 +382,12 @@ namespace ReplayKitHelper
             }
         }
 
-        // restart broker: if /restart-obs-clean was the reason we are exiting, relaunch obs now that the
-        // streamable cookies are gone. we are admin (restart-obs-clean requires it), so the new obs inherits our
-        // admin token with no further uac prompt.
+        // restart broker: if /restart-obs-clean was the reason we are exiting, relaunch obs now that the streamable cookies are gone. we are admin (restart-obs-clean requires it), so the new obs inherits our admin token with no further uac prompt.
         private static void RelaunchObsAfterClean(string obsPath)
         {
-            // same leftover-sentinel problem ClearObsCrashSentinel exists for -- we are about to relaunch right after our own force-kill, which skips obs's graceful-shutdown cleanup same as any other force-kill.
+            // same leftover-sentinel problem ClearObsCrashSentinel exists for -- we are about to relaunch right after our own force-kill, which skips obss graceful-shutdown cleanup same as any other force-kill.
             try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
-            // legacy-fallback twin of the move in restart_obs.ps1 -- apply a staged overlay scene edit now that obs is gone.
+            // the same move restart_obs.ps1 does on the detached path: apply a staged overlay scene edit now that obs is gone
             try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
             // same, for a staged theme change -- obs clobbered user.ini [Appearance] Theme= on its exit-save.
             try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
@@ -408,7 +402,7 @@ namespace ReplayKitHelper
                     WorkingDirectory = Path.GetDirectoryName(obsPath),
                     UseShellExecute = true,
                 };
-                Process.Start(psi);
+                Process.Start(psi)?.Dispose();
                 Log.Write("RestartAfterClean: launch issued.");
             }
             catch (Exception ex)

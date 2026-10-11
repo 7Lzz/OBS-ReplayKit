@@ -34,7 +34,7 @@ local IGNORE_LIST = {
     ["taskmgr.exe"]                 = true,
     ["snippingtool.exe"]            = true,
     ["screenclippinghost.exe"]      = true,
-    -- Robloxs player/client hooks are unreliable for this workflow; keep it on Display Capture.
+    -- robloxs player/client hooks are unreliable for this workflow; keep it on Display Capture.
     ["robloxplayer.exe"]            = true,
     ["robloxplayerbeta.exe"]        = true,
     ["robloxplayerlauncher.exe"]    = true,
@@ -80,6 +80,8 @@ local HOOK_CHECK_INTERVAL      = 1000
 local HOOK_CHECK_MAX_ATTEMPTS  = 10
 local DEFAULT_DESKTOP_SWITCH_GRACE_MS = 1000
 local WINDOW_STALL_TICKS       = 3
+-- a capture that stays dead (the display asleep, the target in a state that cannot be captured) is retried less and less often, up to this many ticks apart, so it neither floods the log nor keeps tearing the capture down
+local WINDOW_STALL_MAX_TICKS   = 300
 local pending_exe              = nil
 local pending_attempts         = 0
 local hook_check_scheduled     = false
@@ -87,6 +89,7 @@ local desktop_switch_scheduled = false
 local desktop_switch_grace_ms  = DEFAULT_DESKTOP_SWITCH_GRACE_MS
 local last_window_token        = nil
 local window_stall_count       = 0
+local window_stall_limit       = WINDOW_STALL_TICKS
 local sticky_window_hwnd       = nil
 local sticky_window_exe        = nil
 
@@ -116,6 +119,7 @@ ffi.cdef[[
     HMONITOR MonitorFromWindow(HWND hwnd, DWORD dwFlags);
     BOOL     GetMonitorInfoA(HMONITOR hMonitor, MONITORINFO* lpmi);
     DWORD    GetWindowThreadProcessId(HWND hWnd, DWORD* lpdwProcessId);
+    DWORD    GetCurrentProcessId();
     HANDLE   OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
     BOOL     CloseHandle(HANDLE hObject);
     BOOL     QueryFullProcessImageNameA(HANDLE hProcess, DWORD dwFlags, char* lpExeName, DWORD* lpdwSize);
@@ -167,8 +171,13 @@ local function read_text(path)
     return text
 end
 
+-- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it
 local function runtime_settings_path()
-    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+    local scripts_dir = parent_dir(script_path())
+    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
+    local file = io.open(current, "rb")
+    if file then file:close() return current end
+    return join_path(scripts_dir, "replaykit_settings.json")
 end
 
 local function valid_capture_mode(mode)
@@ -250,7 +259,11 @@ end
 
 local is_valid_foreground_window
 
+-- a title read on a window of this process is sent to the obs ui thread and waits for it, and the ui thread can be waiting for the lock of this script (obs froze that way when a recording started), so windows of obs itself are never asked, they are not games anyway
 local function get_window_text(hwnd)
+    local owner = ffi.new("unsigned long[1]", 0)
+    ffi.C.GetWindowThreadProcessId(hwnd, owner)
+    if owner[0] == 0 or owner[0] == ffi.C.GetCurrentProcessId() then return "" end
     local len = ffi.C.GetWindowTextLengthA(hwnd)
     if len <= 0 then return "" end
     if len > 512 then len = 512 end
@@ -258,6 +271,11 @@ local function get_window_text(hwnd)
     local copied = ffi.C.GetWindowTextA(hwnd, buf, len + 1)
     if copied <= 0 then return "" end
     return ffi.string(buf, copied)
+end
+
+local function reset_window_stall()
+    window_stall_count = 0
+    window_stall_limit = WINDOW_STALL_TICKS
 end
 
 local function get_window_class(hwnd)
@@ -674,7 +692,7 @@ local function check_fullscreen()
         cancel_desktop_switch()
         last_state = nil
         last_window_token = nil
-        window_stall_count = 0
+        reset_window_stall()
         clear_sticky_window()
         return
     end
@@ -689,7 +707,7 @@ local function check_fullscreen()
             if last_state ~= "window" then
                 print(string.format("[AutoSwitch] %s → WINDOW MODE [%s]",
                     exe or "unknown", cfg.window_source))
-                window_stall_count = 0
+                reset_window_stall()
             end
             last_state = "window"
             apply_switch("window", target_hwnd)
@@ -697,13 +715,19 @@ local function check_fullscreen()
         -- wgc sessions can die silently when the target flips display mode right as capture starts. the token memo then blocks every re-push, so the source sits at 0x0 until something recreates the session -- thats the stuck-until-alt-tab bug. after a few dead ticks clear the memo and re-push, which forces the capture to reinit.
         if last_state == "window" then
             if window_capture_is_live() then
-                window_stall_count = 0
+                reset_window_stall()
             else
                 window_stall_count = window_stall_count + 1
-                if window_stall_count >= WINDOW_STALL_TICKS then
+                if window_stall_count >= window_stall_limit then
                     window_stall_count = 0
                     last_window_token = nil
-                    print("[AutoSwitch] Window Capture stalled at 0x0 — reinitializing capture")
+                    -- written down on the first try and each time the wait grows; a capture that stays dead for hours would fill the log otherwise
+                    local grown = math.min(window_stall_limit * 2, WINDOW_STALL_MAX_TICKS)
+                    if window_stall_limit == WINDOW_STALL_TICKS or grown ~= window_stall_limit then
+                        print(string.format("[AutoSwitch] Window Capture stalled at 0x0 — reinitializing capture (next try in %d s if it stays dead)",
+                            math.floor(grown * cfg.check_interval / 1000 + 0.5)))
+                    end
+                    window_stall_limit = grown
                     update_window_capture_source(target_hwnd)
                 end
             end
@@ -780,7 +804,7 @@ function script_update(settings)
     cfg.verbose        = obs.obs_data_get_bool  (settings, "verbose")
     last_state  = nil
     last_window_token = nil
-    window_stall_count = 0
+    reset_window_stall()
     clear_sticky_window()
     hook_blocked = {}
     window_fallback = {}

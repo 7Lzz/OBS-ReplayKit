@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -11,15 +10,13 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // fetch the official OBS Studio installer from the obsproject github releases and run it silently. only called when
-    // no OBS install is detected -- the setup exe is already elevated (app.manifest), so the nsis installer needs no
-    // extra prompt. nothing is bundled; there is no offline path.
+    // fetch the official OBS Studio installer from the obsproject github releases and run it silently. only called when no OBS install is detected -- the setup exe is already elevated (app.manifest), so the nsis installer needs no extra prompt. nothing is bundled; there is no offline path.
     public static class ObsDownloader
     {
         private const string LatestReleaseApi = "https://api.github.com/repos/obsproject/obs-studio/releases/latest";
         private const string UserAgent = "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)";
 
-        // obs's windows installer is ~150 mb; the cap only exists so a hijacked url cannot fill the disk.
+        // obss windows installer is ~150 mb; the cap only exists so a hijacked url cannot fill the disk.
         private const long MaxInstallerBytes = 500L * 1024 * 1024;
         private const int InstallTimeoutMs = 10 * 60 * 1000;
 
@@ -28,8 +25,7 @@ namespace ReplayKitSetup
         private static extern bool MoveFileEx(string existingFileName, string newFileName, uint flags);
         private const uint MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
 
-        // files OBS's installer must overwrite that get loaded (and locked) by other processes -- the virtual-camera
-        // DirectShow filter is loaded by chrome / Medal / Discord / the Camera app the moment they enumerate cameras.
+        // files OBSs installer must overwrite that get loaded (and locked) by other processes -- the virtual-camera DirectShow filter is loaded by chrome / Medal / Discord / the Camera app the moment they enumerate cameras.
         private static readonly string[] LockProneRelPaths =
         {
             @"data\obs-plugins\win-dshow\obs-virtualcam-module64.dll",
@@ -61,8 +57,7 @@ namespace ReplayKitSetup
 
                 progress.SubProgress(1.0, "Installing OBS Studio...");
                 log("running the OBS installer silently...");
-                // OBS's /S installer aborts (exit 6, ~1s) when it cannot overwrite a loaded file -- almost always the
-                // virtual-camera filter that a browser / capture app holds locked. move any locked file aside first.
+                // OBSs /S installer aborts (exit 6, ~1s) when it cannot overwrite a loaded file -- almost always the virtual-camera filter that a browser / capture app holds locked. move any locked file aside first.
                 PrepareObsInstallDir(Config.PROGRAMFILES_OBS_DIR, log);
                 if (!RunSilentInstaller(installer, log))
                     return false;
@@ -181,8 +176,7 @@ namespace ReplayKitSetup
                     }
                 }
 
-                // a dropped connection makes src.Read return 0 early -- without this the caller would run NSIS on a
-                // partial exe (exit 6, installs nothing). expectedLen is the size GitHub listed for the asset.
+                // a dropped connection makes src.Read return 0 early -- without this the caller would run NSIS on a partial exe (exit 6, installs nothing). expectedLen is the size GitHub listed for the asset.
                 long expect = expectedLen > 0 ? expectedLen : total;
                 if (expect > 0 && done < expect)
                 {
@@ -196,8 +190,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // rename every currently-locked file in an existing OBS dir aside (a loaded image can be renamed within its
-        // folder) so the installer can lay down a fresh copy, and queue the stale one for delete-on-reboot. returns the count.
+        // rename every currently-locked file in an existing OBS dir aside (a loaded image can be renamed within its folder) so the installer can lay down a fresh copy, and queue the stale one for delete-on-reboot. returns the count.
         private static int PrepareObsInstallDir(string obsDir, Action<string> log)
         {
             if (string.IsNullOrEmpty(obsDir) || !Directory.Exists(obsDir)) return 0;
@@ -247,8 +240,7 @@ namespace ReplayKitSetup
             catch (UnauthorizedAccessException) { return true; }
         }
 
-        // shells out to Get-AuthenticodeSignature -- same reasoning as InputOverlay.IsMicrosoftSigned: the os cmdlet is a
-        // safer bet than a hand-rolled WinVerifyTrust p/invoke for a security-critical check before running the exe.
+        // shells out to Get-AuthenticodeSignature -- same reasoning as InputOverlay.IsMicrosoftSigned: the os cmdlet is a safer bet than a hand-rolled WinVerifyTrust p/invoke for a security-critical check before running the exe.
         private static bool IsObsSigned(string path, Action<string> log)
         {
             const string script = @"
@@ -299,8 +291,7 @@ $cert = $sig.SignerCertificate
             catch (Newtonsoft.Json.JsonException) { log("OBS installer signature check returned unreadable data"); return false; }
             string status = info.Value<string>("Status") ?? "";
             string subject = info.Value<string>("Subject") ?? "";
-            // "Valid" already means the authenticode signature is intact and chains to a trusted root; the subject check
-            // is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected.
+            // "Valid" already means the authenticode signature is intact and chains to a trusted root; the subject check is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected.
             bool ok = status == "Valid" &&
                       (subject.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0 ||
                        subject.IndexOf("Hugh Bailey", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -325,8 +316,7 @@ $cert = $sig.SignerCertificate
                     log("OBS installer did not finish within 10 minutes");
                     return false;
                 }
-                // nsis returns 0 on success. a non-zero code is logged but not treated as fatal on its own -- the caller
-                // re-checks for obs64.exe, which is the real signal. exit 6 in ~1s = a file OBS had to overwrite was in use.
+                // nsis returns 0 on success. a non-zero code is logged but not treated as fatal on its own -- the caller re-checks for obs64.exe, which is the real signal. exit 6 in ~1s = a file OBS had to overwrite was in use.
                 if (proc.ExitCode != 0) log("warn: OBS installer exited with code " + proc.ExitCode + " (a nonzero code usually means a file was in use)");
                 return true;
             }

@@ -2,7 +2,7 @@ using System.Text;
 
 namespace ReplayKitSetup
 {
-    // build a properly quoted windows command-line string for ProcessStartInfo.Arguments -- net framework 4.8 has no ArgumentList (that is a newer .net addition), so every subprocess call in this port needs this instead of pythons list-form subprocess.run args.
+    // builds a CommandLineToArgvW-compliant command line for ProcessStartInfo.Arguments
     public static class Win32Args
     {
         public static string Build(params string[] args)

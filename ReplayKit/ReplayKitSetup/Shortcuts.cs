@@ -4,10 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace ReplayKitSetup
 {
-    // minimal .lnk COM interop for the clip-notification shortcut. windows toasts from an unpackaged app need SOME
-    // start-menu shortcut carrying the app's AppUserModelID; rather than ship a separate "OBS ReplayKit" entry we stamp
-    // that id onto OBS Studio's own shortcut (or, if that one is not writable, a same-named copy in the user scope so
-    // the start menu still shows a single "OBS Studio"). mirrors the interop the helper's ToastNotify.cs uses.
+    // minimal .lnk COM interop for the clip-notification shortcut. windows toasts from an unpackaged app need SOME start-menu shortcut carrying the apps AppUserModelID; rather than ship a separate "OBS ReplayKit" entry we stamp that id onto OBS Studios own shortcut (or, if that one is not writable, a same-named copy in the user scope so the start menu still shows a single "OBS Studio"). mirrors the interop the helpers ToastNotify.cs uses.
     internal static class Shortcuts
     {
         // the id the helper registers with the toast API. keep in step with ReplayKitHelper.ToastNotify.Aumid.
@@ -40,7 +37,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // clear the AppUserModelID property from a .lnk (leave OBS's own shortcut pristine on a keep-OBS uninstall).
+        // clear the AppUserModelID property from a .lnk (leave OBSs own shortcut pristine on a keep-OBS uninstall).
         public static void ClearAumid(string lnkPath, Action<string> log = null)
         {
             if (!File.Exists(lnkPath)) return;
@@ -61,7 +58,7 @@ namespace ReplayKitSetup
             }
         }
 
-        // create a launcher .lnk (target obs64.exe, OBS's own icon) carrying the AppUserModelID.
+        // create a launcher .lnk (target obs64.exe, OBSs own icon) carrying the AppUserModelID.
         public static bool Write(string lnkPath, string target, string aumid, Action<string> log = null)
         {
             if (string.IsNullOrEmpty(target) || !File.Exists(target)) return false;

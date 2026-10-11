@@ -7,9 +7,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace ReplayKitSetup
 {
-    // the modern setup window (SetupWindow.cs) needs the evergreen webview2 runtime. it ships on every win11 and most
-    // win10 boxes; when it is missing this downloads microsofts ~1.8 mb evergreen bootstrapper and runs it silently,
-    // the same "fetch a dependency during setup" shape ObsDownloader uses for obs itself. nothing is bundled.
+    // the modern setup window (SetupWindow.cs) needs the evergreen webview2 runtime. it ships on every win11 and most win10 boxes; when it is missing this downloads microsofts ~1.8 mb evergreen bootstrapper and runs it silently, the same "fetch a dependency during setup" shape ObsDownloader uses for obs itself. nothing is bundled.
     internal static class WebView2Runtime
     {
         // microsofts stable evergreen bootstrapper link -- redirects to the current MicrosoftEdgeWebview2Setup.exe.
@@ -80,8 +78,7 @@ namespace ReplayKitSetup
             return true;
         }
 
-        // the bootstrapper is a signed microsoft binary from a microsoft link; /silent /install pulls + installs the
-        // per-machine runtime (the setup exe is already elevated, app.manifest).
+        // the bootstrapper is a signed microsoft binary from a microsoft link; /silent /install pulls + installs the per-machine runtime (the setup exe is already elevated, app.manifest).
         private static bool RunSilent(string bootstrapper, Action<string> log)
         {
             try

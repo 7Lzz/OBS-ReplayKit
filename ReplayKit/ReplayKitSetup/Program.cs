@@ -5,7 +5,7 @@ using System.Text;
 
 namespace ReplayKitSetup
 {
-    // OBS ReplayKit setup entry point. ported from main.py.
+    // OBS ReplayKit setup entry point
     internal static class Program
     {
         [STAThread]
@@ -17,7 +17,7 @@ namespace ReplayKitSetup
             int rc = Run(args);
             AssetBundle.Cleanup();
             FastExit.FastExitNow(rc);
-            return rc; // unreachable -- FastExitNow terminates the process directly, matching pythons fast_exit(main()) at module scope.
+            return rc; // unreachable -- FastExitNow terminates the process directly
         }
 
         // the flags Update.TryRunUpdateFromArgv handles -- all spawned detached from a dock button with no user at a console.
@@ -25,7 +25,6 @@ namespace ReplayKitSetup
             args.Contains("--update") || args.Contains("--cleanup") ||
             args.Contains("--install-discord-screenshare") || args.Contains("--uninstall-discord-screenshare");
 
-        // pythons KeyboardInterrupt/SystemExit catches have no equivalent here: InstallConsoleCloseHandler already intercepts ctrl+c/window-close at the native handler level above, and FastExitNow terminates without raising a catchable exception, so neither branch has anything to adapt.
         private static int Run(string[] args)
         {
             try

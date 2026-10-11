@@ -13,10 +13,11 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // the replaykit_settings.json schema (defaults, per-field validation/coercion, normalize, read, write, the auto-game-list window-token codec) plus the live-apply-into-running-obs half: scene-item CRUD and json-file scene mutation over obs-websocket, overlay/motion-blur/opacity-filter geometry, screenshare/discord/audio-mixer live-apply, hotkey capture, and the http-facing settings payload/save-request handlers. ported from obs_replaykit helper modules/62_replaykit_settings.ps1.
+    // the replaykit_settings.json schema (defaults, per-field validation/coercion, normalize, read, write, the auto-game-list window-token codec) plus applying it to the running obs: scene items and the scene file over obs-websocket, overlay/motion-blur/opacity filters, screenshare/discord/audio live-apply, hotkey capture, and the http settings payload/save handlers
     internal static class ReplaykitSettings
     {
         public static string GetScriptsDir()
@@ -25,7 +26,9 @@ namespace ReplayKitHelper
             return Directory.GetParent(dir).FullName;
         }
 
-        public static string GetSettingsPath() => Path.Combine(GetScriptsDir(), "replaykit_settings.json");
+        public static string GetSettingsPath() => StateLayout.Resolve(AppConfig.GetReplayKitRoot(), StateLayout.SettingsFile);
+
+        private const bool DefaultSeparateAudioTracks = true;
 
         public static JObject GetDefaultSettings()
         {
@@ -42,7 +45,13 @@ namespace ReplayKitHelper
                 ["recordingScaleMode"] = DefaultRecordingScaleMode(),
                 ["downscaleHeight"] = 1080,
                 ["downscaleFilter"] = "lanczos",
+                // which kinds of capture show the mouse cursor in recordings and clips
+                ["showCursorDisplayCapture"] = true,
+                ["showCursorGameCapture"] = true,
+                ["showCursorWindowCapture"] = true,
                 ["clipDir"] = "",
+                // the most the clips may take, in GB (1024-based, the way the storage card shows sizes); 0 = no limit. going over it only warns and offers to delete the oldest clips after a review, nothing is removed on its own
+                ["storageLimitGb"] = 0,
                 ["clipKeybind"] = new JObject { ["key"] = "OBS_KEY_F8" },
                 ["recordingKeybind"] = new JObject(),
                 ["openClipsKeybind"] = new JObject(),
@@ -58,17 +67,43 @@ namespace ReplayKitHelper
                 ["obsStartupEnabled"] = true,
                 ["runObsAsAdmin"] = false,
                 ["disableObsCloseWarning"] = true,
-                // helper keeps obs's .sentinel\run_* swept while it runs so a crash / power loss cant leave the "did not properly shut down" prompt behind for the next launch. off = hand crash detection back to obs.
+                // helper keeps obss .sentinel\run_* swept while it runs so a crash / power loss cant leave the "did not properly shut down" prompt behind for the next launch. off = hand crash detection back to obs.
                 ["disableObsCrashPopup"] = true,
-                // when on, the tray plugin turns the OBS window's X into "minimize to tray" -- real quits still go through the tray Exit / restart routes.
+                // when on, the native plugin turns the OBS windows X into "minimize to tray" -- real quits still go through the tray Exit / restart routes.
                 ["closeToTray"] = true,
                 ["allowSleepWhileActive"] = true,
                 ["pinObsTrayIcon"] = true,
                 ["clipNotificationEnabled"] = true,
                 ["recordingNotificationEnabled"] = true,
                 ["clipNotificationSeconds"] = 90,
+                // keeps the clip saved and recording popups out of screenshots and screen recordings
+                ["hideNotificationsFromCapture"] = true,
+                // copy the streamable link to the clipboard once the uploaded video is watchable
+                ["autoCopyLink"] = true,
+                // the clip uploaded notification that goes with it
+                ["linkNotificationEnabled"] = true,
+                // obs starts in the tray instead of showing its window; the native plugin keeps this equal to the start minimized switch in the system tray settings of obs
+                ["startMinimized"] = true,
+                // what the compress list of the storage card starts out as every time the card opens: favorites are left out of it
+                ["compressSkipFavorites"] = true,
+                // shows the development settings, and nothing in them does anything while this is off
+                ["developmentMode"] = false,
+                // a local command channel to talk to replaykit while it runs, on top of development mode
+                ["sdkMode"] = false,
+                // the native plugin writes what the interface does (views, panels, the preview) to the obs log, on top of development mode
+                ["logInterfaceEvents"] = false,
                 ["trimPreciseDefault"] = false,
+                // the saves that make the video again are encoded by an nvidia card when there is one, in the recording codec; off keeps them on the processor
+                ["trimGpuEncode"] = true,
                 ["showCodecTags"] = false,
+                // how the clip editor behaves: whether it starts playing and loops the selection, how far the arrow keys skip in seconds, the mouse wheel zoom and how a zoomed in video is drawn (smooth or sharp)
+                ["editorAutoplay"] = false,
+                ["editorLoopPreview"] = false,
+                ["editorSeekStep"] = 5,
+                ["editorWheelZoom"] = true,
+                ["editorZoomScaling"] = "smooth",
+                // how a clip is smoothed while it plays large in the theater view, full screen and the editor: none, msaa or fxaa
+                ["clipAntialiasing"] = "none",
                 ["debugLoggingEnabled"] = false,
                 ["autoDeleteLogsOnLaunch"] = true,
                 ["autoUpdateEnabled"] = true,
@@ -83,6 +118,11 @@ namespace ReplayKitHelper
                 // same 0-200-onto-a-gain-filter deal as micVolume, on "Desktop Audio (excl. Discord)" and "Discord Audio (record only)" -- discord audio is an optional source, missing entirely on installs that never added it.
                 ["desktopAudioVolume"] = 100,
                 ["discordAudioVolume"] = 100,
+                // which programs are in the recorded desktop sound. "all" keeps every program except the ones switched off, "specific" keeps only the ones switched on; apps maps a program name (brave.exe) to true or false, and a program that is not in it follows the mode
+                ["recordingAudioMode"] = "all",
+                ["recordingAudioApps"] = new JObject(),
+                // saves the pc audio, discord and the microphone as tracks of their own in every recording, next to the mixed track 1 that players play. on by default; the setup exe turns it on once for an install that existed before
+                ["recordingSeparateAudioTracks"] = DefaultSeparateAudioTracks,
                 ["motionBlurEnabled"] = false,
                 ["motionBlurStrength"] = 0.075,
                 // legacy shareMode is kept only so older settings files dont break parsing; discord output uses the obs windowed projector directly.
@@ -105,7 +145,7 @@ namespace ReplayKitHelper
                 // "default" = leave obs/replaykit icons alone; "custom" = use appIconCustomPath; anything else = a filename in the bundled icons/ folder.
                 ["appIcon"] = "default",
                 ["appIconCustomPath"] = "",
-                // red recording dot on a custom app icon while recording / replay buffer is active (mirrors obs's own tray indicator).
+                // the red recording dot on the tray icon while recording or clipping, on the default obs icon and on a custom one alike; off takes it away everywhere.
                 ["appIconRecordingDot"] = true,
                 // "default" (obs yami) / a bundled preset id (see Themes.PresetOrder) / "custom" / "user/<name>" (a saved custom). drives the dock, replaykit window chrome, and a generated obs theme variant.
                 ["theme"] = "default",
@@ -116,6 +156,8 @@ namespace ReplayKitHelper
                     ["text"] = "#FFFFFF", ["accent"] = "#284CB8", ["border"] = "#3C404D",
                     ["danger"] = "#E33B57", ["gradient"] = "", ["gradients"] = new JObject(), ["dark"] = true,
                 },
+                // "clean" = the sidebar layout (menu bar folded into the title-bar menu, only the controls sidebar docked); "classic" = the stock obs dock layout. the native plugin polls this and re-lays the main window live, no restart.
+                ["interfaceLayout"] = "clean",
                 // armed by the installer on a genuine first install; the dock opens the setup wizard on the next obs launch and /setup/complete clears it.
                 ["setupWizardPending"] = false,
             };
@@ -192,7 +234,7 @@ namespace ReplayKitHelper
             return v;
         }
 
-        // drops a single pair of wrapping quotes -- explorer's "copy as path" gives "C:\...\file", and users paste that verbatim.
+        // drops a single pair of wrapping quotes -- explorers "copy as path" gives "C:\...\file", and users paste that verbatim.
         public static string StripWrappingQuotes(string value)
         {
             if (value == null) return "";
@@ -245,9 +287,7 @@ namespace ReplayKitHelper
             return MicDevices.IsValidId(value) ? value : MicDevices.DefaultId;
         }
 
-        // per-style overlay position: { "<style>": { "x": <canvas fraction>, "y": <canvas fraction> } }. kept per style because the
-        // boxes are nothing alike -- bongo is 1280x768, the input overlay group 628x292 -- so one shared corner would shove the other
-        // overlay off the canvas. anything unrecognised is dropped rather than repaired, which just falls back to the canonical corner.
+        // per-style overlay position: { "<style>": { "x": <canvas fraction>, "y": <canvas fraction> } }. kept per style because the boxes are nothing alike -- bongo is 1280x768, the input overlay group 628x292 -- so one shared corner would shove the other overlay off the canvas. anything unrecognised is dropped rather than repaired, which just falls back to the canonical corner.
         private static JObject NormalizeOverlayPosition(JToken value)
         {
             var result = new JObject();
@@ -339,20 +379,34 @@ namespace ReplayKitHelper
                 codecPreference = "auto";
             }
 
+            // logging used to be a plain setting of the advanced tab and lives under development mode now, so a settings file that has it on and never heard of development mode keeps its logging
+            bool developmentMode = raw != null && raw["developmentMode"] == null && GetBoolSetting(data, "debugLoggingEnabled", false)
+                ? true
+                : GetBoolSetting(data, "developmentMode", defaults["developmentMode"].Value<bool>());
+
+            // obs keeps its own start-minimized switch, so a settings file that never saved this choice takes the one obs has
+            bool startMinimized = raw != null && raw["startMinimized"] == null
+                ? ReadObsStartMinimized() ?? defaults["startMinimized"].Value<bool>()
+                : GetBoolSetting(data, "startMinimized", defaults["startMinimized"].Value<bool>());
+
             return new JObject
             {
                 ["recordingPreset"] = preset,
                 ["compressionMode"] = compression,
                 ["codecPreference"] = codecPreference,
                 ["replaySeconds"] = replaySeconds,
-                // Older builds allowed a single FPS value above the current 240 cap; clamp that legacy value during migration so it cannot block the settings page from loading.
+                // older builds allowed a single FPS value above the current 240 cap; clamp that legacy value during migration so it cannot block the settings page from loading.
                 ["fps"] = Math.Min(240, GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000)),
                 ["fpsNumerator"] = Math.Min(240, GetIntSetting(data, "fpsNumerator", GetIntSetting(data, "fps", defaults["fps"].Value<int>(), 1, 1000), 1, 1000)),
                 ["fpsDenominator"] = GetIntSetting(data, "fpsDenominator", defaults["fpsDenominator"].Value<int>(), 1, 1000),
                 ["recordingScaleMode"] = GetEnumSetting(data, "recordingScaleMode", defaults["recordingScaleMode"].Value<string>(), new[] { "native", "downscale" }),
                 ["downscaleHeight"] = GetIntSetting(data, "downscaleHeight", defaults["downscaleHeight"].Value<int>(), 240, 4320),
                 ["downscaleFilter"] = GetEnumSetting(data, "downscaleFilter", defaults["downscaleFilter"].Value<string>(), new[] { "bilinear", "area", "bicubic", "lanczos" }),
+                ["showCursorDisplayCapture"] = GetBoolSetting(data, "showCursorDisplayCapture", defaults["showCursorDisplayCapture"].Value<bool>()),
+                ["showCursorGameCapture"] = GetBoolSetting(data, "showCursorGameCapture", defaults["showCursorGameCapture"].Value<bool>()),
+                ["showCursorWindowCapture"] = GetBoolSetting(data, "showCursorWindowCapture", defaults["showCursorWindowCapture"].Value<bool>()),
                 ["clipDir"] = clipDir,
+                ["storageLimitGb"] = GetIntSetting(data, "storageLimitGb", defaults["storageLimitGb"].Value<int>(), 0, 1000000),
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
                 ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
@@ -374,8 +428,23 @@ namespace ReplayKitHelper
                 ["clipNotificationEnabled"] = GetBoolSetting(data, "clipNotificationEnabled", defaults["clipNotificationEnabled"].Value<bool>()),
                 ["recordingNotificationEnabled"] = GetBoolSetting(data, "recordingNotificationEnabled", defaults["recordingNotificationEnabled"].Value<bool>()),
                 ["clipNotificationSeconds"] = GetIntSetting(data, "clipNotificationSeconds", replaySeconds, 1, 1200),
+                ["hideNotificationsFromCapture"] = GetBoolSetting(data, "hideNotificationsFromCapture", defaults["hideNotificationsFromCapture"].Value<bool>()),
+                ["autoCopyLink"] = GetBoolSetting(data, "autoCopyLink", defaults["autoCopyLink"].Value<bool>()),
+                ["linkNotificationEnabled"] = GetBoolSetting(data, "linkNotificationEnabled", defaults["linkNotificationEnabled"].Value<bool>()),
+                ["startMinimized"] = startMinimized,
+                ["compressSkipFavorites"] = GetBoolSetting(data, "compressSkipFavorites", defaults["compressSkipFavorites"].Value<bool>()),
+                ["developmentMode"] = developmentMode,
+                ["sdkMode"] = GetBoolSetting(data, "sdkMode", defaults["sdkMode"].Value<bool>()),
+                ["logInterfaceEvents"] = GetBoolSetting(data, "logInterfaceEvents", defaults["logInterfaceEvents"].Value<bool>()),
                 ["trimPreciseDefault"] = GetBoolSetting(data, "trimPreciseDefault", defaults["trimPreciseDefault"].Value<bool>()),
+                ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
+                ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
+                ["editorLoopPreview"] = GetBoolSetting(data, "editorLoopPreview", defaults["editorLoopPreview"].Value<bool>()),
+                ["editorSeekStep"] = GetIntSetting(data, "editorSeekStep", defaults["editorSeekStep"].Value<int>(), 1, 60),
+                ["editorWheelZoom"] = GetBoolSetting(data, "editorWheelZoom", defaults["editorWheelZoom"].Value<bool>()),
+                ["editorZoomScaling"] = GetEnumSetting(data, "editorZoomScaling", defaults["editorZoomScaling"].Value<string>(), new[] { "smooth", "sharp" }),
+                ["clipAntialiasing"] = GetEnumSetting(data, "clipAntialiasing", defaults["clipAntialiasing"].Value<string>(), new[] { "none", "msaa", "fxaa" }),
                 ["debugLoggingEnabled"] = GetBoolSetting(data, "debugLoggingEnabled", defaults["debugLoggingEnabled"].Value<bool>()),
                 ["autoDeleteLogsOnLaunch"] = GetBoolSetting(data, "autoDeleteLogsOnLaunch", defaults["autoDeleteLogsOnLaunch"].Value<bool>()),
                 ["autoUpdateEnabled"] = GetBoolSetting(data, "autoUpdateEnabled", defaults["autoUpdateEnabled"].Value<bool>()),
@@ -388,6 +457,9 @@ namespace ReplayKitHelper
                 ["micInputSensitivity"] = GetIntSetting(data, "micInputSensitivity", defaults["micInputSensitivity"].Value<int>(), MicTest.SensitivityMin, MicTest.SensitivityMax),
                 ["desktopAudioVolume"] = GetIntSetting(data, "desktopAudioVolume", defaults["desktopAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
                 ["discordAudioVolume"] = GetIntSetting(data, "discordAudioVolume", defaults["discordAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
+                ["recordingAudioMode"] = GetEnumSetting(data, "recordingAudioMode", defaults["recordingAudioMode"].Value<string>(), new[] { "all", "specific" }),
+                ["recordingAudioApps"] = AudioApps.NormalizeChoices(data["recordingAudioApps"]),
+                ["recordingSeparateAudioTracks"] = GetBoolSetting(data, "recordingSeparateAudioTracks", defaults["recordingSeparateAudioTracks"].Value<bool>()),
                 ["motionBlurEnabled"] = GetBoolSetting(data, "motionBlurEnabled", defaults["motionBlurEnabled"].Value<bool>()),
                 ["motionBlurStrength"] = GetFloatSetting(data, "motionBlurStrength", defaults["motionBlurStrength"].Value<double>(), 0.0, 1.0),
                 ["shareMode"] = shareMode,
@@ -411,12 +483,12 @@ namespace ReplayKitHelper
                 ["appIconRecordingDot"] = GetBoolSetting(data, "appIconRecordingDot", defaults["appIconRecordingDot"].Value<bool>()),
                 ["theme"] = NormalizeTheme(data["theme"]?.ToString()),
                 ["themeCustom"] = NormalizeThemeCustom(data["themeCustom"], (JObject)defaults["themeCustom"]),
+                ["interfaceLayout"] = GetEnumSetting(data, "interfaceLayout", defaults["interfaceLayout"].Value<string>(), new[] { "clean", "classic" }),
                 ["setupWizardPending"] = GetBoolSetting(data, "setupWizardPending", defaults["setupWizardPending"].Value<bool>()),
             };
         }
 
-        // whether the first-run setup wizard still needs to be shown. fail-closed: any read error -> not pending, so a
-        // broken settings file never traps the user in a wizard loop.
+        // whether the first-run setup wizard still needs to be shown. fail-closed: any read error -> not pending, so a broken settings file never traps the user in a wizard loop.
         public static JObject GetSetupState()
         {
             bool pending = false;
@@ -470,15 +542,16 @@ namespace ReplayKitHelper
             var outObj = new JObject();
             foreach (var k in new[] { "bg", "panel", "field", "text", "accent", "border", "danger" })
                 outObj[k] = Themes.CleanHex(src[k]?.ToString(), defaults[k].ToString());
+            outObj["bar"] = Themes.CleanOptionalHex(src["bar"]?.ToString());
             outObj["gradient"] = Themes.CleanOptionalHex(src["gradient"]?.ToString());
-            // gradients is the current per-token shape; the flat gradient* keys are still carried through so a
-            // settings file written before per-token gradients still resolves its background gradient (Themes.ApplyGradient reads both).
+            // gradients is the current per-token shape; the flat gradient* keys are still carried through so a settings file written before per-token gradients still resolves its background gradient (Themes.ApplyGradient reads both).
             outObj["gradients"] = src["gradients"] is JObject gradients ? gradients.DeepClone() : new JObject();
             foreach (var legacy in new[] { "gradientType", "gradientAngle", "gradientCenterX", "gradientCenterY", "gradientStops" })
             {
                 if (src[legacy] != null) outObj[legacy] = src[legacy].DeepClone();
             }
             outObj["dark"] = src["dark"]?.Type == JTokenType.Boolean ? src["dark"].Value<bool>() : defaults["dark"].Value<bool>();
+            if (src["offsets"] != null) outObj["offsets"] = src["offsets"].DeepClone();
             return Themes.FromCustom(outObj).ToSeedJson();
         }
 
@@ -586,8 +659,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // set theme to id, persist, write the obs .ovt + user.ini. returns true (obs restart still needed to pick it up).
-        // used by /appearance/delete-theme when the removed theme was the active one.
+        // set theme to id, persist, write the obs .ovt + user.ini. returns true (obs restart still needed to pick it up). used by /appearance/delete-theme when the removed theme was the active one.
         public static bool SetThemeAndApply(string id)
         {
             lock (SettingsStore.Gate)
@@ -661,6 +733,38 @@ namespace ReplayKitHelper
             }
         }
 
+        // whether the compress list of the storage card starts out without the favorites
+        public static bool GetCompressSkipFavorites()
+        {
+            try { return ReadSettings()["compressSkipFavorites"]?.Value<bool>() ?? true; }
+            catch (InvalidOperationException) { return true; }
+        }
+
+        // whether the saves that make the video again may use the graphics card encoder
+        public static bool GetTrimGpuEncode()
+        {
+            try { return ReadSettings()["trimGpuEncode"]?.Value<bool>() ?? true; }
+            catch (InvalidOperationException) { return true; }
+        }
+
+        // the recording codec the saves follow: auto, h264 or h265
+        public static string GetCodecPreference()
+        {
+            try { return ReadSettings()["codecPreference"]?.Value<string>() ?? "auto"; }
+            catch (InvalidOperationException) { return "auto"; }
+        }
+
+        // development mode is what lets the development settings do anything, so logging needs both
+        public static bool DevelopmentFlag(JObject settings, string key) =>
+            (settings["developmentMode"]?.Value<bool>() ?? false) && (settings[key]?.Value<bool>() ?? false);
+
+        // the storage limit in GB, 0 when none is set or the settings cannot be read
+        public static long GetStorageLimitGb()
+        {
+            try { return Math.Max(0, ReadSettings()["storageLimitGb"]?.Value<long>() ?? 0); }
+            catch (InvalidOperationException) { return 0; }
+        }
+
         public static void WriteSettings(JObject settings)
         {
             lock (SettingsStore.Gate)
@@ -686,7 +790,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("SyncClipDirToRuntimeConfig: " + ex.Message); }
         }
 
-        // codec for the Auto Game List: a saved games (title, window class, exe name) triple gets packed into one opaque string token (# and : escaped) so it can live as a single string in the settings json array. ported from the same file, lines ~2535-2610.
+        // codec for the Auto Game List: a saved games (title, window class, exe name) triple packed into one string token (# and : escaped) so it fits a json string array
         private static string ConvertToObsWindowTokenPart(string value) => (value ?? "").Replace("#", "#22").Replace(":", "#3A");
         private static string ConvertFromObsWindowTokenPart(string value) => (value ?? "").Replace("#3A", ":").Replace("#22", "#");
 
@@ -747,12 +851,7 @@ namespace ReplayKitHelper
             };
         }
 
-        // -- live-apply: everything below mutates a *running* obs instance or the live scene collection file,
-        // as opposed to the schema/defaults/normalize code above. ported from 62_replaykit_settings.ps1 lines
-        // 1152-5245. the ps original threads a generic JavaScriptSerializer dictionary/arraylist shim thru this
-        // whole section (New/Set/Get/Copy-ReplayKitJsonValue) so the same code can walk either a PSCustomObject
-        // or a Dictionary -- with JObject/JArray already available end to end here, that shim has no purpose and
-        // is not ported; every call site below just uses JObject/JArray directly.
+        // everything below changes the running obs or its live scene collection file, as opposed to the schema/normalize code above
 
         private static JObject ObsResultAsJson(ObsWebSocketResult r) => r.Ok ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = r.Message };
 
@@ -844,8 +943,7 @@ namespace ReplayKitHelper
             return ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = outputSettings }, 5000);
         }
 
-        // resolves a bundled input-overlay preset path; falls back to a recursive filename search under the
-        // presets root for older settings that stored just "<folder>/<file>" without the full relative path.
+        // resolves a bundled input-overlay preset path; falls back to a recursive filename search under the presets root for older settings that stored just "<folder>/<file>" without the full relative path.
         private static string FindOverlayAsset(string relativePath)
         {
             string root = Path.Combine(Directory.GetParent(GetScriptsDir().TrimEnd('\\', '/')).FullName, "input-overlay-presets");
@@ -904,8 +1002,7 @@ namespace ReplayKitHelper
             return ObsResultAsJson(r);
         }
 
-        // removes the scene-item reference, not the source. used to drop duplicate top-level overlay items -- the
-        // source stays alive because "Group" still references it.
+        // removes the scene-item reference, not the source. used to drop duplicate top-level overlay items -- the source stays alive because "Group" still references it.
         private static JObject RemoveSceneItem(string sceneName, JObject item)
         {
             if (item == null) return new JObject { ["ok"] = true, ["skipped"] = true };
@@ -917,9 +1014,7 @@ namespace ReplayKitHelper
             return ObsResultAsJson(r);
         }
 
-        // obs-websocket only accepts a specific subset of transform fields in SetSceneItemTransform (a full
-        // GetSceneItemTransform readback includes derived/readonly fields like sourceWidth that the setter
-        // rejects) -- this is the allow-list.
+        // obs-websocket only accepts a specific subset of transform fields in SetSceneItemTransform (a full GetSceneItemTransform readback includes derived/readonly fields like sourceWidth that the setter rejects) -- this is the allow-list.
         private static readonly string[] SettableTransformKeys = { "positionX", "positionY", "scaleX", "scaleY", "rotation", "alignment", "boundsType", "boundsAlignment", "cropToBounds", "cropLeft", "cropRight", "cropTop", "cropBottom" };
 
         private static JObject GetSettableSceneItemTransform(JObject transform)
@@ -999,7 +1094,7 @@ namespace ReplayKitHelper
             return FindSceneItem(GetSceneItems(sceneName)["items"] as JArray, itemName);
         }
 
-        // the overlay's live rect as canvas fractions. the in-page projector seeds and polls this so it mirrors wherever the item actually sits, including drags the user did in obs itself.
+        // the overlays live rect as canvas fractions. the in-page projector seeds and polls this so it mirrors wherever the item actually sits, including drags the user did in obs itself.
         public static JObject GetOverlayPositionLive()
         {
             // the canvas size rides along even when the item cannot be resolved (overlay off, scene not built yet) so the fake projector still matches the real ones aspect and resolution
@@ -1049,10 +1144,7 @@ namespace ReplayKitHelper
             try { return value.Value<double>(); } catch (FormatException) { return def; } catch (InvalidCastException) { return def; }
         }
 
-        // re-derives a new position/scale from whatever transform obs currently reports, for a live overlay
-        // resize without a full geometry recompute -- snaps to the nearest edge if the items center already
-        // sits in the outer third of the canvas, so scaling an item pinned to a corner keeps it pinned there
-        // instead of shrinking toward the canvas center.
+        // re-derives a new position/scale from whatever transform obs currently reports, for a live overlay resize without a full geometry recompute -- snaps to the nearest edge if the items center already sits in the outer third of the canvas, so scaling an item pinned to a corner keeps it pinned there instead of shrinking toward the canvas center.
         private static JObject GetScaledTransformFromCurrent(JToken transform, double scaleRatio, JObject preset = null)
         {
             if (transform == null) return new JObject();
@@ -1105,9 +1197,7 @@ namespace ReplayKitHelper
             return SetSceneItemTransform(sceneName, item, transform);
         }
 
-        // finds the named input as a scene item, or creates it if missing -- CreateInput can fail if a same-named
-        // input already exists outside this scene (obs inputs are global), so the failure path falls back to
-        // SetInputSettings + CreateSceneItem against the existing input instead of treating that as fatal.
+        // finds the named input as a scene item, or creates it if missing -- CreateInput can fail if a same-named input already exists outside this scene (obs inputs are global), so the failure path falls back to SetInputSettings + CreateSceneItem against the existing input instead of treating that as fatal.
         private static JObject EnsureInputSceneItem(string sceneName, string name, string kind, JObject inputSettings, bool enabled)
         {
             var items = GetSceneItems(sceneName);
@@ -1162,8 +1252,7 @@ namespace ReplayKitHelper
             return ObsResultAsJson(r);
         }
 
-        // keeps Window Capture positioned directly after Display Capture in scene-item order, so it paints on
-        // top when both happen to be enabled during a capture-mode switch.
+        // keeps Window Capture positioned directly after Display Capture in scene-item order, so it paints on top when both happen to be enabled during a capture-mode switch.
         private static JObject SetWindowCaptureSceneOrder(string sceneName, JArray items)
         {
             var window = FindSceneItem(items, "Window Capture");
@@ -1181,12 +1270,7 @@ namespace ReplayKitHelper
             return SetSceneItemIndex(sceneName, window, targetIndex);
         }
 
-        // -- overlay geometry math: pure functions, no i/o. byte-for-byte formula match with
-        // ReplayKitSetup/Transform.cs (a separate assembly ReplayKitHelper does not reference, so these are
-        // reproduced here rather than shared) -- see Transform.OverlayOpacityValue/OverlayHueShiftValue/
-        // OverlayScaleFactor/OverlayHexColor/OverlayColorValue/HasOverlayColorAdjustments/OverlayContentRect/
-        // InputOverlayPos/BottomLeftCornerOverlayPos/InputOverlayGroupGeometry/ApplyInputOverlaySceneItemGeometry/
-        // ApplyBongoGeometry/FitSceneItemToCanvas for the install-time twin of each function below.
+        // -- overlay geometry math: pure functions, no i/o. byte-for-byte formula match with ReplayKitSetup/Transform.cs (a separate assembly ReplayKitHelper does not reference, so these are reproduced here rather than shared) -- see Transform.OverlayOpacityValue/OverlayHueShiftValue/ OverlayScaleFactor/OverlayHexColor/OverlayColorValue/HasOverlayColorAdjustments/OverlayContentRect/ InputOverlayPos/BottomLeftCornerOverlayPos/InputOverlayGroupGeometry/ApplyInputOverlaySceneItemGeometry/ ApplyBongoGeometry/FitSceneItemToCanvas for the install-time twin of each function below.
 
         private static int OverlayOpacityValue(JObject settings)
         {
@@ -1287,9 +1371,7 @@ namespace ReplayKitHelper
             return new JObject { ["x"] = x, ["y"] = y };
         }
 
-        // moves a freshly computed overlay transform onto the spot the user dragged it to, if there is one for this style. runs before
-        // ApplyOverlayFlipH so the mirror shift still lands on top of it, and is what makes a drag survive the scene rewrite + restart
-        // that every overlay-style change goes through -- a live SetSceneItemTransform alone would be thrown away by that reload.
+        // moves a freshly computed overlay transform onto the spot the user dragged it to, if there is one for this style. runs before ApplyOverlayFlipH so the mirror shift still lands on top of it, and is what makes a drag survive the scene rewrite + restart that every overlay-style change goes through -- a live SetSceneItemTransform alone would be thrown away by that reload.
         private static void ApplyOverlayPositionOverride(JObject transform, JObject preset, JObject settings, string style)
         {
             if (!(settings?["overlayPosition"] is JObject map)) return;
@@ -1303,8 +1385,7 @@ namespace ReplayKitHelper
 
         private static bool OverlayFlipHorizontal(JObject settings) => settings?["overlayFlipH"]?.Value<bool>() ?? false;
 
-        // horizontal mirror: negate scaleX and shift positionX right by the rendered width so the item stays in the
-        // same on-screen box (every overlay item is top-left aligned). sourceWidth is the item's unscaled px width.
+        // horizontal mirror: negate scaleX and shift positionX right by the rendered width so the item stays in the same on-screen box (every overlay item is top-left aligned). sourceWidth is the items unscaled px width.
         private static void ApplyOverlayFlipH(JObject transform, double sourceWidth, JObject settings)
         {
             if (!OverlayFlipHorizontal(settings)) return;
@@ -1332,8 +1413,7 @@ namespace ReplayKitHelper
         {
             var content = OverlayContentRect(preset);
             double scale = content["height"].Value<double>() / 1440.0 * OverlayScaleFactor(settings);
-            // un-flipped group base -- these transforms feed the WASD/Mouse group_item_backup items, which don't
-            // render; the visible mirror comes from InputOverlayGroupTransform on the Group scene item.
+            // un-flipped group base -- these transforms feed the WASD/Mouse group_item_backup items, which dont render; the visible mirror comes from InputOverlayGroupTransform on the Group scene item.
             var pos = InputOverlayPos(preset, 628.0, 292.0, scale, scale);
             double groupX = pos["x"].Value<double>(), groupY = pos["y"].Value<double>();
             if (name == "Mouse Overlay")
@@ -1407,8 +1487,7 @@ namespace ReplayKitHelper
             };
         }
 
-        // resolves which live scene collection file obs currently has active. no Setup equivalent -- Setup
-        // always targets the single fixed bundled path at install time and never has to ask a running obs.
+        // resolves which live scene collection file obs currently has active. no Setup equivalent -- Setup always targets the single fixed bundled path at install time and never has to ask a running obs.
         private static string GetSceneCollectionPath()
         {
             string scenesRoot = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
@@ -1426,13 +1505,7 @@ namespace ReplayKitHelper
             return path;
         }
 
-        // -- json-file scene-source/scene-item builders. byte-for-byte shape match with
-        // ReplayKitSetup/Transform.cs's install-time twins (NewBongoSource/NewWindowCaptureSource/
-        // NewMotionBlurFilter/NewOverlayOpacityFilter and friends) -- reproduced here rather than shared since
-        // ReplayKitHelper does not reference the Setup assembly. unlike Transform.cs (which always mints a fresh
-        // BongoCatSourceUuid constant for a brand-new template file), the live-apply functions below preserve
-        // whatever uuid an existing source already has and only mint a new one when creating from scratch --
-        // callers pass whichever uuid is appropriate, these functions never generate one themselves.
+        // -- json-file scene-source/scene-item builders. byte-for-byte shape match with ReplayKitSetup/Transform.css install-time twins (NewBongoSource/NewWindowCaptureSource/ NewMotionBlurFilter/NewOverlayOpacityFilter and friends) -- reproduced here rather than shared since ReplayKitHelper does not reference the Setup assembly. unlike Transform.cs (which always mints a fresh BongoCatSourceUuid constant for a brand-new template file), the live-apply functions below preserve whatever uuid an existing source already has and only mint a new one when creating from scratch -- callers pass whichever uuid is appropriate, these functions never generate one themselves.
 
         private static void SetBongoSourceJson(JObject source, string uuid)
         {
@@ -1463,16 +1536,19 @@ namespace ReplayKitHelper
             return source;
         }
 
+        // whether one kind of capture shows the mouse cursor; on when the setting is not there
+        private static bool CursorSetting(JObject settings, string key) => settings?[key]?.Value<bool>() ?? true;
+
         private static JObject GetGameCaptureInputSettings(JObject settings) => new JObject
         {
-            ["capture_audio"] = false, ["hook_rate"] = 2, ["limit_framerate"] = true, ["capture_cursor"] = true,
+            ["capture_audio"] = false, ["hook_rate"] = 2, ["limit_framerate"] = true, ["capture_cursor"] = CursorSetting(settings, "showCursorGameCapture"),
             ["capture_overlays"] = false, ["anti_cheat_hook"] = true, ["capture_mode"] = "any_fullscreen", ["window"] = "",
         };
 
         private static JObject GetWindowCaptureInputSettings(JObject settings) => new JObject
         {
             ["window"] = settings?["screenshareGameWindow"]?.Value<string>() ?? "",
-            ["method"] = 2, ["priority"] = 0, ["cursor"] = true, ["client_area"] = true,
+            ["method"] = 2, ["priority"] = 0, ["cursor"] = CursorSetting(settings, "showCursorWindowCapture"), ["client_area"] = true,
             ["compatibility"] = false, ["force_sdr"] = false, ["capture_audio"] = false,
         };
 
@@ -1626,18 +1702,14 @@ namespace ReplayKitHelper
             item["hide_transition"] = NewJsonTransition(300);
         }
 
-        // WASD Overlay / Mouse Overlay -> source uuid + the scene-item id it ends up at once placed. Id starts
-        // at 0 (unknown) and gets patched in by SetOverlaySceneFile once the corresponding scene item is written --
-        // a plain mutable field, not a tuple, since that patch-after-construction is exactly what a tuple cant do.
+        // WASD Overlay / Mouse Overlay -> source uuid + the scene-item id it ends up at once placed. Id starts at 0 (unknown) and gets patched in by SetOverlaySceneFile once the corresponding scene item is written -- a plain mutable field, not a tuple, since that patch-after-construction is exactly what a tuple cant do.
         private sealed class InputOverlaySourceRef
         {
             public string Uuid;
             public int Id;
         }
 
-        // builds the group-kind source that wraps WASD+Mouse together, with its own nested items array using
-        // canvas-relative 2560x1440 reference geometry independent of the real canvas size. inputSources maps
-        // "WASD Overlay"/"Mouse Overlay" -> {uuid, id} for whichever of the two are actually present.
+        // builds the group-kind source that wraps WASD+Mouse together, with its own nested items array using canvas-relative 2560x1440 reference geometry independent of the real canvas size. inputSources maps "WASD Overlay"/"Mouse Overlay" -> {uuid, id} for whichever of the two are actually present.
         private static void SetInputOverlayGroupSourceJson(JObject group, string groupUuid, Dictionary<string, InputOverlaySourceRef> inputSources, JObject preset)
         {
             group["prev_ver"] = 536936450; group["name"] = "Group"; group["uuid"] = groupUuid;
@@ -1705,8 +1777,7 @@ namespace ReplayKitHelper
             return max + 1;
         }
 
-        // moves the named item to just after another named item in the scene's item list -- used to keep Window
-        // Capture positioned right after Display Capture when inserting it into an existing item list.
+        // moves the named item to just after another named item in the scenes item list -- used to keep Window Capture positioned right after Display Capture when inserting it into an existing item list.
         private static void MoveJsonSceneItemAfter(JArray items, string targetName, string afterName)
         {
             if (items == null) return;
@@ -2020,11 +2091,7 @@ namespace ReplayKitHelper
             return file != null ? new JObject { ["path"] = file.FullName } : null;
         }
 
-        // last-resort readback of the opacity filter straight off disk, for the settings payload only (never a
-        // write target) -- used when a live websocket filter lookup fails, so the settings dock still shows
-        // something sensible even if obs isnt reachable right now. picks the most-recently-written scene file
-        // under basic\scenes, a looser resolution than GetSceneCollectionPath (which asks obs which collection
-        // is actually active); that imprecision is fine here since this never drives a write.
+        // last-resort readback of the opacity filter straight off disk, for the settings payload only (never a write target) -- used when a live websocket filter lookup fails, so the settings dock still shows something sensible even if obs isnt reachable right now. picks the most-recently-written scene file under basic\scenes, a looser resolution than GetSceneCollectionPath (which asks obs which collection is actually active); that imprecision is fine here since this never drives a write.
         private static JObject GetSceneFileOverlayOpacityPercent(JObject settings)
         {
             var pathToken = GetLatestSceneCollectionPath();
@@ -2130,35 +2197,57 @@ namespace ReplayKitHelper
             return enable.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = enable.Message };
         }
 
-        // -- display capture cursor: intentionally forced true here even though ReplayKitSetup's install-time
-        // template sets it false -- a deliberate product change made after the Setup template was last touched
-        // (users asked for the cursor to stay visible in Display Capture); this file, not Transform.cs, is the
-        // source of truth for this one value.
-
-        private static void SetDisplayCaptureCursorSourceJson(JObject source)
+        // the cursor of the display and game capture sources in a scene file follows the setting of its kind; the window capture source is written whole from the same settings elsewhere
+        private static void SetCaptureCursorSourceJson(JObject source, JObject settings)
         {
             string sourceName = source["name"]?.Value<string>() ?? "";
             string sourceId = source["id"]?.Value<string>() ?? "";
-            if (sourceName != "Display Capture" && sourceId != "monitor_capture") return;
+            string key;
+            if (sourceName == "Display Capture" || sourceId == "monitor_capture") key = "showCursorDisplayCapture";
+            else if (sourceName == "Game Capture" || sourceId == "game_capture") key = "showCursorGameCapture";
+            else return;
             var sourceSettings = source["settings"] as JObject;
             if (sourceSettings == null) { sourceSettings = new JObject(); source["settings"] = sourceSettings; }
-            sourceSettings["capture_cursor"] = true;
+            sourceSettings["capture_cursor"] = CursorSetting(settings, key);
         }
 
-        private static JObject SetDisplayCaptureCursorLive()
+        // the mouse cursor of every capture source on the running obs; a source that is not in the scene (code 600, not found) takes the setting when it is created
+        private static JObject ApplyCursorLive(JObject settings)
+        {
+            var applied = new List<string>();
+            var warnings = new List<string>();
+            foreach (var target in new[]
+            {
+                new[] { "Display Capture", "capture_cursor", "showCursorDisplayCapture" },
+                new[] { "Game Capture", "capture_cursor", "showCursorGameCapture" },
+                new[] { "Window Capture", "cursor", "showCursorWindowCapture" },
+            })
+            {
+                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                {
+                    ["inputName"] = target[0],
+                    ["inputSettings"] = new JObject { [target[1]] = CursorSetting(settings, target[2]) },
+                    ["overlay"] = true,
+                }, 3000);
+                if (set.Ok) { if (!applied.Contains("Mouse cursor")) applied.Add("Mouse cursor"); }
+                else if (set.Unavailable) { warnings.Add("Mouse cursor was saved, but OBS could not be reached: " + set.Message); break; }
+                else if (set.Code != 600) warnings.Add("Mouse cursor was saved, but the " + target[0] + " could not be updated: " + set.Message);
+            }
+            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        private static JObject SetDisplayCaptureCursorLive(JObject settings)
         {
             var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
             {
                 ["inputName"] = "Display Capture",
-                ["inputSettings"] = new JObject { ["capture_cursor"] = true },
+                ["inputSettings"] = new JObject { ["capture_cursor"] = CursorSetting(settings, "showCursorDisplayCapture") },
                 ["overlay"] = true,
             }, 3000);
             return set.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = set.Message };
         }
 
-        // -- game-window enumeration for the screenshare picker: a small, self-contained p/invoke surface
-        // (distinct from Native.cs/ProjectorNative.cs), matching the ps original's own lazily-declared
-        // ReplayKit.WindowApi Add-Type block.
+        // game-window enumeration for the screenshare picker, with its own small p/invoke surface
 
         private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
         [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -2204,12 +2293,7 @@ namespace ReplayKitHelper
             catch (EntryPointNotFoundException) { return false; }
         }
 
-        // enumerates visible top-level windows for the "Auto Game List" picker: filters out child/tool windows,
-        // cloaked (uwp-suspended) windows, and a hardcoded blocklist of system/obs/discord executables, then
-        // encodes each candidate as a title:class:exe token matching obs's own Window Capture "window" setting
-        // format. capped at 80 candidates and sorted by label; a previously-saved selection that fell out of the
-        // live window list (app closed, etc.) is still surfaced as the first entry so the dropdown does not
-        // silently lose the user's choice.
+        // enumerates visible top-level windows for the "Auto Game List" picker: filters out child/tool windows, cloaked (uwp-suspended) windows, and a hardcoded blocklist of system/obs/discord executables, then encodes each candidate as a title:class:exe token matching obss own Window Capture "window" setting format. capped at 80 candidates and sorted by label; a previously-saved selection that fell out of the live window list (app closed, etc.) is still surfaced as the first entry so the dropdown does not silently lose the users choice.
         public static List<JObject> GetGameWindowCandidates(string savedWindow = "")
         {
             var candidates = new List<JObject>();
@@ -2298,10 +2382,7 @@ namespace ReplayKitHelper
             return items;
         }
 
-        // applies the selected screenshare capture mode (desktop/hybrid_auto/game_auto/game_window) live: ensures
-        // all three capture sources exist (creating Display/Game Capture if a user ever deleted one by hand or a
-        // scene got recreated bare -- do not regress this to a bare lookup-and-fail), toggles their scene-item
-        // visibility, and repositions Window Capture directly under Display Capture in scene-item order.
+        // applies the selected screenshare capture mode (desktop/hybrid_auto/game_auto/game_window) live: ensures all three capture sources exist (creating Display/Game Capture if a user ever deleted one by hand or a scene got recreated bare -- do not regress this to a bare lookup-and-fail), toggles their scene-item visibility, and repositions Window Capture directly under Display Capture in scene-item order.
         private static JObject ApplyScreenshareCaptureLive(JObject settings, JObject preset = null)
         {
             var warnings = new List<string>();
@@ -2341,8 +2422,8 @@ namespace ReplayKitHelper
                 if (hideDesktop["ok"]?.Value<bool>() != true) warnings.Add("Could not hide Display Capture: " + hideDesktop["message"]);
             }
 
-            var cursorResult = SetDisplayCaptureCursorLive();
-            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add("Could not enable Display Capture cursor: " + cursorResult["message"]);
+            var cursorResult = SetDisplayCaptureCursorLive(settings);
+            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add("Could not update the Display Capture cursor: " + cursorResult["message"]);
 
             var setGame = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Game Capture", ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
             if (!setGame.Ok) warnings.Add("Could not update Game Capture settings: " + setGame.Message);
@@ -2392,13 +2473,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // full read-modify-write of the live scene collection file: locates or creates the Bongo Cat, WASD/Mouse,
-        // Group, and Window Capture sources, applies motion blur and cursor settings across all capture sources,
-        // then walks the scene-kind source's items array rewriting/creating/removing each scene item to match the
-        // selected overlay style. this is the live-file-edit twin of ReplayKitSetup's Transform.ApplyScenesJson,
-        // except that function only ever handles its own known bundled-template shape once, while this must be
-        // defensive against whatever a real, possibly years-old, possibly hand-edited live scene collection
-        // currently contains -- matching sources by uuid OR by legacy name/id fallback throughout.
+        // full read-modify-write of the live scene collection file: locates or creates the Bongo Cat, WASD/Mouse, Group, and Window Capture sources, applies motion blur and cursor settings across all capture sources, then walks the scene-kind sources items array rewriting/creating/removing each scene item to match the selected overlay style. this is the live-file-edit twin of ReplayKitSetups Transform.ApplyScenesJson, except that function only ever handles its own known bundled-template shape once, while this must be defensive against whatever a real, possibly years-old, possibly hand-edited live scene collection currently contains -- matching sources by uuid OR by legacy name/id fallback throughout.
         private static JObject SetOverlaySceneFile(JObject settings, JObject preset)
         {
             try
@@ -2408,10 +2483,7 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(File.ReadAllText(path));
                 var sources = data["sources"] as JArray;
                 if (sources == null) throw new InvalidOperationException("OBS scene collection has no sources list.");
-                // do NOT self-assign data["sources"] / data["groups"] here -- in the bundled Newtonsoft that detaches
-                // the array from `data`, so every edit below lands on an orphan and the file is written from the
-                // untouched original (symptom: "switched overlay, scene still shows the old one"). they are
-                // re-attached once, right before serialize.
+                // do NOT self-assign data["sources"] / data["groups"] here -- in the bundled Newtonsoft that detaches the array from `data`, so every edit below lands on an orphan and the file is written from the untouched original (symptom: "switched overlay, scene still shows the old one"). they are re-attached once, right before serialize.
                 var groups = data["groups"] as JArray ?? new JArray();
 
                 string overlayStyle = settings["overlayStyle"]?.Value<string>() ?? "";
@@ -2532,7 +2604,7 @@ namespace ReplayKitHelper
                 {
                     var source = (JObject)sourceToken;
                     string sourceName = source["name"]?.Value<string>() ?? "";
-                    SetDisplayCaptureCursorSourceJson(source);
+                    SetCaptureCursorSourceJson(source, settings);
                     if (string.IsNullOrWhiteSpace(MotionBlurFilterUuid(sourceName))) continue;
                     if (useMotionBlur) SetMotionBlurSourceJson(source, true, motionBlurStrength);
                     else RemoveMotionBlurSourceJson(source);
@@ -2660,10 +2732,7 @@ namespace ReplayKitHelper
                 data["groups"] = groups;
                 string json = data.ToString(Formatting.None);
                 AppConfig.WriteUtf8(path, json);
-                // the restart flow gracefully closes OBS so it can save window geometry -- but that exit-save also
-                // writes OBS's stale in-memory scene collection back over the edit just made here. stage a copy with
-                // a non-.json extension (OBS's scene scan ignores it); restart_obs.ps1 / ApplyPendingOverlayScene
-                // move it onto the real file after OBS is fully gone, right before the relaunch.
+                // the restart flow gracefully closes OBS so it can save window geometry -- but that exit-save also writes OBSs stale in-memory scene collection back over the edit just made here. stage a copy with a non-.json extension (OBSs scene scan ignores it); restart_obs.ps1 / ApplyPendingOverlayScene move it onto the real file after OBS is fully gone, right before the relaunch.
                 try { AppConfig.WriteUtf8(path + ".replaykit-pending", json); }
                 catch (Exception ex) { Log.Write("SetOverlaySceneFile: could not stage pending scene: " + ex.Message); }
                 return new JObject { ["ok"] = true, ["path"] = path };
@@ -2681,6 +2750,33 @@ namespace ReplayKitHelper
             string appData = Environment.GetEnvironmentVariable("APPDATA");
             if (!string.IsNullOrEmpty(appData)) return Path.Combine(appData, "obs-studio");
             return Path.Combine(AppConfig.GetUserProfile(), "AppData", "Roaming", "obs-studio");
+        }
+
+        // the start minimized switch of obs as its user.ini holds it, or null when the file or the key is not there
+        private static bool? ReadObsStartMinimized()
+        {
+            try
+            {
+                string path = Path.Combine(GetObsConfigRoot(), "user.ini");
+                if (!File.Exists(path)) return null;
+                bool inSection = false;
+                foreach (var line in File.ReadAllLines(path))
+                {
+                    var sectionMatch = Regex.Match(line, @"^\s*\[(.+?)\]\s*$");
+                    if (sectionMatch.Success)
+                    {
+                        inSection = string.Equals(sectionMatch.Groups[1].Value, "BasicWindow", StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+                    if (!inSection) continue;
+                    var valueMatch = Regex.Match(line, @"^\s*SysTrayWhenStarted\s*=\s*(\w+)\s*$");
+                    if (valueMatch.Success) return string.Equals(valueMatch.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
+            {
+            }
+            return null;
         }
 
         private static string SetIniValue(string text, string section, string key, string value)
@@ -2756,9 +2852,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // requestsoverride is scoped to obs64.exe only -- this never touches system-wide power policy, just
-        // whether *this one process* is allowed to veto sleep/display-off while it's running, and only for the
-        // duration the process holds the override (windows clears it automatically once obs exits).
+        // requestsoverride is scoped to obs64.exe only -- this never touches system-wide power policy, just whether *this one process* is allowed to veto sleep/display-off while its running, and only for the duration the process holds the override (windows clears it automatically once obs exits).
         private static JObject InvokePowerCfg(string[] arguments)
         {
             var allowed = new HashSet<string> { "/requestsoverride", "PROCESS", "obs64.exe", "DISPLAY", "SYSTEM", "AWAYMODE" };
@@ -2891,9 +2985,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // persists a dock-picked clip dir into the shared helper config json (the same file the lua bootstrap
-        // and this process both read) -- psHelper is not written here since the c# port has no separate worker
-        // script for it to point at.
+        // persists a dock-picked clip dir into the shared helper config json (the same file the lua bootstrap and this process both read) -- psHelper is not written here since the c# port has no separate worker script for it to point at.
         private static void UpdateHelperConfigClipDir(string clipDir)
         {
             AppConfig.LoadConfig();
@@ -2929,8 +3021,7 @@ namespace ReplayKitHelper
 
         private static bool TestStringEqual(string actual, string expected) => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
 
-        // obs does not always apply a profile-parameter write instantly -- read-current, write, verify, retry
-        // with backoff up to maxAttempts before giving up.
+        // obs does not always apply a profile-parameter write instantly -- read-current, write, verify, retry with backoff up to maxAttempts before giving up.
         private static JObject SetObsMonitoringDevice(string deviceId, string deviceName, int maxAttempts = 6)
         {
             deviceId = (deviceId ?? "").Trim();
@@ -3070,8 +3161,7 @@ namespace ReplayKitHelper
             return new JObject { ["width"] = GetEvenDimension(sourceWidth * scale), ["height"] = GetEvenDimension(sourceHeight * scale) };
         }
 
-        // canvas-aware default for recordingScaleMode: monitors above 1080p downscale to 1080 by default, 1080p and
-        // below record native (nothing to downscale). only used when the settings file has no explicit value.
+        // canvas-aware default for recordingScaleMode: monitors above 1080p downscale to 1080 by default, 1080p and below record native (nothing to downscale). only used when the settings file has no explicit value.
         private static string DefaultRecordingScaleMode()
         {
             try
@@ -3083,9 +3173,7 @@ namespace ReplayKitHelper
             return "native";
         }
 
-        // OBS-style "Output (Scaled) Resolution" list derived from the real canvas -- same scale-factor steps OBS's
-        // own Video settings use, so a 1440p canvas yields 2560x1440 / 2048x1152 / 1920x1080 / ... and a 4K canvas
-        // yields its own set. value passed back is the height; ResolvePresetVideoSpec keeps the canvas aspect.
+        // OBS-style "Output (Scaled) Resolution" list derived from the real canvas -- same scale-factor steps OBSs own Video settings use, so a 1440p canvas yields 2560x1440 / 2048x1152 / 1920x1080 / ... and a 4K canvas yields its own set. value passed back is the height; ResolvePresetVideoSpec keeps the canvas aspect.
         private static JArray BuildDownscaleResolutionList()
         {
             var mon = GetPrimaryMonitorCanvasSize();
@@ -3093,7 +3181,7 @@ namespace ReplayKitHelper
                 mon["ok"]?.Value<bool>() == true ? mon["width"].Value<int>() : 1920,
                 mon["ok"]?.Value<bool>() == true ? mon["height"].Value<int>() : 1080, 4096, 4096);
             int bw = baseSize["width"].Value<int>(), bh = baseSize["height"].Value<int>();
-            // exact same scale steps + rounding OBS's Video settings use: width truncated to a multiple of 4, height to a multiple of 2.
+            // exact same scale steps + rounding OBSs Video settings use: width truncated to a multiple of 4, height to a multiple of 2.
             double[] scales = { 1.0, 1.25, 1.0 / 0.75, 1.5, 1.0 / 0.6, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0 };
             var list = new JArray();
             var seen = new HashSet<int>();
@@ -3122,8 +3210,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = false, ["width"] = 1920, ["height"] = 1080 };
         }
 
-        // outputHeightCap of 8192 means "never downscale" (output == base); a real value scales the output down to that
-        // height, aspect preserved from the canvas. scaleType is the OBS downscale filter, ignored by OBS when base==output.
+        // outputHeightCap of 8192 means "never downscale" (output == base); a real value scales the output down to that height, aspect preserved from the canvas. scaleType is the OBS downscale filter, ignored by OBS when base==output.
         private static JObject ResolvePresetVideoSpec(int outputHeightCap, string scaleType, int fpsNumerator, int fpsDenominator)
         {
             var monitor = GetPrimaryMonitorCanvasSize();
@@ -3143,7 +3230,6 @@ namespace ReplayKitHelper
                 ["profile"] = new JArray(
                     new JArray("Output", "Mode", "Advanced"),
                     new JArray("AdvOut", "RecType", "Standard"),
-                    new JArray("AdvOut", "RecTracks", "1"),
                     new JArray("Video", "BaseCX", baseSize["width"].Value<int>().ToString()),
                     new JArray("Video", "BaseCY", baseSize["height"].Value<int>().ToString()),
                     new JArray("Video", "OutputCX", output["width"].Value<int>().ToString()),
@@ -3182,11 +3268,7 @@ namespace ReplayKitHelper
             settings?["downscaleHeight"]?.Value<int>() ?? 1080,
             settings?["downscaleFilter"]?.Value<string>() ?? "lanczos");
 
-        // vendor/generation candidate table, effort tuning, and cqp->icq/crf conversion live in Encoder.PickEncoder
-        // (copied from ReplayKitSetup/Encoder.cs -- see its header comment) so both agree on the same tuning
-        // tables; this just adapts that shared choice into the shape Write-ReplayKitRecordEncoderJson expects,
-        // plus the "requested codec unavailable on this gpu" warning that PickEncoder itself has no concept of
-        // (Setup never surfaces that warning to a user, since it has no way to ask one at install time).
+        // vendor/generation candidate table, effort tuning, and cqp->icq/crf conversion live in Encoder.PickEncoder (copied from ReplayKitSetup/Encoder.cs -- see its header comment) so both agree on the same tuning tables; this just adapts that shared choice into the shape Write-ReplayKitRecordEncoderJson expects, plus the "requested codec unavailable on this gpu" warning that PickEncoder itself has no concept of (Setup never surfaces that warning to a user, since it has no way to ask one at install time).
         private static JObject GetEncoderSpec(JObject settings, JObject preset)
         {
             var gpu = Gpu.PrimaryGpu();
@@ -3238,8 +3320,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted:
-        // toggle visibility, reposition, and (for bongo cat) recreate from scratch rather than merely toggling.
+        // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted: toggle visibility, reposition, and (for bongo cat) recreate from scratch rather than merely toggling.
         private static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true)
         {
             var warnings = new List<string>();
@@ -3263,10 +3344,7 @@ namespace ReplayKitHelper
                 if (r["ok"]?.Value<bool>() != true) warnings.Add("Could not toggle " + name + ": " + r["message"]);
             }
 
-            // SetOverlaySceneFile builds WASD/Mouse Overlay as members of "Group". GetSceneItemList only returns top-level
-            // items, so a prior ApplyOverlayLive that ran EnsureInputSceneItem on them saw them as missing and its
-            // CreateInput->CreateSceneItem fallback added a duplicate top-level copy every apply ("two Mouse Overlays").
-            // If the Group is present, any top-level WASD/Mouse item is a stray -- drop it (the source survives).
+            // SetOverlaySceneFile builds WASD/Mouse Overlay as members of "Group". GetSceneItemList only returns top-level items, so a prior ApplyOverlayLive that ran EnsureInputSceneItem on them saw them as missing and its CreateInput->CreateSceneItem fallback added a duplicate top-level copy every apply ("two Mouse Overlays"). If the Group is present, any top-level WASD/Mouse item is a stray -- drop it (the source survives).
             if (FindSceneItem(items, "Group") != null)
             {
                 foreach (var stray in items.OfType<JObject>()
@@ -3282,7 +3360,7 @@ namespace ReplayKitHelper
 
             bool bongoEnabled = overlayStyle == "bongo_cat";
             var bongo = FindSceneItem(items, "Bongo Cat Overlay");
-            // bongobs-cat (live2d) holds an "isLoad" + initialization state across hide/show that never gets reset by SetInputSettings or SetSceneItemEnabled toggling, so switching wasd/mouse -> bongo leaves the renderer producing no output until obs is restarted. only the plugin's create callback (vtubercreate -> initvtuber + updata) puts the model back into a known-good state, so when the user picks bongo cat we destroy any existing input and recreate from scratch -- heavier than a settings merge, but the only thing that survives the plugin's lifecycle bug (see the Bongobs-Cat-Plugin repo, VtuberFrameWork.cpp).
+            // bongobs-cat (live2d) holds an "isLoad" + initialization state across hide/show that never gets reset by SetInputSettings or SetSceneItemEnabled toggling, so switching wasd/mouse -> bongo leaves the renderer producing no output until obs is restarted. only the plugins create callback (vtubercreate -> initvtuber + updata) puts the model back into a known-good state, so when the user picks bongo cat we destroy any existing input and recreate from scratch -- heavier than a settings merge, but the only thing that survives the plugins lifecycle bug (see the Bongobs-Cat-Plugin repo, VtuberFrameWork.cpp).
             if (bongoEnabled)
             {
                 if (bongo != null && recreateBongo)
@@ -3320,8 +3398,8 @@ namespace ReplayKitHelper
                 if (rBongo["ok"]?.Value<bool>() != true) warnings.Add("Could not hide Bongo Cat overlay: " + rBongo["message"]);
             }
 
-            var cursorResult = SetDisplayCaptureCursorLive();
-            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add("Could not enable Display Capture cursor: " + cursorResult["message"]);
+            var cursorResult = SetDisplayCaptureCursorLive(settings);
+            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add("Could not update the Display Capture cursor: " + cursorResult["message"]);
 
             foreach (var captureName in new[] { "Display Capture", "Window Capture", "Game Capture" })
             {
@@ -3362,9 +3440,7 @@ namespace ReplayKitHelper
                         new { name = "WASD Overlay", image = wasdPng, layout = wasdJson },
                         new { name = "Mouse Overlay", image = mousePng, layout = mouseJson },
                     };
-                    // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as
-                    // standalone scene items is exactly the duplicate-stacking bug. no Group (legacy scene) -> ensure them
-                    // as top-level items and position each one.
+                    // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as standalone scene items is exactly the duplicate-stacking bug. no Group (legacy scene) -> ensure them as top-level items and position each one.
                     bool grouped = group != null;
                     foreach (var entry in entries)
                     {
@@ -3394,10 +3470,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = warnings.Count == 0, ["warnings"] = new JArray(warnings) };
         }
 
-        // -- overlay candidate-name resolution + scale/opacity targeting: given the currently-selected overlay
-        // style, works out which live scene item(s) a scale or opacity change should target -- preferring
-        // whatever is actually visible right now over what the style nominally implies, so a live tweak lands on
-        // the right source even mid-transition or if the scene is in an unexpected state.
+        // -- overlay candidate-name resolution + scale/opacity targeting: given the currently-selected overlay style, works out which live scene item(s) a scale or opacity change should target -- preferring whatever is actually visible right now over what the style nominally implies, so a live tweak lands on the right source even mid-transition or if the scene is in an unexpected state.
 
         private static string[] GetOverlaySourceNames(string overlayStyle)
         {
@@ -3595,9 +3668,7 @@ namespace ReplayKitHelper
             };
         }
 
-        // toggle the horizontal flip live by mirroring the overlay's CURRENT scene-item transform in place -- never
-        // repositions to the canonical corner, so a user who dragged the overlay somewhere keeps it there. Group for
-        // input_overlay (WASD/Mouse ride along inside it), Bongo Cat Overlay for bongo.
+        // toggle the horizontal flip live by mirroring the overlays CURRENT scene-item transform in place -- never repositions to the canonical corner, so a user who dragged the overlay somewhere keeps it there. Group for input_overlay (WASD/Mouse ride along inside it), Bongo Cat Overlay for bongo.
         private static JObject ApplyOverlayFlipLive(JObject previous, JObject settings)
         {
             var warnings = new List<string>();
@@ -3668,9 +3739,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
-        // -- overlay live-preview: lets the settings dock preview overlay scale/opacity/color changes live (e.g.
-        // while dragging a slider) without committing them to disk until the user releases or confirms, by
-        // snapshotting the pre-preview transform and filter state once per session and restoring it on cancel.
+        // -- overlay live-preview: lets the settings dock preview overlay scale/opacity/color changes live (e.g. while dragging a slider) without committing them to disk until the user releases or confirms, by snapshotting the pre-preview transform and filter state once per session and restoring it on cancel.
 
         private static bool TestOverlayColorRequest(JObject incoming) =>
             incoming != null && (incoming["overlayOpacity"] != null || incoming["overlayHueShift"] != null || incoming["overlayColorMultiply"] != null || incoming["overlayColorAdd"] != null);
@@ -3684,10 +3753,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
         }
 
-        // holds OverlayPreviewLock across the whole capture, including the obs-websocket round trips, not just
-        // the null-check -- this only runs once per preview session, and a lost race here would mean two callers
-        // each capture their own "baseline", whichever stores last silently winning as the revert target. worth
-        // the extra lock-hold time given how rarely this is actually contended.
+        // holds OverlayPreviewLock across the whole capture, including the obs-websocket round trips, not just the null-check -- this only runs once per preview session, and a lost race here would mean two callers each capture their own "baseline", whichever stores last silently winning as the revert target. worth the extra lock-hold time given how rarely this is actually contended.
         private static JObject GetOverlayPreviewState(JObject settings)
         {
             if (Server.State.ReplaykitOverlayPreviewState != null) return Server.State.ReplaykitOverlayPreviewState;
@@ -3777,12 +3843,7 @@ namespace ReplayKitHelper
             return revision;
         }
 
-        // live preview for the two geometry knobs. size is snapshot-relative (`scaleTouched` latch -> every tick
-        // re-asserts scale(baseline)*ratio so a drag back to 100 restores, without compounding). flip mirrors the
-        // item's CURRENT transform in place, only on a state transition (`mirrorApplied` tracks whether our preview
-        // has the item mirrored) -- so it never yanks a user-repositioned overlay back to the canonical corner, and
-        // the signed shift in MirrorTransformInPlace makes on->off land back exactly. size runs first so flip mirrors
-        // the resized transform.
+        // live preview for the two geometry knobs. size is snapshot-relative (`scaleTouched` latch -> every tick re-asserts scale(baseline)*ratio so a drag back to 100 restores, without compounding). flip mirrors the items CURRENT transform in place, only on a state transition (`mirrorApplied` tracks whether our preview has the item mirrored) -- so it never yanks a user-repositioned overlay back to the canonical corner, and the signed shift in MirrorTransformInPlace makes on->off land back exactly. size runs first so flip mirrors the resized transform.
         private static JObject ApplyOverlayGeometryPreviewLive(JObject preview, JObject settings)
         {
             var warnings = new List<string>();
@@ -3832,8 +3893,7 @@ namespace ReplayKitHelper
                 }
             }
 
-            // flip: mirror the flip target's CURRENT transform in place -- looked up by style, independent of the
-            // snapshot's transforms map (which can miss the item), so it never repositions to the canonical corner
+            // flip: mirror the flip targets CURRENT transform in place -- looked up by style, independent of the snapshots transforms map (which can miss the item), so it never repositions to the canonical corner
             if (flipTransition)
             {
                 string itemName = style == "bongo_cat" ? "Bongo Cat Overlay" : style == "input_overlay" ? "Group" : null;
@@ -3843,7 +3903,7 @@ namespace ReplayKitHelper
                     var cur = GetSceneItemTransformLive(sceneName, item);
                     if (cur["ok"]?.Value<bool>() == true && cur["transform"] != null && cur["transform"].Type != JTokenType.Null)
                     {
-                        // make sure the un-mirrored transform is the snapshot's revert target (adopt a manual reposition since the snapshot; add the entry if the initial capture missed it) so cancel un-flips cleanly.
+                        // make sure the un-mirrored transform is the snapshots revert target (adopt a manual reposition since the snapshot; add the entry if the initial capture missed it) so cancel un-flips cleanly.
                         if (!mirrorApplied && !scaleTouched)
                         {
                             if (transforms[itemName] is JObject snapEntry) snapEntry["transform"] = cur["transform"];
@@ -4041,9 +4101,7 @@ namespace ReplayKitHelper
             try { raw = File.ReadAllText(OverlayPreviewBaselinePath); }
             catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: cannot read baseline, leaving it: " + ex.Message); return; }
 
-            // delete the file before acting on it -- if we cant delete it we must NOT run the revert, otherwise a
-            // baseline that keeps coming back (locked/read-only scratch dir) would re-stomp the users applied
-            // overlay on every single launch. strictly one shot.
+            // delete the file before acting on it -- if we cant delete it we must NOT run the revert, otherwise a baseline that keeps coming back (locked/read-only scratch dir) would re-stomp the users applied overlay on every single launch. strictly one shot.
             try { File.Delete(OverlayPreviewBaselinePath); }
             catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreview: baseline undeletable, skipping revert: " + ex.Message); return; }
 
@@ -4077,9 +4135,7 @@ namespace ReplayKitHelper
 
         private static JObject NewInactiveOutputState() => new JObject { ["ok"] = true, ["wasActive"] = false };
 
-        // serialize the whole stop-outputs -> SetVideoSettings (obs_reset_video) -> restart-outputs cycle. two of
-        // these overlapping deadlock obs's video graph (2026-08-28: a user hard-froze obs by rapidly re-applying the
-        // downscale resolution), and even sequential ones need a beat for the render/graphics threads to re-settle.
+        // serialize the whole stop-outputs -> SetVideoSettings (obs_reset_video) -> restart-outputs cycle. two of these overlapping deadlock obss video graph (2026-08-28: a user hard-froze obs by rapidly re-applying the downscale resolution), and even sequential ones need a beat for the render/graphics threads to re-settle.
         private static JObject ApplyRuntimeOutputsLive(JObject settings, JObject preset, bool restartObs, bool applyVideoSettings = true, bool applyReplayBufferOutput = true)
         {
             lock (Server.State.VideoApplyLock)
@@ -4206,9 +4262,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
         }
 
-        // -- desktop audio mixer: retry-with-verification wrappers, since obs does not always apply an audio
-        // monitor-type/mute change instantly, plus a deliberate mute-then-unmute "flap" to force the obs mixer
-        // icon to visually refresh after a monitor-type change.
+        // -- desktop audio mixer: retry-with-verification wrappers, since obs does not always apply an audio monitor-type/mute change instantly, plus a deliberate mute-then-unmute "flap" to force the obs mixer icon to visually refresh after a monitor-type change.
 
         private static JObject SetDesktopAudioMixerState(string inputName, string monitorType)
         {
@@ -4338,36 +4392,38 @@ namespace ReplayKitHelper
             return value.Value<bool>() == expected;
         }
 
-        // obs-browser-page.exe is obs's own cef subprocess -- without excluding it, clip audio played back in the
-        // dock gets treated as ordinary desktop audio, monitored back out to the discord share, and doubles up
-        // with the copy discord already grabs directly from the same process tree.
+        // obs-browser-page.exe is obss own cef subprocess -- without excluding it, clip audio played back in the dock gets treated as ordinary desktop audio, monitored back out to the discord share, and doubles up with the copy discord already grabs directly from the same process tree.
         private static readonly string[] DesktopAudioExcludeExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe", "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe", HelperExeName };
 
-        private static JArray GetDesktopAudioExcludeList()
-        {
-            var entries = new JArray();
-            foreach (var name in DesktopAudioExcludeExes) entries.Add(new JObject { ["value"] = name });
-            return entries;
-        }
+        // the programs the desktop capture never takes, whatever the recording audio tab says
+        internal static IReadOnlyList<string> DesktopAudioExcludeList => DesktopAudioExcludeExes;
 
-        private static void SetDesktopAudioCaptureSettingsObject(JObject settingsObject)
+        // the capture settings of the desktop source: which programs it takes, from the recording audio settings. in the default all apps mode this is the built in exclusion list and nothing else, which is how the source always ran. the settings come in when the caller has them already, and are read from disk otherwise
+        private static void SetDesktopAudioCaptureSettingsObject(JObject settingsObject, JObject settings = null)
         {
+            string mode = "all";
+            JObject choices = null;
+            try
+            {
+                settings = settings ?? ReadSettings();
+                mode = settings["recordingAudioMode"]?.Value<string>() == "specific" ? "specific" : "all";
+                choices = settings["recordingAudioApps"] as JObject;
+            }
+            catch (InvalidOperationException) { }
             settingsObject["mode"] = "session";
-            settingsObject["executable_list"] = GetDesktopAudioExcludeList();
-            settingsObject["exclude"] = true;
+            settingsObject["executable_list"] = AudioApps.BuildCaptureList(mode, choices, out bool exclude);
+            settingsObject["exclude"] = exclude;
         }
 
-        private static JObject SetDesktopAudioCaptureSettingsLive(string inputName)
+        private static JObject SetDesktopAudioCaptureSettingsLive(string inputName, JObject settings = null)
         {
             var inputSettings = new JObject();
-            SetDesktopAudioCaptureSettingsObject(inputSettings);
+            SetDesktopAudioCaptureSettingsObject(inputSettings, settings);
             var result = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = inputName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
             return result.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = result.Message };
         }
 
-        // keeps the live desktop-audio monitoring/mute change in sync with the on-disk scene file, so a disabled
-        // Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene
-        // collection, not in a profile setting this file already writes elsewhere).
+        // keeps the live desktop-audio monitoring/mute change in sync with the on-disk scene file, so a disabled Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene collection, not in a profile setting this file already writes elsewhere).
         private static JObject SetShareModeSceneFile(int monitoringType, bool muted)
         {
             try
@@ -4402,8 +4458,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // -- discord output live-apply + share preview: updates desktop-audio exclusion/monitoring settings,
-        // starts/stops the legacy virtual camera, and parks/unparks the obs windowed projector via DiscordProjector.
+        // -- discord output live-apply + share preview: updates desktop-audio exclusion/monitoring settings, starts/stops the legacy virtual camera, and parks/unparks the obs windowed projector via DiscordProjector.
 
         private static JObject ApplyDiscordOutputLive(JObject settings)
         {
@@ -4647,8 +4702,7 @@ namespace ReplayKitHelper
             return ApplyDiscordOutputLive(settings);
         }
 
-        // -- motion blur: live-websocket half (create/update/remove the filter on a running obs, including
-        // cleanup of the retired obs_composite_blur-kind filter left over from older ReplayKit versions) --
+        // -- motion blur: live-websocket half (create/update/remove the filter on a running obs, including cleanup of the retired obs_composite_blur-kind filter left over from older ReplayKit versions) --
 
         private static bool TestShaderfilterPluginInstalled()
         {
@@ -4753,7 +4807,7 @@ namespace ReplayKitHelper
 
         // -- microphone: the "Audio Input Capture" input in the replaykit scene. device and volume are plain input properties, noise suppression is an obs noise_suppress_filter (rnnoise) on that same input.
 
-        private const string MicInputName = "Audio Input Capture";
+        internal const string MicInputName = "Audio Input Capture";
         private const string MicNoiseFilterName = "ReplayKit Noise Suppression";
         private const string NoiseSuppressFilterKind = "noise_suppress_filter_v2";
         private const string HelperExeName = "OBSReplayKit.exe";
@@ -4837,6 +4891,129 @@ namespace ReplayKitHelper
                 if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
             }
             return AudioVolumeKeysChanged(previous, settings);
+        }
+
+        private static readonly string[] RecordingAudioKeys = { "recordingAudioMode", "recordingAudioApps" };
+
+        private static bool RecordingAudioKeysChanged(JObject previous, JObject settings) =>
+            RecordingAudioKeys.Any(key => !JToken.DeepEquals(previous[key], settings[key]));
+
+        private static bool TestOnlyRecordingAudioChanged(JObject previous, JObject settings)
+        {
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (RecordingAudioKeys.Contains(prop.Name)) continue;
+                if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
+            }
+            return RecordingAudioKeysChanged(previous, settings);
+        }
+
+        // hands the new choices to the capture source of the desktop sound, live in obs and in the scene file on disk, so they also hold if obs is not shut down cleanly. the source itself is never recreated, only its list changes
+        private static JObject ApplyRecordingAudioLive(JObject settings)
+        {
+            var applied = new List<string>();
+            var warnings = new List<string>();
+            var live = SetDesktopAudioCaptureSettingsLive(DesktopAudioInputName, settings);
+            if (live["ok"]?.Value<bool>() == true) applied.Add("recording audio programs");
+            else warnings.Add("The program choices were saved, but OBS could not be updated right now: " + live["message"] + ". They apply the next time OBS starts.");
+            var file = SetDesktopAudioCaptureInSceneFile(settings);
+            if (file["ok"]?.Value<bool>() != true) warnings.Add("The scene file could not be updated: " + file["message"]);
+            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        // the tracks of a recording: track 1 is the mix every player plays, and with separate tracks on, the pc audio, discord and the microphone also get track 2, 3 and 4 of their own
+        internal static string RecTracksValue(JObject settings) => (settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks) ? "15" : "1";
+
+        // the tracks one of the recording audio sources feeds, as obs keeps them in a bit mask; with separate tracks off every source is back on the six tracks obs starts new sources with
+        private static int AudioSourceMixers(string inputName, bool separate)
+        {
+            const int track1 = 1, track2 = 2, track3 = 4, track4 = 8;
+            if (!separate) return 63;
+            if (inputName == DesktopAudioInputName) return track1 | track2;
+            if (inputName == DiscordAudioInputName) return track1 | track3;
+            if (inputName == MicInputName) return track1 | track4;
+            return 63;
+        }
+
+        // puts the recording audio sources on their tracks in the running obs and in the scene file; the recording itself only reads the tracks when obs starts its outputs, which is why changing this restarts obs
+        private static JObject ApplyAudioTracksLive(JObject settings)
+        {
+            bool separate = settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks;
+            var applied = new List<string>();
+            var warnings = new List<string>();
+            foreach (var name in new[] { DesktopAudioInputName, DiscordAudioInputName, MicInputName })
+            {
+                int mixers = AudioSourceMixers(name, separate);
+                var tracks = new JObject();
+                for (int i = 0; i < 6; i++) tracks[(i + 1).ToString(CultureInfo.InvariantCulture)] = (mixers & (1 << i)) != 0;
+                var set = ObsWebSocket.InvokeRequest("SetInputAudioTracks", new JObject { ["inputName"] = name, ["inputAudioTracks"] = tracks }, 3000);
+                if (set.Ok) { if (!applied.Contains("audio tracks")) applied.Add("audio tracks"); }
+                else if (set.Unavailable) { warnings.Add("The audio tracks were saved, but OBS could not be reached: " + set.Message + ". They apply the next time OBS starts."); break; }
+                // code 600 is a source that is not in the scene, like discord audio on a machine without it
+                else if (set.Code != 600) warnings.Add("The audio tracks were saved, but " + name + " could not be updated: " + set.Message);
+            }
+            var file = SetAudioTracksInSceneFile(settings);
+            if (file["ok"]?.Value<bool>() != true) warnings.Add("The audio tracks were saved, but the scene file could not be updated: " + file["message"]);
+            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+        }
+
+        private static JObject SetAudioTracksInSceneFile(JObject settings)
+        {
+            try
+            {
+                string path = GetSceneCollectionPath();
+                if (!File.Exists(path)) return new JObject { ["ok"] = true, ["changed"] = false };
+                var data = JObject.Parse(File.ReadAllText(path));
+                var sources = data["sources"] as JArray;
+                if (sources == null) return new JObject { ["ok"] = true, ["changed"] = false };
+                bool separate = settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks;
+                bool changed = false;
+                foreach (var sourceToken in sources)
+                {
+                    var source = (JObject)sourceToken;
+                    string name = source["name"]?.Value<string>();
+                    if (name != DesktopAudioInputName && name != DiscordAudioInputName && name != MicInputName) continue;
+                    int mixers = AudioSourceMixers(name, separate);
+                    if (source["mixers"]?.Value<int>() == mixers) continue;
+                    source["mixers"] = mixers;
+                    changed = true;
+                }
+                if (changed) AppConfig.WriteUtf8(path, data.ToString(Formatting.Indented));
+                return new JObject { ["ok"] = true, ["changed"] = changed };
+            }
+            catch (Exception ex)
+            {
+                return new JObject { ["ok"] = false, ["changed"] = false, ["message"] = ex.Message };
+            }
+        }
+
+        private static JObject SetDesktopAudioCaptureInSceneFile(JObject settings)
+        {
+            try
+            {
+                string path = GetSceneCollectionPath();
+                if (!File.Exists(path)) return new JObject { ["ok"] = true, ["changed"] = false };
+                var data = JObject.Parse(File.ReadAllText(path));
+                var sources = data["sources"] as JArray;
+                if (sources == null) return new JObject { ["ok"] = true, ["changed"] = false };
+                bool changed = false;
+                foreach (var sourceToken in sources)
+                {
+                    var source = (JObject)sourceToken;
+                    if (source["name"]?.Value<string>() != DesktopAudioInputName) continue;
+                    var settingsObject = source["settings"] as JObject;
+                    if (settingsObject == null) { settingsObject = new JObject(); source["settings"] = settingsObject; }
+                    string before = settingsObject.ToString(Formatting.None);
+                    SetDesktopAudioCaptureSettingsObject(settingsObject, settings);
+                    if (before != settingsObject.ToString(Formatting.None)) changed = true;
+                }
+                if (changed) AppConfig.WriteUtf8(path, data.ToString(Formatting.Indented));
+                return new JObject { ["ok"] = true, ["changed"] = changed };
+            }
+            catch (Exception ex)
+            {
+                return new JObject { ["ok"] = false, ["changed"] = false, ["message"] = ex.Message };
+            }
         }
 
         private static bool MicKeysChanged(JObject previous, JObject settings) =>
@@ -5017,8 +5194,8 @@ namespace ReplayKitHelper
             applied.Add("microphone input sensitivity");
         }
 
-        private const string DesktopAudioInputName = "Desktop Audio (excl. Discord)";
-        private const string DiscordAudioInputName = "Discord Audio (record only)";
+        internal const string DesktopAudioInputName = "Desktop Audio (excl. Discord)";
+        internal const string DiscordAudioInputName = "Discord Audio (record only)";
 
         private static JObject ApplyAudioVolumesLive(JObject settings)
         {
@@ -5047,15 +5224,15 @@ namespace ReplayKitHelper
             const string inputName = "Desktop Audio (excl. Discord)";
             var current = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = inputName }, 3000);
             if (!current.Ok) return;
+            // a list of the programs to take (the specific mode) never holds the helper, since the choices cannot name it
+            if (current.Data?["inputSettings"]?["exclude"]?.Value<bool>() == false) return;
             var excluded = current.Data?["inputSettings"]?["executable_list"] as JArray;
             if (excluded != null && excluded.Any(e => string.Equals(e["value"]?.Value<string>(), HelperExeName, StringComparison.OrdinalIgnoreCase))) return;
             var result = SetDesktopAudioCaptureSettingsLive(inputName);
             if (result["ok"]?.Value<bool>() != true) Log.Write("EnsureHelperExcludedFromDesktopAudio: " + result["message"]);
         }
 
-        // -- hotkey capture + sync-from-obs: lets the dock's "press a key to bind" ui temporarily blank obs's
-        // native hotkeys while listening, and detects when the user rebinds a hotkey through obs's own Settings
-        // dialog instead of the dock, so the dock does not silently fight/revert that edit.
+        // -- hotkey capture + sync-from-obs: lets the docks "press a key to bind" ui temporarily blank obss native hotkeys while listening, and detects when the user rebinds a hotkey through obss own Settings dialog instead of the dock, so the dock does not silently fight/revert that edit.
 
         private static JObject SyncRecordingKeybindFromObs(JObject settings)
         {
@@ -5095,9 +5272,7 @@ namespace ReplayKitHelper
             return settings;
         }
 
-        // obs's own settings dialog can edit RecRBTime directly, bypassing replaykit entirely -- without this, the
-        // custom settings dock keeps showing (and would re-apply) whatever replaykit last wrote, silently
-        // reverting the user's obs-side edit on the next apply.
+        // obss own settings dialog can edit RecRBTime directly, bypassing replaykit entirely -- without this, the custom settings dock keeps showing (and would re-apply) whatever replaykit last wrote, silently reverting the users obs-side edit on the next apply.
         private static JObject SyncReplayBufferSecondsFromObs(JObject settings)
         {
             var rb = GetObsProfileParameterValue("AdvOut", "RecRBTime");
@@ -5110,18 +5285,12 @@ namespace ReplayKitHelper
             return settings;
         }
 
-        // recording_hotkey.lua fast-polls this file (~50ms, separate from its normal 1s saved-settings sync) and
-        // applies it via obs_hotkey_load, which rewrites the live in-memory hotkey binding immediately. this is not
-        // cosmetic like SetProfileParameter below -- SetProfileParameter only ever reaches the on-disk profile ini,
-        // and obs only rereads that ini into its live hotkey registry on a full profile switch, so it could never
-        // actually stop the native hotkey from firing while capture was "active". obs_hotkey_load is the same api
-        // the lua script already relies on to make a saved keybind change take effect without restarting obs.
-        private static string GetHotkeyCaptureSignalPath() => Path.Combine(GetScriptsDir(), "hotkey_capture_signal.json");
+        // recording_hotkey.lua fast-polls this file (~50ms, separate from its normal 1s saved-settings sync) and applies it via obs_hotkey_load, which rewrites the live in-memory hotkey binding immediately. this is not cosmetic like SetProfileParameter below -- SetProfileParameter only ever reaches the on-disk profile ini, and obs only rereads that ini into its live hotkey registry on a full profile switch, so it could never actually stop the native hotkey from firing while capture was "active". obs_hotkey_load is the same api the lua script already relies on to make a saved keybind change take effect without restarting obs.
+        private static string GetHotkeyCaptureSignalPath() => StateLayout.PathFor(AppConfig.GetReplayKitRoot(), StateLayout.HotkeySignalFile);
 
         private static void WriteHotkeyCaptureSignal(JObject signal) => AppConfig.WriteUtf8(GetHotkeyCaptureSignalPath(), signal.ToString(Formatting.None));
 
-        // called once at helper startup so a signal file left at active:true by a crashed prior helper process
-        // (obs itself keeps running independently of the helper, so its lua side has no equivalent restart to reset on) does not leave the native hotkeys blanked forever.
+        // called once at helper startup so a signal file left at active:true by a crashed prior helper process (obs itself keeps running independently of the helper, so its lua side has no equivalent restart to reset on) does not leave the native hotkeys blanked forever.
         public static void ResetHotkeyCaptureSignalAtStartup() => WriteHotkeyCaptureSignal(new JObject { ["active"] = false });
 
         public static JObject SetHotkeyCapture(bool active)
@@ -5152,8 +5321,7 @@ namespace ReplayKitHelper
             if (!r1.Ok) errors.Add(r1.Message);
             if (r2["ok"]?.Value<bool>() != true) errors.Add(r2["message"]?.Value<string>());
 
-            // unconditional even if the ini writes above failed -- those are best-effort disk consistency, not what
-            // actually restores the live binding, so a websocket hiccup should not leave the native hotkey blanked.
+            // unconditional even if the ini writes above failed -- those are best-effort disk consistency, not what actually restores the live binding, so a websocket hiccup should not leave the native hotkey blanked.
             WriteHotkeyCaptureSignal(new JObject
             {
                 ["active"] = false,
@@ -5182,7 +5350,7 @@ namespace ReplayKitHelper
         // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
         // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
         // preserve that asymmetry, it is not an oversight to fix.
-        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false)
+        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool applyRecordingAudio = false)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -5228,13 +5396,12 @@ namespace ReplayKitHelper
             profileUpdates.Add(new[] { "AdvOut", "RecRBTime", replaySeconds.ToString() });
             profileUpdates.Add(new[] { "AdvOut", "RecRBSize", ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>() ?? "", replaySeconds, preset).ToString(CultureInfo.InvariantCulture) });
             profileUpdates.Add(new[] { "AdvOut", "RecEncoder", encoder["id"]?.Value<string>() ?? "" });
+            profileUpdates.Add(new[] { "AdvOut", "RecTracks", RecTracksValue(settings) });
             profileUpdates.Add(new[] { "Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject) });
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
-            // always pin obs's recording folder to the RESOLVED clip dir (custom or the ~/Videos default) -- the helper's
-            // clip watcher/scanner uses that same resolved dir, so if obs's own RecFilePath ever drifts (a reset profile,
-            // an obs update) clips land where nothing is looking for them.
+            // always pin obss recording folder to the RESOLVED clip dir (custom or the ~/Videos default) -- the helpers clip watcher/scanner uses that same resolved dir, so if obss own RecFilePath ever drifts (a reset profile, an obs update) clips land where nothing is looking for them.
             string clipDirValue = settings["clipDir"]?.Value<string>();
             string resolvedClipDir = string.IsNullOrWhiteSpace(clipDirValue) ? AppConfig.GetDefaultClipDir() : clipDirValue;
             try { Directory.CreateDirectory(resolvedClipDir); } catch (Exception ex) { Log.Write("resolvedClipDir mkdir: " + ex.Message); }
@@ -5254,6 +5421,10 @@ namespace ReplayKitHelper
 
             applied.Add("OBS profile settings");
             applied.Add("OBS recording folder");
+
+            var audioTracks = ApplyAudioTracksLive(settings);
+            applied.AddRange((audioTracks["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            warnings.AddRange((audioTracks["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
 
             if (applyRuntimeOutputs)
             {
@@ -5309,7 +5480,14 @@ namespace ReplayKitHelper
                 warnings.AddRange((audio["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }
 
-            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, theme, or overlay changes require OBS to restart." : "";
+            if (applyRecordingAudio)
+            {
+                var recording = ApplyRecordingAudioLive(settings);
+                applied.AddRange((recording["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((recording["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
+
+            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, interface layout, or overlay changes require OBS to restart." : "";
 
             return new JObject
             {
@@ -5318,12 +5496,9 @@ namespace ReplayKitHelper
             };
         }
 
-        // -- http-facing settings payload + change-detection + save-request handler: the dock's initial page load
-        // fetches GetSettingsPayload; every settings-form submit goes through SaveSettingsFromRequest, which picks
-        // the cheapest live-apply path that actually covers what changed instead of always running the full
-        // ApplyLiveSettings orchestrator.
+        // -- http-facing settings payload + change-detection + save-request handler: the docks initial page load fetches GetSettingsPayload; every settings-form submit goes through SaveSettingsFromRequest, which picks the cheapest live-apply path that actually covers what changed instead of always running the full ApplyLiveSettings orchestrator.
 
-        // resolved theme colours for the tray menu's custom keybind rows -- text is the normal (at-rest) label colour (a widget stylesheet on the row otherwise breaks the label's inherited menu colour), accentLight + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected
+        // resolved theme colours for the tray menus custom keybind rows -- text is the normal (at-rest) label colour (a widget stylesheet on the row otherwise breaks the labels inherited menu colour), accentLight + onAccent are the active/hovered fill + ink so the rows match a native QMenu::item:selected
         private static JObject ThemeMenuColors(JObject settings)
         {
             try
@@ -5333,16 +5508,19 @@ namespace ReplayKitHelper
                 {
                     ["text"] = t.Text,
                     ["muted"] = t.Muted,
+                    // the window ground the clean-layout title bar and rail paint with, and the green of a live status light
+                    ["bg"] = t.Bg,
+                    // one colour for the title bar and the rail, so a theme can set it apart from the stage
+                    ["bar"] = t.BarColor,
+                    ["success"] = t.Success,
+                    ["warning"] = t.Warning,
                     ["accent"] = t.Accent,
                     ["accentLight"] = t.Accent2,
                     ["onAccent"] = Themes.OnColor(t.Accent),
-                    // the dock --grey5 / --grey3 pair, so the title-bar bell can paint the same hover surface and open
-                    // border the clips sort trigger does under whatever theme is active. same mix Themes uses for --grey5.
+                    // the dock --grey5 / --grey3 pair, so the title-bar bell can paint the same hover surface and open border the clips sort trigger does under whatever theme is active. same mix Themes uses for --grey5.
                     ["surface"] = Themes.Mix(t.Panel, t.Field, 0.45),
                     ["border"] = t.Border,
-                    // dock button parity for the plugin confirm dialog: panel = card ground, field = --button_bg,
-                    // borderStrong = --button_border_hover. fieldHover is a lightness bump on field (the dock's grey4->grey3
-                    // step) rather than t.Border, which on some themes equals t.Field and would give no visible hover.
+                    // dock button parity for the plugin confirm dialog: panel = card ground, field = --button_bg, borderStrong = --button_border_hover. fieldHover is a lightness bump on field (the docks grey4->grey3 step) rather than t.Border, which on some themes equals t.Field and would give no visible hover.
                     ["panel"] = t.Panel,
                     ["field"] = t.Field,
                     ["fieldHover"] = Themes.Shift(t.Field, 0.09),
@@ -5353,6 +5531,28 @@ namespace ReplayKitHelper
                 };
             }
             catch { return new JObject(); }
+        }
+
+        // the theme the Appearance tab is editing right now, as menu colours for the native title bar, rail and menus to show before Apply. every edit sets it again, and it lapses after ten minutes so a tab left behind never holds the window in a colour that was never saved
+        private static JObject themePreviewColors;
+        private static DateTime themePreviewUntil = DateTime.MinValue;
+        private static readonly object ThemePreviewGate = new object();
+
+        public static void SetThemePreview(JObject candidate)
+        {
+            var colors = ThemeMenuColors(candidate);
+            lock (ThemePreviewGate) { themePreviewColors = colors; themePreviewUntil = DateTime.UtcNow.AddMinutes(10); }
+            // the plugin reads the colours on a one second poll, this makes the change land at once
+            PipeClient.SendPollSettings();
+        }
+
+        private static JObject ActiveMenuColors(JObject settings)
+        {
+            lock (ThemePreviewGate)
+            {
+                if (themePreviewColors != null && DateTime.UtcNow < themePreviewUntil) return (JObject)themePreviewColors.DeepClone();
+            }
+            return ThemeMenuColors(settings);
         }
 
         public static JObject GetSettingsPayload()
@@ -5380,7 +5580,7 @@ namespace ReplayKitHelper
                 {
                     ["ok"] = true,
                     ["settings"] = settings,
-                    ["menuColors"] = ThemeMenuColors(settings),
+                    ["menuColors"] = ActiveMenuColors(settings),
                     // drives Install vs Uninstall on the Share Preview audio row in the Uninstall box
                     ["shareAudioInstalled"] = IsShareAudioDriverInstalled(),
                     ["options"] = new JObject
@@ -5442,15 +5642,15 @@ namespace ReplayKitHelper
 
         private static bool TestRestartRequired(JObject previous, JObject settings)
         {
-            // recordingScaleMode + downscaleHeight apply live (stop outputs -> SetVideoSettings -> restart outputs, see
-            // ApplyRuntimeOutputsLive). downscaleFilter still needs a restart -- obs only re-reads Video/ScaleType from
-            // the profile ini on load, SetVideoSettings has no scale-type parameter.
-            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator", "downscaleFilter" })
+            // recordingScaleMode + downscaleHeight apply live (stop outputs -> SetVideoSettings -> restart outputs, see ApplyRuntimeOutputsLive). downscaleFilter still needs a restart -- obs only re-reads Video/ScaleType from the profile ini on load, SetVideoSettings has no scale-type parameter.
+            foreach (var key in new[] { "recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "fpsDenominator", "downscaleFilter", "recordingSeparateAudioTracks" })
             {
                 if (previous[key]?.ToString() != settings[key]?.ToString()) return true;
             }
-            // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load).
+            // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load). the Appearance tab shows a live preview meanwhile, the restart is what applies it
             if (previous["theme"]?.ToString() != settings["theme"]?.ToString()) return true;
+            // the clean layout is a frameless window with its own title bar, which the native plugin can only set up before obs shows its window
+            if (previous["interfaceLayout"]?.ToString() != settings["interfaceLayout"]?.ToString()) return true;
             string theme = settings["theme"]?.ToString() ?? "default";
             if ((theme == "custom" || theme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])) return true;
             return previous["overlayStyle"]?.ToString() != settings["overlayStyle"]?.ToString();
@@ -5540,9 +5740,7 @@ namespace ReplayKitHelper
                 previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>();
         }
 
-        // pushes the resolved app icon to replaykit's own windows (helper) and to obs's window + taskbar + system tray
-        // (tray plugin over the ipc pipe). the obs main window is the plugin's job alone now -- the helper's own
-        // WM_SETICON on it raced the plugin at 16/32px and kept the win11 taskbar button small. all live, no restart.
+        // pushes the resolved app icon to replaykits own windows (helper) and to obss window + taskbar + system tray (native plugin over the ipc pipe). the obs main window is the plugins job alone now -- the helpers own WM_SETICON on it raced the plugin at 16/32px and kept the win11 taskbar button small. all live, no restart.
         public static JObject ApplyAppIconLive(JObject settings)
         {
             string path = ResolveAppIconPath(settings);
@@ -5555,7 +5753,7 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray() };
         }
 
-        // re-assert the chosen icon after the helper (re)starts with obs. obs's main window isnt necessarily up yet, so poll briefly; the tray plugin also gets it via the pipe-connect send.
+        // re-assert the chosen icon after the helper (re)starts with obs. obss main window isnt necessarily up yet, so poll briefly; the native plugin also gets it via the pipe-connect send.
         public static void ApplyAppIconAtStartup()
         {
             JObject settings;
@@ -5579,10 +5777,7 @@ namespace ReplayKitHelper
             });
         }
 
-        // self-heal: obs's recording folder (SimpleOutput.FilePath / AdvOut.RecFilePath) can drift off the RESOLVED clip
-        // dir (custom, or the ~/Videos default) -- a reset profile, an obs update, a mid-session force-kill -- and then
-        // new replay clips land where nothing is looking. runs deferred (obs websocket needs a moment) and only writes
-        // on an actual mismatch.
+        // self-heal: obss recording folder (SimpleOutput.FilePath / AdvOut.RecFilePath) can drift off the RESOLVED clip dir (custom, or the ~/Videos default) -- a reset profile, an obs update, a mid-session force-kill -- and then new replay clips land where nothing is looking. runs deferred (obs websocket needs a moment) and only writes on an actual mismatch.
         public static void EnsureObsRecordingFolderAtStartup()
         {
             Task.Run(() =>
@@ -5631,7 +5826,50 @@ namespace ReplayKitHelper
             });
         }
 
-        // self-heal: obs can end up recording at a different size or fps than the saved settings say -- the installer re-seeding the profile, an apply that failed after the settings file was already written, a change made inside obs -- and nothing compared the two, so it stayed that way unnoticed. once per helper start this checks the live video settings against the saved recording resolution and fps and applies the saved ones when they differ; only the output size and fps move (the base canvas is left alone) and a recording or stream in progress is never stopped for it.
+        // self-heal: obs can end up recording at a different size or fps than the saved settings say -- the installer re-seeding the profile, an apply that failed after the settings file was already written, a change made inside obs -- and nothing compared the two, so it stayed that way unnoticed. once per helper start this checks the live video settings against the saved recording resolution and fps and applies the saved ones when they differ; only the output size and fps move (the base canvas is left alone) and a recording or stream in progress is never stopped for it. the choices of the recording audio tab live in the settings, so a scene that came back with the plain list (an update, a fresh template) is put right once obs answers. with no choice made nothing is touched, the source keeps running exactly as it always did
+        public static void EnsureRecordingAudioProgramsAtStartup()
+        {
+            Task.Run(() =>
+            {
+                try { ReconcileRecordingAudioPrograms(); }
+                catch (Exception ex) { Log.Write("EnsureRecordingAudioPrograms: " + ex.Message); }
+            });
+        }
+
+        private static bool SameProgramList(JToken live, JToken wanted)
+        {
+            var a = new HashSet<string>((live as JArray ?? new JArray()).Select(e => e["value"]?.Value<string>() ?? ""), StringComparer.OrdinalIgnoreCase);
+            var b = new HashSet<string>((wanted as JArray ?? new JArray()).Select(e => e["value"]?.Value<string>() ?? ""), StringComparer.OrdinalIgnoreCase);
+            return a.SetEquals(b);
+        }
+
+        private static void ReconcileRecordingAudioPrograms()
+        {
+            var early = ReadSettings();
+            bool chosen = early["recordingAudioMode"]?.Value<string>() == "specific" || ((early["recordingAudioApps"] as JObject)?.HasValues ?? false);
+            if (!chosen) return;
+            ObsWebSocketResult current = null;
+            for (int i = 0; i < 45; i++)
+            {
+                current = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName }, 3000);
+                if (current.Ok) break;
+                Thread.Sleep(1000);
+            }
+            if (current == null || !current.Ok) return;
+
+            // read again under the settings lock so a save that landed while waiting is respected
+            lock (SettingsStore.Gate)
+            {
+                var settings = ReadSettings();
+                var wanted = new JObject();
+                SetDesktopAudioCaptureSettingsObject(wanted, settings);
+                var live = current.Data?["inputSettings"] as JObject ?? new JObject();
+                if (live["exclude"]?.Value<bool>() == wanted["exclude"]?.Value<bool>() && SameProgramList(live["executable_list"], wanted["executable_list"])) return;
+                var result = SetDesktopAudioCaptureSettingsLive(DesktopAudioInputName, settings);
+                Log.Write("EnsureRecordingAudioPrograms: the capture list of the desktop audio was put back to the saved choices: " + (result["ok"]?.Value<bool>() == true ? "ok" : result["message"]?.ToString()));
+            }
+        }
+
         public static void EnsureObsVideoMatchesSettingsAtStartup()
         {
             Task.Run(() =>
@@ -5731,6 +5969,42 @@ namespace ReplayKitHelper
             }
         }
 
+        private const string BongoCatNoticeKey = "bongo-cat-not-loaded";
+
+        // bongo is a plugin source, so when the plugin file is gone or this obs never registered its input kind nothing runs the scene item and nothing else says so. while the style is on the bell says it once per start, and the row clears itself once the plugin loads or the style changes
+        public static void CheckBongoCatAtStartup()
+        {
+            Task.Run(() =>
+            {
+                try { ReportBongoCatState(); }
+                catch (Exception ex) { Log.Write("CheckBongoCat: " + ex.Message); }
+            });
+        }
+
+        private static void ReportBongoCatState()
+        {
+            if (ReadSettings()["overlayStyle"]?.Value<string>() != "bongo_cat") { Notifications.DismissKey(BongoCatNoticeKey); return; }
+            // obs answers its websocket a beat after it starts
+            ObsWebSocketResult kinds = null;
+            for (int i = 0; i < 45; i++)
+            {
+                kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+                if (kinds.Ok) break;
+                Thread.Sleep(1000);
+            }
+            if (kinds == null || !kinds.Ok) { Log.Write("CheckBongoCat: OBS did not answer in time, nothing checked."); return; }
+
+            bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == "bongobs-cat");
+            string root = GetObsInstallRoot();
+            // a loaded plugin still draws nothing, with no error anywhere, when the Bango Cat folder beside obs64.exe cannot be read (seen with a copy of obs whose folder was moved away)
+            bool filesPresent = File.Exists(Path.Combine(root, "obs-plugins\\64bit\\bongobs-cat.dll")) && File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\standard\\config.json"));
+            if (loaded && filesPresent) { Notifications.DismissKey(BongoCatNoticeKey); return; }
+            Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", plugin files present: " + filesPresent + ".");
+            Notifications.Add("warning", BongoCatNoticeKey, "Bongo Cat is not working", !filesPresent
+                ? "The Bongo Cat files are missing from OBS (bongobs-cat.dll or the Bango Cat folder), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
+                : "OBS started without loading the Bongo Cat plugin, so the overlay cannot show. Restart OBS. If it keeps happening, look for bongobs in the OBS log (Help, Log Files, View Current Log) or check whether antivirus is blocking bongobs-cat.dll.");
+        }
+
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
         {
             var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
@@ -5762,6 +6036,39 @@ namespace ReplayKitHelper
                 !JToken.DeepEquals(previous["screenshareGameOverrides"], settings["screenshareGameOverrides"]);
         }
 
+        // the limit is only read by the storage card, so saving it needs no live work in obs
+        private static bool TestOnlyStorageLimitChanged(JObject previous, JObject settings)
+        {
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (prop.Name == "storageLimitGb") continue;
+                if (!JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) return false;
+            }
+            return previous["storageLimitGb"]?.Value<int>() != settings["storageLimitGb"]?.Value<int>();
+        }
+
+        // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
+        private static readonly string[] BehaviorKeys =
+            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
+
+        private static readonly string[] StartupKeys = { "obsStartupEnabled" };
+
+        // the mouse cursor settings, which only touch the capture sources of the running obs
+        private static readonly string[] CursorKeys = { "showCursorDisplayCapture", "showCursorGameCapture", "showCursorWindowCapture" };
+
+        // true when something changed and every change is one of the given keys
+        private static bool TestOnlyKeysChanged(JObject previous, JObject settings, string[] keys)
+        {
+            bool changed = false;
+            foreach (var prop in GetDefaultSettings().Properties())
+            {
+                if (JToken.DeepEquals(previous[prop.Name], settings[prop.Name])) continue;
+                if (!keys.Contains(prop.Name)) return false;
+                changed = true;
+            }
+            return changed;
+        }
+
         private static bool TestOnlySleepOverrideChanged(JObject previous, JObject settings)
         {
             foreach (var prop in GetDefaultSettings().Properties())
@@ -5782,11 +6089,7 @@ namespace ReplayKitHelper
 
         public static JObject SaveOverlayPreviewFromRequest(string body) => OverlayPreviewFromRequest(body, "preview");
 
-        // restartRequested (the ?restart=1 query flag Routes.cs passes thru) is intentionally unused below --
-        // this mirrors the ps original, where the same-named parameter is shadowed by a locally-computed
-        // restartObs near the end of the function and the incoming value never actually influences anything.
-        // preserved as-is rather than wired up, since it is not clear whether that is a latent bug or deliberate.
-        public static JObject SaveSettingsFromRequest(string body, bool restartRequested = false)
+        public static JObject SaveSettingsFromRequest(string body)
         {
             lock (SettingsStore.Gate)
             {
@@ -5812,7 +6115,7 @@ namespace ReplayKitHelper
                     }
                 }
                 // takes effect on this already-running helper the moment settings are saved, not just after the next reload -- Log.Write gates on this flag on every call, so flipping it here is what actually lets someone enable logging, reproduce a bug, and have it show up without restarting obs.
-                Server.State.LogEnabled = settings["debugLoggingEnabled"]?.Value<bool>() ?? false;
+                Server.State.LogEnabled = DevelopmentFlag(settings, "debugLoggingEnabled");
                 var hotkeyRelease = EnsureHotkeyCaptureReleased(settings);
                 if (!TestIncomingSettingsChanged(incoming, previous, settings))
                 {
@@ -5868,6 +6171,50 @@ namespace ReplayKitHelper
                     };
                 }
                 WriteSettings(settings);
+                if (TestOnlyStorageLimitChanged(previous, settings))
+                {
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = hotkeyRelease["applied"], ["warnings"] = hotkeyRelease["warnings"],
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyKeysChanged(previous, settings, BehaviorKeys))
+                {
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = hotkeyRelease["applied"], ["warnings"] = hotkeyRelease["warnings"],
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyKeysChanged(previous, settings, CursorKeys))
+                {
+                    var live = ApplyCursorLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyKeysChanged(previous, settings, StartupKeys))
+                {
+                    var startup = SetObsStartupSetting(settings["obsStartupEnabled"]?.Value<bool>() ?? false);
+                    var applied = new JArray();
+                    var warned = new JArray();
+                    if (startup["ok"]?.Value<bool>() == true) applied.Add("Windows startup");
+                    else warned.Add("Windows startup was saved, but Windows rejected the change: " + startup["message"]);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, applied),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, warned),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
                 if (TestOnlySleepOverrideChanged(previous, settings))
                 {
                     var live = ApplySleepOverrideSetting(settings["allowSleepWhileActive"]?.Value<bool>() ?? false);
@@ -5893,6 +6240,17 @@ namespace ReplayKitHelper
                 if (TestOnlyMicChanged(previous, settings))
                 {
                     var live = ApplyMicLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyRecordingAudioChanged(previous, settings))
+                {
+                    var live = ApplyRecordingAudioLive(settings);
                     return new JObject
                     {
                         ["ok"] = true, ["settings"] = settings,
@@ -5970,7 +6328,7 @@ namespace ReplayKitHelper
                 bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
                 bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
                 bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
-                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings));
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), RecordingAudioKeysChanged(previous, settings));
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
                     previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())

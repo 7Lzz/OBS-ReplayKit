@@ -1,0 +1,49 @@
+ReplayKit patch 1 of 4 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+Exclude mode keeps following the audio sessions of every other program, as the 2.2.x plugin did, and never switches to
+the native single client that captures everything except one process tree. ReplayKit
+depends on the older behaviour for the desktop audio source: its exclude list names the obs processes (obs64, the cef
+pages, the helper) so their sound is never captured, and the single client cannot leave out more than one tree. With
+one excluded program playing (Discord in a call) the single client would capture the monitoring output of obs itself
+again, and the capture would also restart every time an excluded program starts or stops playing.
+
+--- a/src/audio-capture.cpp
++++ b/src/audio-capture.cpp
+@@ -283,36 +283,7 @@
+ 		capture_pids.insert(key.pid);
+ 	}
+ 
+-	if (config.exclude) {
+-		if (exclude_pids.size() > 0) {
+-			// Windows can capture "everything except this process tree"
+-			// natively, with a single client. That is both cheaper than one
+-			// helper per application and more complete: it also covers
+-			// system sounds and anything that never shows up as a tracked
+-			// audio session.
+-			//
+-			// The API takes a single target, so this only applies when the
+-			// excluded executables resolve to one process tree; otherwise
+-			// fall back to enumerating everything that should be captured.
+-			auto excluded_roots = AudioCapture::DeDuplicateCaptureList(exclude_pids);
+-
+-			if (excluded_roots.size() == 1) {
+-				StartCapture(excluded_roots, true);
+-				return;
+-			}
+-		} else {
+-			// None of the excluded executables is running. Enumerating
+-			// sessions here (like the multi-tree case below) would make the
+-			// capture depend on whether the excluded application is alive:
+-			// system sounds and sessionless applications would drop out
+-			// until it starts playing. Keep the native whole-system capture
+-			// by excluding our own process tree instead - it always exists,
+-			// can never match a target, and keeps OBS's own audio
+-			// monitoring out of the capture.
+-			StartCapture({GetCurrentProcessId()}, true);
+-			return;
+-		}
+-	}
++	// replaykit: exclude mode keeps following sessions like 2.2.x did. the native whole-system client can leave out only one process tree, so obs own audio (the monitoring output of the share preview) would be captured again whenever exactly one excluded program has a session, and the capture would restart each time such a program starts or stops playing
+ 
+ 	if (capture_pids.size() == 0) {
+ 		StopCapture();

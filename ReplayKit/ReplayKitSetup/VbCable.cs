@@ -11,7 +11,7 @@ using Microsoft.Win32;
 
 namespace ReplayKitSetup
 {
-    // install and rename the virtual audio device used for obs stream audio. ported from obs_replaykit/vbcable.py. the com interop the python version ran through a powershell Add-Type script now lives natively in AudioHelper.cs -- straight in-process calls instead of shelling out.
+    // install and rename the virtual audio device used for obs stream audio; the audio endpoint com interop lives in AudioHelper.cs
     public static class VbCable
     {
         // post-install rename table -- the render endpoint is what obs monitors to, the loopback endpoint is what discord captures when the user selects it.
@@ -61,7 +61,7 @@ namespace ReplayKitSetup
         // matches a leading index prefix some endpoint friendly names carry (e.g. "2 - Speakers" -> "Speakers") before matching against the rename table.
         private static readonly Regex LeadingIndexPrefix = new Regex(@"^\s*\d+\s*-\s*");
 
-        // the FriendlyName property under an endpoint's Properties key, registry-value-name-encoded as "{fmtid},pid" -- same PKEY the old powershell Get-ItemProperty call read.
+        // the FriendlyName property under an endpoints Properties key, registry-value-name-encoded as "{fmtid},pid" -- same PKEY the old powershell Get-ItemProperty call read.
         private const string FriendlyNameValue = "{a45c254e-df1c-4efd-8020-67d146a850e0},2";
         private const int HiddenStateFlag = 0x10000000;
 
@@ -224,8 +224,7 @@ namespace ReplayKitSetup
             return false;
         }
 
-        // true when the cable is installed AND its render endpoint already carries the "OBS Stream Audio" name -- i.e.
-        // EnsureVbcable has nothing to do, so the setup step can skip it (no installer, no audiosrv bounce).
+        // true when the cable is installed AND its render endpoint already carries the "OBS Stream Audio" name -- i.e. EnsureVbcable has nothing to do, so the setup step can skip it (no installer, no audiosrv bounce).
         public static bool IsShareAudioReady()
         {
             if (!IsVbcableInstalled()) return false;
@@ -486,7 +485,7 @@ namespace ReplayKitSetup
                         CreateNoWindow = true,
                         WorkingDirectory = Path.GetDirectoryName(exe),
                     };
-                    Process.Start(psi);
+                    Process.Start(psi)?.Dispose();
                     log?.Invoke("restarted Discord -> " + exe);
                 }
                 catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)

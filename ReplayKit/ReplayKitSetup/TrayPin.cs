@@ -4,7 +4,7 @@ using Microsoft.Win32;
 
 namespace ReplayKitSetup
 {
-    // pin the obs tray icon so windows never buries it behind the '^' overflow arrow. ported from obs_replaykit/tray_pin.py.
+    // pin the obs tray icon so windows never buries it behind the '^' overflow arrow
     public static class TrayPin
     {
         private const string NotifyIconSettings = @"Control Panel\NotifyIconSettings";

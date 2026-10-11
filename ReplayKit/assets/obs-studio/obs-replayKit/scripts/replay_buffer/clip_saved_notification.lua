@@ -60,6 +60,7 @@ local SW_HIDE              = 0
 local cfg = {
     clip_enabled = true,
     recording_enabled = true,
+    hide_from_capture = true,
     seconds = 90,
     duration_ms = 3200,
 }
@@ -158,8 +159,13 @@ local function popup_script_path()
     return join_path(script_path(), "clip_saved_notification.ps1")
 end
 
+-- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it
 local function runtime_settings_path()
-    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+    local scripts_dir = parent_dir(script_path())
+    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
+    local f = io.open(current, "rb")
+    if f then f:close() return current end
+    return join_path(scripts_dir, "replaykit_settings.json")
 end
 
 local function load_runtime_settings()
@@ -174,6 +180,9 @@ local function load_runtime_settings()
     end
     if obs.obs_data_has_user_value(data, "recordingNotificationEnabled") then
         cfg.recording_enabled = obs.obs_data_get_bool(data, "recordingNotificationEnabled")
+    end
+    if obs.obs_data_has_user_value(data, "hideNotificationsFromCapture") then
+        cfg.hide_from_capture = obs.obs_data_get_bool(data, "hideNotificationsFromCapture")
     end
     if obs.obs_data_has_user_value(data, "clipNotificationSeconds") then
         cfg.seconds = clamp_int(
@@ -205,7 +214,8 @@ local function show_popup(kind)
         win_quote(script) ..
         " -Kind " .. win_quote(kind) ..
         " -Seconds " .. tostring(cfg.seconds) ..
-        " -DurationMs " .. tostring(cfg.duration_ms)
+        " -DurationMs " .. tostring(cfg.duration_ms) ..
+        " -HideFromCapture " .. (cfg.hide_from_capture and "1" or "0")
     local ok, err = spawn_hidden(cmd)
     if not ok then
         log(obs.LOG_WARNING, "Could not show clip popup. Win32 error: " .. tostring(err))

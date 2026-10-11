@@ -1,9 +1,10 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 
 namespace ReplayKitHelper
 {
-    // shared curl.exe subprocess runner. every streamable api call in this port goes thru curl.exe rather than HttpClient, matching the ps originals own choice (documented in upload_worker.ps1: PowerShell 5.1s Invoke-WebRequest is unreliable when winhttp proxy auto-detect is slow or misconfigured, hanging silently before hitting the wire -- curl.exe, built into windows 10+, sidesteps that). the ps original duplicated this spawn logic separately in 10_auth_core.ps1 / upload_worker.ps1 / transcode_poll_worker.ps1 becuase the latter two ran as seperate processes with no access to the formers functions; that constraint doesnt apply here, so its one shared implementation.
+    // shared curl.exe runner for the streamable api calls. curl ships with windows 10+ and does not stall on a slow or misconfigured proxy auto-detect, so it is used instead of an in-process http client
     internal static class Curl
     {
         public struct Result
@@ -13,8 +14,8 @@ namespace ReplayKitHelper
             public string Stderr;
         }
 
-        // onStarted fires right after the process launches, letting a caller (Upload.cs) publish the live Process onto the current job record so a cancel request can kill whichever curl step happens to be running -- the ps original got this for free since its cancel killed the whole upload_worker.ps1 wrapper process tree; there is no equivalent single wrapper process here to kill instead.
-        public static Result Run(string[] args, Action<Process> onStarted, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        // a cancel or the two minute deadline kills whichever curl step is running
+        public static Result Run(string[] args, CancellationToken cancellationToken)
         {
             var psi = new ProcessStartInfo
             {
@@ -27,11 +28,10 @@ namespace ReplayKitHelper
             };
             cancellationToken.ThrowIfCancellationRequested();
             using (var proc = Process.Start(psi))
-            using (var deadline = new System.Threading.CancellationTokenSource(TimeSpan.FromMinutes(2)))
-            using (var stopping = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
+            using (var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2)))
+            using (var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
             using (stopping.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { } }))
             {
-                onStarted?.Invoke(proc);
                 var stdout = proc.StandardOutput.ReadToEndAsync();
                 var stderr = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
@@ -41,6 +41,6 @@ namespace ReplayKitHelper
             }
         }
 
-        public static Result Run(params string[] args) => Run(args, null);
+        public static Result Run(params string[] args) => Run(args, CancellationToken.None);
     }
 }

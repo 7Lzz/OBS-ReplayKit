@@ -2,13 +2,12 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // dispatches a plain streamable upload (UploadWorker) and reacts once it finishes: writes the clips_db entry, shows a toast, and kicks off the background transcode poller. the "watcher" from the ps original is now a plain Task continuation instead of a second runspace blocked on the spawned processs exit + a status-file read. ported from obs_replaykit helper modules/51_upload.ps1 (Start-StreamableUpload / Resolve-UploadAuthJar) and the plain-upload half of modules/50_upload_state.ps1s Start-UploadResultWatcher.
+    // starts a plain streamable upload (UploadWorker) and reacts once it finishes: writes the clips_db entry and starts the background transcode poller
     internal static class Upload
     {
         public static JObject ResolveUploadAuthJar()
@@ -112,16 +111,14 @@ namespace ReplayKitHelper
                 UploadState.SetUploadState(
                     requestId: requestId, state: "uploading", active: true, clipName: clipName,
                     startedAt: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), url: "", error: "", phase: "preparing",
-                    percent: 1, kind: "upload", tempPath: "");
+                    percent: 1, kind: "upload");
 
                 bool authRequired = auth["required"]?.Value<bool>() ?? false;
                 string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
 
                 Log.Write("Start-StreamableUpload spawning in-process upload task", "upload", requestId);
 
-                // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that
-                // lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say)
-                // 70% could still finish the S3 upload + trigger the transcode.
+                // token so /cancel-upload can abort between steps -- killing the curl process only covers a cancel that lands while curl is actually running; steps 1/3 and the gaps had no way to stop, so a cancel at (say) 70% could still finish the S3 upload + trigger the transcode.
                 var token = JobCoordinator.Token(requestId);
 
                 reservation.Start(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet, token),
@@ -131,7 +128,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // runs once an upload task finishes -- whether it was a plain upload or the tail of a compress-then-upload chain (Compression.StartCompressedStreamableUpload calls this too, since the ps original routed both thru this same Start-UploadResultWatcher). on success, records the clips_db entry (url + initial "still processing" transcode state), shows a toast, and starts the background transcode poller; on failure or cancellation, resolves the job to error/idle. mirrors Start-UploadResultWatcher, minus the process-wait + status-file read (UploadWorker.Run reports thru UploadState.SetUploadState directly and returns its outcome, so theres nothing left to poll for).
+        // runs once an upload task finishes, for a plain upload and for the tail of a compress-then-upload: on success it records the clips_db entry (url + still-processing transcode state) and starts the transcode poller, on failure it resolves the job to error
         public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, bool quiet = false)
         {
             bool workerThrew = task.IsFaulted;
@@ -146,12 +143,12 @@ namespace ReplayKitHelper
                     cancelled = true;
                 }
             }
-            // The coordinator publishes final cancellation only after the worker and completion cleanup have stopped.
+            // the coordinator publishes final cancellation only after the worker and completion cleanup have stopped.
             if (cancelled) return;
 
             if (workerThrew)
             {
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: "Upload failed: " + workerThrewMessage, phase: "error", tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: "Upload failed: " + workerThrewMessage, phase: "error");
                 return;
             }
 
@@ -159,7 +156,7 @@ namespace ReplayKitHelper
             if (!outcome.Ok || string.IsNullOrEmpty(outcome.Url))
             {
                 string msg = !string.IsNullOrEmpty(outcome.Message) ? outcome.Message : "Upload finished without a Streamable result";
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error", tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: msg, phase: "error");
                 return;
             }
 
@@ -173,7 +170,7 @@ namespace ReplayKitHelper
             {
                 Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0);
 
-                UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100, tempPath: "");
+                UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100);
             });
 
             // the "link copied" toast + the actual clipboard write are deferred to TranscodePollWorker (fires on streamable status 2) so the link isnt handed over until the video is watchable. quiet (bulk) still suppresses both.
@@ -203,16 +200,16 @@ namespace ReplayKitHelper
         }
 
         // "Clip Uploaded" toast once streamable finishes. delegates to ToastNotify (real action-center notification via the start-menu shortcut + ToastNotificationManager) -- the shell falls back to a transient Shell_NotifyIcon balloon otherwise, which win11 shows with a generic (i) and doesnt keep in the notification list. link is NOT in the body -- its already on the clipboard.
-        internal static void ShowUploadToast(string url, string clipName = "")
+        internal static void ShowUploadToast(string url, string clipName = "", bool copied = true)
         {
             string shownName = string.IsNullOrEmpty(clipName) ? "" : Path.GetFileNameWithoutExtension(clipName);
             string body = string.IsNullOrEmpty(shownName)
-                ? "Your clip is ready and the link is on your clipboard"
-                : "Your \"" + shownName + "\" is ready, link copied to clipboard";
+                ? (copied ? "Your clip is ready and the link is on your clipboard" : "Your clip is ready")
+                : "Your \"" + shownName + "\" is ready" + (copied ? ", link copied to clipboard" : "");
             ToastNotify.Show("Clip Uploaded", body, ResolveToastIconPath());
         }
 
-        // background transcode poller. streamables /transcode call only queues encoding; the video isnt watchable until the status field on /api/v1/videos/<shortcode> reaches 2. spawned detached (CREATE_BREAKAWAY_FROM_JOB) as this same exe running its hidden --transcode-poll mode, rather than a plain Task, becuase a plain in-process worker dies with the helper the instant obs/the helper exits -- confirmed 2026-08-19 (in the ps original) this was leaving clips permanently stuck showing "processing" even long after streamable had actually finished, since nothing ever resumed a poll that got killed mid-flight.
+        // background transcode poller: streamables /transcode only queues the encode, and the video is watchable once /api/v1/videos/<shortcode> reports status 2. it runs as this exe in --transcode-poll mode outside the kill-on-close job, since a poll inside the helper died with it and left clips stuck on processing
         private static void StartTranscodePoll(string shortcode, string clipName, bool quiet = false)
         {
             try
@@ -225,6 +222,16 @@ namespace ReplayKitHelper
                     string candidate = AuthCore.GetAuthCookieJarPath();
                     if (File.Exists(candidate)) cookieJar = candidate;
                 }
+                // what the settings say about the link is read now, since the poll runs on its own from here and cannot look it up later
+                bool copyLink = true;
+                bool notify = true;
+                try
+                {
+                    var settings = ReplaykitSettings.ReadSettings();
+                    copyLink = settings["autoCopyLink"]?.Value<bool>() ?? true;
+                    notify = settings["linkNotificationEnabled"]?.Value<bool>() ?? true;
+                }
+                catch (InvalidOperationException) { }
                 string exePath = Process.GetCurrentProcess().MainModule.FileName;
                 string cmdLine = ProcessArgs.Quote(exePath) +
                     " --transcode-poll" +
@@ -234,7 +241,9 @@ namespace ReplayKitHelper
                     " -Api " + ProcessArgs.Quote(Constants.STREAMABLE_API) +
                     " -LogPath " + ProcessArgs.Quote(logPath) +
                     " -CookieJar " + ProcessArgs.Quote(cookieJar) +
-                    " -Quiet " + (quiet ? "1" : "0");
+                    " -Quiet " + (quiet ? "1" : "0") +
+                    " -CopyLink " + (copyLink ? "1" : "0") +
+                    " -Notify " + (notify ? "1" : "0");
                 Native.SpawnDetached(cmdLine, Constants.HelperRoot);
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)

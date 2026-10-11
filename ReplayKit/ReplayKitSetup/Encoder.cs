@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon. ported from obs_replaykit/encoder.py.
+    // pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon.
     public enum CodecPreference
     {
         Auto,

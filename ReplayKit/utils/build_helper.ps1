@@ -1,4 +1,4 @@
-# Publish the helper with its managed dependencies merged into the executable.
+# publish the helper with its managed dependencies merged into the executable.
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectDir = Join-Path $repoRoot 'ReplayKitHelper'
@@ -40,7 +40,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 foreach ($name in $requiredFiles) {
     Copy-Item -LiteralPath (Join-Path $publishTmp $name) -Destination (Join-Path $outDir $name) -Force
 }
-# Delete obsolete managed companions only after the merged executable is successfully published.
+# delete obsolete managed companions only after the merged executable is successfully published.
 foreach ($name in @('Newtonsoft.Json.dll', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll', 'OBSReplayKit.exe.config')) {
     $obsolete = Join-Path $outDir $name
     if (Test-Path -LiteralPath $obsolete -PathType Leaf) { Remove-Item -LiteralPath $obsolete -Force }

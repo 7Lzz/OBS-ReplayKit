@@ -1,0 +1,248 @@
+<!-- shared partial (helper #include target: home-dashboard). the top of the home view of the obs window: a title with one line of numbers about the library, and a bar for anything that needs attention. clips.html mounts it into #hm-root when it is loaded with ?home=1 and draws the shelves of clips right below it, so a clip on home is the very player of the clips view. host: RKHomeDashboard.mount(root) starts it, RKHomeDashboard.ready is a promise for the first round of data -->
+<style>
+  .hm-root { display: none; }
+  .rk-home .hm-root { display: block; margin-bottom: 18px; }
+  .hm-root, .hm-root * { box-sizing: border-box; }
+  body.is-clip-theater .hm-root, body.is-clip-fullscreen .hm-root { visibility: hidden; }
+
+  .hm-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 2px 2px 0; }
+  .hm-head-main { min-width: 0; }
+  .hm-h1 { margin: 0; font-size: 22px; font-weight: 600; line-height: 28px; }
+  .hm-facts { margin: 4px 0 0; color: var(--text_muted); font-size: 12.5px; line-height: 18px; }
+  .hm-facts b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hm-facts .hm-sep { margin: 0 7px; opacity: .55; }
+  .hm-links { display: flex; align-items: center; gap: 2px; flex: none; margin-right: -10px; }
+  .hm-link { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .hm-link:hover { background: rgba(var(--text-rgb, 255, 255, 255), .08); }
+
+  .hm-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .hm-bars:empty { display: none; }
+  .hm-bar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--grey4-solid, var(--grey4)); border-radius: 8px; background: var(--bg_card); }
+  .hm-bar-ic { width: 16px; height: 16px; flex: none; fill: currentColor; }
+  .hm-bar[data-tone="warn"] .hm-bar-ic { color: var(--amber); }
+  .hm-bar[data-tone="error"] .hm-bar-ic { color: var(--red); }
+  .hm-bar[data-tone="info"] .hm-bar-ic { color: var(--primary_light); }
+  .hm-bar-body { flex: 1; min-width: 0; }
+  .hm-bar-title { font-weight: 600; }
+  .hm-bar-text { color: var(--text_muted); }
+  .hm-bar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+  .hm-btn { display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 14px; border: 1px solid var(--button_border); border-radius: var(--border_radius); background-color: var(--button_bg); color: var(--text); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+  .hm-btn:hover { background-color: var(--button_bg_hover); border-color: var(--button_border_hover); }
+  .hm-btn:active { background-color: var(--button_bg_down); }
+  .hm-btn.primary { background-color: var(--primary); border-color: var(--primary_light); color: var(--on-accent); }
+  .hm-btn.primary:hover { background-color: var(--primary_light); }
+  .hm-x { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--text_muted); cursor: pointer; }
+  .hm-x:hover { background: var(--button_bg_hover); color: var(--text); }
+  .hm-x svg { width: 14px; height: 14px; fill: currentColor; }
+  @media (max-width: 760px) {
+    .hm-head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+<script>
+(function () {
+  "use strict";
+
+  var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var STATE_POLL_MS = 2000;
+  var SUMMARY_POLL_MS = 10000;
+  var UPDATE_POLL_MS = 30 * 60 * 1000;
+  var HELPER_GRACE_MS = 15000;
+  var OBS_GRACE_MS = 20000;
+  var LOW_SPACE_BYTES = 5 * 1024 * 1024 * 1024;
+  var ICON_ALERT = '<svg class="hm-bar-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+  var ICON_INFO = '<svg class="hm-bar-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>';
+  var ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+
+  var S = {
+    bootAt: Date.now(),
+    helperOk: false,
+    helperFailSince: 0,
+    obsConnected: false,
+    summary: null,
+    storage: null,
+    update: null,
+    dismissed: {},
+    updateDismissed: lsGet("rkHomeUpdateDismissed") || "",
+  };
+  var root = null;
+  var timers = [];
+  var readyResolve = function () {};
+  var ready = new Promise(function (resolve) { readyResolve = resolve; });
+
+  function lsGet(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
+  function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+
+  function fmtBytes(n) {
+    if (!Number.isFinite(n) || n < 0) return "";
+    if (n === 0) return "0 KB";
+    if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + " KB";
+    if (n < 1024 * 1024 * 1024) return (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + " MB";
+    return (n / 1073741824).toFixed(n < 107374182400 ? 1 : 0) + " GB";
+  }
+
+  async function api(path, options) {
+    var res = await fetch(HELPER + path, Object.assign({ cache: "no-store" }, options || {}));
+    var body = {};
+    try { body = await res.json(); } catch (_) { body = {}; }
+    if (!res.ok || body.ok === false) {
+      var error = new Error(body.message || body.error || ("HTTP " + res.status));
+      error.status = res.status;
+      throw error;
+    }
+    return body;
+  }
+  function post(path, json) {
+    return api(path, json === undefined ? { method: "POST" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(json) });
+  }
+
+  // the page owns the toast; this only speaks through it
+  function say(message) {
+    if (typeof showToast === "function") { showToast(esc(message)); if (typeof scheduleToastHide === "function") scheduleToastHide(4200); }
+  }
+
+  function setHtml(el, html) {
+    if (el._html === html) return false;
+    el._html = html;
+    el.innerHTML = html;
+    return true;
+  }
+  // a re-render replaces the buttons, so keyboard focus is handed back to the same control afterwards
+  function focusKey() {
+    var a = document.activeElement;
+    var act = a && root && root.contains(a) ? a.closest("[data-act]") : null;
+    return act ? { act: act.dataset.act, name: act.dataset.name || "" } : null;
+  }
+  function restoreFocus(key) {
+    if (!key || !root) return;
+    var hit = Array.from(root.querySelectorAll('[data-act="' + key.act + '"]')).filter(function (el) { return (el.dataset.name || "") === key.name; })[0];
+    if (hit) hit.focus();
+  }
+
+  function state() {
+    var now = Date.now();
+    if (!S.helperOk) return S.helperFailSince && now - S.helperFailSince > HELPER_GRACE_MS ? "helper" : "starting";
+    if (!S.obsConnected) return now - S.bootAt < OBS_GRACE_MS ? "starting" : "error";
+    return "ok";
+  }
+
+  // one line of counts under the title; a figure that is not known yet is left out, not shown as zero. the size of the library and the room left on the drive are in the rail, above the settings button
+  function factsHtml() {
+    var sum = S.summary;
+    if (!sum) return "&nbsp;";
+    var week = Array.isArray(sum.week) ? sum.week : [];
+    var thisWeek = week.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
+    var sep = '<span class="hm-sep">&middot;</span>';
+    return ["<b>" + sum.clipCount + "</b> " + (sum.clipCount === 1 ? "clip" : "clips"), "<b>" + thisWeek + "</b> this week"].join(sep);
+  }
+
+  function headHtml() {
+    return '<div class="hm-head"><div class="hm-head-main"><h1 class="hm-h1">Home</h1><p class="hm-facts">' + factsHtml() + '</p></div>' +
+      '<div class="hm-links"><button type="button" class="hm-link" data-act="open-folder">Open folder</button></div></div>';
+  }
+
+  // only what needs attention gets a bar
+  function bars() {
+    var list = [];
+    var sum = S.summary;
+    var st = state();
+    if (st === "helper") {
+      list.push({ id: "helper", tone: "error", title: "ReplayKit is not responding.", text: "The background helper stopped answering and normally comes back within a few seconds. If this stays, restart OBS.", label: "Try again", act: "retry", keep: true });
+    } else if (st === "error") {
+      list.push({ id: "obs", tone: "error", title: "Cannot reach OBS.", text: "ReplayKit lost its connection to OBS, so clips cannot be saved right now. Restarting OBS usually fixes it. Your clips are not affected.", label: "Restart OBS", act: "restart-obs", primary: true, keep: true });
+    }
+    if (sum && sum.clipDirExists === false) {
+      list.push({ id: "folder", tone: "error", title: "Clips folder not found.", text: "ReplayKit cannot save clips until the folder is back. Check that its drive is connected, or choose another folder in Settings.", label: "Open settings", act: "open-settings" });
+    } else if (sum && sum.freeBytes >= 0 && sum.freeBytes < LOW_SPACE_BYTES) {
+      list.push({ id: "space", tone: "warn", title: "Low disk space.", text: "Only " + fmtBytes(sum.freeBytes) + " left" + (sum.drive ? " on " + sum.drive : "") + ". New clips may fail to save.", label: "Free up space", act: "open-storage" });
+    }
+    if (S.storage && S.storage.state === "over") {
+      list.push({ id: "storage-over", tone: "warn", title: "Over your storage limit.", text: "Your clips take " + S.storage.overText + " more than the limit you set. Nothing is deleted unless you say so.", label: "Free up space", act: "open-storage" });
+    }
+    if (S.update && S.updateDismissed !== S.update.latest) {
+      list.push({ id: "update", tone: "info", title: "ReplayKit " + S.update.latest + " is available.", text: "OBS restarts once to finish the update. Your clips are not touched.", label: "Update now", act: "update-now", later: true, primary: true });
+    }
+    return list.filter(function (b) { return b.keep || !S.dismissed[b.id]; });
+  }
+  function barsHtml() {
+    return bars().map(function (b) {
+      var dismiss = b.keep ? "" : '<button type="button" class="hm-x" data-act="' + (b.later ? "update-later" : "dismiss") + '" data-name="' + b.id + '" aria-label="' + (b.later ? "Later" : "Dismiss") + '">' + ICON_X + "</button>";
+      return '<div class="hm-bar" data-tone="' + b.tone + '">' + (b.tone === "info" ? ICON_INFO : ICON_ALERT) + '<div class="hm-bar-body"><span class="hm-bar-title">' + esc(b.title) + '</span> <span class="hm-bar-text">' + esc(b.text) + '</span></div><div class="hm-bar-actions"><button type="button" class="hm-btn' + (b.primary ? " primary" : "") + '" data-act="' + b.act + '">' + esc(b.label) + "</button>" + dismiss + "</div></div>";
+    }).join("");
+  }
+
+  function paint() {
+    if (!root) return;
+    var key = focusKey();
+    var html = headHtml() + '<div class="hm-bars">' + barsHtml() + "</div>";
+    if (setHtml(root, html)) restoreFocus(key);
+  }
+
+  // controls-state can take seconds while obs is busy, so a poll is skipped while the last one is still out instead of piling up on the helper
+  var stateBusy = false;
+  async function pollState() {
+    if (stateBusy) return;
+    stateBusy = true;
+    try {
+      var d = await api("/controls-state");
+      S.helperOk = true;
+      S.helperFailSince = 0;
+      S.obsConnected = d.obsConnected === true;
+    } catch (e) {
+      S.helperOk = false;
+      if (!S.helperFailSince) S.helperFailSince = Date.now();
+    } finally {
+      stateBusy = false;
+    }
+    paint();
+  }
+  async function pollSummary() {
+    try { S.summary = await api("/home/summary"); } catch (e) { console.warn("home summary failed: " + e.message); }
+    try { S.storage = await api("/storage/summary"); } catch (e) { console.warn("home storage failed: " + e.message); }
+    paint();
+  }
+  async function checkUpdate() {
+    try {
+      var d = await api("/update/check");
+      S.update = d.updateAvailable && d.latestVersion ? { latest: d.latestVersion } : null;
+    } catch (e) {
+      console.warn("home update check failed: " + e.message);
+    }
+    paint();
+  }
+
+  var ACTIONS = {
+    "restart-obs": function () { post("/ui-confirm", { kind: "restart-obs" }).catch(function (e) { say("Could not ask to restart OBS: " + e.message); }); },
+    "open-folder": function () { post("/open-clip-folder").catch(function (e) { say(e.message); }); },
+    "open-storage": function () { post("/storage/open").catch(function (e) { say("Could not open the storage card: " + e.message); }); },
+    "open-settings": function () { post("/open-settings-window").catch(function (e) { say("Could not open Settings: " + e.message); }); },
+    "retry": function () { S.helperFailSince = 0; pollState(); pollSummary(); },
+    "dismiss": function (el) { S.dismissed[el.dataset.name] = true; paint(); },
+    "update-now": function () { if (S.update) post("/update/open-prompt?version=" + encodeURIComponent(S.update.latest)).catch(function (e) { say("Could not start the update: " + e.message); }); },
+    "update-later": function () { if (S.update) { S.updateDismissed = S.update.latest; lsSet("rkHomeUpdateDismissed", S.update.latest); paint(); } },
+  };
+
+  function startPolling() {
+    stopPolling();
+    Promise.allSettled([pollState(), pollSummary()]).then(function () { readyResolve(); });
+    timers = [setInterval(pollState, STATE_POLL_MS), setInterval(pollSummary, SUMMARY_POLL_MS), setInterval(checkUpdate, UPDATE_POLL_MS)];
+  }
+  function stopPolling() { timers.forEach(clearInterval); timers = []; }
+
+  function mount(el) {
+    root = el;
+    root.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-act]");
+      if (!t || t.disabled) return;
+      var fn = ACTIONS[t.dataset.act];
+      if (fn) fn(t);
+    });
+    paint();
+    setTimeout(checkUpdate, 4000);
+    if (window.RKWindow) RKWindow.onChange(function (up) { if (up) startPolling(); else stopPolling(); });
+    if (!window.RKWindow || RKWindow.up()) startPolling();
+  }
+
+  window.RKHomeDashboard = { mount: mount, ready: ready };
+})();
+</script>

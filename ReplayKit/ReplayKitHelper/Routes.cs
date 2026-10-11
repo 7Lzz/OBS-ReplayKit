@@ -15,7 +15,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // request dispatcher. ported from obs_replaykit helper modules/71_routes.ps1.
+    // request dispatcher for every helper route
     internal static class Routes
     {
         private static readonly string[] AppIconExtensions = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
@@ -40,7 +40,7 @@ namespace ReplayKitHelper
         private const string FolderPickerTitle = "Choose the recordings folder";
         private const string FilePickerTitle = "Choose an icon image";
 
-        // blocking modal picker on a one-shot STA thread (winforms dialogs need STA + a pump). parents to the ReplayKit Settings popup if it's open. "" on cancel/error.
+        // blocking modal picker on a one-shot STA thread (winforms dialogs need STA + a pump). parents to the ReplayKit Settings popup if its open. "" on cancel/error.
         private static string PickPath(bool folder, string filter, string initial)
         {
             string result = "";
@@ -49,8 +49,7 @@ namespace ReplayKitHelper
                 try
                 {
                     IntPtr ownerHwnd = Native.FindReplayKitSettingsWindow();
-                    // Show() below blocks this thread while the dialog is up, so bring it to the front from a watcher --
-                    // the helper is a separate process and the dialog otherwise opens behind OBS.
+                    // show() below blocks this thread while the dialog is up, so bring it to the front from a watcher -- the helper is a separate process and the dialog otherwise opens behind OBS.
                     var raiser = new Thread(() => Native.RaiseOwnDialog(folder ? FolderPickerTitle : FilePickerTitle))
                     { IsBackground = true, Name = "picker-raise" };
                     raiser.Start();
@@ -78,9 +77,37 @@ namespace ReplayKitHelper
             return result;
         }
 
-        // modern folder picker -- IFileOpenDialog with FOS_PICKFOLDERS, the same Explorer-style chrome as the icon
-        // file picker. the net48 WinForms FolderBrowserDialog is the legacy tree-view control. STA-only; the caller
-        // already runs this on a one-shot STA thread. "" on cancel or any failure.
+        private const string AudioPickerTitle = "Import audio";
+        // the containers of video are listed too, since the sound of a video file can be taken out and used
+        private const string AudioFilter = "Audio files|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|All files (*.*)|*.*";
+
+        // the picker of the editor: a modal dialog on a one-shot sta thread like PickPath, where several files can be chosen at once; an empty list when it is cancelled or fails
+        private static string[] PickAudioFiles()
+        {
+            string[] result = new string[0];
+            var t = new Thread(() =>
+            {
+                try
+                {
+                    IntPtr ownerHwnd = Native.FindReplayKitSettingsWindow();
+                    var raiser = new Thread(() => Native.RaiseOwnDialog(AudioPickerTitle)) { IsBackground = true, Name = "picker-raise" };
+                    raiser.Start();
+                    System.Windows.Forms.IWin32Window owner = ownerHwnd == IntPtr.Zero ? null : new OwnerWindow(ownerHwnd);
+                    using (var d = new System.Windows.Forms.OpenFileDialog { Filter = AudioFilter, CheckFileExists = true, Multiselect = true, Title = AudioPickerTitle })
+                    {
+                        if (d.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK) result = d.FileNames;
+                    }
+                }
+                catch (Exception ex) { Log.Write("PickAudioFiles: " + ex.Message); }
+            });
+            t.SetApartmentState(ApartmentState.STA);
+            t.IsBackground = true;
+            t.Start();
+            t.Join(180000);
+            return result;
+        }
+
+        // modern folder picker -- IFileOpenDialog with FOS_PICKFOLDERS, the same Explorer-style chrome as the icon file picker. the net48 WinForms FolderBrowserDialog is the legacy tree-view control. STA-only; the caller already runs this on a one-shot STA thread. "" on cancel or any failure.
         private static string PickFolderModern(IntPtr owner, string initial)
         {
             IFileOpenDialog dlg = null;
@@ -201,12 +228,12 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // close the main window first so obs's own closeEvent runs and saves window position to global.ini -- Process.Kill() skips that entirely, which is why obs kept reopening at a stale (sometimes wrong-monitor) position after every replaykit-triggered restart. uses Native.CloseObsMainWindow (hwnd published once per session by the tray plugin) instead of MainWindowHandle/CloseMainWindow() -- .net's heuristic can grab a parked/hidden Discord-share projector instead of the real main window, which silently skips the graceful close and falls thru to the force-kill below every time. obs-browser-page helpers never own the published main-window hwnd so this is correctly a no-op for them.
+        // close the main window first so obss own closeEvent runs and saves window position to global.ini -- Process.Kill() skips that entirely, which is why obs kept reopening at a stale (sometimes wrong-monitor) position after every replaykit-triggered restart. uses Native.CloseObsMainWindow (hwnd published once per session by the native plugin) instead of MainWindowHandle/CloseMainWindow() -- .nets heuristic can grab a parked/hidden Discord-share projector instead of the real main window, which silently skips the graceful close and falls thru to the force-kill below every time. obs-browser-page helpers never own the published main-window hwnd so this is correctly a no-op for them.
         private static void StopObsForRestart(string reason)
         {
             Thread.Sleep(300);
-            // tell the plugin's close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it swallows the close and obs never gets to save its geometry before the force-kill below. wait for the plugin to ack so the close can't beat the message; proceed anyway if it doesn't (older bundle without the pipe -- same as before this signal existed).
-            try { if (!PipeClient.SendAllowCloseAndWait(1000)) Log.Write(reason + ": close-to-tray plugin did not ack ALLOWCLOSE; proceeding."); } catch { }
+            // tell the plugins close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it swallows the close and obs never gets to save its geometry before the force-kill below. wait for the plugin to ack so the close cant beat the message; proceed anyway if it doesnt (older bundle without the pipe -- same as before this signal existed).
+            try { if (!PipeClient.SendAllowCloseAndWait(1000)) Log.Write(reason + ": native plugin did not ack ALLOWCLOSE; proceeding."); } catch { }
             var procs = GetProcessesByNames("obs64", "obs32", "obs", "obs-browser-page");
             foreach (var p in procs)
             {
@@ -286,6 +313,14 @@ namespace ReplayKitHelper
             }
         }
 
+        // the body of a failed action; a problem with the setup file also carries its code, which the settings page keys on
+        private static JObject FailureJson(Exception ex)
+        {
+            var body = new JObject { ["ok"] = false, ["message"] = ex.Message };
+            if (ex is SetupExeException setup) body["code"] = setup.Code;
+            return body;
+        }
+
         private static bool TestSettingsOrigin(HttpRequest req)
         {
             if (req.Headers.TryGetValue("sec-fetch-site", out string site) &&
@@ -333,7 +368,7 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // find an already-open file explorer window thats showing targetPath. returns the window's hwnd or IntPtr.Zero if no match. used by /open-clip-folder, /open-log-folder and /open-folder to raise an existing explorer window for the clip folder instead of spawning yet another explorer.exe -- windows otherwise stacks duplicate folder windows every time the user clicks the dock's open folder button. uses Shell.Application's Windows() collection (the same one explorer itself uses); LocationURL on each item is a file:// url we can convert to a local path and compare case-insensitively to the target. ie/edge browser windows show up here too -- we skip anything whose LocationURL isnt file://.
+        // find an already-open file explorer window thats showing targetPath. returns the windows hwnd or IntPtr.Zero if no match. used by /open-clip-folder, /open-log-folder and /open-folder to raise an existing explorer window for the clip folder instead of spawning yet another explorer.exe -- windows otherwise stacks duplicate folder windows every time the user clicks the docks open folder button. uses Shell.Applications Windows() collection (the same one explorer itself uses); LocationURL on each item is a file:// url we can convert to a local path and compare case-insensitively to the target. ie/edge browser windows show up here too -- we skip anything whose LocationURL isnt file://.
         public static IntPtr GetExplorerHwndForPath(string targetPath)
         {
             if (string.IsNullOrWhiteSpace(targetPath)) return IntPtr.Zero;
@@ -376,7 +411,7 @@ namespace ReplayKitHelper
         private static JObject TrimResultToJson(TrimResult r)
         {
             var obj = new JObject { ["ok"] = r.Ok };
-            if (!r.Ok) { obj["message"] = r.Message; return obj; }
+            if (!r.Ok) { obj["message"] = r.Message; if (r.Cancelled) obj["cancelled"] = true; return obj; }
             if (r.Name != null) obj["name"] = r.Name;
             if (r.SourceName != null)
             {
@@ -484,6 +519,7 @@ namespace ReplayKitHelper
             AppConfig.LoadConfig();
 
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
+            // every route is gated here on host and origin, so no route checks them again
             if (!req.Headers.TryGetValue("host", out string host) ||
                 !(string.Equals(host, "127.0.0.1:" + port, StringComparison.OrdinalIgnoreCase) ||
                   string.Equals(host, "localhost:" + port, StringComparison.OrdinalIgnoreCase) ||
@@ -508,15 +544,20 @@ namespace ReplayKitHelper
 
             if (Regex.IsMatch(path, @"^/(?:controls\.html)?$")) { HttpResponse.ServeHtml(stream, "controls.html"); return false; }
             if (Regex.IsMatch(path, @"^/controls_app\.html$")) { HttpResponse.ServeHtml(stream, "controls_app.html"); return false; }
-            if (Regex.IsMatch(path, @"^/clips-view$|^/clips\.html$")) { HttpResponse.ServeHtml(stream, "clips.html"); return false; }
-            if (Regex.IsMatch(path, @"^/settings-view$|^/settings\.html$")) { HttpResponse.ServeHtml(stream, "settings.html"); return false; }
-            if (Regex.IsMatch(path, @"^/setup-view$|^/setup\.html$")) { HttpResponse.ServeHtml(stream, "setup.html"); return false; }
+            // the clean layout frames these inside its shell page (?embedded=1), which needs same-origin framing; the popup windows load them on their own and keep the DENY
+            bool framed = QFlag("embedded");
+            if (Regex.IsMatch(path, @"^/clips-view$|^/clips\.html$")) { HttpResponse.ServeHtml(stream, "clips.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/settings-view$|^/settings\.html$")) { HttpResponse.ServeHtml(stream, "settings.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/setup-view$|^/setup\.html$")) { HttpResponse.ServeHtml(stream, "setup.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/shell-view$|^/shell\.html$")) { HttpResponse.ServeHtml(stream, "shell.html"); return false; }
             if (Regex.IsMatch(path, @"^/update-prompt$|^/update-prompt\.html$")) { HttpResponse.ServeHtml(stream, "update_prompt.html"); return false; }
             if (Regex.IsMatch(path, @"^/notifications-view$|^/notifications\.html$")) { HttpResponse.ServeHtml(stream, "notifications.html"); return false; }
+            if (Regex.IsMatch(path, @"^/account-menu$|^/account-menu\.html$")) { HttpResponse.ServeHtml(stream, "account-menu.html"); return false; }
+            if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html"); return false; }
+            if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html"); return false; }
 
             if (path == "/settings")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 if (req.Method == "GET")
                 {
                     try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetSettingsPayload()); }
@@ -527,8 +568,8 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        bool restartRequested = QFlag("restart");
-                        var result = ReplaykitSettings.SaveSettingsFromRequest(req.Body, restartRequested);
+                        // whether obs restarts follows from what changed, so the restart flag a page sends is not needed here
+                        var result = ReplaykitSettings.SaveSettingsFromRequest(req.Body);
                         if (result["restartRequired"]?.Value<bool>() == true)
                         {
                             string obsPath = GetRunningObsPath();
@@ -543,6 +584,7 @@ namespace ReplayKitHelper
                             return false;
                         }
                         HttpResponse.SendJson(stream, 200, result);
+                        PipeClient.SendSettingsApplied();
                     }
                     catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                     return false;
@@ -553,7 +595,6 @@ namespace ReplayKitHelper
 
             if (path == "/setup/state")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 // fail-closed to not-pending: never surface an error that would make the dock keep trying to open the wizard.
                 try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetSetupState()); }
                 catch (Exception) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["pending"] = false }); }
@@ -563,7 +604,6 @@ namespace ReplayKitHelper
             if (path == "/setup/complete")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.SetSetupComplete()); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -572,7 +612,6 @@ namespace ReplayKitHelper
             // primary-desktop jpeg for the overlay-preview backdrop; one capture per obs session (see GetDesktopPreviewJpeg), served no-store, and the dock cache-busts per page load so cef never shows a stale one.
             if (path == "/desktop-preview.jpg")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 byte[] jpeg = null;
                 try { jpeg = GetDesktopPreviewJpeg(); }
                 catch (Exception ex) { Log.Write("desktop-preview capture failed: " + ex.Message); }
@@ -589,7 +628,6 @@ namespace ReplayKitHelper
             if (path == "/settings/overlay-preview")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     string mode = Q("mode", "preview");
@@ -599,10 +637,9 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // the overlay item's live rect on the canvas, and a setter the Apply path calls once the user has dragged it in the in-page projector. obs's own scene item stays the source of truth for position, so a drag done in the projector and one done in obs converge on the same value.
+            // the overlay items live rect on the canvas, and a setter the Apply path calls once the user has dragged it in the in-page projector. obss own scene item stays the source of truth for position, so a drag done in the projector and one done in obs converge on the same value.
             if (path == "/overlay/position")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 // read-only: a drag is saved as the overlayPosition setting and reaches obs through the normal settings apply, so it survives the scene rewrite + restart an overlay-style change forces
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetOverlayPositionLive());
@@ -612,7 +649,6 @@ namespace ReplayKitHelper
             if (path == "/settings/hotkey-capture")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 bool active = QFlag("active");
                 try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.SetHotkeyCapture(active)); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -623,7 +659,6 @@ namespace ReplayKitHelper
             if (path == "/mic/devices")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, MicTest.GetDevicesPayload());
                 return false;
             }
@@ -631,7 +666,6 @@ namespace ReplayKitHelper
             if (path == "/mic/test/start")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
                 if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
                 string noiseFlag = Q("ns");
@@ -646,7 +680,6 @@ namespace ReplayKitHelper
             if (path == "/mic/test/params")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
                 if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
                 string noiseFlag = Q("ns");
@@ -659,7 +692,6 @@ namespace ReplayKitHelper
             if (path == "/mic/test/level")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, MicTest.ReadLevel());
                 return false;
             }
@@ -667,14 +699,12 @@ namespace ReplayKitHelper
             if (path == "/mic/test/stop")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, MicTest.Stop());
                 return false;
             }
 
             if (path == "/share-preview")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 if (req.Method == "GET")
                 {
                     try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetSharePreviewState(true)); }
@@ -698,7 +728,6 @@ namespace ReplayKitHelper
             if (path == "/projector-inspect")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, DiscordProjector.Inspect()); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -707,7 +736,6 @@ namespace ReplayKitHelper
             if (path == "/projector-repark")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, DiscordProjector.Repark(force: true)); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -716,27 +744,39 @@ namespace ReplayKitHelper
             if (path == "/uninstall")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, Uninstall.StartCleanupFromSettings(req.Body)); }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 400, FailureJson(ex)); }
+                return false;
+            }
+
+            // the cached setup exe the uninstall and the discord screenshare buttons run: what state it is in, and a download of it again from the latest release
+            if (path == "/setup/status")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                HttpResponse.SendJson(stream, 200, SetupExe.GetStatus());
+                return false;
+            }
+
+            if (path == "/setup/repair")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, SetupExe.Repair()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 400, FailureJson(ex)); }
                 return false;
             }
 
             if (path == "/install-discord-screenshare")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, Uninstall.StartDiscordScreenshareInstall()); }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 400, FailureJson(ex)); }
                 return false;
             }
 
-            // dock -> plugin bridge: the dock cannot draw a modal past its own panel, so it asks the tray plugin to
-            // show a themed confirm over the whole dimmed obs window. the plugin runs the matching action on ok.
+            // dock -> plugin bridge: the dock cannot draw a modal past its own panel, so it asks the native plugin to show a themed confirm over the whole dimmed obs window. the plugin runs the matching action on ok.
             if (path == "/ui-confirm")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     string kind = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body).Value<string>("kind");
@@ -752,9 +792,8 @@ namespace ReplayKitHelper
             if (path == "/uninstall-discord-screenshare")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try { HttpResponse.SendJson(stream, 200, Uninstall.StartDiscordScreenshareRemoval()); }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 400, FailureJson(ex)); }
                 return false;
             }
 
@@ -762,7 +801,6 @@ namespace ReplayKitHelper
             if (path == "/notifications")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Notifications.Get());
                 return false;
             }
@@ -771,7 +809,6 @@ namespace ReplayKitHelper
                 path == "/notifications/dismiss" || path == "/notifications/clear")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string id = Q("id");
                 if (path == "/notifications/read-all") HttpResponse.SendJson(stream, 200, Notifications.MarkAllRead());
                 else if (path == "/notifications/clear") HttpResponse.SendJson(stream, 200, Notifications.Clear());
@@ -785,13 +822,12 @@ namespace ReplayKitHelper
             if (path == "/notifications/open-link")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string url = Q("url");
                 // scoped to github release pages on purpose -- this is not a general "open any url/file" primitive, only ever used for the link a notification itself carries
                 bool validUrl = !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
                     uri.Scheme == Uri.UriSchemeHttps && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase);
                 if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only a github.com release link can be opened this way." }); return false; }
-                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true }); }
+                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true }); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
@@ -799,7 +835,6 @@ namespace ReplayKitHelper
             if (path == "/update/check")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetUpdateStatus(Q("manual") == "1"));
                 return false;
             }
@@ -807,7 +842,6 @@ namespace ReplayKitHelper
             if (path == "/update/notes")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     string installed = Update.NormalizeVersion(Update.GetInstalledVersion());
@@ -829,7 +863,6 @@ namespace ReplayKitHelper
             if (path == "/update/startup-check")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetStartupUpdateStatus());
                 return false;
             }
@@ -837,7 +870,6 @@ namespace ReplayKitHelper
             if (path == "/update/auto-check")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetAutoUpdateStatus());
                 return false;
             }
@@ -845,7 +877,6 @@ namespace ReplayKitHelper
             if (path == "/update/apply")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.ApplyUpdate());
                 return false;
             }
@@ -854,7 +885,6 @@ namespace ReplayKitHelper
             if (path == "/update/progress")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetProgress());
                 return false;
             }
@@ -862,7 +892,6 @@ namespace ReplayKitHelper
             if (path == "/update/install-result")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.GetInstallResult());
                 return false;
             }
@@ -870,7 +899,6 @@ namespace ReplayKitHelper
             if (path == "/update/install-result/ack")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.MarkInstallResultSeen());
                 return false;
             }
@@ -878,7 +906,6 @@ namespace ReplayKitHelper
             if (path == "/update/open-prompt")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 HttpResponse.SendJson(stream, 200, Update.OpenUpdatePromptWindow(Q("version")));
                 return false;
             }
@@ -886,7 +913,6 @@ namespace ReplayKitHelper
             if (path == "/update/later")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     string version = Q("version");
@@ -903,7 +929,7 @@ namespace ReplayKitHelper
 
             if (path == "/signin-windows-status")
             {
-                // returns visible sign-in popups owned by obs's process family so the dock can update its status label. with overlay=1, the google oauth popup is moved onto the streamable login window so the flow presents as one window while preserving streamable's popup-based oauth.
+                // returns visible sign-in popups owned by obss process family so the dock can update its status label. with overlay=1, the google oauth popup is moved onto the streamable login window so the flow presents as one window while preserving streamables popup-based oauth.
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 uint ownerPid = ParentWatchdog.ParentPid > 0 ? (uint)ParentWatchdog.ParentPid : 0;
                 string jsonArr = "[]";
@@ -1021,12 +1047,12 @@ namespace ReplayKitHelper
 
             if (path == "/open-url")
             {
-                // target=_blank inside these docks opens a bare cef popup (obs' own embedded chromium), not the user's actual browser -- shelling out here hands it to whatever the os has registered for http/https instead.
+                // target=_blank inside these docks opens a bare cef popup (obs' own embedded chromium), not the users actual browser -- shelling out here hands it to whatever the os has registered for http/https instead.
                 string target = Q("url");
                 bool ok = false;
                 if (Regex.IsMatch(target, "^https://[^\\s\"]+$"))
                 {
-                    try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true }); ok = true; }
+                    try { Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true })?.Dispose(); ok = true; }
                     catch (Exception ex) { Log.Write("/open-url failed for '" + target + "': " + ex.Message); }
                 }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = ok });
@@ -1038,12 +1064,10 @@ namespace ReplayKitHelper
                 string title = Q("title", "Clips");
                 bool taskbar = QFlag("taskbar");
                 int matched = -1;
-                // the tray plugin owns the icon (title bar + win11 taskbar button) for its own Clips / ReplayKit
-                // Settings windows -- style their chrome here but leave the icon to the plugin.
+                // the native plugin owns the icon (title bar + win11 taskbar button) for its own Clips / ReplayKit Settings windows -- style their chrome here but leave the icon to the plugin.
                 bool pluginOwnsIcon = title.Equals("Clips", StringComparison.OrdinalIgnoreCase) ||
                     title.Equals("ReplayKit Settings", StringComparison.OrdinalIgnoreCase);
-                // On the default app icon, leave the browser-hosted window's native OBS/SVG icon alone. Forcing the
-                // legacy ReplayKit ICO here replaces it with a distorted 16px caption image.
+                // on the default app icon, leave the browser-hosted windows native OBS/SVG icon alone. Forcing the legacy ReplayKit ICO here replaces it with a distorted 16px caption image.
                 string iconPath = "";
                 if (!pluginOwnsIcon)
                 {
@@ -1064,8 +1088,7 @@ namespace ReplayKitHelper
 
             if (path == "/appearance/icons")
             {
-                // the Appearance tab's picker grid: OBS Default + bundled presets + the user's saved custom picks.
-                // replaykit.ico remains an internal fallback, not a selectable app icon.
+                // the Appearance tabs picker grid: OBS Default + bundled presets + the users saved custom picks. replaykit.ico remains an internal fallback, not a selectable app icon.
                 var icons = new JArray { new JObject { ["id"] = "default", ["label"] = "Default", ["url"] = "/obs-icon.svg?v=4" } };
                 try
                 {
@@ -1202,8 +1225,7 @@ namespace ReplayKitHelper
 
             if (path == "/rk-theme.css")
             {
-                // the committed theme stylesheet the dock pages <link> to. matches the physical rk-theme.css the
-                // helper writes for the file:// dock.
+                // the committed theme stylesheet the dock pages <link> to. matches the physical rk-theme.css the helper writes for the file:// dock.
                 string css;
                 try
                 {
@@ -1227,6 +1249,12 @@ namespace ReplayKitHelper
                 {
                     try { s["themeCustom"] = JObject.Parse(rawCustom); s["theme"] = "custom"; } catch { }
                 }
+                // the settings tab asks with preview=1 while the theme is being edited, so the native chrome shows the same candidate
+                if (Q("preview", "") == "1")
+                {
+                    try { ReplaykitSettings.SetThemePreview(s); }
+                    catch (Exception ex) { Log.Write("/appearance/theme.css preview: " + ex.Message); }
+                }
                 string css;
                 try { css = (s["theme"]?.Value<string>() ?? "default") == "default" ? Themes.DockCss(Themes.Resolve(new JObject { ["theme"] = "default" })) : Themes.DockCss(Themes.Resolve(s)); }
                 catch (Exception ex) { Log.Write("/appearance/theme.css: " + ex.Message); css = ""; }
@@ -1238,7 +1266,6 @@ namespace ReplayKitHelper
             if (path == "/appearance/save-theme")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string label = Q("label", "");
                 string existingId = Q("id", "");
                 JObject payload;
@@ -1260,7 +1287,6 @@ namespace ReplayKitHelper
             if (path == "/appearance/pick-color")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     string color = DesktopColorPicker.Pick();
@@ -1277,7 +1303,6 @@ namespace ReplayKitHelper
             if (path == "/appearance/delete-theme")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 string raw = Q("id", "");
                 if (!raw.StartsWith("user/", StringComparison.Ordinal))
                 {
@@ -1322,7 +1347,7 @@ namespace ReplayKitHelper
 
             if (path == "/focus-window")
             {
-                // server-side foreground-raise for an existing dock-spawned popup (e.g. "view clips" clicked while the clips window is already open). the dock's window.focus() is unreliable inside cef; this route uses win32 SetForegroundWindow + the AttachThreadInput dance which works regardless of who currently owns the foreground.
+                // server-side foreground-raise for an existing dock-spawned popup (e.g. "view clips" clicked while the clips window is already open). the docks window.focus() is unreliable inside cef; this route uses win32 SetForegroundWindow + the AttachThreadInput dance which works regardless of who currently owns the foreground.
                 string title = Q("title", "Clips");
                 bool focused = false;
                 try { focused = Native.FocusWindow(title); } catch { }
@@ -1337,6 +1362,13 @@ namespace ReplayKitHelper
                 if (title != "ReplayKit Settings" && title != "ReplayKit Update" && title != "ReplayKit Setup")
                 {
                     HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unsupported window title." });
+                    return false;
+                }
+                // a page the clean layout embeds in the obs window has no window of its own to close; the plugin just puts the obs window back on its home view
+                if (QFlag("embedded") && title != "ReplayKit Update")
+                {
+                    PipeClient.SendCloseView(title == "ReplayKit Setup" ? "setup" : "settings");
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["closed"] = 1 });
                     return false;
                 }
                 // the update popup can be hosted by msedge.exe (--app launched from the bootstrap), which is not an obs-family process, so pass 0 for that title so CloseWindowsByTitle finds it by title alone; settings still goes thru the obs-family gate.
@@ -1362,6 +1394,13 @@ namespace ReplayKitHelper
             {
                 string title = Q("title", "Clips");
                 bool fullscreen = false;
+                // embedded in the obs window: the plugin widens the page over the whole window, there is no host window to make fullscreen
+                if (QFlag("embedded") && title == "Clips")
+                {
+                    PipeClient.SendClipsFullscreen(true);
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["fullscreen"] = true });
+                    return false;
+                }
                 if (title == "Clips") PipeClient.SendClipsFullscreen(true);
                 try { fullscreen = Native.EnterObsWindowFullscreen(title); } catch { }
                 if (!fullscreen && title == "Clips") PipeClient.SendClipsFullscreen(false);
@@ -1373,6 +1412,12 @@ namespace ReplayKitHelper
             {
                 string title = Q("title", "Clips");
                 bool restored = false;
+                if (QFlag("embedded") && title == "Clips")
+                {
+                    PipeClient.SendClipsFullscreen(false);
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = true });
+                    return false;
+                }
                 try { restored = Native.ExitObsWindowFullscreen(title); } catch { }
                 if (title == "Clips") PipeClient.SendClipsFullscreen(false);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["restored"] = restored });
@@ -1395,7 +1440,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string title = Q("title");
                 int minW, minH, maxW = 2400, maxH = 1800;
-                // kept in sync with the native QWidget::setMinimumSize() calls in replaykit.cpp's CreateSettingsWindow/CreateClipsWindow -- this custom corner-grip resize used to enforce different bounds than obs's own native edge/corner resize on the same windows, so the two disagreed about how small each window could get depending on which resize handle you used.
+                // kept in sync with the native QWidget::setMinimumSize() calls in the native plugins CreateSettingsWindow/CreateClipsWindow (windows/settings_window.cpp, windows/clips_window.cpp) -- this custom corner-grip resize used to enforce different bounds than obss own native edge/corner resize on the same windows, so the two disagreed about how small each window could get depending on which resize handle you used.
                 if (title == "ReplayKit Settings") { minW = 700; minH = 500; }
                 else if (title == "Clips") { minW = 850; minH = 620; }
                 else if (title == "ReplayKit Update") { minW = 480; minH = 400; }
@@ -1409,7 +1454,7 @@ namespace ReplayKitHelper
 
             if (path == "/window/set-size")
             {
-                // one-shot corrective resize for a window we just spawned via "chrome --app=" -- see SetWindowSizeCentered's comment for why the spawn-time --window-size flag alone is not reliable.
+                // one-shot corrective resize for a window we just spawned via "chrome --app=" -- see SetWindowSizeCentereds comment for why the spawn-time --window-size flag alone is not reliable.
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string title = Q("title");
                 if (!int.TryParse(Q("w"), out int w) || !int.TryParse(Q("h"), out int h) || w <= 0 || h <= 0)
@@ -1430,10 +1475,81 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the storage card of the clean layout. the summary is polled by the plugin for the ring in the rail and read by the card itself; every route that changes something is a post from the dock origin
+            if (path == "/storage/summary")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, Storage.GetSummaryPayload(QFlag("fresh"))); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // the temporary files are emptied from the card; the ones kept to open clips quickly are made again the next time a clip is opened
+            if (path == "/storage/clear-temp")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, Storage.ClearTemp()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            if (path == "/storage/trim-apply" || path == "/storage/open" || path == "/storage/close")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    if (path == "/storage/open" || path == "/storage/close")
+                    {
+                        if (path == "/storage/open") PipeClient.SendOpenStorage(); else PipeClient.SendCloseStorage();
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                    }
+                    else
+                    {
+                        var applied = Storage.ApplyTrim(Q("token"));
+                        HttpResponse.SendJson(stream, applied["ok"]?.Value<bool>() == true ? 200 : 409, applied);
+                    }
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // compressing clips from the card: what is offered, the status of the run, and the two posts that start and stop it
+            if (path == "/storage/compress-candidates" || path == "/storage/compress-status")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, path == "/storage/compress-status" ? Storage.GetCompressPayload() : Storage.GetCompressCandidates(QFlag("favorites"), int.TryParse(Q("limit"), out int offerLimit) ? offerLimit : 0)); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            if (path == "/storage/compress-start" || path == "/storage/compress-cancel")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    if (path == "/storage/compress-cancel") HttpResponse.SendJson(stream, 200, Storage.CancelCompress());
+                    else
+                    {
+                        JArray names = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body)["names"] as JArray;
+                        var started = Storage.StartCompress(names);
+                        HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 409, started);
+                    }
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            if (path == "/storage/trim-plan")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, Storage.GetTrimPlanPayload()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
             if (path == "/open-clips-window")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 PipeClient.SendOpenClips();
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -1442,8 +1558,10 @@ namespace ReplayKitHelper
             if (path == "/open-settings-window")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
-                PipeClient.SendOpenSettings();
+                // the tab to land on; anything that is not a short lowercase word is dropped, since the plugin puts it into a script for the shell page
+                string settingsPage = Q("page");
+                if (!Regex.IsMatch(settingsPage, @"^[a-z]{1,20}$")) settingsPage = "";
+                PipeClient.SendOpenSettings(settingsPage);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }
@@ -1451,7 +1569,6 @@ namespace ReplayKitHelper
             if (path == "/open-setup-window")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 lock (Server.State.UpdateCheckLock) Server.State.SetupWizardOpened = true;
                 PipeClient.SendOpenSetup();
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
@@ -1462,7 +1579,6 @@ namespace ReplayKitHelper
 
             if (path == "/clips/state")
             {
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     if (req.Method == "GET") { HttpResponse.SendJson(stream, 200, Clips.GetClipUiStatePayload()); return false; }
@@ -1470,6 +1586,39 @@ namespace ReplayKitHelper
                     HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // the unsaved edits of the clip editor, one per clip: the list for the drafts tab, one draft for the editor to put back, and the two ways to change them
+            if (path == "/drafts" || path.StartsWith("/drafts/"))
+            {
+                try
+                {
+                    if (path == "/drafts" && req.Method == "GET") { HttpResponse.SendJson(stream, 200, EditDrafts.List()); return false; }
+                    if (path == "/drafts/get" && req.Method == "GET")
+                    {
+                        var got = EditDrafts.Get(Q("file"));
+                        HttpResponse.SendJson(stream, got.Value<bool>("ok") ? 200 : 404, got);
+                        return false;
+                    }
+                    if (path == "/drafts/save" && req.Method == "POST")
+                    {
+                        JObject edit;
+                        try { edit = JObject.Parse(req.Body); }
+                        catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad edit" }); return false; }
+                        var saved = EditDrafts.Save(Q("file"), edit);
+                        HttpResponse.SendJson(stream, saved.Value<bool>("ok") ? 200 : 400, saved);
+                        return false;
+                    }
+                    if (path == "/drafts/delete" && req.Method == "POST")
+                    {
+                        var removed = EditDrafts.Delete(Q("file"));
+                        HttpResponse.SendJson(stream, removed.Value<bool>("ok") ? 200 : 400, removed);
+                        return false;
+                    }
+                    HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
 
@@ -1523,7 +1672,8 @@ namespace ReplayKitHelper
                     ["ok"] = true,
                     ["ffmpeg"] = !string.IsNullOrEmpty(caps["ffmpeg"]?.Value<string>()),
                     ["ffprobe"] = !string.IsNullOrEmpty(caps["ffprobe"]?.Value<string>()),
-                    ["logging"] = caps["logging"]?.Value<bool>() ?? false,
+                    // the switch can change while the capabilities are kept, so it is read as it is now
+                    ["logging"] = Server.State.LogEnabled,
                 });
                 return false;
             }
@@ -1559,12 +1709,10 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // one poll for the merged controls dock: share-preview state (from the settings file, no monitor probe)
-            // plus the live replay-buffer / recording output state.
+            // one poll for the merged controls dock: share-preview state (from the settings file, no monitor probe) plus the live replay-buffer / recording output state.
             if (path == "/controls-state")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     var s = ReplaykitSettings.ReadSettings();
@@ -1575,13 +1723,21 @@ namespace ReplayKitHelper
 
                     var rbRes = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
                     var recRes = ObsWebSocket.InvokeRequest("GetRecordStatus");
+                    // mute state of the three inputs the Settings > Audio switches drive; null when an input is missing from the scene
+                    var micMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = ReplaykitSettings.MicInputName }, 1500);
+                    var desktopMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = ReplaykitSettings.DesktopAudioInputName }, 1500);
+                    var discordMute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = ReplaykitSettings.DiscordAudioInputName }, 1500);
                     HttpResponse.SendJson(stream, 200, new JObject
                     {
+                        ["micMuted"] = micMute.Ok ? micMute.Data?["inputMuted"]?.Value<bool>() : (bool?)null,
+                        ["desktopMuted"] = desktopMute.Ok ? desktopMute.Data?["inputMuted"]?.Value<bool>() : (bool?)null,
+                        ["discordMuted"] = discordMute.Ok ? discordMute.Data?["inputMuted"]?.Value<bool>() : (bool?)null,
                         ["ok"] = true,
                         ["sharePreviewAvailable"] = spAvailable,
                         ["sharePreviewEnabled"] = spEnabled,
                         ["replayBufferActive"] = rbRes.Ok ? rbRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
                         ["recordActive"] = recRes.Ok ? recRes.Data?["outputActive"]?.Value<bool>() : (bool?)null,
+                        ["recordMs"] = recRes.Ok ? recRes.Data?["outputDuration"]?.Value<long?>() : (long?)null,
                         ["obsConnected"] = rbRes.Ok || recRes.Ok,
                     });
                 }
@@ -1589,15 +1745,107 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // "Start / Stop Clipping" in the dock -- toggles OBS's replay buffer.
+            // what the home page shows besides live state: clip count and size, this weeks per-day counts, and the room left on the clips drive.
+            if (path == "/home/summary")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, Clips.GetHomeSummaryPayload()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // the shell page (the one browser the clean layout keeps inside the obs window) says which view it now shows, so the plugin lifts it above the preview only once the right page is really on screen.
+            if (path == "/shell/shown")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string view = Q("view");
+                if (view != "home" && view != "clips" && view != "settings" && view != "setup") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown view." }); return false; }
+                PipeClient.SendViewShown(view);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            // the shell page answering a ping of the plugin, with the number the ping carried; the plugin reloads a page that stays silent, since a page whose renderer died stays blank until the browser is reloaded
+            if (path == "/shell/ping")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!int.TryParse(Q("n"), NumberStyles.None, CultureInfo.InvariantCulture, out int pingNumber) || pingNumber < 1) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected n." }); return false; }
+                PipeClient.SendShellPong(pingNumber);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            // a page of the shell saw alt + an arrow or a side button of the mouse; the plugin keeps the history of the views, so the page only says which way
+            if (path == "/shell/nav")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string direction = Q("dir");
+                if (direction != "back" && direction != "forward") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected dir back or forward." }); return false; }
+                PipeClient.SendShellNav(direction);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            // the clips page says a clip is playing, or that it stopped, so the display stays on for as long as one plays; PlaybackWake holds the windows request and lets a lease lapse on its own if the page dies
+            if (path == "/power/playing")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string source = Q("src");
+                string playing = Q("state");
+                if (!Regex.IsMatch(source, "^[A-Za-z0-9_-]{1,40}$") || (playing != "1" && playing != "0"))
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected src and state (1 or 0)." });
+                    return false;
+                }
+                bool holding = PlaybackWake.Report(source, playing == "1");
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["holding"] = holding });
+                return false;
+            }
+
+            // start or stop clipping: toggles the obs replay buffer, or drives it to the state a state query names, which is what the queued clipping switch in Settings sends so that applying it twice, or after obs got there already, cannot undo it
             if (path == "/obs/replay-buffer")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
+                string want = Q("state");
+                if (want != "" && want != "on" && want != "off") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "state must be on or off." }); return false; }
                 try
                 {
-                    var res = ObsWebSocket.InvokeRequest("ToggleReplayBuffer");
+                    if (want != "")
+                    {
+                        var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                        bool active = status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false);
+                        if (status.Ok && active == (want == "on"))
+                        {
+                            HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["active"] = active });
+                            return false;
+                        }
+                    }
+                    var res = ObsWebSocket.InvokeRequest(want == "on" ? "StartReplayBuffer" : want == "off" ? "StopReplayBuffer" : "ToggleReplayBuffer");
                     var body = ObsResultToJson(res);
+                    if (res.Ok && want != "")
+                    {
+                        // the request only asks obs, which starts or stops its output a moment later: the answer waits for obs to get there and says what obs really did, so a page never shows a state that is still on its way
+                        bool rbWantOn = want == "on";
+                        bool rbObserved = rbWantOn;
+                        bool rbReached = false;
+                        var rbUntil = DateTime.UtcNow.AddMilliseconds(3000);
+                        while (true)
+                        {
+                            var rbNow = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                            if (rbNow.Ok) rbObserved = rbNow.Data?["outputActive"]?.Value<bool>() ?? rbObserved;
+                            if (rbNow.Ok && rbObserved == rbWantOn) { rbReached = true; break; }
+                            if (DateTime.UtcNow >= rbUntil) break;
+                            Thread.Sleep(60);
+                        }
+                        body["active"] = rbObserved;
+                        if (!rbReached)
+                        {
+                            body["ok"] = false;
+                            body["message"] = "OBS did not " + (rbWantOn ? "start" : "stop") + " the replay buffer in time.";
+                        }
+                        HttpResponse.SendJson(stream, rbReached ? 200 : 409, body);
+                        return false;
+                    }
                     if (res.Ok) body["active"] = res.Data?["outputActive"]?.Value<bool>() ?? false;
                     HttpResponse.SendJson(stream, res.Ok ? 200 : res.Unavailable ? 503 : 409, body);
                 }
@@ -1609,7 +1857,6 @@ namespace ReplayKitHelper
             if (path == "/obs/record")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 try
                 {
                     var res = ObsWebSocket.InvokeRequest("ToggleRecord");
@@ -1621,12 +1868,101 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // "OBS Studio Settings" in the dock -- the plugin triggers OBS's own Settings dialog.
+            // mute switches in Settings > Audio. the page names one of three fixed inputs, never an obs input name of its own, so it cannot mute arbitrary sources.
+            if (path == "/audio-mute")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    var body = JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body);
+                    string which = body["input"]?.Value<string>();
+                    string inputName = which == "mic" ? ReplaykitSettings.MicInputName : which == "desktop" ? ReplaykitSettings.DesktopAudioInputName : which == "discord" ? ReplaykitSettings.DiscordAudioInputName : null;
+                    if (inputName == null || body["muted"]?.Type != JTokenType.Boolean)
+                    {
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected input (mic, desktop or discord) and muted (true or false)." });
+                        return false;
+                    }
+                    var res = ObsWebSocket.InvokeRequest("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = body["muted"].Value<bool>() }, 3000);
+                    HttpResponse.SendJson(stream, res.Ok ? 200 : res.Unavailable ? 503 : 409, ObsResultToJson(res));
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // the programs that play sound, for the recording audio tab: the list with each choice, and the icon of one of them
+            if (path == "/audio/apps")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try
+                {
+                    var current = ReplaykitSettings.ReadSettings();
+                    string mode = current["recordingAudioMode"]?.Value<string>() == "specific" ? "specific" : "all";
+                    HttpResponse.SendJson(stream, 200, AudioApps.GetAppsPayload(mode, current["recordingAudioApps"] as JObject));
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            if (path == "/audio/app-icon")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                byte[] png = null;
+                try { png = AudioApps.GetIconPng(Q("exe")); }
+                catch (Exception ex) { Log.Write("/audio/app-icon: " + ex.Message); }
+                if (png == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
+                var iconHeaders = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" });
+                HttpResponse.SendBytes(stream, 200, "OK", iconHeaders, png);
+                return false;
+            }
+
+            // "OBS Studio Settings" in the dock -- the plugin triggers OBSs own Settings dialog.
             if (path == "/open-obs-settings")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!TestSettingsOrigin(req)) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "Untrusted origin." }); return false; }
                 PipeClient.SendOpenObsSettings();
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            // the query of the settings search, shared by the search box of the replaykit settings and the one of the obs settings
+            if (path == "/settings/search")
+            {
+                if (req.Method == "POST") SettingsSearch.Set(Q("q"));
+                else if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["q"] = SettingsSearch.Get() });
+                return false;
+            }
+
+            // the local command channel of sdk mode: the list of commands, running one, and the answer of the plugin to one it was sent. nothing of it answers while development mode and sdk mode are not both on
+            if (path == "/sdk" || path == "/sdk/run" || path == "/sdk/reply")
+            {
+                if (!Sdk.Enabled()) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "SDK mode is off." }); return false; }
+                if (path == "/sdk")
+                {
+                    if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                    HttpResponse.SendJson(stream, 200, Sdk.List());
+                    return false;
+                }
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (path == "/sdk/reply")
+                {
+                    bool taken = int.TryParse(Q("id"), out int replyId) && Sdk.Answer(replyId, req.Body);
+                    HttpResponse.SendJson(stream, taken ? 200 : 404, new JObject { ["ok"] = taken });
+                    return false;
+                }
+                JObject call;
+                try { call = string.IsNullOrWhiteSpace(req.Body) ? new JObject() : JObject.Parse(req.Body); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad json." }); return false; }
+                HttpResponse.SendJson(stream, 200, Sdk.Execute(call["command"]?.ToString(), call["args"] as JObject));
+                return false;
+            }
+
+            // the menus of the obs menu bar, opened from the Advanced tab now that the title bar has no menu button
+            if (path == "/obs-menu")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (!int.TryParse(Q("index", ""), out int menuIndex) || menuIndex < 0 || menuIndex > 15) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad menu." }); return false; }
+                PipeClient.SendObsMenu(menuIndex);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }
@@ -1659,7 +1995,7 @@ namespace ReplayKitHelper
                 string readyUrl = Q("url");
                 if (Regex.IsMatch(readyUrl, @"^https://streamable\.com/[A-Za-z0-9_-]+$"))
                 {
-                    try { Upload.ShowUploadToast(readyUrl, Q("name")); } catch (Exception ex) { Log.Write("/internal/clip-ready toast: " + ex.Message, "upload"); }
+                    try { Upload.ShowUploadToast(readyUrl, Q("name"), Q("copied") != "0"); } catch (Exception ex) { Log.Write("/internal/clip-ready toast: " + ex.Message, "upload"); }
                 }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -1704,6 +2040,91 @@ namespace ReplayKitHelper
                 return HttpResponse.ServePreview(stream, req, path.Substring(6));
             }
 
+            if (path == "/clip-audio")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                HttpResponse.SendJson(stream, 200, ClipAudioTracks.Describe(Q("name")));
+                return false;
+            }
+
+            if (path == "/audio-track") return HttpResponse.ServeAudioTrack(stream, req, Q("key"), Q("i"));
+
+            if (path == "/audio-peaks")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                string peaks = ClipAudioTracks.PeaksPathFor(Q("key"), Q("i"));
+                if (peaks == null) { HttpResponse.SendText(stream, 404, "Not Found", "Peaks not found"); return false; }
+                HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "application/json; charset=utf-8" }), File.ReadAllBytes(peaks));
+                return false;
+            }
+
+            // audio the editor brings in from outside the clip: the picker of the helper, the bytes of a drop, how an import stands, and the finished file with its waveform
+            if (path == "/import-audio/pick")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                int.TryParse(Q("max"), NumberStyles.None, CultureInfo.InvariantCulture, out int room);
+                if (room < 1 || room > 8) room = 8;
+                string[] picked = PickAudioFiles();
+                if (picked.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
+                var started = new JArray();
+                foreach (string file in picked.Take(room)) started.Add(AudioImports.BeginFromPath(file));
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["files"] = started, ["skipped"] = picked.Length - started.Count });
+                return false;
+            }
+
+            if (path == AudioImports.UploadPath)
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                var imported = AudioImports.BeginFromUpload(req, Q("name"), out int importStatus);
+                HttpResponse.SendJson(stream, importStatus, imported);
+                return false;
+            }
+
+            if (path == "/import-audio/status")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                HttpResponse.SendJson(stream, 200, AudioImports.Describe(Q("id")));
+                return false;
+            }
+
+            if (path == "/import-audio/file") return HttpResponse.ServeAudioFile(stream, req, AudioImports.PathFor(Q("id")));
+
+            if (path == "/import-audio/peaks")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                string importPeaks = AudioImports.PeaksPathFor(Q("id"));
+                if (importPeaks == null) { HttpResponse.SendText(stream, 404, "Not Found", "Peaks not found"); return false; }
+                HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "application/json; charset=utf-8" }), File.ReadAllBytes(importPeaks));
+                return false;
+            }
+
+            // the film strip of the editor: what it asks for with the name of a clip, and the picture itself, which never changes under its key
+            if (path == "/clip-filmstrip")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                HttpResponse.SendJson(stream, 200, ClipFilmstrip.Describe(Q("name")));
+                return false;
+            }
+
+            if (path == "/film-strip")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                string strip = ClipFilmstrip.PathFor(Q("key"));
+                if (strip == null) { HttpResponse.SendText(stream, 404, "Not Found", "Film strip not found"); return false; }
+                try
+                {
+                    var stripHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Cache-Control"] = "public, max-age=31536000, immutable",
+                        ["Content-Type"] = "image/jpeg",
+                        ["Connection"] = "close",
+                    };
+                    HttpResponse.SendFile(stream, 200, "OK", stripHeaders, strip);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { HttpResponse.SendText(stream, 404, "Not Found", "Film strip not found"); }
+                return false;
+            }
+
             if (path.StartsWith("/thumb/")) { HttpResponse.ServeThumbnail(stream, path.Substring(7)); return false; }
 
             if (path == "/open-clip-folder")
@@ -1721,7 +2142,7 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused2 });
                         return false;
                     }
-                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = ProcessArgs.Quote(root), UseShellExecute = false });
+                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = ProcessArgs.Quote(root), UseShellExecute = false })?.Dispose();
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = false });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -1743,7 +2164,7 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused2 });
                         return false;
                     }
-                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = ProcessArgs.Quote(root), UseShellExecute = false });
+                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = ProcessArgs.Quote(root), UseShellExecute = false })?.Dispose();
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = false });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -1770,7 +2191,7 @@ namespace ReplayKitHelper
                         }
                     }
                     // explorer.exe /select,"<path>" opens the containing folder with the file already highlighted. arguments must be one string becuase explorer parses /select,<rest> as a unit.
-                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select," + ProcessArgs.Quote(selected.Full), UseShellExecute = false });
+                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select," + ProcessArgs.Quote(selected.Full), UseShellExecute = false })?.Dispose();
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = false });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -1780,18 +2201,9 @@ namespace ReplayKitHelper
             if (path == "/delete")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
-                string requestId = UploadState.NewRequestId();
-                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy);
-                if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
-                try
-                {
-                    JobCoordinator.Commit(requestId, () => File.Delete(selected.Full));
-                    Clips.UpdateDb(db => db.Remove(selected.Name));
-                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = selected.Name });
-                }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                var deleted = Clips.DeleteClip(query.ContainsKey("file") ? query["file"] : null);
+                if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name });
+                else HttpResponse.SendJson(stream, deleted.Status, new JObject { ["ok"] = false, ["message"] = deleted.Message });
                 return false;
             }
 
@@ -1827,9 +2239,29 @@ namespace ReplayKitHelper
                 bool removeAudio = removeAudioStr != "0" && removeAudioStr.ToLowerInvariant() != "false";
                 double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double startSec);
                 double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double endSec);
+                // the audio edits of the editor come as json in the body; no body means the audio is left as it is
+                JToken audioEdit = null;
+                JToken videoEdit = null;
+                if (!string.IsNullOrWhiteSpace(req.Body))
+                {
+                    try
+                    {
+                        var editBody = JObject.Parse(req.Body);
+                        // a member that is null is the same as one that is not there
+                        audioEdit = editBody["audio"] != null && editBody["audio"].Type != JTokenType.Null ? editBody["audio"] : null;
+                        videoEdit = editBody["video"] != null && editBody["video"].Type != JTokenType.Null ? editBody["video"] : null;
+                    }
+                    catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad audio edit" }); return false; }
+                }
                 try
                 {
-                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio);
+                    double videoSpeed = 1;
+                    if (!string.IsNullOrEmpty(Q("speed")) && !double.TryParse(Q("speed"), NumberStyles.Float, CultureInfo.InvariantCulture, out videoSpeed))
+                    {
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad speed" });
+                        return false;
+                    }
+                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)
@@ -1883,24 +2315,19 @@ namespace ReplayKitHelper
                 string mode = Q("mode", "smaller");
                 int.TryParse(Q("scaleHeight"), out int scaleHeight);
                 // compress-history rules (enforced server-side as defense in depth; the dock ui also disables the relevant card): clip already marked slow (libx265 medium) -> reject entirely, its the best mode and re-running anything would just degrade quality without size gain. clip already marked fast (libx264 fast) + fast again requested -> reject, re-fast-compressing produces no meaningful gain. re-running with smaller is allowed (fast -> slow is a valid upgrade path).
-                var checkSel = Clips.GetSafeClipPath(file);
-                if (checkSel != null && File.Exists(checkSel.Full))
-                {
-                    var existingMarker = Compression.GetCompressMarker(checkSel.Full);
-                    string existingMode = existingMarker.Mode;
-                    if (existingMode == "slow")
-                    {
-                        HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already at maximum compression (slow mode).", ["alreadyCompressed"] = true, ["existingMode"] = "slow" });
-                        return false;
-                    }
-                    if (existingMode == "fast" && mode == "fast")
-                    {
-                        HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already fast-compressed. Choose Smaller for further reduction.", ["alreadyCompressed"] = true, ["existingMode"] = "fast" });
-                        return false;
-                    }
-                }
                 var selected = Clips.GetSafeClipPath(file);
                 if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
+                string existingMode = Compression.GetCompressMarker(selected.Full).Mode;
+                if (existingMode == "slow")
+                {
+                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already at maximum compression (slow mode).", ["alreadyCompressed"] = true, ["existingMode"] = "slow" });
+                    return false;
+                }
+                if (existingMode == "fast" && mode == "fast")
+                {
+                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already fast-compressed. Choose Smaller for further reduction.", ["alreadyCompressed"] = true, ["existingMode"] = "fast" });
+                    return false;
+                }
                 try
                 {
                     var result = CompressOverwrite.StartCompressOverwriteFile(selected, mode, scaleHeight);
@@ -1938,6 +2365,7 @@ namespace ReplayKitHelper
                         if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
                         return true;
                     });
+                    EditDrafts.Rename(selected.Name, newName);
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
@@ -2008,7 +2436,7 @@ namespace ReplayKitHelper
 
             if (path == "/exit-obs")
             {
-                // plain graceful exit, no relaunch -- reuses the same StopObsForRestart used by /restart-obs above, so the tray menu's Exit button gets the same close-main-window-first-then-force-kill-if-needed behavior as a restart or clicking obs's own X button, instead of skipping straight to a force-kill.
+                // plain graceful exit, no relaunch -- reuses the same StopObsForRestart used by /restart-obs above, so the tray menus Exit button gets the same close-main-window-first-then-force-kill-if-needed behavior as a restart or clicking obss own X button, instead of skipping straight to a force-kill.
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is closing." });
                 StopObsForRestart("/exit-obs");
@@ -2028,7 +2456,7 @@ namespace ReplayKitHelper
                 Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile and will relaunch from '" + obsPath + "'.");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
 
-                // give the response a moment to flush before we kill obs (otherwise the dock's fetch sees a torn connection).
+                // give the response a moment to flush before we kill obs (otherwise the docks fetch sees a torn connection).
                 StopObsForRestart("/restart-obs-clean");
                 return false;
             }

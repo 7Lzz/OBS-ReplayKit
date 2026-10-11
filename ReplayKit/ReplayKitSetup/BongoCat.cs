@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // install the bongobs/bango cat obs plugin from the bundled zip. ported from obs_replaykit/bongo_cat.py.
+    // install the bongobs/bango cat obs plugin from the bundled zip
     public static class BongoCat
     {
         private const string ZipRoot = "Bango Cat/";
@@ -30,7 +30,32 @@ namespace ReplayKitSetup
             return target;
         }
 
-        public static bool IsBongoCatInstalled() => File.Exists(PluginDll) && Directory.Exists(PluginData);
+        // every bundled file present at its bundled size, not just the dll and the data folder: a partial or older copy used to count as installed, so running the installer again never repaired it
+        public static bool IsBongoCatInstalled()
+        {
+            if (!File.Exists(PluginDll) || !Directory.Exists(PluginData)) return false;
+            if (!File.Exists(Config.BONGO_CAT_ZIP)) return true;
+            try
+            {
+                using (var zf = ZipFile.OpenRead(Config.BONGO_CAT_ZIP))
+                {
+                    foreach (var entry in zf.Entries)
+                    {
+                        string name = entry.FullName.Replace("\\", "/");
+                        if (!name.StartsWith(ZipRoot) || name.EndsWith("/")) continue;
+                        string relText = name.Substring(ZipRoot.Length).Trim('/');
+                        if (relText.Length == 0) continue;
+                        var installed = new FileInfo(TargetPath(relText));
+                        if (!installed.Exists || installed.Length != entry.Length) return false;
+                    }
+                }
+            }
+            catch (Exception exc) when (exc is IOException || exc is InvalidDataException || exc is InvalidOperationException || exc is UnauthorizedAccessException)
+            {
+                return false;
+            }
+            return true;
+        }
 
         // extract the bango cat archive into the obs install root.
         public static bool InstallBongoCatPlugin(Action<string> log = null)

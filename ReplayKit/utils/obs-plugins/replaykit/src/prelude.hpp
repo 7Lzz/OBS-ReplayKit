@@ -1,0 +1,77 @@
+// precompiled prelude that every source file includes first: obs, qt and standard headers, then the windows ones last through core/win32.hpp
+#pragma once
+
+#include <obs-module.h>
+#include <obs-frontend-api.h>
+
+#include <QCoreApplication>
+#include <QAbstractNativeEventFilter>
+#include <QMenu>
+#include <QAction>
+#include <QSystemTrayIcon>
+#include <QList>
+#include <QObject>
+#include <QString>
+#include <QStringList>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QListWidget>
+#include <QDialogButtonBox>
+#include <QPushButton>
+#include <QDockWidget>
+#include <QMainWindow>
+#include <QWidgetAction>
+#include <QStyle>
+#include <QPointer>
+#include <QTimer>
+#include <QElapsedTimer>
+#include <QEvent>
+#include <QCloseEvent>
+#include <QResizeEvent>
+#include <QMouseEvent>
+#include <QKeyEvent>
+#include <QPaintEvent>
+#include <QDialog>
+#include <QFont>
+#include <QFile>
+#include <QMessageBox>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QDir>
+#include <QGuiApplication>
+#include <QIcon>
+#include <QImage>
+#include <QPixmap>
+#include <QPainter>
+#include <QPainterPath>
+#include <QtMath>
+#include <QSvgRenderer>
+#include <QScreen>
+#include <QWindow>
+#include <QCursor>
+#include <QSettings>
+#include <QHash>
+#include <QMargins>
+#include <QMoveEvent>
+#include <QShowEvent>
+#include <QHideEvent>
+
+#include "browser-panel.hpp"
+
+#include <string>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
+#include <thread>
+#include <future>
+#include <functional>
+#include <atomic>
+#include <mutex>
+#include <chrono>
+#include <algorithm>
+#include <unordered_map>
+#include <vector>
+
+#include "core/win32.hpp"

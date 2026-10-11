@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Hotkeys</title>
+<style>
+  /* fallbacks only -- the helper injects the real theme tokens above this block */
+  :root {
+    --window:#1D1F26;
+    --grey3:#464B59;
+    --grey5:#2F323C;
+    --grey6:#272A33;
+    --line2:#5B6273;
+    --primary_light:#476BD7;
+    --text:#ffffff;
+    --text_muted:#969696;
+    --red:#e33b57;
+    --button_bg_hover:#464B59;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --anim_press:130ms;
+    --tab-width:120px;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:transparent; color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; color:inherit; }
+
+  /* the whole window is the panel; the badge above it is drawn as the open tab, so the top border is left off under it */
+  .panel {
+    position:absolute; inset:0;
+    background:var(--grey5); border:1px solid var(--grey3);
+    border-radius:0 4px 4px 4px;
+  }
+  /* --tab-width is the width of the badge, set by the plugin; the strip paints over the top border under the badge in the header colour, so the tab and the header row read as one shape. the two border columns of the tab stay, they run into the border of the panel */
+  .panel::after {
+    content:""; position:absolute; z-index:3; top:-1px; left:0;
+    width:calc(var(--tab-width) - 2px); max-width:calc(100% - 2px); height:1px;
+    background:var(--grey6);
+  }
+  /* the window is cut to a height that moves while it rolls open, so the clip only has to keep the square corners of the rows inside the round ones of the panel */
+  .clip { position:absolute; inset:0; overflow:hidden; border-radius:0 3px 3px 3px; display:flex; flex-direction:column; }
+
+  .head {
+    flex:none; height:40px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 12px; background:var(--grey6); border-bottom:1px solid var(--grey3);
+  }
+  .head-title { font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--text_muted); text-transform:uppercase; }
+  /* the title and, on the clip menu, the clipping switch right after it; the switch partial sets its own margin and order, so the rule has to be as specific as its own */
+  .head-left { display:flex; align-items:center; gap:10px; min-width:0; --sw-w:32px; --sw-h:18px; }
+  .head-left input[type=checkbox].rk-switch { margin:0; order:0; }
+  .manage {
+    display:flex; align-items:center; gap:6px; height:26px; padding:0 6px; margin-right:-6px;
+    border:0; border-radius:4px; background:transparent; font-size:12px; font-weight:700; cursor:pointer;
+    transition:background-color 90ms linear;
+  }
+  .manage:hover { background:var(--button_bg_hover); }
+  .manage svg { width:14px; height:14px; flex:none; }
+
+  .info { flex:none; display:flex; align-items:center; gap:8px; padding:12px 12px 8px; color:var(--text_muted); font-size:12px; }
+  .info svg { width:14px; height:14px; flex:none; fill:currentColor; }
+
+  .key {
+    flex:none; display:flex; align-items:center; justify-content:center; height:44px; margin:0 12px 12px;
+    border:1px solid var(--grey3); border-radius:6px; background:var(--window);
+    font-size:13px; font-weight:600; letter-spacing:.02em; cursor:pointer; outline:0;
+    transition:border-color 90ms linear, background-color 90ms linear, color 90ms linear;
+  }
+  .key:hover { border-color:var(--line2); }
+  .key:focus-visible { border-color:var(--primary_light); }
+  .key.is-empty, .key.is-hint { color:var(--text_muted); font-weight:500; letter-spacing:0; }
+  .key.is-listening { border-color:var(--primary_light); color:var(--text_muted); font-weight:500; letter-spacing:0; }
+  .key.is-error { border-color:var(--red); color:var(--red); font-weight:500; letter-spacing:0; }
+  .key.is-busy { cursor:default; }
+
+  .link {
+    flex:none; display:flex; align-items:center; justify-content:space-between; width:100%; height:40px;
+    padding:0 12px; margin-top:auto; border:0; border-top:1px solid var(--grey3); border-radius:0;
+    background:transparent; color:var(--text_muted); font-size:12.5px; text-align:left; cursor:pointer;
+    --rk-row-padding:12px;
+  }
+  .link:hover { color:var(--text); }
+  .link svg { width:14px; height:14px; flex:none; }
+</style>
+<!--#include interaction-states-->
+<!--#include theme-preview-->
+<!--#include switch-->
+</head>
+<body>
+<div class="panel">
+  <div class="clip">
+    <div class="head">
+      <span class="head-left">
+        <span class="head-title" id="title">Clipping</span>
+        <input type="checkbox" class="rk-switch" id="clipSwitch" aria-label="Clipping" title="Turn clipping on or off" hidden>
+      </span>
+      <button class="manage" type="button" id="manage">Manage Hotkeys
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="info">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+      <span id="infoText"></span>
+    </div>
+    <button class="key" type="button" id="keyBtn"><span id="keyLabel"></span></button>
+    <button class="link" type="button" id="link">
+      <span id="linkText"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+</div>
+<!--#include hotkey-keys-->
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const CAPTURE_TIMEOUT_MS = 10000;
+  const KINDS = {
+    clip: { title:"Clipping", field:"clipKeybind", link:"Clip settings" },
+    record: { title:"Recording", field:"recordingKeybind", link:"Recording settings" },
+  };
+  const els = {
+    title:document.getElementById("title"), manage:document.getElementById("manage"), info:document.getElementById("infoText"),
+    key:document.getElementById("keyBtn"), keyLabel:document.getElementById("keyLabel"), link:document.getElementById("link"), linkText:document.getElementById("linkText"),
+    clipSwitch:document.getElementById("clipSwitch"),
+  };
+  let kind = "clip";
+  let settings = {};
+  // whether obs is keeping the last moments for clips (its replay buffer). clipActual is what obs said last, null while that is not known; clipWant is what the last click asked for while it is still on its way to obs
+  let clipActual = null;
+  let clipWant = null;
+  let clipSending = false;
+  // counts the clicks, so an answer that was asked for before a click is known to be older than the click
+  let clipEpoch = 0;
+  // polls are skipped for a moment after a change has been answered: obs has just said what it has, and an older word must not undo it
+  let clipQuietUntil = 0;
+  // what the switch shows: the click that is still on its way, else what obs said
+  function clipShown() { return clipWant !== null ? clipWant : clipActual; }
+  // idle, arming (obs hotkeys being paused), listening, saving
+  let phase = "idle";
+  let flashText = "";
+  let captureActive = false;
+  let captureTimer = 0;
+  // bumped by every cancel, so a request that comes back after the capture ended knows it is stale
+  let generation = 0;
+
+  function lengthText(seconds) {
+    const v = Math.max(0, Math.round(seconds || 0));
+    if (v < 60) return v + "s";
+    const m = Math.floor(v / 60), s = v % 60;
+    return s === 0 ? (m + "m") : (m + "m " + s + "s");
+  }
+
+  function infoText() {
+    if (kind === "clip" && clipShown() === false) return "Clipping is off, nothing is being kept";
+    if (kind === "clip") return "Save the last " + lengthText(settings.replaySeconds || 90) + " of gameplay";
+    return "Start and stop a recording of any length";
+  }
+
+  function render() {
+    const def = KINDS[kind];
+    els.title.textContent = def.title;
+    els.info.textContent = infoText();
+    els.linkText.textContent = def.link;
+    const label = RKHotkeys.comboToLabel(settings[def.field]);
+    let text = label || "Click to set a hotkey";
+    let state = label ? "" : "is-empty";
+    if (phase === "arming") { text = "Connecting..."; state = "is-hint is-busy"; }
+    else if (phase === "listening") { text = "Press a key combination"; state = "is-listening"; }
+    else if (phase === "saving") { text = "Saving..."; state = "is-hint is-busy"; }
+    else if (flashText) { text = flashText; state = "is-error"; }
+    els.keyLabel.textContent = text;
+    els.key.className = "key" + (state ? " " + state : "");
+    const shown = clipShown();
+    els.clipSwitch.hidden = kind !== "clip";
+    // not known yet: no switch, rather than one that says off and then jumps to on
+    els.clipSwitch.style.visibility = shown === null ? "hidden" : "";
+    els.clipSwitch.checked = shown === true;
+  }
+
+  function flash(text) {
+    flashText = text;
+    render();
+    setTimeout(() => { if (flashText === text) { flashText = ""; render(); } }, 2200);
+  }
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + path, { cache:"no-store", ...(options || {}) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) throw new Error(body.message || ("HTTP " + res.status));
+    return body;
+  }
+
+  // pauses obs own bindings while a key is being picked, otherwise pressing the current hotkey would save a clip or start a recording
+  async function setCapture(active) {
+    try {
+      await helperJson("/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now(), { method:"POST" });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function beginCapture() {
+    if (phase !== "idle") return;
+    flashText = "";
+    phase = "arming";
+    render();
+    const mine = ++generation;
+    const ok = await setCapture(true);
+    if (mine !== generation) {
+      // cancelled while the request was out: give the bindings back
+      if (ok) setCapture(false);
+      return;
+    }
+    if (!ok) {
+      phase = "idle";
+      flash("Could not pause the OBS hotkeys");
+      return;
+    }
+    captureActive = true;
+    phase = "listening";
+    render();
+    els.key.focus();
+    captureTimer = setTimeout(cancelCapture, CAPTURE_TIMEOUT_MS);
+  }
+
+  function cancelCapture() {
+    clearTimeout(captureTimer);
+    ++generation;
+    phase = "idle";
+    render();
+    if (captureActive) {
+      captureActive = false;
+      setCapture(false);
+    }
+  }
+
+  async function saveCombo(combo) {
+    clearTimeout(captureTimer);
+    phase = "saving";
+    render();
+    const mine = ++generation;
+    const field = KINDS[kind].field;
+    try {
+      const body = await helperJson("/settings", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ [field]: combo }) });
+      if (mine !== generation) return;
+      // the save gives the obs bindings back itself, from the new settings
+      captureActive = false;
+      settings = body.settings || settings;
+      phase = "idle";
+      render();
+    } catch (err) {
+      if (mine !== generation) return;
+      if (captureActive) { captureActive = false; setCapture(false); }
+      phase = "idle";
+      flash("Could not save the hotkey");
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (phase !== "listening") return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Escape") { cancelCapture(); return; }
+    const combo = RKHotkeys.comboFromEvent(e);
+    if (combo) saveCombo(combo);
+  }, true);
+
+  async function readClipState(force) {
+    if (!force && Date.now() < clipQuietUntil) return;
+    const epoch = clipEpoch;
+    try {
+      const live = await helperJson("/controls-state?t=" + Date.now());
+      // an answer asked for before a click is older than the click, and one that comes in while a click is on its way can be taken in the middle of obs starting or stopping its output; either would be the switch jumping back
+      if (epoch !== clipEpoch || clipSending || clipWant !== null) return;
+      clipActual = live.obsConnected === false ? null : live.replayBufferActive === true;
+    } catch (_) {}
+  }
+
+  // a click only says what is wanted. one request is out at a time and the last wish wins, so quick clicks cannot start and stop obs over and over, and the switch shows the wish at once and keeps it until obs has answered. the call is the one the settings page and the controls dock make, and its answer is what obs really did
+  async function pumpClip() {
+    if (clipSending) return;
+    clipSending = true;
+    try {
+      while (clipWant !== null && clipWant !== clipActual) {
+        const want = clipWant;
+        const body = await helperJson("/obs/replay-buffer?state=" + (want ? "on" : "off") + "&t=" + Date.now(), { method:"POST" });
+        clipActual = typeof body.active === "boolean" ? body.active : want;
+      }
+      clipWant = null;
+    } catch (_) {
+      const asked = clipWant;
+      clipWant = null;
+      clipSending = false;
+      ++clipEpoch;
+      flash(asked ? "Could not turn clipping on" : "Could not turn clipping off");
+      // the change was refused or did not get there in time, so what obs has is what the switch shows
+      await readClipState(true);
+      clipQuietUntil = Date.now() + 1200;
+      render();
+      return;
+    }
+    clipSending = false;
+    ++clipEpoch;
+    clipQuietUntil = Date.now() + 1200;
+    render();
+  }
+
+  els.clipSwitch.addEventListener("change", () => {
+    if (clipActual === null) { render(); return; }
+    ++clipEpoch;
+    clipWant = els.clipSwitch.checked;
+    render();
+    pumpClip();
+  });
+
+  els.key.addEventListener("click", beginCapture);
+  // clicking anywhere else in the panel while listening gives up the capture
+  els.key.addEventListener("blur", () => { if (phase === "listening") cancelCapture(); });
+
+  function openSettings(page) {
+    fetch(HELPER + "/open-settings-window?page=" + encodeURIComponent(page) + "&t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+  }
+  els.manage.addEventListener("click", () => openSettings("hotkeys"));
+  els.link.addEventListener("click", () => openSettings("output"));
+
+  async function refresh() {
+    try {
+      const data = await helperJson("/settings?t=" + Date.now());
+      settings = data.settings || settings;
+    } catch (_) {}
+    // obs is the one that knows whether it is keeping clips
+    await readClipState();
+    if (phase === "idle") render();
+  }
+
+  // called by the plugin every time the panel opens: the window is reused, so a fresh open picks which badge it hangs off and how wide it is, and re-reads the bindings itself. the plugin repeats the call a moment later in case the first one was lost, and a repeat (fresh false) must not end a key that is already being picked
+  window.__replaykitShowHotkeyMenu = function (nextKind, fresh, tabWidth, clipOn) {
+    const changed = !!KINDS[nextKind] && nextKind !== kind;
+    if (KINDS[nextKind]) kind = nextKind;
+    // the plugin knows whether clipping is on and says so with every real open, so the switch is right on the first frame. a repeat carries the same word from the moment of the open, which can be older than a click, so only the open itself is taken
+    if (fresh && typeof clipOn === "boolean" && !clipSending && clipWant === null) clipActual = clipOn;
+    if (tabWidth > 0) document.documentElement.style.setProperty("--tab-width", tabWidth + "px");
+    if (fresh || changed) {
+      if (phase !== "idle") cancelCapture();
+      flashText = "";
+    }
+    if (phase === "idle") {
+      render();
+      refresh();
+    }
+  };
+  // and when it closes, so a key that was being picked is given up and the obs bindings come back
+  window.__replaykitHotkeyMenuHidden = function () {
+    if (phase !== "idle") cancelCapture();
+  };
+
+  // the address of the page is the state of the menu, and the plugin gives it a new one on every open: which badge it hangs off, how wide the tab is, and a count. it is read at load and again whenever it changes, which does not depend on a script getting through to the page
+  function applyAddress() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    window.__replaykitShowHotkeyMenu(params.get("kind"), true, parseInt(params.get("tab"), 10), params.has("clip") ? params.get("clip") === "1" : undefined);
+  }
+  window.addEventListener("hashchange", applyAddress);
+  // the window is activated when it opens, so the bindings are read again then too
+  window.addEventListener("focus", () => { if (phase === "idle") refresh(); });
+
+  if (window.RKHover) RKHover.apply(document, { row:".link" });
+  applyAddress();
+</script>
+</body>
+</html>

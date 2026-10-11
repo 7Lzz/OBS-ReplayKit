@@ -7,9 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // theming for the whole surface: the ReplayKit dock pages (a :root override injected when the helper serves the
-    // html), ReplayKit's native window chrome (Native.StyleWindow), and OBS itself (a generated Yami .ovt variant +
-    // user.ini [Appearance] Theme=, applied on the next OBS start). one small token model feeds all three.
+    // theming for the whole surface: the ReplayKit dock pages (a :root override injected when the helper serves the html), ReplayKits native window chrome (Native.StyleWindow), and OBS itself (a generated Yami .ovt variant + user.ini [Appearance] Theme=, applied on the next OBS start). one small token model feeds all three.
     internal static class Themes
     {
         // the 15 colours every surface maps from. all "#rrggbb".
@@ -17,12 +15,14 @@ namespace ReplayKitHelper
         {
             public string Bg, Panel, Field, Field2, Border, BorderStrong,
                           Text, Muted, Disabled, Accent, Accent2, Danger, Success, Warning;
+            // the ground of the clean layout title bar and sidebar, one colour for both. empty means derived from Bg, so a theme that never named one keeps the step under the stage it always had
+            public string Bar;
+            public string BarColor => string.IsNullOrEmpty(Bar) ? DeriveBar(Bg) : Bar;
             public bool Dark = true;
+            // the step between each token the custom editor does not show and what FromCustom works out for it from the colours the editor does show, carried by a custom theme that was made from a preset so that it starts out as an exact copy; null on a token set that never had one
+            public JObject Offsets;
 
-            // a gradient per surface token, keyed by the swatch name the editor uses. only these four: text, border
-            // and danger are colour roles -- they end up in border-color, color and the Mix/Shift/ToColorRef maths,
-            // where a gradient value paints nothing at all. the colour field above always stays a real hex so every
-            // derived token, the win32 chrome and the qt theme keep working; the gradient is an extra paint layer.
+            // a gradient per surface token, keyed by the swatch name the editor uses. only these four: text, border and danger are colour roles -- they end up in border-color, color and the Mix/Shift/ToColorRef maths, where a gradient value paints nothing at all. the colour field above always stays a real hex so every derived token, the win32 chrome and the qt theme keep working; the gradient is an extra paint layer.
             public static readonly string[] GradientTargets = { "bg", "panel", "field", "accent" };
             public Dictionary<string, GradientSpec> Gradients = new Dictionary<string, GradientSpec>(StringComparer.OrdinalIgnoreCase);
 
@@ -50,6 +50,7 @@ namespace ReplayKitHelper
                 ["text"] = Text, ["muted"] = Muted, ["disabled"] = Disabled,
                 ["accent"] = Accent, ["accent2"] = Accent2,
                 ["danger"] = Danger, ["success"] = Success, ["warning"] = Warning,
+                ["bar"] = BarColor,
                 ["gradient"] = "", ["gradients"] = GradientsJson(),
                 ["dark"] = Dark,
             };
@@ -59,8 +60,29 @@ namespace ReplayKitHelper
             {
                 ["bg"] = Bg, ["panel"] = Panel, ["field"] = Field, ["text"] = Text,
                 ["accent"] = Accent, ["border"] = Border, ["danger"] = Danger,
+                ["bar"] = BarColor,
                 ["gradient"] = "", ["gradients"] = GradientsJson(), ["dark"] = Dark,
+                ["offsets"] = Offsets ?? SeedOffsets(),
             };
+
+            // what this token set has beyond the formulas: its own value of each token the editor does not show, minus what FromCustom works out for it from the seven colours the editor does show
+            private JObject SeedOffsets()
+            {
+                Tokens derived = FromCustom(new JObject
+                {
+                    ["bg"] = Bg, ["panel"] = Panel, ["field"] = Field, ["text"] = Text,
+                    ["accent"] = Accent, ["border"] = Border, ["danger"] = Danger, ["dark"] = Dark,
+                });
+                var offsets = new JObject();
+                RecordOffset(offsets, "field2", Field2, derived.Field2);
+                RecordOffset(offsets, "borderStrong", BorderStrong, derived.BorderStrong);
+                RecordOffset(offsets, "muted", Muted, derived.Muted);
+                RecordOffset(offsets, "disabled", Disabled, derived.Disabled);
+                RecordOffset(offsets, "accent2", Accent2, derived.Accent2);
+                RecordOffset(offsets, "success", Success, derived.Success);
+                RecordOffset(offsets, "warning", Warning, derived.Warning);
+                return offsets;
+            }
 
             private JObject GradientsJson()
             {
@@ -111,7 +133,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // presets. keep "default" first + exactly matching the dock's shipped :root so selecting it is a true no-op.
+        // presets. keep "default" first + exactly matching the docks shipped :root so selecting it is a true no-op.
         public static readonly List<KeyValuePair<string, string>> PresetOrder = new List<KeyValuePair<string, string>>
         {
             new KeyValuePair<string, string>("default", "OBS Default"),
@@ -127,19 +149,18 @@ namespace ReplayKitHelper
             ["default"] = new Tokens { Bg = "#1D1F26", Panel = "#272A33", Field = "#3C404D", Field2 = "#323540", Border = "#3C404D", BorderStrong = "#5B6273", Text = "#FFFFFF", Muted = "#969696", Disabled = "#7E828C", Accent = "#284CB8", Accent2 = "#476BD7", Danger = "#E33B57", Success = "#37D247", Warning = "#E2A33B", Dark = true },
             // same OBS Yami hues + accent, just the background greys stepped down darker.
             ["obs-darker"] = new Tokens { Bg = "#14161B", Panel = "#1B1D24", Field = "#2A2D36", Field2 = "#23252D", Border = "#2A2D36", BorderStrong = "#404551", Text = "#FFFFFF", Muted = "#969696", Disabled = "#7E828C", Accent = "#284CB8", Accent2 = "#476BD7", Danger = "#E33B57", Success = "#37D247", Warning = "#E2A33B", Dark = true },
-            // same OBS blue accent, backgrounds sit around medal's darkness floor with a cooler blue lean (was near-pure-black, too dark).
-            ["obs-black"] = new Tokens { Bg = "#0A0B0F", Panel = "#16181E", Field = "#22242C", Field2 = "#1E2028", Border = "#282A33", BorderStrong = "#3C3F49", Text = "#FFFFFF", Muted = "#9597A1", Disabled = "#696B75", Accent = "#284CB8", Accent2 = "#476BD7", Danger = "#E33B57", Success = "#37D247", Warning = "#E2A33B", Dark = true },
-            // shadcn "zinc" dark scale + medal brand-primary lime, pulled from %LOCALAPPDATA%\Medal\app-*\resources\app\renderer.min.css (--background/--card/--muted oklch -> hex, --color-brand-primary-400 = #BFF83E). the older #E94F56 coral is medal's secondary, not the ui accent.
-            ["medal"] = new Tokens { Bg = "#09090B", Panel = "#18181B", Field = "#232327", Field2 = "#1C1C1F", Border = "#27272A", BorderStrong = "#3F3F46", Text = "#FAFAFA", Muted = "#A1A1AA", Disabled = "#71717A", Accent = "#BFF83E", Accent2 = "#CFFF53", Danger = "#EB4D55", Success = "#01D28E", Warning = "#FFCA49", Dark = true },
-            // discord dark, verified against themeandcolor.com's token dump: bg tertiary/secondary/floating, text-normal #DBDEE1 (not the brighter header #F2F3F5), brand #5865F2, brand-hover family for accent2
+            // same OBS blue accent, backgrounds sit around medals darkness floor with a cooler blue lean (was near-pure-black, too dark).
+            ["obs-black"] = new Tokens { Bar = "#12141A", Bg = "#0A0B0F", Panel = "#16181E", Field = "#22242C", Field2 = "#1E2028", Border = "#282A33", BorderStrong = "#3C3F49", Text = "#FFFFFF", Muted = "#9597A1", Disabled = "#696B75", Accent = "#284CB8", Accent2 = "#476BD7", Danger = "#E33B57", Success = "#37D247", Warning = "#E2A33B", Dark = true },
+            // shadcn "zinc" dark scale + medal brand-primary lime, pulled from %LOCALAPPDATA%\Medal\app-*\resources\app\renderer.min.css (--background/--card/--muted oklch -> hex, --color-brand-primary-400 = #BFF83E). the older #E94F56 coral is medals secondary, not the ui accent.
+            ["medal"] = new Tokens { Bar = "#121214", Bg = "#09090B", Panel = "#18181B", Field = "#232327", Field2 = "#1C1C1F", Border = "#27272A", BorderStrong = "#3F3F46", Text = "#FAFAFA", Muted = "#A1A1AA", Disabled = "#71717A", Accent = "#BFF83E", Accent2 = "#CFFF53", Danger = "#EB4D55", Success = "#01D28E", Warning = "#FFCA49", Dark = true },
+            // discord dark, verified against themeandcolor.coms token dump: bg tertiary/secondary/floating, text-normal #DBDEE1 (not the brighter header #F2F3F5), brand #5865F2, brand-hover family for accent2
             ["discord"] = new Tokens { Bg = "#1E1F22", Panel = "#2B2D31", Field = "#383A40", Field2 = "#313338", Border = "#3F4147", BorderStrong = "#4E5058", Text = "#DBDEE1", Muted = "#B5BAC1", Disabled = "#80848E", Accent = "#5865F2", Accent2 = "#7984F5", Danger = "#F23F43", Success = "#23A559", Warning = "#F0B232", Dark = true },
             ["light"] = new Tokens { Bg = "#F2F3F5", Panel = "#FFFFFF", Field = "#E9EBEF", Field2 = "#DFE2E7", Border = "#CDD0D6", BorderStrong = "#B4B8C0", Text = "#1A1D24", Muted = "#5C6270", Disabled = "#9AA0AC", Accent = "#2F6FE8", Accent2 = "#5590F5", Danger = "#E23B2E", Success = "#1E8A3C", Warning = "#C05A0B", Dark = false },
         };
 
         public static bool IsPreset(string id) => id != null && Presets.ContainsKey(id);
 
-        // "theme" id -> tokens. "default"/preset -> that preset; "user/<name>" -> the saved json; "custom" -> the
-        // themeCustom object (6 picks + dark, rest derived); anything else -> default.
+        // "theme" id -> tokens. "default"/preset -> that preset; "user/<name>" -> the saved json; "custom" -> the themeCustom object (6 picks + dark, rest derived); anything else -> default.
         public static Tokens Resolve(JObject settings)
         {
             string id = settings?["theme"]?.Value<string>() ?? "default";
@@ -183,13 +204,65 @@ namespace ReplayKitHelper
                 Success = dark ? "#3BA55D" : "#1A7F37",
                 Warning = dark ? "#E2A33B" : "#B45309",
                 Dark = dark,
+                Bar = CleanOptionalHex(c["bar"]?.ToString()),
             };
+            tokens.Offsets = CleanOffsets(c["offsets"]);
+            ApplyOffsets(tokens);
             ApplyGradient(c, tokens);
             return tokens;
         }
 
-        // the :root override the helper splices into every dock page before </head>. covers both var-naming schemes
-        // in use across the dock html (settings.html vs clips/controls.html).
+        // the tokens that follow a formula in FromCustom, and so can carry a step away from it
+        private static readonly string[] OffsetNames = { "field2", "borderStrong", "muted", "disabled", "accent2", "success", "warning" };
+
+        // a payload from the page: the names above only, each as three whole numbers a colour channel moves by, and anything else dropped; null when nothing is left
+        private static JObject CleanOffsets(JToken raw)
+        {
+            if (!(raw is JObject src)) return null;
+            var clean = new JObject();
+            foreach (string name in OffsetNames)
+            {
+                if (!(src[name] is JArray steps) || steps.Count != 3) continue;
+                var channel = new int[3];
+                bool whole = true;
+                for (int i = 0; i < 3 && whole; i++)
+                {
+                    whole = steps[i].Type == JTokenType.Integer && steps[i].Value<long>() >= -255 && steps[i].Value<long>() <= 255;
+                    if (whole) channel[i] = steps[i].Value<int>();
+                }
+                if (whole) clean[name] = new JArray(channel[0], channel[1], channel[2]);
+            }
+            return clean.Count > 0 ? clean : null;
+        }
+
+        // own minus derived per colour channel, left out when the two are the same colour
+        private static void RecordOffset(JObject offsets, string name, string own, string derived)
+        {
+            ToRgb(own, out int ownR, out int ownG, out int ownB);
+            ToRgb(derived, out int derivedR, out int derivedG, out int derivedB);
+            if (ownR == derivedR && ownG == derivedG && ownB == derivedB) return;
+            offsets[name] = new JArray(ownR - derivedR, ownG - derivedG, ownB - derivedB);
+        }
+
+        private static string StepColor(string hex, JObject offsets, string name)
+        {
+            if (offsets == null || !(offsets[name] is JArray steps)) return hex;
+            ToRgb(hex, out int r, out int g, out int b);
+            return ToHex(r + steps[0].Value<int>(), g + steps[1].Value<int>(), b + steps[2].Value<int>());
+        }
+
+        private static void ApplyOffsets(Tokens t)
+        {
+            t.Field2 = StepColor(t.Field2, t.Offsets, "field2");
+            t.BorderStrong = StepColor(t.BorderStrong, t.Offsets, "borderStrong");
+            t.Muted = StepColor(t.Muted, t.Offsets, "muted");
+            t.Disabled = StepColor(t.Disabled, t.Offsets, "disabled");
+            t.Accent2 = StepColor(t.Accent2, t.Offsets, "accent2");
+            t.Success = StepColor(t.Success, t.Offsets, "success");
+            t.Warning = StepColor(t.Warning, t.Offsets, "warning");
+        }
+
+        // the :root override the helper splices into every dock page before </head>. covers both var-naming schemes in use across the dock html (settings.html vs clips/controls.html).
         public static string DockCss(Tokens t)
         {
             string grey8 = Shift(t.Bg, t.Dark ? -0.28 : -0.06);
@@ -199,15 +272,11 @@ namespace ReplayKitHelper
             // beat the anti-FOUC inline style on <html>/<body> and the theme-color meta
             string pageBackground = BackgroundCss(t);
             sb.Append("html,body{background:").Append(pageBackground).Append("!important;color:").Append(t.Text).Append("!important;}");
-            // always emitted, even with no gradient: this stylesheet replaces one that may have set a gradient on
-            // .shell, and a theme that simply omitted the rule left that gradient painted -- html,body{background}
-            // cannot reach .shell. "none" is what actually clears it when switching back to a flat preset.
+            // always emitted, even with no gradient: this stylesheet replaces one that may have set a gradient on .shell, and a theme that simply omitted the rule left that gradient painted -- html,body{background} cannot reach .shell. "none" is what actually clears it when switching back to a flat preset.
             sb.Append("body,.shell{background-image:").Append(t.GradientFor("bg") != null ? pageBackground : "none")
               .Append("!important;background-attachment:fixed!important;}");
             sb.Append("html{color-scheme:").Append(t.Dark ? "dark" : "light").Append("!important;}"); // beat the inline style + <meta>, so native controls/scrollbars flip on a light theme
-            // a surface token paints with its gradient where one is set; everything that needs a real colour --
-            // borders, text, the Mix/Shift maths above, the win32 chrome -- keeps reading the plain field. the
-            // *-solid vars exist for the handful of dock rules that use a surface token as a border colour.
+            // a surface token paints with its gradient where one is set; everything that needs a real colour -- borders, text, the Mix/Shift maths above, the win32 chrome -- keeps reading the plain field. the *-solid vars exist for the handful of dock rules that use a surface token as a border colour.
             string bgPaint = Paint(t, "bg", t.Bg);
             string panelPaint = Paint(t, "panel", t.Panel);
             string fieldPaint = Paint(t, "field", t.Field);
@@ -293,9 +362,7 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
-        // physical stylesheet the dock html files <link> to. the "Custom Controls" dock is loaded from a file:// url
-        // (user.ini ExtraBrowserDocks), so the helper's http-time injection never reaches it -- this file does.
-        // rewritten on every theme change + at startup; empty-ish on the default theme.
+        // physical stylesheet the dock html files <link> to. the "Custom Controls" dock is loaded from a file:// url (user.ini ExtraBrowserDocks), so the helpers http-time injection never reaches it -- this file does. rewritten on every theme change + at startup; empty-ish on the default theme.
         public static void WriteDockThemeCss(JObject settings)
         {
             try
@@ -309,7 +376,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.WriteDockThemeCss: " + ex.Message); }
         }
 
-        // the <style> block ServeHtml injects. "" for the default theme (leave the html's own :root untouched).
+        // the <style> block ServeHtml injects. "" for the default theme (leave the htmls own :root untouched).
         public static string DockStyleTag(JObject settings)
         {
             try
@@ -321,14 +388,10 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.DockStyleTag: " + ex.Message); return ""; }
         }
 
-        // where the target obs theme id is staged between "Apply" and the post-exit relaunch. obs rewrites the whole
-        // user.ini from memory on a graceful close, so a key written now gets clobbered -- restart_obs.ps1 /
-        // ApplyPendingTheme re-splice it once obs is actually gone.
+        // where the target obs theme id is staged between "Apply" and the post-exit relaunch. obs rewrites the whole user.ini from memory on a graceful close, so a key written now gets clobbered -- restart_obs.ps1 / ApplyPendingTheme re-splice it once obs is actually gone.
         public static readonly string PendingThemeMarker = Path.Combine(Constants.OBS_CONFIG_DIR, ".replaykit-theme-pending");
 
-        // writes %APPDATA%\obs-studio\themes\rk_<slug>.ovt (a Yami variant) for non-default themes, sets user.ini now
-        // AND stages the id so the relaunch path can put it back after obs's exit-save clobbers user.ini. returns the
-        // restart-reason token, or "" on failure.
+        // writes %APPDATA%\obs-studio\themes\rk_<slug>.ovt (a Yami variant) for non-default themes, sets user.ini now AND stages the id so the relaunch path can put it back after obss exit-save clobbers user.ini. returns the restart-reason token, or "" on failure.
         public static string ApplyToObs(JObject settings)
         {
             try
@@ -354,8 +417,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.ApplyToObs: " + ex.Message); return ""; }
         }
 
-        // consume the staged marker: re-write user.ini [Appearance] Theme= from it (obs just clobbered it on exit).
-        // safe only once obs is gone; called by restart_obs.ps1's twin path in Program.RelaunchObsAfterClean.
+        // consume the staged marker: re-write user.ini [Appearance] Theme= from it (obs just clobbered it on exit). safe only once obs is gone; called by restart_obs.ps1's twin path in Program.RelaunchObsAfterClean.
         public static void ApplyPendingTheme()
         {
             try
@@ -369,8 +431,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
         }
 
-        // startup reconciler -- only touches disk if the current theme's .ovt is missing or user.ini points somewhere
-        // else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
+        // startup reconciler -- only touches disk if the current themes .ovt is missing or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
         public static void EnsureObsInSync(JObject settings)
         {
             try
@@ -410,8 +471,7 @@ namespace ReplayKitHelper
             sb.Append("@OBSThemeMeta {\n");
             sb.Append("    name: 'RK ").Append(label.Replace("'", "")).Append("';\n");
             sb.Append("    id: '").Append(obsId).Append("';\n");
-            // a light theme extends Yami's Light variant so it inherits the DARK-coloured icon/checkbox SVG set
-            // (theme:Light/*.svg) -- otherwise obs keeps drawing the white Dark icons and they vanish on a light bg.
+            // a light theme extends Yamis Light variant so it inherits the DARK-coloured icon/checkbox SVG set (theme:Light/*.svg) -- otherwise obs keeps drawing the white Dark icons and they vanish on a light bg.
             sb.Append("    extends: '").Append(t.Dark ? "com.obsproject.Yami" : "com.obsproject.Yami.Light").Append("';\n");
             sb.Append("    dark: '").Append(t.Dark ? "true" : "false").Append("';\n");
             sb.Append("}\n\n");
@@ -432,8 +492,7 @@ namespace ReplayKitHelper
             V("--blue3", t.Accent);
             V("--blue4", Shift(t.Accent, -0.16));
             V("--blue5", Shift(t.Accent, -0.3));
-            // Yami-base aliases --primary -> --blue3, but Yami.Light hardcodes --primary, so set the semantic vars
-            // directly -- works whichever base we extend.
+            // yami-base aliases --primary -> --blue3, but Yami.Light hardcodes --primary, so set the semantic vars directly -- works whichever base we extend.
             V("--primary", t.Accent);
             V("--primary_light", t.Accent2);
             V("--primary_lighter", Shift(t.Accent2, 0.16));
@@ -453,7 +512,7 @@ namespace ReplayKitHelper
             V("--yellow1", Shift(t.Warning, 0.12));
             V("--yellow2", t.Warning);
             sb.Append("}\n");
-            // selected rows / tabs / menu items fill with --primary and keep white --text on top (Yami.obt QListView::item:selected etc) -- a light accent like medal's lime makes that unreadable, so when OnColor wants dark ink pin those selected states to it; blue-accent presets skip this untouched
+            // selected rows / tabs / menu items fill with --primary and keep white --text on top (Yami.obt QListView::item:selected etc) -- a light accent like medals lime makes that unreadable, so when OnColor wants dark ink pin those selected states to it; blue-accent presets skip this untouched
             string onAccent = OnColor(t.Accent);
             if (!string.Equals(onAccent, "#FFFFFF", StringComparison.OrdinalIgnoreCase))
             {
@@ -463,8 +522,7 @@ namespace ReplayKitHelper
                 sb.Append("QComboBox QAbstractItemView::item:selected, QTabBar::tab:selected,\n");
                 sb.Append("SourceTreeItem[selected=\"true\"] { color: ").Append(onAccent).Append("; }\n");
             }
-            // only the window gradient goes to OBS: panel/field/accent are used as plain colours all through the
-            // generated .ovt, where a qgradient is not a valid value.
+            // only the window gradient goes to OBS: panel/field/accent are used as plain colours all through the generated .ovt, where a qgradient is not a valid value.
             GradientSpec windowGradient = t.GradientFor("bg");
             if (windowGradient != null)
             {
@@ -560,6 +618,7 @@ namespace ReplayKitHelper
                     Accent2 = Hex(j["accent2"], "#476BD7"), Danger = Hex(j["danger"], "#E33B57"),
                     Success = Hex(j["success"], "#37D247"), Warning = Hex(j["warning"], "#E2A33B"),
                     Dark = j["dark"] == null ? true : j["dark"].Value<bool>(),
+                    Bar = CleanOptionalHex(j["bar"]?.ToString()),
                 };
                 ApplyGradient(j, tokens);
                 return tokens;
@@ -659,8 +718,7 @@ namespace ReplayKitHelper
 
         public static string BackgroundCss(Tokens t) => Paint(t, "bg", t.Bg);
 
-        // the css a token paints with: its gradient when one is set for that token, otherwise its plain colour.
-        // callers that need a real colour (border-color, colour arithmetic, ToColorRef) must use the field directly.
+        // the css a token paints with: its gradient when one is set for that token, otherwise its plain colour. callers that need a real colour (border-color, colour arithmetic, ToColorRef) must use the field directly.
         public static string Paint(Tokens t, string target, string solid)
         {
             GradientSpec spec = t?.GradientFor(target);
@@ -687,9 +745,7 @@ namespace ReplayKitHelper
             return "qlineargradient(x1:" + F(0.5 - dx) + ",y1:" + F(0.5 - dy) + ",x2:" + F(0.5 + dx) + ",y2:" + F(0.5 + dy) + "," + stops + ")";
         }
 
-        // reads the per-token gradients. themes written before gradients were per-token carry a flat
-        // gradientStops/gradientAngle block plus the even older single "gradient" colour -- both are read here as
-        // the bg gradient so an existing custom theme keeps looking the way its author left it.
+        // reads the per-token gradients. themes written before gradients were per-token carry a flat gradientStops/gradientAngle block plus the even older single "gradient" colour -- both are read here as the bg gradient so an existing custom theme keeps looking the way its author left it.
         private static void ApplyGradient(JObject source, Tokens tokens)
         {
             tokens.Gradients = new Dictionary<string, GradientSpec>(StringComparer.OrdinalIgnoreCase);
@@ -708,8 +764,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // accepts both shapes: the per-token one ({type,angle,centerX,centerY,stops}) and the legacy flat one
-        // ({gradientType,gradientAngle,...,gradientStops} plus a bare "gradient" end colour).
+        // accepts both shapes: the per-token one ({type,angle,centerX,centerY,stops}) and the legacy flat one ({gradientType,gradientAngle,...,gradientStops} plus a bare "gradient" end colour).
         private static GradientSpec ReadGradientSpec(JObject source, Tokens tokens)
         {
             if (source == null) return null;
@@ -806,6 +861,35 @@ namespace ReplayKitHelper
                 (int)Math.Round(ar + (br - ar) * w),
                 (int)Math.Round(ag + (bg - ag) * w),
                 (int)Math.Round(ab + (bb - ab) * w));
+        }
+
+        // the title bar and sidebar of a theme that names no colour of its own: a few points of lightness under the stage (more on a light one), same hue and saturation, the step the clean layout drew before the bar was its own colour
+        public static string DeriveBar(string bgHex)
+        {
+            ToRgb(Hex(bgHex, "#000000"), out int r, out int g, out int b);
+            double rf = r / 255.0, gf = g / 255.0, bf = b / 255.0;
+            double max = Math.Max(rf, Math.Max(gf, bf)), min = Math.Min(rf, Math.Min(gf, bf));
+            double l = (max + min) / 2.0, d = max - min, h = 0, s = 0;
+            if (d > 0)
+            {
+                s = d / (1.0 - Math.Abs(2.0 * l - 1.0));
+                if (max == rf) h = ((gf - bf) / d) % 6.0;
+                else if (max == gf) h = (bf - rf) / d + 2.0;
+                else h = (rf - gf) / d + 4.0;
+                if (h < 0) h += 6.0;
+            }
+            l = Math.Max(0.0, l - (l < 0.5 ? 0.035 : 0.05));
+            double c = (1.0 - Math.Abs(2.0 * l - 1.0)) * s;
+            double x = c * (1.0 - Math.Abs(h % 2.0 - 1.0));
+            double m = l - c / 2.0;
+            double r1 = 0, g1 = 0, b1 = 0;
+            if (h < 1) { r1 = c; g1 = x; }
+            else if (h < 2) { r1 = x; g1 = c; }
+            else if (h < 3) { g1 = c; b1 = x; }
+            else if (h < 4) { g1 = x; b1 = c; }
+            else if (h < 5) { r1 = x; b1 = c; }
+            else { r1 = c; b1 = x; }
+            return ToHex((int)Math.Round((r1 + m) * 255.0), (int)Math.Round((g1 + m) * 255.0), (int)Math.Round((b1 + m) * 255.0));
         }
 
         // "#rrggbb" -> win32 COLORREF (0x00bbggrr) for DwmSetWindowAttribute.

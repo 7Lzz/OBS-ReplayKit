@@ -77,12 +77,17 @@ local function read_text(path)
     return text
 end
 
+-- the settings file and the capture signal sit in the replaykit folder, one level above scripts; an install from before that move keeps the settings in scripts until the helper has moved them
 local function runtime_settings_path()
-    return join_path(parent_dir(script_path()), "replaykit_settings.json")
+    local scripts_dir = parent_dir(script_path())
+    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
+    local f = io.open(current, "rb")
+    if f then f:close() return current end
+    return join_path(scripts_dir, "replaykit_settings.json")
 end
 
 local function capture_signal_path()
-    return join_path(parent_dir(script_path()), "hotkey_capture_signal.json")
+    return join_path(parent_dir(parent_dir(script_path())), "hotkey_capture_signal.json")
 end
 
 local function valid_obs_key(key)
@@ -231,9 +236,7 @@ local function refresh_hotkeys(force)
     log(obs.LOG_INFO, "Loaded OBS native hotkeys: " .. signature)
 end
 
--- written by the c# helper when the settings dock starts/stops capturing a new hotkey combo. fast-polled
--- (CAPTURE_POLL_SECONDS) separately from the REFRESH_SECONDS saved-settings sync above, since this is the
--- signal that actually has to beat a users reaction time.
+-- written by the c# helper when the settings dock starts/stops capturing a new hotkey combo. fast-polled (CAPTURE_POLL_SECONDS) separately from the REFRESH_SECONDS saved-settings sync above, since this is the signal that actually has to beat a users reaction time.
 local function read_capture_signal()
     local text = read_text(capture_signal_path())
     if not text or text == "" then return nil end
@@ -267,9 +270,7 @@ local function apply_capture_signal()
     end
 end
 
--- a signal left at active:true by a crashed prior obs session would otherwise blank the native hotkeys
--- forever -- obs has no equivalent restart hook to clear this on the way the c# helper does for its own copy,
--- so a fresh script load always resets it on disk before the fast poll starts trusting it.
+-- a signal left at active:true by a crashed prior obs session would otherwise blank the native hotkeys forever -- obs has no equivalent restart hook to clear this on the way the c# helper does for its own copy, so a fresh script load always resets it on disk before the fast poll starts trusting it.
 local function write_capture_signal_inactive()
     local f = io.open(capture_signal_path(), "wb")
     if not f then return end

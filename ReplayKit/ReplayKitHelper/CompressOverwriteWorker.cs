@@ -13,7 +13,7 @@ namespace ReplayKitHelper
         public string Message;
     }
 
-    // compresses a clip locally with the machines best available encoder and atomically replaces the original -- no upload. runs as an in-process Task from CompressOverwrite.StartCompressOverwriteFile. ported from the embedded worker script inside obs_replaykit helper modules/42_compress_overwrite.ps1 -- that script already ran as an in-process runspace in the ps original (not a spawned powershell.exe), so this port only changes the invocation mechanism (Task instead of [powershell]::Create() on a RunspacePool), not the architecture. progress/cancellation/marker-writing that the ps worker had to duplicate inline (becuase a runspace cant see the main scripts function scope) call the real shared helpers directly here: UploadState.SetUploadState for progress, Clips.MarkCompressed for the clips_db marker.
+    // compresses a clip locally with the best encoder the machine has and atomically replaces the original, reporting progress through UploadState and writing the compress marker through Clips.MarkCompressed
     internal static class CompressOverwriteWorker
     {
         private static List<string> Combine(List<string> head, string[] mid, List<string> tail)
@@ -58,8 +58,8 @@ namespace ReplayKitHelper
             try { preSize = new FileInfo(sourcePath).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             string comment = "obs-replaykit_compress_v2_" + tagMode + ":" + tagTs + ":" + preSize;
 
-            // build encoder-specific argv. goals: fast mode -> shortest wall time, ok quality. gpu encoders win here becuase they barely touch the cpu (so games keep running fine) and ffmpeg sustains 5-10x realtime on them. smaller mode -> smallest file at watch-anywhere quality. cpu sw encoders win here -- libx265 is ~2-3x more bit-efficient than nvenc/amf/qsv at matched perceptual quality. qp / crf targets are picked one or two notches below the obs source, so the output is guaranteed to be a step worse perceptually and a noticeable step smaller in size -- the size guard further down verifies that and reverts the replace if the output is somehow not smaller.
-            var commonHead = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-i", sourcePath };
+            // build encoder-specific argv. goals: fast mode -> shortest wall time, ok quality. gpu encoders win here becuase they barely touch the cpu (so games keep running fine) and ffmpeg sustains 5-10x realtime on them. smaller mode -> smallest file at watch-anywhere quality. cpu sw encoders win here -- libx265 is ~2-3x more bit-efficient than nvenc/amf/qsv at matched perceptual quality. qp / crf targets are picked one or two notches below the obs source, so the output is guaranteed to be a step worse perceptually and a noticeable step smaller in size -- the size guard further down verifies that and reverts the replace if the output is somehow not smaller. the first video stream and every audio stream, so a clip recorded with separate audio tracks keeps all of them; ffmpeg alone would pick one
+            var commonHead = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-i", sourcePath, "-map", "0:v:0", "-map", "0:a?" };
             // optional resolution reduction folded into the same encode. -2 keeps aspect + even width; min(ih,H) never upscales, so this is a no-op if the source is already at/below the target.
             if (scaleHeight > 0)
                 commonHead.AddRange(new[] { "-vf", "scale=-2:min(ih\\," + scaleHeight + ")" });
@@ -119,9 +119,6 @@ namespace ReplayKitHelper
 
             // drop to belownormal so a running encode never starves the users foreground apps (game, browser, obs itself). best-effort: if PriorityClass fails (rare race / weird security context), the encode just runs at normal.
             try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is NotSupportedException) { }
-
-            // exposes the live ffmpeg process on the job record so UploadState.CancelActiveUpload can kill it directly -- replaces the ps originals $statusPath.pid sidecar file, which existed only becuase that worker ran in a seperate runspace unable to reach $script:State.
-            UploadState.SetUploadState(requestId: requestId, encoderProcess: proc);
 
             // stderr is collected once at end for diagnostics only.
             var stderrTask = proc.StandardError.ReadToEndAsync();

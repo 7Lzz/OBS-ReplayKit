@@ -1,0 +1,27 @@
+<!-- shared partial (helper #include target: shell-nav). the history of the clean shell, from inside a page: alt + left and alt + right, and the two side buttons of the mouse, go back and forward through the views the way a browser does. the plugin keeps the history, so the page only says which way, through the helper. the pages of the shell are cef windows that qt never sees, which is why this is here and not in the plugin; the arrows of the title bar and the qt parts of the window have their own way in, and the plugin counts one press once -->
+<script>
+(function () {
+  var inShell = false;
+  try { inShell = new URLSearchParams(location.search).get("embedded") === "1" || location.pathname === "/shell-view"; } catch (_) {}
+  if (!inShell) return;
+  var base = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  function go(direction) {
+    fetch(base + "/shell/nav?dir=" + direction + "&t=" + Date.now(), { method: "POST", cache: "no-store" }).catch(function () {});
+  }
+  window.addEventListener("keydown", function (e) {
+    if (!e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    if (!e.repeat) go(e.key === "ArrowLeft" ? "back" : "forward");
+  }, true);
+  // a browser walks its own history on these buttons, which for a page inside the window leads nowhere
+  function side(e) { return e.button === 3 || e.button === 4; }
+  window.addEventListener("mousedown", function (e) { if (side(e)) e.preventDefault(); }, true);
+  window.addEventListener("auxclick", function (e) { if (side(e)) e.preventDefault(); }, true);
+  window.addEventListener("mouseup", function (e) {
+    if (!side(e)) return;
+    e.preventDefault();
+    go(e.button === 3 ? "back" : "forward");
+  }, true);
+})();
+</script>

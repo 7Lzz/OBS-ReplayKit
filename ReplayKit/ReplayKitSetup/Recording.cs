@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // recording presets -- resolution + fps + cqp target tier. the actual encoder json is built per-machine in Encoder.cs from the detected gpu + codec preference, so the same preset works on nvidia/amd/intel/software. ported from obs_replaykit/recording.py.
+    // recording presets -- resolution + fps + cqp target tier. the actual encoder json is built per-machine in Encoder.cs from the detected gpu + codec preference, so the same preset works on nvidia/amd/intel/software.
     public sealed class RecordingPreset
     {
         public string Name { get; }

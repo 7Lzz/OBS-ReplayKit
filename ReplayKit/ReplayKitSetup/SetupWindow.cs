@@ -12,9 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // the modern setup window: a raw win32 window (no WinForms/WPF -- trimming forbids them) hosting a CoreWebView2
-    // controller that renders setup_installer.html. the install itself still runs on a worker thread via
-    // Apply.RunInstallFlow; progress is pushed to the page as json messages. reuses the Native p/invoke surface from InstallerWindow.cs.
+    // the modern setup window: a raw win32 window (no WinForms/WPF -- trimming forbids them) hosting a CoreWebView2 controller that renders setup_installer.html. the install itself still runs on a worker thread via Apply.RunInstallFlow; progress is pushed to the page as json messages. reuses the Native p/invoke surface from InstallerWindow.cs.
     internal sealed class SetupWindow : IDisposable
     {
         private const string ClassName = "ReplayKitSetupWindow";
@@ -26,8 +24,7 @@ namespace ReplayKitSetup
         private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
         // 20 = immersive dark mode (19 on pre-20H1), 34 = border colour, 35 = caption colour. COLORREF is 0x00bbggrr.
         private const int DWMWA_DARK = 20, DWMWA_DARK_PRE20H1 = 19, DWMWA_BORDER_COLOR = 34, DWMWA_CAPTION_COLOR = 35;
-        // the helper gives its own windows (Clips, Settings) a caption in the theme PANEL colour, a touch lighter than
-        // the window body -- not a flat match. mirror that: panel #272A33, border #3C404D (--line).
+        // the helper gives its own windows (Clips, Settings) a caption in the theme PANEL colour, a touch lighter than the window body -- not a flat match. mirror that: panel #272A33, border #3C404D (--line).
         private const int CaptionColorRef = 0x00332A27; // #272A33 (--panel)
         private const int BorderColorRef = 0x004D403C;  // #3C404D (--line)
 
@@ -70,8 +67,7 @@ namespace ReplayKitSetup
             int w = S(560), h = S(370);
             int x = (Native.GetSystemMetrics(0) - w) / 2;
             int y = (Native.GetSystemMetrics(1) - h) / 2;
-            // a plain titled window -- WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, no thickframe/maximize so it stays a
-            // fixed installer dialog. dwm themes + rounds the frame on its own.
+            // a plain titled window -- WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, no thickframe/maximize so it stays a fixed installer dialog. dwm themes + rounds the frame on its own.
             const uint style = 0x00C00000 | 0x00080000 | 0x00020000;
             _hwnd = Native.CreateWindowExW(0, ClassName, "OBS ReplayKit Setup", style, x, y, w, h,
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
@@ -128,8 +124,7 @@ namespace ReplayKitSetup
 
         private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
-            // the page posts JSON.stringify(obj), i.e. a string -- read it as a string (WebMessageAsJson would hand back
-            // the value re-quoted and JObject.Parse would throw). same read UpdatePromptWindow.cs uses.
+            // the page posts JSON.stringify(obj), i.e. a string -- read it as a string (WebMessageAsJson would hand back the value re-quoted and JObject.Parse would throw). same read UpdatePromptWindow.cs uses.
             string json;
             try { json = e.TryGetWebMessageAsString(); }
             catch (Exception) { try { json = e.WebMessageAsJson; } catch (Exception) { return; } }
@@ -142,8 +137,7 @@ namespace ReplayKitSetup
             switch (o.Value<string>("cmd"))
             {
                 case "start":
-                    // discord is only sent when the opt-in checkbox was on screen. absent -> leave the setting as loaded
-                    // (the live file for an update, the default after a clean re-install wiped it).
+                    // discord is only sent when the opt-in checkbox was on screen. absent -> leave the setting as loaded (the live file for an update, the default after a clean re-install wiped it).
                     bool? discord = o["discord"]?.Type == JTokenType.Boolean ? o.Value<bool>("discord") : (bool?)null;
                     StartInstall(discord, o.Value<string>("mode") == "reinstall");
                     break;
@@ -206,8 +200,7 @@ namespace ReplayKitSetup
 
         // ---- page <-> host ----
 
-        // JObject, not an anonymous type: the app assembly is trimmed and Newtonsoft's reflection serializer cannot keep
-        // an anon type's getters alive, so JsonConvert.SerializeObject(new { ... }) can come back as "{}".
+        // JObject, not an anonymous type: the app assembly is trimmed and Newtonsofts reflection serializer cannot keep an anon types getters alive, so JsonConvert.SerializeObject(new { ... }) can come back as "{}".
         internal void PostToPage(JObject payload)
         {
             string json = payload.ToString(Formatting.None);
@@ -289,16 +282,14 @@ namespace ReplayKitSetup
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 html = reader.ReadToEnd();
             }
-            // the hero art + brand icon are the same files the update window fetches over http; there is no helper here,
-            // so pull them straight out of the embedded asset bundle and inline them as data uris.
+            // the hero art + brand icon are the same files the update window fetches over http; there is no helper here, so pull them straight out of the embedded asset bundle and inline them as data uris.
             html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
             html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
             html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
             return html;
         }
 
-        // {installed, cable, screenshare} -- lets the page show Update / Re-Install instead of Install and pre-check the
-        // Discord opt-in when the audio cable is already on the machine (or the current settings file has it on).
+        // {installed, cable, screenshare} -- lets the page show Update / Re-Install instead of Install and pre-check the Discord opt-in when the audio cable is already on the machine (or the current settings file has it on).
         private static string DetectSetupState()
         {
             bool installed = false, screenshare = false;
@@ -347,8 +338,7 @@ namespace ReplayKitSetup
             return 1.0;
         }
 
-        // dark caption + themed caption/border colour, same treatment the helper gives its own windows -- otherwise
-        // win11 draws a plain light title bar on top of the dark webview content.
+        // dark caption + themed caption/border colour, same treatment the helper gives its own windows -- otherwise win11 draws a plain light title bar on top of the dark webview content.
         private void ApplyDarkTitleBar()
         {
             try
@@ -395,8 +385,7 @@ namespace ReplayKitSetup
             if (_brushBg != IntPtr.Zero) Native.DeleteObject(_brushBg);
         }
 
-        // resumes awaited continuations from InitWebViewAsync on the window message thread via the same queue the
-        // worker->ui path uses.
+        // resumes awaited continuations from InitWebViewAsync on the window message thread via the same queue the worker->ui path uses.
         private sealed class QueueSyncContext : SynchronizationContext
         {
             private readonly SetupWindow _w;
@@ -406,8 +395,7 @@ namespace ReplayKitSetup
             public override SynchronizationContext CreateCopy() => this;
         }
 
-        // IInstallProgress that pushes every callback to setup_installer.html as a json message. arrives on the worker
-        // thread; PostToPage marshals to the message thread.
+        // IInstallProgress that pushes every callback to setup_installer.html as a json message. arrives on the worker thread; PostToPage marshals to the message thread.
         private sealed class BridgeProgress : IInstallProgress
         {
             private readonly SetupWindow _w;

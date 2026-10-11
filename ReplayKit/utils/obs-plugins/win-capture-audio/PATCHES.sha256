@@ -1,0 +1,4 @@
+a9a370b315b2f682568e0e7b090cde8a4f68b53e58646dda8924bcf7b60b76cb  0001-keep-exclude-mode-on-per-app-capture.patch
+04043ab018dd4d1b6fcefbd1d76c4055740772fe4dd68b5832f0c251b907e153  0002-build-id.patch
+970ba7da7c63b96a04a7468069c8100889ceb65b3e42fed9f9aacc93d2f6a5ed  0003-guard-the-capture-buffer-read.patch
+3c8da447997fab8be11e4e35897fa20a508c3425f7a6e31525286adf579efa86  0004-heap-allocated-wasapi-callbacks.patch

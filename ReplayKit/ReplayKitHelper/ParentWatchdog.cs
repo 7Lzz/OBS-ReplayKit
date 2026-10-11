@@ -4,7 +4,7 @@ using System.Management;
 
 namespace ReplayKitHelper
 {
-    // tracks the process that spawned this helper (obs64.exe, via lua spawn_hidden) so the helper can exit voluntarily once its specific parent is gone, instead of orphaning and jamming port 8767 forever. pinned by both pid and start time so pid reuse cant fool it. ported from obs_replaykit helper modules/90_runtime.ps1's parent-identity block + Check-ParentAlive.
+    // tracks the obs process that spawned this helper (via lua) so the helper exits once that obs is gone instead of holding port 8767; pinned by pid and start time so pid reuse cannot fool it
     internal static class ParentWatchdog
     {
         public static int ParentPid { get; private set; }
@@ -16,7 +16,7 @@ namespace ReplayKitHelper
         private static DateTime _lastCheck = DateTime.MinValue;
         private static bool _resolved;
 
-        // resolves parent pid/name/starttime via wmi (not Process, which has no "get my own parent" api on net48). safe to call more than once -- only the first call matters, since a processs parent never changes after launch.
+        // resolves parent pid/name/start time through wmi, since net48 has no api for the parent process; only the first call does anything
         public static void Resolve()
         {
             if (_resolved) return;
@@ -39,7 +39,7 @@ namespace ReplayKitHelper
 
             if (ParentPid <= 0) return;
 
-            // Get-Process fails (access denied) when the parent runs at a higher integrity level than us -- e.g. admin obs64 launching a non-admin helper. wmi can often still see the name/start time in that case, so it is the fallback, not the primary source.
+            // opening the process fails when the parent runs at a higher integrity level (admin obs, non-admin helper), so wmi is the fallback for the name and start time
             try
             {
                 using (var proc = Process.GetProcessById(ParentPid))
@@ -57,9 +57,7 @@ namespace ReplayKitHelper
                 ResolveParentViaWmi();
             }
 
-            // Lua can be hosted by a short-lived OBS browser child instead of the
-            // main OBS process. Watch the actual OBS lifetime in that case so the
-            // helper does not disappear as soon as the child exits.
+            // lua can be hosted by a short-lived obs child process, so the running obs is watched instead and the helper does not exit as soon as that child does
             if (!IsMainObsProcess(ParentName)) ResolveRunningObs();
         }
 
@@ -118,7 +116,7 @@ namespace ReplayKitHelper
             catch (ManagementException) { }
         }
 
-        // opens a real os handle on the parent so CheckAlive can poll GetExitCodeProcess instead of relying purely on Get-Process. PROCESS_QUERY_LIMITED_INFORMATION works cross-integrity-level. returns false if we have no known parent, or the parent is already gone / at a integrity level we cant even query -- either way the caller should exit rather than risk a non-admin orphan jamming the port while the correctly-elevated helper is waiting to bind it.
+        // opens a handle on the parent so CheckAlive can poll GetExitCodeProcess; PROCESS_QUERY_LIMITED_INFORMATION works across integrity levels. false when there is no known parent or it cannot be opened, which the caller only logs
         public static bool OpenHandle()
         {
             if (ParentPid <= 0) return true;
@@ -126,7 +124,7 @@ namespace ReplayKitHelper
             return _parentHandle != IntPtr.Zero;
         }
 
-        // kernel signal first (instant, no polling interval), then a throttled Get-Process fallback pinned by start time. mirrors Check-ParentAlive exactly, including the 5s throttle and the "never knew parent, dont enforce" escape hatch.
+        // kernel signal first, then a throttled lookup pinned by start time; a parent that was never known is never enforced
         public static bool CheckAlive()
         {
             if (_parentHandle != IntPtr.Zero && Native.ParentExited(_parentHandle))

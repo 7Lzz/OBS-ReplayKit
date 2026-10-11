@@ -12,9 +12,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitSetup
 {
-    // the modern uninstall window: the twin of SetupWindow, hosting uninstall_prompt.html. the removal runs on a
-    // worker thread via Cleanup.RunCleanup; progress is pushed to the page as json messages. auto-runs on load
-    // (the confirm already happened in the settings dialog), then relaunches OBS unless OBS itself was removed.
+    // the modern uninstall window: the twin of SetupWindow, hosting uninstall_prompt.html. the removal runs on a worker thread via Cleanup.RunCleanup; progress is pushed to the page as json messages. auto-runs on load (the confirm already happened in the settings dialog), then relaunches OBS unless OBS itself was removed.
     internal sealed class UninstallWindow : IDisposable
     {
         private const string ClassName = "ReplayKitUninstallWindow";
@@ -80,8 +78,7 @@ namespace ReplayKitSetup
             _outerW = w; _outerH = h;
             int x = (Native.GetSystemMetrics(0) - w) / 2;
             int y = (Native.GetSystemMetrics(1) - h) / 2;
-            // borderless like the update window: keep WS_THICKFRAME (dwm needs it to round the corners) + WS_SYSMENU +
-            // WS_MINIMIZEBOX, drop WS_CAPTION, and eat the whole non-client area in WM_NCCALCSIZE so no title bar draws.
+            // borderless like the update window: keep WS_THICKFRAME (dwm needs it to round the corners) + WS_SYSMENU + WS_MINIMIZEBOX, drop WS_CAPTION, and eat the whole non-client area in WM_NCCALCSIZE so no title bar draws.
             const uint style = 0x00040000 | 0x00080000 | 0x00020000; // WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX
             _hwnd = Native.CreateWindowExW(0, ClassName, "OBS ReplayKit Uninstall", style, x, y, w, h,
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
@@ -300,8 +297,7 @@ namespace ReplayKitSetup
                     return IntPtr.Zero;
             }
             IntPtr res = Native.DefWindowProcW(hWnd, msg, wParam, lParam);
-            // WM_NCHITTEST: turn every resize-border hit (HTLEFT..HTBOTTOMRIGHT = 10..17) into client so WS_THICKFRAME
-            // cannot be used to edge-drag-resize the window.
+            // WM_NCHITTEST: turn every resize-border hit (HTLEFT..HTBOTTOMRIGHT = 10..17) into client so WS_THICKFRAME cannot be used to edge-drag-resize the window.
             if (msg == 0x0084)
             {
                 int hit = res.ToInt32();
@@ -425,8 +421,7 @@ namespace ReplayKitSetup
             public override SynchronizationContext CreateCopy() => this;
         }
 
-        // IInstallProgress that pushes every callback to uninstall_prompt.html as a json message. arrives on the
-        // worker thread; PostToPage marshals to the message thread. same shape as SetupWindow.BridgeProgress.
+        // IInstallProgress that pushes every callback to uninstall_prompt.html as a json message. arrives on the worker thread; PostToPage marshals to the message thread. same shape as SetupWindow.BridgeProgress.
         private sealed class BridgeProgress : IInstallProgress
         {
             private readonly UninstallWindow _w;
