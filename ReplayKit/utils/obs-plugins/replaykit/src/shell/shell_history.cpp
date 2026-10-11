@@ -82,12 +82,12 @@ void ShellHistoryNote(ShellView view)
 
 bool ShellCanGoBack()
 {
-	return g_model.Target(-1, Openable) >= 0;
+	return g_shellView != ShellView::Setup && g_model.Target(-1, Openable) >= 0;
 }
 
 bool ShellCanGoForward()
 {
-	return g_model.Target(1, Openable) >= 0;
+	return g_shellView != ShellView::Setup && g_model.Target(1, Openable) >= 0;
 }
 
 bool ShellHistoryGo(int direction)

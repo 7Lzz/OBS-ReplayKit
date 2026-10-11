@@ -13,6 +13,7 @@
 #include "shell/shell_frame.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage.hpp"
+#include "shell/shell_views.hpp"
 #include "ui/anchored_panel.hpp"
 
 namespace rk {
@@ -162,6 +163,8 @@ void EndCardWarm()
 		g_card->hide();
 		g_card->setAttribute(Qt::WA_ShowWithoutActivating, false);
 	}
+	if (ShellSetupLocked())
+		ShellReclaimForeground();
 	// the page starts its polling when it loads, the way it does when the card opens, and a card that is not up has no use for it
 	RunScript("window.__replaykitHideStorage && window.__replaykitHideStorage();");
 	if (!g_cardOpenWaits)
@@ -332,7 +335,7 @@ void StorageModalFollow()
 
 void StorageModalOpen()
 {
-	if (StorageModalIsOpen())
+	if (StorageModalIsOpen() || ShellSetupLocked())
 		return;
 	QWidget *host = g_mainWindow ? g_mainWindow.data() : (QWidget *)obs_frontend_get_main_window();
 	if (!host || !host->isVisible() || host->isMinimized())

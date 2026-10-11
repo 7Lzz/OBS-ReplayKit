@@ -87,6 +87,17 @@ void ShellRail::SetSelected(int id)
 	update();
 }
 
+void ShellRail::SyncLock()
+{
+	const bool locked = ShellSetupLocked();
+	if (locked) {
+		SetHover(-1);
+		m_pressed = -1;
+	}
+	m_storage->setEnabled(!locked);
+	update();
+}
+
 void ShellRail::SetShare(bool available, bool enabled)
 {
 	if (available == m_shareAvailable && enabled == m_shareOn)
@@ -104,12 +115,12 @@ void ShellRail::leaveEvent(QEvent *event)
 
 void ShellRail::mouseMoveEvent(QMouseEvent *event)
 {
-	SetHover(HitItem(event->position().toPoint()));
+	SetHover(ShellSetupLocked() ? -1 : HitItem(event->position().toPoint()));
 }
 
 void ShellRail::mousePressEvent(QMouseEvent *event)
 {
-	if (event->button() != Qt::LeftButton)
+	if (event->button() != Qt::LeftButton || ShellSetupLocked())
 		return;
 	m_pressed = HitItem(event->position().toPoint());
 	update();
@@ -135,10 +146,13 @@ void ShellRail::paintEvent(QPaintEvent *)
 	p.fillRect(rect(), g_chromeBar);
 
 	const qreal dpr = devicePixelRatioF();
+	const bool locked = ShellSetupLocked();
+	if (locked)
+		p.setOpacity(0.4);
 	for (int i = 0; i < m_items.size(); ++i) {
 		const Item &item = m_items[i];
 		const QRectF r = ItemRect(i);
-		const bool selected = item.id == m_selected;
+		const bool selected = !locked && item.id == m_selected;
 		const bool hover = i == m_hover;
 		const bool down = i == m_pressed;
 		if (selected || hover || down) {

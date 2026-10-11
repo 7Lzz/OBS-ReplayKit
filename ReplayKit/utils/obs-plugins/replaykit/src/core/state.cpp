@@ -11,6 +11,7 @@ bool g_clipsFullscreenActive = false;
 bool g_shellNativeFullscreen = false;
 QPointer<QWidget> g_settingsWindow;
 QPointer<QWidget> g_setupWindow;
+bool g_setupPending = false;
 bool g_closeToTray = true;
 QPointer<QWidget> g_mainWindow;
 QElapsedTimer g_menuShownTimer;

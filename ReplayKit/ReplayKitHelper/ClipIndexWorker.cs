@@ -163,7 +163,7 @@ namespace ReplayKitHelper
                 ["updatedAt"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 ["clips"] = entries,
             };
-            string json = payload.ToString(Formatting.None);
+            string json = payload.ToString(Formatting.Indented);
             Directory.CreateDirectory(Constants.SCRATCH_DIR);
             string tmp = Path.Combine(Constants.SCRATCH_DIR, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
             File.WriteAllText(tmp, json, Utf8NoBom);

@@ -15,6 +15,8 @@ void ShellSurfaceView();
 void ShellRaiseGrip();
 // false when the change did not happen: the shell is not up, the obs settings are not built, or their dialog would not close
 bool ShellActivate(ShellView view);
+bool ShellSetupLocked();
+void ShellReclaimForeground();
 void ShellHostShown(const std::string &name);
 void ShellOpenSettingsPage(const QString &page);
 void ShellEnsureHost();

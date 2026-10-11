@@ -56,19 +56,22 @@
     padding:14px 10px 0 14px;
     position:relative;
   }
-  .wiz-head { padding:2px 8px 12px 0; }
-  /* one segmented bar -- the step labels ARE the progress track, filled left to right */
-  .wiz-prog {
-    display:flex; gap:2px; height:26px; border-radius:6px; overflow:hidden; background:var(--line);
+  .wiz-head { padding:0 8px 10px 0; }
+  .wiz-tabs { display:flex; align-items:center; gap:2px; }
+  .tab {
+    position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    height:30px; padding:0 11px 0 9px; border:0; border-radius:6px; background:transparent;
+    color:rgba(var(--text-rgb), .62); font-weight:700; cursor:pointer; white-space:nowrap;
+    --hover_grow:1.02; --press_shrink:.985;
   }
-  .wiz-seg {
-    flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:center;
-    background:var(--field); color:var(--muted); font-size:10.5px; letter-spacing:.2px;
-    transition:background 160ms linear, color 160ms linear;
-  }
-  .wiz-seg > span { max-width:100%; padding:0 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .wiz-seg.is-done { background:var(--selected2); color:var(--on-accent); }
-  .wiz-seg.is-current { background:var(--selected); color:var(--on-accent); font-weight:600; }
+  .tab:hover { background:rgba(var(--text-rgb), .08); color:rgb(var(--text-rgb)); }
+  .tab:active { background:rgba(var(--text-rgb), .13); }
+  .tab.is-active,
+  .tab.is-active:hover,
+  .tab.is-active:active { background:rgba(var(--text-rgb), .16); color:rgb(var(--text-rgb)); }
+  .tab:disabled { pointer-events:none; }
+  .tab svg { width:16px; height:16px; flex:0 0 auto; fill:currentColor; }
+  .tab-text { position:relative; top:-1px; }
 
   .box {
     background:var(--panel); border-radius:4px;
@@ -82,6 +85,22 @@
 
   .panel { animation:rk-page-in 190ms var(--ease_smooth) both; }
   @keyframes rk-page-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+
+  .panel[data-step="done"]:not([hidden]) {
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:0 32px 36px; text-align:center; animation:none;
+  }
+  .done-mark { width:96px; height:96px; margin-bottom:24px; overflow:visible; }
+  .done-ring, .done-tick {
+    fill:none; stroke:var(--success); stroke-width:3.5; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:1 3; stroke-dashoffset:1.02;
+  }
+  .done-ring { fill:var(--success); fill-opacity:0; transform:rotate(-90deg); transform-origin:50% 50%; animation:rk-done-draw 640ms var(--ease_smooth) 80ms forwards, rk-done-fill 420ms ease-out 420ms forwards; }
+  .done-tick { animation:rk-done-draw 380ms var(--ease_smooth) 580ms forwards; }
+  .done-title { font-size:40px; font-weight:700; line-height:1.15; letter-spacing:-.2px; animation:rk-page-in 460ms var(--ease_smooth) 520ms both; }
+  .done-msg { max-width:440px; margin-top:12px; color:var(--muted); font-size:15px; line-height:1.5; animation:rk-page-in 460ms var(--ease_smooth) 660ms both; }
+  @keyframes rk-done-draw { to { stroke-dashoffset:0; } }
+  @keyframes rk-done-fill { to { fill-opacity:.12; } }
 
   .form-row {
     --rk-row-pad:12px;
@@ -207,6 +226,10 @@
   .btn[hidden] { display:none; }
 
 
+  @media (max-width:780px) {
+    .tab svg { display:none; }
+    .tab { padding:0 9px; }
+  }
   @media (max-width:760px) {
     .form-row { grid-template-columns:130px minmax(180px,1fr); --rk-label-col:130px; }
     .hotkey-row { grid-template-columns:150px minmax(160px,1fr) auto; }
@@ -224,14 +247,35 @@
 <!--#include tooltip-->
 <div class="shell">
   <div class="wiz-head">
-    <div class="wiz-prog" id="crumbs">
-      <div class="wiz-seg" data-step="1"><span>Welcome</span></div>
-      <div class="wiz-seg" data-step="2"><span>Recording</span></div>
-      <div class="wiz-seg" data-step="3"><span>Clip length</span></div>
-      <div class="wiz-seg" data-step="4"><span>Microphone</span></div>
-      <div class="wiz-seg" data-step="5"><span>Hotkeys</span></div>
-      <div class="wiz-seg" data-step="6"><span>Overlay</span></div>
-      <div class="wiz-seg" data-step="7"><span>Appearance</span></div>
+    <div class="wiz-tabs" id="crumbs">
+      <button class="tab" type="button" data-step="1">
+        <svg data-i="nav/tab-welcome" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Welcome</span>
+      </button>
+      <button class="tab" type="button" data-step="2">
+        <svg data-i="nav/tab-output" viewBox="0 0 16 16" aria-hidden="true"></svg>
+        <span class="tab-text">Recording</span>
+      </button>
+      <button class="tab" type="button" data-step="3">
+        <svg data-i="action/content-cut" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Clip length</span>
+      </button>
+      <button class="tab" type="button" data-step="4">
+        <svg data-i="audio/microphone" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Microphone</span>
+      </button>
+      <button class="tab" type="button" data-step="5">
+        <svg data-i="nav/tab-hotkeys" viewBox="0 0 16 16" aria-hidden="true"></svg>
+        <span class="tab-text">Hotkeys</span>
+      </button>
+      <button class="tab" type="button" data-step="6">
+        <svg data-i="nav/tab-overlay" viewBox="0 0 16 16" aria-hidden="true"></svg>
+        <span class="tab-text">Overlay</span>
+      </button>
+      <button class="tab" type="button" data-step="7">
+        <svg data-i="nav/tab-appearance" viewBox="0 0 16 16" aria-hidden="true"></svg>
+        <span class="tab-text">Appearance</span>
+      </button>
     </div>
   </div>
 
@@ -332,8 +376,12 @@
     </section>
 
     <section class="panel" data-step="done" hidden>
-      <div class="box-title">All set</div>
-      <div class="box-lead" id="doneMsg">ReplayKit is ready. This window will close on its own.</div>
+      <svg class="done-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <circle class="done-ring" cx="32" cy="32" r="28" pathLength="1"/>
+        <path class="done-tick" d="M21.5 33L29 40.5L43 25" pathLength="1"/>
+      </svg>
+      <div class="done-title">All set</div>
+      <div class="done-msg" id="doneMsg">ReplayKit is ready. This window will close on its own.</div>
     </section>
   </div>
 
@@ -347,7 +395,7 @@
 </div>
 
 <script>
-  if (window.RKHover) RKHover.apply(document, { control: ".btn, .icon-btn, .spin-btn" });
+  if (window.RKHover) RKHover.apply(document, { control: ".btn, .icon-btn, .spin-btn, .tab" });
   // fill the <svg data-i="..."> placeholders from the helper-injected window.RK_ICONS map (same as settings.html)
   (function () {
     const m = window.RK_ICONS || {};
@@ -667,17 +715,16 @@
 
   // ---- step navigation ---- set when the user drags the overlay in the projector, so Finish knows to push a position at the scene item
   let step = 1;
-  const crumbs = Array.from(document.querySelectorAll(".wiz-seg"));
+  const crumbs = Array.from(document.querySelectorAll(".wiz-tabs .tab"));
+  function setTabsDisabled(off) { crumbs.forEach((c) => { c.disabled = off; }); }
   function showStep(n) {
+    if (step === 2) state.clipDir = els.clipDir.value.trim();
+    if (step === 3) commitReplaySeconds(readReplaySeconds());
     step = n;
     els.panels.forEach((p) => { p.hidden = p.dataset.step !== String(n); });
     const done = n === "done";
-    const shown = done ? TOTAL_STEPS : n;
-    crumbs.forEach((c) => {
-      const cs = Number(c.dataset.step);
-      c.classList.toggle("is-current", !done && cs === n);
-      c.classList.toggle("is-done", cs < shown || done);
-    });
+    crumbs.forEach((c) => { c.classList.toggle("is-active", !done && Number(c.dataset.step) === n); });
+    setTabsDisabled(done);
     els.backBtn.hidden = done;
     els.nextBtn.hidden = done;
     els.backBtn.disabled = done || n <= 1;
@@ -691,11 +738,13 @@
   els.backBtn.addEventListener("click", () => { if (typeof step === "number" && step > 1) showStep(step - 1); });
   els.nextBtn.addEventListener("click", async () => {
     if (activeHotkeyField) return;
-    if (step === 3) commitReplaySeconds(readReplaySeconds());
-    if (step === 2) state.clipDir = els.clipDir.value.trim();
     if (typeof step === "number" && step < TOTAL_STEPS) { showStep(step + 1); return; }
     await finish();
   });
+  crumbs.forEach((c) => c.addEventListener("click", () => {
+    const n = Number(c.dataset.step);
+    if (!activeHotkeyField && n !== step) showStep(n);
+  }));
 
   els.browseClipDir.addEventListener("click", async () => {
     els.browseClipDir.disabled = true;
@@ -709,6 +758,7 @@
   async function finish() {
     els.nextBtn.disabled = true;
     els.backBtn.disabled = true;
+    setTabsDisabled(true);
     setStatus("Saving...");
     const payload = {
       clipDir: state.clipDir,
@@ -743,7 +793,8 @@
     } catch (e) {
       els.nextBtn.disabled = false;
       els.backBtn.disabled = false;
-      setStatus("Could not save: " + (e.message || e) + ". You can finish in ReplayKit Settings.", "bad");
+      setTabsDisabled(false);
+      setStatus("Could not save: " + String(e.message || e).replace(/[.\s]+$/, "") + ". Press Finish to try again.", "bad");
     }
   }
 

@@ -88,9 +88,10 @@ void PipeDispatchLine(const std::string &line)
 				return;
 			if (which == "settings")
 				ShellCloseView(ShellView::Settings);
-			else if (which == "setup")
+			else if (which == "setup") {
+				SetupPendingChanged(false);
 				ShellCloseView(ShellView::Setup);
-			else if (which == "clips")
+			} else if (which == "clips")
 				ShellCloseView(ShellView::Clips);
 		}, Qt::QueuedConnection);
 	} else if (line.rfind("VIEWSHOWN ", 0) == 0) {

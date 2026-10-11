@@ -141,7 +141,7 @@ void ShellEmbedObsSettings(QDialog *dlg)
 
 bool ObsSettingsEmbedFilter::eventFilter(QObject *watched, QEvent *event)
 {
-	if (event->type() != QEvent::Polish || !g_shellOn || g_obsSettingsDialog || !watched->isWidgetType())
+	if (event->type() != QEvent::Polish || !g_shellOn || g_obsSettingsDialog || !watched->isWidgetType() || ShellSetupLocked())
 		return false;
 	QWidget *w = static_cast<QWidget *>(watched);
 	if (!w->isWindow() || w->isVisible() || qstrcmp(w->metaObject()->className(), "OBSBasicSettings") != 0)

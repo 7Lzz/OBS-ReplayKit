@@ -4,5 +4,6 @@
 namespace rk {
 
 void ShowSetup(bool quiet);
+void SetupPendingChanged(bool pending);
 
 } // namespace rk

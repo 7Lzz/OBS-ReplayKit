@@ -19,6 +19,7 @@ extern bool g_clipsFullscreenActive;
 extern bool g_shellNativeFullscreen;
 extern QPointer<QWidget> g_settingsWindow;
 extern QPointer<QWidget> g_setupWindow;
+extern bool g_setupPending;
 
 // close-to-tray: when true, the OBS windows X hides to tray instead of quitting. polled from /settings on the same 1s timer as the open-clips hotkey. real quits/restarts (tray Exit, restart routes) send ALLOWCLOSE over the ipc pipe just before posting WM_CLOSE so the filter lets those through untouched.
 extern bool g_closeToTray;

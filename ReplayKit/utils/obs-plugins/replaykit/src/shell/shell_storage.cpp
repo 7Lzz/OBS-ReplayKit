@@ -133,6 +133,8 @@ void ShellStorage::paintEvent(QPaintEvent *)
 	p.setRenderHint(QPainter::Antialiasing, true);
 	if (!m_info.known)
 		return;
+	if (!isEnabled())
+		p.setOpacity(0.4);
 
 	const bool busy = m_info.compressing;
 	// full is the library at its limit or the drive nearly out of room, the only time the size under the ring takes the red as well; the ring itself shows how full it is all the way

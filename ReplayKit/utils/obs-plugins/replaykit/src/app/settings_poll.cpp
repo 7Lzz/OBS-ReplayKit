@@ -18,6 +18,7 @@
 #include "ui/anchored_panel.hpp"
 #include "shell/shell.hpp"
 #include "shell/shell_layout.hpp"
+#include "windows/setup_window.hpp"
 
 namespace rk {
 
@@ -159,6 +160,9 @@ void PollHelperSettings()
 		QMetaObject::invokeMethod(g_callbacks, [settingsBody]() {
 			g_openClipsHotkeyRequestInFlight = false;
 			g_closeToTray = JsonBoolField(settingsBody, "closeToTray", true);
+			const bool setupPending = JsonBoolField(settingsBody, "setupWizardPending", g_setupPending);
+			if (setupPending != g_setupPending)
+				SetupPendingChanged(setupPending);
 			// development mode is what lets the two development settings do anything
 			const bool development = JsonBoolField(settingsBody, "developmentMode", false);
 			DevLogSetEnabled(development && JsonBoolField(settingsBody, "logInterfaceEvents", false));

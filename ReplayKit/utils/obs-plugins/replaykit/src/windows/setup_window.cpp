@@ -6,6 +6,7 @@
 #include "core/async.hpp"
 #include "core/cef_host.hpp"
 #include "core/state.hpp"
+#include "shell/shell_state.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_views.hpp"
 #include "windows/cef_host_window.hpp"
@@ -15,6 +16,14 @@ namespace rk {
 namespace {
 
 bool g_setupCheckInFlight = false;
+
+void SyncSetupWindowClose()
+{
+	if (!g_setupWindow)
+		return;
+	if (HMENU menu = GetSystemMenu((HWND)g_setupWindow->winId(), FALSE))
+		EnableMenuItem(menu, SC_CLOSE, MF_BYCOMMAND | (g_setupPending ? MF_GRAYED : MF_ENABLED));
+}
 
 // twin of CreateSettingsWindow for the one-time first-run wizard. It gets the same native icon path so CEFs favicon cannot leave Setup visually different from Clips and Settings.
 void CreateSetupWindow(bool quiet)
@@ -43,6 +52,7 @@ void CreateSetupWindow(bool quiet)
 		win->activateWindow();
 	}
 	g_setupWindow = win;
+	SyncSetupWindowClose();
 	RefreshAppIcon();
 	QTimer::singleShot(500, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow"); });
 	QTimer::singleShot(1600, g_callbacks, []() { if (g_setupWindow) ApplyAuxWindowIcon(g_setupWindow, &g_ownedIconSetup, &g_taggedSetup, L"ReplayKit.SetupWindow"); });
@@ -50,7 +60,15 @@ void CreateSetupWindow(bool quiet)
 
 } // namespace
 
-// quiet = the helper opened this by itself on a pending first run, so show it without pulling focus off obs as it starts up. a deliberate open (tray row, dock button) still raises and activates.
+void SetupPendingChanged(bool pending)
+{
+	g_setupPending = pending;
+	if (g_shellRail)
+		g_shellRail->SyncLock();
+	SyncSetupWindowClose();
+}
+
+// quiet = show it without pulling focus off obs. a pending first run is opened loud now, so a window sitting in the tray comes out and takes focus; only an older helper still asks for quiet.
 void ShowSetup(bool quiet)
 {
 	if (g_shellOn) {

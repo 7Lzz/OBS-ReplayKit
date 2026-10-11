@@ -38,6 +38,7 @@ constexpr int kCoverSettleMs = 34;
 constexpr int kFirstRaiseSettleMs = 140;
 // pings of the page that go unanswered in a row before it is taken for dead
 constexpr int kHostMissLimit = 4;
+bool g_setupForeground = false;
 
 bool ShellMainWindowIsForeground();
 
@@ -469,8 +470,10 @@ static void FinishActivate(ShellView view, bool coverUp, bool entering, bool dip
 				ShellProjectorReveal();
 		});
 	}
-	if (g_shellRail)
+	if (g_shellRail) {
 		g_shellRail->SetSelected(ShellRailIdFor(view));
+		g_shellRail->SyncLock();
+	}
 	AnchoredPanel::HideOwnedBy(mw);
 }
 
@@ -502,10 +505,29 @@ static void ActivateNow(ShellView view, bool coverUp)
 	FinishActivate(view, coverUp, enteringProjector, false);
 }
 
+bool ShellSetupLocked()
+{
+	return g_setupPending && g_shellView == ShellView::Setup;
+}
+
+void ShellReclaimForeground()
+{
+	QMainWindow *mw = ObsMainWindowQt();
+	HWND foreground = GetForegroundWindow();
+	if (!mw || !mw->isVisible() || mw->isMinimized() || !foreground || foreground == (HWND)mw->winId())
+		return;
+	DWORD owner = 0;
+	GetWindowThreadProcessId(foreground, &owner);
+	if (owner == GetCurrentProcessId() && !IsWindowVisible(foreground))
+		ShellForegroundMainWindow();
+}
+
 bool ShellActivate(ShellView view)
 {
 	QMainWindow *mw = ObsMainWindowQt();
 	if (!mw || !g_shellOn)
+		return false;
+	if (view != ShellView::Setup && ShellSetupLocked())
 		return false;
 	// nothing to show until the dialog exists, and building it is the slow part, so it stays built while the two settings pages trade places
 	if (view == ShellView::ObsSettings && !g_obsSettingsDialog)
@@ -573,11 +595,17 @@ void ShellHostShown(const std::string &name)
 		// the preview or the obs settings are showing, so the page that just came up is told it is not
 		ShellRunJs(g_shellHost->browser, "RKShell.park();");
 	}
+	if (name == "setup" && g_setupForeground) {
+		g_setupForeground = false;
+		if (!ShellMainWindowIsForeground())
+			ShellForegroundMainWindow();
+	}
 }
 
 void ShellOpenSettingsPage(const QString &page)
 {
-	g_shellSettingsPage = page;
+	if (!ShellSetupLocked())
+		g_shellSettingsPage = page;
 	ShellOpenView(ShellView::Settings, false);
 }
 
@@ -615,6 +643,17 @@ void ShellOpenView(ShellView view, bool quiet)
 	QMainWindow *mw = ObsMainWindowQt();
 	if (!mw || !g_shellOn || !g_shellTitle)
 		return;
+	if (view != ShellView::Setup && ShellSetupLocked()) {
+		if (!quiet)
+			ShellForegroundMainWindow();
+		return;
+	}
+	if (view == ShellView::Setup && !g_shellTimer) {
+		g_shellPendingSetup = true;
+		return;
+	}
+	if (view == ShellView::Setup && !quiet)
+		g_setupForeground = true;
 	if (view == ShellView::Home || view == ShellView::Projector) {
 		ShellActivate(view);
 		return;

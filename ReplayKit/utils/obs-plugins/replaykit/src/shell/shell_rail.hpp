@@ -24,6 +24,7 @@ public:
 	explicit ShellRail(QWidget *parent);
 
 	void SetSelected(int id);
+	void SyncLock();
 	void SetShare(bool available, bool enabled);
 	bool ShareOn() const { return m_shareAvailable && m_shareOn; }
 	// the size of the library, drawn just above the settings button

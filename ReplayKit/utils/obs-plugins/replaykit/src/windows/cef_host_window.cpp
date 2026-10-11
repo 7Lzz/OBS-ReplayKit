@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "windows/cef_host_window.hpp"
 
+#include "core/state.hpp"
 #include "ui/anchored_panel.hpp"
 
 namespace rk {
@@ -21,6 +22,10 @@ void TellPageWindowShown(QCefWidget *browser, bool shown)
 
 void CefHostWindow::closeEvent(QCloseEvent *event)
 {
+	if (g_setupPending && static_cast<QWidget *>(this) == g_setupWindow.data() && !qGuiApp->isSavingSession()) {
+		event->ignore();
+		return;
+	}
 	hide();
 	AnchoredPanel::HideOwnedBy(this);
 	event->ignore();

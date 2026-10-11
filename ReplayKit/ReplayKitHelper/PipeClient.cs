@@ -113,10 +113,9 @@ namespace ReplayKitHelper
             try
             {
                 if (!(ReplaykitSettings.GetSetupState()["pending"]?.Value<bool>() ?? false)) return;
-                // quiet: obs is still coming up, so the wizard appears without yanking focus off the main window
                 lock (Server.State.UpdateCheckLock) Server.State.SetupWizardOpened = true;
-                TryWrite("OPENSETUPQUIET");
-                Log.Write("First-run setup wizard is pending; asked the native plugin to open it without focus.");
+                SendOpenSetup();
+                Log.Write("First-run setup wizard is pending; asked the native plugin to open it and bring OBS forward.");
             }
             catch (Exception ex) { Log.Write("IPC OPENSETUP on connect: " + ex.Message); }
         }

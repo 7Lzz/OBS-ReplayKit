@@ -170,6 +170,10 @@ void ShellStart()
 	ShellLayout();
 	// after the throwaway browser of PrewarmCefBrowser has taken the first cef surface of the process, which is the one that used to come up half painted
 	QTimer::singleShot(800, g_callbacks, []() { ShellEnsureHost(); });
+	if (g_shellPendingSetup) {
+		g_shellPendingSetup = false;
+		QTimer::singleShot(1000, g_callbacks, []() { ShellOpenView(ShellView::Setup, false); });
+	}
 }
 
 // takes the app-wide filters back out while the code they point into is still loaded

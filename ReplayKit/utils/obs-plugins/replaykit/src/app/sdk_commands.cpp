@@ -89,6 +89,8 @@ QJsonObject UiState(const QJsonObject &)
 	out["panelsOpen"] = AnchoredPanel::ShownCount();
 	out["warmUp"] = QJsonObject{{"panels", AnchoredPanel::WarmReport()}, {"storageCard", StorageModalWarmReport()}};
 	out["pageHostReady"] = g_hostReady;
+	out["setupPending"] = g_setupPending;
+	out["setupLocked"] = ShellSetupLocked();
 	out["pagePings"] = QJsonObject{{"sent", g_hostPingSent}, {"answered", g_hostPingAcked}, {"proven", g_hostPingProven}, {"misses", g_hostPingMisses}};
 	return out;
 }
