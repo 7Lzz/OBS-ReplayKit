@@ -17,6 +17,7 @@
     --text:#ffffff;
     --muted:#969696;
     --danger:#e33b57;
+    --danger-deep:#7f2232;
     --success:#37D247;
     --on-accent:#ffffff;
     --button-hover:#464B59;
@@ -117,6 +118,8 @@
   .btn:active { transform:scale(.97); }
   .btn.is-primary { background:var(--selected); border-color:var(--selected2); color:var(--on-accent); }
   .btn.is-primary:hover { background:var(--selected2); }
+  .btn.is-danger { background:var(--danger-deep); border-color:var(--danger); color:#fff; }
+  .btn.is-danger:hover { background:var(--danger); }
   .btn[hidden] { display:none; }
 </style>
 </head>
@@ -132,9 +135,22 @@
         <input type="checkbox" id="discord">
         <span>
           <span class="t">Enable Discord screenshare (Share Preview)</span>
-          <span class="s">Installs an audio cable driver and a hidden OBS projector window so you can screen-share OBS's output in Discord. Leave unchecked to not install the driver or have support for Discord screenshare.</span>
+          <span class="s">Installs an audio cable driver and a hidden OBS projector window so you can screen-share OBS's output in Discord. Leave unchecked to not install the driver or have support for Discord screenshare. It can be installed later at any time.</span>
         </span>
       </label>
+      <div id="uninstallOpts" hidden>
+        <label class="opt">
+          <input type="checkbox" id="keepSettings" checked>
+          <span class="t">Keep user settings for next install</span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="removeObs">
+          <span>
+            <span class="t">Also uninstall OBS Studio</span>
+            <span class="s">Your OBS scenes and profiles in AppData are left in place.</span>
+          </span>
+        </label>
+      </div>
     </div>
   </main>
 
@@ -150,6 +166,8 @@
         <div class="stat-detail" id="statDetail"></div>
       </div>
       <div class="stat-pct" id="statPct"></div>
+      <button class="btn" type="button" id="cancelBtn" hidden>Cancel</button>
+      <button class="btn is-danger" type="button" id="uninstallBtn" hidden>Uninstall</button>
       <button class="btn" type="button" id="reinstallBtn" hidden>Re-Install</button>
       <button class="btn is-primary" type="button" id="installBtn">Install</button>
       <button class="btn" type="button" id="closeBtn" hidden>Close</button>
@@ -175,8 +193,11 @@
       title: $("title"), line1: $("line1"), line2: $("line2"), opt: $("opt"), discord: $("discord"),
       fill: $("fill"), statLine: $("statLine"), statDetail: $("statDetail"), statPct: $("statPct"),
       spinner: $("spinner"), installBtn: $("installBtn"), reinstallBtn: $("reinstallBtn"), closeBtn: $("closeBtn"),
+      uninstallBtn: $("uninstallBtn"), cancelBtn: $("cancelBtn"), uninstallOpts: $("uninstallOpts"), keepSettings: $("keepSettings"), removeObs: $("removeObs"),
     };
     let running = false;
+    let confirming = false;
+    let uninstalling = false;
 
     function send(obj) { if (host) host.postMessage(JSON.stringify(obj)); }
 
@@ -184,9 +205,11 @@
     if (SETUP.installed) {
       els.installBtn.textContent = "Update";
       els.reinstallBtn.hidden = false;
+      els.uninstallBtn.hidden = false;
       els.line1.textContent = "Updates the ReplayKit files and keeps your current settings.";
       els.line2.hidden = true;
     }
+    const landing = { title: els.title.textContent, line1: els.line1.textContent };
     // pre-check the Discord opt-in when the audio cable is already on the machine (or the current install has it on) -- a fresh machine with no cable stays unchecked. unchecking it before Update / Re-Install removes the cable.
     els.discord.checked = !!(SETUP.cable || SETUP.screenshare);
 
@@ -204,8 +227,46 @@
       send({ cmd: "start", mode: mode, discord: els.discord.checked });
     }
 
+    function showLanding() {
+      confirming = false;
+      els.title.textContent = landing.title;
+      els.line1.textContent = landing.line1;
+      els.opt.hidden = false;
+      els.uninstallOpts.hidden = true;
+      els.cancelBtn.hidden = true;
+      els.installBtn.hidden = false;
+      els.reinstallBtn.hidden = false;
+    }
+
+    function showUninstallConfirm() {
+      confirming = true;
+      els.title.textContent = "Uninstall OBS ReplayKit?";
+      els.line1.textContent = "This removes the ReplayKit dock, scene, sources and script from OBS, then restarts OBS.";
+      els.opt.hidden = true;
+      els.uninstallOpts.hidden = false;
+      els.cancelBtn.hidden = false;
+      els.installBtn.hidden = true;
+      els.reinstallBtn.hidden = true;
+    }
+
+    function startUninstall() {
+      if (running) return;
+      running = true;
+      uninstalling = true;
+      els.title.textContent = "Removing OBS ReplayKit";
+      els.line1.textContent = "This can take a few minutes.";
+      els.uninstallOpts.hidden = true;
+      els.uninstallBtn.hidden = true;
+      els.cancelBtn.hidden = true;
+      els.spinner.hidden = false;
+      els.statLine.textContent = "Starting…";
+      send({ cmd: "uninstall", keepSettings: els.keepSettings.checked, removeObs: els.removeObs.checked });
+    }
+
     els.installBtn.addEventListener("click", () => startFlow(SETUP.installed ? "update" : "install"));
     els.reinstallBtn.addEventListener("click", () => startFlow("reinstall"));
+    els.uninstallBtn.addEventListener("click", () => (confirming ? startUninstall() : showUninstallConfirm()));
+    els.cancelBtn.addEventListener("click", showLanding);
     els.closeBtn.addEventListener("click", () => send({ cmd: "close" }));
 
     // shrink a nowrap line until it fits its fixed-width box, so long step text scales down instead of clipping
@@ -240,8 +301,13 @@
         case "done":
           els.spinner.hidden = true;
           els.statLine.classList.remove("is-bad");
+          if (d.mode === "uninstall") {
+            els.title.textContent = "OBS ReplayKit removed";
+            els.line1.textContent = d.removeObs ? "OBS Studio was uninstalled too." : "OBS is starting back up.";
+            els.closeBtn.hidden = !d.removeObs;
+          }
           // never surface a warning count here -- benign per-step notes (audio default restore, an optional plugin skipped) read as "something is broken" to a user watching the installer finish.
-          els.statLine.textContent = "Done. OBS is starting…";
+          els.statLine.textContent = d.mode === "uninstall" && d.removeObs ? "Done." : "Done. OBS is starting…";
           els.statDetail.textContent = "";
           els.statPct.textContent = "";
           els.fill.style.width = "100%";
@@ -251,7 +317,7 @@
         case "failed":
           els.spinner.hidden = true;
           els.title.classList.add("is-bad");
-          els.title.textContent = "Setup failed";
+          els.title.textContent = uninstalling ? "Uninstall failed" : "Setup failed";
           els.statLine.classList.add("is-bad");
           els.statLine.textContent = d.message || "unknown error";
           els.statPct.textContent = "";

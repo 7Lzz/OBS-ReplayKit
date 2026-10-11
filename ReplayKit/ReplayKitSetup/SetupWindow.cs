@@ -141,6 +141,10 @@ namespace ReplayKitSetup
                     bool? discord = o["discord"]?.Type == JTokenType.Boolean ? o.Value<bool>("discord") : (bool?)null;
                     StartInstall(discord, o.Value<string>("mode") == "reinstall");
                     break;
+                case "uninstall":
+                    StartUninstall(o["keepSettings"]?.Type != JTokenType.Boolean || o.Value<bool>("keepSettings"),
+                                   o["removeObs"]?.Type == JTokenType.Boolean && o.Value<bool>("removeObs"));
+                    break;
                 case "close":
                     if (!_running || _done) Native.DestroyWindow(_hwnd);
                     break;
@@ -182,6 +186,55 @@ namespace ReplayKitSetup
             };
             _worker.SetApartmentState(ApartmentState.STA); // some steps touch shell / COM apis
             _worker.Start();
+        }
+
+        private void StartUninstall(bool keepUserSettings, bool removeObs)
+        {
+            if (_running) return;
+            _running = true;
+
+            var progress = new BridgeProgress(this);
+            _worker = new Thread(() =>
+            {
+                int code = 1;
+                SetupLog.Line("=== uninstall flow start (keepSettings=" + keepUserSettings + ", removeObs=" + removeObs + ") ===");
+                try
+                {
+                    Cleanup.RunCleanup(progress, keepUserSettings, removeObs);
+                    if (!removeObs)
+                    {
+                        try { Obs.LaunchObs(progress.LogLine); }
+                        catch (Exception ex) { progress.LogLine("warn: could not relaunch OBS: " + ex.Message); }
+                    }
+                    code = 0;
+                    SetupLog.Line("=== uninstall flow complete ===");
+                    Enqueue(() => OnUninstallSucceeded(removeObs));
+                }
+                catch (Exception ex)
+                {
+                    WriteErrorLog(ex);
+                    SetupLog.Line("=== uninstall flow FAILED: " + ex.Message + " ===");
+                    Enqueue(() => OnFlowFailed(ex.Message));
+                }
+                finally
+                {
+                    ExitCode = code;
+                    _running = false;
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "uninstall-flow",
+            };
+            _worker.SetApartmentState(ApartmentState.STA);
+            _worker.Start();
+        }
+
+        private void OnUninstallSucceeded(bool removeObs)
+        {
+            _done = true;
+            PostToPage(new JObject { ["type"] = "done", ["mode"] = "uninstall", ["removeObs"] = removeObs });
+            if (!removeObs) Native.SetTimer(_hwnd, (IntPtr)1, 2600, IntPtr.Zero);
         }
 
         private void OnFlowSucceeded(int issueCount)

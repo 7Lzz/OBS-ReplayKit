@@ -206,6 +206,7 @@
   /* the [hidden] attribute otherwise loses to .form-row's display:grid (same specificity, author sheet wins). */
   .form-row[hidden] { display:none; }
   .form-row.tight { min-height:30px; }
+  .box-title + #setupFileRow[hidden] + #setupFileStatusRow[hidden] + .form-row > .action-row { border-top:0; }
   .label {
     justify-self:end;
     text-align:right;
@@ -1737,9 +1738,10 @@
           <div></div>
           <div class="inline-status" id="setupFileStatusLine"></div>
         </div>
-        <div class="form-row">
-          <div class="label">ReplayKit</div>
-          <div class="field-wrap">
+        <div class="form-row tight">
+          <div></div>
+          <div class="action-row">
+            <span>ReplayKit</span>
             <button class="btn is-danger" type="button" id="uninstallReplayKitBtn">Uninstall</button>
           </div>
         </div>
