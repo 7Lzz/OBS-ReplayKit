@@ -597,7 +597,8 @@ void ShellHostShown(const std::string &name)
 	}
 	if (name == "setup" && g_setupForeground) {
 		g_setupForeground = false;
-		if (!ShellMainWindowIsForeground())
+		QMainWindow *mw = ObsMainWindowQt();
+		if (mw && mw->isVisible() && !mw->isMinimized() && !ShellMainWindowIsForeground())
 			ShellForegroundMainWindow();
 	}
 }

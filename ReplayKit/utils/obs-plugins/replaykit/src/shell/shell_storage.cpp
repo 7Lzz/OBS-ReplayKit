@@ -102,7 +102,6 @@ void ShellStorage::leaveEvent(QEvent *event)
 {
 	QWidget::leaveEvent(event);
 	m_hover = false;
-	m_down = false;
 	update();
 	if (g_notifyTip)
 		g_notifyTip->Leave();

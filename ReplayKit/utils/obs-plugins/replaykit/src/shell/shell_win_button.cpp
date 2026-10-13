@@ -34,7 +34,6 @@ void ShellWinButton::leaveEvent(QEvent *event)
 {
 	QWidget::leaveEvent(event);
 	m_hover = false;
-	m_down = false;
 	update();
 }
 
