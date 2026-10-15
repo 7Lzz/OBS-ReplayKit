@@ -89,17 +89,32 @@
     var shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || "shader");
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      var message = gl.getShaderInfoLog(shader) || "shader";
+      gl.deleteShader(shader);
+      throw new Error(message);
+    }
     return shader;
   }
 
   function program(gl, fragment) {
     var p = gl.createProgram();
-    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, VERTEX));
-    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fragment));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || "program");
-    return p;
+    var vertex = null, pixel = null;
+    try {
+      vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
+      pixel = compile(gl, gl.FRAGMENT_SHADER, fragment);
+      gl.attachShader(p, vertex);
+      gl.attachShader(p, pixel);
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || "program");
+      return p;
+    } catch (error) {
+      gl.deleteProgram(p);
+      throw error;
+    } finally {
+      if (vertex) gl.deleteShader(vertex);
+      if (pixel) gl.deleteShader(pixel);
+    }
   }
 
   function texture(gl, mips) {
@@ -123,19 +138,36 @@
       if (lose) lose.loseContext();
       return null;
     }
-    var g = {
-      gl: gl,
-      resolve: program(gl, RESOLVE),
-      fxaa: program(gl, FXAA),
-      video: texture(gl, true),
-      target: texture(gl, false),
-      frame: gl.createFramebuffer(),
-      vao: gl.createVertexArray(),
-      width: 0,
-      height: 0,
-    };
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    return g;
+    var g = { gl: gl, width: 0, height: 0 };
+    try {
+      g.resolve = program(gl, RESOLVE);
+      g.fxaa = program(gl, FXAA);
+      g.video = texture(gl, true);
+      g.target = texture(gl, false);
+      g.frame = gl.createFramebuffer();
+      g.vao = gl.createVertexArray();
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      return g;
+    } catch (error) {
+      release(g);
+      throw error;
+    }
+  }
+
+  function release(g) {
+    var gl = g.gl;
+    if (g.resolve) gl.deleteProgram(g.resolve);
+    if (g.fxaa) gl.deleteProgram(g.fxaa);
+    if (g.video) gl.deleteTexture(g.video);
+    if (g.target) gl.deleteTexture(g.target);
+    if (g.frame) gl.deleteFramebuffer(g.frame);
+    if (g.vao) gl.deleteVertexArray(g.vao);
+    var lose = gl.getExtension("WEBGL_lose_context");
+    if (lose) lose.loseContext();
+  }
+
+  function visible() {
+    return window.RKWindow ? RKWindow.up() : !document.hidden;
   }
 
   function resizeTarget(g, width, height) {
@@ -167,7 +199,7 @@
     var video = state.video;
     var canvas = state.canvas;
     // a frame asked for in the middle of a seek is not there yet, and the seeked event that follows draws it
-    if (!state.alive || !video.videoWidth || video.readyState < 2 || video.seeking) return;
+    if (!state.alive || !visible() || !video.videoWidth || video.readyState < 2 || video.seeking) return;
     // zoomed in, the video itself is shown, since a picture drawn at the size of the box would only be enlarged
     var zoomed = !!video.style.transform;
     canvas.style.visibility = zoomed ? "hidden" : "visible";
@@ -243,6 +275,7 @@
     };
     var loop = function () {
       if (!state.alive) return;
+      if (!visible()) { suspend(); return; }
       draw(state);
       state.handle = video.requestVideoFrameCallback(loop);
     };
@@ -264,8 +297,7 @@
     try { video.cancelVideoFrameCallback(state.handle); } catch (e) { /* the callback already ran */ }
     ["seeked", "loadeddata", "resize", "pause", "play"].forEach(function (name) { video.removeEventListener(name, state.redraw); });
     if (state.observer) state.observer.disconnect();
-    var lose = state.g.gl.getExtension("WEBGL_lose_context");
-    if (lose) lose.loseContext();
+    release(state.g);
     state.canvas.remove();
   }
 
@@ -284,7 +316,7 @@
   }
 
   function scan() {
-    if (mode === "none") { attached.forEach(function (state, video) { detach(video); }); return; }
+    if (mode === "none" || !visible()) { suspend(); return; }
     if (supported === false) return;
     document.querySelectorAll("video").forEach(function (video) {
       var has = attached.has(video);
@@ -293,6 +325,7 @@
       else if (!wanted && has) detach(video);
     });
     attached.forEach(function (state, video) { if (!video.isConnected) detach(video); });
+    if (supported === false) suspend();
   }
 
   function setMode(next) {
@@ -301,13 +334,23 @@
     mode = next;
     // the drawing follows the mode, so the videos that are already drawn start over with it
     attached.forEach(function (state, video) { detach(video); });
-    if (mode === "none") {
-      if (scanTimer) { clearInterval(scanTimer); scanTimer = 0; }
-      return;
-    }
+    sync();
+  }
+
+  function suspend() {
+    if (scanTimer) { clearInterval(scanTimer); scanTimer = 0; }
+    attached.forEach(function (state, video) { detach(video); });
+  }
+
+  function sync() {
+    if (mode === "none" || !visible() || supported === false) { suspend(); return; }
     if (!scanTimer) scanTimer = setInterval(scan, 400);
     scan();
   }
+
+  if (window.RKWindow) RKWindow.onChange(sync);
+  else document.addEventListener("visibilitychange", sync);
+  window.addEventListener("pagehide", suspend);
 
   window.RKVideoFx = {
     setMode: setMode,

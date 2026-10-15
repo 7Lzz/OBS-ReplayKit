@@ -38,13 +38,13 @@ namespace ReplayKitSetup
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
             string installer = null;
-            string workDir = Path.Combine(Path.GetTempPath(), "ReplayKit", "obs-setup");
+            string workDir = null;
             try
             {
                 if (!TryResolveInstallerAsset(log, out string url, out string assetName, out long expectedLen))
                     return false;
 
-                Directory.CreateDirectory(workDir);
+                workDir = Directory.CreateTempSubdirectory("ReplayKit-obs-setup-").FullName;
                 installer = Path.Combine(workDir, assetName);
                 if (!DownloadInstaller(url, installer, expectedLen, progress))
                     return false;
@@ -77,7 +77,7 @@ namespace ReplayKitSetup
                 log("OBS installed: " + found);
                 return true;
             }
-            catch (Exception ex) when (ex is HttpRequestException || ex is IOException || ex is System.Threading.Tasks.TaskCanceledException)
+            catch (Exception ex) when (ex is HttpRequestException || ex is InvalidDataException || ex is IOException || ex is System.OperationCanceledException)
             {
                 log("Could not download OBS: " + ex.Message + ". Install OBS yourself from obsproject.com, then re-run this installer.");
                 return false;
@@ -98,7 +98,7 @@ namespace ReplayKitSetup
             {
                 client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
                 client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
-                var resp = client.GetAsync(LatestReleaseApi).GetAwaiter().GetResult();
+                using var resp = client.GetAsync(LatestReleaseApi).GetAwaiter().GetResult();
                 body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 if (!resp.IsSuccessStatusCode)
                 {
@@ -130,6 +130,9 @@ namespace ReplayKitSetup
             url = best.Value<string>("browser_download_url");
             name = best.Value<string>("name");
             size = best.Value<long?>("size") ?? 0;
+            if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                name != Path.GetFileName(name) || !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            { log("The OBS installer asset name is invalid."); return false; }
             if (string.IsNullOrEmpty(url)) { log("The OBS installer download link was missing from the release."); return false; }
             if (size > MaxInstallerBytes) { log($"The OBS installer is larger than the {MaxInstallerBytes / (1024 * 1024)} MB safety cap; not downloading it."); return false; }
             log("OBS installer: " + name + (size > 0 ? $" ({size / (1024 * 1024)} MB)" : ""));
@@ -142,48 +145,19 @@ namespace ReplayKitSetup
             using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) })
             {
                 client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-                var resp = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
-                if (!resp.IsSuccessStatusCode)
-                {
-                    log($"OBS installer download returned HTTP {(int)resp.StatusCode}.");
-                    return false;
-                }
-                long total = resp.Content.Headers.ContentLength ?? expectedLen;
-                if (total > MaxInstallerBytes) { log("OBS installer exceeded the size cap; aborting."); return false; }
-
-                long done = 0;
                 DateTime lastTick = DateTime.UtcNow;
-                using (var src = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                using (var outFile = File.Open(dst, FileMode.Create, FileAccess.Write))
+                Download.Save(client, url, dst, MaxInstallerBytes, TimeSpan.FromMinutes(15), expectedLen, (done, total) =>
                 {
-                    var buffer = new byte[1024 * 1024];
-                    int read;
-                    while ((read = src.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        done += read;
-                        if (done > MaxInstallerBytes) { log("OBS installer exceeded the size cap mid-download; aborting."); return false; }
-                        outFile.Write(buffer, 0, read);
-                        DateTime now = DateTime.UtcNow;
-                        if ((now - lastTick).TotalMilliseconds >= 250)
-                        {
-                            lastTick = now;
-                            double frac = total > 0 ? Math.Min(0.99, (double)done / total) : 0.0;
-                            string mb = total > 0
-                                ? $"{done / (1024 * 1024)} / {total / (1024 * 1024)} MB"
-                                : $"{done / (1024 * 1024)} MB";
-                            progress.SubProgress(frac, "Downloading OBS Studio  " + mb);
-                        }
-                    }
-                }
-
-                // a dropped connection makes src.Read return 0 early -- without this the caller would run NSIS on a partial exe (exit 6, installs nothing). expectedLen is the size GitHub listed for the asset.
-                long expect = expectedLen > 0 ? expectedLen : total;
-                if (expect > 0 && done < expect)
-                {
-                    log($"OBS installer download was incomplete: got {done} of {expect} bytes.");
-                    try { File.Delete(dst); } catch (Exception) { }
-                    return false;
-                }
+                    DateTime now = DateTime.UtcNow;
+                    if ((now - lastTick).TotalMilliseconds < 250) return;
+                    lastTick = now;
+                    double frac = total > 0 ? Math.Min(0.99, (double)done / total) : 0.0;
+                    string mb = total > 0
+                        ? $"{done / (1024 * 1024)} / {total / (1024 * 1024)} MB"
+                        : $"{done / (1024 * 1024)} MB";
+                    progress.SubProgress(frac, "Downloading OBS Studio  " + mb);
+                });
+                long done = new FileInfo(dst).Length;
                 progress.SubProgress(1.0, "Downloaded OBS Studio");
                 log($"OBS installer downloaded ({done} bytes)");
                 return true;
@@ -254,13 +228,15 @@ $cert = $sig.SignerCertificate
             string stdout, stderr;
             try
             {
-                var psi = new ProcessStartInfo("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
+                string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+                var psi = new ProcessStartInfo(powershell, Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
                 {
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
+                psi.EnvironmentVariables["PSModulePath"] = Path.Combine(Path.GetDirectoryName(powershell), "Modules");
                 psi.EnvironmentVariables["OBSREPLAYKIT_OBS_INSTALLER"] = path;
                 using var proc = new Process { StartInfo = psi };
                 proc.Start();

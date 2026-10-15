@@ -19,6 +19,7 @@ namespace ReplayKitHelper
             public Task Task;
             public string Name;
             public string Error;
+            public DateTime FinishedAt;
         }
 
         // an error with a message meant for the person using the editor
@@ -68,6 +69,7 @@ namespace ReplayKitHelper
                         failed["message"] = job.Error;
                         return failed;
                     }
+                    Jobs.Remove(id);
                 }
             }
             if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker))) return Fail("This audio is no longer available. Add it again.");
@@ -169,6 +171,10 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
+                foreach (var old in Jobs.Where(p => p.Value.Task.IsCompleted && p.Value.Error == null).Select(p => p.Key).ToList())
+                    Jobs.Remove(old);
+                foreach (var old in Jobs.Where(p => p.Value.Task.IsCompleted).OrderBy(p => p.Value.FinishedAt).Take(Math.Max(0, Jobs.Count - 63)).Select(p => p.Key).ToList())
+                    Jobs.Remove(old);
                 string dir = Path.Combine(Root, id);
                 bool done = File.Exists(Path.Combine(dir, ClipCache.DoneMarker));
                 bool running = Jobs.TryGetValue(id, out Job existing) && !existing.Task.IsCompleted;
@@ -186,10 +192,10 @@ namespace ReplayKitHelper
             return Describe(id);
         }
 
-        private static void Run(Job job, string id, string source, string staging)
+        private static async Task Run(Job job, string id, string source, string staging)
         {
             string dir = Path.Combine(Root, id);
-            Slots.Wait();
+            await Slots.WaitAsync().ConfigureAwait(false);
             try
             {
                 Extract(job, source, dir);
@@ -205,6 +211,7 @@ namespace ReplayKitHelper
             finally
             {
                 DeleteStaging(staging);
+                job.FinishedAt = DateTime.UtcNow;
                 Slots.Release();
             }
         }

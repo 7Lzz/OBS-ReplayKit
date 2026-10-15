@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
 
 namespace ReplayKitSetup
 {
@@ -102,55 +101,27 @@ namespace ReplayKitSetup
                 using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(90) })
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)");
-                    var response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        log?.Invoke($"warn: FFmpeg archive download returned HTTP {(int)response.StatusCode}: {url}");
-                        return null;
-                    }
-                    long expectedLen = response.Content.Headers.ContentLength ?? 0;
-                    if (expectedLen > MaxArchiveBytes)
-                    {
-                        log?.Invoke($"warn: FFmpeg archive is larger than {MaxArchiveBytes / (1024 * 1024)} MB cap");
-                        return null;
-                    }
-
                     Directory.CreateDirectory(HelperDir);
                     tmpPath = Path.Combine(HelperDir, "ffmpeg-tools." + Guid.NewGuid().ToString("N") + ".zip.download");
-                    long total = 0;
                     long nextLog = ProgressIntervalBytes;
                     DateTime lastLogAt = DateTime.UtcNow;
                     DateTime startedAt = lastLogAt;
-
-                    using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                    using (var outFile = File.Open(tmpPath, FileMode.Create, FileAccess.Write))
+                    Download.Save(client, url, tmpPath, MaxArchiveBytes, TimeSpan.FromSeconds(90), progress: (total, expectedLen) =>
                     {
-                        var buffer = new byte[1024 * 1024];
-                        int read;
-                        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                        DateTime now = DateTime.UtcNow;
+                        if (log != null && (total >= nextLog || (now - lastLogAt).TotalSeconds >= ProgressIntervalSeconds))
                         {
-                            total += read;
-                            if (total > MaxArchiveBytes)
-                            {
-                                log?.Invoke($"warn: FFmpeg archive exceeded {MaxArchiveBytes / (1024 * 1024)} MB cap, aborting");
-                                return null;
-                            }
-                            outFile.Write(buffer, 0, read);
-                            DateTime now = DateTime.UtcNow;
-                            if (log != null && (total >= nextLog || (now - lastLogAt).TotalSeconds >= ProgressIntervalSeconds))
-                            {
-                                log(DownloadProgressLine(total, expectedLen, startedAt));
-                                nextLog += ProgressIntervalBytes;
-                                lastLogAt = now;
-                            }
+                            log(DownloadProgressLine(total, expectedLen, startedAt));
+                            nextLog = total + ProgressIntervalBytes;
+                            lastLogAt = now;
                         }
-                    }
-
-                    log?.Invoke(DownloadProgressLine(total, expectedLen, startedAt));
+                    });
+                    long size = new FileInfo(tmpPath).Length;
+                    log?.Invoke(DownloadProgressLine(size, size, startedAt));
                     return tmpPath;
                 }
             }
-            catch (Exception exc) when (exc is HttpRequestException || exc is TaskCanceledException || exc is IOException)
+            catch (Exception exc) when (exc is HttpRequestException || exc is InvalidDataException || exc is OperationCanceledException || exc is IOException)
             {
                 log?.Invoke($"warn: FFmpeg archive download error: {exc.Message}: {url}");
                 if (tmpPath != null && File.Exists(tmpPath))

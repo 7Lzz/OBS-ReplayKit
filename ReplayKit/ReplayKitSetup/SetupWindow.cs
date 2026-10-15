@@ -111,7 +111,7 @@ namespace ReplayKitSetup
                 s.AreBrowserAcceleratorKeysEnabled = false;
 
                 _web.WebMessageReceived += OnWebMessage;
-                _web.NavigateToString(_html);
+                BuiltinPage.Load(_web, _html);
                 _controller.IsVisible = true;
             }
             catch (Exception ex)
@@ -124,6 +124,7 @@ namespace ReplayKitSetup
 
         private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
+            if (!BuiltinPage.IsTrusted(e.Source)) return;
             // the page posts JSON.stringify(obj), i.e. a string -- read it as a string (WebMessageAsJson would hand back the value re-quoted and JObject.Parse would throw). same read UpdatePromptWindow.cs uses.
             string json;
             try { json = e.TryGetWebMessageAsString(); }

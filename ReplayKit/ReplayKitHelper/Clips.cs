@@ -147,6 +147,7 @@ namespace ReplayKitHelper
                                 }
                                 db[prop.Name] = entry;
                             }
+                            else if (cmpEntry != null) db[prop.Name] = cmpEntry;
                         }
                         else if (cmpEntry != null)
                         {
@@ -319,6 +320,7 @@ namespace ReplayKitHelper
         private static bool TestClipIndexEntryCurrent(JToken entry, FileInfo file)
         {
             if (entry == null) return false;
+            if (!string.Equals(entry["path"]?.Value<string>(), file.FullName, StringComparison.OrdinalIgnoreCase)) return false;
             var size = entry["size"];
             var mtimeTicks = entry["mtimeTicks"];
             if (size == null || mtimeTicks == null) return false;

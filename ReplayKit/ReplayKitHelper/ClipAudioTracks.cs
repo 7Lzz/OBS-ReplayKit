@@ -6,7 +6,6 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -14,23 +13,13 @@ namespace ReplayKitHelper
     // the audio tracks of a clip as the editor uses them: which tracks the clip has, and every track the editor lays out cut into a small audio file that the page plays next to the muted video, with the waveform of each one
     internal static class ClipAudioTracks
     {
-        private sealed class Job
-        {
-            public Task Task;
-            public string Error;
-            public DateTime FinishedAt;
-        }
-
         private static readonly string Root = ClipCache.KindDir("tracks");
-        private static readonly object Gate = new object();
-        private static readonly Dictionary<string, Job> Jobs = new Dictionary<string, Job>();
+        private static readonly PreviewJobs Jobs = new PreviewJobs();
         private static readonly Regex KeyPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private const string DoneMarker = ClipCache.DoneMarker;
         // the waveform is read from the track at a low sample rate and kept as the loudest sample of every 40 ms
         private const int PeakSampleRate = 8000;
         private const int PeakRate = 25;
-        // a failed cut is not tried again for this long, so a page that keeps asking does not start ffmpeg over and over
-        private const int RetryAfterSeconds = 10;
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -91,29 +80,7 @@ namespace ReplayKitHelper
         // returns the error of a cut that just failed, or null; starts a cut when none is running
         private static string EnsureJob(string key, string source, int first, int count, string dir, bool lowPriority)
         {
-            lock (Gate)
-            {
-                if (Jobs.TryGetValue(key, out Job job))
-                {
-                    if (!job.Task.IsCompleted) return null;
-                    if (job.Error != null && (DateTime.UtcNow - job.FinishedAt).TotalSeconds < RetryAfterSeconds) return job.Error;
-                    Jobs.Remove(key);
-                }
-                var fresh = new Job();
-                fresh.Task = Task.Run(() =>
-                {
-                    try { Extract(source, first, count, dir, lowPriority); }
-                    // the end of a background task: whatever went wrong is kept as the answer for the page instead of being lost with the task
-                    catch (Exception ex)
-                    {
-                        fresh.Error = ex.Message;
-                        Log.Write("ClipAudioTracks: " + Path.GetFileName(source) + ": " + ex.Message);
-                    }
-                    fresh.FinishedAt = DateTime.UtcNow;
-                });
-                Jobs[key] = fresh;
-                return null;
-            }
+            return Jobs.Ensure(key, () => Extract(source, first, count, dir, lowPriority));
         }
 
         private static void Extract(string source, int first, int count, string dir, bool lowPriority)

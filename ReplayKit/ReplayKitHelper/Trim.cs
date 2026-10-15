@@ -96,10 +96,7 @@ namespace ReplayKitHelper
                 ClipCache.Prune(path);
                 // the times are written as they were read, since a cut that starts a hair before a keyframe lands on the one before it
                 var json = new JObject { ["sig"] = cacheSig, ["name"] = result.Name, ["method"] = result.Method, ["probeMs"] = result.ProbeMs, ["keyframes"] = new JArray(result.Keyframes) };
-                string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                File.WriteAllText(temp, json.ToString(Newtonsoft.Json.Formatting.None), new System.Text.UTF8Encoding(false));
-                if (File.Exists(path)) File.Delete(path);
-                File.Move(temp, path);
+                AppConfig.WriteUtf8(path, json.ToString(Newtonsoft.Json.Formatting.None));
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("keyframe cache not written: " + ex.Message); }
         }
@@ -120,7 +117,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException || ex is FormatException) { return null; }
         }
 
-        private static void SaveTrimKeyframeCache(string cacheKey, string cacheSig, KeyframeScanResult result)
+        private static void SaveTrimKeyframeCache(string cacheKey, string cacheSig, KeyframeScanResult result, bool persist = true)
         {
             lock (Server.State.TrimKeyframeCacheLock)
             {
@@ -132,14 +129,15 @@ namespace ReplayKitHelper
                     foreach (var key in oldest) Server.State.TrimKeyframeCache.Remove(key);
                 }
             }
-            WriteKeyframeFile(cacheKey, cacheSig, result);
+            if (persist) WriteKeyframeFile(cacheKey, cacheSig, result);
         }
 
         private static KeyframeScanResult GetTrimKeyframeCache(string cacheKey, string cacheSig)
         {
             lock (Server.State.TrimKeyframeCacheLock)
             {
-                if (Server.State.TrimKeyframeCache.TryGetValue(cacheKey, out var entry) && entry.Sig == cacheSig && entry.Result != null)
+                if (Server.State.TrimKeyframeCache.TryGetValue(cacheKey, out var entry) && entry.Sig == cacheSig && entry.Result != null &&
+                    (entry.Result.Ok || (DateTime.UtcNow - entry.At).TotalSeconds < 10))
                 {
                     var r = entry.Result;
                     return new KeyframeScanResult
@@ -158,15 +156,12 @@ namespace ReplayKitHelper
             }
             var stored = ReadKeyframeFile(cacheKey, cacheSig);
             if (stored == null) return null;
-            lock (Server.State.TrimKeyframeCacheLock)
-            {
-                Server.State.TrimKeyframeCache[cacheKey] = new TrimKeyframeCacheEntry { Sig = cacheSig, At = DateTime.UtcNow, Result = stored };
-            }
+            SaveTrimKeyframeCache(cacheKey, cacheSig, stored, false);
             return GetTrimKeyframeCache(cacheKey, cacheSig);
         }
 
         // polls an in-flight keyframe scan; TrimKeyframesWorker.Run always returns a result object, so a finished task is either a result or a timeout
-        private static KeyframeScanResult GetTrimKeyframeWorkerResult(TrimKeyframeJob job, string cacheKey, string cacheSig, string clipName)
+        private static KeyframeScanResult GetTrimKeyframeWorkerResult(TrimKeyframeJob job)
         {
             if (job.Task.IsCompleted)
             {
@@ -179,12 +174,8 @@ namespace ReplayKitHelper
                 else
                 {
                     result = job.Task.Result;
-                    if (string.IsNullOrWhiteSpace(result.Name)) result.Name = clipName;
-                    if (result.Ok) SaveTrimKeyframeCache(cacheKey, cacheSig, result);
                 }
                 result.Pending = false;
-                lock (Server.State.TrimKeyframeJobsLock) { Server.State.TrimKeyframeJobs.Remove(job.Key); }
-                job.Cts.Dispose();
                 return result;
             }
 
@@ -192,7 +183,6 @@ namespace ReplayKitHelper
             if (ageMs > TrimKeyframeWorkerTimeoutMs)
             {
                 try { job.Cts.Cancel(); } catch (ObjectDisposedException) { }
-                lock (Server.State.TrimKeyframeJobsLock) { Server.State.TrimKeyframeJobs.Remove(job.Key); }
                 return new KeyframeScanResult { Ok = false, Pending = false, Message = "Keyframe scan timed out; using normal fast trim" };
             }
 
@@ -202,10 +192,28 @@ namespace ReplayKitHelper
         // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one" one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never both see "no job yet" and each start their own ffprobe for the same file.
         private static TrimKeyframeJob StartTrimKeyframeWorkerLocked(Clips.SafeClipPath source, string ffprobe, string jobKey, string cacheSig)
         {
-            var cts = new CancellationTokenSource();
-            var task = Task.Run(() => TrimKeyframesWorker.Run(ffprobe, source.Full, source.Name, cts.Token));
-            var job = new TrimKeyframeJob { Key = jobKey, Sig = cacheSig, Task = task, StartedAt = DateTime.UtcNow, Cts = cts };
+            var cts = new CancellationTokenSource(TrimKeyframeWorkerTimeoutMs);
+            var job = new TrimKeyframeJob { Key = jobKey, Sig = cacheSig, StartedAt = DateTime.UtcNow, Cts = cts };
+            job.Task = Task.Run(() =>
+            {
+                var result = TrimKeyframesWorker.Run(ffprobe, source.Full, source.Name, cts.Token);
+                if (string.IsNullOrWhiteSpace(result.Name)) result.Name = source.Name;
+                SaveTrimKeyframeCache(source.Full.ToLowerInvariant(), cacheSig, result);
+                return result;
+            });
             Server.State.TrimKeyframeJobs[jobKey] = job;
+            job.Task.ContinueWith(done =>
+            {
+                try
+                {
+                    if (done.IsFaulted) Program.WriteCrashReport("keyframe_worker", done.Exception, false);
+                }
+                finally
+                {
+                    lock (Server.State.TrimKeyframeJobsLock) { Server.State.TrimKeyframeJobs.Remove(jobKey); }
+                    cts.Dispose();
+                }
+            }, TaskScheduler.Default);
             return job;
         }
 
@@ -229,6 +237,8 @@ namespace ReplayKitHelper
             {
                 if (!Server.State.TrimKeyframeJobs.TryGetValue(jobKey, out job))
                 {
+                    if (Server.State.TrimKeyframeJobs.Count >= 2)
+                        return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe scans are busy", RetryMs = 500 };
                     string ffprobe = Compression.GetHelperCapabilities()["ffprobe"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
                         return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
@@ -237,7 +247,7 @@ namespace ReplayKitHelper
                 }
             }
             if (startedNew) return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are loading", RetryMs = 500 };
-            return GetTrimKeyframeWorkerResult(job, cacheKey, cacheSig, source.Name);
+            return GetTrimKeyframeWorkerResult(job);
         }
 
         // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the clip folder. returns null if 99 candidates are taken.

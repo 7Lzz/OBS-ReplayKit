@@ -51,6 +51,7 @@ namespace ReplayKitHelper
         private static bool TestEntryCurrent(JToken entry, FileInfo file)
         {
             if (entry == null) return false;
+            if (!string.Equals(entry["path"]?.Value<string>(), file.FullName, StringComparison.OrdinalIgnoreCase)) return false;
             var size = entry["size"];
             var mtimeTicks = entry["mtimeTicks"];
             if (size == null || mtimeTicks == null) return false;
@@ -136,6 +137,7 @@ namespace ReplayKitHelper
             var entry = new JObject
             {
                 ["name"] = file.Name,
+                ["path"] = file.FullName,
                 ["size"] = file.Length,
                 ["mtime"] = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds(),
                 ["mtimeTicks"] = file.LastWriteTimeUtc.Ticks,
@@ -163,19 +165,7 @@ namespace ReplayKitHelper
                 ["updatedAt"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 ["clips"] = entries,
             };
-            string json = payload.ToString(Formatting.Indented);
-            Directory.CreateDirectory(Constants.SCRATCH_DIR);
-            string tmp = Path.Combine(Constants.SCRATCH_DIR, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-            File.WriteAllText(tmp, json, Utf8NoBom);
-            try
-            {
-                Native.MoveFileReplace(tmp, path);
-            }
-            catch (IOException)
-            {
-                try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                throw;
-            }
+            AppConfig.WriteUtf8(path, payload.ToString(Formatting.Indented));
         }
 
         // returns the names actually (re)probed this pass (not reused from the existing index) -- newest-first, same order as the enumeration below -- so a caller can proactively warm up just-created clips without also rescanning every clip already sitting in the folder.

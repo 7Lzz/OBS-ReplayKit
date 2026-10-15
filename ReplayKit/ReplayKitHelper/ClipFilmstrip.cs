@@ -13,16 +13,8 @@ namespace ReplayKitHelper
     // the film strip of the editor made ahead of time: a row of small frames of the clip in one picture, kept in the cache, so the editor draws the video row from a file instead of seeking the video once for every frame, which takes seconds on a long clip every time it is opened
     internal static class ClipFilmstrip
     {
-        private sealed class Job
-        {
-            public Task Task;
-            public string Error;
-            public DateTime FinishedAt;
-        }
-
         private static readonly string Root = ClipCache.KindDir("film");
-        private static readonly object Gate = new object();
-        private static readonly Dictionary<string, Job> Jobs = new Dictionary<string, Job>();
+        private static readonly PreviewJobs Jobs = new PreviewJobs();
         private static readonly Regex KeyPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private const string StripFile = "strip.jpg";
         private const string ManifestFile = "strip.json";
@@ -33,8 +25,6 @@ namespace ReplayKitHelper
         // frames are cut out a few at a time, quickly when the editor waits for them and gently when it is only a warm up after a recording
         private const int ParallelFrames = 6;
         private const int ParallelFramesGentle = 2;
-        // a failed strip is not tried again for this long, so a page that keeps asking does not start ffmpeg over and over
-        private const int RetryAfterSeconds = 10;
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -78,29 +68,7 @@ namespace ReplayKitHelper
         // returns the error of a strip that just failed, or null; starts making one when none is running
         private static string EnsureJob(string key, string source, string dir, bool lowPriority)
         {
-            lock (Gate)
-            {
-                if (Jobs.TryGetValue(key, out Job job))
-                {
-                    if (!job.Task.IsCompleted) return null;
-                    if (job.Error != null && (DateTime.UtcNow - job.FinishedAt).TotalSeconds < RetryAfterSeconds) return job.Error;
-                    Jobs.Remove(key);
-                }
-                var fresh = new Job();
-                fresh.Task = Task.Run(() =>
-                {
-                    try { Make(source, dir, lowPriority); }
-                    // the end of a background task: whatever went wrong is kept as the answer for the page instead of being lost with the task
-                    catch (Exception ex)
-                    {
-                        fresh.Error = ex.Message;
-                        Log.Write("ClipFilmstrip: " + Path.GetFileName(source) + ": " + ex.Message);
-                    }
-                    fresh.FinishedAt = DateTime.UtcNow;
-                });
-                Jobs[key] = fresh;
-                return null;
-            }
+            return Jobs.Ensure(key, () => Make(source, dir, lowPriority));
         }
 
         private static void Make(string source, string dir, bool gentle)

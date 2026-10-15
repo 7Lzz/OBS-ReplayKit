@@ -65,20 +65,31 @@ namespace ReplayKitHelper
         {
             Directory.CreateDirectory(Constants.SCRATCH_DIR);
             string tmp = Path.Combine(Constants.SCRATCH_DIR, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-            File.WriteAllText(tmp, text, Utf8NoBom);
-            string destVol = Path.GetPathRoot(path);
-            string tmpVol = Path.GetPathRoot(tmp);
-            if (string.Equals(destVol, tmpVol, StringComparison.OrdinalIgnoreCase))
+            string sideTemp = null;
+            try
             {
-                Native.MoveFileReplace(tmp, path);
+                File.WriteAllText(tmp, text, Utf8NoBom);
+                string destVol = Path.GetPathRoot(Path.GetFullPath(path));
+                string tmpVol = Path.GetPathRoot(tmp);
+                if (string.Equals(destVol, tmpVol, StringComparison.OrdinalIgnoreCase))
+                {
+                    Native.MoveFileReplace(tmp, path);
+                }
+                else
+                {
+                    sideTemp = Path.Combine(Path.GetDirectoryName(path), "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+                    File.Copy(tmp, sideTemp, false);
+                    Native.MoveFileReplace(sideTemp, path);
+                }
             }
-            else
+            finally
             {
-                // different volume -- stage on the destinations own volume first so the final replace is still a same-volume atomic rename instead of a copy+delete that can leave $path half-written on crash.
-                string sideTemp = Path.Combine(Path.GetDirectoryName(path), "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-                File.Copy(tmp, sideTemp, true);
-                Native.MoveFileReplace(sideTemp, path);
-                try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                foreach (string temporary in new[] { tmp, sideTemp })
+                {
+                    if (temporary == null) continue;
+                    try { File.Delete(temporary); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Temporary write cleanup: " + ex.Message); }
+                }
             }
         }
 

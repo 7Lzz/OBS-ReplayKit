@@ -82,40 +82,11 @@ namespace ReplayKitSetup
                 using (var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) })
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit");
-                    var response = client.GetAsync(Config.VCPP_REDIST_DOWNLOAD_URL, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
-                    Uri finalUri = response.RequestMessage.RequestUri;
-                    string host = (finalUri.Host ?? "").ToLowerInvariant();
-                    if (!string.Equals(finalUri.Scheme, "https", StringComparison.OrdinalIgnoreCase) || !VcppAllowedDownloadHosts.Contains(host))
-                    {
-                        throw new InvalidOperationException("unexpected download host: " + finalUri);
-                    }
-
-                    long? length = response.Content.Headers.ContentLength;
-                    if (length.HasValue && length.Value > Config.VCPP_REDIST_DOWNLOAD_MAX_BYTES)
-                    {
-                        throw new InvalidOperationException("download is larger than expected");
-                    }
-
-                    long total = 0;
+                    Download.Save(client, Config.VCPP_REDIST_DOWNLOAD_URL, target, Config.VCPP_REDIST_DOWNLOAD_MAX_BYTES,
+                        TimeSpan.FromSeconds(60), allowedHosts: VcppAllowedDownloadHosts);
                     byte[] hash;
                     using (var sha = SHA256.Create())
-                    {
-                        using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                        using (var fh = File.Open(target, FileMode.Create, FileAccess.Write))
-                        {
-                            var buffer = new byte[1024 * 1024];
-                            int read;
-                            while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
-                            {
-                                total += read;
-                                if (total > Config.VCPP_REDIST_DOWNLOAD_MAX_BYTES) throw new InvalidOperationException("download exceeded size limit");
-                                sha.TransformBlock(buffer, 0, read, null, 0);
-                                fh.Write(buffer, 0, read);
-                            }
-                            sha.TransformFinalBlock(new byte[0], 0, 0);
-                            hash = sha.Hash;
-                        }
-                    }
+                    using (var file = File.OpenRead(target)) hash = sha.ComputeHash(file);
                     string hex = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
                     long mb = Math.Max(1, new FileInfo(target).Length / (1024 * 1024));
                     log?.Invoke($"downloaded VC++ redist from Microsoft ({mb} MB, sha256 {hex.Substring(0, 12)}...)");
@@ -131,7 +102,7 @@ namespace ReplayKitSetup
         }
 
         // shells out to windows own Get-AuthenticodeSignature rather than reimplementing authenticode verification natively -- this is a security-critical check (confirms the downloaded exe is genuinely microsoft-signed before running it), and the well-tested os cmdlet is a safer bet here than a hand-rolled WinVerifyTrust p/invoke.
-        private static bool IsMicrosoftSigned(string path, Action<string> log = null)
+        internal static bool IsMicrosoftSigned(string path, Action<string> log = null)
         {
             const string script = @"
 $sig = Get-AuthenticodeSignature -LiteralPath $env:OBSREPLAYKIT_REDIST_PATH
@@ -146,13 +117,15 @@ $cert = $sig.SignerCertificate
             string stdout, stderr;
             try
             {
-                var psi = new ProcessStartInfo("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
+                string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+                var psi = new ProcessStartInfo(powershell, Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
                 {
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                 };
+                psi.EnvironmentVariables["PSModulePath"] = Path.Combine(Path.GetDirectoryName(powershell), "Modules");
                 psi.EnvironmentVariables["OBSREPLAYKIT_REDIST_PATH"] = path;
                 proc.StartInfo = psi;
                 proc.Start();
@@ -161,7 +134,7 @@ $cert = $sig.SignerCertificate
                 if (!proc.WaitForExit(30000))
                 {
                     try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log?.Invoke("VC++ redist signature check failed to run: timed out");
+                    log?.Invoke("Microsoft installer signature check failed to run: timed out");
                     return false;
                 }
                 stdout = stdoutTask.GetAwaiter().GetResult();
@@ -169,12 +142,12 @@ $cert = $sig.SignerCertificate
             }
             catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
             {
-                log?.Invoke("VC++ redist signature check failed to run: " + exc.Message);
+                log?.Invoke("Microsoft installer signature check failed to run: " + exc.Message);
                 return false;
             }
             if (proc.ExitCode != 0)
             {
-                log?.Invoke("VC++ redist signature check failed: " + Truncate(stderr.Trim(), 160));
+                log?.Invoke("Microsoft installer signature check failed: " + Truncate(stderr.Trim(), 160));
                 return false;
             }
 
@@ -182,14 +155,14 @@ $cert = $sig.SignerCertificate
             try { info = JObject.Parse(stdout); }
             catch (Newtonsoft.Json.JsonException)
             {
-                log?.Invoke("VC++ redist signature check returned invalid data");
+                log?.Invoke("Microsoft installer signature check returned invalid data");
                 return false;
             }
             string status = info.Value<string>("Status") ?? "";
             string subject = info.Value<string>("Subject") ?? "";
             string issuer = info.Value<string>("Issuer") ?? "";
             bool ok = status == "Valid" && subject.Contains("Microsoft Corporation") && issuer.Contains("Microsoft");
-            if (!ok) log?.Invoke($"VC++ redist signature rejected: status={status} subject={Truncate(subject, 80)}");
+            if (!ok) log?.Invoke($"Microsoft installer signature rejected: status={status} subject={Truncate(subject, 80)}");
             return ok;
         }
 

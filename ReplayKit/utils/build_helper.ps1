@@ -16,8 +16,13 @@ function Fingerprint([string[]]$paths) {
 }
 
 $sourceFiles = Get-ChildItem -LiteralPath $projectDir -Recurse -File |
-    Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' -and $_.Extension -in '.cs', '.csproj', '.manifest', '.targets' }
-$inputs = @($sourceFiles.FullName) + @($PSCommandPath, (Join-Path $repoRoot 'Version.props'))
+    Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' -and $_.Extension -in '.cs', '.csproj', '.manifest', '.targets', '.bin' }
+$inputs = @($sourceFiles.FullName) + @(
+    $PSCommandPath,
+    (Join-Path $repoRoot 'Version.props'),
+    (Join-Path $repoRoot 'ReplayKitSetup\StateLayout.cs'),
+    (Join-Path $outDir 'obs-replaykit.ico')
+)
 $outputs = @($requiredFiles | ForEach-Object { Join-Path $outDir $_ })
 $inputHash = Fingerprint $inputs
 $outputHash = Fingerprint $outputs

@@ -29,18 +29,19 @@ namespace ReplayKitSetup
 
             Log("WebView2 runtime not found; downloading it from Microsoft...");
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-            string workDir = Path.Combine(Path.GetTempPath(), "ReplayKit", "webview2-setup");
-            string bootstrapper = Path.Combine(workDir, "MicrosoftEdgeWebview2Setup.exe");
+            string workDir = null;
             try
             {
-                Directory.CreateDirectory(workDir);
+                workDir = Directory.CreateTempSubdirectory("ReplayKit-webview2-").FullName;
+                string bootstrapper = Path.Combine(workDir, "MicrosoftEdgeWebview2Setup.exe");
                 if (!Download(BootstrapperUrl, bootstrapper, Log)) return false;
+                if (!InputOverlay.IsMicrosoftSigned(bootstrapper, Log)) return false;
                 if (!RunSilent(bootstrapper, Log)) return false;
                 bool ok = IsAvailable();
                 Log(ok ? "WebView2 runtime installed." : "WebView2 runtime install finished but the runtime is still not detected.");
                 return ok;
             }
-            catch (Exception ex) when (ex is HttpRequestException || ex is IOException || ex is System.Threading.Tasks.TaskCanceledException || ex is UnauthorizedAccessException)
+            catch (Exception ex) when (ex is HttpRequestException || ex is InvalidDataException || ex is IOException || ex is OperationCanceledException || ex is UnauthorizedAccessException)
             {
                 Log("Could not install the WebView2 runtime: " + ex.Message);
                 return false;
@@ -56,24 +57,8 @@ namespace ReplayKitSetup
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             client.DefaultRequestHeaders.Add("User-Agent", "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)");
-            var resp = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult();
-            if (!resp.IsSuccessStatusCode) { log("WebView2 bootstrapper download returned HTTP " + (int)resp.StatusCode + "."); return false; }
-            long total = resp.Content.Headers.ContentLength ?? 0;
-            if (total > MaxBootstrapperBytes) { log("WebView2 bootstrapper exceeded the size cap; aborting."); return false; }
-
-            long done = 0;
-            using (var src = resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-            using (var outFile = File.Open(dst, FileMode.Create, FileAccess.Write))
-            {
-                var buffer = new byte[256 * 1024];
-                int read;
-                while ((read = src.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    done += read;
-                    if (done > MaxBootstrapperBytes) { log("WebView2 bootstrapper exceeded the size cap mid-download; aborting."); return false; }
-                    outFile.Write(buffer, 0, read);
-                }
-            }
+            ReplayKitSetup.Download.Save(client, url, dst, MaxBootstrapperBytes, TimeSpan.FromMinutes(5));
+            long done = new FileInfo(dst).Length;
             log("WebView2 bootstrapper downloaded (" + (done / 1024) + " KB).");
             return true;
         }

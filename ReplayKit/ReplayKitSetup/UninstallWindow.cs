@@ -121,7 +121,7 @@ namespace ReplayKitSetup
                 s.AreBrowserAcceleratorKeysEnabled = false;
 
                 _web.WebMessageReceived += OnWebMessage;
-                _web.NavigateToString(_html);
+                BuiltinPage.Load(_web, _html);
                 _controller.IsVisible = true;
             }
             catch (Exception ex)
@@ -134,6 +134,7 @@ namespace ReplayKitSetup
 
         private void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
+            if (!BuiltinPage.IsTrusted(e.Source)) return;
             string json;
             try { json = e.TryGetWebMessageAsString(); }
             catch (Exception) { try { json = e.WebMessageAsJson; } catch (Exception) { return; } }

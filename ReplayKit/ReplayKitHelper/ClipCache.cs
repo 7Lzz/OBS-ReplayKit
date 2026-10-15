@@ -37,7 +37,7 @@ namespace ReplayKitHelper
         {
             using (var sha = SHA1.Create())
             {
-                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(name + "|" + info.Length + "|" + info.LastWriteTimeUtc.Ticks + "|" + tag));
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(info.FullName.ToUpperInvariant() + "|" + name + "|" + info.Length + "|" + info.LastWriteTimeUtc.Ticks + "|" + tag));
                 return string.Concat(hash.Take(8).Select(b => b.ToString("x2")));
             }
         }
