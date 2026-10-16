@@ -69,6 +69,8 @@ set(REPLAYKIT_SOURCES
     src/shell/shell_state.cpp
     src/shell/shell_storage.cpp
     src/shell/shell_storage_modal.cpp
+    src/shell/shell_modal_card.cpp
+    src/shell/shell_notify_reader.cpp
     src/shell/shell_title_bar.cpp
     src/shell/shell_title_button.cpp
     src/shell/shell_views.cpp

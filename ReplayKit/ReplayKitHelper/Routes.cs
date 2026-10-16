@@ -555,6 +555,15 @@ namespace ReplayKitHelper
             if (Regex.IsMatch(path, @"^/account-menu$|^/account-menu\.html$")) { HttpResponse.ServeHtml(stream, "account-menu.html"); return false; }
             if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html"); return false; }
             if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html"); return false; }
+            if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html"); return false; }
+
+            if (path == "/settings/native")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetNativeSettingsPayload()); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
 
             if (path == "/settings")
             {
@@ -826,6 +835,14 @@ namespace ReplayKitHelper
                 string id = Q("id");
                 if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Invalid id." }); return false; }
                 PipeClient.SendNotificationReader(id);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            if (path == "/notifications/reader/close")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                PipeClient.SendNotificationReaderClose();
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }

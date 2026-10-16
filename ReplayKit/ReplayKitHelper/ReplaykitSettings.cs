@@ -5740,6 +5740,16 @@ namespace ReplayKitHelper
             return ThemeMenuColors(settings);
         }
 
+        // what the plugin reads on its one second poll: the saved settings and the menu colours, without the reads from obs that GetSettingsPayload makes (hotkeys, clip length, mic, volumes, overlay opacity; about ten websocket requests each time). the plugin asks for the full payload once the obs settings dialog closes or the profile changes, which is when those can differ from the file
+        public static JObject GetNativeSettingsPayload()
+        {
+            lock (SettingsStore.Gate)
+            {
+                var settings = ReadSettings();
+                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings) };
+            }
+        }
+
         public static JObject GetSettingsPayload()
         {
             lock (SettingsStore.Gate)

@@ -16,6 +16,9 @@ local last_signature = nil
 local refresh_elapsed = 0
 local capture_elapsed = 0
 local capture_active = false
+-- write time and size of the capture signal when it was last read; the 50ms poll runs on the obs graphics thread, and checking these costs about a third of reading the file
+local last_signal_stamp = nil
+local file_attr = nil
 local native_warned = false
 local missing_warned = {}
 local obsffi = nil
@@ -252,6 +255,26 @@ local function refresh_hotkeys(force)
     log(obs.LOG_INFO, "Loaded OBS native hotkeys: " .. signature)
 end
 
+-- nil when the stamp cannot be taken, and the file is then read every time like before
+local function file_stamp(path)
+    if not ffi_ok then return nil end
+    if file_attr == nil then
+        if not _G.__replaykit_file_stamp_defined then
+            pcall(ffi.cdef, [[
+                typedef struct { uint32_t attrs, c1, c2, a1, a2, w1, w2, sizeHigh, sizeLow; } rk_file_attr_t;
+                int GetFileAttributesExA(const char *name, int level, rk_file_attr_t *out);
+            ]])
+            _G.__replaykit_file_stamp_defined = true
+        end
+        local ok, attr = pcall(ffi.new, "rk_file_attr_t")
+        if not ok then return nil end
+        file_attr = attr
+    end
+    local ok, found = pcall(ffi.C.GetFileAttributesExA, path, 0, file_attr)
+    if not ok or found == 0 then return nil end
+    return tostring(file_attr.w1) .. ":" .. tostring(file_attr.w2) .. ":" .. tostring(file_attr.sizeLow)
+end
+
 -- written by the c# helper when the settings dock starts/stops capturing a new hotkey combo. fast-polled (CAPTURE_POLL_SECONDS) separately from the REFRESH_SECONDS saved-settings sync above, since this is the signal that actually has to beat a users reaction time.
 local function read_capture_signal()
     local text = read_text(capture_signal_path())
@@ -268,6 +291,10 @@ local function read_capture_signal()
 end
 
 local function apply_capture_signal()
+    -- an unchanged file holds the signal that was already applied
+    local stamp = file_stamp(capture_signal_path())
+    if stamp ~= nil and stamp == last_signal_stamp then return end
+    last_signal_stamp = stamp
     local signal = read_capture_signal()
     if not signal then return end
 
@@ -297,6 +324,7 @@ end
 function script_load(settings)
     write_capture_signal_inactive()
     capture_active = false
+    last_signal_stamp = nil
     refresh_hotkeys(true)
 end
 

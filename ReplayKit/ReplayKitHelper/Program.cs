@@ -236,26 +236,31 @@ namespace ReplayKitHelper
 
         private static readonly SemaphoreSlim ConnectionSlots = new SemaphoreSlim(Constants.MAX_CONNECTION_THREADS);
 
-        // single-threaded accept loop; Pending() lets us cooperatively check the shutdown flag every ~50ms instead of blocking in AcceptTcpClient forever. also runs the parent-process watchdog: with the users auto-elevation flow we can end up spawned by a non-admin obs that then exits when its elevated replacement takes over -- without this, the orphan helper happily holds the port forever.
+        // single-threaded accept loop. the accept waits on its handle with a 50ms cap, so a connection is taken the moment it arrives (a Pending() check followed by a 50ms sleep added 25ms on average to every request) and the shutdown flag and the parent-process watchdog still get looked at every ~50ms: with the users auto-elevation flow we can end up spawned by a non-admin obs that then exits when its elevated replacement takes over -- without this, the orphan helper happily holds the port forever.
         private static void RunAcceptLoop()
         {
             try
             {
+                IAsyncResult accept = null;
+                var idleWork = Stopwatch.StartNew();
                 while (!Server.State.Shutdown)
                 {
                     if (!ParentWatchdog.CheckAlive()) break;
-                    if (!_listener.Pending())
+                    // on a clock rather than on idle passes, so steady traffic cannot hold them off
+                    if (idleWork.ElapsedMilliseconds >= 50)
                     {
+                        idleWork.Restart();
                         if (ParentWatchdog.ExitedNow())
                         {
                             Log.Write("Parent terminated during idle (GetExitCodeProcess). Exiting.");
                             break;
                         }
                         try { DiscordProjector.KeepAlive(); } catch (Exception ex) { Log.Write("warn: Discord projector keep-alive threw: " + ex.Message); }
-                        Thread.Sleep(50);
-                        continue;
                     }
-                    var client = _listener.AcceptTcpClient();
+                    if (accept == null) accept = _listener.BeginAcceptTcpClient(null, null);
+                    if (!accept.AsyncWaitHandle.WaitOne(50)) continue;
+                    var client = _listener.EndAcceptTcpClient(accept);
+                    accept = null;
                     if (!ConnectionSlots.Wait(0)) { client.Close(); continue; }
                     Task.Run(() =>
                     {

@@ -223,6 +223,7 @@ namespace ReplayKitHelper
         // the settings page has unsaved edits or not, and its answer to the prompt the plugin raised when another view was picked meanwhile
         // the id is checked by the route already, the plugin checks it again before it reaches a script
         public static void SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
+        public static void SendNotificationReaderClose() => TryWrite("NOTIFYREADERCLOSE");
 
         public static void SendSettingsDirty(bool dirty) => TryWrite("SETTINGSDIRTY " + (dirty ? "1" : "0"));
         public static void SendSettingsLeave(string view) { if (view == "home" || view == "clips" || view == "setup" || view == "projector") TryWrite("SETTINGSLEAVE " + view); }

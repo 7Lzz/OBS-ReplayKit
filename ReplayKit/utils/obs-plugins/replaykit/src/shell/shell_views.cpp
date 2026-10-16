@@ -17,6 +17,7 @@
 #include "shell/shell_projector.hpp"
 #include "shell/shell_rail.hpp"
 #include "shell/shell_state.hpp"
+#include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
 #include "windows/obs_settings.hpp"
@@ -551,8 +552,9 @@ bool ShellActivate(ShellView view)
 		return false;
 	if (view != ShellView::ObsSettings && view != ShellView::Settings && !ShellCloseObsSettings())
 		return false;
-	// the storage card is drawn over the view it was opened on, so it goes with any change of view, keybind or click
+	// the storage card and the notification reader are drawn over the view they were opened on, so they go with any change of view, keybind or click
 	StorageModalClose();
+	NotifyReaderClose();
 	// the place is noted now and not when the change lands, since a dip may take a moment to come about
 	ShellHistoryNote(view);
 	const int gen = ++g_activateGen;
@@ -726,6 +728,7 @@ void ShellToggleClips()
 	// the storage card sits over whatever view is under it, and the press is spent on taking it away when clips are already what shows
 	const bool cardWasOpen = StorageModalIsOpen();
 	StorageModalClose();
+	NotifyReaderClose();
 	if (onScreen && g_shellView == ShellView::Clips) {
 		if (cardWasOpen || !ShellMainWindowIsForeground())
 			ShellForegroundMainWindow();

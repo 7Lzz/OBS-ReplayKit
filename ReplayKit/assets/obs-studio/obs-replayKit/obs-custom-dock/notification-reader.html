@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Notification</title>
+<style>
+  /* fallbacks only -- the helper injects the real theme tokens above this block */
+  :root {
+    --window:#1D1F26;
+    --grey3:#464B59;
+    --grey5:#2F323C;
+    --grey6:#272A33;
+    --field:#3C404D;
+    --line2:#5B6273;
+    --primary:#284CB8;
+    --primary_light:#476BD7;
+    --text:#ffffff;
+    --text_muted:#969696;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --anim_press:130ms;
+    --sb-outline:var(--grey5);
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:var(--grey6); color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; color:inherit; }
+
+  /* the window is the card: the plugin gives it round corners and a border through the system, so the page only fills it, in the colour the plugin looks for to tell a painted card from an empty one */
+  .card { position:absolute; inset:0; display:flex; flex-direction:column; background:var(--grey6); }
+  .card.is-opening { animation:rk-open 240ms ease-out; }
+  @keyframes rk-open { from { opacity:0; } to { opacity:1; } }
+
+  .top { position:relative; flex:none; padding:18px 60px 12px 24px; border-bottom:1px solid var(--grey3); }
+  .top h1 { margin:0 0 4px; font-size:16px; font-weight:700; line-height:1.35; }
+  .sub { margin:0; font-size:12px; color:var(--text_muted); }
+  .x {
+    position:absolute; top:14px; right:16px; width:30px; height:30px; padding:0; border:0; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; background:var(--grey3); color:var(--text); cursor:pointer;
+    transition:background-color 90ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  .x:hover { background:var(--line2); }
+  .x:active { transform:scale(.94); }
+  .x svg { width:14px; height:14px; }
+
+  .body { flex:1; min-height:0; overflow-y:auto; padding:14px 24px 18px; font-size:13px; line-height:1.6; user-select:text; -webkit-user-select:text; }
+  .body h1,.body h2,.body h3,.body h4,.body h5 { margin:14px 0 6px; font-size:14px; color:var(--text); }
+  .body h1:first-child,.body h2:first-child,.body h3:first-child,.body h4:first-child,.body h5:first-child { margin-top:0; }
+  .body p { margin:6px 0; color:var(--text_muted); }
+  .body ul,.body ol { margin:6px 0; padding-left:20px; color:var(--text_muted); }
+  .body li { margin:4px 0; }
+  .body b { color:var(--text); }
+  .body code { background:var(--field); border-radius:3px; padding:1px 4px; font-size:12px; color:var(--text); }
+  .body pre { background:var(--field); border-radius:4px; padding:8px 10px; overflow-x:auto; margin:8px 0; }
+  .body pre code { background:transparent; padding:0; }
+  .body a { color:var(--primary_light); }
+  .body hr { border:0; border-top:1px solid var(--grey3); margin:12px 0; }
+
+  .foot { flex:none; display:flex; justify-content:flex-end; gap:8px; padding:12px 24px; border-top:1px solid var(--grey3); }
+  .btn {
+    height:32px; padding:0 14px; border:1px solid var(--grey3); border-radius:6px; background:var(--window);
+    font-size:12.5px; font-weight:600; cursor:pointer;
+    transition:border-color 90ms linear, background-color 90ms linear, color 90ms linear;
+  }
+  .btn:hover { border-color:var(--line2); }
+  .btn[hidden] { display:none; }
+  .btn.is-primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+  .btn.is-primary:hover { background:var(--primary_light); border-color:var(--primary_light); }
+</style>
+<!--#include scrollbar-->
+<!--#include interaction-states-->
+</head>
+<body>
+<div class="card" id="card">
+  <header class="top">
+    <h1 id="title">&nbsp;</h1>
+    <p class="sub" id="when">&nbsp;</p>
+    <button class="x" type="button" id="close" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </header>
+  <div class="body" id="body"></div>
+  <div class="foot">
+    <button class="btn" type="button" id="link" hidden>Open release page</button>
+    <button class="btn is-primary" type="button" id="done">Close</button>
+  </div>
+</div>
+<!--#include markdown-->
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const $ = (id) => document.getElementById(id);
+  const els = { card:$("card"), title:$("title"), when:$("when"), body:$("body"), link:$("link"), done:$("done"), close:$("close") };
+  let url = "";
+  // a show that comes while the one before it is still fetching wins, so a slow answer never paints over a newer notification
+  let showRun = 0;
+
+  function closeCard() {
+    fetch(HELPER + "/notifications/reader/close?t=" + Date.now(), { method:"POST", cache:"no-store" }).catch(() => {});
+  }
+
+  function clear() {
+    els.title.innerHTML = "&nbsp;";
+    els.when.innerHTML = "&nbsp;";
+    els.body.innerHTML = "";
+    els.link.hidden = true;
+    url = "";
+  }
+
+  // the window is reused: the plugin calls this with the notification to show each time it opens the card
+  window.__replaykitShowReader = async function (id) {
+    const run = ++showRun;
+    els.card.classList.remove("is-opening");
+    void els.card.offsetWidth;
+    els.card.classList.add("is-opening");
+    els.done.focus();
+    let item = null;
+    try {
+      const res = await fetch(HELPER + "/notifications?t=" + Date.now(), { cache:"no-store" });
+      const data = await res.json();
+      item = (Array.isArray(data && data.items) ? data.items : []).find((i) => i && i.id === id) || null;
+    } catch (_) {}
+    if (run !== showRun) return;
+    if (!item) {
+      els.title.textContent = "Notification not found";
+      els.when.textContent = "It may have been deleted.";
+      els.body.innerHTML = "";
+      els.link.hidden = true;
+      return;
+    }
+    els.title.textContent = item.title || "";
+    const when = Date.parse(item.createdUtc);
+    els.when.textContent = Number.isFinite(when) ? new Date(when).toLocaleString() : "";
+    if (window.RKMarkdown) els.body.innerHTML = RKMarkdown.render(item.body || "");
+    else els.body.textContent = item.body || "";
+    els.body.scrollTop = 0;
+    url = item.url || "";
+    els.link.hidden = !url;
+  };
+
+  // the next open must not show this notification for a frame before its own arrives
+  window.__replaykitHideReader = function () {
+    showRun++;
+    clear();
+  };
+
+  els.close.addEventListener("click", closeCard);
+  els.done.addEventListener("click", closeCard);
+  els.link.addEventListener("click", () => {
+    if (url) fetch(HELPER + "/notifications/open-link?url=" + encodeURIComponent(url), { method:"POST", cache:"no-store" }).catch(() => {});
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCard(); });
+  // a link in the notes goes through the helper, which only opens github release pages, instead of a navigation of this window
+  els.body.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href]");
+    if (!a) return;
+    e.preventDefault();
+    fetch(HELPER + "/notifications/open-link?url=" + encodeURIComponent(a.href), { method:"POST", cache:"no-store" }).catch(() => {});
+  });
+
+  if (window.RKHover) RKHover.apply(document, { control:".btn" });
+</script>
+</body>
+</html>

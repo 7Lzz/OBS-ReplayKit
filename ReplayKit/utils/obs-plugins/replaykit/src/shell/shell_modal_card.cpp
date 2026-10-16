@@ -1,0 +1,426 @@
+// a card drawn over a dimmed obs window, the window the storage card and the notification reader live in
+#include "prelude.hpp"
+#include "shell/shell_modal_card.hpp"
+
+#include <QScreen>
+
+#include "core/cef_host.hpp"
+#include "core/dev_log.hpp"
+#include "core/state.hpp"
+#include "core/theme.hpp"
+#include "notify/notify_tip.hpp"
+#include "shell/shell_frame.hpp"
+#include "shell/shell_state.hpp"
+#include "shell/shell_views.hpp"
+#include "ui/anchored_panel.hpp"
+
+namespace rk {
+
+namespace {
+
+// the card keeps this much of the obs window showing around it
+constexpr int kCardMargin = 40;
+// dwm attributes from the windows 11 sdk, spelled out so an older sdk still builds; a windows that does not know them ignores the call
+constexpr DWORD kCornerPreference = 33;
+constexpr DWORD kBorderColor = 34;
+constexpr DWORD kCornerRound = 2;
+
+QWidget *ObsHost()
+{
+	return g_mainWindow ? g_mainWindow.data() : (QWidget *)obs_frontend_get_main_window();
+}
+
+// the dim over the whole obs window. it has to be a window of its own: the preview and the cef pages are native child windows, so a plain child widget painted over them just shows black, while dwm composites a translucent top-level over them. the card cannot be a child of it for the same reason, a layered window does not show native children, so the card is a second window owned by this one
+class Curtain : public QWidget {
+public:
+	Curtain(QWidget *host, ModalCard *owner) : QWidget(host), m_owner(owner)
+	{
+		setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
+		setAttribute(Qt::WA_TranslucentBackground, true);
+		setAttribute(Qt::WA_ShowWithoutActivating, true);
+	}
+
+protected:
+	void paintEvent(QPaintEvent *) override { QPainter(this).fillRect(rect(), QColor(0, 0, 0, 150)); }
+	// a click on the dim is a click outside the card
+	void mousePressEvent(QMouseEvent *) override { m_owner->OnPagePressedOutside(); }
+	// the title bar under the dim stays a place to drag the window from, and the dim and the card follow it
+	bool nativeEvent(const QByteArray &, void *message, qintptr *result) override
+	{
+		MSG *msg = static_cast<MSG *>(message);
+		if (!msg || msg->message != WM_NCHITTEST || !ShellPointIsCaption(msg->lParam))
+			return false;
+		*result = HTTRANSPARENT;
+		return true;
+	}
+
+private:
+	ModalCard *m_owner;
+};
+
+// keeps the dim and the card on the obs window while it moves or resizes, and takes them away when it hides or minimizes
+class HostFilter : public QObject {
+public:
+	HostFilter(QWidget *host, ModalCard *owner) : m_host(host), m_owner(owner) {}
+
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override
+	{
+		if (watched != m_host)
+			return false;
+		switch (event->type()) {
+		case QEvent::Move:
+		case QEvent::Resize:
+			m_owner->OnHostMoved();
+			break;
+		case QEvent::Hide:
+			m_owner->OnHostGone();
+			break;
+		case QEvent::WindowStateChange:
+			if (m_host && m_host->isMinimized())
+				m_owner->OnHostGone();
+			break;
+		default:
+			break;
+		}
+		return false;
+	}
+
+private:
+	QPointer<QWidget> m_host;
+	ModalCard *m_owner;
+};
+
+} // namespace
+
+ModalCard::ModalCard(ModalCardSpec spec) : m_spec(std::move(spec)) {}
+
+void ModalCard::Sync()
+{
+	QWidget *host = m_curtain ? m_curtain->parentWidget() : nullptr;
+	if (!host || !m_card)
+		return;
+	const QRect stage(host->mapToGlobal(QPoint(0, 0)), host->size());
+	m_curtain->setGeometry(stage);
+	const int w = qMax(420, qMin(m_spec.width, stage.width() - kCardMargin * 2));
+	const int h = qMax(360, qMin(m_spec.height, stage.height() - kCardMargin * 2));
+	m_card->setGeometry(stage.center().x() - w / 2, stage.center().y() - h / 2, w, h);
+}
+
+// the same placement done natively, in one batch so the dim and the card land together. it runs from the message that moves the window, before qt has taken in the new rectangle, so what qt holds for the window is a step behind and only windows knows where it is now; physical pixels all the way
+void ModalCard::FollowWindowRect()
+{
+	QWidget *host = m_curtain ? m_curtain->parentWidget() : nullptr;
+	RECT wr = {};
+	if (!host || !m_card || !g_shellHwnd || IsIconic(g_shellHwnd) || !GetWindowRect(g_shellHwnd, &wr))
+		return;
+	const qreal dpr = host->devicePixelRatioF();
+	const int hostW = int(wr.right - wr.left);
+	const int hostH = int(wr.bottom - wr.top);
+	const int w = qRound(qMax(420, qMin(m_spec.width, qRound(hostW / dpr) - kCardMargin * 2)) * dpr);
+	const int h = qRound(qMax(360, qMin(m_spec.height, qRound(hostH / dpr) - kCardMargin * 2)) * dpr);
+	const int x = int(wr.left) + (hostW - w) / 2;
+	const int y = int(wr.top) + (hostH - h) / 2;
+	HWND curtain = (HWND)m_curtain->winId();
+	HWND card = (HWND)m_card->winId();
+	const UINT flags = SWP_NOZORDER | SWP_NOACTIVATE;
+	HDWP batch = BeginDeferWindowPos(2);
+	if (batch)
+		batch = DeferWindowPos(batch, curtain, nullptr, int(wr.left), int(wr.top), hostW, hostH, flags);
+	if (batch)
+		batch = DeferWindowPos(batch, card, nullptr, x, y, w, h, flags);
+	if (batch && EndDeferWindowPos(batch))
+		return;
+	SetWindowPos(curtain, nullptr, int(wr.left), int(wr.top), hostW, hostH, flags);
+	SetWindowPos(card, nullptr, x, y, w, h, flags);
+}
+
+void ModalCard::OnHostMoved()
+{
+	// only while the card is up; it is also made to wait out of sight for its page, and a placement would bring it onto the window
+	if (IsOpen())
+		FollowWindowRect();
+}
+
+void ModalCard::RunScript(const std::string &script)
+{
+	if (m_browser && !script.empty())
+		m_browser->executeJavaScript(script);
+}
+
+// the card is a plain top-level window, so windows 11 rounds its corners and draws its border itself; a page inside it could not have round corners of its own, cef windows are opaque
+void ModalCard::StyleCard()
+{
+	HWND hwnd = (HWND)m_card->winId();
+	const DWORD round = kCornerRound;
+	DwmSetWindowAttribute(hwnd, kCornerPreference, &round, sizeof(round));
+	const COLORREF border = RGB(g_notifyBorder.red(), g_notifyBorder.green(), g_notifyBorder.blue());
+	DwmSetWindowAttribute(hwnd, kBorderColor, &border, sizeof(border));
+}
+
+void ModalCard::EndCardWarm()
+{
+	m_warming = false;
+	if (m_card) {
+		m_card->hide();
+		m_card->setAttribute(Qt::WA_ShowWithoutActivating, false);
+	}
+	if (ShellSetupLocked())
+		ShellReclaimForeground();
+	// the page starts its polling when it loads, the way it does when the card opens, and a card that is not up has no use for it
+	RunScript(m_spec.hideScript);
+	if (!m_openWaits)
+		return;
+	m_openWaits = false;
+	const std::string script = m_waitingScript;
+	m_waitingScript.clear();
+	Open(script);
+}
+
+void ModalCard::OnCardPageReady()
+{
+	m_ready = true;
+	if (!m_warming)
+		return;
+	m_warmMs = m_clock.elapsed();
+	blog(LOG_INFO, "[replaykit] %s page is up after %lld ms", m_spec.name, m_warmMs);
+	// left up a moment longer, so the page has been drawn to the window once before it is hidden
+	const int run = m_run;
+	QTimer::singleShot(kCefWarmSettleMs, m_card.data(), [this, run]() {
+		if (m_warming && run == m_run)
+			EndCardWarm();
+	});
+}
+
+bool ModalCard::EnsureBuilt()
+{
+	if (m_card)
+		return true;
+	QWidget *host = ObsHost();
+	if (!g_cef || !g_cef->initialized() || !host)
+		return false;
+
+	m_curtain = new Curtain(host, this);
+	m_card = new QWidget(m_curtain);
+	m_card->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
+	m_card->setWindowTitle(m_spec.windowTitle);
+	m_card->resize(m_spec.width, m_spec.height);
+	// paints under cef before its first frame, so the gap is the card colour rather than white
+	m_card->setAutoFillBackground(true);
+	QPalette pal = m_card->palette();
+	pal.setColor(QPalette::Window, g_menuPanel);
+	m_card->setPalette(pal);
+	QVBoxLayout *layout = new QVBoxLayout(m_card);
+	layout->setContentsMargins(0, 0, 0, 0);
+	QCefWidget *browser = g_cef->create_widget(m_card, m_spec.url.toStdString(), nullptr);
+	layout->addWidget(browser);
+	m_browser = browser;
+	m_blind = !CefWatchPageReady(browser, m_card, [this]() { OnCardPageReady(); });
+	m_card->createWinId();
+	StyleCard();
+
+	m_hostFilter = new HostFilter(host, this);
+	host->installEventFilter(m_hostFilter);
+	return true;
+}
+
+void ModalCard::StartCardWarm()
+{
+	if (m_ready || m_gaveUp || m_warming)
+		return;
+	QWidget *host = ObsHost();
+	if (!host || !host->isVisible() || host->isMinimized() || !EnsureBuilt())
+		return;
+	m_warming = true;
+	m_warmMs = -1;
+	m_clock.start();
+	const int run = ++m_run;
+	m_card->setAttribute(Qt::WA_ShowWithoutActivating, true);
+	m_card->move(CefOutOfSight(host));
+	m_card->show();
+	blog(LOG_INFO, "[replaykit] %s warm-up started%s", m_spec.name, m_blind ? " (its page cannot report, waiting a fixed time)" : "");
+	// the wait is bounded, so a page that never says it is up cannot hold the card back for long
+	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, m_card.data(), [this, run]() {
+		if (!m_warming || run != m_run)
+			return;
+		if (m_blind) {
+			m_ready = true;
+		} else {
+			m_gaveUp = true;
+			blog(LOG_WARNING, "[replaykit] the page of the %s did not say it was up in time, so it opens as it is", m_spec.name);
+		}
+		EndCardWarm();
+	});
+}
+
+// looks at the screen over the card and says whether the page painted it: the page fills the card with its colour out to the edges, so a card with none of that colour at the points just inside its edge has a browser that put nothing on the window and the dim shows through. points that another window covers do not count, and a grab that is all black says nothing
+bool ModalCard::CardLooksEmpty()
+{
+	if (!m_card || !m_card->isVisible() || !m_card->screen())
+		return false;
+	QScreen *screen = m_card->screen();
+	const QRect area = m_card->geometry().translated(-screen->geometry().topLeft());
+	const QImage shot = screen->grabWindow(0, area.x(), area.y(), area.width(), area.height()).toImage();
+	if (shot.isNull())
+		return false;
+	const double scale = double(shot.width()) / qMax(1, area.width());
+	const int w = area.width();
+	const int h = area.height();
+	const QPoint spots[] = {{w / 2, 6}, {w / 4, 6}, {3 * w / 4, 6}, {w / 2, h - 6}, {w / 4, h - 6}, {3 * w / 4, h - 6}, {6, h / 2}, {w - 6, h / 2}};
+	HWND card = (HWND)m_card->winId();
+	int counted = 0;
+	bool allBlack = true;
+	for (const QPoint &spot : spots) {
+		const QPoint global = m_card->geometry().topLeft() + spot;
+		const qreal dpr = m_card->devicePixelRatioF();
+		const POINT pt = {LONG(global.x() * dpr), LONG(global.y() * dpr)};
+		HWND at = WindowFromPoint(pt);
+		if (!at || GetAncestor(at, GA_ROOT) != card)
+			continue;
+		const QColor c = shot.pixelColor(qBound(0, int(spot.x() * scale), shot.width() - 1), qBound(0, int(spot.y() * scale), shot.height() - 1));
+		counted++;
+		if (c.red() || c.green() || c.blue())
+			allBlack = false;
+		if (qAbs(c.red() - g_menuPanel.red()) < 12 && qAbs(c.green() - g_menuPanel.green()) < 12 && qAbs(c.blue() - g_menuPanel.blue()) < 12)
+			return false;
+	}
+	return counted >= 4 && !allBlack;
+}
+
+// a browser that was hidden before its first frame reached the window can stay empty for good, so a card that shows nothing is built again and opened onto a page that has drawn; twice at most, then it is left as it is
+void ModalCard::CheckCardPainted(int run)
+{
+	if (run != m_run || !IsOpen())
+		return;
+	if (!CardLooksEmpty()) {
+		m_heals = 0;
+		return;
+	}
+	if (m_heals >= 2) {
+		blog(LOG_WARNING, "[replaykit] the %s is still empty after being built again, leaving it", m_spec.name);
+		return;
+	}
+	m_heals++;
+	blog(LOG_WARNING, "[replaykit] the %s opened empty, building it again (%d)", m_spec.name, m_heals);
+	OpenFresh();
+}
+
+void ModalCard::Prepare()
+{
+	EnsureBuilt();
+}
+
+bool ModalCard::WarmNext()
+{
+	if (m_ready || m_gaveUp)
+		return false;
+	if (!m_warming)
+		StartCardWarm();
+	return true;
+}
+
+QJsonObject ModalCard::WarmReport() const
+{
+	return QJsonObject{{"built", !m_card.isNull()}, {"ready", m_ready}, {"warming", m_warming}, {"gaveUp", m_gaveUp}, {"blind", m_blind}, {"warmMs", double(m_warmMs)}};
+}
+
+bool ModalCard::IsOpen() const
+{
+	return m_curtain && m_curtain->isVisible();
+}
+
+void ModalCard::Follow()
+{
+	if (IsOpen())
+		FollowWindowRect();
+}
+
+void ModalCard::Open(const std::string &showScript)
+{
+	const std::string script = showScript.empty() ? m_spec.showScript : showScript;
+	if (ShellSetupLocked())
+		return;
+	// a card that is up stays as it is, unless the open names what it should show now
+	if (IsOpen()) {
+		RunScript(showScript);
+		return;
+	}
+	QWidget *host = ObsHost();
+	if (!host || !host->isVisible() || host->isMinimized())
+		return;
+	// any panel that hangs off the title bar would sit on top of the dim
+	AnchoredPanel::HideAll();
+	if (g_notifyTip)
+		g_notifyTip->hide();
+	if (!EnsureBuilt())
+		return;
+	// the page has to be up before the card is, or the card opens onto a white window, so the open waits for it
+	if (!m_ready && !m_gaveUp) {
+		m_openWaits = true;
+		m_waitingScript = script;
+		StartCardWarm();
+		if (m_warming)
+			return;
+		// the window of obs is not on screen, so there is nothing to wait for
+		m_openWaits = false;
+		m_waitingScript.clear();
+	}
+	DevLog("%s opened", m_spec.name);
+	m_lastScript = script;
+	const int run = m_run;
+	StyleCard();
+	Sync();
+	m_curtain->show();
+	m_card->show();
+	m_card->raise();
+	m_card->activateWindow();
+	if (m_browser)
+		m_browser->setFocus();
+	RunScript(script);
+	QTimer::singleShot(500, m_card.data(), [this, run]() { CheckCardPainted(run); });
+}
+
+// the card is thrown away and built again, and the open that comes of it waits for the new page like any first open
+void ModalCard::OpenFresh()
+{
+	Close();
+	Destroy();
+	m_ready = m_warming = m_gaveUp = m_blind = false;
+	m_openWaits = true;
+	m_waitingScript = m_lastScript;
+	StartCardWarm();
+}
+
+void ModalCard::Close()
+{
+	m_openWaits = false;
+	m_waitingScript.clear();
+	if (!IsOpen())
+		return;
+	RunScript(m_spec.hideScript);
+	DevLog("%s closed", m_spec.name);
+	m_card->hide();
+	m_curtain->hide();
+	if (QWidget *host = m_curtain->parentWidget())
+		host->activateWindow();
+	if (m_spec.onClosed)
+		m_spec.onClosed();
+}
+
+// reads the screen where the card is: the page fills the card with its colour right out to the edges, so when none of the points just inside the edge has it the browser is putting nothing on the window and the dim shows through
+QJsonObject ModalCard::Probe()
+{
+	return QJsonObject{{"open", IsOpen()}, {"looksEmpty", CardLooksEmpty()}, {"heals", m_heals}};
+}
+
+void ModalCard::Destroy()
+{
+	if (m_hostFilter) {
+		delete m_hostFilter;
+		m_hostFilter = nullptr;
+	}
+	if (m_curtain)
+		delete m_curtain.data();
+}
+
+} // namespace rk

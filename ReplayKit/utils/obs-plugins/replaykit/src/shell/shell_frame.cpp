@@ -5,6 +5,7 @@
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "shell/shell_state.hpp"
+#include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_title_bar.hpp"
 #include "shell/shell_types.hpp"
@@ -483,6 +484,7 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		// the menus that hang off the title bar, the card of the storage and the confirm sheet keep up with the window all through a drag or a resize, where no timer runs. each one is placed from the window rectangle itself, since qt has not taken the new one in yet
 		AnchoredPanel::FollowAll();
 		StorageModalFollow();
+		NotifyReaderFollow();
 		ConfirmDialogFollow();
 		return false;
 	case WM_NCLBUTTONDOWN:

@@ -78,6 +78,27 @@ LONG CALLBACK RecordReplayKitException(EXCEPTION_POINTERS *exception)
 	return EXCEPTION_CONTINUE_SEARCH;
 }
 
+// every unclean exit leaves a small record and nothing else ever removes them, so only the newest ones are kept
+void PruneUncleanRecords(const std::wstring &directory)
+{
+	constexpr size_t kKeep = 30;
+	std::vector<std::pair<ULONGLONG, std::wstring>> records;
+	WIN32_FIND_DATAW entry = {};
+	HANDLE files = FindFirstFileW((directory + L"\\replaykit-session-*.pending.unclean").c_str(), &entry);
+	if (files == INVALID_HANDLE_VALUE)
+		return;
+	do {
+		const ULONGLONG written = (ULONGLONG(entry.ftLastWriteTime.dwHighDateTime) << 32) | entry.ftLastWriteTime.dwLowDateTime;
+		records.emplace_back(written, entry.cFileName);
+	} while (FindNextFileW(files, &entry));
+	FindClose(files);
+	if (records.size() <= kKeep)
+		return;
+	std::sort(records.begin(), records.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+	for (size_t i = kKeep; i < records.size(); i++)
+		DeleteFileW((directory + L"\\" + records[i].second).c_str());
+}
+
 void StartSessionRecord(const std::wstring &directory)
 {
 	WIN32_FIND_DATAW entry = {};
@@ -102,6 +123,7 @@ void StartSessionRecord(const std::wstring &directory)
 		} while (FindNextFileW(files, &entry));
 		FindClose(files);
 	}
+	PruneUncleanRecords(directory);
 	swprintf_s(g_nativeSessionPath, L"%ls\\replaykit-session-%lu.pending", directory.c_str(), (unsigned long)GetCurrentProcessId());
 	HANDLE marker = CreateFileW(g_nativeSessionPath, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, nullptr);
 	if (marker != INVALID_HANDLE_VALUE) {

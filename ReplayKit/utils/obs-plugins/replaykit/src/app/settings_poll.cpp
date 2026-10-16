@@ -2,6 +2,8 @@
 #include "prelude.hpp"
 #include "app/settings_poll.hpp"
 
+#include <QApplication>
+
 #include "app/sdk_commands.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/async.hpp"
@@ -17,6 +19,7 @@
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
 #include "shell/shell.hpp"
+#include "shell/shell_state.hpp"
 #include "shell/shell_layout.hpp"
 #include "windows/setup_window.hpp"
 
@@ -25,6 +28,20 @@ namespace rk {
 namespace {
 
 bool g_openClipsHotkeyRequestInFlight = false;
+// the full settings read obs over its websocket about ten times, so the poll takes the saved file alone and asks for the full read only when obs may hold something newer: at the start, after the obs settings dialog closes, after a profile change
+bool g_fullSyncDue = true;
+bool g_obsSettingsWasOpen = false;
+
+bool ObsSettingsOpen()
+{
+	if (g_obsSettingsDialog)
+		return true;
+	for (QWidget *w : QApplication::topLevelWidgets()) {
+		if (w->isVisible() && qstrcmp(w->metaObject()->className(), "OBSBasicSettings") == 0)
+			return true;
+	}
+	return false;
+}
 bool g_startMinSeen = false;
 // what the switch of obs held when it was last looked at, so a flip made in the settings of obs is told apart from a change made in replaykit
 bool g_startMinLastObs = false;
@@ -157,15 +174,29 @@ void SyncStartMinimized(const std::string &settingsBody)
 
 } // namespace
 
+void RequestFullSettingsSync()
+{
+	g_fullSyncDue = true;
+}
+
 void PollHelperSettings()
 {
 	if (g_openClipsHotkeyRequestInFlight)
 		return;
+	const bool open = ObsSettingsOpen();
+	if (g_obsSettingsWasOpen && !open)
+		g_fullSyncDue = true;
+	g_obsSettingsWasOpen = open;
+	const bool full = g_fullSyncDue;
+	g_fullSyncDue = false;
 	g_openClipsHotkeyRequestInFlight = true;
-	RunAsync([]() {
-		std::string settingsBody = HttpRequest("GET", "/settings", 8767, nullptr, 3000);
-		QMetaObject::invokeMethod(g_callbacks, [settingsBody]() {
+	RunAsync([full]() {
+		std::string settingsBody = HttpRequest("GET", full ? "/settings" : "/settings/native", 8767, nullptr, 3000);
+		QMetaObject::invokeMethod(g_callbacks, [settingsBody, full]() {
 			g_openClipsHotkeyRequestInFlight = false;
+			// a helper that did not answer is asked for the full read again next time
+			if (full && settingsBody.empty())
+				g_fullSyncDue = true;
 			g_closeToTray = JsonBoolField(settingsBody, "closeToTray", true);
 			const bool setupPending = JsonBoolField(settingsBody, "setupWizardPending", g_setupPending);
 			if (setupPending != g_setupPending)

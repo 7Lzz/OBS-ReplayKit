@@ -1044,8 +1044,21 @@ namespace ReplayKitHelper
         // atomic same-volume rename-with-overwrite. net48s File.Move has no overwrite option, and a manual delete-then-move reopens the crash/race window the atomic-write callers are trying to close; fails as an IOException like the managed file apis so the callers file-error handling covers it
         public static void MoveFileReplace(string src, string dest)
         {
-            if (!MoveFileEx(src, dest, MOVEFILE_REPLACE_EXISTING))
-                throw new IOException(new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message + " (" + Path.GetFileName(dest) + ")");
+            // windows refuses the replace while any handle is open on dest, even one that shares delete, and the obs scripts read the settings file about five times a second and the hotkey capture signal twenty -- a write that met one of those reads failed outright, so a sharing error is tried again for up to 250ms before it is reported
+            const int ErrorAccessDenied = 5, ErrorSharingViolation = 32, BudgetMs = 250;
+            var clock = Stopwatch.StartNew();
+            for (int attempt = 1; ; attempt++)
+            {
+                if (MoveFileEx(src, dest, MOVEFILE_REPLACE_EXISTING))
+                {
+                    if (attempt > 1) Log.Write("MoveFileReplace: " + Path.GetFileName(dest) + " was busy, replaced on attempt " + attempt + " after " + clock.ElapsedMilliseconds + " ms");
+                    return;
+                }
+                int error = Marshal.GetLastWin32Error();
+                if ((error != ErrorAccessDenied && error != ErrorSharingViolation) || clock.ElapsedMilliseconds >= BudgetMs)
+                    throw new IOException(new System.ComponentModel.Win32Exception(error).Message + " (" + Path.GetFileName(dest) + ")");
+                Thread.Sleep(10);
+            }
         }
 
         // same-volume ntfs hard link -- shares the underlying file content, no extra disk, an in-place update to the target is picked up automatically. net48 has no managed api for this (unlike New-Item -ItemType HardLink in PS, which is really just this same syscall).

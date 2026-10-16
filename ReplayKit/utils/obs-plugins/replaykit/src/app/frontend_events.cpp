@@ -21,6 +21,7 @@
 #include "ui/anchored_panel.hpp"
 #include "shell/shell.hpp"
 #include "shell/shell_state.hpp"
+#include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "tray/tray_menu.hpp"
 
@@ -33,6 +34,7 @@ void CloseCefWidgetsBeforeShutdown()
 {
 	AnchoredPanel::DestroyAll();
 	StorageModalDestroy();
+	NotifyReaderDestroy();
 	if (g_shellTimer)
 		g_shellTimer->stop();
 	if (g_shellHost)
@@ -82,6 +84,9 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	}
 
 	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
+	// another profile has its own hotkeys and clip length
+	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED)
+		RequestFullSettingsSync();
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED || event == OBS_FRONTEND_EVENT_RECORDING_STOPPED ||
 	    event == OBS_FRONTEND_EVENT_RECORDING_PAUSED || event == OBS_FRONTEND_EVENT_RECORDING_UNPAUSED ||
 	    event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED) {

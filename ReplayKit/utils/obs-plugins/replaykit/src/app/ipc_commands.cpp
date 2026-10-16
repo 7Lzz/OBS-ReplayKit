@@ -12,6 +12,7 @@
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
 #include "shell/shell_history.hpp"
+#include "shell/shell_notify_reader.hpp"
 #include "shell/shell_page.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
@@ -111,18 +112,19 @@ void PipeDispatchLine(const std::string &line)
 		const bool safe = !id.empty() && id.size() <= 64 && std::all_of(id.begin(), id.end(), [](char c) { return std::isalnum((unsigned char)c) || c == '-' || c == '_'; });
 		if (safe) {
 			QMetaObject::invokeMethod(g_callbacks, [id]() {
-				// the card is drawn by the shell page, so it needs that page on top; under the preview or the obs settings the panel opens the row itself
-				if (!g_shellOn || !g_shellHost || !g_hostOnTop) {
+				// the card sits over the obs window, which only the clean layout keeps the bell on; the classic layout has bells on the clips and settings windows too, so there the panel opens the row itself
+				if (!g_shellOn) {
 					for (const QPointer<NotifyButton> &bell : g_notifyButtons) {
 						if (bell && bell->Panel() && bell->Panel()->IsOpen())
 							bell->Panel()->RunScript(QString::fromStdString("window.__replaykitReaderUnavailable && window.__replaykitReaderUnavailable('" + id + "');"));
 					}
 					return;
 				}
-				AnchoredPanel::HideAll(true);
-				ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.readNotification && RKShell.readNotification('" + id + "');");
+				NotifyReaderOpen(id);
 			}, Qt::QueuedConnection);
 		}
+	} else if (line == "NOTIFYREADERCLOSE") {
+		QMetaObject::invokeMethod(g_callbacks, []() { NotifyReaderClose(); }, Qt::QueuedConnection);
 	} else if (line.rfind("SETTINGSDIRTY ", 0) == 0) {
 		const bool dirty = line.substr(14) == "1";
 		QMetaObject::invokeMethod(g_callbacks, [dirty]() { g_settingsDirty = dirty; }, Qt::QueuedConnection);
