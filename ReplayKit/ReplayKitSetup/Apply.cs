@@ -49,11 +49,11 @@ namespace ReplayKitSetup
             if (cleanInstall) WipePreservedReplaykitState(progress);
 
             var prefs = Prefs.LoadPrefs();
-            // the setup checkbox is a single on/off for the whole Share Preview feature: enable -> cable + hidden projector both on; disable -> both off. null (headless) leaves whatever was loaded.
+            // the setup checkbox turns the whole Share Preview feature on or off: turning it on from off also switches Share Preview on, turning it off switches it off, and an update that leaves it on keeps the Share Preview state saved in the settings. null (headless) leaves whatever was loaded.
             if (discordScreenshare.HasValue)
             {
+                if (discordScreenshare.Value && !prefs.DiscordScreenshareEnabled) prefs.DiscordProjectorEnabled = true;
                 prefs.DiscordScreenshareEnabled = discordScreenshare.Value;
-                prefs.DiscordProjectorEnabled = discordScreenshare.Value;
             }
             if (!prefs.DiscordScreenshareEnabled) prefs.DiscordProjectorEnabled = false;
 
@@ -121,13 +121,14 @@ namespace ReplayKitSetup
             Add("Install video tools", "Verifies the trim/compress tools.", () => (object)Installer.InstallObsFfmpeg(progress.LogLine));
             Add("Install WASD/mouse overlay", "Adds the WASD/mouse overlay plugin.",
                 () => (object)(InputOverlay.InstallInputOverlayPlugin(progress.LogLine) && InputOverlay.InstallInputOverlayPresets(progress.LogLine)));
-            Add("Install Bongo Cat overlay", "Adds the Bongo Cat overlay plugin.",
-                () => (object)BongoCat.InstallBongoCatPlugin(progress.LogLine));
+            Add("Install Bongo Cat overlay", "Adds the Bongo Cat overlay files.",
+                () => (object)BongoCat.InstallBongoCat(progress.LogLine));
             Add("Install motion blur filter", "Adds the motion blur filter.",
                 () => (object)ShaderFilter.InstallReplaykitMotionBlurPlugin(progress.LogLine));
             Add("Install desktop audio capture", "Adds desktop audio capture.", () => (object)WinCapture.InstallWinCaptureAudio(progress.LogLine));
             Add("Prepare clip folders", "Creates the clip folders.", () => { Installer.EnsureRecordingDirs(prefs, progress.LogLine); return (object)true; });
             Add("Set Windows startup", "Adds OBS to Windows startup.", () => (object)Startup.ConfigureObsStartup(prefs.ObsStartupEnabled, progress.LogLine));
+            Add("Prepare OBS theme", "Applies your theme before OBS starts.", () => { Installer.PrepareObsTheme(progress.LogLine); return (object)true; });
             Add("Launch OBS", "Starts OBS.", () => (object)Obs.LaunchObs(progress.LogLine));
 
             progress.TotalSteps = steps.Count;

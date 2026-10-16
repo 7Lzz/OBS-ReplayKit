@@ -12,6 +12,7 @@ namespace ReplayKitSetup
     {
         [JsonProperty("recording_preset")] public string RecordingPreset { get; set; } = Prefs.DEFAULT_RECORDING_PRESET;
         [JsonProperty("input_overlay_enabled")] public bool InputOverlayEnabled { get; set; } = Prefs.DEFAULT_INPUT_OVERLAY;
+        [JsonProperty("bongo_mode")] public string BongoMode { get; set; } = Prefs.DEFAULT_BONGO_MODE;
         [JsonProperty("overlay_style")] public string OverlayStyle { get; set; } = Prefs.DEFAULT_OVERLAY_STYLE;
         [JsonProperty("overlay_opacity")] public int OverlayOpacity { get; set; } = Prefs.DEFAULT_OVERLAY_OPACITY;
         [JsonProperty("overlay_scale")] public int OverlayScale { get; set; } = Prefs.DEFAULT_OVERLAY_SCALE;
@@ -84,6 +85,9 @@ namespace ReplayKitSetup
         // overlay ships off -- the input-overlay + bongo cat plugins still install so Settings can switch to either, the scene just starts clean.
         public const bool DEFAULT_INPUT_OVERLAY = false;
         public const string DEFAULT_OVERLAY_STYLE = "off";
+        public const string DEFAULT_BONGO_MODE = "standard";
+        // the modes of the Bango Cat folder, by their folder names
+        public static readonly string[] ALLOWED_BONGO_MODES = { "standard", "keyboard", "feixue", "mania" };
         public static readonly string[] ALLOWED_OVERLAY_STYLES = { "input_overlay", "bongo_cat", "off" };
         public const int DEFAULT_OVERLAY_OPACITY = 100;
         public const int DEFAULT_OVERLAY_SCALE = 100;
@@ -287,6 +291,7 @@ namespace ReplayKitSetup
             ["codecPreference"] = "codec_preference",
             ["replaySeconds"] = "replay_buffer_seconds",
             ["overlayStyle"] = "overlay_style",
+            ["bongoMode"] = "bongo_mode",
             ["overlayOpacity"] = "overlay_opacity",
             ["overlayScale"] = "overlay_scale",
             ["overlayHueShift"] = "overlay_hue_shift",
@@ -413,6 +418,9 @@ namespace ReplayKitSetup
             if (!ALLOWED_OVERLAY_STYLES.Contains(overlayStyle)) overlayStyle = DEFAULT_OVERLAY_STYLE;
             bool inputOverlayEnabled = overlayStyle != "off";
 
+            string bongoMode = GetString("bongo_mode", DEFAULT_BONGO_MODE);
+            if (!ALLOWED_BONGO_MODES.Contains(bongoMode)) bongoMode = DEFAULT_BONGO_MODE;
+
             string shareMode = GetString("share_mode", DEFAULT_SHARE_MODE);
             if (shareMode == "share_bridge") shareMode = DEFAULT_SHARE_MODE;
             if (!ALLOWED_SHARE_MODES.Contains(shareMode)) shareMode = DEFAULT_SHARE_MODE;
@@ -443,6 +451,7 @@ namespace ReplayKitSetup
                 RecordingPreset = GetString("recording_preset", DEFAULT_RECORDING_PRESET),
                 InputOverlayEnabled = inputOverlayEnabled,
                 OverlayStyle = overlayStyle,
+                BongoMode = bongoMode,
                 OverlayOpacity = CoerceIntRange(Get("overlay_opacity"), DEFAULT_OVERLAY_OPACITY, OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 OverlayScale = CoerceIntRange(Get("overlay_scale"), DEFAULT_OVERLAY_SCALE, OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX),
                 OverlayHueShift = CoerceFloatRange(Get("overlay_hue_shift"), DEFAULT_OVERLAY_HUE_SHIFT, OVERLAY_HUE_SHIFT_MIN, OVERLAY_HUE_SHIFT_MAX),

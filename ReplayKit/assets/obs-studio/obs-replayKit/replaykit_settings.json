@@ -13,6 +13,7 @@
   "recordingKeybind": {},
   "openClipsKeybind": {},
   "overlayStyle": "input_overlay",
+  "bongoMode": "standard",
   "overlayOpacity": 100,
   "overlayScale": 100,
   "overlayHueShift": 0,

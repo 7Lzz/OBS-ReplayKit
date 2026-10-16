@@ -13,5 +13,7 @@ void OpenCrashLogsFolder();
 void ConfirmedExit();
 void ToggleRecording();
 void ToggleReplayBuffer();
+// puts the WASD Overlay and Mouse Overlay items of the current scene into a group named Group, the shape the helper scene file gives the input overlay; obs-websocket has no request that makes a group
+void GroupInputOverlay();
 
 } // namespace rk

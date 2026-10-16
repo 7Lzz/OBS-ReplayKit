@@ -15,6 +15,7 @@ QDockWidget *FindSidebarDock(QMainWindow *mw);
 void ApplyLayoutChrome(bool clean);
 void ApplyLayoutDocks(UiLayout wanted);
 void PrepareDocksForNextLaunch();
+void LockCleanLayoutMenus();
 void ApplyLayout();
 
 // set when the previous clean shell start never got as far as clearing its marker, see InitLayoutAtStartup

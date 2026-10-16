@@ -166,4 +166,19 @@ void ToggleReplayBuffer()
 	active ? obs_frontend_replay_buffer_stop() : obs_frontend_replay_buffer_start();
 }
 
+// the members keep their place, and the group starts at their top left corner with scale 1, so the transform the helper sets on Group next means the same as in the scene file it writes
+void GroupInputOverlay()
+{
+	obs_source_t *current = obs_frontend_get_current_scene();
+	obs_scene_t *scene = obs_scene_from_source(current);
+	if (scene && !obs_scene_get_group(scene, "Group")) {
+		obs_sceneitem_t *items[] = {obs_scene_find_source(scene, "WASD Overlay"), obs_scene_find_source(scene, "Mouse Overlay")};
+		if (items[0] && items[1])
+			obs_scene_insert_group(scene, "Group", items, 2);
+		else
+			blog(LOG_WARNING, "[replaykit] input overlay group: WASD Overlay or Mouse Overlay is not in the current scene");
+	}
+	obs_source_release(current);
+}
+
 } // namespace rk

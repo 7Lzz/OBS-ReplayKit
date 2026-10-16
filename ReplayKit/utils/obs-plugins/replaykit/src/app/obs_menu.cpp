@@ -35,6 +35,12 @@ void ShowObsMenu(int index)
 		blog(LOG_WARNING, "[replaykit] no obs menu at position %d, the bar holds %d", index, int(menus.size()));
 		return;
 	}
+	// only Tools and Help open from here; the others rearrange the window, its docks, profiles and scene collections underneath the replaykit layout, and the settings page greys their buttons out
+	const QString name = menus[index]->objectName();
+	if (name != QLatin1String("menuTools") && name != QLatin1String("menuBasic_MainMenu_Help")) {
+		blog(LOG_WARNING, "[replaykit] obs menu %s is not opened from the settings page", name.toUtf8().constData());
+		return;
+	}
 	menus[index]->popup(QCursor::pos());
 }
 

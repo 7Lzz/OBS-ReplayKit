@@ -117,6 +117,29 @@ namespace ReplayKitSetup
         // the verified copy of this exe the in-app uninstall and the discord screenshare buttons run; a failure is a warning line the setup window lists as needing attention
         public static bool CacheSetupExecutable(Action<string> log = null) => SetupCache.Provision(log);
 
+        public static void PrepareObsTheme(Action<string> log = null)
+        {
+            string helper = Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit.exe");
+            VerifyFile(Path.Combine(GetRuntimeAssetsDir(), "scripts", "helper", "OBSReplayKit.exe"), helper);
+            var start = new System.Diagnostics.ProcessStartInfo(helper, "--prepare-theme")
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true,
+                WorkingDirectory = Path.GetDirectoryName(helper),
+            };
+            using (var process = System.Diagnostics.Process.Start(start))
+            {
+                if (process == null) throw new IOException("Could not start OBS theme preparation.");
+                var error = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit(15000))
+                {
+                    process.Kill();
+                    throw new IOException("OBS theme preparation timed out.");
+                }
+                if (process.ExitCode != 0) throw new IOException(error.GetAwaiter().GetResult().Trim());
+            }
+            log?.Invoke("OBS theme prepared before launch");
+        }
+
         // mirror assets/obs-studio/ into %appdata%/obs-studio/. returns the file count.
         public static int InstallObsConfig(Preferences prefs, Action<string> log = null)
         {

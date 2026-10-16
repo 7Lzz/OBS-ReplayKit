@@ -50,6 +50,14 @@ void ApplyNotifyThemeColors(const std::string &settingsBody)
 	QColor mBorderStrong(QString::fromStdString(ExtractJsonStringField(menuColors, "borderStrong")));
 	QColor mDanger(QString::fromStdString(ExtractJsonStringField(menuColors, "danger")));
 	QColor mMuted(QString::fromStdString(ExtractJsonStringField(menuColors, "muted")));
+	bool changed = (accent.isValid() && accent != g_menuAccent) ||
+		(accentLight.isValid() && accentLight != g_menuAccentLight) ||
+		(onAccent.isValid() && onAccent != g_menuOnAccent) ||
+		(mPanel.isValid() && mPanel != g_menuPanel) ||
+		(mField.isValid() && mField != g_menuField) ||
+		(mFieldHover.isValid() && mFieldHover != g_menuFieldHover) ||
+		(mBorderStrong.isValid() && mBorderStrong != g_menuBorderStrong) ||
+		(mMuted.isValid() && mMuted != g_menuMuted);
 	if (accent.isValid()) g_menuAccent = accent;
 	if (accentLight.isValid()) g_menuAccentLight = accentLight;
 	if (onAccent.isValid()) g_menuOnAccent = onAccent;
@@ -59,7 +67,6 @@ void ApplyNotifyThemeColors(const std::string &settingsBody)
 	if (mBorderStrong.isValid()) g_menuBorderStrong = mBorderStrong;
 	if (mDanger.isValid()) g_menuDanger = mDanger;
 	if (mMuted.isValid()) g_menuMuted = mMuted;
-	bool changed = false;
 	QColor chromeBg(QString::fromStdString(ExtractJsonStringField(menuColors, "bg")));
 	QColor chromeBar(QString::fromStdString(ExtractJsonStringField(menuColors, "bar")));
 	QColor chromeSuccess(QString::fromStdString(ExtractJsonStringField(menuColors, "success")));

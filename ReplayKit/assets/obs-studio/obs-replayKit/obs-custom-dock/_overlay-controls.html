@@ -1,5 +1,6 @@
 <!-- shared partial (helper #include target: overlay-controls). the input-overlay control set (style, flip, opacity, size, hue, colour multiply/add + resets) for the setup wizard. uses settings.html's OWN component classes and markup -- .combo, .check-row, .volume-control, .color-control, .field-reset -- so the wizard and Settings are the same controls, not lookalikes; the css those need is carried here because setup.html does not define it. host: RKOverlay.init({ get, set, onChange }); RKOverlay.collect() returns the overlay* fields. depends on _color-picker being on the page. -->
 <style>
+  #ovcModeRow[hidden] { display:none; }
   /* lifted verbatim from settings.html so the sliders keep their quarter tick lines and the colour boxes stay filled */
   .volume-control { width:100%; display:grid; grid-template-columns:72px minmax(180px,1fr); align-items:center; gap:8px; }
   .volume-value { background:transparent; border-color:var(--field-solid,var(--field)); text-align:center; padding:0 8px; }
@@ -45,6 +46,15 @@
   <div class="label">Overlay</div>
   <div class="field-wrap">
     <div class="combo" data-self-wired id="ovcStyle" tabindex="0" role="combobox" aria-expanded="false">
+      <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+      <div class="combo-menu" role="listbox"></div>
+    </div>
+  </div>
+</div>
+<div class="form-row" id="ovcModeRow" hidden>
+  <div class="label">Bongo Cat mode</div>
+  <div class="field-wrap">
+    <div class="combo" data-self-wired id="ovcMode" tabindex="0" role="combobox" aria-expanded="false">
       <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
       <div class="combo-menu" role="listbox"></div>
     </div>
@@ -102,18 +112,24 @@
 </div>
 <script>
 (function () {
-  var DEF = { overlayStyle:"off", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
+  var DEF = { overlayStyle:"off", bongoMode:"standard", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
   var STYLES = [
     { value:"input_overlay", label:"WASD / mouse", blurb:"Simple keyboard and mouse overlay." },
     { value:"bongo_cat", label:"Bongo Cat", blurb:"Animated keyboard and mouse overlay." },
     { value:"off", label:"Off", blurb:"No input overlay in the OBS scene." },
   ];
+  // the same list the settings page gets from the helper options
+  var MODES = [
+    { value:"standard", label:"Standard", blurb:"Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space." },
+    { value:"keyboard", label:"Keyboard", blurb:"Two paws on the arrow keys, R, Left Ctrl and Left Shift." },
+    { value:"feixue", label:"Feixue", blurb:"Game panel with W, A, S, D and Space, and a mouse paw." },
+    { value:"mania", label:"Mania", blurb:"Rhythm game keys Z, X, comma and period." },
+  ];
   var host = { get:function(k){ return DEF[k]; }, set:function(){}, onChange:function(){} };
   var st = Object.assign({}, DEF);
 
-  var combo = document.getElementById("ovcStyle");
-  var comboLabel = combo.querySelector(".combo-label"), comboMenu = combo.querySelector(".combo-menu");
   var flip = document.getElementById("ovcFlip");
+  var modeRow = document.getElementById("ovcModeRow");
   var sliders = {
     overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:0, max:100 },
     overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:50, max:200 },
@@ -140,37 +156,55 @@
     el.style.setProperty("--fill", Math.max(0, Math.min(100, ((value - min) / Math.max(1, max - min)) * 100)) + "%");
   }
 
-  function renderCombo() {
-    var cur = STYLES.find(function (o) { return o.value === st.overlayStyle; }) || STYLES[2];
-    comboLabel.textContent = cur.label;
-    comboMenu.innerHTML = STYLES.map(function (o) {
-      var blurb = o.blurb ? '<span class="option-blurb">- ' + o.blurb + '</span>' : "";
-      return '<div class="combo-option' + (o.value === st.overlayStyle ? " is-selected" : "") + '" role="option" data-v="' + o.value + '"><span>' + o.label + '</span>' + blurb + "</div>";
-    }).join("");
-  }
-  function closeCombo() { combo.classList.remove("is-open"); combo.setAttribute("aria-expanded", "false"); }
-  combo.querySelector(".combo-button").addEventListener("click", function (e) {
-    e.stopPropagation();
-    var open = !combo.classList.contains("is-open");
-    // the host page owns other combos and cannot see this click (stopPropagation keeps our own document listener from closing us), so shut them here to keep one menu open at a time
-    if (open) document.querySelectorAll(".combo.is-open").forEach(function (c) {
-      if (c === combo) return;
-      c.classList.remove("is-open");
-      c.setAttribute("aria-expanded", "false");
+  // a self-wired combo over one of the lists above; picked runs after the new value is in st
+  function wireCombo(id, key, options, fallback, picked) {
+    var combo = document.getElementById(id);
+    var label = combo.querySelector(".combo-label"), menu = combo.querySelector(".combo-menu");
+    function close() { combo.classList.remove("is-open"); combo.setAttribute("aria-expanded", "false"); }
+    combo.querySelector(".combo-button").addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = !combo.classList.contains("is-open");
+      // the host page owns other combos and cannot see this click (stopPropagation keeps our own document listener from closing us), so shut them here to keep one menu open at a time
+      if (open) document.querySelectorAll(".combo.is-open").forEach(function (c) {
+        if (c === combo) return;
+        c.classList.remove("is-open");
+        c.setAttribute("aria-expanded", "false");
+      });
+      combo.classList.toggle("is-open", open);
+      combo.setAttribute("aria-expanded", open ? "true" : "false");
     });
-    combo.classList.toggle("is-open", open);
-    combo.setAttribute("aria-expanded", open ? "true" : "false");
-  });
-  comboMenu.addEventListener("click", function (e) {
-    var o = e.target.closest(".combo-option");
-    if (!o) return;
-    st.overlayStyle = o.dataset.v;
+    menu.addEventListener("click", function (e) {
+      var o = e.target.closest(".combo-option");
+      if (!o) return;
+      st[key] = o.dataset.v;
+      renderCombos(); close();
+      host.set(key, st[key]);
+      picked();
+    });
+    document.addEventListener("click", close);
+    return function render() {
+      var cur = options.find(function (o) { return o.value === st[key]; }) || options[fallback];
+      label.textContent = cur.label;
+      menu.innerHTML = options.map(function (o) {
+        var blurb = o.blurb ? '<span class="option-blurb">- ' + o.blurb + '</span>' : "";
+        return '<div class="combo-option' + (o.value === cur.value ? " is-selected" : "") + '" role="option" data-v="' + o.value + '"><span>' + o.label + '</span>' + blurb + "</div>";
+      }).join("");
+    };
+  }
+  var renderStyle = wireCombo("ovcStyle", "overlayStyle", STYLES, 2, function () {
     resetOverlayPosition(st.overlayStyle);
-    renderCombo(); closeCombo();
-    host.set("overlayStyle", st.overlayStyle); fire();
+    fire();
     if (window.RKOverlayPreview) RKOverlayPreview.resetPosition();
   });
-  document.addEventListener("click", closeCombo);
+  var renderMode = wireCombo("ovcMode", "bongoMode", MODES, 0, function () {
+    fire();
+    if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+  });
+  function renderCombos() {
+    modeRow.hidden = st.overlayStyle !== "bongo_cat";
+    renderStyle();
+    renderMode();
+  }
 
   flip.addEventListener("change", function () {
     st.overlayFlipH = flip.checked;
@@ -216,7 +250,7 @@
   }
 
   function paint() {
-    renderCombo();
+    renderCombos();
     flip.checked = !!st.overlayFlipH;
     Object.keys(sliders).forEach(function (key) {
       var c = sliders[key];
@@ -230,7 +264,7 @@
     refreshResets();
   }
 
-  var KEYS = ["overlayStyle","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd"];
+  var KEYS = ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd"];
   function pull() {
     KEYS.forEach(function (k) {
       var v = host.get(k);

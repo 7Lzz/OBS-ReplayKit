@@ -43,6 +43,8 @@ void PipeDispatchLine(const std::string &line)
 		QMetaObject::invokeMethod(g_callbacks, []() { StorageModalOpen(); }, Qt::QueuedConnection);
 	} else if (line == "CLOSESTORAGE") {
 		QMetaObject::invokeMethod(g_callbacks, []() { StorageModalClose(); }, Qt::QueuedConnection);
+	} else if (line == "GROUPINPUTOVERLAY") {
+		QMetaObject::invokeMethod(g_callbacks, []() { GroupInputOverlay(); }, Qt::QueuedConnection);
 	} else if (line == "OPENOBSSETTINGS") {
 		QMetaObject::invokeMethod(g_callbacks, []() { OpenObsSettings(); }, Qt::QueuedConnection);
 	} else if (line.rfind("OBSMENU ", 0) == 0) {

@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is the plugin's standard-mode sprite set. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle) where getStyle() -> the overlay* fields, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
+<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is RKBongo (live2d-bongo partial) drawing the selected Bango Cat mode the way the obs source does. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle, onMove, onScale) where getStyle() -> the overlay* fields, onMove(x, y) takes a drag and onScale(percent) a corner resize already clamped to the size slider range, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
 <style>
   /* the overlay renders at its true canvas fraction, so small parts (the mouse wheel is ~0.4% of canvas width) only become readable on a wide screen */
   .ovp-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
@@ -21,13 +21,22 @@
     pointer-events:none; transition:border-color 120ms linear;
   }
   .ovp-screen:hover .ovp-stage::after, .ovp-stage.is-dragging::after { border-color:var(--line2); }
+  /* corner grips for resizing; they sit outside the stage so a horizontal flip of the overlay does not swap them */
+  .ovp-grip {
+    position:absolute; width:10px; height:10px; margin:-5px 0 0 -5px; box-sizing:border-box; border-radius:2px;
+    border:1px solid rgb(var(--accent-rgb)); background:var(--window); opacity:0; transition:opacity 120ms linear; touch-action:none; z-index:2;
+  }
+  .ovp-grip[hidden] { display:none; }
+  .ovp-grip[data-corner="nw"], .ovp-grip[data-corner="se"] { cursor:nwse-resize; }
+  .ovp-grip[data-corner="ne"], .ovp-grip[data-corner="sw"] { cursor:nesw-resize; }
+  .ovp-screen:hover .ovp-grip, .ovp-grip.is-dragging { opacity:1; }
   .ovp-layer { position:absolute; overflow:visible; }
   .ovp-layer[hidden] { display:none; }
   .ovp-sprite { position:absolute; left:0; top:0; transform-origin:0 0; }
   .ovp-key { position:absolute; background-repeat:no-repeat; }
   .ovp-bongo { position:absolute; inset:0; }
   .ovp-bongo[hidden] { display:none; }
-  .ovp-bongo img, .ovp-bongo canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .ovp-bongo canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
   .ovp-tint { position:absolute; inset:0; pointer-events:none; }
   .ovp-hint { display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:4px; }
   .ovp-hint-text { font-size:10.5px; color:var(--muted); }
@@ -53,13 +62,11 @@
     <div class="ovp-stage" id="ovpStage">
       <div class="ovp-layer" id="ovpWasd"><div class="ovp-sprite" id="ovpWasdInner"></div></div>
       <div class="ovp-layer" id="ovpMouse"><div class="ovp-sprite" id="ovpMouseInner"></div></div>
-      <!-- layer order copied from Bongobs-Cat View::Render: catbg, pressed keys, the live2d cat + mouse arm, then the keyboard arm -->
-      <div class="ovp-bongo" id="ovpBongo" hidden>
-        <img id="ovpBongoBase" alt=""><img id="ovpBongoKbd" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><canvas id="ovpBongoGl"></canvas><img id="ovpBongoLeft" alt="">
-      </div>
+      <div class="ovp-bongo" id="ovpBongo" hidden><canvas id="ovpBongoCanvas"></canvas></div>
       <div class="ovp-tint" id="ovpTintMul" style="mix-blend-mode:multiply"></div>
       <div class="ovp-tint" id="ovpTintAdd" style="mix-blend-mode:screen"></div>
     </div>
+    <div class="ovp-grip" data-corner="nw"></div><div class="ovp-grip" data-corner="ne"></div><div class="ovp-grip" data-corner="sw"></div><div class="ovp-grip" data-corner="se"></div>
   </div>
 </div>
 <script>
@@ -71,12 +78,15 @@
   var wasdEl = document.getElementById("ovpWasd"), wasdInner = document.getElementById("ovpWasdInner");
   var mouseEl = document.getElementById("ovpMouse"), mouseInner = document.getElementById("ovpMouseInner");
   var bongoEl = document.getElementById("ovpBongo");
-  var bBase = document.getElementById("ovpBongoBase"), bKbd = document.getElementById("ovpBongoKbd");
-  var bLeft = document.getElementById("ovpBongoLeft"), bGl = document.getElementById("ovpBongoGl");
+  var bongoCanvas = document.getElementById("ovpBongoCanvas");
   var tintMul = document.getElementById("ovpTintMul"), tintAdd = document.getElementById("ovpTintAdd");
 
   var getStyle = function () { return {}; };
   var onMove = function () {};
+  var onScale = null;
+  var grips = Array.prototype.slice.call(screenEl.querySelectorAll(".ovp-grip"));
+  // the size slider range, which is all the helper accepts for overlayScale
+  var SCALE_MIN = 50, SCALE_MAX = 200;
 
   // one desktop grab painted behind the fake screen so the overlay is positioned against the users real screen. the token is fixed per page load, so a fresh settings/setup open refetches but refresh()/start() do not -- the helper serves it no-store and captures just once per obs session anyway. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a failure clears the flag so a later start() retries.
   var BACKDROP_TOKEN = Date.now();
@@ -99,7 +109,6 @@
   var wasdBuilt = false, mouseBuilt = false, bongoBuilt = false;
   var wasdSize = { w: 568, h: 394 }, mouseSize = { w: 285, h: 421 };
 
-  var BLANK_PX = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   // gap between an elements released sprite and the pressed one directly below it, measured on both preset sheets
   var SPRITE_GUTTER = 3;
 
@@ -110,11 +119,6 @@
   };
   // MouseEvent.button -> element id in mouse-no-movement.json
   var BTN_TO_ID = { 0:"lmb", 2:"rmb", 3:"smb2", 4:"smb1" };
-  // KeyboardEvent.code -> bongo standard-mode frame suffix (its config KeyUse list)
-  var CODE_TO_BONGO = {
-    Digit1:"1", Digit2:"2", Digit3:"3", Digit4:"4", Digit5:"5", Digit6:"6", Digit7:"7",
-    KeyQ:"q", KeyE:"e", KeyR:"r", Space:"space", KeyA:"a", KeyD:"d", KeyS:"s", KeyW:"w",
-  };
 
   // starting guess only (basic.ini BaseCX/BaseCY) -- the position poll replaces both with the projectors real resolution as soon as obs answers.
   var CANVAS_W = 2560, CANVAS_H = 1440;
@@ -198,16 +202,19 @@
   }
 
   function ensureBongo() {
+    if (!window.RKBongo) return;
+    window.RKBongo.setMode((getStyle() || {}).bongoMode || "standard");
     if (bongoBuilt) return;
     bongoBuilt = true;
-    var base = HELPER + "/overlay-preview/bongo/";
-    bBase.src = base + "catbg.png";
-    bLeft.src = base + "l-up.png";
-    if (window.RKBongoLive2D) {
-      window.RKBongoLive2D.mount(bGl)
-        .then(function () { if (running && mode === "bongo_cat") window.RKBongoLive2D.start(); })
-        .catch(function () { bGl.hidden = true; });
-    }
+    window.RKBongo.mount(bongoCanvas)
+      .then(function () { if (running && mode === "bongo_cat") window.RKBongo.start(); })
+      .catch(function (error) { bongoBuilt = false; console.error(error); });
+  }
+
+  // twin of ReplaykitSettings.ScaleAnchor, in canvas pixels
+  function scaledStart(start, size, next, canvas) {
+    var anchor = start <= 1 ? -1 : start + size >= canvas - 1 ? 1 : start + size / 2 <= canvas / 3 ? -1 : start + size / 2 >= canvas * 2 / 3 ? 1 : 0;
+    return anchor < 0 ? start : anchor > 0 ? start + size - next : start + (size - next) / 2;
   }
 
   function setBox(el, x, y, w, h) {
@@ -233,13 +240,12 @@
     if (liveRect) {
       bx = liveRect.x * CANVAS_W; by = liveRect.y * CANVAS_H;
       bw = liveRect.w * CANVAS_W; bh = liveRect.h * CANVAS_H;
-      // an unapplied size edit grows the real box, anchored the way ScaleTransformInPlace does: centred, unless the item already hugs an outer third
+      // an unapplied size edit grows the real box, anchored the way the helper ScaleAnchor does at Apply: an edge on the canvas edge stays there, else an item in an outer third keeps to that side, else the center holds
       var f = clampNum(curScalePct(), 50, 200, 100) / (liveRect.scalePct || 100);
       if (Math.abs(f - 1) > 0.0005) {
         var nw = bw * f, nh = bh * f;
-        var cxp = bx + bw / 2, cyp = by + bh / 2;
-        bx = cxp <= CANVAS_W / 3 ? bx : (cxp >= CANVAS_W * 2 / 3 ? bx + (bw - nw) : bx + (bw - nw) / 2);
-        by = cyp <= CANVAS_H / 3 ? by : (cyp >= CANVAS_H * 2 / 3 ? by + (bh - nh) : by + (bh - nh) / 2);
+        bx = scaledStart(bx, bw, nw, CANVAS_W);
+        by = scaledStart(by, bh, nh, CANVAS_H);
         bw = nw; bh = nh;
       }
     }
@@ -251,6 +257,12 @@
     if (posOverride) { bx = posOverride.x * CANVAS_W; by = posOverride.y * CANVAS_H; }
     setBox(stage, bx * k, by * k, bw * k, bh * k);
     stageRect = { x: bx, y: by, w: bw, h: bh };
+    grips.forEach(function (grip) {
+      var corner = grip.dataset.corner;
+      grip.hidden = !onScale;
+      grip.style.left = (corner[1] === "e" ? bx + bw : bx) * k + "px";
+      grip.style.top = (corner[0] === "s" ? by + bh : by) * k + "px";
+    });
     if (mode === "input_overlay") {
       // the sub-layers are laid out in the computed local space, then scaled into whatever box obs reports
       var fx = localW > 0 ? bw / localW : 1, fy = localH > 0 ? bh / localH : 1;
@@ -264,17 +276,22 @@
 
   // ---- drag to reposition ----
   var drag = null;
-  // committed drag positions so ctrl+z steps back. each entry is a {x,y} canvas-fraction override, or null meaning "back to the corner obs / the saved setting produces". a fresh drag clears the redo stack.
+  // committed drags and resizes so ctrl+z steps back and ctrl+shift+z / ctrl+y forward. each entry is { pos, scale }: pos a {x,y} canvas-fraction override or null for the corner obs / the saved setting produces, scale the size slider value. a fresh edit clears the redo stack.
   var moveUndo = [], moveRedo = [], MOVE_HISTORY_MAX = 60;
   function clearMoveHistory() { moveUndo.length = 0; moveRedo.length = 0; }
+  function snapshot(pos) { return { pos: pos ? { x: pos.x, y: pos.y } : null, scale: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100) }; }
+  function pushHistory(entry) {
+    moveUndo.push(entry);
+    if (moveUndo.length > MOVE_HISTORY_MAX) moveUndo.shift();
+    moveRedo.length = 0;
+  }
   function onStageDown(ev) {
     if (!running || mode === "off" || ev.button !== 0) return;
     var sw = screenEl.clientWidth;
     if (!sw || !stageRect) return;
     ev.preventDefault();
     ev.stopPropagation();
-    drag = { px: ev.clientX, py: ev.clientY, x: stageRect.x, y: stageRect.y, k: sw / CANVAS_W,
-             before: posOverride ? { x: posOverride.x, y: posOverride.y } : null, dirty: false };
+    drag = { px: ev.clientX, py: ev.clientY, x: stageRect.x, y: stageRect.y, k: sw / CANVAS_W, before: snapshot(posOverride), dirty: false };
     stage.classList.add("is-dragging");
     try { stage.setPointerCapture(ev.pointerId); } catch (_) {}
   }
@@ -313,31 +330,59 @@
     stage.classList.remove("is-dragging");
     try { stage.releasePointerCapture(ev.pointerId); } catch (_) {}
     if (posOverride && wasDirty) {
-      moveUndo.push(before);
-      if (moveUndo.length > MOVE_HISTORY_MAX) moveUndo.shift();
-      moveRedo.length = 0;
+      pushHistory(before);
       posDirty = true;
       onMove(posOverride.x, posOverride.y);
     }
   }
 
-  // restore a history entry ({x,y} override, or null = the corner obs / the saved setting produces) and re-stage it
+  // ---- corner resize ----
+  // the box grows or shrinks by how far the corner moved from where it was grabbed, measured on both axes and averaged so a diagonal pull feels even; the new size goes through the size slider, which is what obs and Apply read
+  var resize = null;
+  function onGripDown(ev) {
+    if (!running || mode === "off" || ev.button !== 0 || !stageRect || !onScale) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var grip = ev.currentTarget;
+    resize = { grip: grip, px: ev.clientX, py: ev.clientY, w: stageRect.w, h: stageRect.h, k: screenEl.clientWidth / CANVAS_W, before: snapshot(posOverride),
+               pct: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100), sx: grip.dataset.corner[1] === "e" ? 1 : -1, sy: grip.dataset.corner[0] === "s" ? 1 : -1 };
+    grip.classList.add("is-dragging");
+    try { grip.setPointerCapture(ev.pointerId); } catch (_) {}
+  }
+  function onGripMove(ev) {
+    if (!resize) return;
+    var dw = resize.sx * (ev.clientX - resize.px) / resize.k, dh = resize.sy * (ev.clientY - resize.py) / resize.k;
+    var factor = ((resize.w + dw) / resize.w + (resize.h + dh) / resize.h) / 2;
+    var pct = Math.round(Math.max(SCALE_MIN, Math.min(SCALE_MAX, resize.pct * factor)));
+    if (pct !== clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100)) onScale(pct);
+  }
+  function onGripUp(ev) {
+    if (!resize) return;
+    resize.grip.classList.remove("is-dragging");
+    try { resize.grip.releasePointerCapture(ev.pointerId); } catch (_) {}
+    if (resize.before.scale !== clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100)) pushHistory(resize.before);
+    resize = null;
+  }
+
+  // restore a history entry and re-stage it: the size goes back through the host slider first, since the position of an item without an override follows its size
   function applyHistoryEntry(entry) {
-    posOverride = entry ? { x: entry.x, y: entry.y } : null;
+    var current = snapshot(posOverride);
+    if (entry.scale !== current.scale && onScale) onScale(entry.scale);
+    if (JSON.stringify(entry.pos) === JSON.stringify(current.pos)) return;
+    posOverride = entry.pos ? { x: entry.pos.x, y: entry.pos.y } : null;
     posDirty = true;
     layout();
     if (posOverride) onMove(posOverride.x, posOverride.y);
     else if (stageRect) onMove(stageRect.x / CANVAS_W, stageRect.y / CANVAS_H);
   }
-  function curOverride() { return posOverride ? { x: posOverride.x, y: posOverride.y } : null; }
   function undoMove() {
     if (!running || mode === "off" || !moveUndo.length) return;
-    moveRedo.push(curOverride());
+    moveRedo.push(snapshot(posOverride));
     applyHistoryEntry(moveUndo.pop());
   }
   function redoMove() {
     if (!running || mode === "off" || !moveRedo.length) return;
-    moveUndo.push(curOverride());
+    moveUndo.push(snapshot(posOverride));
     applyHistoryEntry(moveRedo.pop());
   }
   function onHistoryKey(ev) {
@@ -352,6 +397,7 @@
 
   function applyStyle() {
     var s = getStyle() || {};
+    if (mode === "bongo_cat") ensureBongo();
     var op = clampNum(s.overlayOpacity, 0, 100, 100) / 100;
     var hue = clampNum(s.overlayHueShift, -180, 180, 0);
     stage.style.opacity = String(op);
@@ -378,35 +424,21 @@
     var off = mode === "off";
     offEl.hidden = !off;
     stage.hidden = off;
+    grips.forEach(function (grip) { grip.hidden = off || !onScale; });
     var bongo = mode === "bongo_cat";
     bongoEl.hidden = !bongo;
     wasdEl.hidden = bongo;
     mouseEl.hidden = bongo;
     if (bongo) ensureBongo(); else ensureInputOverlay();
-    if (window.RKBongoLive2D) { if (bongo && running) window.RKBongoLive2D.start(); else window.RKBongoLive2D.stop(); }
+    if (window.RKBongo) { if (bongo && running) window.RKBongo.start(); else window.RKBongo.stop(); }
     layout();
   }
 
   // ---- live input ----
-  var bongoCode = "";
-  function bongoDown(code) {
-    var n = CODE_TO_BONGO[code];
-    if (!n) return;
-    bongoCode = code;
-    var base = HELPER + "/overlay-preview/bongo/";
-    bKbd.src = base + "k-" + n + ".png";
-    bLeft.src = base + "l-" + n + ".png";
-  }
-  function bongoUp(code) {
-    if (code !== bongoCode) return;
-    bongoCode = "";
-    bKbd.src = BLANK_PX;
-    bLeft.src = HELPER + "/overlay-preview/bongo/l-up.png";
-  }
-  // the cat + mouse arm are live2d models the plugin rigs at runtime; RKBongoLive2D renders them and takes the same normalised cursor + button state Model.cpp feeds the rig
+  // the cat and its mouse arm take the same normalised cursor and button state Model.cpp feeds the rig
   var pawMx = 0.5, pawMy = 0.5, pawL = 0, pawR = 0;
   function pushLive2d() {
-    if (window.RKBongoLive2D) window.RKBongoLive2D.setInput(pawMx, pawMy, pawL, pawR);
+    if (window.RKBongo) window.RKBongo.setInput(pawMx, pawMy, pawL, pawR);
   }
   function bongoButton(button, down) {
     if (button === 0) pawL = down ? 1 : 0;
@@ -425,7 +457,7 @@
       if (!running) return;
       var code = ev.code || "";
       if (mode === "bongo_cat") {
-        if (down) bongoDown(code); else bongoUp(code);
+        if (window.RKBongo) window.RKBongo.setKey(code, down);
         return;
       }
       var id = CODE_TO_ID[code];
@@ -464,6 +496,13 @@
     document.addEventListener("mousemove", onMouseMove, true);
     window.addEventListener("wheel", onWheel, { passive: true, capture: true });
     window.addEventListener("resize", layout);
+    window.addEventListener("blur", function () { if (window.RKBongo) window.RKBongo.clearKeys(); pawL = pawR = 0; pushLive2d(); });
+    grips.forEach(function (grip) {
+      grip.addEventListener("pointerdown", onGripDown);
+      grip.addEventListener("pointermove", onGripMove);
+      grip.addEventListener("pointerup", onGripUp);
+      grip.addEventListener("pointercancel", onGripUp);
+    });
     stage.addEventListener("pointerdown", onStageDown);
     stage.addEventListener("pointermove", onStageMove);
     stage.addEventListener("pointerup", onStageUp);
@@ -516,9 +555,10 @@
   function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
 
   window.RKOverlayPreview = {
-    init: function (fn, onMoveFn) {
+    init: function (fn, onMoveFn, onScaleFn) {
       if (typeof fn === "function") getStyle = fn;
       if (typeof onMoveFn === "function") onMove = onMoveFn;
+      if (typeof onScaleFn === "function") onScale = onScaleFn;
       ensureBackdrop();
     },
     // host calls this once the drag has been saved, so the poll can resume following the scene item
@@ -550,7 +590,7 @@
     stop: function () {
       running = false;
       clearTimeout(posTimer); posTimer = 0;
-      if (window.RKBongoLive2D) window.RKBongoLive2D.stop();
+      if (window.RKBongo) window.RKBongo.stop();
     },
     refresh: function () {
       var s = getStyle() || {};

@@ -990,8 +990,23 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            // static assets under obs-custom-dock/overlay-preview/ -- the sprite sheets + layout json the fake overlay projector renders (wasd/, bongo/), plus the live2d runtime + bongo cat models (live2d/). two path segments, no traversal.
-            var previewAsset = Regex.Match(path, @"^/overlay-preview/([a-z0-9_-]+/[a-z0-9_-]+\.(png|json|moc3|js))$");
+            // the Bango Cat folder of obs for the overlay preview: its modes with their configs and model bakes, and its pictures by path inside it
+            if (path == "/bongo-cat/manifest")
+            {
+                HttpResponse.SendJson(stream, 200, BongoCatFiles.Manifest());
+                return false;
+            }
+            if (path == "/bongo-cat/picture")
+            {
+                string picture = BongoCatFiles.Picture(Q("path", ""));
+                if (picture == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
+                var hb = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" });
+                HttpResponse.SendBytes(stream, 200, "OK", hb, File.ReadAllBytes(picture));
+                return false;
+            }
+
+            // static assets under obs-custom-dock/overlay-preview/ -- the sprite sheets + layout json of the wasd/mouse preview (wasd/, mouse/) and the baked bongo cat models (bongo-models/). two path segments, no traversal.
+            var previewAsset = Regex.Match(path, @"^/overlay-preview/([a-z0-9_-]+/[a-z0-9_-]+\.(png|json))$");
             if (previewAsset.Success)
             {
                 string baseDir = Path.Combine(AppConfig.GetDockDir(), "overlay-preview");
@@ -1000,10 +1015,7 @@ namespace ReplayKitHelper
                 if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full))
                 {
                     string ext = previewAsset.Groups[2].Value;
-                    string ctype = ext == "json" ? "application/json"
-                        : ext == "js" ? "text/javascript; charset=utf-8"
-                        : ext == "moc3" ? "application/octet-stream"
-                        : "image/png";
+                    string ctype = ext == "json" ? "application/json" : "image/png";
                     var hp = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = ctype });
                     HttpResponse.SendBytes(stream, 200, "OK", hp, File.ReadAllBytes(full));
                 }

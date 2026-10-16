@@ -11,6 +11,9 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 # sources are listed by hand so a new file is a reviewed change and nothing stray ends up in the dll
 set(REPLAYKIT_SOURCES
     src/plugin.cpp
+    src/overlays/bongo.cpp
+    src/overlays/bongo_input.cpp
+    src/overlays/bongo_model.cpp
 
     src/app/frontend_events.cpp
     src/app/ipc_commands.cpp

@@ -111,6 +111,16 @@ ffi.cdef[[
         DWORD   dwFlags;
     } MONITORINFO;
 
+    typedef struct { MONITORINFO info; char device[32]; } CAPTURE_MONITOR_INFO;
+    typedef struct {
+        DWORD cb;
+        char DeviceName[32];
+        char DeviceString[128];
+        DWORD StateFlags;
+        char DeviceID[128];
+        char DeviceKey[128];
+    } CAPTURE_DISPLAY_DEVICE;
+
     HWND     GetForegroundWindow();
     BOOL     IsWindow(HWND hWnd);
     BOOL     IsIconic(HWND hWnd);
@@ -118,6 +128,7 @@ ffi.cdef[[
     LONG     GetWindowLongA(HWND hWnd, int nIndex);
     HMONITOR MonitorFromWindow(HWND hwnd, DWORD dwFlags);
     BOOL     GetMonitorInfoA(HMONITOR hMonitor, MONITORINFO* lpmi);
+    BOOL     EnumDisplayDevicesA(const char* device, DWORD index, CAPTURE_DISPLAY_DEVICE* info, DWORD flags);
     DWORD    GetWindowThreadProcessId(HWND hWnd, DWORD* lpdwProcessId);
     DWORD    GetCurrentProcessId();
     HANDLE   OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dwProcessId);
@@ -682,7 +693,78 @@ function desktop_switch_callback()
     print(string.format("[AutoSwitch] → DESKTOP MODE [%s]", cfg.display_source))
 end
 
+local monitor_check_at = 0
+local monitor_warning = nil
+
+local function primary_monitor_ids()
+    local monitor = ffi.C.MonitorFromWindow(nil, 1)
+    local info = ffi.new("CAPTURE_MONITOR_INFO")
+    info.info.cbSize = ffi.sizeof(info)
+    if ffi.C.GetMonitorInfoA(monitor, ffi.cast("MONITORINFO*", info)) == 0 then return nil, nil end
+    local adapter = ffi.string(info.device)
+    local device = ffi.new("CAPTURE_DISPLAY_DEVICE")
+    device.cb = ffi.sizeof(device)
+    local id = nil
+    if ffi.C.EnumDisplayDevicesA(adapter, 0, device, 1) ~= 0 then id = ffi.string(device.DeviceID) end
+    return id, adapter
+end
+
+local function repair_display_capture()
+    local now = obs.os_gettime_ns()
+    if now < monitor_check_at then return end
+    local source = obs.obs_get_source_by_name(cfg.display_source)
+    if source == nil then monitor_check_at = now + 1000000000; return end
+    monitor_check_at = now + 5 * 1000000000
+    local settings = obs.obs_source_get_settings(source)
+    -- Live source properties run OBS's modified callbacks and reset display capture.
+    local properties = obs.obs_get_source_properties(obs.obs_source_get_id(source))
+    local ok, err = pcall(function()
+        if settings == nil or properties == nil then return end
+        local property = obs.obs_properties_get(properties, "monitor_id")
+        if property == nil then return end
+        local selected = obs.obs_data_get_string(settings, "monitor_id") or ""
+        local choices = {}
+        for i = 0, obs.obs_property_list_item_count(property) - 1 do
+            local value = obs.obs_property_list_item_string(property, i)
+            if value ~= nil and value ~= "" and not obs.obs_property_list_item_disabled(property, i) then
+                choices[#choices + 1] = value
+            end
+        end
+        local target = nil
+        for _, value in ipairs(choices) do
+            if value:lower() == selected:lower() then target = value; break end
+        end
+        if target == nil then
+            local id, adapter = primary_monitor_ids()
+            for _, value in ipairs(choices) do
+                if (id and value:lower() == id:lower()) or (adapter and value:lower() == adapter:lower()) then
+                    target = value
+                    break
+                end
+            end
+        end
+        if target == nil then
+            if monitor_warning ~= selected then
+                monitor_warning = selected
+                obs.script_log(obs.LOG_WARNING, "[AutoSwitch] Display Capture has no matching active monitor. Choose a display in its Properties.")
+            end
+            return
+        end
+        monitor_warning = nil
+        if selected ~= target then
+            obs.obs_data_set_string(settings, "monitor_id", target)
+            obs.obs_source_update(source, settings)
+            obs.script_log(obs.LOG_INFO, "[AutoSwitch] Repaired Display Capture's monitor selection using OBS's active display list.")
+        end
+    end)
+    if properties ~= nil then obs.obs_properties_destroy(properties) end
+    if settings ~= nil then obs.obs_data_release(settings) end
+    obs.obs_source_release(source)
+    if not ok then obs.script_log(obs.LOG_WARNING, "[AutoSwitch] Monitor selection check failed: " .. tostring(err)) end
+end
+
 local function check_fullscreen()
+    repair_display_capture()
     local policy = read_capture_policy()
     -- picked up live so the slider takes effect without a script reload
     desktop_switch_grace_ms = policy.switch_grace_ms
@@ -809,7 +891,10 @@ function script_update(settings)
     hook_blocked = {}
     window_fallback = {}
     graphics_api_seen = {}
+    monitor_check_at = 0
+    monitor_warning = nil
     desktop_switch_grace_ms = DEFAULT_DESKTOP_SWITCH_GRACE_MS
+    repair_display_capture()
     obs.timer_add(check_fullscreen, cfg.check_interval)
     print("[AutoSwitch] Active — dynamic hook detection enabled")
 end

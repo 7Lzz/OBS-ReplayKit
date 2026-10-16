@@ -431,6 +431,24 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
         }
 
+        public static void PrepareForLaunch(JObject settings)
+        {
+            string id = settings?["theme"]?.Value<string>() ?? "default";
+            string ini = Path.Combine(Constants.OBS_CONFIG_DIR, "user.ini");
+            string current = ReadObsThemeKey(ini);
+            if (id == "default" && (current == null || !current.StartsWith("com.replaykit.theme.", StringComparison.Ordinal)))
+            {
+                if (File.Exists(PendingThemeMarker)) File.Delete(PendingThemeMarker);
+                WriteDockThemeCss(settings);
+                return;
+            }
+            if (ApplyToObs(settings) != "theme") throw new IOException("Could not prepare the selected OBS theme.");
+            ApplyPendingTheme();
+            string expected = id == "default" ? "" : "com.replaykit.theme." + Slug(id);
+            if (File.Exists(PendingThemeMarker) || (ReadObsThemeKey(ini) ?? "") != expected)
+                throw new IOException("The selected OBS theme could not be saved before launch.");
+        }
+
         // startup reconciler -- only touches disk if the current themes .ovt is missing or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
         public static void EnsureObsInSync(JObject settings)
         {

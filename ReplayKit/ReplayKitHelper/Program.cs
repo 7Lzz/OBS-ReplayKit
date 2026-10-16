@@ -27,6 +27,16 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
+            if (args.Length == 1 && string.Equals(args[0], "--prepare-theme", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
+                    Themes.PrepareForLaunch(ReplaykitSettings.ReadSettings());
+                    return 0;
+                }
+                catch (Exception ex) { Console.Error.WriteLine("Theme preparation failed: " + ex.Message); return 1; }
+            }
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
             if (args.Length > 0 && string.Equals(args[0], "--update-watchdog", StringComparison.OrdinalIgnoreCase))

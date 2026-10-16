@@ -12,6 +12,7 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
+#include "overlays/bongo.hpp"
 #include "shell/shell.hpp"
 
 OBS_DECLARE_MODULE()
@@ -19,6 +20,7 @@ OBS_DECLARE_MODULE()
 bool obs_module_load(void)
 {
 	using namespace rk;
+	RegisterBongo();
 	g_callbacks = new QObject();
 	StartWorkers();
 	StartReplayKitCrashReporter();

@@ -20,7 +20,7 @@ namespace ReplayKitSetup
         {
             get
             {
-                var parts = DeviceId.Split('#');
+                var parts = (DeviceId ?? "").Split('#');
                 return parts.Length > 1 ? parts[1] : "?";
             }
         }
@@ -100,13 +100,13 @@ namespace ReplayKitSetup
             foreach (var info in monitors)
             {
                 var dd = new DISPLAY_DEVICEW { cb = (uint)Marshal.SizeOf<DISPLAY_DEVICEW>() };
-                if (!EnumDisplayDevicesW(info.szDevice, 0, ref dd, EDD_GET_DEVICE_INTERFACE_NAME)) continue;
+                bool identified = EnumDisplayDevicesW(info.szDevice, 0, ref dd, EDD_GET_DEVICE_INTERFACE_NAME);
                 displays.Add(new DisplayInfo
                 {
                     IsPrimary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0,
                     Adapter = info.szDevice,
-                    DeviceId = dd.DeviceID,
-                    FriendlyName = dd.DeviceString,
+                    DeviceId = identified && !string.IsNullOrWhiteSpace(dd.DeviceID) ? dd.DeviceID : info.szDevice,
+                    FriendlyName = identified && !string.IsNullOrWhiteSpace(dd.DeviceString) ? dd.DeviceString : info.szDevice,
                     Width = info.rcMonitor.Right - info.rcMonitor.Left,
                     Height = info.rcMonitor.Bottom - info.rcMonitor.Top,
                 });

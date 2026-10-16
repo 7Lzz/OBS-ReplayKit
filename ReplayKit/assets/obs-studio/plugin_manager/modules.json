@@ -35,19 +35,6 @@
         "version": ""
     },
     {
-        "display_name": "Bongo Cat",
-        "enabled": true,
-        "encoders": [],
-        "id": "",
-        "module_name": "bongobs-cat",
-        "outputs": [],
-        "services": [],
-        "sources": [
-            "bongobs-cat"
-        ],
-        "version": ""
-    },
-    {
         "display_name": "",
         "enabled": true,
         "encoders": [],

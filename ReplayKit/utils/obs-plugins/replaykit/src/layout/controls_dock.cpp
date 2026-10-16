@@ -26,6 +26,7 @@ void ApplyControlsDockTweaks()
 		// also what finishes a pending switch to the clean layout: it holds off until this dock exists, see ApplyLayoutDocks
 		if (main)
 			ApplyLayoutDocks(UiLayout::Clean);
+		LockCleanLayoutMenus();
 	} else if (main && ourDock && !dockPlacedState.value("controlsDockPlaced", false).toBool()) {
 		// only ever once, on a clean install -- not every obs launch, and not a repeating poll, since some users deliberately move or resize this dock afterward and either would eventually fight that. persisted in window_state.ini instead of an in-memory flag so it survives obs restarts; it only ever resets when a clean reinstall wipes obs-replayKit/ (this file included) and a fresh one gets written.
 		if (ourDock->isFloating() || main->dockWidgetArea(ourDock) != Qt::BottomDockWidgetArea) {

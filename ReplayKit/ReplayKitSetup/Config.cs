@@ -59,7 +59,7 @@ namespace ReplayKitSetup
         public static readonly string WIN_CAPTURE_AUDIO_ZIP;
         public const string WIN_CAPTURE_AUDIO_DLL_REL = "obs-plugins/64bit/win-capture-audio.dll";
 
-        // bongobs/bango cat plugin -- the archive is distributed as a manual obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
+        // the Bango Cat folder (modes, pictures, live2d models) from the bongobs-cat project, laid out as an obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
         public static readonly string BONGO_CAT_ZIP;
 
         // obs shaderfilter plugin -- replaykit uses its bundled motion_blur.shader when the optional motion blur setting is enabled.

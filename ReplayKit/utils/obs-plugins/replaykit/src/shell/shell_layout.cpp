@@ -24,6 +24,27 @@ void ShellTintPreview()
 		preview = mw->findChild<QWidget *>(QStringLiteral("preview"));
 	if (preview)
 		preview->setProperty("displayBackgroundColor", g_chromeBg);
+	const QString sourcesStyle = QStringLiteral(
+		"QDockWidget#sourcesDock, #dockWidgetContents_6, #sourcesFrame, SourceTree { background:%1; color:%3; }"
+		"QDockWidget::title { background:%2; color:%3; border:none; }"
+		"#sourcesToolbar { background:%2; color:%3; }"
+		"SourceTree { alternate-background-color:%1; selection-background-color:%4; selection-color:%5; }"
+		"SourceTreeItem { background:transparent; color:%3; }"
+		"SourceTree::item:selected, SourceTreeItem[selected=\"true\"] { background:%4; color:%5; }")
+		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name());
+	if (QWidget *sources = mw->findChild<QWidget *>(QStringLiteral("sourcesDock"))) {
+		if (sources->styleSheet() != sourcesStyle)
+			sources->setStyleSheet(sourcesStyle);
+	}
+	const QString contextStyle = QStringLiteral(
+		"#contextContainer, #contextSubContainer { background:%1; color:%2; }"
+		"QLabel { color:%2; } QPushButton { background:%3; color:%2; border:1px solid %4; }"
+		"QPushButton:hover { background:%4; } QPushButton:disabled { color:%5; }")
+		.arg(g_menuPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name());
+	if (QWidget *context = mw->findChild<QWidget *>(QStringLiteral("contextContainer"))) {
+		if (context->styleSheet() != contextStyle)
+			context->setStyleSheet(contextStyle);
+	}
 }
 
 void ShellRepaintChrome()

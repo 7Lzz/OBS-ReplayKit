@@ -1298,6 +1298,10 @@
           <div class="label">Overlay</div>
           <div class="field-wrap"><div class="combo" id="overlayStyle" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
+        <div class="form-row" id="bongoModeRow" hidden>
+          <div class="label">Bongo Cat mode</div>
+          <div class="field-wrap"><div class="combo" id="bongoMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
         <div class="form-row">
           <div class="label">Opacity</div>
           <div class="field-wrap">
@@ -1655,18 +1659,18 @@
           <div class="label">Menu bar</div>
           <div class="field-wrap">
             <button class="btn" type="button" id="obsMenuToggle" aria-expanded="false" aria-controls="obsMenuButtons">Show OBS menus</button>
-            <button class="info-dot" type="button" aria-label="About the OBS menus" title="The OBS menus (File, Edit, View, and more) live here now. Press Show OBS menus, then click one to open it."></button>
+            <button class="info-dot" type="button" aria-label="About the OBS menus" title="The OBS menus live here now. Press Show OBS menus, then click one to open it. Only Tools and Help can be opened: the other menus change the OBS window and its panels in ways the ReplayKit layout is not built for."></button>
           </div>
         </div>
         <div class="form-row tight" id="obsMenuButtons" hidden>
           <div></div>
           <div class="field-wrap obs-menu-buttons">
-            <button class="btn" type="button" data-obs-menu="0">File</button>
-            <button class="btn" type="button" data-obs-menu="1">Edit</button>
-            <button class="btn" type="button" data-obs-menu="2">View</button>
-            <button class="btn" type="button" data-obs-menu="3">Docks</button>
-            <button class="btn" type="button" data-obs-menu="4">Profile</button>
-            <button class="btn" type="button" data-obs-menu="5">Scene Collection</button>
+            <button class="btn" type="button" data-obs-menu="0" disabled>File</button>
+            <button class="btn" type="button" data-obs-menu="1" disabled>Edit</button>
+            <button class="btn" type="button" data-obs-menu="2" disabled>View</button>
+            <button class="btn" type="button" data-obs-menu="3" disabled>Docks</button>
+            <button class="btn" type="button" data-obs-menu="4" disabled>Profile</button>
+            <button class="btn" type="button" data-obs-menu="5" disabled>Scene Collection</button>
             <button class="btn" type="button" data-obs-menu="6">Tools</button>
             <button class="btn" type="button" data-obs-menu="7">Help</button>
           </div>
@@ -2062,6 +2066,8 @@
     overlayScale: document.getElementById("overlayScale"),
     overlayScaleValue: document.getElementById("overlayScaleValue"),
     overlayFlipH: document.getElementById("overlayFlipH"),
+    bongoMode: document.getElementById("bongoMode"),
+    bongoModeRow: document.getElementById("bongoModeRow"),
     overlayHueShift: document.getElementById("overlayHueShift"),
     overlayHueShiftValue: document.getElementById("overlayHueShiftValue"),
     overlayColorMultiply: document.getElementById("overlayColorMultiply"),
@@ -2435,7 +2441,7 @@
   }
 
   function needsObsRestart() {
-    return settingValueChanged("overlayStyle") || Array.from(restartSettingKeys).some(settingValueChanged);
+    return Array.from(restartSettingKeys).some(settingValueChanged);
   }
 
   // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
@@ -3050,6 +3056,8 @@
     syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, state.overlayOpacity ?? 100, clampVolume, 0, 100);
     syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, state.overlayScale ?? 100, clampOverlayScale, 50, 200);
     els.overlayFlipH.checked = !!state.overlayFlipH;
+    setComboValue(els.bongoMode, state.bongoMode || "standard", false);
+    els.bongoModeRow.hidden = state.overlayStyle !== "bongo_cat";
     syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, state.overlayHueShift ?? 0, clampHueShift, -180, 180);
     refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
     refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
@@ -3146,6 +3154,7 @@
     state.overlayOpacity = clampVolume(els.overlayOpacity.value);
     state.overlayScale = clampOverlayScale(els.overlayScale.value);
     state.overlayFlipH = els.overlayFlipH.checked;
+    state.bongoMode = comboValue(els.bongoMode);
     state.overlayHueShift = clampHueShift(els.overlayHueShift.value);
     state.overlayColorMultiply = cleanHexColor(els.overlayColorMultiplyValue.value, "#ffffff");
     state.overlayColorAdd = cleanHexColor(els.overlayColorAddValue.value, "#000000");
@@ -3232,7 +3241,7 @@
     });
   });
 
-  // ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for the overlay drag while the Overlay page is open. settings.htmls keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
+  // ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo/redo for overlay drags and corner resizes while the Overlay page is open. settings.htmls keyboard context is the one that reliably gets keys in the CEF host; the preview partial also listens as a fallback.
   document.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || !window.RKOverlayPreview) return;
     if (!document.querySelector('.nav-btn[data-page="overlay"].is-active')) return;
@@ -3291,7 +3300,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -3305,7 +3314,9 @@
         syncScreenshareCaptureFields();
         refreshFieldResetState("screenshareCaptureMode", DEFAULT_SCREENSHARE_CAPTURE_MODE);
       }
+      if (combo === els.bongoMode && window.RKOverlayPreview) RKOverlayPreview.refresh();
       if (combo === els.overlayStyle) {
+        els.bongoModeRow.hidden = state.overlayStyle !== "bongo_cat";
         resetOverlayPosition(state.overlayStyle);
         if (window.RKOverlayPreview) RKOverlayPreview.resetPosition();
       }
@@ -3318,7 +3329,8 @@
   });
   if (window.RKOverlayPreview) RKOverlayPreview.init(
     () => { try { readUi(); } catch (_) {} return state; },
-    (x, y) => { setOverlayPosition(x, y); markDirty(); });
+    (x, y) => { setOverlayPosition(x, y); markDirty(); },
+    (pct) => { els.overlayScale.value = String(pct); els.overlayScale.dispatchEvent(new Event("input")); });
   // the mic controls write straight into state (the host contract is get/set/onChange), so Apply, Cancel and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
@@ -3671,6 +3683,7 @@
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       fillCombo(els.overlayStyle, data.options.overlays || []);
+      fillCombo(els.bongoMode, data.options.bongoModes || []);
       if (data.defaultClipDir) els.clipDir.placeholder = data.defaultClipDir;
       clearLivePending();
       acceptSettings(data.settings || {});

@@ -198,6 +198,7 @@ namespace ReplayKitSetup
 
                 if (relaunch)
                 {
+                    Installer.PrepareObsTheme(LogBoth);
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
                     if (!relaunched)
                     {

@@ -222,12 +222,14 @@
       els.opt.hidden = true;
       els.installBtn.hidden = true;
       els.reinstallBtn.hidden = true;
+      els.uninstallBtn.hidden = true;
       els.spinner.hidden = false;
       els.statLine.textContent = "Starting…";
       send({ cmd: "start", mode: mode, discord: els.discord.checked });
     }
 
     function showLanding() {
+      if (running) return;
       confirming = false;
       els.title.textContent = landing.title;
       els.line1.textContent = landing.line1;
@@ -239,6 +241,7 @@
     }
 
     function showUninstallConfirm() {
+      if (running) return;
       confirming = true;
       els.title.textContent = "Uninstall OBS ReplayKit?";
       els.line1.textContent = "This removes the ReplayKit dock, scene, sources and script from OBS, then restarts OBS.";

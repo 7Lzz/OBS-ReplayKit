@@ -40,7 +40,8 @@ void ShowSourcesPanel(bool show)
 	if (!dock)
 		return;
 	if (show) {
-		dock->setFeatures(dock->features() & ~QDockWidget::DockWidgetClosable);
+		// fixed under the preview: no close, and no dragging it off or floating it, whether or not obs has its docks locked
+		dock->setFeatures(dock->features() & ~(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable));
 		if (dock->isFloating())
 			dock->setFloating(false);
 	}

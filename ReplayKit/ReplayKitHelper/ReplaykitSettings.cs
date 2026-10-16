@@ -56,6 +56,7 @@ namespace ReplayKitHelper
                 ["recordingKeybind"] = new JObject(),
                 ["openClipsKeybind"] = new JObject(),
                 ["overlayStyle"] = "off",
+                ["bongoMode"] = "standard",
                 ["overlayOpacity"] = 100,
                 ["overlayScale"] = 100,
                 ["overlayFlipH"] = false,
@@ -414,6 +415,7 @@ namespace ReplayKitHelper
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
                 ["overlayFlipH"] = GetBoolSetting(data, "overlayFlipH", defaults["overlayFlipH"].Value<bool>()),
+                ["bongoMode"] = GetEnumSetting(data, "bongoMode", defaults["bongoMode"].Value<string>(), BongoModes),
                 ["overlayHueShift"] = GetFloatSetting(data, "overlayHueShift", defaults["overlayHueShift"].Value<double>(), -180.0, 180.0),
                 ["overlayColorMultiply"] = GetHexColorSetting(data, "overlayColorMultiply", defaults["overlayColorMultiply"].Value<string>()),
                 ["overlayColorAdd"] = GetHexColorSetting(data, "overlayColorAdd", defaults["overlayColorAdd"].Value<string>()),
@@ -1144,7 +1146,19 @@ namespace ReplayKitHelper
             try { return value.Value<double>(); } catch (FormatException) { return def; } catch (InvalidCastException) { return def; }
         }
 
-        // re-derives a new position/scale from whatever transform obs currently reports, for a live overlay resize without a full geometry recompute -- snaps to the nearest edge if the items center already sits in the outer third of the canvas, so scaling an item pinned to a corner keeps it pinned there instead of shrinking toward the canvas center.
+        // which side of an axis stays put when an overlay is resized in place: -1 the near edge, 1 the far edge, 0 the center. an edge touching the canvas edge wins, so the bottom-left bongo cat stays flush however tall it gets -- judging by the center alone sent a bongo cat at the maximum size into the middle third and it shrank back up off the bottom; otherwise an item in an outer third keeps to that side
+        private static int ScaleAnchor(double start, double size, double canvas)
+        {
+            if (canvas <= 0.0 || size <= 0.0) return 0;
+            if (start <= 1.0) return -1;
+            if (start + size >= canvas - 1.0) return 1;
+            double center = start + size / 2.0;
+            if (center <= canvas / 3.0) return -1;
+            if (center >= canvas * 2.0 / 3.0) return 1;
+            return 0;
+        }
+
+        // re-derives a new position/scale from whatever transform obs currently reports, for a live overlay resize without a full geometry recompute, anchored by ScaleAnchor. a mirrored item has its position on its right edge, so the box is worked out from that first.
         private static JObject GetScaledTransformFromCurrent(JToken transform, double scaleRatio, JObject preset = null)
         {
             if (transform == null) return new JObject();
@@ -1163,8 +1177,8 @@ namespace ReplayKitHelper
 
             double nextWidth = width * scaleRatio;
             double nextHeight = height * scaleRatio;
-            double nextPositionX = positionX + (width - nextWidth) / 2.0;
-            double nextPositionY = positionY + (height - nextHeight) / 2.0;
+            double left = scaleX < 0.0 ? positionX - width : positionX;
+            double top = scaleY < 0.0 ? positionY - height : positionY;
 
             double canvasW = 0.0, canvasH = 0.0;
             if (preset?["video"] != null)
@@ -1172,20 +1186,19 @@ namespace ReplayKitHelper
                 canvasW = GetDoubleValue(preset["video"], "baseWidth", 0.0);
                 canvasH = GetDoubleValue(preset["video"], "baseHeight", 0.0);
             }
-            if (canvasW > 0.0 && width > 0.0)
+            double Moved(double start, double size, double next, double canvas)
             {
-                double centerX = positionX + width / 2.0;
-                if (centerX <= canvasW / 3.0) nextPositionX = positionX;
-                else if (centerX >= canvasW * 2.0 / 3.0) nextPositionX = positionX + (width - nextWidth);
+                int anchor = ScaleAnchor(start, size, canvas);
+                return anchor < 0 ? start : anchor > 0 ? start + size - next : start + (size - next) / 2.0;
             }
-            if (canvasH > 0.0 && height > 0.0)
-            {
-                double centerY = positionY + height / 2.0;
-                if (centerY <= canvasH / 3.0) nextPositionY = positionY;
-                else if (centerY >= canvasH * 2.0 / 3.0) nextPositionY = positionY + (height - nextHeight);
-            }
+            double nextLeft = Moved(left, width, nextWidth, canvasW);
+            double nextTop = Moved(top, height, nextHeight, canvasH);
 
-            return new JObject { ["positionX"] = nextPositionX, ["positionY"] = nextPositionY, ["scaleX"] = scaleX * scaleRatio, ["scaleY"] = scaleY * scaleRatio };
+            return new JObject
+            {
+                ["positionX"] = scaleX < 0.0 ? nextLeft + nextWidth : nextLeft, ["positionY"] = scaleY < 0.0 ? nextTop + nextHeight : nextTop,
+                ["scaleX"] = scaleX * scaleRatio, ["scaleY"] = scaleY * scaleRatio,
+            };
         }
 
         private static JObject SetSceneItemScaledFromCurrent(string sceneName, JObject item, double scaleRatio, JObject preset = null)
@@ -1507,10 +1520,18 @@ namespace ReplayKitHelper
 
         // -- json-file scene-source/scene-item builders. byte-for-byte shape match with ReplayKitSetup/Transform.css install-time twins (NewBongoSource/NewWindowCaptureSource/ NewMotionBlurFilter/NewOverlayOpacityFilter and friends) -- reproduced here rather than shared since ReplayKitHelper does not reference the Setup assembly. unlike Transform.cs (which always mints a fresh BongoCatSourceUuid constant for a brand-new template file), the live-apply functions below preserve whatever uuid an existing source already has and only mint a new one when creating from scratch -- callers pass whichever uuid is appropriate, these functions never generate one themselves.
 
-        private static void SetBongoSourceJson(JObject source, string uuid)
+        // the bongo cat source of replaykit.dll; bongobs-cat is the opengl plugin older installs used, still matched so its leftovers get converted or dropped
+        private const string BongoInputKind = "replaykit-bongo";
+        private const string LegacyBongoInputKind = "bongobs-cat";
+        // the modes of the Bango Cat folder, by their folder names
+        private static readonly string[] BongoModes = { "standard", "keyboard", "feixue", "mania" };
+
+        private static bool IsBongoInputKind(string id) => id == BongoInputKind || id == LegacyBongoInputKind;
+
+        private static void SetBongoSourceJson(JObject source, string uuid, JObject settings)
         {
             source["prev_ver"] = 536936450; source["name"] = "Bongo Cat Overlay"; source["uuid"] = uuid;
-            source["id"] = "bongobs-cat"; source["versioned_id"] = "bongobs-cat";
+            source["id"] = BongoInputKind; source["versioned_id"] = BongoInputKind;
             source["mixers"] = 0; source["sync"] = 0; source["flags"] = 0; source["volume"] = 1.0; source["balance"] = 0.5;
             source["enabled"] = true; source["muted"] = false;
             source["push-to-mute"] = false; source["push-to-mute-delay"] = 0; source["push-to-talk"] = false; source["push-to-talk-delay"] = 0;
@@ -1520,8 +1541,10 @@ namespace ReplayKitHelper
 
             var sourceSettings = source["settings"] as JObject;
             if (sourceSettings == null) { sourceSettings = new JObject(); source["settings"] = sourceSettings; }
-            sourceSettings.Remove("mode");
-            sourceSettings["Mode"] = "standard"; sourceSettings["width"] = 1280; sourceSettings["height"] = 768;
+            string mode = settings?["bongoMode"]?.Value<string>();
+            if (!BongoModes.Contains(mode)) mode = "standard";
+            sourceSettings["mode"] = mode;
+            sourceSettings["Mode"] = mode; sourceSettings["width"] = 1280; sourceSettings["height"] = 768;
             sourceSettings["x"] = 0.0; sourceSettings["y"] = 0.02; sourceSettings["scale"] = 1.83;
             sourceSettings["delay"] = 1.0; sourceSettings["delaytime"] = 1.0;
             sourceSettings["random_motion"] = true; sourceSettings["breath"] = true; sourceSettings["eyeblink"] = true; sourceSettings["track"] = true;
@@ -1529,10 +1552,10 @@ namespace ReplayKitHelper
             sourceSettings["mouse_horizontal_flip"] = true; sourceSettings["mouse_vertical_flip"] = true; sourceSettings["mask"] = false;
         }
 
-        private static JObject NewBongoSourceJson(string uuid)
+        private static JObject NewBongoSourceJson(string uuid, JObject settings)
         {
             var source = new JObject();
-            SetBongoSourceJson(source, uuid);
+            SetBongoSourceJson(source, uuid, settings);
             return source;
         }
 
@@ -2485,6 +2508,7 @@ namespace ReplayKitHelper
                 if (sources == null) throw new InvalidOperationException("OBS scene collection has no sources list.");
                 // do NOT self-assign data["sources"] / data["groups"] here -- in the bundled Newtonsoft that detaches the array from `data`, so every edit below lands on an orphan and the file is written from the untouched original (symptom: "switched overlay, scene still shows the old one"). they are re-attached once, right before serialize.
                 var groups = data["groups"] as JArray ?? new JArray();
+                RemoveBongoStandby(sources, groups);
 
                 string overlayStyle = settings["overlayStyle"]?.Value<string>() ?? "";
                 bool useInputOverlay = overlayStyle == "input_overlay";
@@ -2521,7 +2545,7 @@ namespace ReplayKitHelper
                 {
                     foreach (var source in sources)
                     {
-                        if (source["id"]?.Value<string>() == "bongobs-cat") { bongoSource = (JObject)source; break; }
+                        if (IsBongoInputKind(source["id"]?.Value<string>())) { bongoSource = (JObject)source; break; }
                     }
                 }
                 string bongoUuid = bongoSource?["uuid"]?.Value<string>() ?? "";
@@ -2572,14 +2596,14 @@ namespace ReplayKitHelper
 
                 if (useBongo && bongoSource == null)
                 {
-                    bongoSource = NewBongoSourceJson(Guid.NewGuid().ToString());
+                    bongoSource = NewBongoSourceJson(Guid.NewGuid().ToString(), settings);
                     sources.Add(bongoSource);
                 }
                 if (useBongo)
                 {
                     bongoUuid = bongoSource["uuid"]?.Value<string>() ?? "";
                     if (string.IsNullOrWhiteSpace(bongoUuid)) bongoUuid = Guid.NewGuid().ToString();
-                    SetBongoSourceJson(bongoSource, bongoUuid);
+                    SetBongoSourceJson(bongoSource, bongoUuid, settings);
                     SetOverlayOpacitySourceJson(bongoSource, settings);
                 }
                 else
@@ -2587,7 +2611,7 @@ namespace ReplayKitHelper
                     string bongoUuidCapture = bongoUuid;
                     RemoveJsonListWhere(sources, source =>
                         source["name"]?.Value<string>() == "Bongo Cat Overlay" ||
-                        source["id"]?.Value<string>() == "bongobs-cat" ||
+                        IsBongoInputKind(source["id"]?.Value<string>()) ||
                         (!string.IsNullOrWhiteSpace(bongoUuidCapture) && source["uuid"]?.Value<string>() == bongoUuidCapture));
                 }
                 if (windowCaptureSource == null)
@@ -3320,7 +3344,152 @@ namespace ReplayKitHelper
             }
         }
 
-        // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted: toggle visibility, reposition, and (for bongo cat) recreate from scratch rather than merely toggling.
+        private const string BongoInactiveName = "Bongo Cat Overlay (Inactive)";
+        private const string BongoSwitchingName = "Bongo Cat Overlay (Switching)";
+
+        // the bongo input in the live scene. one an older install left as the opengl bongobs-cat is hidden and renamed out of the way, never removed: that plugin keeps its keyboard hook running on freed state once its source is destroyed, and the next key press takes obs down. SetOverlaySceneFile and the installer drop it while obs is not running
+        private static JObject SelectBongoInput(string sceneName, JArray items, JObject inputSettings, List<string> warnings, bool refresh)
+        {
+            var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+            if (!kinds.Ok || !(kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind))
+            {
+                warnings.Add("Bongo Cat needs the ReplayKit OBS plugin. Run the ReplayKit installer again, then restart OBS.");
+                return null;
+            }
+            string Kind(string name)
+            {
+                var result = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
+                if (!result.Ok) throw new InvalidOperationException("Could not inspect Bongo Cat: " + result.Message);
+                return result.Data?["inputKind"]?.Value<string>();
+            }
+            bool Rename(string from, string to)
+            {
+                var result = ObsWebSocket.InvokeRequest("SetInputName", new JObject { ["inputName"] = from, ["newInputName"] = to }, 3000);
+                if (!result.Ok) warnings.Add("Could not set up Bongo Cat: " + result.Message);
+                return result.Ok;
+            }
+            bool Enable(JObject item, bool enabled)
+            {
+                var result = SetSceneItemEnabled(sceneName, item, enabled);
+                if (result["ok"]?.Value<bool>() != true) { warnings.Add("Could not change Bongo Cat visibility: " + result["message"]); return false; }
+                return true;
+            }
+
+            var current = FindSceneItem(items, "Bongo Cat Overlay");
+            var inactive = FindSceneItem(items, BongoInactiveName);
+            JObject legacy = null;
+            if (current != null && Kind("Bongo Cat Overlay") != BongoInputKind)
+            {
+                if (!Enable(current, false) || !Rename("Bongo Cat Overlay", BongoSwitchingName)) return null;
+                legacy = current;
+                current = null;
+            }
+            // a replaykit-bongo input parked by an earlier renderer switch comes back instead of a new one
+            if (current == null && inactive != null && Kind(BongoInactiveName) == BongoInputKind)
+            {
+                if (!Rename(BongoInactiveName, "Bongo Cat Overlay")) return null;
+                current = inactive;
+                current["sourceName"] = "Bongo Cat Overlay";
+                inactive = null;
+                refresh = true;
+            }
+            if (legacy != null && inactive == null) Rename(BongoSwitchingName, BongoInactiveName);
+            if (inactive != null) Enable(inactive, false);
+            if (current == null)
+            {
+                refresh = true;
+                var created = ObsWebSocket.InvokeRequest("CreateInput", new JObject
+                {
+                    ["sceneName"] = sceneName, ["inputName"] = "Bongo Cat Overlay", ["inputKind"] = BongoInputKind,
+                    ["inputSettings"] = inputSettings, ["sceneItemEnabled"] = true,
+                }, 5000);
+                if (!created.Ok)
+                {
+                    warnings.Add("Could not create Bongo Cat overlay: " + created.Message);
+                    return null;
+                }
+                current = new JObject { ["sceneItemId"] = created.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = "Bongo Cat Overlay" };
+            }
+            if (refresh)
+            {
+                var update = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                {
+                    ["inputName"] = "Bongo Cat Overlay", ["inputSettings"] = inputSettings, ["overlay"] = true,
+                }, 3000);
+                if (!update.Ok) warnings.Add("Could not update Bongo Cat settings: " + update.Message);
+            }
+            Enable(current, true);
+            return current;
+        }
+
+        private static void RemoveBongoStandby(JArray sources, JArray groups)
+        {
+            var standby = sources.OfType<JObject>().Where(source =>
+                (source["name"]?.Value<string>() == BongoInactiveName || source["name"]?.Value<string>() == BongoSwitchingName) &&
+                IsBongoInputKind(source["id"]?.Value<string>())).ToList();
+            foreach (var source in standby)
+            {
+                string uuid = source["uuid"]?.Value<string>();
+                string name = source["name"]?.Value<string>();
+                foreach (var owner in sources.Concat(groups).OfType<JObject>())
+                    RemoveJsonListWhere(owner["settings"]?["items"] as JArray, item => item["name"]?.Value<string>() == name ||
+                        (!string.IsNullOrEmpty(uuid) && item["source_uuid"]?.Value<string>() == uuid));
+                sources.Remove(source);
+            }
+        }
+
+        // where WASD Overlay and Mouse Overlay sit inside Group, the member transforms SetInputOverlayGroupMemberJson writes
+        private static JObject InputOverlayMemberTransform(string name)
+        {
+            bool mouse = name == "Mouse Overlay";
+            return new JObject
+            {
+                ["positionX"] = mouse ? 431.0 : 0.0, ["positionY"] = 0.0,
+                ["scaleX"] = mouse ? 0.6909722089767456 : 0.7395833134651184, ["scaleY"] = mouse ? 0.6909722089767456 : 0.7388888597488403,
+                ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
+            };
+        }
+
+        // removing the inputs takes their items inside Group with them, and the empty Group item goes after
+        private static bool RemoveInputOverlayLive(string sceneName, JArray items, List<string> warnings)
+        {
+            bool removed = false;
+            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
+            {
+                if (!ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000).Ok) continue;
+                var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
+                if (result.Ok) removed = true;
+                else warnings.Add("Could not remove " + name + ": " + result.Message);
+            }
+            var group = FindSceneItem(items, "Group");
+            if (group != null)
+            {
+                var result = RemoveSceneItem(sceneName, group);
+                if (result["ok"]?.Value<bool>() == true) removed = true;
+                else warnings.Add("Could not remove the input overlay group: " + result["message"]);
+            }
+            return removed;
+        }
+
+        // the bongo input and any input parked by an older renderer switch; one of the opengl bongobs-cat kind is only removed while that plugin is not loaded, since destroying its source leaves its keyboard hook running on freed state
+        private static bool RemoveBongoLive(List<string> warnings)
+        {
+            var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
+            bool legacyLoaded = !kinds.Ok || (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == LegacyBongoInputKind);
+            bool removed = false;
+            foreach (var name in new[] { "Bongo Cat Overlay", BongoInactiveName, BongoSwitchingName })
+            {
+                var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000);
+                if (!input.Ok) continue;
+                if (input.Data?["inputKind"]?.Value<string>() == LegacyBongoInputKind && legacyLoaded) continue;
+                var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
+                if (result.Ok) removed = true;
+                else warnings.Add("Could not remove " + name + ": " + result.Message);
+            }
+            return removed;
+        }
+
+        // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
         private static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true)
         {
             var warnings = new List<string>();
@@ -3336,12 +3505,14 @@ namespace ReplayKitHelper
             int opacity = OverlayOpacityValue(settings);
             string overlayStyle = settings["overlayStyle"]?.Value<string>() ?? "";
 
-            foreach (var name in new[] { "WASD Overlay", "Mouse Overlay", "Group" })
+            // only the picked overlay lives in obs: the others are removed rather than hidden, so they do not sit in the sources list, and get built again when picked
+            bool removed = false;
+            if (overlayStyle != "input_overlay") removed |= RemoveInputOverlayLive(sceneName, items, warnings);
+            if (overlayStyle != "bongo_cat") removed |= RemoveBongoLive(warnings);
+            if (removed)
             {
-                var item = FindSceneItem(items, name);
-                bool enabled = overlayStyle == "input_overlay";
-                var r = SetSceneItemEnabled(sceneName, item, enabled);
-                if (r["ok"]?.Value<bool>() != true) warnings.Add("Could not toggle " + name + ": " + r["message"]);
+                var afterRemoval = GetSceneItems(sceneName);
+                if (afterRemoval["ok"]?.Value<bool>() == true) items = afterRemoval["items"] as JArray ?? items;
             }
 
             // SetOverlaySceneFile builds WASD/Mouse Overlay as members of "Group". GetSceneItemList only returns top-level items, so a prior ApplyOverlayLive that ran EnsureInputSceneItem on them saw them as missing and its CreateInput->CreateSceneItem fallback added a duplicate top-level copy every apply ("two Mouse Overlays"). If the Group is present, any top-level WASD/Mouse item is a stray -- drop it (the source survives).
@@ -3360,42 +3531,10 @@ namespace ReplayKitHelper
 
             bool bongoEnabled = overlayStyle == "bongo_cat";
             var bongo = FindSceneItem(items, "Bongo Cat Overlay");
-            // bongobs-cat (live2d) holds an "isLoad" + initialization state across hide/show that never gets reset by SetInputSettings or SetSceneItemEnabled toggling, so switching wasd/mouse -> bongo leaves the renderer producing no output until obs is restarted. only the plugins create callback (vtubercreate -> initvtuber + updata) puts the model back into a known-good state, so when the user picks bongo cat we destroy any existing input and recreate from scratch -- heavier than a settings merge, but the only thing that survives the plugins lifecycle bug (see the Bongobs-Cat-Plugin repo, VtuberFrameWork.cpp).
             if (bongoEnabled)
             {
-                if (bongo != null && recreateBongo)
-                {
-                    var remove = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = "Bongo Cat Overlay" }, 3000);
-                    if (!remove.Ok) warnings.Add("Could not remove stale Bongo Cat overlay: " + remove.Message);
-                    else bongo = null;
-                }
-                if (bongo == null)
-                {
-                    var bongoSettings = new JObject
-                    {
-                        ["Mode"] = "standard", ["width"] = 1280, ["height"] = 768, ["x"] = 0.0, ["y"] = 0.02, ["scale"] = 1.83,
-                        ["delay"] = 1.0, ["delaytime"] = 1.0, ["random_motion"] = true, ["breath"] = true, ["eyeblink"] = true,
-                        ["track"] = true, ["live2d"] = true, ["relative_mouse"] = true, ["mouse_horizontal_flip"] = true,
-                        ["mouse_vertical_flip"] = true, ["mask"] = false,
-                    };
-                    var created = ObsWebSocket.InvokeRequest("CreateInput", new JObject
-                    {
-                        ["sceneName"] = sceneName, ["inputName"] = "Bongo Cat Overlay", ["inputKind"] = "bongobs-cat",
-                        ["inputSettings"] = bongoSettings, ["sceneItemEnabled"] = true,
-                    }, 5000);
-                    if (created.Ok) bongo = new JObject { ["sceneItemId"] = created.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = "Bongo Cat Overlay" };
-                    else warnings.Add("Could not create Bongo Cat overlay: " + created.Message);
-                }
-                else
-                {
-                    var rBongo = SetSceneItemEnabled(sceneName, bongo, true);
-                    if (rBongo["ok"]?.Value<bool>() != true) warnings.Add("Could not show Bongo Cat overlay: " + rBongo["message"]);
-                }
-            }
-            else if (bongo != null)
-            {
-                var rBongo = SetSceneItemEnabled(sceneName, bongo, false);
-                if (rBongo["ok"]?.Value<bool>() != true) warnings.Add("Could not hide Bongo Cat overlay: " + rBongo["message"]);
+                var inputSettings = NewBongoSourceJson(Guid.NewGuid().ToString(), settings)["settings"] as JObject;
+                bongo = SelectBongoInput(sceneName, items, inputSettings, warnings, recreateBongo);
             }
 
             var cursorResult = SetDisplayCaptureCursorLive(settings);
@@ -3440,31 +3579,47 @@ namespace ReplayKitHelper
                         new { name = "WASD Overlay", image = wasdPng, layout = wasdJson },
                         new { name = "Mouse Overlay", image = mousePng, layout = mouseJson },
                     };
-                    // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as standalone scene items is exactly the duplicate-stacking bug. no Group (legacy scene) -> ensure them as top-level items and position each one.
-                    bool grouped = group != null;
+                    // with a "Group" the two overlays are its members -- only refresh the source settings; adding them as standalone scene items is exactly the duplicate-stacking bug. without one (the overlay was just picked) they are built the way SetOverlaySceneFile builds them: members at their spots inside the group, grouped by the plugin, then the group placed
                     foreach (var entry in entries)
                     {
                         var io = new JObject
                         {
                             ["io.input_source"] = "This computer", ["io.overlay_image"] = entry.image, ["io.layout_file"] = entry.layout,
                         };
-                        if (grouped)
+                        if (group != null)
                         {
                             var s = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
                             if (!s.Ok) warnings.Add("Could not update " + entry.name + ": " + s.Message);
+                            continue;
                         }
+                        var created = EnsureInputSceneItem(sceneName, entry.name, "input-overlay", io, true);
+                        if (created["ok"]?.Value<bool>() != true) { warnings.Add("Could not create " + entry.name + ": " + created["message"]); continue; }
+                        var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, InputOverlayMemberTransform(entry.name));
+                        if (rTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position " + entry.name + ": " + rTransform["message"]);
+                    }
+                    if (group == null)
+                    {
+                        PipeClient.SendGroupInputOverlay();
+                        for (int i = 0; i < 30 && group == null; i++)
+                        {
+                            Thread.Sleep(100);
+                            var grouped = GetSceneItems(sceneName);
+                            if (grouped["ok"]?.Value<bool>() == true) group = FindSceneItem(grouped["items"] as JArray, "Group");
+                        }
+                        if (group == null) warnings.Add("Could not group the WASD and mouse overlays. Restart OBS to rebuild them.");
                         else
                         {
-                            var created = EnsureInputSceneItem(sceneName, entry.name, "input-overlay", io, true);
-                            if (created["ok"]?.Value<bool>() != true) { warnings.Add("Could not create " + entry.name + ": " + created["message"]); continue; }
-                            var transform = InputOverlayTransform(entry.name, preset, settings);
-                            var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, transform);
-                            if (rTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position " + entry.name + ": " + rTransform["message"]);
+                            var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
+                            if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position input overlay group: " + rGroupTransform["message"]);
                         }
+                    }
+                    foreach (var entry in entries)
+                    {
                         var rOpacity = ApplyOverlayOpacityLive(entry.name, opacity, settings);
                         if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add("Could not set " + entry.name + " opacity: " + rOpacity["message"]);
                     }
                 }
+                if (group != null) SetSceneItemEnabled(sceneName, group, true);
             }
 
             return new JObject { ["ok"] = warnings.Count == 0, ["warnings"] = new JArray(warnings) };
@@ -5487,7 +5642,7 @@ namespace ReplayKitHelper
                 warnings.AddRange((recording["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }
 
-            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, interface layout, or overlay changes require OBS to restart." : "";
+            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, or interface layout changes require OBS to restart." : "";
 
             return new JObject
             {
@@ -5616,6 +5771,12 @@ namespace ReplayKitHelper
                             new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
                             new JObject { ["value"] = "off", ["label"] = "Off", ["blurb"] = "No input overlay in the OBS scene." }
                         ),
+                        ["bongoModes"] = new JArray(
+                            new JObject { ["value"] = "standard", ["label"] = "Standard", ["blurb"] = "Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space." },
+                            new JObject { ["value"] = "keyboard", ["label"] = "Keyboard", ["blurb"] = "Two paws on the arrow keys, R, Left Ctrl and Left Shift." },
+                            new JObject { ["value"] = "feixue", ["label"] = "Feixue", ["blurb"] = "Game panel with W, A, S, D and Space, and a mouse paw." },
+                            new JObject { ["value"] = "mania", ["label"] = "Mania", ["blurb"] = "Rhythm game keys Z, X, comma and period." }
+                        ),
                         ["screenshareCaptureModes"] = new JArray(
                             new JObject { ["value"] = "hybrid_auto", ["label"] = "Auto", ["blurb"] = "Desktop fallback with fullscreen Game Capture on top." },
                             new JObject { ["value"] = "desktop", ["label"] = "Desktop", ["blurb"] = "Show the full ReplayKit desktop capture." },
@@ -5652,8 +5813,8 @@ namespace ReplayKitHelper
             // the clean layout is a frameless window with its own title bar, which the native plugin can only set up before obs shows its window
             if (previous["interfaceLayout"]?.ToString() != settings["interfaceLayout"]?.ToString()) return true;
             string theme = settings["theme"]?.ToString() ?? "default";
-            if ((theme == "custom" || theme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"])) return true;
-            return previous["overlayStyle"]?.ToString() != settings["overlayStyle"]?.ToString();
+            // the overlay style used to restart obs for the opengl bongo plugin, which could not be created and removed while obs ran; every overlay now switches live through ApplyOverlayLive
+            return (theme == "custom" || theme.StartsWith("user/", StringComparison.Ordinal)) && !JToken.DeepEquals(previous["themeCustom"], settings["themeCustom"]);
         }
 
         private static bool TestRuntimeVideoSettingsChanged(JObject previous, JObject settings)
@@ -5983,7 +6144,8 @@ namespace ReplayKitHelper
 
         private static void ReportBongoCatState()
         {
-            if (ReadSettings()["overlayStyle"]?.Value<string>() != "bongo_cat") { Notifications.DismissKey(BongoCatNoticeKey); return; }
+            var settings = ReadSettings();
+            if (settings["overlayStyle"]?.Value<string>() != "bongo_cat") { Notifications.DismissKey(BongoCatNoticeKey); return; }
             // obs answers its websocket a beat after it starts
             ObsWebSocketResult kinds = null;
             for (int i = 0; i < 45; i++)
@@ -5994,15 +6156,18 @@ namespace ReplayKitHelper
             }
             if (kinds == null || !kinds.Ok) { Log.Write("CheckBongoCat: OBS did not answer in time, nothing checked."); return; }
 
-            bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == "bongobs-cat");
+            bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind);
+            // replaykit.dll draws the Bango Cat folder beside obs64.exe with the models ReplayKit baked from it, and a missing folder or bake leaves the cat silently empty
             string root = GetObsInstallRoot();
-            // a loaded plugin still draws nothing, with no error anywhere, when the Bango Cat folder beside obs64.exe cannot be read (seen with a copy of obs whose folder was moved away)
-            bool filesPresent = File.Exists(Path.Combine(root, "obs-plugins\\64bit\\bongobs-cat.dll")) && File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\standard\\config.json"));
+            string bakes = Path.Combine(AppConfig.GetDockDir(), "overlay-preview", "bongo-models");
+            bool filesPresent = File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\config.json")) &&
+                File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\standard\\config.json")) &&
+                Directory.Exists(bakes) && Directory.EnumerateFiles(bakes, "*.json").Any();
             if (loaded && filesPresent) { Notifications.DismissKey(BongoCatNoticeKey); return; }
-            Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", plugin files present: " + filesPresent + ".");
+            Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", Bango Cat folder and baked models present: " + filesPresent + ".");
             Notifications.Add("warning", BongoCatNoticeKey, "Bongo Cat is not working", !filesPresent
-                ? "The Bongo Cat files are missing from OBS (bongobs-cat.dll or the Bango Cat folder), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
-                : "OBS started without loading the Bongo Cat plugin, so the overlay cannot show. Restart OBS. If it keeps happening, look for bongobs in the OBS log (Help, Log Files, View Current Log) or check whether antivirus is blocking bongobs-cat.dll.");
+                ? "The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
+                : "OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again.");
         }
 
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
@@ -6322,8 +6487,10 @@ namespace ReplayKitHelper
                     previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();
                 bool motionBlurChanged = previous["motionBlurEnabled"]?.Value<bool>() != settings["motionBlurEnabled"]?.Value<bool>() ||
                     previous["motionBlurStrength"]?.Value<double>() != settings["motionBlurStrength"]?.Value<double>();
-                bool applyOverlay = overlayStyleChanged || overlayGeometryChanged;
-                bool recreateBongo = overlayStyleChanged && settings["overlayStyle"]?.Value<string>() == "bongo_cat";
+                // the mode is a setting of the bongo source, so a change reaches obs live
+                bool bongoModeChanged = previous["bongoMode"]?.Value<string>() != settings["bongoMode"]?.Value<string>();
+                bool applyOverlay = overlayStyleChanged || overlayGeometryChanged || bongoModeChanged;
+                bool recreateBongo = (overlayStyleChanged || bongoModeChanged) && settings["overlayStyle"]?.Value<string>() == "bongo_cat";
                 bool restartObs = TestRestartRequired(previous, settings);
                 bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
                 bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);

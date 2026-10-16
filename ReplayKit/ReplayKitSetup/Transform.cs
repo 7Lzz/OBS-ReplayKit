@@ -281,8 +281,8 @@ namespace ReplayKitSetup
             return JsonConvert.SerializeObject(rebuilt).Replace("\\", "\\\\");
         }
 
-        // raw value of [BasicWindow] <key>= from the live user.ini, or null. used to preserve dockstate and feed the extrabrowserdocks merge.
-        private static string ReadLiveUserIniValue(string key)
+        // raw value from the live user.ini, or null.
+        private static string ReadLiveUserIniValue(string key, string section = "BasicWindow")
         {
             string livePath = System.IO.Path.Combine(Config.OBS_CONFIG, "user.ini");
             if (!System.IO.File.Exists(livePath)) return null;
@@ -295,7 +295,7 @@ namespace ReplayKitSetup
             {
                 return null;
             }
-            var m = Regex.Match(liveText, @"\[BasicWindow\][^\[]*?\n" + Regex.Escape(key) + @"=([^\r\n]*)", RegexOptions.Singleline);
+            var m = Regex.Match(liveText, @"\[" + Regex.Escape(section) + @"\][^\[]*?\n" + Regex.Escape(key) + @"=([^\r\n]*)", RegexOptions.Singleline);
             return m.Success ? m.Groups[1].Value : null;
         }
 
@@ -307,6 +307,11 @@ namespace ReplayKitSetup
         // write one canonical custom controls dock entry and reset stale dock layout state.
         public static string ApplyUserIni(string text, Preferences prefs)
         {
+            if (!CleanReinstall)
+            {
+                string theme = ReadLiveUserIniValue("Theme", "Appearance");
+                if (theme != null) text = SetIniValue(text, "Appearance", "Theme", theme);
+            }
             var sectionRe = new Regex(@"(\[BasicWindow\][^\[]*?\n)ExtraBrowserDocks=([^\r\n]*)", RegexOptions.Singleline);
             var m = sectionRe.Match(text);
             if (m.Success)
@@ -428,7 +433,9 @@ namespace ReplayKitSetup
         private const double InputOverlayBottomMarginAtRef = 16.0;
         private const string OverlayOpacityFilterName = "ReplayKit Overlay Opacity";
         private const string OverlayOpacityFilterId = "color_filter";
-        private const string BongoCatSourceId = "bongobs-cat";
+        // the bongo cat source of replaykit.dll; bongobs-cat is the opengl plugin older installs used, converted wherever it is found
+        private const string BongoCatSourceId = "replaykit-bongo";
+        private const string LegacyBongoCatSourceId = "bongobs-cat";
         private const string BongoCatSourceName = "Bongo Cat Overlay";
         private const string BongoCatSourceUuid = "c93f3934-0dfd-4f4f-96e4-0abf45423f0f";
         private const double BongoCatSourceW = 1280.0;
@@ -517,6 +524,7 @@ namespace ReplayKitSetup
             obj["clipKeybind"] = JObject.FromObject(prefs.ClipKeybind);
             obj["recordingKeybind"] = JObject.FromObject(prefs.RecordingKeybind);
             obj["overlayStyle"] = prefs.OverlayStyle;
+            obj["bongoMode"] = prefs.BongoMode;
             obj["overlayOpacity"] = prefs.OverlayOpacity;
             obj["overlayScale"] = prefs.OverlayScale;
             obj["overlayHueShift"] = prefs.OverlayHueShift;
@@ -714,7 +722,11 @@ namespace ReplayKitSetup
             foreach (var item in toRemove) sources.Remove(item);
         }
 
-        private static void RemoveBongoSources(JArray sources) => RemoveSourcesByUuidOrId(sources, new HashSet<string> { BongoCatSourceUuid }, BongoCatSourceId);
+        private static void RemoveBongoSources(JArray sources)
+        {
+            RemoveSourcesByUuidOrId(sources, new HashSet<string> { BongoCatSourceUuid }, BongoCatSourceId);
+            RemoveSourcesByUuidOrId(sources, new HashSet<string> { BongoCatSourceUuid }, LegacyBongoCatSourceId);
+        }
 
         private static string MotionBlurShaderPath() => System.IO.Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "obs-shaderfilter", "examples", "motion_blur.shader").Replace('\\', '/');
 
@@ -803,7 +815,7 @@ namespace ReplayKitSetup
             if (filters.Count == 0) src.Remove("filters");
         }
 
-        private static JObject NewBongoSource() => new JObject
+        private static JObject NewBongoSource(Preferences prefs) => new JObject
         {
             ["prev_ver"] = 536936450,
             ["name"] = BongoCatSourceName,
@@ -812,7 +824,8 @@ namespace ReplayKitSetup
             ["versioned_id"] = BongoCatSourceId,
             ["settings"] = new JObject
             {
-                ["Mode"] = "standard",
+                ["Mode"] = prefs.BongoMode,
+                ["mode"] = prefs.BongoMode,
                 ["width"] = (int)BongoCatSourceW,
                 ["height"] = (int)BongoCatSourceH,
                 ["x"] = 0.0,
@@ -848,23 +861,23 @@ namespace ReplayKitSetup
             ["private_settings"] = new JObject(),
         };
 
-        private static void EnsureBongoSource(JArray sources)
+        private static void EnsureBongoSource(JArray sources, Preferences prefs)
         {
             foreach (var srcToken in sources)
             {
                 if (!(srcToken is JObject src)) continue;
-                if (src.Value<string>("uuid") == BongoCatSourceUuid || src.Value<string>("id") == BongoCatSourceId)
+                if (src.Value<string>("uuid") == BongoCatSourceUuid || src.Value<string>("id") == BongoCatSourceId || src.Value<string>("id") == LegacyBongoCatSourceId)
                 {
                     src["name"] = BongoCatSourceName;
                     src["id"] = BongoCatSourceId;
                     src["versioned_id"] = BongoCatSourceId;
                     src["enabled"] = true;
                     if (!(src["settings"] is JObject settings)) { settings = new JObject(); src["settings"] = settings; }
-                    foreach (var prop in ((JObject)NewBongoSource()["settings"]).Properties()) settings[prop.Name] = prop.Value;
+                    foreach (var prop in ((JObject)NewBongoSource(prefs)["settings"]).Properties()) settings[prop.Name] = prop.Value;
                     return;
                 }
             }
-            sources.Add(NewBongoSource());
+            sources.Add(NewBongoSource(prefs));
         }
 
         // the mouse cursor choice for one kind of capture as the settings file of the helper holds it; on when the file or the key is not there, like the default of the helper
@@ -1356,6 +1369,18 @@ namespace ReplayKitSetup
             if (!(data["sources"] is JArray sources)) { sources = new JArray(); data["sources"] = sources; }
             if (!(data["groups"] is JArray groups)) { groups = new JArray(); data["groups"] = groups; }
 
+            var standby = sources.OfType<JObject>().Where(source =>
+                (source.Value<string>("name") == "Bongo Cat Overlay (Inactive)" || source.Value<string>("name") == "Bongo Cat Overlay (Switching)") &&
+                (source.Value<string>("id") == BongoCatSourceId || source.Value<string>("id") == LegacyBongoCatSourceId)).ToList();
+            foreach (var source in standby)
+            {
+                string uuid = source.Value<string>("uuid"), name = source.Value<string>("name");
+                foreach (var owner in sources.Concat(groups).OfType<JObject>())
+                    if (owner["settings"]?["items"] is JArray children)
+                        foreach (var child in children.OfType<JObject>().Where(item => item.Value<string>("name") == name ||
+                            (!string.IsNullOrEmpty(uuid) && item.Value<string>("source_uuid") == uuid)).ToList()) children.Remove(child);
+                sources.Remove(source);
+            }
             var primary = Display.PrimaryDisplay();
             var (canvasW, canvasH) = CanvasSize(prefs);
             string overlayStyle = SelectedOverlayStyle(prefs);
@@ -1376,7 +1401,7 @@ namespace ReplayKitSetup
                 foreach (var g in keptGroups) groups.Add(g);
             }
 
-            if (useBongoCat) EnsureBongoSource(sources);
+            if (useBongoCat) EnsureBongoSource(sources, prefs);
             else RemoveBongoSources(sources);
             EnsureWindowCaptureSource(sources, prefs);
 
@@ -1425,7 +1450,7 @@ namespace ReplayKitSetup
                     if (useInputOverlay) ApplyOverlayOpacityFilter(src, prefs);
                     else RemoveOverlayOpacityFilter(src);
                 }
-                else if (sid == BongoCatSourceId || src.Value<string>("name") == BongoCatSourceName)
+                else if (sid == BongoCatSourceId || sid == LegacyBongoCatSourceId || src.Value<string>("name") == BongoCatSourceName)
                 {
                     if (useBongoCat) ApplyOverlayOpacityFilter(src, prefs);
                 }

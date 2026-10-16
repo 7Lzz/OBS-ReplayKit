@@ -175,6 +175,9 @@ namespace ReplayKitHelper
         // one of the obs menu bar menus (File, Edit, ...) by its position, dropped open at the pointer
         public static void SendObsMenu(int index) { if (index >= 0 && index < 20) TryWrite("OBSMENU " + index); }
 
+        // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which obs-websocket cannot do
+        public static void SendGroupInputOverlay() => TryWrite("GROUPINPUTOVERLAY");
+
         // opens the plugin-owned first-run setup wizard window. fired once per helper process on the first pipe connect when setupWizardPending is set (works even if obs launched to the tray), and again by the dock once the obs window is on screen -- ShowSetup is a singleton so the second call just focuses it.
         public static void SendOpenSetup() => TryWrite("OPENSETUP");
 

@@ -822,7 +822,7 @@
       if (g.openClipsKeybind && g.openClipsKeybind.key) state.openClipsKeybind = g.openClipsKeybind;
       [
         "micDeviceId","micVolume","micInputSensitivity",
-        "overlayStyle","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
+        "overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
         "theme","themeCustom","appIcon","appIconCustomPath","appIconRecordingDot",
       ].forEach((k) => { if (g[k] !== undefined && g[k] !== null) state[k] = g[k]; });
     } catch (_) {}
@@ -850,6 +850,11 @@
       if (style !== "input_overlay" && style !== "bongo_cat") return;
       state.overlayPosition = Object.assign({}, state.overlayPosition);
       state.overlayPosition[style] = { x, y };
+    }, (pct) => {
+      const slider = document.getElementById("ovcScale");
+      if (!slider) return;
+      slider.value = String(pct);
+      slider.dispatchEvent(new Event("input"));
     });
     if (window.RKAppearance) RKAppearance.init({ get:hostGet, set:hostSet, onChange:() => {}, setStatus });
 
