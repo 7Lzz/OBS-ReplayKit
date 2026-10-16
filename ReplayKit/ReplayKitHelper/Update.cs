@@ -6,6 +6,7 @@ using System.Management;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -280,7 +281,56 @@ namespace ReplayKitHelper
             }
         }
 
-        public static JObject GetAutoUpdateStatus()
+        private static Timer pollTimer;
+        private static int pollRunning;
+        private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(30);
+
+        public static void StartPolling()
+        {
+            lock (Server.State.UpdateCheckLock)
+            {
+                if (pollTimer == null) pollTimer = new Timer(PollUpdates, null, PollInterval, PollInterval);
+            }
+        }
+
+        public static void StopPolling()
+        {
+            lock (Server.State.UpdateCheckLock)
+            {
+                pollTimer?.Dispose();
+                pollTimer = null;
+            }
+        }
+
+        private static void PollUpdates(object state)
+        {
+            if (Interlocked.CompareExchange(ref pollRunning, 1, 0) != 0) return;
+            try
+            {
+                lock (Server.State.UpdateCheckLock)
+                    if (pollTimer == null || Server.State.UpdateApplyInProgress) return;
+
+                // The normal 30-minute cache can still contain the startup result at the first tick.
+                var status = GetAutoUpdateStatus(manual: true);
+                if (status["ok"]?.Value<bool>() != true)
+                {
+                    WriteUpdateDebug("periodic update check failed: " + status["message"]);
+                    return;
+                }
+                if (status["prompt"]?.Value<bool>() != true) return;
+                string version = status["latestVersion"]?.Value<string>();
+                lock (Server.State.UpdateCheckLock)
+                {
+                    if (pollTimer == null || Server.State.UpdateApplyInProgress || StartupPromptSuppressedBecause(version) != null) return;
+                    var opened = OpenUpdatePromptWindow(version);
+                    if (opened["ok"]?.Value<bool>() != true) WriteUpdateDebug("periodic update prompt failed: " + opened["message"]);
+                }
+            }
+            catch (Exception ex) { WriteUpdateDebug("periodic update check failed: " + ex.Message); }
+            finally { Interlocked.Exchange(ref pollRunning, 0); }
+        }
+
+        public static JObject GetAutoUpdateStatus(bool manual = false)
         {
             try
             {
@@ -295,7 +345,7 @@ namespace ReplayKitHelper
                     };
                 }
 
-                var status = GetUpdateStatus();
+                var status = GetUpdateStatus(manual);
                 status["autoUpdateEnabled"] = true;
                 status["prompt"] = false;
                 if ((status["ok"]?.Value<bool>() ?? false) && (status["updateAvailable"]?.Value<bool>() ?? false) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>()))

@@ -177,6 +177,7 @@ namespace ReplayKitHelper
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
             try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
+            try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
 
             RunAcceptLoop();
 
@@ -428,6 +429,7 @@ namespace ReplayKitHelper
 
         private static void Shutdown()
         {
+            Update.StopPolling();
             _crashSentinelTimer?.Dispose();
             try { PipeClient.Stop(); } catch { }
             try { AppConfig.StopClipFolderWatcher(); } catch (Exception ex) { Log.Write("StopClipFolderWatcher: " + ex.Message); }
