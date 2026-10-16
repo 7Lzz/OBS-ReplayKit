@@ -625,6 +625,9 @@
   }
   .hotkey-input.is-empty { color:var(--muted); }
   .hotkey-actions { display:flex; gap:3px; }
+  .hotkey-row[hidden] { display:none; }
+  /* as wide as the three buttons of the row above, so both fields line up */
+  .hotkey-extra-row .hotkey-actions { width:90px; }
   .icon-btn {
     width:28px;
     height:28px;
@@ -1240,8 +1243,17 @@
             <button class="icon-btn" type="button" id="clearHotkey" title="Clear hotkey">
               <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
-            <button class="icon-btn" type="button" id="addHotkey" title="One ReplayKit hotkey is supported" disabled>
+            <button class="icon-btn" type="button" id="addHotkey" title="Add another hotkey">
               <svg data-i="action/plus" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hotkey-row hotkey-extra-row" data-hotkey-name="Save Clip" data-extra-of="clipKeybind" hidden>
+          <div class="label"></div>
+          <div class="hotkey-input" id="clipKeybindExtra" tabindex="0" role="textbox" aria-label="Extra Save Clip hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-remove-extra="clipKeybind" title="Remove this hotkey">
+              <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
         </div>
@@ -1256,8 +1268,17 @@
             <button class="icon-btn" type="button" id="clearRecordingHotkey" title="Clear hotkey">
               <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
-            <button class="icon-btn" type="button" id="addRecordingHotkey" title="One ReplayKit recording hotkey is supported" disabled>
+            <button class="icon-btn" type="button" id="addRecordingHotkey" title="Add another hotkey">
               <svg data-i="action/plus" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hotkey-row hotkey-extra-row" data-hotkey-name="Start / Stop Recording" data-extra-of="recordingKeybind" hidden>
+          <div class="label"></div>
+          <div class="hotkey-input" id="recordingKeybindExtra" tabindex="0" role="textbox" aria-label="Extra Start or Stop Recording hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-remove-extra="recordingKeybind" title="Remove this hotkey">
+              <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
         </div>
@@ -1272,8 +1293,17 @@
             <button class="icon-btn" type="button" id="clearOpenClipsHotkey" title="Clear hotkey">
               <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
-            <button class="icon-btn" type="button" id="addOpenClipsHotkey" title="One ReplayKit clips hotkey is supported" disabled>
+            <button class="icon-btn" type="button" id="addOpenClipsHotkey" title="Add another hotkey">
               <svg data-i="action/plus" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hotkey-row hotkey-extra-row" data-hotkey-name="Open Clips" data-extra-of="openClipsKeybind" hidden>
+          <div class="label"></div>
+          <div class="hotkey-input" id="openClipsKeybindExtra" tabindex="0" role="textbox" aria-label="Extra Open clips hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-remove-extra="openClipsKeybind" title="Remove this hotkey">
+              <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
         </div>
@@ -1940,6 +1970,19 @@
       </div>
     </div>
   </div>
+  <div class="modal-backdrop" id="leaveConfirmModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="leaveConfirmTitle">
+      <div class="modal-title" id="leaveConfirmTitle">You have unsaved changes</div>
+      <div class="modal-body">
+        <div class="modal-text">Save them before you leave Settings, or leave without saving and lose them.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="leaveConfirmStayBtn">Stay</button>
+        <button class="btn" type="button" id="leaveConfirmDiscardBtn">Leave without saving</button>
+        <button class="btn is-primary" type="button" id="leaveConfirmSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
   <!--#include window-chrome-->
   <!--#include shell-nav-->
 </div>
@@ -1997,6 +2040,7 @@
   const FPS_MAX = 240;
   const DEFAULT_CLIP_KEYBIND = { key:"OBS_KEY_F8" };
   const DEFAULT_RECORDING_KEYBIND = {};
+  const DEFAULT_OPEN_CLIPS_KEYBIND = { alt:true, key:"OBS_KEY_Z" };
   const DEFAULT_OVERLAY_OPACITY = 100;
   const DEFAULT_OVERLAY_SCALE = 100;
   const DEFAULT_OVERLAY_HUE_SHIFT = 0;
@@ -2452,6 +2496,20 @@
     els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
     els.applyBtn.classList.toggle("is-primary", restart);
     els.applyBtn.disabled = !dirty || applyInFlight;
+    reportDirty();
+  }
+
+  // inside the obs window the plugin holds a switch to another view while this page has unsaved edits and asks __rkConfirmLeave instead, so it is told every time that changes
+  const EMBEDDED = new URLSearchParams(location.search).get("embedded") === "1";
+  let reportedDirty = null;
+  // one report at a time and in order: the helper serves requests on parallel threads, so a dirty and a clean sent back to back (a save flips it quickly) could reach the plugin the wrong way round and leave it asking about edits that were saved
+  let dirtyReports = Promise.resolve();
+  function reportDirty() {
+    if (!EMBEDDED || reportedDirty === dirty) return dirtyReports;
+    reportedDirty = dirty;
+    const value = dirty ? "1" : "0";
+    dirtyReports = dirtyReports.then(() => fetch(HELPER + "/shell/settings-dirty?dirty=" + value, { method:"POST", cache:"no-store" })).catch(() => { reportedDirty = null; });
+    return dirtyReports;
   }
 
   function markDirty() {
@@ -2628,22 +2686,33 @@
 
   let hotkeyCaptureActive = false;
   let hotkeyCapturePending = null;
-  let hotkeyCaptureDesired = false;
   let activeHotkeyField = null;
   let hotkeyCaptureTimer = null;
   const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
-    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:{} },
+    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:DEFAULT_OPEN_CLIPS_KEYBIND },
+    clipKeybindExtra: { el:document.getElementById("clipKeybindExtra"), defaultValue:{} },
+    recordingKeybindExtra: { el:document.getElementById("recordingKeybindExtra"), defaultValue:{} },
+    openClipsKeybindExtra: { el:document.getElementById("openClipsKeybindExtra"), defaultValue:{} },
   };
+  // each hotkey takes one extra binding: its + opens the row under it, and the row stays while it holds a key or is being set
+  const EXTRA_HOTKEY_ADD_BUTTONS = { clipKeybind:"addHotkey", recordingKeybind:"addRecordingHotkey", openClipsKeybind:"addOpenClipsHotkey" };
+  const extraHotkeyOpen = new Set();
+  function syncExtraHotkeyRow(baseName) {
+    const row = document.querySelector('[data-extra-of="' + baseName + '"]');
+    const extra = state[baseName + "Extra"];
+    const shown = !!(extra && extra.key) || extraHotkeyOpen.has(baseName);
+    row.hidden = !shown;
+    document.getElementById(EXTRA_HOTKEY_ADD_BUTTONS[baseName]).disabled = shown;
+  }
 
   function clearHotkeyCaptureTimer() {
     if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
   }
 
   function setHotkeyCapture(active, keepalive) {
-    hotkeyCaptureDesired = !!active;
     if (!active && hotkeyCapturePending) {
       return hotkeyCapturePending.finally(() => setHotkeyCapture(false, keepalive));
     }
@@ -2656,7 +2725,8 @@
       keepalive:!!keepalive,
     }).then((res) => res.json()).then((body) => {
       if (!body || body.ok !== true) throw new Error((body && body.message) || "Hotkey capture failed");
-      if (hotkeyCaptureDesired === !!active) hotkeyCaptureActive = !!active;
+      // what the helper now holds, even when the field was left meanwhile: the release queued behind this request only goes out while this says active, and skipping it left the obs hotkeys blanked until obs restarted
+      hotkeyCaptureActive = !!active;
       return true;
     }).catch(() => false).finally(() => {
       if (hotkeyCapturePending === request) hotkeyCapturePending = null;
@@ -2709,6 +2779,8 @@
     const label = comboToLabel(state[fieldName]);
     field.el.textContent = label || "";
     field.el.classList.toggle("is-empty", !label);
+    const baseName = fieldName.replace(/Extra$/, "");
+    if (EXTRA_HOTKEY_ADD_BUTTONS[baseName]) syncExtraHotkeyRow(baseName);
   }
 
   function syncHotkeyFields() {
@@ -3619,6 +3691,8 @@
     field.el.addEventListener("focus", () => beginHotkeyCapture(fieldName));
     field.el.addEventListener("blur", () => {
       releaseHotkeyCapture(true);
+      // an extra row that was opened and left without a key closes again
+      if (/Extra$/.test(fieldName)) extraHotkeyOpen.delete(fieldName.replace(/Extra$/, ""));
       syncHotkeyField(fieldName);
     });
     field.el.addEventListener("keydown", (e) => {
@@ -3664,6 +3738,19 @@
   document.getElementById("clearRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
   document.getElementById("resetOpenClipsHotkey").addEventListener("click", () => resetHotkey("openClipsKeybind"));
   document.getElementById("clearOpenClipsHotkey").addEventListener("click", () => clearHotkey("openClipsKeybind"));
+  Object.keys(EXTRA_HOTKEY_ADD_BUTTONS).forEach((baseName) => {
+    document.getElementById(EXTRA_HOTKEY_ADD_BUTTONS[baseName]).addEventListener("click", () => {
+      extraHotkeyOpen.add(baseName);
+      syncExtraHotkeyRow(baseName);
+      hotkeyFields[baseName + "Extra"].el.focus();
+    });
+  });
+  document.querySelectorAll("[data-remove-extra]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      extraHotkeyOpen.delete(btn.dataset.removeExtra);
+      clearHotkey(btn.dataset.removeExtra + "Extra");
+    });
+  });
   async function loadSettings() {
     setStatus("Loading settings...", "");
     els.applyBtn.disabled = true;
@@ -3694,13 +3781,16 @@
     }
   }
 
+  // the save that is running, so a prompt asked for meanwhile can wait for its outcome instead of asking about edits that are being saved
+  let saveRun = Promise.resolve();
   async function saveSettings(closeAfter) {
     if (applyInFlight) return;
     applyInFlight = true;
     els.applyBtn.disabled = true;
     els.okBtn.disabled = true;
     try {
-      await runSaveSettings(closeAfter);
+      saveRun = runSaveSettings(closeAfter);
+      await saveRun;
     } finally {
       applyInFlight = false;
       els.okBtn.disabled = false;
@@ -4019,6 +4109,61 @@
   els.uninstallReplayKitBtn.addEventListener("click", uninstallReplayKit);
   els.uninstallDiscordScreenshareBtn.addEventListener("click", toggleDiscordScreenshare);
   els.setupFileRepairBtn.addEventListener("click", repairSetupFile);
+  // the plugin calls this with the view it was asked for: Save applies first and stays here if that fails, Leave without saving drops the edits, Stay keeps the page
+  let leaveTarget = "";
+  const leaveModal = document.getElementById("leaveConfirmModal");
+  function closeLeaveModal() {
+    leaveModal.classList.remove("is-visible");
+    leaveModal.setAttribute("aria-hidden", "true");
+  }
+  let leaving = false;
+  window.__rkConfirmLeave = async (target) => {
+    leaveTarget = String(target || "home");
+    // a save and leave is already on its way and goes to the view picked last
+    if (leaving) return;
+    // a save still running decides whether anything is left unsaved, so the prompt waits for it
+    if (applyInFlight) {
+      try { await saveRun; } catch (_) {}
+      if (leaving) return;
+    }
+    // the plugin only had an old answer: nothing is unsaved, so it is put right and the switch goes ahead without asking
+    if (!dirty) {
+      reportedDirty = null;
+      leaveSettings(false);
+      return;
+    }
+    // same wording as the Apply button: a save that restarts obs says so before it is pressed
+    const saveBtn = document.getElementById("leaveConfirmSaveBtn");
+    saveBtn.textContent = needsObsRestart() ? "Save & Restart" : "Save";
+    leaveModal.classList.add("is-visible");
+    leaveModal.setAttribute("aria-hidden", "false");
+    saveBtn.focus();
+  };
+  async function leaveSettings(save) {
+    if (leaving) return;
+    leaving = true;
+    closeLeaveModal();
+    try {
+      if (save) {
+        await saveSettings(false);
+        if (dirty) return;
+      } else {
+        await cancelOverlayPreview();
+        revertLocalEdits();
+      }
+      await reportDirty();
+      closeLeaveModal();
+      fetch(HELPER + "/shell/leave-settings?to=" + encodeURIComponent(leaveTarget), { method:"POST", cache:"no-store" }).catch(() => {});
+    } finally {
+      leaving = false;
+    }
+  }
+  document.getElementById("leaveConfirmStayBtn").addEventListener("click", closeLeaveModal);
+  document.getElementById("leaveConfirmDiscardBtn").addEventListener("click", () => leaveSettings(false));
+  document.getElementById("leaveConfirmSaveBtn").addEventListener("click", () => leaveSettings(true));
+  leaveModal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeLeaveModal(); }
+  });
   els.discordScreenshareConfirmCancelBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(false));
   els.discordScreenshareConfirmOkBtn.addEventListener("click", () => closeDiscordScreenshareConfirmModal(true));
   els.discordScreenshareConfirmModal.addEventListener("keydown", (e) => {
@@ -4762,9 +4907,28 @@
     paintLiveControls();
     return failed;
   }
+  // clipping starts or stops the moment it is switched; the mutes still wait for Apply
+  async function applyClippingNow(want) {
+    liveEpoch++;
+    try {
+      await helperJson("obs/replay-buffer?state=" + (want ? "on" : "off"), { method:"POST" });
+      liveState.clipping = want;
+      setStatus(want ? "Clipping on" : "Clipping off", "good");
+    } catch (e) {
+      setStatus("Could not turn clipping " + (want ? "on" : "off") + ": " + (e.message || e), "bad");
+    }
+    liveEpoch++;
+    paintLiveControls();
+  }
   Object.keys(liveEls).forEach((key) => {
     liveEls[key].addEventListener("change", () => {
       const want = liveEls[key].checked;
+      if (key === "clipping") {
+        delete pendingLive.clipping;
+        markDirty();
+        applyClippingNow(want);
+        return;
+      }
       if (want === liveState[key]) delete pendingLive[key];
       else pendingLive[key] = want;
       markDirty();

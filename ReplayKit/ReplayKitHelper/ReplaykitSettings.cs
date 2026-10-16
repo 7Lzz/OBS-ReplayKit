@@ -54,7 +54,11 @@ namespace ReplayKitHelper
                 ["storageLimitGb"] = 0,
                 ["clipKeybind"] = new JObject { ["key"] = "OBS_KEY_F8" },
                 ["recordingKeybind"] = new JObject(),
-                ["openClipsKeybind"] = new JObject(),
+                ["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" },
+                // the one extra binding each hotkey may have (the + of the hotkeys page)
+                ["clipKeybindExtra"] = new JObject(),
+                ["recordingKeybindExtra"] = new JObject(),
+                ["openClipsKeybindExtra"] = new JObject(),
                 ["overlayStyle"] = "off",
                 ["bongoMode"] = "standard",
                 ["overlayOpacity"] = 100,
@@ -278,7 +282,10 @@ namespace ReplayKitHelper
             NormalizeHotkeyCombo(value, new JObject(), "recording keybind");
 
         private static JObject NormalizeOpenClipsKeybind(JToken value) =>
-            NormalizeHotkeyCombo(value, new JObject(), "open clips keybind");
+            NormalizeHotkeyCombo(value, new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" }, "open clips keybind");
+
+        private static JObject NormalizeExtraKeybind(JToken value, string settingName) =>
+            NormalizeHotkeyCombo(value, new JObject(), settingName);
 
         // a stale or hand-edited id falls back to "default" the way an unknown theme does, rather than failing the whole settings load.
         private static string NormalizeMicDeviceId(string value)
@@ -411,6 +418,9 @@ namespace ReplayKitHelper
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
                 ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
+                ["clipKeybindExtra"] = NormalizeExtraKeybind(data["clipKeybindExtra"], "extra clip keybind"),
+                ["recordingKeybindExtra"] = NormalizeExtraKeybind(data["recordingKeybindExtra"], "extra recording keybind"),
+                ["openClipsKeybindExtra"] = NormalizeExtraKeybind(data["openClipsKeybindExtra"], "extra open clips keybind"),
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), new[] { "input_overlay", "bongo_cat", "off" }),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
@@ -896,6 +906,7 @@ namespace ReplayKitHelper
         private static JObject StartObsOutputIfNeeded(JObject state, string startRequest, string label)
         {
             if (state["wasActive"]?.Value<bool>() != true) return new JObject { ["ok"] = true };
+            PipeClient.ReleaseObsOutputsAndWait(1500);
             var start = ObsWebSocket.InvokeRequest(startRequest, null, 8000);
             if (!start.Ok) return new JObject { ["ok"] = false, ["warning"] = "Could not restart " + label + " after applying live settings: " + start.Message };
             string statusRequest = startRequest == "StartRecord" ? "GetRecordStatus"
@@ -3113,40 +3124,45 @@ namespace ReplayKitHelper
             return bind;
         }
 
-        private static string ConvertClipKeybindToBasicIni(JObject combo)
+        // obs keeps every binding of a hotkey in one array, so the extra binding is just the second entry; the same combo twice is written once
+        private static JArray ConvertKeybindsToObsBindings(JObject combo, JObject extra)
         {
+            var list = new JArray();
             var bind = ConvertKeybindToObsBinding(combo);
-            return new JObject { ["ReplayBuffer.Save"] = bind == null ? new JArray() : new JArray(bind) }.ToString(Formatting.None);
+            var extraBind = ConvertKeybindToObsBinding(extra);
+            if (bind != null) list.Add(bind);
+            if (extraBind != null && (bind == null || !JToken.DeepEquals(bind, extraBind))) list.Add(extraBind);
+            return list;
         }
 
-        private static string ConvertRecordingKeybindToBasicIni(JObject combo)
-        {
-            var bind = ConvertKeybindToObsBinding(combo);
-            return new JObject { ["bindings"] = bind == null ? new JArray() : new JArray(bind) }.ToString(Formatting.None);
-        }
+        private static string ConvertClipKeybindToBasicIni(JObject combo, JObject extra) =>
+            new JObject { ["ReplayBuffer.Save"] = ConvertKeybindsToObsBindings(combo, extra) }.ToString(Formatting.None);
 
-        private static JObject ConvertRecordingBasicIniToKeybind(string json)
+        private static string ConvertRecordingKeybindToBasicIni(JObject combo, JObject extra) =>
+            new JObject { ["bindings"] = ConvertKeybindsToObsBindings(combo, extra) }.ToString(Formatting.None);
+
+        private static JObject ConvertRecordingBasicIniToKeybind(string json, int index = 0)
         {
             if (string.IsNullOrWhiteSpace(json)) return new JObject();
             try
             {
                 var data = JObject.Parse(json);
                 var bindings = data["bindings"] as JArray;
-                if (bindings == null || bindings.Count < 1 || bindings[0] == null || bindings[0].Type == JTokenType.Null) return new JObject();
-                return NormalizeRecordingKeybind(bindings[0]);
+                if (bindings == null || bindings.Count <= index || bindings[index] == null || bindings[index].Type == JTokenType.Null) return new JObject();
+                return index == 0 ? NormalizeRecordingKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "extra recording keybind");
             }
             catch (JsonException) { return new JObject(); }
         }
 
-        private static JObject ConvertClipBasicIniToKeybind(string json)
+        private static JObject ConvertClipBasicIniToKeybind(string json, int index = 0)
         {
             if (string.IsNullOrWhiteSpace(json)) return new JObject();
             try
             {
                 var data = JObject.Parse(json);
                 var bindings = data["ReplayBuffer.Save"] as JArray;
-                if (bindings == null || bindings.Count < 1 || bindings[0] == null || bindings[0].Type == JTokenType.Null) return new JObject();
-                return NormalizeClipKeybind(bindings[0]);
+                if (bindings == null || bindings.Count <= index || bindings[index] == null || bindings[index].Type == JTokenType.Null) return new JObject();
+                return index == 0 ? NormalizeClipKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "extra clip keybind");
             }
             catch (JsonException) { return new JObject(); }
         }
@@ -5395,34 +5411,46 @@ namespace ReplayKitHelper
             var stop = GetObsProfileParameterSafe("Hotkeys", "OBSBasic.StopRecording");
             if (!start.Ok && !stop.Ok) return settings;
 
-            JObject combo = new JObject();
-            if (start.Ok) combo = ConvertRecordingBasicIniToKeybind(start.Data?["parameterValue"]?.Value<string>() ?? "");
-            if (combo["key"] == null && stop.Ok) combo = ConvertRecordingBasicIniToKeybind(stop.Data?["parameterValue"]?.Value<string>() ?? "");
+            string json = start.Ok ? start.Data?["parameterValue"]?.Value<string>() ?? "" : "";
+            JObject combo = ConvertRecordingBasicIniToKeybind(json);
+            if (combo["key"] == null && stop.Ok)
+            {
+                json = stop.Data?["parameterValue"]?.Value<string>() ?? "";
+                combo = ConvertRecordingBasicIniToKeybind(json);
+            }
+            JObject extra = ConvertRecordingBasicIniToKeybind(json, 1);
 
             string current = (settings["recordingKeybind"] as JObject ?? new JObject()).ToString(Formatting.None);
             string next = combo.ToString(Formatting.None);
             if (current != next) settings["recordingKeybind"] = combo;
+            if ((settings["recordingKeybindExtra"] as JObject ?? new JObject()).ToString(Formatting.None) != extra.ToString(Formatting.None)) settings["recordingKeybindExtra"] = extra;
             return settings;
         }
 
+        private static string HotkeySignature(JObject settings) =>
+            new JObject { ["clip"] = settings["clipKeybind"], ["clipExtra"] = settings["clipKeybindExtra"], ["recording"] = settings["recordingKeybind"], ["recordingExtra"] = settings["recordingKeybindExtra"] }.ToString(Formatting.None);
+
         private static JObject SyncHotkeysFromObs(JObject settings)
         {
-            string before = new JObject { ["clip"] = settings["clipKeybind"], ["recording"] = settings["recordingKeybind"] }.ToString(Formatting.None);
+            string before = HotkeySignature(settings);
 
             var clip = GetObsProfileParameterSafe("Hotkeys", "ReplayBuffer");
             if (clip.Ok)
             {
-                var combo = ConvertClipBasicIniToKeybind(clip.Data?["parameterValue"]?.Value<string>() ?? "");
+                string json = clip.Data?["parameterValue"]?.Value<string>() ?? "";
+                var combo = ConvertClipBasicIniToKeybind(json);
                 if (combo["key"] != null)
                 {
                     string current = (settings["clipKeybind"] as JObject ?? new JObject()).ToString(Formatting.None);
                     string next = combo.ToString(Formatting.None);
                     if (current != next) settings["clipKeybind"] = combo;
+                    var extra = ConvertClipBasicIniToKeybind(json, 1);
+                    if ((settings["clipKeybindExtra"] as JObject ?? new JObject()).ToString(Formatting.None) != extra.ToString(Formatting.None)) settings["clipKeybindExtra"] = extra;
                 }
             }
 
             settings = SyncRecordingKeybindFromObs(settings);
-            string after = new JObject { ["clip"] = settings["clipKeybind"], ["recording"] = settings["recordingKeybind"] }.ToString(Formatting.None);
+            string after = HotkeySignature(settings);
             if (before != after) WriteSettings(settings);
             return settings;
         }
@@ -5468,8 +5496,8 @@ namespace ReplayKitHelper
 
         private static JObject RestoreHotkeysFromSettings(JObject settings)
         {
-            string clipJson = ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject);
-            string recordingJson = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject);
+            string clipJson = ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject);
+            string recordingJson = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             var r1 = SetReplayBufferHotkeyJson(clipJson);
             var r2 = SetRecordingHotkeyPairJson(recordingJson, recordingJson);
             var errors = new List<string>();
@@ -5482,6 +5510,8 @@ namespace ReplayKitHelper
                 ["active"] = false,
                 ["clipKeybind"] = settings["clipKeybind"] as JObject ?? new JObject(),
                 ["recordingKeybind"] = settings["recordingKeybind"] as JObject ?? new JObject(),
+                ["clipKeybindExtra"] = settings["clipKeybindExtra"] as JObject ?? new JObject(),
+                ["recordingKeybindExtra"] = settings["recordingKeybindExtra"] as JObject ?? new JObject(),
             });
             lock (Server.State.HotkeyCaptureLock)
             {
@@ -5552,8 +5582,8 @@ namespace ReplayKitHelper
             profileUpdates.Add(new[] { "AdvOut", "RecRBSize", ScaledRbSizeMb(settings["recordingPreset"]?.Value<string>() ?? "", replaySeconds, preset).ToString(CultureInfo.InvariantCulture) });
             profileUpdates.Add(new[] { "AdvOut", "RecEncoder", encoder["id"]?.Value<string>() ?? "" });
             profileUpdates.Add(new[] { "AdvOut", "RecTracks", RecTracksValue(settings) });
-            profileUpdates.Add(new[] { "Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject) });
-            string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject);
+            profileUpdates.Add(new[] { "Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject) });
+            string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
             // always pin obss recording folder to the RESOLVED clip dir (custom or the ~/Videos default) -- the helpers clip watcher/scanner uses that same resolved dir, so if obss own RecFilePath ever drifts (a reset profile, an obs update) clips land where nothing is looking for them.

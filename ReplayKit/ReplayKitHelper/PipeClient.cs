@@ -21,6 +21,8 @@ namespace ReplayKitHelper
         private static StreamWriter _writer;
         private static bool _setupWizardKicked;
         private static readonly ManualResetEventSlim AllowCloseAck = new ManualResetEventSlim(false);
+        private static readonly ManualResetEventSlim OutputsReleasedAck = new ManualResetEventSlim(false);
+        private static readonly object ReleaseOutputsLock = new object();
 
         public static void Start()
         {
@@ -145,6 +147,9 @@ namespace ReplayKitHelper
                 case "ALLOWCLOSE_ACK":
                     AllowCloseAck.Set();
                     break;
+                case "RELEASEOUTPUTS_ACK":
+                    OutputsReleasedAck.Set();
+                    break;
             }
         }
 
@@ -154,6 +159,19 @@ namespace ReplayKitHelper
             AllowCloseAck.Reset();
             if (!TryWrite("ALLOWCLOSE")) return false;
             return AllowCloseAck.Wait(timeoutMs);
+        }
+
+        // obs refuses to start an output, without an error, while its settings dialog exists, and the plugin keeps that dialog built (parked) after the obs settings view is left; this has the plugin drop a parked one and waits until obs takes outputs again. false when the plugin is not connected or never answers, and the start then goes ahead as it would have
+        public static bool ReleaseObsOutputsAndWait(int timeoutMs)
+        {
+            lock (ReleaseOutputsLock)
+            {
+                OutputsReleasedAck.Reset();
+                if (!TryWrite("RELEASEOUTPUTS")) return false;
+                bool acked = OutputsReleasedAck.Wait(timeoutMs);
+                if (!acked) Log.Write("RELEASEOUTPUTS: no answer from the plugin in " + timeoutMs + " ms");
+                return acked;
+            }
         }
 
         public static void SendOpenClips() => TryWrite("OPENCLIPS");
@@ -201,6 +219,13 @@ namespace ReplayKitHelper
 
         // a page of the shell saw alt + an arrow or a side button of the mouse: the plugin keeps the history of the views and takes the step
         public static void SendShellNav(string direction) { if (direction == "back" || direction == "forward") TryWrite("SHELLNAV " + direction); }
+
+        // the settings page has unsaved edits or not, and its answer to the prompt the plugin raised when another view was picked meanwhile
+        // the id is checked by the route already, the plugin checks it again before it reaches a script
+        public static void SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
+
+        public static void SendSettingsDirty(bool dirty) => TryWrite("SETTINGSDIRTY " + (dirty ? "1" : "0"));
+        public static void SendSettingsLeave(string view) { if (view == "home" || view == "clips" || view == "setup" || view == "projector") TryWrite("SETTINGSLEAVE " + view); }
 
         // the shell page answers a ping of the plugin, so the plugin learns the page still runs; a page whose renderer died says nothing
         public static void SendShellPong(int n) { if (n > 0) TryWrite("SHELLPONG " + n.ToString(System.Globalization.CultureInfo.InvariantCulture)); }

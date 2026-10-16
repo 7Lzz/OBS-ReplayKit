@@ -120,6 +120,11 @@ local function read_combo(data, key_name)
     return combo
 end
 
+-- a hotkey is its saved combo plus the one extra binding the settings page allows
+local function read_combos(data, key_name)
+    return { read_combo(data, key_name), read_combo(data, key_name .. "Extra") }
+end
+
 local function load_runtime_settings()
     local text = read_text(runtime_settings_path())
     if not text or text == "" then return { clip = {}, recording = {} } end
@@ -128,8 +133,8 @@ local function load_runtime_settings()
     if data == nil then return { clip = {}, recording = {} } end
 
     local settings = {
-        clip = read_combo(data, "clipKeybind"),
-        recording = read_combo(data, "recordingKeybind"),
+        clip = read_combos(data, "clipKeybind"),
+        recording = read_combos(data, "recordingKeybind"),
     }
     obs.obs_data_release(data)
     return settings
@@ -145,21 +150,32 @@ local function combo_signature(combo)
     return table.concat(parts, "+")
 end
 
-local function settings_signature(settings)
-    return "clip=" .. combo_signature(settings.clip) ..
-        "|recording=" .. combo_signature(settings.recording)
+local function combos_signature(combos)
+    local parts = {}
+    for _, combo in ipairs(combos or {}) do parts[#parts + 1] = combo_signature(combo) end
+    return table.concat(parts, ",")
 end
 
-local function create_binding_array(combo)
+local function settings_signature(settings)
+    return "clip=" .. combos_signature(settings.clip) ..
+        "|recording=" .. combos_signature(settings.recording)
+end
+
+local function create_binding_array(combos)
     local arr = obs.obs_data_array_create()
-    if combo and combo.key then
-        local item = obs.obs_data_create()
-        for _, mod in ipairs({ "control", "alt", "shift", "command" }) do
-            if combo[mod] then obs.obs_data_set_bool(item, mod, true) end
+    local seen = {}
+    for _, combo in ipairs(combos or {}) do
+        local signature = combo_signature(combo)
+        if signature ~= "" and not seen[signature] then
+            seen[signature] = true
+            local item = obs.obs_data_create()
+            for _, mod in ipairs({ "control", "alt", "shift", "command" }) do
+                if combo[mod] then obs.obs_data_set_bool(item, mod, true) end
+            end
+            obs.obs_data_set_string(item, "key", combo.key)
+            obs.obs_data_array_push_back(arr, item)
+            obs.obs_data_release(item)
         end
-        obs.obs_data_set_string(item, "key", combo.key)
-        obs.obs_data_array_push_back(arr, item)
-        obs.obs_data_release(item)
     end
     return arr
 end
@@ -197,7 +213,7 @@ local function collect_hotkey_ids(target_names)
     return found
 end
 
-local function load_native_hotkeys(target_names, combo, warn_key, missing_message)
+local function load_native_hotkeys(target_names, combos, warn_key, missing_message)
     if type(obs.obs_hotkey_load) ~= "function" then
         if not native_warned then
             native_warned = true
@@ -215,7 +231,7 @@ local function load_native_hotkeys(target_names, combo, warn_key, missing_messag
         return
     end
 
-    local arr = create_binding_array(combo)
+    local arr = create_binding_array(combos)
     for _, id in ipairs(found) do
         local ok, err = pcall(obs.obs_hotkey_load, id, arr)
         if not ok then
@@ -244,8 +260,8 @@ local function read_capture_signal()
     if data == nil then return nil end
     local signal = { active = obs.obs_data_get_bool(data, "active") }
     if not signal.active then
-        signal.clip = read_combo(data, "clipKeybind")
-        signal.recording = read_combo(data, "recordingKeybind")
+        signal.clip = read_combos(data, "clipKeybind")
+        signal.recording = read_combos(data, "recordingKeybind")
     end
     obs.obs_data_release(data)
     return signal

@@ -1,7 +1,7 @@
 <!-- shared partial (helper #include target: window-state). whether the window this page lives in is on screen, for pages that live in a window the plugin hides instead of destroying: closing it leaves the page alive and polling, and cef does not reliably send visibilitychange for the hide or the show. the plugin fires a replaykit-window event (detail.shown) from its own show and hide handlers, and that is trusted once it has spoken; before that, and in a plain browser, the page falls back to document.hidden. embedded in the obs window (?embedded=1) the page is an iframe of the shell page, which stays on screen for the life of the window, so there the event from the shell page is the only source and document.hidden / document.visibilityState follow it, with a visibilitychange whenever it flips, which keeps every existing document.hidden gate working. host: RKWindow.up() says whether the window is showing, RKWindow.onChange(fn) calls fn(up) whenever that flips. -->
 <script>
 (function () {
-  var spoke = false, shown = true, listeners = [];
+  var spoke = false, shown = true, windowUp = true, listeners = [];
   var embedded = false;
   try { embedded = new URLSearchParams(location.search).get("embedded") === "1"; } catch (_) {}
   var hiddenGetter = null;
@@ -23,6 +23,7 @@
   window.addEventListener("replaykit-window", function (e) {
     spoke = true;
     shown = !!(e.detail && e.detail.shown);
+    windowUp = !(e.detail && e.detail.windowUp === false);
     check();
   });
   // input can only reach a window that is showing, so it corrects a show signal that never arrived
@@ -32,6 +33,7 @@
   document.addEventListener("visibilitychange", check);
   // covers a visibilitychange that never fires while the page is still trusting document.hidden
   setInterval(check, 1000);
-  window.RKWindow = { up: up, onChange: function (fn) { if (typeof fn === "function") listeners.push(fn); } };
+  // windowUp is false only once the window itself went away (tray, closed); a page that another view covers still has its window up
+  window.RKWindow = { up: up, windowUp: function () { return windowUp; }, onChange: function (fn) { if (typeof fn === "function") listeners.push(fn); } };
 })();
 </script>

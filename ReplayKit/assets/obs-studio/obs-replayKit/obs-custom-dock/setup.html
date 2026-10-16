@@ -459,7 +459,7 @@
     replaySeconds: 90,
     clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
     recordingKeybind: {},
-    openClipsKeybind: {},
+    openClipsKeybind: { alt:true, key:"OBS_KEY_Z" },
     micDeviceId: "default",
     micVolume: 100,
     micNoiseSuppression: true,
@@ -625,13 +625,12 @@
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:{} },
-    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:{} },
+    openClipsKeybind: { el:els.openClipsKeybind, defaultValue:{ alt:true, key:"OBS_KEY_Z" } },
   };
-  let hotkeyCaptureActive = false, hotkeyCapturePending = null, hotkeyCaptureDesired = false, activeHotkeyField = null, hotkeyCaptureTimer = null;
+  let hotkeyCaptureActive = false, hotkeyCapturePending = null, activeHotkeyField = null, hotkeyCaptureTimer = null;
   const HOTKEY_CAPTURE_TIMEOUT_MS = 10000;
 
   function setHotkeyCapture(active, keepalive) {
-    hotkeyCaptureDesired = !!active;
     if (!active && hotkeyCapturePending) return hotkeyCapturePending.finally(() => setHotkeyCapture(false, keepalive));
     if (active && hotkeyCaptureActive) return Promise.resolve(true);
     if (!active && !hotkeyCaptureActive && !hotkeyCapturePending) return Promise.resolve(true);
@@ -639,7 +638,8 @@
     const request = fetch(url, { method:"POST", cache:"no-store", keepalive:!!keepalive })
       .then((res) => res.json()).then((body) => {
         if (!body || body.ok !== true) throw new Error((body && body.message) || "Hotkey capture failed");
-        if (hotkeyCaptureDesired === !!active) hotkeyCaptureActive = !!active;
+        // what the helper now holds, even when the field was left meanwhile: the release queued behind this request only goes out while this says active, and skipping it left the obs hotkeys blanked until obs restarted
+        hotkeyCaptureActive = !!active;
         return true;
       }).catch(() => false).finally(() => { if (hotkeyCapturePending === request) hotkeyCapturePending = null; });
     hotkeyCapturePending = request;

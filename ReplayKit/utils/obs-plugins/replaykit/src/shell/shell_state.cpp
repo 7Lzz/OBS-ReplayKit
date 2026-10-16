@@ -23,6 +23,7 @@ QPointer<QWidget> g_viewObsHost;
 QPointer<QDialog> g_obsSettingsDialog;
 QPointer<QWidget> g_obsNav;
 ShellView g_shellView = ShellView::Home;
+bool g_settingsDirty = false;
 bool g_shellPendingSetup = false;
 bool g_hostCreating = false;
 bool g_hostReady = false;

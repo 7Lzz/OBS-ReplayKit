@@ -9,8 +9,9 @@ namespace rk {
 
 namespace {
 
-constexpr int kOpenClipsHotkeyId = 0x524B;
-bool g_openClipsHotkeyRegistered = false;
+// the saved binding and the one extra binding of the settings page, each its own windows hotkey
+constexpr int kOpenClipsHotkeyIds[2] = {0x524B, 0x524C};
+bool g_openClipsHotkeyRegistered[2] = {false, false};
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
 std::string g_openClipsHotkeyBinding;
 
@@ -45,29 +46,15 @@ public:
 	bool nativeEventFilter(const QByteArray &, void *message, qintptr *) override
 	{
 		MSG *msg = static_cast<MSG *>(message);
-		if (!msg || msg->message != WM_HOTKEY || msg->wParam != kOpenClipsHotkeyId)
+		if (!msg || msg->message != WM_HOTKEY || (msg->wParam != (WPARAM)kOpenClipsHotkeyIds[0] && msg->wParam != (WPARAM)kOpenClipsHotkeyIds[1]))
 			return false;
 		ToggleClips();
 		return true;
 	}
 };
 
-} // namespace
-
-QPointer<QTimer> g_openClipsHotkeyTimer;
-
-void RegisterOpenClipsHotkey(const std::string &settingsBody)
+void RegisterOneOpenClipsHotkey(int slot, const std::string &binding)
 {
-	std::string binding = ExtractJsonObjectField(settingsBody, "openClipsKeybind");
-	if (binding.empty() || binding == g_openClipsHotkeyBinding)
-		return;
-	g_openClipsHotkeyBinding = binding;
-
-	if (g_openClipsHotkeyRegistered) {
-		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
-		g_openClipsHotkeyRegistered = false;
-	}
-
 	std::string keyName = ExtractJsonStringField(binding, "key");
 	if (keyName.empty())
 		return;
@@ -81,12 +68,43 @@ void RegisterOpenClipsHotkey(const std::string &settingsBody)
 	if (JsonBoolField(binding, "alt", false)) modifiers |= MOD_ALT;
 	if (JsonBoolField(binding, "shift", false)) modifiers |= MOD_SHIFT;
 	if (JsonBoolField(binding, "command", false)) modifiers |= MOD_WIN;
-	if (!RegisterHotKey(nullptr, kOpenClipsHotkeyId, modifiers, key)) {
-		blog(LOG_WARNING, "[replaykit] Could not register Open Clips hotkey (error=%lu)", GetLastError());
+	if (!RegisterHotKey(nullptr, kOpenClipsHotkeyIds[slot], modifiers, key)) {
+		blog(LOG_WARNING, "[replaykit] Could not register Open Clips hotkey %d (error=%lu)", slot + 1, GetLastError());
 		return;
 	}
-	g_openClipsHotkeyRegistered = true;
-	blog(LOG_INFO, "[replaykit] Open Clips hotkey registered");
+	g_openClipsHotkeyRegistered[slot] = true;
+	blog(LOG_INFO, "[replaykit] Open Clips hotkey %d registered", slot + 1);
+}
+
+void UnregisterOpenClipsHotkeys()
+{
+	for (int slot = 0; slot < 2; slot++) {
+		if (g_openClipsHotkeyRegistered[slot])
+			UnregisterHotKey(nullptr, kOpenClipsHotkeyIds[slot]);
+		g_openClipsHotkeyRegistered[slot] = false;
+	}
+}
+
+} // namespace
+
+QPointer<QTimer> g_openClipsHotkeyTimer;
+
+void RegisterOpenClipsHotkey(const std::string &settingsBody)
+{
+	std::string binding = ExtractJsonObjectField(settingsBody, "openClipsKeybind");
+	std::string extra = ExtractJsonObjectField(settingsBody, "openClipsKeybindExtra");
+	if (binding.empty() && extra.empty())
+		return;
+	std::string signature = binding + "|" + extra;
+	if (signature == g_openClipsHotkeyBinding)
+		return;
+	g_openClipsHotkeyBinding = signature;
+
+	UnregisterOpenClipsHotkeys();
+	RegisterOneOpenClipsHotkey(0, binding);
+	// the same combo twice would only fail the second registration
+	if (extra != binding)
+		RegisterOneOpenClipsHotkey(1, extra);
 }
 
 // puts the native filter in place that turns the registered hotkey into a clips toggle
@@ -101,8 +119,7 @@ void RemoveOpenClipsHotkey()
 {
 	if (g_openClipsHotkeyTimer)
 		g_openClipsHotkeyTimer->stop();
-	if (g_openClipsHotkeyRegistered)
-		UnregisterHotKey(nullptr, kOpenClipsHotkeyId);
+	UnregisterOpenClipsHotkeys();
 	if (g_openClipsHotkeyFilter) {
 		qApp->removeNativeEventFilter(g_openClipsHotkeyFilter);
 		delete g_openClipsHotkeyFilter;

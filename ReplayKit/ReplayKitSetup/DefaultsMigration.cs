@@ -14,6 +14,7 @@ namespace ReplayKitSetup
         private const string ToolbarsStep = "toolbars-off-v1";
         private const string TracksStep = "separate-audio-tracks-v1";
         private const string NoiseStep = "mic-noise-suppression-v1";
+        private const string OpenClipsKeyStep = "open-clips-alt-z-v1";
 
         private const string MicSourceName = "Audio Input Capture";
         private const string NoiseFilterName = "ReplayKit Noise Suppression";
@@ -36,6 +37,7 @@ namespace ReplayKitSetup
                 (ToolbarsStep, "source toolbar and status bar off", HideToolbarsAndStatusBar),
                 (TracksStep, "separate audio tracks on", EnableSeparateAudioTracks),
                 (NoiseStep, "mic noise suppression on", EnableMicNoiseSuppression),
+                (OpenClipsKeyStep, "open clips hotkey alt + z", SetOpenClipsHotkey),
             };
             foreach (var step in steps)
             {
@@ -103,6 +105,17 @@ namespace ReplayKitSetup
             string next = Transform.SetIniValue(text, "BasicWindow", "ShowListboxToolbars", "false");
             next = Transform.SetIniValue(next, "BasicWindow", "ShowStatusBar", "false");
             if (!string.Equals(text, next, StringComparison.Ordinal)) WriteText(UserIniPath, next);
+            return true;
+        }
+
+        // the open clips hotkey had no key before, so an install that never set one gets alt + z; a key someone picked stays
+        private static bool SetOpenClipsHotkey()
+        {
+            if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return true;
+            var settings = JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE));
+            if (settings["openClipsKeybind"] is JObject current && !string.IsNullOrWhiteSpace(current.Value<string>("key"))) return true;
+            settings["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" };
+            WriteText(Prefs.RUNTIME_SETTINGS_FILE, settings.ToString(Formatting.Indented) + "\n");
             return true;
         }
 

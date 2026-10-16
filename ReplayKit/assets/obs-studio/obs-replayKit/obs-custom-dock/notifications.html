@@ -96,21 +96,37 @@
   .item.is-read .item-title { color:var(--text_muted); font-weight:500; }
   /* trash + timestamp + more-options clustered tighter than the item-head gap, same idea as clips.html .title-actions grouping its own icon row */
   .item-actions { flex:none; display:flex; align-items:center; gap:4px; }
-  .item-time { flex:none; font-size:10.5px; color:var(--text_muted); }
+  /* one width for every row, so a shorter or longer time never pushes the buttons out of line */
+  .item-time { flex:none; width:56px; text-align:right; white-space:nowrap; font-size:10.5px; color:var(--text_muted); }
   .item-chevron {
     flex:none; width:12px; height:12px; fill:currentColor; color:var(--text_muted); opacity:.7;
     transition:transform var(--anim_menu) var(--ease_smooth);
   }
   .item.is-open .item-chevron { transform:rotate(180deg); }
+  /* a row without notes keeps the place of the chevron, so its buttons line up with the rows that have one */
+  .item-chevron-gap { flex:none; width:12px; }
+  /* the same hairline settings draws between its rows, kept off the edges of the panel */
+  .item + .item::after {
+    content:""; position:absolute; top:0; left:12px; right:12px; height:1px;
+    background:var(--hairline, rgba(255, 255, 255, .08));
+  }
+
+  /* the notes roll down and back up: a one-row grid going from 0fr to 1fr animates to the height of whatever is inside */
+  .item-drop {
+    display:grid; grid-template-rows:0fr;
+    transition:grid-template-rows var(--anim_menu) var(--ease_smooth);
+  }
+  .item.is-open .item-drop { grid-template-rows:1fr; }
+  .item-drop-inner { min-height:0; overflow:hidden; visibility:hidden; transition:visibility 0s linear var(--anim_menu); }
+  .item.is-open .item-drop-inner { visibility:visible; transition:none; }
 
   /* release notes sit one step below the row, the same relationship a clip card body has to its card */
   .item-body {
     margin-top:9px; padding:10px 12px; border-radius:4px;
     background:var(--window); border:1px solid var(--grey3);
     font-size:12px; line-height:1.55; color:var(--text);
-    display:none; max-height:210px; overflow-y:auto; user-select:text; -webkit-user-select:text;
+    max-height:210px; overflow-y:auto; user-select:text; -webkit-user-select:text;
   }
-  .item.is-open .item-body { display:block; }
   .item-body h3,.item-body h4,.item-body h5 { margin:9px 0 4px; font-size:12.5px; color:var(--text); }
   .item-body h3:first-child,.item-body h4:first-child,.item-body h5:first-child { margin-top:0; }
   .item-body p { margin:5px 0; color:var(--text_muted); }
@@ -187,6 +203,14 @@
   .ctx-separator { height:1px; margin:4px 0; background:var(--grey3); }
 </style>
 <!--#include scrollbar-->
+<style>
+  /* the panel is narrow and a body sits in a bordered box of its own, so the outlined track of the shared bar doubled every edge there; here a bar is only a slim thumb */
+  .list::-webkit-scrollbar, .item-body::-webkit-scrollbar { width:8px; }
+  .list::-webkit-scrollbar-track, .item-body::-webkit-scrollbar-track { border:0; background:transparent; }
+  .list::-webkit-scrollbar-thumb, .item-body::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:4px; min-height:24px; background-color:var(--grey3); }
+  .list::-webkit-scrollbar-thumb:hover, .item-body::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
+  .item-body::-webkit-scrollbar-button:vertical:start:decrement, .item-body::-webkit-scrollbar-button:vertical:end:increment { height:3px; }
+</style>
 </head>
 <body>
 <div class="panel">
@@ -298,9 +322,9 @@
             '<button class="item-icon-btn item-menu-btn" type="button" data-tooltip="More options" aria-label="More options">' + MORE_ICON + "</button>" +
             '<span class="item-time">' + escapeHtml(relativeTime(item.createdUtc)) + "</span>" +
           "</div>" +
-          (notes ? CHEVRON : "") +
+          (notes ? CHEVRON : '<span class="item-chevron-gap"></span>') +
         "</div>" +
-        (notes ? '<div class="item-body">' + notes + "</div>" : "") +
+        (notes ? '<div class="item-drop"><div class="item-drop-inner"><div class="item-body">' + notes + "</div></div></div>" : "") +
         "</div>";
     }).join("");
     applyHovers(listEl);
@@ -417,9 +441,29 @@
     const row = e.target.closest(".item");
     if (!row) return;
     const id = row.dataset.id;
-    setItemOpen(row, id, openId !== id);
+    const opening = openId !== id;
     setItemReadState(id, true);
+    // notes too long for the row go straight to the card over the obs window, so the row never starts to roll open under it
+    if (opening && notesTooLong(row)) {
+      helperJson("notifications/reader?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => openInPlace(id));
+      return;
+    }
+    setItemOpen(row, id, opening);
   });
+
+  // the notes are laid out while the row is closed (only clipped), so their real height is known before anything opens
+  function notesTooLong(row) {
+    const body = row.querySelector(".item-body");
+    return !!body && body.scrollHeight > body.clientHeight + 2;
+  }
+
+  function openInPlace(id) {
+    const row = rowFor(id);
+    if (row && openId !== id) setItemOpen(row, id, true);
+  }
+
+  // the plugin calls this when the obs window cannot show the card (the preview or the obs settings are over it), and the notes open here instead
+  window.__replaykitReaderUnavailable = openInPlace;
 
   // the row is a div now, not a button, so Enter/Space no longer trigger a click natively -- .click() re-enters the same handler above rather than duplicating its logic
   listEl.addEventListener("keydown", (e) => {
@@ -464,11 +508,13 @@
     try {
       const data = await helperJson("update/notes?t=" + Date.now());
       items = Array.isArray(data.items) ? data.items : items;
-      // render closed first so the row actually exists at max-height:0 before opening it -- setting openId before render() used to bake the row in already-open, which is a freshly-inserted node with no prior frame to transition from, so it just snapped open instead of animating
+      // render closed first so the row actually exists closed before opening it -- setting openId before render() used to bake the row in already-open, which is a freshly-inserted node with no prior frame to transition from, so it just snapped open instead of animating
       openId = "";
       render();
       const row = data.id ? rowFor(data.id) : null;
-      if (row) {
+      if (row && notesTooLong(row)) {
+        helperJson("notifications/reader?id=" + encodeURIComponent(data.id), { method:"POST" }).catch(() => openInPlace(data.id));
+      } else if (row) {
         void row.offsetWidth; // reflow, or the closed state above never actually commits before setItemOpen changes it
         setItemOpen(row, data.id, true);
       }

@@ -754,15 +754,16 @@ namespace ReplayKitHelper
         private sealed class Snapshot
         {
             internal readonly List<JObject> Body;
-            internal readonly string Json, Signature, Version;
+            internal readonly string Json, Signature, Version, Folder;
             internal readonly DateTime Created = DateTime.UtcNow;
             internal readonly int Linked;
             private readonly Dictionary<string, List<JObject>> sorted = new Dictionary<string, List<JObject>>();
 
-            internal Snapshot(List<JObject> body, string signature)
+            internal Snapshot(List<JObject> body, string signature, string folder)
             {
                 Body = body;
                 Signature = signature;
+                Folder = folder;
                 Json = JsonConvert.SerializeObject(body, Formatting.None);
                 // the same list has the same version whenever it was rebuilt, so a page that keeps what it read does not take a rebuild for a change and start over
                 using (var sha = System.Security.Cryptography.SHA1.Create())
@@ -790,7 +791,8 @@ namespace ReplayKitHelper
 
         private static Snapshot GetSnapshot()
         {
-            string signature = GetClipsCacheSignature(AppConfig.GetClipDir());
+            string clipDir = AppConfig.GetClipDir();
+            string signature = GetClipsCacheSignature(clipDir);
             long observed;
             lock (Server.State.ClipsMetaLock)
             {
@@ -798,12 +800,20 @@ namespace ReplayKitHelper
                     (DateTime.UtcNow - cached.Created).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS) return cached;
                 observed = generation;
             }
-            var snapshot = new Snapshot(GetClipsListUncached(), signature);
+            var snapshot = new Snapshot(GetClipsListUncached(), signature, FolderId(clipDir));
             lock (Server.State.ClipsMetaLock)
             {
                 if (observed == generation) cached = snapshot;
             }
             return snapshot;
+        }
+
+        // which clip folder a list was read from, so a page that keeps clips between polls drops all of them (favorites, drafts, counts) when the folder is switched; a hash, so the path itself is not handed out
+        private static string FolderId(string dir)
+        {
+            string normalized = (dir ?? "").Trim().TrimEnd('\\', '/').ToLowerInvariant();
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+                return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(normalized))).Replace("-", "").Substring(0, 12).ToLowerInvariant();
         }
 
         public static List<JObject> GetClipsList() => GetSnapshot().Body;
@@ -827,6 +837,7 @@ namespace ReplayKitHelper
             var payload = new JObject
             {
                 ["version"] = snapshot.Version + "|sort:" + safeSort,
+                ["folder"] = snapshot.Folder,
                 ["total"] = total,
                 ["linked"] = linked,
                 ["offset"] = safeOffset,
@@ -873,6 +884,7 @@ namespace ReplayKitHelper
             var payload = new JObject
             {
                 ["version"] = snapshot.Version + "|sort:" + safeSort + "|names",
+                ["folder"] = snapshot.Folder,
                 ["total"] = sorted.Count,
                 ["sort"] = safeSort,
                 ["clips"] = SerializeShared(sorted),

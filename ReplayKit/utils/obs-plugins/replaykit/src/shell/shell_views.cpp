@@ -403,6 +403,17 @@ void ShellDropParkedObsSettings()
 	}
 }
 
+void ShellStartOutputWhenFree(std::function<void()> start)
+{
+	if (!g_shellOn || !g_obsSettingsDialog || g_shellView == ShellView::ObsSettings) {
+		start();
+		return;
+	}
+	ShellDropParkedObsSettings();
+	// the dialog is torn down once its exec() returns, after this call has unwound, and that is when obs takes outputs again
+	QTimer::singleShot(0, g_callbacks, [start]() { start(); });
+}
+
 // puts the native window of the current view on top of the stack. the preview, the obs settings and the shell browser are all native windows, so what shows is decided by their order, and nothing is hidden or shown again once it exists: a cef window that is shown fresh paints white first, which is the flash this replaces
 void ShellSurfaceView()
 {
@@ -529,6 +540,12 @@ bool ShellActivate(ShellView view)
 		return false;
 	if (view != ShellView::Setup && ShellSetupLocked())
 		return false;
+	// unsaved replaykit settings: the page asks to save or leave first and answers through ShellLeaveSettings; the obs settings open on top of that page, so they are not leaving it
+	if (g_settingsDirty && g_shellView == ShellView::Settings && view != ShellView::Settings && view != ShellView::ObsSettings && g_shellHost && g_hostOnTop) {
+		const char *target = view == ShellView::Projector ? "projector" : ShellViewName(view);
+		ShellRunJs(g_shellHost->browser, std::string("window.RKShell && RKShell.confirmLeave && RKShell.confirmLeave('") + target + "');");
+		return false;
+	}
 	// nothing to show until the dialog exists, and building it is the slow part, so it stays built while the two settings pages trade places
 	if (view == ShellView::ObsSettings && !g_obsSettingsDialog)
 		return false;
@@ -729,8 +746,20 @@ void ShellTrayClickWithObsSettings()
 // the helper asked for a page to go away (the settings page finishing its OK / Cancel, the wizard finishing)
 void ShellCloseView(ShellView view)
 {
+	// OK and Cancel of the settings page have already saved or dropped the edits, and the clean flag from the page can arrive after this
+	if (view == ShellView::Settings)
+		g_settingsDirty = false;
 	if (view == g_shellView && view != ShellView::Home)
 		ShellActivate(ShellView::Home);
+}
+
+void ShellLeaveSettings(const std::string &target)
+{
+	g_settingsDirty = false;
+	if (g_shellView != ShellView::Settings)
+		return;
+	const ShellView view = target == "projector" ? ShellView::Projector : target == "clips" ? ShellView::Clips : target == "setup" ? ShellView::Setup : ShellView::Home;
+	ShellActivate(view);
 }
 
 // a clip started playing fullscreen (or stopped) in the clips view or in the recent clips of home: the browser covers the whole window while it plays

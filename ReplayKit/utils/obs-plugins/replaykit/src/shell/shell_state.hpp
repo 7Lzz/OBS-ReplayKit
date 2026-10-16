@@ -37,6 +37,8 @@ extern QPointer<QDialog> g_obsSettingsDialog;
 // the column that stands in for the list of pages of that dialog
 extern QPointer<QWidget> g_obsNav;
 extern ShellView g_shellView;
+// the replaykit settings page has edits that are not applied yet (SETTINGSDIRTY of the helper); leaving that view then asks the page first
+extern bool g_settingsDirty;
 // a quiet open (first-run wizard while obs sits in the tray) waits here for the window to come back
 extern bool g_shellPendingSetup;
 // the browser is created once cef and the helper are up; ready means it has reported its first page on screen

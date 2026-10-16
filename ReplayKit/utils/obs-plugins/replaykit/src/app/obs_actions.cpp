@@ -6,6 +6,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
+#include "shell/shell_views.hpp"
 #include "tray/tray_menu.hpp"
 #include "ui/confirm_dialog.hpp"
 
@@ -156,14 +157,20 @@ void ToggleRecording()
 {
 	bool active = obs_frontend_recording_active();
 	blog(LOG_INFO, "[replaykit] ToggleRecording: active=%d -> calling %s", active, active ? "stop" : "start");
-	active ? obs_frontend_recording_stop() : obs_frontend_recording_start();
+	if (active)
+		obs_frontend_recording_stop();
+	else
+		ShellStartOutputWhenFree([]() { obs_frontend_recording_start(); });
 }
 
 void ToggleReplayBuffer()
 {
 	bool active = obs_frontend_replay_buffer_active();
 	blog(LOG_INFO, "[replaykit] ToggleReplayBuffer: active=%d -> calling %s", active, active ? "stop" : "start");
-	active ? obs_frontend_replay_buffer_stop() : obs_frontend_replay_buffer_start();
+	if (active)
+		obs_frontend_replay_buffer_stop();
+	else
+		ShellStartOutputWhenFree([]() { obs_frontend_replay_buffer_start(); });
 }
 
 // the members keep their place, and the group starts at their top left corner with scale 1, so the transform the helper sets on Group next means the same as in the scene file it writes

@@ -10,7 +10,10 @@
 #include "core/ipc_pipe.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
+#include "notify/notify_button.hpp"
 #include "shell/shell_history.hpp"
+#include "shell/shell_page.hpp"
+#include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_views.hpp"
@@ -103,6 +106,33 @@ void PipeDispatchLine(const std::string &line)
 			if (g_shellOn)
 				ShellHostShown(which);
 		}, Qt::QueuedConnection);
+	} else if (line.rfind("NOTIFYREADER ", 0) == 0) {
+		const std::string id = line.substr(13);
+		const bool safe = !id.empty() && id.size() <= 64 && std::all_of(id.begin(), id.end(), [](char c) { return std::isalnum((unsigned char)c) || c == '-' || c == '_'; });
+		if (safe) {
+			QMetaObject::invokeMethod(g_callbacks, [id]() {
+				// the card is drawn by the shell page, so it needs that page on top; under the preview or the obs settings the panel opens the row itself
+				if (!g_shellOn || !g_shellHost || !g_hostOnTop) {
+					for (const QPointer<NotifyButton> &bell : g_notifyButtons) {
+						if (bell && bell->Panel() && bell->Panel()->IsOpen())
+							bell->Panel()->RunScript(QString::fromStdString("window.__replaykitReaderUnavailable && window.__replaykitReaderUnavailable('" + id + "');"));
+					}
+					return;
+				}
+				AnchoredPanel::HideAll(true);
+				ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.readNotification && RKShell.readNotification('" + id + "');");
+			}, Qt::QueuedConnection);
+		}
+	} else if (line.rfind("SETTINGSDIRTY ", 0) == 0) {
+		const bool dirty = line.substr(14) == "1";
+		QMetaObject::invokeMethod(g_callbacks, [dirty]() { g_settingsDirty = dirty; }, Qt::QueuedConnection);
+	} else if (line.rfind("SETTINGSLEAVE ", 0) == 0) {
+		// the answer of the unsaved-changes prompt of the settings page, with the view that was held back
+		const std::string target = line.substr(14);
+		QMetaObject::invokeMethod(g_callbacks, [target]() {
+			if (g_shellOn)
+				ShellLeaveSettings(target);
+		}, Qt::QueuedConnection);
 	} else if (line.rfind("SHELLNAV ", 0) == 0) {
 		// a page of the shell saw alt + an arrow, or a side button of the mouse: the history is kept here, so the page only says which way
 		const std::string which = line.substr(9);
@@ -123,6 +153,11 @@ void PipeDispatchLine(const std::string &line)
 	} else if (line == "POLLSETTINGS") {
 		// a theme being previewed in the settings tab: read the colours now instead of on the next second
 		QMetaObject::invokeMethod(g_callbacks, []() { PollHelperSettings(); }, Qt::QueuedConnection);
+	} else if (line == "RELEASEOUTPUTS") {
+		// the helper is about to start the replay buffer or a recording through obs-websocket and waits for the ack
+		QMetaObject::invokeMethod(g_callbacks, []() {
+			ShellStartOutputWhenFree([]() { g_pipeSendOutputsReleasedAck.store(true); });
+		}, Qt::QueuedConnection);
 	} else if (line == "SETTINGSAPPLIED") {
 		QMetaObject::invokeMethod(g_callbacks, []() {
 			if (g_shellOn)

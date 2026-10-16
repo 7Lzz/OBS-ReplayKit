@@ -53,6 +53,10 @@ void PipeServeClient(HANDLE pipe)
 			if (!PipeWriteLine(pipe, "ALLOWCLOSE_ACK"))
 				return;
 		}
+		if (g_pipeSendOutputsReleasedAck.exchange(false)) {
+			if (!PipeWriteLine(pipe, "RELEASEOUTPUTS_ACK"))
+				return;
+		}
 		auto now = std::chrono::steady_clock::now();
 		if (now - lastProjectors >= std::chrono::milliseconds(250)) {
 			lastProjectors = now;
@@ -133,6 +137,7 @@ void PipeServerThread()
 std::atomic<quintptr> g_mainWinValue{0};
 std::atomic<unsigned long long> g_allowCloseUntilMs{0};
 std::atomic<bool> g_pipeSendAllowCloseAck{false};
+std::atomic<bool> g_pipeSendOutputsReleasedAck{false};
 
 // obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 enumeration, so the helper (a separate process with no qt/obs-object access) cant read it directly -- this plugin can, since it runs inside obss own qt process. this refreshes the hwnd list the pipe thread streams to the helper so it can check the SAME authoritative signal obs uses internally instead of inferring "looks like a projector" from window class + ownership heuristics, which had real false-positive risk (NameDialog, the Scripts window, the auto-config wizard are independently-owned top-level windows too). must run on the gui thread for topLevelWindows()/winId().
 void PublishProjectorWindows()

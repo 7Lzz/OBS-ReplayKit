@@ -819,6 +819,17 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // a notification too long for the panel: the plugin shows all of it in a card over the obs window
+            if (path == "/notifications/reader")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string id = Q("id");
+                if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Invalid id." }); return false; }
+                PipeClient.SendNotificationReader(id);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
             if (path == "/notifications/open-link")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -1787,6 +1798,26 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the settings page reports unsaved edits, and later its answer to the unsaved-changes prompt (save or leave) with the view that was picked
+            if (path == "/shell/settings-dirty" || path == "/shell/leave-settings")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                if (path == "/shell/settings-dirty")
+                {
+                    string dirtyFlag = Q("dirty");
+                    if (dirtyFlag != "0" && dirtyFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected dirty 0 or 1." }); return false; }
+                    PipeClient.SendSettingsDirty(dirtyFlag == "1");
+                }
+                else
+                {
+                    string target = Q("to");
+                    if (target != "home" && target != "clips" && target != "setup" && target != "projector") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown view." }); return false; }
+                    PipeClient.SendSettingsLeave(target);
+                }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
             // a page of the shell saw alt + an arrow or a side button of the mouse; the plugin keeps the history of the views, so the page only says which way
             if (path == "/shell/nav")
             {
@@ -1822,16 +1853,14 @@ namespace ReplayKitHelper
                 if (want != "" && want != "on" && want != "off") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "state must be on or off." }); return false; }
                 try
                 {
-                    if (want != "")
+                    var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                    bool active = status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false);
+                    if (want != "" && status.Ok && active == (want == "on"))
                     {
-                        var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
-                        bool active = status.Ok && (status.Data?["outputActive"]?.Value<bool>() ?? false);
-                        if (status.Ok && active == (want == "on"))
-                        {
-                            HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["active"] = active });
-                            return false;
-                        }
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["active"] = active });
+                        return false;
                     }
+                    if (want == "on" || (want == "" && status.Ok && !active)) PipeClient.ReleaseObsOutputsAndWait(1500);
                     var res = ObsWebSocket.InvokeRequest(want == "on" ? "StartReplayBuffer" : want == "off" ? "StopReplayBuffer" : "ToggleReplayBuffer");
                     var body = ObsResultToJson(res);
                     if (res.Ok && want != "")
@@ -1871,6 +1900,8 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
+                    var recordStatus = ObsWebSocket.InvokeRequest("GetRecordStatus");
+                    if (recordStatus.Ok && !(recordStatus.Data?["outputActive"]?.Value<bool>() ?? false)) PipeClient.ReleaseObsOutputsAndWait(1500);
                     var res = ObsWebSocket.InvokeRequest("ToggleRecord");
                     var body = ObsResultToJson(res);
                     if (res.Ok) body["active"] = res.Data?["outputActive"]?.Value<bool>() ?? false;

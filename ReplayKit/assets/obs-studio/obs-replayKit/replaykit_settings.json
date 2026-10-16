@@ -11,7 +11,13 @@
     "key": "OBS_KEY_F8"
   },
   "recordingKeybind": {},
-  "openClipsKeybind": {},
+  "openClipsKeybind": {
+    "alt": true,
+    "key": "OBS_KEY_Z"
+  },
+  "clipKeybindExtra": {},
+  "recordingKeybindExtra": {},
+  "openClipsKeybindExtra": {},
   "overlayStyle": "input_overlay",
   "bongoMode": "standard",
   "overlayOpacity": 100,

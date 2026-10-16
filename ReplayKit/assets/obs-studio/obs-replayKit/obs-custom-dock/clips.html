@@ -3504,6 +3504,8 @@
   }
   let didInitialClipRender = false;
   let clipsPageVersion = "";
+  // the folder id the helper gives with each list; empty until the first list
+  let clipsFolder = "";
   let clipsTotal = 0;
   // false from the moment the total is reset until the helper has answered with the real one, so a count made of the rows that happen to be loaded is never what the tabs show
   let clipsTotalKnown = false;
@@ -3824,6 +3826,8 @@
       lastClipsByName = byName;
       if (activeFilter === "all" || activeFilter === "favorites") {
         renderLoadedClips(loadedClips);
+      } else {
+        updateTabs(loadedClips);
       }
     } catch {
       // the regular poll path will retry this; favorites should not block clips from rendering.
@@ -3860,6 +3864,8 @@
     draftResolveKey = "";
     draftResolveRetries = 0;
     draftsLoaded = true;
+    // the count of the tab waits for the drafts to be found in this folder
+    ensureDraftResolve();
     updateTabs(loadedClips);
     syncAllDraftUi();
     if (activeFilter === "drafts") renderLoadedClips(loadedClips);
@@ -3904,6 +3910,7 @@
       for (const clip of next.values()) byName.set(clip.name, clip);
       lastClipsByName = byName;
       if (activeFilter === "drafts") renderLoadedClips(loadedClips);
+      else updateTabs(loadedClips);
     } catch {
       // asked for again in a moment, a few times at most
       if (draftResolveRetries++ < 3) setTimeout(ensureDraftResolve, 1500);
@@ -4170,12 +4177,15 @@
       linkedTotal = tabCountsShown.linked;
     }
     const known = total !== undefined;
+    // favorites are kept by name for every folder, so the count is the favorites the helper found in this folder, not the length of that list
+    const favoritesKnown = !favoriteNamesList().length || favoriteResolveKey === currentFavoriteResolveKey();
     const counts = {
       all: total,
-      favorites: (typeof favoriteNames !== "undefined" && favoriteNames.size) || source.filter(c => isFavorite(c.name)).length,
+      favorites: favoritesKnown ? resolvedFavoriteClips.length : undefined,
       linked: linkedTotal,
       local: known ? Math.max(0, total - linkedTotal) : undefined,
-      drafts: draftsLoaded ? draftsByName.size : undefined,
+      // the same for drafts: the ones whose clip is in this folder
+      drafts: draftsLoaded && draftResolveKey === currentDraftResolveKey() ? resolvedDraftClips.size : undefined,
     };
     for (const btn of tabBtns) {
       const key = btn.dataset.filter;
@@ -5084,6 +5094,7 @@
     return {
       paged: true,
       version: String((data && data.version) || ""),
+      folder: String((data && data.folder) || ""),
       total: Math.max(0, Number((data && data.total) || clips.length) || 0),
       linked: Math.max(0, Number(data && data.linked) || 0),
       offset: Math.max(0, Number((data && data.offset) || requestedOffset) || 0),
@@ -5117,6 +5128,11 @@
     const requestSort = activeSort;
     const page = await fetchClipsPage(0, forceRefresh, requestSort);
     if (requestSort !== activeSort) return null;
+    if (page.paged && page.folder && page.folder !== clipsFolder) {
+      const switched = clipsFolder !== "";
+      clipsFolder = page.folder;
+      if (switched) forgetFolderState();
+    }
     if (!page.paged) {
       clipsPageVersion = page.version;
       clipsTotal = page.total;
@@ -5139,6 +5155,26 @@
       return mergeClipsPage(page, loadedClips);
     }
     return page.clips;
+  }
+
+  // the clip folder was switched: nothing read from the old one may stay, neither the loaded clips nor the favorites and drafts found in it nor the counts of the tabs, which come back from the new folder
+  function forgetFolderState() {
+    clipsPageVersion = "";
+    clipsTotal = 0;
+    clipsTotalKnown = false;
+    clipsLinkedTotal = 0;
+    clipsNextOffset = 0;
+    loadedClips = [];
+    lastClipsByName = new Map();
+    resolvedFavoriteClips = [];
+    resolvedDraftClips = new Map();
+    draftResolveKey = "";
+    tabCountsShown = null;
+    try { localStorage.removeItem(TAB_COUNTS_KEY); } catch {}
+    scrollAreaEl.scrollTop = 0;
+    resetVirtualWindow();
+    refreshFavoriteClips();
+    refreshDrafts();
   }
 
   async function loadMoreClipsIfNeeded(force) {
@@ -7883,6 +7919,24 @@
     return exitTheaterMode();
   };
 
+  // the editor survives a trip to another view of the obs window: the video stops, and the rest of the reset waits for the window to go away (tray, close), which drops the edit to a draft like before
+  let editorHeldAway = false;
+  function editorKeptForReturn() {
+    const open = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open");
+    return open && !!(window.RKWindow && window.RKWindow.windowUp && window.RKWindow.windowUp());
+  }
+  function holdEditorWhileAway() {
+    editorHeldAway = true;
+    try { trimVideo.pause(); } catch {}
+    closeAllMenus();
+  }
+  window.addEventListener("replaykit-window", (e) => {
+    if (!editorHeldAway || !e.detail || e.detail.windowUp !== false) return;
+    editorHeldAway = false;
+    resetClipsWindowState();
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) editorHeldAway = false; });
+
   let wasHiddenSinceShown = false;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
@@ -7894,10 +7948,11 @@
         abortVideoLoad(activePreview);
         activePreview = null;
       }
-      // embedded in the obs window this page sits behind another view now, so the reset is done while nobody looks and the next show finds a clean grid instead of watching it reset
+      // embedded in the obs window this page sits behind another view now, so the reset is done while nobody looks and the next show finds a clean grid instead of watching it reset; an open editor is kept for when the user comes back, unless the window itself went away
       if (window.RKEmbedded) {
         wasHiddenSinceShown = false;
-        resetClipsWindowState();
+        if (editorKeptForReturn()) holdEditorWhileAway();
+        else resetClipsWindowState();
       }
     } else {
       if (wasHiddenSinceShown) {

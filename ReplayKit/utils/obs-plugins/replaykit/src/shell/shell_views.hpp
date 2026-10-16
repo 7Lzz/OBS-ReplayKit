@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QString>
+#include <functional>
 #include <string>
 
 #include "shell/shell_types.hpp"
@@ -10,6 +11,8 @@ namespace rk {
 
 void ShellEndClipFullscreen();
 void ShellDropParkedObsSettings();
+// obs refuses to start any output while its settings dialog exists, so a parked one is dropped first and then runs once it is gone
+void ShellStartOutputWhenFree(std::function<void()> start);
 void ShellSurfaceView();
 // the rounded corner of the stage and the resize grip go back on top of whatever was raised over them
 void ShellRaiseGrip();
@@ -34,6 +37,8 @@ void ShellToggleClips();
 void ShellReselect(ShellView view);
 void ShellTrayClickWithObsSettings();
 void ShellCloseView(ShellView view);
+// the settings page answered the unsaved-changes prompt with save or leave, and the view it held back goes ahead
+void ShellLeaveSettings(const std::string &target);
 void ShellSetClipsFullscreen(bool active);
 
 } // namespace rk
