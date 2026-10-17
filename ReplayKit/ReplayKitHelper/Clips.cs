@@ -642,7 +642,8 @@ namespace ReplayKitHelper
         // clip listing -- cached by directory/db signature so unchanged popup polls dont re-enumerate the folder or re-serialize a large json list.
         public static string GetClipsCacheSignature(string root)
         {
-            var parts = new List<string>();
+            // the folder itself is part of it, so a list read from one folder can never be served for another whose timestamp happens to match
+            var parts = new List<string> { "path:" + (root ?? "").Trim().ToLowerInvariant() };
             try
             {
                 var dir = new DirectoryInfo(root);

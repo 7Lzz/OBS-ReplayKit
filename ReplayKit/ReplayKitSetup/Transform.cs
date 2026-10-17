@@ -883,6 +883,20 @@ namespace ReplayKitSetup
         // the mouse cursor choice for one kind of capture as the settings file of the helper holds it; on when the file or the key is not there, like the default of the helper
         private static bool CursorSetting(string key) => RuntimeFlag(key, true);
 
+        private static string RuntimeString(string key, string fallback)
+        {
+            try
+            {
+                if (!File.Exists(Prefs.RUNTIME_SETTINGS_FILE)) return fallback;
+                string value = JObject.Parse(File.ReadAllText(Prefs.RUNTIME_SETTINGS_FILE))[key]?.Value<string>();
+                return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            }
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is Newtonsoft.Json.JsonException || exc is InvalidCastException)
+            {
+                return fallback;
+            }
+        }
+
         // one on or off setting of the settings file of the helper; the given value stands in when the file or the key is not there
         private static bool RuntimeFlag(string key, bool fallback)
         {
@@ -1422,7 +1436,11 @@ namespace ReplayKitSetup
                 else if (sid == MonitorSourceId && primary != null)
                 {
                     if (!(src["settings"] is JObject monSettings)) { monSettings = new JObject(); src["settings"] = monSettings; }
-                    monSettings["monitor_id"] = primary.DeviceId;
+                    // the Display setting: "primary" or the monitor_id of one display, which the capture script keeps the source on; a chosen display that is not connected now leaves the primary showing until it is back
+                    string wanted = RuntimeString("captureDisplay", "primary");
+                    var chosen = wanted == "primary" ? null : Display.ListDisplays().FirstOrDefault(d => string.Equals(d.DeviceId, wanted, StringComparison.OrdinalIgnoreCase));
+                    monSettings["monitor_id"] = chosen?.DeviceId ?? primary.DeviceId;
+                    monSettings["replaykit_wanted_monitor_id"] = wanted;
                     monSettings["capture_cursor"] = CursorSetting("showCursorDisplayCapture");
                 }
 

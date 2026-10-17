@@ -28,8 +28,8 @@ void SyncSetupWindowClose()
 // twin of CreateSettingsWindow for the one-time first-run wizard. It gets the same native icon path so CEFs favicon cannot leave Setup visually different from Clips and Settings.
 void CreateSetupWindow(bool quiet)
 {
-	if (!g_cef) {
-		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable; cannot open the setup wizard");
+	if (!CefOpen()) {
+		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable or shutting down; cannot open the setup wizard");
 		return;
 	}
 

@@ -695,6 +695,14 @@ end
 
 local monitor_check_at = 0
 local monitor_warning = nil
+-- the display the capture is meant to show, kept on the source beside monitor_id and set from the Display setting of replaykit: "primary" follows whichever display windows calls primary, anything else is one display; monitor_id itself only says what it shows right now
+local WANTED_MONITOR_KEY = "replaykit_wanted_monitor_id"
+-- what this script last put in monitor_id, so a display picked in the properties of the source is told apart from a fallback of this script
+local last_applied_monitor = nil
+-- a switch this script makes has to hold for this many checks in a row: while a game changes its mode or a monitor wakes up, a display drops out and windows hands the primary to another one for a moment, and following that is how the capture ended up on the second display
+local pending_monitor = nil
+local pending_checks = 0
+local PENDING_CHECK_LIMIT = 2
 
 local function primary_monitor_ids()
     local monitor = ffi.C.MonitorFromWindow(nil, 1)
@@ -730,19 +738,38 @@ local function repair_display_capture()
                 choices[#choices + 1] = value
             end
         end
-        local target = nil
-        for _, value in ipairs(choices) do
-            if value:lower() == selected:lower() then target = value; break end
-        end
-        if target == nil then
-            local id, adapter = primary_monitor_ids()
-            for _, value in ipairs(choices) do
-                if (id and value:lower() == id:lower()) or (adapter and value:lower() == adapter:lower()) then
-                    target = value
-                    break
-                end
+        local function find(value)
+            if value == nil or value == "" then return nil end
+            for _, choice in ipairs(choices) do
+                if choice:lower() == value:lower() then return choice end
             end
+            return nil
         end
+        local function primary_choice()
+            local id, adapter = primary_monitor_ids()
+            return find(id) or find(adapter)
+        end
+
+        local function resolve(wanted_id)
+            if wanted_id == "" or wanted_id == "primary" then return primary_choice() end
+            return find(wanted_id)
+        end
+
+        local wanted = obs.obs_data_get_string(settings, WANTED_MONITOR_KEY) or ""
+        local wanted_changed = false
+        if wanted == "" then
+            -- the installer sets up the primary display, and a source from before this key may hold a fallback this script saved over it
+            wanted = "primary"
+            wanted_changed = true
+        elseif last_applied_monitor ~= nil and selected ~= last_applied_monitor and find(selected) and resolve(wanted) ~= find(selected) then
+            -- someone picked a display in the properties of the source, and that is the one to keep from now on
+            wanted = find(selected)
+            wanted_changed = true
+        end
+
+        local desired = resolve(wanted)
+        -- a wanted display that is gone leaves the capture where it is, or on the primary when that is gone too, and it goes back by itself once the display is back
+        local target = desired or find(selected) or primary_choice()
         if target == nil then
             if monitor_warning ~= selected then
                 monitor_warning = selected
@@ -751,11 +778,34 @@ local function repair_display_capture()
             return
         end
         monitor_warning = nil
-        if selected ~= target then
-            obs.obs_data_set_string(settings, "monitor_id", target)
-            obs.obs_source_update(source, settings)
-            obs.script_log(obs.LOG_INFO, "[AutoSwitch] Repaired Display Capture's monitor selection using OBS's active display list.")
+
+        local switching = find(selected) ~= target
+        if not switching then
+            pending_monitor = nil
+            pending_checks = 0
+        elseif last_applied_monitor ~= nil then
+            -- the first check after obs starts switches at once, every later switch waits to see the change hold
+            if pending_monitor == target then pending_checks = pending_checks + 1 else pending_monitor = target; pending_checks = 1 end
+            if pending_checks < PENDING_CHECK_LIMIT then
+                switching = false
+                target = selected
+            else
+                pending_monitor = nil
+                pending_checks = 0
+            end
         end
+
+        if wanted_changed then obs.obs_data_set_string(settings, WANTED_MONITOR_KEY, wanted) end
+        if switching or wanted_changed then
+            if switching then obs.obs_data_set_string(settings, "monitor_id", target) end
+            obs.obs_source_update(source, settings)
+            if switching then
+                obs.script_log(obs.LOG_INFO, target == desired
+                    and "[AutoSwitch] Display Capture is on its chosen display."
+                    or "[AutoSwitch] Display Capture's chosen display is missing, showing another one until it is back.")
+            end
+        end
+        last_applied_monitor = target
     end)
     if properties ~= nil then obs.obs_properties_destroy(properties) end
     if settings ~= nil then obs.obs_data_release(settings) end

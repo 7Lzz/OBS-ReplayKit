@@ -297,6 +297,10 @@
         </div>
       </div>
       <div class="form-row">
+        <div class="label">Display</div>
+        <div class="field-wrap"><div class="combo" id="captureDisplay" tabindex="0" role="combobox" aria-expanded="false" aria-label="Display to capture"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+      </div>
+      <div class="form-row">
         <div class="label">Recording Quality</div>
         <div class="field-wrap"><div class="combo" id="recordingPreset" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
       </div>
@@ -446,6 +450,7 @@
     clipDir: document.getElementById("clipDir"),
     browseClipDir: document.getElementById("browseClipDir"),
     recordingPreset: document.getElementById("recordingPreset"),
+    captureDisplay: document.getElementById("captureDisplay"),
     replaySeconds: document.getElementById("replaySeconds"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
@@ -456,6 +461,7 @@
   const state = {
     clipDir: "",
     recordingPreset: "balanced",
+    captureDisplay: "primary",
     replaySeconds: 90,
     clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
     recordingKeybind: {},
@@ -548,6 +554,7 @@
   });
   document.addEventListener("click", () => closeCombos());
   els.recordingPreset.addEventListener("combochange", () => { state.recordingPreset = comboValue(els.recordingPreset); });
+  els.captureDisplay.addEventListener("combochange", () => { state.captureDisplay = comboValue(els.captureDisplay) || "primary"; });
 
   // ---- clip length (mm:ss like settings.html) ----
   function readReplaySeconds() {
@@ -763,6 +770,7 @@
     const payload = {
       clipDir: state.clipDir,
       recordingPreset: state.recordingPreset,
+      captureDisplay: state.captureDisplay,
       replaySeconds: state.replaySeconds,
       clipNotificationSeconds: state.replaySeconds,
       clipKeybind: state.clipKeybind,
@@ -816,6 +824,7 @@
       const g = s.settings || {};
       if (typeof g.clipDir === "string") state.clipDir = g.clipDir;
       if (g.recordingPreset) state.recordingPreset = g.recordingPreset;
+      if (typeof g.captureDisplay === "string" && g.captureDisplay) state.captureDisplay = g.captureDisplay;
       if (Number.isFinite(g.replaySeconds)) state.replaySeconds = g.replaySeconds;
       if (g.clipKeybind && g.clipKeybind.key) state.clipKeybind = g.clipKeybind;
       if (g.recordingKeybind && g.recordingKeybind.key) state.recordingKeybind = g.recordingKeybind;
@@ -835,6 +844,8 @@
       { value:"quality", label:"Quality", blurb:"Higher-quality target." },
     ]);
     setComboValue(els.recordingPreset, state.recordingPreset, false);
+    fillCombo(els.captureDisplay, opts.captureDisplays || [{ value:"primary", label:"Primary display" }]);
+    setComboValue(els.captureDisplay, state.captureDisplay, false);
 
     els.clipDir.value = state.clipDir;
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds);

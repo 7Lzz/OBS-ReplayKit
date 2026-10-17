@@ -22,8 +22,8 @@ bool g_settingsCheckInFlight = false;
 // same shape as CreateClipsWindow -- title matches settings.htmls <title> and the /close-window whitelist, size matches the controls_app.html popup so it looks the same either way its opened
 void CreateSettingsWindow()
 {
-	if (!g_cef) {
-		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable; cannot open settings");
+	if (!CefOpen()) {
+		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable or shutting down; cannot open settings");
 		return;
 	}
 

@@ -18,6 +18,7 @@
   "clipKeybindExtra": {},
   "recordingKeybindExtra": {},
   "openClipsKeybindExtra": {},
+  "captureDisplay": "primary",
   "overlayStyle": "input_overlay",
   "bongoMode": "standard",
   "overlayOpacity": 100,

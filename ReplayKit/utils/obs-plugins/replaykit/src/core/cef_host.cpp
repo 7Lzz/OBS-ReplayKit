@@ -26,6 +26,20 @@ const char kReadyScript[] = "(function(){var done=false;function go(){if(done)re
 QCef *g_cef = nullptr;
 QPointer<QWidget> g_prewarmWindow;
 
+namespace {
+bool g_cefClosed = false;
+} // namespace
+
+bool CefOpen()
+{
+	return g_cef && !g_cefClosed;
+}
+
+void CefCloseForShutdown()
+{
+	g_cefClosed = true;
+}
+
 // background-thread only, can block for real time on a cold start -- waits for cefs background thread so widgets never hit the "first open only" white window race from being created before cef is ready
 bool EnsureCefReadyBlocking()
 {
@@ -51,7 +65,7 @@ void PrewarmCefBrowser()
 		QMetaObject::invokeMethod(
 			g_callbacks,
 			[cefReady]() {
-				if (!cefReady || !g_cef)
+				if (!cefReady || !CefOpen())
 					return;
 
 				QWidget *warmWin = new QWidget(nullptr);

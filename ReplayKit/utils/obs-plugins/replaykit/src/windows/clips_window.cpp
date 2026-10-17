@@ -65,8 +65,8 @@ void UnminimizeClips()
 // ui-thread only -- builds the actual window once we know theres no existing clips window to reuse and cef is already confirmed started via EnsureCefReadyBlocking
 void CreateClipsWindow()
 {
-	if (!g_cef) {
-		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable; cannot open clips");
+	if (!CefOpen()) {
+		blog(LOG_WARNING, "[replaykit] obs-browser is unavailable or shutting down; cannot open clips");
 		return;
 	}
 

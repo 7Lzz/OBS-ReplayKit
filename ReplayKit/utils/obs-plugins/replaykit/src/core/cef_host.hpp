@@ -12,6 +12,9 @@ namespace rk {
 
 extern QCef *g_cef;
 extern QPointer<QWidget> g_prewarmWindow;
+// whether a cef widget may be made now: cef is there and the widgets have not been taken down for shutdown. the ipc pipe keeps running until the module unloads, and a command it queued before obs exited would otherwise build a browser after CloseCefWidgetsBeforeShutdown, which is the teardown race that function is there to avoid
+bool CefOpen();
+void CefCloseForShutdown();
 bool EnsureCefReadyBlocking();
 void PrewarmCefBrowser();
 

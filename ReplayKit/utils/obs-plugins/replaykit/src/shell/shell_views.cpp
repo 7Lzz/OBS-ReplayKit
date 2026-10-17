@@ -648,7 +648,7 @@ void ShellEnsureHost()
 			[cefReady, helperUp]() {
 				g_hostCreating = false;
 				QMainWindow *mw = ObsMainWindowQt();
-				if (!cefReady || !helperUp || !g_cef || !mw || !g_shellOn || g_shellHost) {
+				if (!cefReady || !helperUp || !CefOpen() || !mw || !g_shellOn || g_shellHost) {
 					blog(LOG_WARNING, "[replaykit] shell browser not created (cef ready: %d, helper up: %d)", cefReady, helperUp);
 					return;
 				}

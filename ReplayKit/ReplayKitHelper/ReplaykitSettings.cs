@@ -49,6 +49,8 @@ namespace ReplayKitHelper
                 ["showCursorDisplayCapture"] = true,
                 ["showCursorGameCapture"] = true,
                 ["showCursorWindowCapture"] = true,
+                // the display Display Capture shows: "primary" follows whichever display windows calls primary, anything else is the obs monitor_id of one display
+                ["captureDisplay"] = "primary",
                 ["clipDir"] = "",
                 // the most the clips may take, in GB (1024-based, the way the storage card shows sizes); 0 = no limit. going over it only warns and offers to delete the oldest clips after a review, nothing is removed on its own
                 ["storageLimitGb"] = 0,
@@ -284,6 +286,64 @@ namespace ReplayKitHelper
         private static JObject NormalizeOpenClipsKeybind(JToken value) =>
             NormalizeHotkeyCombo(value, new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" }, "open clips keybind");
 
+        // a display that is unplugged right now still counts, so a choice survives the monitor being off; only the shape of an obs monitor_id is checked, the way obs itself writes it
+        private static string NormalizeCaptureDisplay(JToken value)
+        {
+            string v = value?.Type == JTokenType.String ? value.Value<string>().Trim() : "";
+            if (v.Length == 0 || v.Length > 260 || string.Equals(v, "primary", StringComparison.OrdinalIgnoreCase)) return "primary";
+            return Regex.IsMatch(v, @"^(\\\\\?\\DISPLAY#[A-Za-z0-9&#_{}.\-]+|\\\\\.\\DISPLAY\d{1,2})$", RegexOptions.IgnoreCase) ? v : "primary";
+        }
+
+        // the choices of the Display row: the primary first, then every active display with its size, and a chosen display that is not connected right now so the row still says what was picked
+        private static JArray CaptureDisplayOptions(string current)
+        {
+            var displays = Displays.Active();
+            var primary = displays.Find(d => d.Primary);
+            var options = new JArray(new JObject
+            {
+                ["value"] = "primary",
+                ["label"] = "Primary display",
+                ["blurb"] = primary != null ? "Now " + primary.Name : "Follows the display Windows calls primary.",
+            });
+            bool currentListed = current == "primary";
+            foreach (var d in displays)
+            {
+                options.Add(new JObject { ["value"] = d.Id, ["label"] = d.Name + (d.Width > 0 ? " (" + d.Width + "x" + d.Height + ")" : ""), ["blurb"] = d.Primary ? "Primary" : "" });
+                if (string.Equals(d.Id, current, StringComparison.OrdinalIgnoreCase)) currentListed = true;
+            }
+            if (!currentListed) options.Add(new JObject { ["value"] = current, ["label"] = "Display not connected", ["blurb"] = "Shown again when it is plugged back in." });
+            return options;
+        }
+
+        // obs keeps the choice on the Display Capture source as replaykit_wanted_monitor_id, beside monitor_id which is what it shows right now; a display picked in the properties of the source becomes the wanted one through the capture script, so the setting follows the source
+        private const string WantedMonitorKey = "replaykit_wanted_monitor_id";
+
+        private static JObject SyncCaptureDisplayFromObs(JObject settings)
+        {
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Display Capture" }, 3000);
+            if (!input.Ok) return settings;
+            string wanted = NormalizeCaptureDisplay(input.Data?["inputSettings"]?[WantedMonitorKey]);
+            if (string.Equals(wanted, settings["captureDisplay"]?.Value<string>(), StringComparison.Ordinal)) return settings;
+            settings["captureDisplay"] = wanted;
+            WriteSettings(settings);
+            return settings;
+        }
+
+        // the capture script switches only once a change has held for a couple of checks, so this sets both keys itself and the new display shows at once
+        private static JObject ApplyCaptureDisplayLive(JObject settings)
+        {
+            string wanted = settings["captureDisplay"]?.Value<string>() ?? "primary";
+            var displays = Displays.Active();
+            var chosen = wanted == "primary" ? displays.Find(d => d.Primary) : displays.Find(d => string.Equals(d.Id, wanted, StringComparison.OrdinalIgnoreCase));
+            var inputSettings = new JObject { [WantedMonitorKey] = wanted };
+            // a chosen display that is not connected keeps whatever shows now, and the script moves to it once it is back
+            if (chosen != null) inputSettings["monitor_id"] = chosen.Id;
+            var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Display Capture", ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+            if (set.Ok) return new JObject { ["applied"] = new JArray("Display Capture display"), ["warnings"] = new JArray() };
+            if (set.Code == 600) return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray() };
+            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray("The display was saved, but Display Capture could not be updated: " + set.Message) };
+        }
+
         private static JObject NormalizeExtraKeybind(JToken value, string settingName) =>
             NormalizeHotkeyCombo(value, new JObject(), settingName);
 
@@ -413,6 +473,7 @@ namespace ReplayKitHelper
                 ["showCursorDisplayCapture"] = GetBoolSetting(data, "showCursorDisplayCapture", defaults["showCursorDisplayCapture"].Value<bool>()),
                 ["showCursorGameCapture"] = GetBoolSetting(data, "showCursorGameCapture", defaults["showCursorGameCapture"].Value<bool>()),
                 ["showCursorWindowCapture"] = GetBoolSetting(data, "showCursorWindowCapture", defaults["showCursorWindowCapture"].Value<bool>()),
+                ["captureDisplay"] = NormalizeCaptureDisplay(data["captureDisplay"]),
                 ["clipDir"] = clipDir,
                 ["storageLimitGb"] = GetIntSetting(data, "storageLimitGb", defaults["storageLimitGb"].Value<int>(), 0, 1000000),
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
@@ -5760,6 +5821,7 @@ namespace ReplayKitHelper
                 settings = SyncReplayBufferSecondsFromObs(settings);
                 settings = SyncMicFromObs(settings);
                 settings = SyncAudioVolumesFromObs(settings);
+                settings = SyncCaptureDisplayFromObs(settings);
                 if (string.IsNullOrWhiteSpace(settings["clipDir"]?.Value<string>()) && !string.IsNullOrWhiteSpace(Server.State.Config?["clipDir"]?.Value<string>()))
                 {
                     settings["clipDir"] = ResolveClipDirSetting(Server.State.Config["clipDir"]?.Value<string>());
@@ -5824,6 +5886,7 @@ namespace ReplayKitHelper
                             new JObject { ["value"] = "game_window", ["label"] = "Specific game", ["blurb"] = "Use Window Capture for the selected game window." }
                         ),
                         ["screenshareGameWindows"] = new JArray(GetGameWindowCandidates(settings["screenshareGameWindow"]?.Value<string>() ?? "")),
+                        ["captureDisplays"] = CaptureDisplayOptions(settings["captureDisplay"]?.Value<string>() ?? "primary"),
                         ["discordOutputModes"] = new JArray(
                             new JObject { ["value"] = "projector", ["label"] = "Projector", ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
                         ),
@@ -6260,6 +6323,7 @@ namespace ReplayKitHelper
 
         // the mouse cursor settings, which only touch the capture sources of the running obs
         private static readonly string[] CursorKeys = { "showCursorDisplayCapture", "showCursorGameCapture", "showCursorWindowCapture" };
+        private static readonly string[] CaptureDisplayKeys = { "captureDisplay" };
 
         // true when something changed and every change is one of the given keys
         private static bool TestOnlyKeysChanged(JObject previous, JObject settings, string[] keys)
@@ -6391,6 +6455,17 @@ namespace ReplayKitHelper
                     {
                         ["ok"] = true, ["settings"] = settings,
                         ["applied"] = hotkeyRelease["applied"], ["warnings"] = hotkeyRelease["warnings"],
+                        ["restartRequired"] = false, ["restartReason"] = "",
+                    };
+                }
+                if (TestOnlyKeysChanged(previous, settings, CaptureDisplayKeys))
+                {
+                    var live = ApplyCaptureDisplayLive(settings);
+                    return new JObject
+                    {
+                        ["ok"] = true, ["settings"] = settings,
+                        ["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, live["applied"] as JArray),
+                        ["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, live["warnings"] as JArray),
                         ["restartRequired"] = false, ["restartReason"] = "",
                     };
                 }
@@ -6535,6 +6610,13 @@ namespace ReplayKitHelper
                 bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
                 bool applyReplayBufferOutput = TestReplayBufferOutputChanged(previous, settings);
                 bool applyRuntimeOutputs = restartObs || applyVideoSettings || applyReplayBufferOutput;
+                // set on the source before anything restarts obs, which then saves it with the scene
+                if (previous["captureDisplay"]?.Value<string>() != settings["captureDisplay"]?.Value<string>())
+                {
+                    var display = ApplyCaptureDisplayLive(settings);
+                    hotkeyRelease["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, display["applied"] as JArray);
+                    hotkeyRelease["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, display["warnings"] as JArray);
+                }
                 var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), RecordingAudioKeysChanged(previous, settings));
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||

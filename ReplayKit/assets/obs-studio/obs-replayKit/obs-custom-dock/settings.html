@@ -1039,6 +1039,10 @@
           </div>
         </div>
         <div class="form-row">
+          <div class="label">Display</div>
+          <div class="field-wrap"><div class="combo" id="captureDisplay" tabindex="0" role="combobox" aria-expanded="false" aria-label="Display to capture"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
           <div class="label">Recording Path</div>
           <div class="field-wrap">
             <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Videos">
@@ -2084,6 +2088,7 @@
     compressionMode: document.getElementById("compressionMode"),
     codecPreference: document.getElementById("codecPreference"),
     recordingScaleMode: document.getElementById("recordingScaleMode"),
+    captureDisplay: document.getElementById("captureDisplay"),
     downscaleTarget: document.getElementById("downscaleTarget"),
     downscaleTargetRow: document.getElementById("downscaleTargetRow"),
     downscaleHeight: document.getElementById("downscaleHeight"),
@@ -3103,6 +3108,7 @@
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
     setComboValue(els.codecPreference, state.codecPreference || "auto", false);
     setComboValue(els.recordingScaleMode, state.recordingScaleMode || "native", false);
+    setComboValue(els.captureDisplay, state.captureDisplay || "primary", false);
     setComboValue(els.downscaleFilter, state.downscaleFilter || "lanczos", false);
     {
       // match the stored height to a standard step (tolerating small OBS-rounding / monitor-mismatch drift, ~1%);
@@ -3210,6 +3216,7 @@
     state.compressionMode = comboValue(els.compressionMode);
     state.codecPreference = comboValue(els.codecPreference);
     state.recordingScaleMode = comboValue(els.recordingScaleMode) || "native";
+    state.captureDisplay = comboValue(els.captureDisplay) || "primary";
     state.downscaleFilter = comboValue(els.downscaleFilter) || "lanczos";
     {
       const target = comboValue(els.downscaleTarget);
@@ -3372,7 +3379,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -3761,6 +3768,7 @@
       fillCombo(els.compressionMode, data.options.compressionModes || []);
       fillCombo(els.codecPreference, data.options.codecs || []);
       fillCombo(els.recordingScaleMode, data.options.recordingScaleModes || []);
+      fillCombo(els.captureDisplay, data.options.captureDisplays || [{ value:"primary", label:"Primary display" }]);
       fillCombo(els.downscaleTarget, [
         { value: "custom", label: "Custom…" },
         ...((data.options.downscaleResolutions || []).map((r) => ({ value: String(r.height), label: r.label }))),
@@ -3909,6 +3917,8 @@
       const next = data.settings || {};
       fillCombo(els.screenshareGameWindow, data.options.screenshareGameWindows || []);
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
+      // a display plugged in or out while the page is open shows up in the list
+      fillCombo(els.captureDisplay, data.options.captureDisplays || [{ value:"primary", label:"Primary display" }]);
       if (JSON.stringify(next) !== JSON.stringify(state)) {
         acceptSettings(next);
       }

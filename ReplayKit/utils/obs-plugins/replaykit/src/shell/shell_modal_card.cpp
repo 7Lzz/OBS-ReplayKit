@@ -197,7 +197,7 @@ bool ModalCard::EnsureBuilt()
 	if (m_card)
 		return true;
 	QWidget *host = ObsHost();
-	if (!g_cef || !g_cef->initialized() || !host)
+	if (!CefOpen() || !g_cef->initialized() || !host)
 		return false;
 
 	m_curtain = new Curtain(host, this);

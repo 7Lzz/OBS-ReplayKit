@@ -81,7 +81,7 @@ bool AnchoredPanel::EnsureBuilt()
 	if (m_window)
 		return true;
 	// a widget created before cef has finished starting is the one that comes up white the first time
-	if (!g_cef || !g_cef->initialized() || !m_owner)
+	if (!CefOpen() || !g_cef->initialized() || !m_owner)
 		return false;
 	QWidget *panel = new QWidget(m_owner);
 	panel->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
