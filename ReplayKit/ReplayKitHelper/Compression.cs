@@ -537,7 +537,7 @@ namespace ReplayKitHelper
                 reservation.Start(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, authJarPath, authRequired), t =>
                 {
                     try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    Upload.HandleUploadCompletion(t, requestId, selectedName);
+                    Upload.HandleUploadCompletion(t, requestId, selectedName, sourcePath: selectedFull);
                 });
 
                 return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = "Compressing temp copy and uploading" };

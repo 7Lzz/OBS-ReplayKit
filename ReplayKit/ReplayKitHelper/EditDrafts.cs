@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // the unsaved edits of the clip editor, one per clip, kept in edit_drafts.json beside the clip database so an obs that was closed, or another view that was opened, does not take them away. the page sends the whole edit as json and gets the same json back; the helper only checks that the clip is there and that the edit is a sane size, and never reads into it
+    // Drafts are tied to a source file and keep their imported assets in the cache.
     internal static class EditDrafts
     {
         public const int MaxEditBytes = 512 * 1024;
@@ -17,35 +18,71 @@ namespace ReplayKitHelper
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
-        // every draft in short form, newest first. the draft of a clip that is no longer in the folder is dropped on the way, since there is nothing left to open it on
+        private static string FullPath(string name) => Path.GetFullPath(Path.IsPathRooted(name) ? name : Path.Combine(AppConfig.GetClipDir(), name));
+        private static string Key(string path) => FullPath(path).ToUpperInvariant();
+
+        private static bool Matches(JObject entry, string path)
+        {
+            if (entry == null) return false;
+            try
+            {
+                string source = entry["source"]?.Value<string>();
+                if (source != null && Key(source) != Key(path)) return false;
+                var file = new FileInfo(path);
+                return file.Exists && (file.Attributes & FileAttributes.ReparsePoint) == 0 && entry["size"]?.Value<long>() == file.Length &&
+                    (entry["mtimeTicks"] != null ? entry["mtimeTicks"].Value<long>() == file.LastWriteTimeUtc.Ticks :
+                        entry["mtime"]?.Value<long>() == new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds());
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is FormatException || ex is InvalidCastException) { return false; }
+        }
+
+        private static JObject Entry(JObject db, Clips.SafeClipPath clip, out bool migrated)
+        {
+            migrated = false;
+            string key = Key(clip.Full);
+            if (db[key] is JObject scoped) return Matches(scoped, clip.Full) ? scoped : null;
+            if (!(db[clip.Name] is JObject legacy) || !Matches(legacy, clip.Full)) return null;
+            var entry = (JObject)legacy.DeepClone();
+            entry["source"] = clip.Full;
+            entry["mtimeTicks"] = File.GetLastWriteTimeUtc(clip.Full).Ticks;
+            db[key] = entry;
+            db.Remove(clip.Name);
+            migrated = true;
+            return entry;
+        }
+
+        // Show only drafts of the current folder. Switching folders never deletes another folder's edits.
         public static JObject List()
         {
             var rows = new List<JObject>();
-            var gone = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string folder = Path.GetFullPath(AppConfig.GetClipDir());
             try
             {
-                ClipStore.Read(StorePath(), db =>
+                ClipStore.Update(StorePath(), db =>
                 {
-                    foreach (var prop in db.Properties())
+                    bool changed = false;
+                    foreach (var prop in db.Properties().ToList())
                     {
-                        if (!(prop.Value is JObject entry)) continue;
-                        var clip = Clips.GetSafeClipPath(prop.Name);
-                        if (clip == null || !File.Exists(clip.Full))
-                        {
-                            gone.Add(prop.Name);
-                            continue;
-                        }
+                        if (!(prop.Value is JObject saved)) continue;
+                        if (saved["source"] != null && saved["source"].Type != JTokenType.String) continue;
+                        string source = saved["source"]?.Value<string>();
+                        string name = source == null ? prop.Name : Path.GetFileName(source);
+                        var clip = Clips.GetSafeClipPath(name);
+                        if (clip == null || !string.Equals(Path.GetDirectoryName(clip.Full), folder, StringComparison.OrdinalIgnoreCase) ||
+                            (source != null && Key(source) != Key(clip.Full)) || !seen.Add(clip.Name)) continue;
+                        var entry = Entry(db, clip, out bool migrated);
+                        changed |= migrated;
+                        if (entry == null) continue;
                         rows.Add(new JObject
                         {
-                            ["name"] = prop.Name,
+                            ["name"] = clip.Name,
                             ["savedAt"] = entry["savedAt"]?.Value<long>() ?? 0,
                             ["duration"] = entry["duration"]?.Value<double>() ?? 0,
                         });
                     }
-                    return true;
+                    return changed;
                 });
-                if (gone.Count > 0)
-                    ClipStore.Update(StorePath(), db => gone.Aggregate(false, (changed, name) => db.Remove(name) || changed));
             }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
@@ -59,7 +96,7 @@ namespace ReplayKitHelper
             var clip = Clips.GetSafeClipPath(name);
             if (clip == null) return Fail("Bad filename");
             JObject entry = null;
-            try { entry = ClipStore.Read(StorePath(), db => db[clip.Name] as JObject); }
+            try { ClipStore.Update(StorePath(), db => { entry = Entry(db, clip, out bool migrated); return migrated; }); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Get: " + ex.Message);
@@ -81,19 +118,23 @@ namespace ReplayKitHelper
             var clip = Clips.GetSafeClipPath(name);
             if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
             if (edit == null) return Fail("Bad edit");
-            if (edit.ToString(Formatting.None).Length > MaxEditBytes) return Fail("The edit is too large to keep");
+            if (Encoding.UTF8.GetByteCount(edit.ToString(Formatting.None)) > MaxEditBytes) return Fail("The edit is too large to keep");
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             double duration = edit["duration"]?.Type == JTokenType.Float || edit["duration"]?.Type == JTokenType.Integer ? edit["duration"].Value<double>() : 0;
+            if (double.IsNaN(duration) || double.IsInfinity(duration) || duration < 0) return Fail("Invalid draft duration");
             var info = new FileInfo(clip.Full);
             try
             {
                 ClipStore.Update(StorePath(), db =>
                 {
-                    db[clip.Name] = new JObject
+                    if (Matches(db[clip.Name] as JObject, clip.Full)) db.Remove(clip.Name);
+                    db[Key(clip.Full)] = new JObject
                     {
+                        ["source"] = clip.Full,
                         ["savedAt"] = now,
                         ["size"] = info.Length,
                         ["mtime"] = new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeSeconds(),
+                        ["mtimeTicks"] = info.LastWriteTimeUtc.Ticks,
                         ["duration"] = duration,
                         ["edit"] = edit,
                     };
@@ -121,7 +162,7 @@ namespace ReplayKitHelper
         {
             var clip = Clips.GetSafeClipPath(name);
             if (clip == null) return Fail("Bad filename");
-            try { ClipStore.Update(StorePath(), db => db.Remove(clip.Name)); }
+            try { ClipStore.Update(StorePath(), db => Remove(db, clip.Full)); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Delete: " + ex.Message);
@@ -137,9 +178,18 @@ namespace ReplayKitHelper
             {
                 ClipStore.Update(StorePath(), db =>
                 {
-                    if (!db.ContainsKey(from)) return false;
-                    db[to] = db[from];
-                    db.Remove(from);
+                    string source = FullPath(from), target = FullPath(to), key = Key(source);
+                    var entry = db[key] as JObject;
+                    if (entry == null && Matches(db[Path.GetFileName(source)] as JObject, target))
+                    {
+                        key = Path.GetFileName(source);
+                        entry = db[key] as JObject;
+                    }
+                    if (entry == null) return false;
+                    var moved = (JObject)entry.DeepClone();
+                    moved["source"] = target;
+                    if (key != Key(target)) db.Remove(key);
+                    db[Key(target)] = moved;
                     return true;
                 });
             }
@@ -148,8 +198,53 @@ namespace ReplayKitHelper
 
         public static void Forget(string name)
         {
-            try { ClipStore.Update(StorePath(), db => db.Remove(name)); }
+            try { ClipStore.Update(StorePath(), db => Remove(db, FullPath(name))); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException) { Log.Write("EditDrafts.Forget: " + ex.Message); }
+        }
+
+        private static bool Remove(JObject db, string path)
+        {
+            bool changed = db.Remove(Key(path));
+            string name = Path.GetFileName(path);
+            if (Matches(db[name] as JObject, path)) changed |= db.Remove(name);
+            return changed;
+        }
+
+        public static HashSet<string> ReferencedAssets()
+        {
+            try
+            {
+                return ClipStore.Read(StorePath(), db =>
+                {
+                    var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var prop in db.Properties())
+                    {
+                        if (!(prop.Value is JObject entry) || !(entry["edit"] is JObject edit)) continue;
+                        if (entry["source"] != null && entry["source"].Type != JTokenType.String) continue;
+                        string source = entry["source"]?.Value<string>();
+                        if (source == null)
+                        {
+                            var clip = Clips.GetSafeClipPath(prop.Name);
+                            if (clip == null) continue;
+                            source = clip.Full;
+                        }
+                        if (!Matches(entry, source)) continue;
+                        foreach (var field in edit.Descendants().OfType<JProperty>())
+                        {
+                            if ((field.Name != "id" && field.Name != "ref") || field.Value.Type != JTokenType.String) continue;
+                            string id = field.Value.Value<string>();
+                            if (AudioImports.IsId(id)) paths.Add(Path.Combine(ClipCache.KindDir("imports"), id));
+                            if (MediaImports.IsId(id)) paths.Add(Path.Combine(ClipCache.KindDir("media"), id));
+                        }
+                    }
+                    return paths;
+                });
+            }
+            catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
+            {
+                Log.Write("EditDrafts.ReferencedAssets: " + ex.Message);
+                return null;
+            }
         }
     }
 }

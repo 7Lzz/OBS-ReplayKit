@@ -532,8 +532,7 @@ namespace ReplayKitHelper
         {
             foreach (string path in new[] { InstallResultPath(), InstallPidPath() })
             {
-                try { File.Delete(path); }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                File.Delete(path);
             }
         }
 
@@ -891,12 +890,14 @@ namespace ReplayKitHelper
                 if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException("Latest release is missing " + ChecksumsAsset + ".");
 
                 string tempDir = CreateUpdateTemp();
-                string installerPath = DownloadVerifiedInstaller(latest, tempDir, " OBS was left running; try again once a fixed release is out.");
-
-                ClearInstallResult();
-                SetProgressStage("install");
                 JObject started;
-                try { started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl); }
+                try
+                {
+                    string installerPath = DownloadVerifiedInstaller(latest, tempDir, " OBS was left running; try again once a fixed release is out.");
+                    ClearInstallResult();
+                    SetProgressStage("install");
+                    started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
+                }
                 catch
                 {
                     // the installer never started (a declined uac prompt, a failed spawn), so its download goes

@@ -2154,7 +2154,7 @@ namespace ReplayKitHelper
             if (path.StartsWith("/file/"))
             {
                 // only route allowed to keep the connection open past this request -- see HttpResponse.ServePreview.
-                return HttpResponse.ServePreview(stream, req, path.Substring(6));
+                return HttpResponse.ServePreview(stream, req, Uri.UnescapeDataString(path.Substring(6)));
             }
 
             if (path == "/clip-audio")
@@ -2282,7 +2282,7 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path.StartsWith("/thumb/")) { HttpResponse.ServeThumbnail(stream, path.Substring(7)); return false; }
+            if (path.StartsWith("/thumb/")) { HttpResponse.ServeThumbnail(stream, Uri.UnescapeDataString(path.Substring(7))); return false; }
 
             if (path == "/open-clip-folder")
             {
@@ -2527,8 +2527,8 @@ namespace ReplayKitHelper
                     {
                         if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
                         return true;
-                    });
-                    EditDrafts.Rename(selected.Name, newName);
+                    }, Path.GetDirectoryName(selected.Full));
+                    EditDrafts.Rename(selected.Full, newPath);
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }

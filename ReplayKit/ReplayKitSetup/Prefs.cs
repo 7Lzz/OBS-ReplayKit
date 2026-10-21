@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using ReplayKitShared;
 
 namespace ReplayKitSetup
@@ -17,6 +18,8 @@ namespace ReplayKitSetup
         [JsonProperty("overlay_opacity")] public int OverlayOpacity { get; set; } = Prefs.DEFAULT_OVERLAY_OPACITY;
         [JsonProperty("overlay_scale")] public int OverlayScale { get; set; } = Prefs.DEFAULT_OVERLAY_SCALE;
         [JsonProperty("overlay_rotation")] public int OverlayRotation { get; set; } = 0;
+        [JsonProperty("overlay_flip_h")] public bool OverlayFlipH { get; set; }
+        [JsonProperty("overlay_position")] public JObject OverlayPosition { get; set; } = new JObject();
         [JsonProperty("overlay_hue_shift")] public double OverlayHueShift { get; set; } = Prefs.DEFAULT_OVERLAY_HUE_SHIFT;
         [JsonProperty("overlay_color_multiply")] public string OverlayColorMultiply { get; set; } = Prefs.DEFAULT_OVERLAY_COLOR_MULTIPLY;
         [JsonProperty("overlay_color_add")] public string OverlayColorAdd { get; set; } = Prefs.DEFAULT_OVERLAY_COLOR_ADD;
@@ -210,7 +213,7 @@ namespace ReplayKitSetup
 
         private static double CoerceFloatRange(object value, double @default, double minimum, double maximum)
         {
-            if (!TryToDouble(value, out double number)) return @default;
+            if (!TryToDouble(value, out double number) || double.IsNaN(number) || double.IsInfinity(number)) return @default;
             return Math.Max(minimum, Math.Min(maximum, number));
         }
 
@@ -226,7 +229,7 @@ namespace ReplayKitSetup
         {
             result = 0;
             if (value == null) return false;
-            try { result = Convert.ToDouble(value); return true; }
+            try { result = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture); return true; }
             catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException) { return false; }
         }
 
@@ -238,6 +241,23 @@ namespace ReplayKitSetup
                 return text;
             }
             return @default;
+        }
+
+        private static JObject CoerceOverlayPosition(object value)
+        {
+            var result = new JObject();
+            var map = AsNativeDict(value);
+            if (map == null) return result;
+            foreach (string style in new[] { "input_overlay", "bongo_cat" })
+            {
+                if (!map.TryGetValue(style, out var position)) continue;
+                var point = AsNativeDict(position);
+                if (point == null || !point.TryGetValue("x", out var rawX) || !point.TryGetValue("y", out var rawY) ||
+                    !TryToDouble(rawX, out double x) || !TryToDouble(rawY, out double y) ||
+                    !double.IsFinite(x) || !double.IsFinite(y) || x < -1 || x > 2 || y < -1 || y > 2) continue;
+                result[style] = new JObject { ["x"] = x, ["y"] = y };
+            }
+            return result;
         }
 
         private static string CleanOverrideText(object value, int maxLength)
@@ -296,6 +316,8 @@ namespace ReplayKitSetup
             ["overlayOpacity"] = "overlay_opacity",
             ["overlayScale"] = "overlay_scale",
             ["overlayRotation"] = "overlay_rotation",
+            ["overlayFlipH"] = "overlay_flip_h",
+            ["overlayPosition"] = "overlay_position",
             ["overlayHueShift"] = "overlay_hue_shift",
             ["overlayColorMultiply"] = "overlay_color_multiply",
             ["overlayColorAdd"] = "overlay_color_add",
@@ -457,6 +479,8 @@ namespace ReplayKitSetup
                 OverlayOpacity = CoerceIntRange(Get("overlay_opacity"), DEFAULT_OVERLAY_OPACITY, OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 OverlayScale = CoerceIntRange(Get("overlay_scale"), DEFAULT_OVERLAY_SCALE, OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX),
                 OverlayRotation = CoerceIntRange(Get("overlay_rotation"), 0, -180, 180),
+                OverlayFlipH = CoerceBool(Get("overlay_flip_h"), false),
+                OverlayPosition = CoerceOverlayPosition(Get("overlay_position")),
                 OverlayHueShift = CoerceFloatRange(Get("overlay_hue_shift"), DEFAULT_OVERLAY_HUE_SHIFT, OVERLAY_HUE_SHIFT_MIN, OVERLAY_HUE_SHIFT_MAX),
                 OverlayColorMultiply = CoerceHexColor(Get("overlay_color_multiply"), DEFAULT_OVERLAY_COLOR_MULTIPLY),
                 OverlayColorAdd = CoerceHexColor(Get("overlay_color_add"), DEFAULT_OVERLAY_COLOR_ADD),

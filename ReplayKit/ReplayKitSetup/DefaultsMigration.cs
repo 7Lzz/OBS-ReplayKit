@@ -26,11 +26,12 @@ namespace ReplayKitSetup
         private static string BasicIniPath => Path.Combine(Config.OBS_CONFIG, "basic", "profiles", "Untitled", "basic.ini");
         private static string UserIniPath => Path.Combine(Config.OBS_CONFIG, "user.ini");
 
-        public static void Run(Action<string> log = null)
+        public static bool Run(Action<string> log = null)
         {
             HashSet<string> done = ReadDone(log);
             // fail closed: a marker that cannot be read could mean the defaults already ran, and running them again would put them over a choice the user made
-            if (done == null) return;
+            if (done == null) return false;
+            bool complete = true;
 
             var steps = new (string Id, string What, Func<bool> Apply)[]
             {
@@ -47,6 +48,7 @@ namespace ReplayKitSetup
                     if (!step.Apply())
                     {
                         log?.Invoke("warn: default not applied (" + step.What + "), it is tried again on the next update");
+                        complete = false;
                         continue;
                     }
                     done.Add(step.Id);
@@ -56,9 +58,11 @@ namespace ReplayKitSetup
                 // best effort on purpose: whatever goes wrong inside a step (a locked file, a scene that does not parse, a missing bundle) must never fail the install or the update around it
                 catch (Exception ex)
                 {
+                    complete = false;
                     log?.Invoke("warn: default not applied (" + step.What + "): " + ex.Message);
                 }
             }
+            return complete;
         }
 
         private static HashSet<string> ReadDone(Action<string> log)
@@ -68,10 +72,12 @@ namespace ReplayKitSetup
             try
             {
                 var marker = JObject.Parse(File.ReadAllText(MarkerPath));
-                foreach (var id in marker["steps"] as JArray ?? new JArray())
+                if (!(marker["steps"] is JArray steps)) throw new JsonException("The defaults marker has no valid steps list.");
+                foreach (var id in steps)
                 {
                     string value = id.Type == JTokenType.String ? id.Value<string>() : null;
-                    if (!string.IsNullOrEmpty(value)) done.Add(value);
+                    if (string.IsNullOrEmpty(value)) throw new JsonException("The defaults marker contains an invalid step.");
+                    done.Add(value);
                 }
                 return done;
             }

@@ -19,7 +19,7 @@ namespace ReplayKitSetup
     // headless installer flow: make sure OBS is present, write the ReplayKit setup, launch OBS. the only interactive choice, discord screenshare, comes from the setup window.
     public static class Apply
     {
-        // shared step-runner for the apply flow and Cleanup.RunCleanup. renders "working" before the action and "done" after; a thrown action rethrows (so the caller stops the flow) after logging, a false result just adds an issue.
+        // Exceptions stop the flow; false results are reported as incomplete steps.
         public static void RunApplyStep(IInstallProgress progress, int index, string title, string detail, Func<object> action)
         {
             progress.Render(index - 1, title, detail, "working");
@@ -37,6 +37,8 @@ namespace ReplayKitSetup
             if (result is bool b && !b)
             {
                 progress.AddIssue($"{title} did not complete. Re-run the installer after fixing the issue.");
+                progress.Render(index, title, detail, "failed");
+                return;
             }
             progress.Render(index, title, detail, "done");
             System.Threading.Thread.Sleep(120);
@@ -104,7 +106,7 @@ namespace ReplayKitSetup
                 if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
                 return (object)ok;
             });
-            Add("Apply default settings", "Turns on the defaults this version ships with.", () => { DefaultsMigration.Run(progress.LogLine); return (object)true; });
+            Add("Apply default settings", "Turns on the defaults this version ships with.", () => (object)DefaultsMigration.Run(progress.LogLine));
             Add("Enable OBS WebSocket", "Enables the local OBS WebSocket.", () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
             Add("Install Custom Controls and Clips", "Adds the dock and Clips files.", () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
             Add("Install ReplayKit plugin", "Adds the ReplayKit window, notifications and tray menu.", () => (object)NativePlugin.InstallReplaykitPlugin(progress.LogLine));
@@ -145,7 +147,9 @@ namespace ReplayKitSetup
             {
                 RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action);
             }
-            progress.Render(progress.TotalSteps, "Setup complete", "OBS ReplayKit is ready.", "done");
+            bool complete = progress.Issues.Count == 0;
+            Update.RecordSetupResult(complete);
+            progress.Render(progress.TotalSteps, complete ? "Setup complete" : "Setup incomplete", complete ? "OBS ReplayKit is ready." : "Some steps need attention. See the setup log and run the installer again.", complete ? "done" : "failed");
             return progress.Issues;
         }
 

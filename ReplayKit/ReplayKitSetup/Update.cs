@@ -36,6 +36,9 @@ namespace ReplayKitSetup
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
         private static string ResultFile() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_result.json");
 
+        internal static void RecordSetupResult(bool complete) => WriteResult(complete, complete ? "done" : "incomplete",
+            complete ? "ReplayKit setup completed." : "ReplayKit setup is incomplete. Run the installer again to finish the repair.");
+
         private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage)
         {
             try
@@ -152,7 +155,7 @@ namespace ReplayKitSetup
             }
 
             bool obsClosed = false;
-            bool installed = false;
+            bool relaunchAttempted = false;
             bool relaunched = false;
             Mutex updateGate = null;
             bool updateGateHeld = false;
@@ -194,11 +197,11 @@ namespace ReplayKitSetup
                 var problems = new List<string>();
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
-                installed = true;
 
                 if (relaunch)
                 {
                     Installer.PrepareObsTheme(LogBoth);
+                    relaunchAttempted = true;
                     relaunched = LaunchObsPath(relaunchObs, LogBoth);
                     if (!relaunched)
                     {
@@ -223,7 +226,11 @@ namespace ReplayKitSetup
             finally
             {
                 // obs has to come back even when the install died partway thru the copy, otherwise a failed update costs the user their whole obs session. skipped once the install got far enough to report its own relaunch outcome.
-                if (obsClosed && relaunch && !installed) LaunchObsPath(relaunchObs, LogBoth);
+                if (obsClosed && relaunch && !relaunchAttempted)
+                {
+                    try { LaunchObsPath(relaunchObs, LogBoth); }
+                    catch (Exception ex) { Log("OBS recovery launch failed: " + ex.Message); }
+                }
                 if (updateGateHeld) updateGate.ReleaseMutex();
                 updateGate?.Dispose();
                 ScheduleCleanup(cleanupDir);

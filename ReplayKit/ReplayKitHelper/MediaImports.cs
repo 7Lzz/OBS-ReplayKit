@@ -15,6 +15,7 @@ namespace ReplayKitHelper
         private static readonly string Root = ClipCache.KindDir("media");
         private static readonly Regex IdPattern = new Regex("^[0-9a-f]{16}$", RegexOptions.Compiled);
         private static readonly string[] Extensions = { ".png", ".gif", ".jpg" };
+        private static readonly object StoreGate = new object();
 
         public static bool IsId(string id) => id != null && IdPattern.IsMatch(id);
 
@@ -112,13 +113,16 @@ namespace ReplayKitHelper
             string id;
             using (var sha = SHA1.Create()) id = string.Concat(sha.ComputeHash(bytes).Take(8).Select(b => b.ToString("x2")));
             string dir = Path.Combine(Root, id);
-            if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker)))
+            lock (StoreGate)
             {
-                ClipCache.Prune(dir);
-                if (Directory.Exists(dir)) Directory.Delete(dir, true);
-                Directory.CreateDirectory(dir);
-                File.WriteAllBytes(Path.Combine(dir, "media" + ext), bytes);
-                File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "ok");
+                if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker)))
+                {
+                    ClipCache.Prune(dir);
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                    Directory.CreateDirectory(dir);
+                    File.WriteAllBytes(Path.Combine(dir, "media" + ext), bytes);
+                    File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "ok");
+                }
             }
             return new JObject { ["ok"] = true, ["id"] = id, ["name"] = name, ["gif"] = ext == ".gif" };
         }

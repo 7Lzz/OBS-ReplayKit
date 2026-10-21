@@ -224,7 +224,7 @@ namespace ReplayKitHelper
                 newMtimeTicks = 0;
                 try { newMtimeTicks = new FileInfo(sourcePath).LastWriteTimeUtc.Ticks; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
-            Clips.MarkCompressed(clipName, tagMode, newMtimeTicks, preBytes);
+            Clips.MarkCompressed(clipName, tagMode, newMtimeTicks, preBytes, sourcePath);
             Log.Write("marker written: name=" + clipName + " mode=" + tagMode + " mtime=" + newMtimeTicks, "compress", requestId);
 
             Log.Write("done", "compress", requestId);

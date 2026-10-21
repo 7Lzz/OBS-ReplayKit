@@ -80,13 +80,16 @@ namespace ReplayKitHelper
         {
             var list = new List<Entry>();
             DateTime now = DateTime.UtcNow;
+            var referenced = EditDrafts.ReferencedAssets();
             foreach (var kind in SafeDirs(Constants.CACHE_DIR))
             {
                 foreach (var dir in SafeDirs(kind))
                 {
                     DateTime last = Directory.GetLastWriteTimeUtc(dir);
                     bool done = File.Exists(Path.Combine(dir, DoneMarker));
-                    list.Add(new Entry { Path = dir, IsDir = true, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = !done && now - last < UnfinishedGrace });
+                    bool import = Path.GetFileName(kind) == "imports" || Path.GetFileName(kind) == "media";
+                    bool inDraft = import && (referenced == null || referenced.Contains(dir));
+                    list.Add(new Entry { Path = dir, IsDir = true, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = inDraft || !done && now - last < UnfinishedGrace });
                 }
                 foreach (var file in SafeFiles(kind))
                 {

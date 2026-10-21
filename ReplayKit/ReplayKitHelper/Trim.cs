@@ -783,7 +783,7 @@ namespace ReplayKitHelper
             }
 
             // the clip under this name is another file now, so an edit that was kept for the old one fits nothing any more
-            if (overwrite) EditDrafts.Forget(source.Name);
+            if (overwrite) EditDrafts.Forget(source.Full);
             AppConfig.ClearClipsCache();
             return new TrimResult
             {

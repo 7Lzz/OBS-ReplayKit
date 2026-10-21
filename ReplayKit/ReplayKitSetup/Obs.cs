@@ -87,6 +87,7 @@ namespace ReplayKitSetup
             // cef renderer children outlive obs64.exe otherwise and keep plugin_config/obs-browser locked, which stalls the backup step right after this.
             RunTaskkill("obs-browser-page.exe");
             if (killed > 0) Thread.Sleep(1500); // give the process tree time to actualy exit
+            if (AnyObsRunning()) throw new IOException("OBS could not be closed. Installation was stopped; close OBS and run the installer again.");
             return killed;
         }
 

@@ -496,25 +496,25 @@ namespace ReplayKitSetup
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
             if (files.Count == 0) throw new InvalidDataException("The bundled ReplayKit runtime is empty.");
 
-            Directory.CreateDirectory(stageRoot);
-            foreach (string src in files)
-            {
-                string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
-                string staged = Path.Combine(stageRoot, fileRel);
-                StageRuntimeFile(src, staged);
-                if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
-                {
-                    if (!File.Exists(staged)) throw new IOException("Staging failed: " + fileRel);
-                }
-                else VerifyFile(src, staged);
-            }
-            log?.Invoke($"staged and verified {files.Count} runtime file(s)");
-
             int count = 0;
             var changes = new List<RuntimeChange>();
             bool recoveryComplete = false;
             try
             {
+                Directory.CreateDirectory(stageRoot);
+                foreach (string src in files)
+                {
+                    string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
+                    string staged = Path.Combine(stageRoot, fileRel);
+                    StageRuntimeFile(src, staged);
+                    if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
+                    {
+                        if (!File.Exists(staged)) throw new IOException("Staging failed: " + fileRel);
+                    }
+                    else VerifyFile(src, staged);
+                }
+                log?.Invoke($"staged and verified {files.Count} runtime file(s)");
+
                 foreach (string src in files)
                 {
                     string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
@@ -587,16 +587,18 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 log?.Invoke($"warn: scene patch pass failed: {ex.Message}");
+                problems?.Add("scene source settings");
             }
 
             // the defaults this build ships, once per install -- see DefaultsMigration
             try
             {
-                DefaultsMigration.Run(log);
+                if (!DefaultsMigration.Run(log)) problems?.Add("default settings");
             }
             catch (Exception ex)
             {
                 log?.Invoke($"warn: default settings pass failed: {ex.Message}");
+                problems?.Add("default settings");
             }
 
             try
@@ -627,8 +629,18 @@ namespace ReplayKitSetup
                 problems.Add("FFmpeg and FFprobe");
             }
 
-            try { ShaderFilter.InstallReplaykitMotionBlurPlugin(log); }
-            catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh skipped: {ex.Message}"); }
+            try
+            {
+                if (!ShaderFilter.InstallReplaykitMotionBlurPlugin(log)) problems.Add("the motion blur plugin");
+            }
+            catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh failed: {ex.Message}"); problems.Add("the motion blur plugin"); }
+
+            try
+            {
+                if (!InputOverlay.InstallInputOverlayPlugin(log) || !InputOverlay.InstallInputOverlayPresets(log))
+                    problems.Add("the WASD/mouse overlay");
+            }
+            catch (Exception ex) { log?.Invoke($"warn: input overlay refresh failed: {ex.Message}"); problems.Add("the WASD/mouse overlay"); }
 
             // the native plugin was missing from this refresh entirely, so an updating install kept whatever replaykit.dll it already had and never picked up plugin-side changes -- and never dropped the pre-unification replaykit-tray.dll, which obs then loaded alongside the new one and injected every tray menu item twice. safe to copy here because the update flow has already closed obs.
             try { NativePlugin.InstallReplaykitPlugin(log); }

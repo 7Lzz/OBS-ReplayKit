@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -25,24 +23,6 @@ namespace ReplayKitSetup
 
         // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against Config.PROGRAMFILES_OBS_DIR before writing, so a malformed archive path can never escape the install root.
         private const string PluginZipRoot = "input-overlay/";
-
-        private static bool IsSafeRelative(string[] parts)
-        {
-            return parts.Length > 0 && parts.All(p => p != "" && p != "." && p != "..");
-        }
-
-        private static string TargetPath(string relPosix)
-        {
-            string targetRoot = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/');
-            var parts = relPosix.Split('/');
-            string target = Path.GetFullPath(Path.Combine(new[] { Config.PROGRAMFILES_OBS_DIR }.Concat(parts).ToArray()));
-            if (!string.Equals(target, targetRoot, StringComparison.OrdinalIgnoreCase) &&
-                !target.StartsWith(targetRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("unsafe archive path: " + relPosix);
-            }
-            return target;
-        }
 
         // vc++ 2015-2022 (x64) redistributable -- prerequisite for input-overlay.dll. downloaded from microsoft only when missing.
         private static readonly HashSet<string> VcppAllowedDownloadHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -237,7 +217,7 @@ $cert = $sig.SignerCertificate
         // description of the installed plugin, or null.
         private static string AlreadyInstalled()
         {
-            return File.Exists(PluginDll) && File.Exists(PluginSdl2) ? "installed at " + PluginDll : null;
+            return BundledFiles.IsCurrent(Config.INPUT_OVERLAY_PLUGIN_ZIP, Config.PROGRAMFILES_OBS_DIR, PluginZipRoot) ? "installed at " + PluginDll : null;
         }
 
         // install input-overlay and verify obs can load its dlls.
@@ -272,31 +252,7 @@ $cert = $sig.SignerCertificate
 
             try
             {
-                using (var zf = ZipFile.OpenRead(Config.INPUT_OVERLAY_PLUGIN_ZIP))
-                {
-                    foreach (var entry in zf.Entries)
-                    {
-                        string name = entry.FullName.Replace("\\", "/");
-                        if (!name.StartsWith(PluginZipRoot)) continue;
-                        string relText = name.Substring(PluginZipRoot.Length).Trim('/');
-                        if (relText.Length == 0) continue;
-                        var parts = relText.Split('/');
-                        if (!IsSafeRelative(parts)) throw new InvalidOperationException("unsafe archive path: " + entry.FullName);
-                        string dest = TargetPath(relText);
-                        bool isDir = name.EndsWith("/") && entry.Length == 0;
-                        if (isDir)
-                        {
-                            Directory.CreateDirectory(dest);
-                            continue;
-                        }
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                        using (var src = entry.Open())
-                        using (var dst = File.Open(dest, FileMode.Create, FileAccess.Write))
-                        {
-                            src.CopyTo(dst);
-                        }
-                    }
-                }
+                if (!BundledFiles.Install(Config.INPUT_OVERLAY_PLUGIN_ZIP, Config.PROGRAMFILES_OBS_DIR, log, PluginZipRoot)) return false;
             }
             catch (Exception exc)
             {
@@ -311,8 +267,9 @@ $cert = $sig.SignerCertificate
             }
             if (!File.Exists(PluginSdl2))
             {
-                // sdl2 might be elsewhere on path, so warn but dont fail the install.
-                log?.Invoke("warn: SDL2.dll missing at " + PluginSdl2 + " - plugin may not load");
+                // Both bundled DLLs are required; a partial install must be reported as failed.
+                log?.Invoke("warn: SDL2.dll missing at " + PluginSdl2 + " - plugin cannot be verified");
+                return false;
             }
 
             log?.Invoke("installed -> " + PluginDll);
@@ -321,95 +278,32 @@ $cert = $sig.SignerCertificate
             return true;
         }
 
-        // extract input-overlay-presets.zip directly under INPUT_OVERLAY_TARGET (no double-nested folder). zip has a top-level input-overlay-presets/ that lines up with the target name, so extracting into target.parent is what makes the files land at the right path.
+        private static byte[] PresetBytes(string relative, byte[] bytes)
+        {
+            if (relative != MouseLayoutRel) return bytes;
+            var data = JObject.Parse(System.Text.Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF'));
+            data["default_width"] = MouseLayoutWidth;
+            data["default_height"] = MouseLayoutHeight;
+            return new System.Text.UTF8Encoding(false).GetBytes(data.ToString(Newtonsoft.Json.Formatting.Indented));
+        }
+
         public static bool InstallInputOverlayPresets(Action<string> log = null)
         {
             if (!File.Exists(Config.INPUT_OVERLAY_ZIP))
             {
-                log?.Invoke($"(no {Path.GetFileName(Config.INPUT_OVERLAY_ZIP)} bundled, skipping)");
+                log?.Invoke("warn: the bundled input-overlay presets are missing.");
                 return false;
             }
-
-            string target = Config.INPUT_OVERLAY_TARGET;
-            Directory.CreateDirectory(target);
-
-            string wasdSample = Path.Combine(target, "wasd", "wasd.png");
-            if (File.Exists(wasdSample))
-            {
-                if (!RepairMouseOverlayLayout(target, log)) return false;
-                log?.Invoke("already extracted -> " + target);
-                return true;
-            }
-
-            long sizeMb = new FileInfo(Config.INPUT_OVERLAY_ZIP).Length / (1024 * 1024);
-            log?.Invoke($"extracting {Path.GetFileName(Config.INPUT_OVERLAY_ZIP)} ({sizeMb} MB) -> {target}");
-
-            // extract into the parent so the zips top-level input-overlay-presets/ folder lands as target. extracting into target itself would double-nest.
             try
             {
-                ZipFile.ExtractToDirectory(Config.INPUT_OVERLAY_ZIP, Path.GetDirectoryName(target.TrimEnd('\\', '/')));
+                if (BundledFiles.IsCurrent(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, "input-overlay-presets/", normalize: PresetBytes)) return true;
+                return BundledFiles.Install(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, log, "input-overlay-presets/", normalize: PresetBytes);
             }
-            catch (Exception exc)
+            catch (Exception ex)
             {
-                log?.Invoke("warn: failed to extract presets: " + exc.Message);
+                log?.Invoke("warn: input-overlay preset repair failed: " + ex.Message);
                 return false;
             }
-
-            log?.Invoke("extracted -> " + target);
-            return RepairMouseOverlayLayout(target, log);
-        }
-
-        // ensure the mouse preset has explicit source dimensions so obs does not render it as a canvas-sized source.
-        private static bool RepairMouseOverlayLayout(string target, Action<string> log = null)
-        {
-            string layout = Path.Combine(target, MouseLayoutRel.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(layout))
-            {
-                log?.Invoke("warn: missing input-overlay mouse layout: " + layout);
-                return false;
-            }
-
-            JObject data;
-            try
-            {
-                data = JObject.Parse(ReadUtf8SigText(layout));
-            }
-            catch (Exception exc) when (exc is IOException || exc is Newtonsoft.Json.JsonException)
-            {
-                log?.Invoke("warn: invalid input-overlay mouse layout: " + exc.Message);
-                return false;
-            }
-
-            if (data.Value<int?>("default_width") == MouseLayoutWidth && data.Value<int?>("default_height") == MouseLayoutHeight)
-            {
-                return true;
-            }
-
-            data["default_width"] = MouseLayoutWidth;
-            data["default_height"] = MouseLayoutHeight;
-            try
-            {
-                File.WriteAllText(layout, data.ToString(Newtonsoft.Json.Formatting.Indented), new System.Text.UTF8Encoding(false));
-            }
-            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
-            {
-                log?.Invoke("warn: failed to repair input-overlay mouse layout: " + exc.Message);
-                return false;
-            }
-
-            log?.Invoke("repaired input-overlay mouse layout dimensions -> " + layout);
-            return true;
-        }
-
-        private static string ReadUtf8SigText(string path)
-        {
-            byte[] bytes = File.ReadAllBytes(path);
-            var enc = new System.Text.UTF8Encoding(false);
-            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-            {
-                return enc.GetString(bytes, 3, bytes.Length - 3);
-            }
-            return enc.GetString(bytes);
         }
     }
 }

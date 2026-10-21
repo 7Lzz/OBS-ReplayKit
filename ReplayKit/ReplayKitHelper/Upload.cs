@@ -122,14 +122,14 @@ namespace ReplayKitHelper
                 var token = JobCoordinator.Token(requestId);
 
                 reservation.Start(() => UploadWorker.Run(requestId, uploadFull, authJarPath, authRequired, 0, 100, quiet, token),
-                    t => HandleUploadCompletion(t, requestId, clipName, quiet));
+                    t => HandleUploadCompletion(t, requestId, clipName, quiet, clip.Full));
 
                 return new JObject { ["ok"] = true, ["state"] = "uploading", ["clip"] = clipName, ["requestId"] = requestId };
             }
         }
 
         // runs once an upload task finishes, for a plain upload and for the tail of a compress-then-upload: on success it records the clips_db entry (url + still-processing transcode state) and starts the transcode poller, on failure it resolves the job to error
-        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, bool quiet = false)
+        public static void HandleUploadCompletion(Task<UploadOutcome> task, string requestId, string clipName, bool quiet = false, string sourcePath = null)
         {
             bool workerThrew = task.IsFaulted;
             string workerThrewMessage = workerThrew ? (task.Exception?.InnerException?.Message ?? task.Exception?.Message) : null;
@@ -168,7 +168,7 @@ namespace ReplayKitHelper
             // the transcode step just triggered streamables encode; the video isnt watchable until streamable finishes processing it. mark ready=false and let the background poller flip it once streamables api reports status=2.
             JobCoordinator.Commit(requestId, () =>
             {
-                Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0);
+                Clips.MarkUploaded(clipName, result, shortcode, ready: false, transcodeStatus: 1, transcodePercent: 0, sourcePath: sourcePath);
 
                 UploadState.SetUploadState(requestId: requestId, state: "done", active: false, url: result, error: "", phase: "done", percent: 100);
             });

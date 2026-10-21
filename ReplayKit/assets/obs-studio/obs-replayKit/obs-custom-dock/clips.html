@@ -6209,6 +6209,8 @@
       rate = Math.max(SPEED_MIN, Math.min(SPEED_MAX, parsed));
       // playbackrate has weird floating-point precision quirks; snap to the nearest 0.05 so the readout stays clean.
       rate = Math.round(rate * 20) / 20;
+      // Unloading the source restores playbackRate from defaultPlaybackRate.
+      video.defaultPlaybackRate = rate;
       video.playbackRate = rate;
       // dont stomp the input while the user is mid-edit -- theyd see their typing get rewritten character-by-character.
       if (speedCurrent && source !== "input") {

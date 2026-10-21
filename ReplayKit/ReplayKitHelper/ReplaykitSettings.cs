@@ -198,9 +198,10 @@ namespace ReplayKitHelper
         {
             var token = data[key];
             if (token == null) return defaultValue;
-            if (!double.TryParse(token.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double n))
+            string text = token is JValue scalar ? Convert.ToString(scalar.Value, CultureInfo.InvariantCulture) : "";
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double n))
                 throw new InvalidOperationException("Invalid number setting: " + key);
-            if (n < min || n > max) throw new InvalidOperationException(key + " must be between " + min + " and " + max + ".");
+            if (double.IsNaN(n) || double.IsInfinity(n) || n < min || n > max) throw new InvalidOperationException(key + " must be between " + min + " and " + max + ".");
             return n;
         }
 

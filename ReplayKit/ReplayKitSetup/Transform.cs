@@ -528,6 +528,8 @@ namespace ReplayKitSetup
             obj["overlayOpacity"] = prefs.OverlayOpacity;
             obj["overlayScale"] = prefs.OverlayScale;
             obj["overlayRotation"] = prefs.OverlayRotation;
+            obj["overlayFlipH"] = prefs.OverlayFlipH;
+            obj["overlayPosition"] = prefs.OverlayPosition.DeepClone();
             obj["overlayHueShift"] = prefs.OverlayHueShift;
             obj["overlayColorMultiply"] = prefs.OverlayColorMultiply;
             obj["overlayColorAdd"] = prefs.OverlayColorAdd;
@@ -862,7 +864,7 @@ namespace ReplayKitSetup
             ["private_settings"] = new JObject(),
         };
 
-        private static void EnsureBongoSource(JArray sources, Preferences prefs)
+        private static string EnsureBongoSource(JArray sources, Preferences prefs)
         {
             foreach (var srcToken in sources)
             {
@@ -875,10 +877,13 @@ namespace ReplayKitSetup
                     src["enabled"] = true;
                     if (!(src["settings"] is JObject settings)) { settings = new JObject(); src["settings"] = settings; }
                     foreach (var prop in ((JObject)NewBongoSource(prefs)["settings"]).Properties()) settings[prop.Name] = prop.Value;
-                    return;
+                    string uuid = src.Value<string>("uuid");
+                    if (string.IsNullOrWhiteSpace(uuid)) src["uuid"] = uuid = Guid.NewGuid().ToString();
+                    return uuid;
                 }
             }
             sources.Add(NewBongoSource(prefs));
+            return BongoCatSourceUuid;
         }
 
         // the mouse cursor choice for one kind of capture as the settings file of the helper holds it; on when the file or the key is not there, like the default of the helper
@@ -1281,24 +1286,32 @@ namespace ReplayKitSetup
             item["bounds_rel"] = new JObject { ["x"] = 0.0, ["y"] = 0.0 };
             item["bounds_type"] = 0;
             item["bounds_align"] = 0;
-            ApplyOverlayRotation(item, canvasW, canvasH, prefs.OverlayRotation, 628, 292);
+            ApplyOverlayTransform(item, canvasW, canvasH, prefs, "input_overlay", 628, 292);
         }
 
-        private static void ApplyOverlayRotation(JObject item, double canvasW, double canvasH, int angle, double width, double height)
+        private static void ApplyOverlayTransform(JObject item, double canvasW, double canvasH, Preferences prefs, string style, double width, double height)
         {
+            if (prefs.OverlayPosition?[style] is JObject position)
+                item["pos"] = new JObject { ["x"] = position.Value<double>("x") * canvasW, ["y"] = position.Value<double>("y") * canvasH };
+            if (prefs.OverlayFlipH)
+            {
+                item["pos"]["x"] = item["pos"].Value<double>("x") + width * Math.Abs(item["scale"].Value<double>("x"));
+                item["scale"]["x"] = -item["scale"].Value<double>("x");
+                item["scale_rel"]["x"] = -item["scale_rel"].Value<double>("x");
+            }
             var transform = new JObject
             {
                 ["positionX"] = item["pos"]?["x"], ["positionY"] = item["pos"]?["y"],
                 ["scaleX"] = item["scale"]?["x"], ["scaleY"] = item["scale"]?["y"], ["alignment"] = item["align"], ["rotation"] = 0,
             };
-            var rotated = ReplayKitShared.OverlayRotation.Rotate(transform, angle, width, height);
+            var rotated = ReplayKitShared.OverlayRotation.Rotate(transform, prefs.OverlayRotation, width, height);
             double x = rotated["positionX"].Value<double>(), y = rotated["positionY"].Value<double>();
-            item["rot"] = angle;
+            item["rot"] = prefs.OverlayRotation;
             item["pos"] = new JObject { ["x"] = x, ["y"] = y };
             item["pos_rel"] = SceneRelPos(x, y, canvasW, canvasH);
         }
 
-        private static void ApplyBongoGeometry(JObject item, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
+        private static void ApplyBongoGeometry(JObject item, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content = null)
         {
             var c = content ?? OverlayContentRect(canvasW, canvasH);
             double scaleRatio = (c.H / BongoCatCanvasH) * OverlayScaleFactor(prefs);
@@ -1311,7 +1324,7 @@ namespace ReplayKitSetup
             double y = Math.Abs(y0) < 0.001 ? 0.0 : y0;
 
             item["name"] = BongoCatSourceName;
-            item["source_uuid"] = BongoCatSourceUuid;
+            item["source_uuid"] = sourceUuid;
             item["visible"] = true;
             item["locked"] = false;
             item["rot"] = 0.0;
@@ -1337,28 +1350,28 @@ namespace ReplayKitSetup
             item["show_transition"] = new JObject { ["duration"] = 300 };
             item["hide_transition"] = new JObject { ["duration"] = 300 };
             item["private_settings"] = new JObject();
-            ApplyOverlayRotation(item, canvasW, canvasH, prefs.OverlayRotation, BongoCatSourceW, BongoCatSourceH);
+            ApplyOverlayTransform(item, canvasW, canvasH, prefs, "bongo_cat", BongoCatSourceW, BongoCatSourceH);
         }
 
-        private static JObject NewBongoSceneItem(int itemId, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
+        private static JObject NewBongoSceneItem(int itemId, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content = null)
         {
             var item = new JObject { ["id"] = itemId };
-            ApplyBongoGeometry(item, canvasW, canvasH, prefs, content);
+            ApplyBongoGeometry(item, canvasW, canvasH, prefs, sourceUuid, content);
             return item;
         }
 
-        private static void EnsureBongoSceneItem(JArray items, JObject settings, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
+        private static void EnsureBongoSceneItem(JArray items, JObject settings, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content = null)
         {
             foreach (var itemToken in items)
             {
-                if (itemToken is JObject item && (item.Value<string>("source_uuid") == BongoCatSourceUuid || item.Value<string>("name") == BongoCatSourceName))
+                if (itemToken is JObject item && (item.Value<string>("source_uuid") == sourceUuid || item.Value<string>("name") == BongoCatSourceName))
                 {
-                    ApplyBongoGeometry(item, canvasW, canvasH, prefs, content);
+                    ApplyBongoGeometry(item, canvasW, canvasH, prefs, sourceUuid, content);
                     return;
                 }
             }
 
-            var newItem = NewBongoSceneItem(NextSceneItemId(items), canvasW, canvasH, prefs, content);
+            var newItem = NewBongoSceneItem(NextSceneItemId(items), canvasW, canvasH, prefs, sourceUuid, content);
             items.Add(newItem);
             int existingCounter = settings["id_counter"] != null && int.TryParse(settings["id_counter"].ToString(), out var ic) ? ic : 0;
             settings["id_counter"] = Math.Max(existingCounter, SceneItemIds(items).DefaultIfEmpty(0).Max());
@@ -1432,8 +1445,8 @@ namespace ReplayKitSetup
                 foreach (var g in keptGroups) groups.Add(g);
             }
 
-            if (useBongoCat) EnsureBongoSource(sources, prefs);
-            else RemoveBongoSources(sources);
+            string bongoUuid = useBongoCat ? EnsureBongoSource(sources, prefs) : null;
+            if (!useBongoCat) RemoveBongoSources(sources);
             EnsureWindowCaptureSource(sources, prefs);
 
             int primaryW = primary?.Width ?? 0;
@@ -1523,11 +1536,11 @@ namespace ReplayKitSetup
                             }
                             continue;
                         }
-                        if (item.Value<string>("source_uuid") == BongoCatSourceUuid || name == BongoCatSourceName)
+                        if ((bongoUuid != null && item.Value<string>("source_uuid") == bongoUuid) || item.Value<string>("source_uuid") == BongoCatSourceUuid || name == BongoCatSourceName)
                         {
                             if (useBongoCat)
                             {
-                                ApplyBongoGeometry(item, canvasW, canvasH, prefs, overlayContent);
+                                ApplyBongoGeometry(item, canvasW, canvasH, prefs, bongoUuid, overlayContent);
                                 keptItems.Add(item);
                             }
                             continue;
@@ -1567,7 +1580,7 @@ namespace ReplayKitSetup
                     }
                     MoveSceneItemAfter(keptItems, WindowCaptureSourceName, "Display Capture");
 
-                    if (useBongoCat) EnsureBongoSceneItem(keptItems, settings, canvasW, canvasH, prefs, overlayContent);
+                    if (useBongoCat) EnsureBongoSceneItem(keptItems, settings, canvasW, canvasH, prefs, bongoUuid, overlayContent);
                     settings["items"] = keptItems;
                 }
             }

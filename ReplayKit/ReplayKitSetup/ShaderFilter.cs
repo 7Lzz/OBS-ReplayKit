@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.IO.Compression;
-using System.Linq;
 using System.Security.Cryptography;
 
 namespace ReplayKitSetup
@@ -25,27 +23,13 @@ namespace ReplayKitSetup
             Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "obs-composite-blur"),
         };
 
-        private static bool IsSafeRelative(string[] parts) => parts.Length > 0 && parts.All(p => p != "" && p != "." && p != "..");
-
-        private static string TargetPath(string relPosix)
-        {
-            string targetRoot = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/');
-            var parts = relPosix.Split('/');
-            string target = Path.GetFullPath(Path.Combine(new[] { Config.PROGRAMFILES_OBS_DIR }.Concat(parts).ToArray()));
-            if (!string.Equals(target, targetRoot, StringComparison.OrdinalIgnoreCase) &&
-                !target.StartsWith(targetRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("unsafe archive path: " + relPosix);
-            }
-            return target;
-        }
-
         private static bool AllowedArchiveMember(string relText)
         {
             return relText == PluginDllRel || relText == PluginPdbRel || relText.StartsWith(PluginDataRel + "/");
         }
 
-        public static bool IsShaderfilterInstalled() => File.Exists(PluginDll) && File.Exists(MotionBlurShader);
+        public static bool IsShaderfilterInstalled() => File.Exists(Config.SHADERFILTER_ZIP) && VerifyArchive(Config.SHADERFILTER_ZIP) &&
+            BundledFiles.IsCurrent(Config.SHADERFILTER_ZIP, Config.PROGRAMFILES_OBS_DIR, include: AllowedArchiveMember);
 
         private static bool VerifyArchive(string path, Action<string> log = null)
         {
@@ -95,30 +79,7 @@ namespace ReplayKitSetup
 
             try
             {
-                using (var zf = ZipFile.OpenRead(Config.SHADERFILTER_ZIP))
-                {
-                    foreach (var entry in zf.Entries)
-                    {
-                        string name = entry.FullName.Replace("\\", "/").Trim('/');
-                        if (name.Length == 0) continue;
-                        var parts = name.Split('/');
-                        if (!IsSafeRelative(parts)) throw new InvalidOperationException("unsafe archive path: " + entry.FullName);
-                        if (!AllowedArchiveMember(name)) continue;
-                        string dest = TargetPath(name);
-                        bool isDir = entry.FullName.EndsWith("/") && entry.Length == 0;
-                        if (isDir)
-                        {
-                            Directory.CreateDirectory(dest);
-                            continue;
-                        }
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                        using (var src = entry.Open())
-                        using (var dst = File.Open(dest, FileMode.Create, FileAccess.Write))
-                        {
-                            src.CopyTo(dst);
-                        }
-                    }
-                }
+                if (!BundledFiles.Install(Config.SHADERFILTER_ZIP, Config.PROGRAMFILES_OBS_DIR, log, include: AllowedArchiveMember)) return false;
             }
             catch (Exception exc)
             {

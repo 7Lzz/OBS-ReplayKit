@@ -15,9 +15,8 @@ namespace ReplayKitHelper
         public static string GetSafeFilename(string raw)
         {
             if (string.IsNullOrEmpty(raw)) return null;
-            string decoded = Uri.UnescapeDataString(raw);
-            if (decoded.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
-            string name = Path.GetFileName(decoded).Trim();
+            if (raw.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
+            string name = Path.GetFileName(raw).Trim();
             if (string.IsNullOrEmpty(name)) return null;
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (!Constants.ALLOWED_EXTS.Contains(ext)) return null;
@@ -62,8 +61,8 @@ namespace ReplayKitHelper
                 try
                 {
                     JobCoordinator.Commit(requestId, () => File.Delete(selected.Full));
-                    UpdateDb(db => db.Remove(selected.Name));
-                    EditDrafts.Forget(selected.Name);
+                    UpdateDb(db => db.Remove(selected.Name), Path.GetDirectoryName(selected.Full));
+                    EditDrafts.Forget(selected.Full);
                     return new DeleteResult { Status = 200, Name = selected.Name };
                 }
                 catch (Exception ex) { return new DeleteResult { Status = 500, Name = selected.Name, Message = ex.Message }; }
@@ -73,7 +72,7 @@ namespace ReplayKitHelper
         // clips db (filename -> {url, uploaded_at, ...}) with retention expiry.
         public static string GetClipsDbCacheSignature()
         {
-            var parts = new List<string> { "minute:" + (long)Math.Floor(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60.0) };
+            var parts = new List<string> { "folder:" + AppConfig.GetClipDir().ToUpperInvariant(), "minute:" + (long)Math.Floor(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60.0) };
             string p = AppConfig.GetDbPath();
             try
             {
@@ -100,7 +99,7 @@ namespace ReplayKitHelper
                 var db = new JObject();
                 try
                 {
-                    var parsed = ClipStore.Read(path, data => data);
+                    var parsed = ClipStore.ReadFolder(path, AppConfig.GetClipDir(), data => data);
                     foreach (var prop in parsed.Properties())
                     {
                         if (!(prop.Value is JObject v)) continue;
@@ -166,11 +165,11 @@ namespace ReplayKitHelper
             }
         }
 
-        public static bool UpdateDb(Func<JObject, bool> change)
+        public static bool UpdateDb(Func<JObject, bool> change, string folder = null)
         {
             lock (Server.State.ClipsMetaLock)
             {
-                bool result = ClipStore.Update(AppConfig.GetDbPath(), change);
+                bool result = ClipStore.UpdateFolder(AppConfig.GetDbPath(), folder ?? AppConfig.GetClipDir(), change);
                 Server.State.ClipsDbCache = null;
                 Server.State.ClipsDbCacheSig = "";
                 AppConfig.ClearClipsCache();
@@ -179,7 +178,7 @@ namespace ReplayKitHelper
         }
 
         // the transcode fields are optional so an upload records its url and the initial still-processing state in one write, keeping the cmp_* fields
-        public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null)
+        public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null, string sourcePath = null)
         {
             // UpdateDb coordinates this mutation with detached pollers as well as helper requests.
             UpdateDb(db =>
@@ -207,11 +206,11 @@ namespace ReplayKitHelper
                 db[name] = entry;
 
                 return true;
-            });
+            }, sourcePath == null ? null : Path.GetDirectoryName(sourcePath));
         }
 
         // called once the compress-overwrite encode + atomic replace succeeds. stores the new mode + the freshly-written files mtime as the cache key, plus the timestamp + pre-compress size for ui purposes, so later /clips polls dont need to re-probe the file.
-        public static void MarkCompressed(string name, string mode, long mtimeTicks, long preBytes)
+        public static void MarkCompressed(string name, string mode, long mtimeTicks, long preBytes, string sourcePath = null)
         {
             if (string.IsNullOrWhiteSpace(name)) return;
             if (mode != "fast" && mode != "slow") return;
@@ -227,7 +226,7 @@ namespace ReplayKitHelper
                 db[name] = entry;
 
                 return true;
-            });
+            }, sourcePath == null ? null : Path.GetDirectoryName(sourcePath));
         }
 
         // drop the streamable link + its transcode state from a clips_db entry (the "remove link" action on a failed / unwanted upload). keeps the cmp_* compress-history fields; removes the whole entry if nothing else was on it. returns false when there was no entry to touch.
@@ -518,9 +517,7 @@ namespace ReplayKitHelper
             if (!File.Exists(path)) return state;
             try
             {
-                string raw = File.ReadAllText(path);
-                if (string.IsNullOrWhiteSpace(raw)) return state;
-                var parsed = JObject.Parse(raw);
+                var parsed = ClipStore.ReadFolder(path, AppConfig.GetClipDir(), data => data);
                 state["favorites"] = new JArray(NormalizeFavoriteClipNames(parsed["favorites"]));
                 state["sort"] = NormalizeClipSort(parsed["sort"]?.ToString());
             }
@@ -540,7 +537,12 @@ namespace ReplayKitHelper
             };
             string path = AppConfig.GetClipUiStatePath();
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            AppConfig.WriteUtf8(path, safe.ToString(Formatting.Indented));
+            ClipStore.UpdateFolder(path, AppConfig.GetClipDir(), data =>
+            {
+                data["favorites"] = safe["favorites"].DeepClone();
+                data["sort"] = safe["sort"].DeepClone();
+                return true;
+            });
             return safe;
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -44,37 +45,89 @@ namespace ReplayKitHelper
             {
                 var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
                 if (!change(db)) return false;
-                string temporary = full + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                try
-                {
-                    using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
-                    {
-                        byte[] bytes = new UTF8Encoding(false).GetBytes(db.ToString(Newtonsoft.Json.Formatting.Indented));
-                        file.Write(bytes, 0, bytes.Length);
-                        file.Flush(true);
-                    }
-                    // a plain rename over the old file -- File.Replace leaves a ~RF<hex>.TMP backup behind whenever another process still has the old file open
-                    Native.MoveFileReplace(temporary, full);
-                }
-                finally { if (File.Exists(temporary)) File.Delete(temporary); }
+                Write(full, db);
                 return true;
             });
+        }
+
+        private static void Write(string path, JObject db)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
+                    byte[] bytes = new UTF8Encoding(false).GetBytes(db.ToString(Newtonsoft.Json.Formatting.Indented));
+                    file.Write(bytes, 0, bytes.Length);
+                    file.Flush(true);
+                }
+                Native.MoveFileReplace(temporary, path);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+
+        private static JObject Folder(JObject db, string folder, out bool created)
+        {
+            string key;
+            using (var hash = SHA256.Create())
+                key = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(folder).TrimEnd('\\', '/').ToUpperInvariant()))).Replace("-", "");
+            created = false;
+            if (db["_folders"] != null && !(db["_folders"] is JObject)) throw new Newtonsoft.Json.JsonException("Invalid clip folder metadata.");
+            var folders = db["_folders"] as JObject;
+            if (folders == null)
+            {
+                // Bind legacy filename-only state once; retain the original fields for recovery.
+                var legacy = (JObject)db.DeepClone();
+                folders = new JObject { [key] = legacy };
+                db["_folders"] = folders;
+                created = true;
+            }
+            if (folders[key] != null && !(folders[key] is JObject)) throw new Newtonsoft.Json.JsonException("Invalid clip folder metadata.");
+            if (folders[key] == null)
+            {
+                folders[key] = new JObject();
+                created = true;
+            }
+            return (JObject)folders[key];
+        }
+
+        public static T ReadFolder<T>(string path, string folder, Func<JObject, T> read)
+        {
+            return WithLock(path, full =>
+            {
+                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                var scoped = Folder(db, folder, out bool created);
+                if (created) Write(full, db);
+                return read(scoped);
+            });
+        }
+
+        public static bool UpdateFolder(string path, string folder, Func<JObject, bool> change)
+        {
+            return Update(path, db => { var scoped = Folder(db, folder, out bool created); return change(scoped) || created; });
         }
 
         public static bool SetTranscode(string path, string clip, string shortcode, int status, int percent)
         {
             return Update(path, db =>
             {
-                if (!(db[clip] is JObject entry) || !string.Equals(entry["shortcode"]?.Value<string>(), shortcode, StringComparison.Ordinal)) return false;
-                int currentStatus = entry["transcode_status"]?.Value<int>() ?? 0;
-                if (currentStatus >= 2 && (status < 2 || status == 4)) return false;
-                entry["transcode_status"] = status;
-                entry["transcode_percent"] = percent;
-                entry["ready"] = status == 2;
-                entry["failed"] = status == 3;
-                if (status == 4) entry["transcode_error"] = "Streamable status check timed out after 30 minutes.";
-                else entry.Remove("transcode_error");
-                return true;
+                bool changed = false;
+                var folders = (db["_folders"] as JObject)?.Properties().Select(p => p.Value).OfType<JObject>() ?? Enumerable.Empty<JObject>();
+                foreach (var owner in folders.Concat(new[] { db }))
+                {
+                    if (!(owner[clip] is JObject entry) || !string.Equals(entry["shortcode"]?.Value<string>(), shortcode, StringComparison.Ordinal)) continue;
+                    int currentStatus = entry["transcode_status"]?.Value<int>() ?? 0;
+                    if (currentStatus >= 2 && (status < 2 || status == 4)) continue;
+                    entry["transcode_status"] = status;
+                    entry["transcode_percent"] = percent;
+                    entry["ready"] = status == 2;
+                    entry["failed"] = status == 3;
+                    if (status == 4) entry["transcode_error"] = "Streamable status check timed out after 30 minutes.";
+                    else entry.Remove("transcode_error");
+                    changed = true;
+                }
+                return changed;
             });
         }
     }

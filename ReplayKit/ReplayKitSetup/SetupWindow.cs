@@ -165,7 +165,7 @@ namespace ReplayKitSetup
                 try
                 {
                     var issues = Apply.RunInstallFlow(discord, progress, cleanInstall);
-                    code = 0;
+                    code = issues.Count == 0 ? 0 : 1;
                     SetupLog.Line("=== install flow complete: " + issues.Count + " issue(s) ===");
                     Enqueue(() => OnFlowSucceeded(issues.Count));
                 }
@@ -240,6 +240,11 @@ namespace ReplayKitSetup
 
         private void OnFlowSucceeded(int issueCount)
         {
+            if (issueCount > 0)
+            {
+                OnFlowFailed("Setup is incomplete: " + issueCount + " step(s) need attention. Run the installer again after resolving the warnings in the log.");
+                return;
+            }
             _done = true;
             PostToPage(new JObject { ["type"] = "done", ["issues"] = issueCount });
             Native.SetTimer(_hwnd, (IntPtr)1, 2400, IntPtr.Zero);
