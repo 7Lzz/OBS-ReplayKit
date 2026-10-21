@@ -23,6 +23,7 @@
   "bongoMode": "standard",
   "overlayOpacity": 100,
   "overlayScale": 100,
+  "overlayRotation": 0,
   "overlayHueShift": 0,
   "overlayColorMultiply": "#ffffff",
   "overlayColorAdd": "#000000",

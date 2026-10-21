@@ -635,6 +635,16 @@ namespace ReplayKitSetup
             catch (Exception ex) { log?.Invoke($"warn: plugin refresh skipped: {ex.Message}"); }
             if (NativePlugin.IsBundled() && !NativePlugin.IsCurrent()) problems.Add("the ReplayKit plugin");
 
+            try
+            {
+                if (!BongoCat.InstallBongoCat(log)) problems.Add("Bongo Cat files and saved sources");
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: Bongo Cat refresh failed: {ex.Message}");
+                problems.Add("Bongo Cat files and saved sources");
+            }
+
             // the desktop audio plugin was only ever put in by a full setup, so an updating install kept the 2022 build with its known crash and never got a fix to the build replaykit ships. it compares the installed dll with the bundled one and does nothing when they match; obs is closed here
             try { WinCapture.InstallWinCaptureAudio(log); }
             catch (Exception ex) { log?.Invoke($"warn: desktop audio plugin refresh skipped: {ex.Message}"); }

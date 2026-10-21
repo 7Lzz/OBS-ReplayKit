@@ -65,6 +65,7 @@ namespace ReplayKitHelper
                 ["bongoMode"] = "standard",
                 ["overlayOpacity"] = 100,
                 ["overlayScale"] = 100,
+                ["overlayRotation"] = 0,
                 ["overlayFlipH"] = false,
                 ["overlayHueShift"] = 0,
                 ["overlayColorMultiply"] = "#ffffff",
@@ -485,6 +486,7 @@ namespace ReplayKitHelper
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), new[] { "input_overlay", "bongo_cat", "off" }),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
+                ["overlayRotation"] = GetIntSetting(data, "overlayRotation", 0, -180, 180),
                 ["overlayFlipH"] = GetBoolSetting(data, "overlayFlipH", defaults["overlayFlipH"].Value<bool>()),
                 ["bongoMode"] = GetEnumSetting(data, "bongoMode", defaults["bongoMode"].Value<string>(), BongoModes),
                 ["overlayHueShift"] = GetFloatSetting(data, "overlayHueShift", defaults["overlayHueShift"].Value<double>(), -180.0, 180.0),
@@ -1188,14 +1190,9 @@ namespace ReplayKitHelper
                 if (cur["ok"]?.Value<bool>() != true || t == null) return miss;
                 var canvas = GetCanvasSizeLive();
                 double cw = canvas["width"].Value<double>(), ch = canvas["height"].Value<double>();
-                double sx = GetDoubleValue(t, "scaleX", 1.0), sy = GetDoubleValue(t, "scaleY", 1.0);
-                double w = GetDoubleValue(t, "width", 0.0), h = GetDoubleValue(t, "height", 0.0);
-                if (w <= 0.0) w = GetDoubleValue(t, "sourceWidth", 0.0) * Math.Abs(sx);
-                if (h <= 0.0) h = GetDoubleValue(t, "sourceHeight", 0.0) * Math.Abs(sy);
-                double x = GetDoubleValue(t, "positionX", 0.0), y = GetDoubleValue(t, "positionY", 0.0);
-                // a mirrored item is anchored on its right edge, so walk back to the visible top-left the preview draws from
-                if (sx < 0.0) x -= w;
-                if (sy < 0.0) y -= h;
+                var rect = OverlayRotation.Rectangle(t);
+                double x = rect["x"].Value<double>(), y = rect["y"].Value<double>();
+                double w = rect["w"].Value<double>(), h = rect["h"].Value<double>();
                 return new JObject
                 {
                     ["ok"] = true, ["available"] = true,
@@ -1206,6 +1203,7 @@ namespace ReplayKitHelper
                     ["style"] = style,
                     // the saved overlayScale this rect was produced at -- the preview divides by it so an unapplied size edit can grow the box from the real one
                     ["scalePct"] = OverlayScaleFactor(Normalize(ReadSettings())) * 100.0,
+                    ["rotation"] = GetDoubleValue(t, "rotation", 0.0),
                 };
             }
             catch (Exception ex) { Log.Write("GetOverlayPositionLive: " + ex.Message); return miss; }
@@ -1236,21 +1234,12 @@ namespace ReplayKitHelper
             if (transform == null) return new JObject();
             if (scaleRatio <= 0.0) scaleRatio = 1.0;
 
-            double positionX = GetDoubleValue(transform, "positionX", 0.0);
-            double positionY = GetDoubleValue(transform, "positionY", 0.0);
-            double scaleX = GetDoubleValue(transform, "scaleX", 1.0);
-            double scaleY = GetDoubleValue(transform, "scaleY", 1.0);
-            double width = GetDoubleValue(transform, "width", 0.0);
-            double height = GetDoubleValue(transform, "height", 0.0);
-            if (width <= 0.0) width = GetDoubleValue(transform, "sourceWidth", 0.0) * Math.Abs(scaleX);
-            if (height <= 0.0) height = GetDoubleValue(transform, "sourceHeight", 0.0) * Math.Abs(scaleY);
-            if (width < 0.0) width = 0.0;
-            if (height < 0.0) height = 0.0;
+            var rect = OverlayRotation.Rectangle((JObject)transform);
+            double width = rect["w"].Value<double>(), height = rect["h"].Value<double>();
 
             double nextWidth = width * scaleRatio;
             double nextHeight = height * scaleRatio;
-            double left = scaleX < 0.0 ? positionX - width : positionX;
-            double top = scaleY < 0.0 ? positionY - height : positionY;
+            double left = rect["x"].Value<double>(), top = rect["y"].Value<double>();
 
             double canvasW = 0.0, canvasH = 0.0;
             if (preset?["video"] != null)
@@ -1266,11 +1255,7 @@ namespace ReplayKitHelper
             double nextLeft = Moved(left, width, nextWidth, canvasW);
             double nextTop = Moved(top, height, nextHeight, canvasH);
 
-            return new JObject
-            {
-                ["positionX"] = scaleX < 0.0 ? nextLeft + nextWidth : nextLeft, ["positionY"] = scaleY < 0.0 ? nextTop + nextHeight : nextTop,
-                ["scaleX"] = scaleX * scaleRatio, ["scaleY"] = scaleY * scaleRatio,
-            };
+            return OverlayRotation.Resize((JObject)transform, scaleRatio, nextLeft, nextTop);
         }
 
         private static JObject SetSceneItemScaledFromCurrent(string sceneName, JObject item, double scaleRatio, JObject preset = null)
@@ -1491,6 +1476,7 @@ namespace ReplayKitHelper
             };
             ApplyOverlayPositionOverride(transform, preset, settings, "input_overlay");
             ApplyOverlayFlipH(transform, 628.0, settings);
+            transform.Merge(OverlayRotation.Rotate(transform, settings?["overlayRotation"]?.Value<int>() ?? 0, 628, 292));
             return transform;
         }
 
@@ -1533,6 +1519,7 @@ namespace ReplayKitHelper
             };
             ApplyOverlayPositionOverride(transform, preset, settings, "bongo_cat");
             ApplyOverlayFlipH(transform, 1280.0, settings);
+            transform.Merge(OverlayRotation.Rotate(transform, settings?["overlayRotation"]?.Value<int>() ?? 0, 1280, 768));
             return transform;
         }
 
@@ -1746,6 +1733,7 @@ namespace ReplayKitHelper
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
             var transform = BongoTransform(preset, settings);
             SetSceneItemBaseJson(item, "Bongo Cat Overlay", visible);
+            item["rot"] = transform["rotation"];
             item["source_uuid"] = uuid;
             item["scale_ref"] = new JObject { ["x"] = 1280.0, ["y"] = 768.0 };
             double posX = transform["positionX"].Value<double>(), posY = transform["positionY"].Value<double>();
@@ -1846,6 +1834,7 @@ namespace ReplayKitHelper
             double scaleX = transform["scaleX"].Value<double>(), scaleY = transform["scaleY"].Value<double>();
             double x = transform["positionX"].Value<double>(), y = transform["positionY"].Value<double>();
             SetSceneItemBaseJson(item, "Group", visible);
+            item["rot"] = transform["rotation"];
             item["source_uuid"] = groupUuid;
             item["scale_ref"] = new JObject { ["x"] = canvasW, ["y"] = canvasH };
             item["group_item_backup"] = false;
@@ -3882,22 +3871,32 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
-        // horizontal mirror of a scene-item transform, in place: negate scaleX and shift positionX by the SIGNED rendered width so the on-screen box is unchanged and the shift is its own inverse (flipping on then off lands back exactly). overlay items are align-top-left.
+        // Mirror along the rotated local axis while keeping the same center.
         private static JObject MirrorTransformInPlace(JObject current, string overlayStyle)
         {
-            double px = GetDoubleValue(current, "positionX", 0.0);
-            double sx = GetDoubleValue(current, "scaleX", 1.0);
-            double renderedW = Math.Abs(GetDoubleValue(current, "width", 0.0));
-            if (renderedW <= 0.0) renderedW = Math.Abs(GetDoubleValue(current, "sourceWidth", 0.0) * sx);
-            if (renderedW <= 0.0) renderedW = (overlayStyle == "bongo_cat" ? 1280.0 : 628.0) * Math.Abs(sx);
-            double dir = sx < 0.0 ? -1.0 : 1.0;
-            return new JObject
+            return OverlayRotation.Mirror(current, overlayStyle == "bongo_cat" ? 1280 : 628, overlayStyle == "bongo_cat" ? 768 : 292);
+        }
+
+        private static JObject ApplyOverlayRotationLive(JObject settings)
+        {
+            var warnings = new List<string>();
+            var applied = new List<string>();
+            var scene = GetSceneName();
+            if (scene["ok"]?.Value<bool>() != true) return scene;
+            string sceneName = scene["name"]?.Value<string>();
+            var itemsResult = GetSceneItems(sceneName);
+            if (itemsResult["ok"]?.Value<bool>() != true) return itemsResult;
+            var items = itemsResult["items"] as JArray;
+            foreach (string name in GetOverlayScaleSceneItemNames(items, settings["overlayStyle"]?.Value<string>() ?? ""))
             {
-                ["positionX"] = px + renderedW * dir,
-                ["positionY"] = GetDoubleValue(current, "positionY", 0.0),
-                ["scaleX"] = -sx,
-                ["scaleY"] = GetDoubleValue(current, "scaleY", 1.0),
-            };
+                var item = FindSceneItem(items, name);
+                var current = GetSceneItemTransformLive(sceneName, item);
+                if (current["ok"]?.Value<bool>() != true || !(current["transform"] is JObject transform)) { warnings.Add("Could not read " + name + " rotation."); continue; }
+                var result = SetSceneItemTransform(sceneName, item, OverlayRotation.Rotate(transform, settings["overlayRotation"]?.Value<int>() ?? 0));
+                if (result["ok"]?.Value<bool>() == true) applied.Add(name + " rotation");
+                else warnings.Add("Could not rotate " + name + ": " + result["message"]);
+            }
+            return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
         // toggle the horizontal flip live by mirroring the overlays CURRENT scene-item transform in place -- never repositions to the canonical corner, so a user who dragged the overlay somewhere keeps it there. Group for input_overlay (WASD/Mouse ride along inside it), Bongo Cat Overlay for bongo.
@@ -3957,6 +3956,13 @@ namespace ReplayKitHelper
                 var flip = ApplyOverlayFlipLive(previous, settings);
                 applied.AddRange((flip["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((flip["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
+            if (previous["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>())
+            {
+                var rotation = ApplyOverlayRotationLive(settings);
+                applied.AddRange((rotation["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((rotation["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add("Could not rotate overlay: " + rotation["message"]);
             }
             bool colorChanged = previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
@@ -4075,7 +4081,7 @@ namespace ReplayKitHelper
             return revision;
         }
 
-        // live preview for the two geometry knobs. size is snapshot-relative (`scaleTouched` latch -> every tick re-asserts scale(baseline)*ratio so a drag back to 100 restores, without compounding). flip mirrors the items CURRENT transform in place, only on a state transition (`mirrorApplied` tracks whether our preview has the item mirrored) -- so it never yanks a user-repositioned overlay back to the canonical corner, and the signed shift in MirrorTransformInPlace makes on->off land back exactly. size runs first so flip mirrors the resized transform.
+        // Size is relative to the snapshot; flip and rotation preserve the current center. The snapshot remains the cancel target.
         private static JObject ApplyOverlayGeometryPreviewLive(JObject preview, JObject settings)
         {
             var warnings = new List<string>();
@@ -4093,8 +4099,14 @@ namespace ReplayKitHelper
             bool wantMirror = (previewSettings["overlayFlipH"]?.Value<bool>() ?? false) != (settings["overlayFlipH"]?.Value<bool>() ?? false);
             bool mirrorApplied = preview["mirrorApplied"]?.Value<bool>() ?? false;
             bool flipTransition = wantMirror != mirrorApplied;
+            bool rotationTouched = preview["rotationTouched"]?.Value<bool>() ?? false;
+            if (previewSettings["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>())
+            {
+                preview["rotationTouched"] = true;
+                rotationTouched = true;
+            }
 
-            if (!scaleTouched && !flipTransition)
+            if (!scaleTouched && !flipTransition && !rotationTouched)
                 return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
 
             double baseScale = OverlayScaleFactor(previewSettings);
@@ -4115,9 +4127,12 @@ namespace ReplayKitHelper
                     {
                         double sw = GetDoubleValue(entry["transform"], "sourceWidth", 0.0);
                         if (sw <= 0.0) sw = style == "bongo_cat" ? 1280.0 : 628.0;
-                        double sx = scaled["scaleX"].Value<double>();
-                        scaled["positionX"] = scaled["positionX"].Value<double>() + sw * sx;
-                        scaled["scaleX"] = -sx;
+                        var basis = (JObject)entry["transform"].DeepClone();
+                        basis.Merge(scaled);
+                        var size = OverlayRotation.Rectangle((JObject)entry["transform"]);
+                        basis["width"] = size["w"].Value<double>() * scaleRatio;
+                        basis["height"] = size["h"].Value<double>() * scaleRatio;
+                        scaled = OverlayRotation.Mirror(basis, sw, style == "bongo_cat" ? 768 : 292);
                     }
                     var rs = SetSceneItemTransform(sceneName, entry["item"] as JObject, scaled);
                     if (rs["ok"]?.Value<bool>() == true) { if (!flipTransition) applied.Add(prop.Name + " size"); }
@@ -4136,7 +4151,7 @@ namespace ReplayKitHelper
                     if (cur["ok"]?.Value<bool>() == true && cur["transform"] != null && cur["transform"].Type != JTokenType.Null)
                     {
                         // make sure the un-mirrored transform is the snapshots revert target (adopt a manual reposition since the snapshot; add the entry if the initial capture missed it) so cancel un-flips cleanly.
-                        if (!mirrorApplied && !scaleTouched)
+                            if (!mirrorApplied && !scaleTouched && !rotationTouched)
                         {
                             if (transforms[itemName] is JObject snapEntry) snapEntry["transform"] = cur["transform"];
                             else transforms[itemName] = new JObject { ["item"] = item, ["transform"] = cur["transform"] };
@@ -4148,6 +4163,13 @@ namespace ReplayKitHelper
                     else warnings.Add("Could not read " + itemName + " to flip: " + cur["message"]);
                 }
                 preview["mirrorApplied"] = wantMirror;
+            }
+            if (rotationTouched)
+            {
+                var rotation = ApplyOverlayRotationLive(settings);
+                applied.AddRange((rotation["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((rotation["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add("Could not preview overlay rotation: " + rotation["message"]);
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -4242,7 +4264,7 @@ namespace ReplayKitHelper
                 var incoming = JObject.Parse(body);
                 long? previewRevision = GetOverlayPreviewRevision(incoming);
                 if (incoming.Count < 1) throw new InvalidOperationException("Missing overlay preview setting.");
-                var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
+                var allowedKeys = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayRotation", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
                 foreach (var prop in incoming.Properties())
                 {
                     if (!allowedKeys.Contains(prop.Name)) throw new InvalidOperationException("Unknown overlay preview setting: " + prop.Name);
@@ -6260,22 +6282,25 @@ namespace ReplayKitHelper
             if (kinds == null || !kinds.Ok) { Log.Write("CheckBongoCat: OBS did not answer in time, nothing checked."); return; }
 
             bool loaded = (kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind);
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Bongo Cat Overlay" }, 3000);
+            bool sourceCurrent = input.Ok && input.Data?["inputKind"]?.Value<string>() == BongoInputKind;
             // replaykit.dll draws the Bango Cat folder beside obs64.exe with the models ReplayKit baked from it, and a missing folder or bake leaves the cat silently empty
             string root = GetObsInstallRoot();
             string bakes = Path.Combine(AppConfig.GetDockDir(), "overlay-preview", "bongo-models");
             bool filesPresent = File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\config.json")) &&
                 File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\standard\\config.json")) &&
                 Directory.Exists(bakes) && Directory.EnumerateFiles(bakes, "*.json").Any();
-            if (loaded && filesPresent) { Notifications.DismissKey(BongoCatNoticeKey); return; }
-            Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", Bango Cat folder and baked models present: " + filesPresent + ".");
+            if (loaded && filesPresent && sourceCurrent) { Notifications.DismissKey(BongoCatNoticeKey); return; }
+            Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", source uses ReplayKit renderer: " + sourceCurrent + ", Bango Cat folder and baked models present: " + filesPresent + ".");
             Notifications.Add("warning", BongoCatNoticeKey, "Bongo Cat is not working", !filesPresent
                 ? "The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
-                : "OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again.");
+                : !loaded ? "OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again."
+                : "The Bongo Cat source is missing or still uses the older renderer. Run the ReplayKit installer again to repair the saved scene.");
         }
 
         private static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
         {
-            var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
+            var skip = new HashSet<string> { "overlayOpacity", "overlayScale", "overlayRotation", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd" };
             foreach (var prop in GetDefaultSettings().Properties())
             {
                 if (skip.Contains(prop.Name)) continue;
@@ -6283,6 +6308,7 @@ namespace ReplayKitHelper
             }
             return previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
+                    previous["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>() ||
                 previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                 previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||
@@ -6596,6 +6622,7 @@ namespace ReplayKitHelper
                     previous["recordingPreset"]?.Value<string>() != settings["recordingPreset"]?.Value<string>() ||
                     previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                     previous["overlayScale"]?.Value<int>() != settings["overlayScale"]?.Value<int>() ||
+                    previous["overlayRotation"]?.Value<int>() != settings["overlayRotation"]?.Value<int>() ||
                     previous["overlayFlipH"]?.Value<bool>() != settings["overlayFlipH"]?.Value<bool>() ||
                     previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
                     previous["overlayColorMultiply"]?.Value<string>() != settings["overlayColorMultiply"]?.Value<string>() ||

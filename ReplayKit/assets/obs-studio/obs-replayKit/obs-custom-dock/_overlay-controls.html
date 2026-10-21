@@ -64,6 +64,16 @@
   </div>
 </div>
 <div class="form-row">
+  <div class="label">Rotation</div>
+  <div class="field-wrap">
+    <div class="volume-control">
+      <input class="text-input volume-value" id="ovcRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" min="-180" max="180" step="1" aria-label="Overlay rotation slider"></div>
+    </div>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayRotation" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+  </div>
+</div>
+<div class="form-row">
   <div class="label">Hue Shift</div>
   <div class="field-wrap">
     <div class="volume-control">
@@ -95,7 +105,7 @@
 </div>
 <script>
 (function () {
-  var DEF = { overlayStyle:"off", bongoMode:"standard", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
+  var DEF = { overlayStyle:"off", bongoMode:"standard", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayRotation:0, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
   var STYLES = [
     { value:"input_overlay", label:"WASD / mouse", blurb:"Simple keyboard and mouse overlay." },
     { value:"bongo_cat", label:"Bongo Cat", blurb:"Animated keyboard and mouse overlay." },
@@ -116,6 +126,7 @@
   var sliders = {
     overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:0, max:100 },
     overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:50, max:200 },
+    overlayRotation:{ r:document.getElementById("ovcRotation"), n:document.getElementById("ovcRotationValue"), min:-180, max:180 },
     overlayHueShift:{ r:document.getElementById("ovcHue"), n:document.getElementById("ovcHueValue"), min:-180, max:180 },
   };
   var colors = {
@@ -196,13 +207,15 @@
 
   Object.keys(sliders).forEach(function (key) {
     var c = sliders[key];
-    c.commit = function (val) {
+    c.commit = function (val, keepText) {
       st[key] = clamp(val, c.min, c.max, DEF[key]);
-      c.r.value = String(st[key]); c.n.value = String(st[key]);
+      c.r.value = String(st[key]);
+      if (!keepText) c.n.value = String(st[key]);
       setFill(c.r, st[key], c.min, c.max);
       host.set(key, st[key]); refreshResets(); fire();
     };
     c.r.addEventListener("input", function () { c.commit(c.r.value); });
+    if (key === "overlayRotation") c.n.addEventListener("input", function () { c.commit(c.n.value, true); });
     c.n.addEventListener("change", function () { c.commit(c.n.value); });
   });
 
@@ -247,7 +260,7 @@
     refreshResets();
   }
 
-  var KEYS = ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd"];
+  var KEYS = ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd"];
   function pull() {
     KEYS.forEach(function (k) {
       var v = host.get(k);
@@ -255,6 +268,7 @@
     });
     st.overlayOpacity = clamp(st.overlayOpacity, 0, 100, 100);
     st.overlayScale = clamp(st.overlayScale, 50, 200, 100);
+    st.overlayRotation = clamp(st.overlayRotation, -180, 180, 0);
     st.overlayHueShift = clamp(st.overlayHueShift, -180, 180, 0);
     st.overlayColorMultiply = normHex(st.overlayColorMultiply, "#ffffff");
     st.overlayColorAdd = normHex(st.overlayColorAdd, "#000000");

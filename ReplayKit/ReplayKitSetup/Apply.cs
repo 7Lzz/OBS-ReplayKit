@@ -126,8 +126,12 @@ namespace ReplayKitSetup
             });
             Add("Install WASD/mouse overlay", "Adds the WASD/mouse overlay plugin.",
                 () => (object)(InputOverlay.InstallInputOverlayPlugin(progress.LogLine) && InputOverlay.InstallInputOverlayPresets(progress.LogLine)));
-            Add("Install Bongo Cat overlay", "Adds the Bongo Cat overlay files.",
-                () => (object)BongoCat.InstallBongoCat(progress.LogLine));
+            Add("Install Bongo Cat overlay", "Verifies the Bongo Cat files and saved sources.", () =>
+            {
+                if (!BongoCat.InstallBongoCat(progress.LogLine))
+                    throw new IOException("Bongo Cat could not be installed or repaired. Run the ReplayKit installer again to finish setting up the overlay.");
+                return (object)true;
+            });
             Add("Install motion blur filter", "Adds the motion blur filter.",
                 () => (object)ShaderFilter.InstallReplaykitMotionBlurPlugin(progress.LogLine));
             Add("Install desktop audio capture", "Adds desktop audio capture.", () => (object)WinCapture.InstallWinCaptureAudio(progress.LogLine));

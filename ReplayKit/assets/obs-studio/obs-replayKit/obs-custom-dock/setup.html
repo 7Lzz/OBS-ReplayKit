@@ -477,6 +477,7 @@
     overlayFlipH: false,
     overlayOpacity: 100,
     overlayScale: 100,
+    overlayRotation: 0,
     overlayHueShift: 0,
     overlayColorMultiply: "#ffffff",
     overlayColorAdd: "#000000",
@@ -834,7 +835,7 @@
       if (g.openClipsKeybind && g.openClipsKeybind.key) state.openClipsKeybind = g.openClipsKeybind;
       [
         "micDeviceId","micVolume","micInputSensitivity",
-        "overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
+        "overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
         "theme","themeCustom","appIcon","appIconCustomPath","appIconRecordingDot",
       ].forEach((k) => { if (g[k] !== undefined && g[k] !== null) state[k] = g[k]; });
     } catch (_) {}
@@ -868,6 +869,11 @@
       const slider = document.getElementById("ovcScale");
       if (!slider) return;
       slider.value = String(pct);
+      slider.dispatchEvent(new Event("input"));
+    }, (degrees) => {
+      const slider = document.getElementById("ovcRotation");
+      if (!slider) return;
+      slider.value = String(degrees);
       slider.dispatchEvent(new Event("input"));
     });
     if (window.RKAppearance) RKAppearance.init({ get:hostGet, set:hostSet, onChange:() => {}, setStatus });

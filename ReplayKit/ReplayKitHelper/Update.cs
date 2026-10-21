@@ -238,6 +238,15 @@ namespace ReplayKitHelper
             return null;
         }
 
+        private static bool NeedsRepair(string version)
+        {
+            if (!VideoTools.IsInstalled(Constants.HelperRoot)) return true;
+            var result = GetInstallResult();
+            return result["present"]?.Value<bool>() == true && result["installOk"]?.Value<bool>() == false &&
+                result["stage"]?.Value<string>() == "incomplete" &&
+                NormalizeVersion(result["version"]?.Value<string>() ?? "") == version;
+        }
+
         public static JObject GetUpdateStatus(bool manual = false)
         {
             try
@@ -257,7 +266,7 @@ namespace ReplayKitHelper
                     ["releaseName"] = latest.Name,
                     ["releaseNotes"] = latest.Body,
                     ["updateAvailable"] = cmp < 0,
-                    ["repairRequired"] = cmp == 0 && !VideoTools.IsInstalled(Constants.HelperRoot),
+                    ["repairRequired"] = cmp == 0 && NeedsRepair(installed),
                     ["hashRequired"] = true,
                 };
             }
@@ -868,7 +877,7 @@ namespace ReplayKitHelper
                 var latest = GetLatestRelease();
                 if (!string.IsNullOrWhiteSpace(latest.HtmlUrl)) releaseUrl = latest.HtmlUrl;
                 int comparison = CompareVersion(installed, latest.LatestVersion);
-                bool repairRequired = comparison == 0 && !VideoTools.IsInstalled(Constants.HelperRoot);
+                bool repairRequired = comparison == 0 && NeedsRepair(installed);
                 if (comparison > 0 || (comparison == 0 && !repairRequired))
                 {
                     return new JObject

@@ -44,6 +44,7 @@
     <!-- one source file for where the settings and the saved state live, shared with the setup so the two can never disagree about it. -->
     <Compile Include="..\ReplayKitSetup\StateLayout.cs" Link="StateLayout.cs" />
     <Compile Include="..\ReplayKitSetup\VideoTools.cs" Link="VideoTools.cs" />
+    <Compile Include="..\ReplayKitSetup\OverlayRotation.cs" Link="OverlayRotation.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

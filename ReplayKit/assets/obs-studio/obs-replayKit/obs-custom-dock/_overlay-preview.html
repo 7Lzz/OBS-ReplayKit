@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is RKBongo (live2d-bongo partial) drawing the selected Bango Cat mode the way the obs source does. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle, onMove, onScale) where getStyle() -> the overlay* fields, onMove(x, y) takes a drag and onScale(percent) a corner resize already clamped to the size slider range, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
+<!-- shared partial (helper #include target: overlay-preview). a bare fake screen that draws the SELECTED input overlay at its real size + corner position on the canvas (mirrors the helper InputOverlayTransform / BongoTransform math), reacting to real keyboard + mouse in this window, with the live overlay style (opacity / size / flip / hue / colour) applied. wasd + mouse are the real input-overlay preset sheets driven by their own layout json; bongo is RKBongo (live2d-bongo partial) drawing the selected Bango Cat mode the way the obs source does. colours are theme tokens so it follows the Appearance theme. host: RKOverlayPreview.init(getStyle, onMove, onScale, onRotate) where getStyle() -> the overlay* fields, onMove(x, y) takes a drag and onScale(percent) a corner resize already clamped to the size slider range, then .start()/.stop() on section show/hide and .refresh() whenever a control changes. -->
 <style>
   /* the overlay renders at its true canvas fraction, so small parts (the mouse wheel is ~0.4% of canvas width) only become readable on a wide screen */
   .ovp-wrap { width:100%; max-width:760px; margin:2px 0 8px; }
@@ -30,6 +30,10 @@
   .ovp-grip[data-corner="nw"], .ovp-grip[data-corner="se"] { cursor:nwse-resize; }
   .ovp-grip[data-corner="ne"], .ovp-grip[data-corner="sw"] { cursor:nesw-resize; }
   .ovp-screen:hover .ovp-grip, .ovp-grip.is-dragging { opacity:1; }
+  .ovp-rotate { position:absolute; z-index:3; width:12px; height:12px; margin:-6px 0 0 -6px; box-sizing:border-box; border-radius:50%; border:2px solid var(--text); background:rgb(var(--accent-rgb)); opacity:0; transition:opacity 120ms linear; cursor:grab; touch-action:none; }
+  .ovp-rotate::after { content:""; position:absolute; left:50%; top:10px; width:1px; height:14px; margin-left:-.5px; background:var(--line2); pointer-events:none; }
+  .ovp-rotate[hidden] { display:none; }
+  .ovp-screen:hover .ovp-rotate, .ovp-rotate.is-dragging { opacity:1; }
   .ovp-layer { position:absolute; overflow:visible; }
   .ovp-layer[hidden] { display:none; }
   .ovp-sprite { position:absolute; left:0; top:0; transform-origin:0 0; }
@@ -55,7 +59,7 @@
 <div class="ovp-wrap">
   <div class="ovp-hint">
     <span class="ovp-hint-text">Drag to position</span>
-    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag the overlay to move it. It snaps to the edges and the center of the video. Hold Shift to place it anywhere, and press Ctrl+Z to undo a move. The new spot is applied when you press Apply."></button>
+    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply."></button>
   </div>
   <div class="ovp-screen" id="ovpScreen">
     <div class="ovp-off" id="ovpOff" hidden>Input overlay is off</div>
@@ -67,6 +71,7 @@
       <div class="ovp-tint" id="ovpTintAdd" style="mix-blend-mode:screen"></div>
     </div>
     <div class="ovp-grip" data-corner="nw"></div><div class="ovp-grip" data-corner="ne"></div><div class="ovp-grip" data-corner="sw"></div><div class="ovp-grip" data-corner="se"></div>
+    <div class="ovp-rotate" id="ovpRotate"></div>
   </div>
 </div>
 <script>
@@ -84,6 +89,8 @@
   var getStyle = function () { return {}; };
   var onMove = function () {};
   var onScale = null;
+  var onRotate = null;
+  var rotateHandle = document.getElementById("ovpRotate");
   var grips = Array.prototype.slice.call(screenEl.querySelectorAll(".ovp-grip"));
   // the size slider range, which is all the helper accepts for overlayScale
   var SCALE_MIN = 50, SCALE_MAX = 200;
@@ -257,12 +264,21 @@
     if (posOverride) { bx = posOverride.x * CANVAS_W; by = posOverride.y * CANVAS_H; }
     setBox(stage, bx * k, by * k, bw * k, bh * k);
     stageRect = { x: bx, y: by, w: bw, h: bh };
+    var angle = curRotation() * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle);
+    function handlePoint(x, y) { return { x:(bx + bw / 2 + x * cos - y * sin) * k, y:(by + bh / 2 + x * sin + y * cos) * k }; }
     grips.forEach(function (grip) {
       var corner = grip.dataset.corner;
       grip.hidden = !onScale;
-      grip.style.left = (corner[1] === "e" ? bx + bw : bx) * k + "px";
-      grip.style.top = (corner[0] === "s" ? by + bh : by) * k + "px";
+      var at = handlePoint(corner[1] === "e" ? bw / 2 : -bw / 2, corner[0] === "s" ? bh / 2 : -bh / 2);
+      grip.style.left = at.x + "px";
+      grip.style.top = at.y + "px";
+      grip.style.transform = "rotate(" + curRotation() + "deg)";
     });
+    var turnAt = handlePoint(0, -bh / 2 - 24 / k);
+    rotateHandle.style.left = turnAt.x + "px";
+    rotateHandle.style.top = turnAt.y + "px";
+    rotateHandle.style.transform = "rotate(" + curRotation() + "deg)";
+    rotateHandle.hidden = !onRotate;
     if (mode === "input_overlay") {
       // the sub-layers are laid out in the computed local space, then scaled into whatever box obs reports
       var fx = localW > 0 ? bw / localW : 1, fy = localH > 0 ? bh / localH : 1;
@@ -276,10 +292,10 @@
 
   // ---- drag to reposition ----
   var drag = null;
-  // committed drags and resizes so ctrl+z steps back and ctrl+shift+z / ctrl+y forward. each entry is { pos, scale }: pos a {x,y} canvas-fraction override or null for the corner obs / the saved setting produces, scale the size slider value. a fresh edit clears the redo stack.
+  // committed drags and resizes so ctrl+z steps back and ctrl+shift+z / ctrl+y forward. each entry is { pos, scale, rotation }: pos a {x,y} canvas-fraction override or null for the corner obs / the saved setting produces, scale the size slider value. a fresh edit clears the redo stack.
   var moveUndo = [], moveRedo = [], MOVE_HISTORY_MAX = 60;
   function clearMoveHistory() { moveUndo.length = 0; moveRedo.length = 0; }
-  function snapshot(pos) { return { pos: pos ? { x: pos.x, y: pos.y } : null, scale: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100) }; }
+  function snapshot(pos) { return { pos: pos ? { x: pos.x, y: pos.y } : null, scale: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100), rotation:curRotation() }; }
   function pushHistory(entry) {
     moveUndo.push(entry);
     if (moveUndo.length > MOVE_HISTORY_MAX) moveUndo.shift();
@@ -312,14 +328,18 @@
     var nx = drag.x + (ev.clientX - drag.px) / drag.k;
     var ny = drag.y + (ev.clientY - drag.py) / drag.k;
     if (Math.abs(ev.clientX - drag.px) > 1 || Math.abs(ev.clientY - drag.py) > 1) drag.dirty = true;
+    var angle = curRotation() * Math.PI / 180;
+    var boundW = Math.abs(stageRect.w * Math.cos(angle)) + Math.abs(stageRect.h * Math.sin(angle));
+    var boundH = Math.abs(stageRect.w * Math.sin(angle)) + Math.abs(stageRect.h * Math.cos(angle));
+    var offsetX = (stageRect.w - boundW) / 2, offsetY = (stageRect.h - boundH) / 2;
     if (!ev.shiftKey) {
       var tol = 3 / drag.k; // ~3 screen px of pull, expressed in canvas units -- hold Shift to place freely
-      nx = snapAxis(nx, stageRect.w, CANVAS_W, tol);
-      ny = snapAxis(ny, stageRect.h, CANVAS_H, tol);
+      nx = snapAxis(nx + offsetX, boundW, CANVAS_W, tol) - offsetX;
+      ny = snapAxis(ny + offsetY, boundH, CANVAS_H, tol) - offsetY;
     }
     // keep a sliver on screen so the overlay can never be dragged fully out of reach
-    nx = Math.max(-stageRect.w + 24, Math.min(CANVAS_W - 24, nx));
-    ny = Math.max(-stageRect.h + 24, Math.min(CANVAS_H - 24, ny));
+    nx = Math.max(-boundW + 24, Math.min(CANVAS_W - 24, nx + offsetX)) - offsetX;
+    ny = Math.max(-boundH + 24, Math.min(CANVAS_H - 24, ny + offsetY)) - offsetY;
     posOverride = { x: nx / CANVAS_W, y: ny / CANVAS_H };
     layout();
   }
@@ -351,7 +371,8 @@
   }
   function onGripMove(ev) {
     if (!resize) return;
-    var dw = resize.sx * (ev.clientX - resize.px) / resize.k, dh = resize.sy * (ev.clientY - resize.py) / resize.k;
+    var angle = curRotation() * Math.PI / 180, dx = (ev.clientX - resize.px) / resize.k, dy = (ev.clientY - resize.py) / resize.k;
+    var dw = resize.sx * (dx * Math.cos(angle) + dy * Math.sin(angle)), dh = resize.sy * (-dx * Math.sin(angle) + dy * Math.cos(angle));
     var factor = ((resize.w + dw) / resize.w + (resize.h + dh) / resize.h) / 2;
     var pct = Math.round(Math.max(SCALE_MIN, Math.min(SCALE_MAX, resize.pct * factor)));
     if (pct !== clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100)) onScale(pct);
@@ -368,6 +389,7 @@
   function applyHistoryEntry(entry) {
     var current = snapshot(posOverride);
     if (entry.scale !== current.scale && onScale) onScale(entry.scale);
+    if (entry.rotation !== current.rotation && onRotate) onRotate(entry.rotation);
     if (JSON.stringify(entry.pos) === JSON.stringify(current.pos)) return;
     posOverride = entry.pos ? { x: entry.pos.x, y: entry.pos.y } : null;
     posDirty = true;
@@ -401,7 +423,7 @@
     var op = clampNum(s.overlayOpacity, 0, 100, 100) / 100;
     var hue = clampNum(s.overlayHueShift, -180, 180, 0);
     stage.style.opacity = String(op);
-    stage.style.transform = s.overlayFlipH ? "scaleX(-1)" : "none";
+    stage.style.transform = "rotate(" + curRotation() + "deg)" + (s.overlayFlipH ? " scaleX(-1)" : "");
     stage.style.filter = hue ? ("hue-rotate(" + hue + "deg)") : "none";
     var mul = normHex(s.overlayColorMultiply, "#ffffff");
     var add = normHex(s.overlayColorAdd, "#000000");
@@ -425,6 +447,7 @@
     offEl.hidden = !off;
     stage.hidden = off;
     grips.forEach(function (grip) { grip.hidden = off || !onScale; });
+    rotateHandle.hidden = off || !onRotate;
     var bongo = mode === "bongo_cat";
     bongoEl.hidden = !bongo;
     wasdEl.hidden = bongo;
@@ -507,16 +530,20 @@
     stage.addEventListener("pointermove", onStageMove);
     stage.addEventListener("pointerup", onStageUp);
     stage.addEventListener("pointercancel", onStageUp);
+    rotateHandle.addEventListener("pointerdown", onRotateDown);
+    rotateHandle.addEventListener("pointermove", onRotateMove);
+    rotateHandle.addEventListener("pointerup", onRotateUp);
+    rotateHandle.addEventListener("pointercancel", onRotateUp);
   }
 
   // obs owns the real position, so poll it while the section is on screen -- moving the item in the projector shows up here without a reload. skipped mid-drag so it cannot fight the pointer.
   async function pollPosition() {
     if (!running) return;
-    if (!drag && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
+    if (!drag && !resize && !turn && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
       try {
         var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
         var d = await r.json();
-        if (d && d.ok && !drag && !posDirty) {
+        if (d && d.ok && !drag && !resize && !turn && !posDirty) {
           var changed = false;
           // mirror the projectors own resolution so the fake screen has the same aspect and the overlay covers the same fraction of it. reported even when the item cannot be resolved, so the box stays true while the overlay is off.
           if (d.canvasWidth > 0 && d.canvasHeight > 0 && (d.canvasWidth !== CANVAS_W || d.canvasHeight !== CANVAS_H)) {
@@ -543,6 +570,36 @@
   }
 
   function curScalePct() { var s = getStyle() || {}; return s.overlayScale; }
+  function curRotation() { return Math.round(clampNum((getStyle() || {}).overlayRotation, -180, 180, 0)); }
+  var turn = null;
+  function onRotateDown(ev) {
+    if (!running || mode === "off" || ev.button !== 0 || !stageRect || !onRotate) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var screen = screenEl.getBoundingClientRect(), k = screenEl.clientWidth / CANVAS_W;
+    if (!k) return;
+    var cx = screen.left + (stageRect.x + stageRect.w / 2) * k, cy = screen.top + (stageRect.y + stageRect.h / 2) * k;
+    turn = { cx:cx, cy:cy, angle:Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI, before:snapshot(posOverride) };
+    rotateHandle.classList.add("is-dragging");
+    try { rotateHandle.setPointerCapture(ev.pointerId); } catch (_) {}
+  }
+  function onRotateMove(ev) {
+    if (!turn) return;
+    var degrees = turn.before.rotation + Math.atan2(ev.clientY - turn.cy, ev.clientX - turn.cx) * 180 / Math.PI - turn.angle;
+    degrees = ((degrees + 180) % 360 + 360) % 360 - 180;
+    if (!ev.shiftKey) {
+      var straight = Math.round(degrees / 90) * 90;
+      if (Math.abs(degrees - straight) <= 5) degrees = straight === 180 ? -180 : straight;
+    }
+    degrees = Math.round(degrees);
+    if (degrees !== curRotation()) onRotate(degrees);
+  }
+  function onRotateUp(ev) {
+    if (!turn) return;
+    if (turn.before.rotation !== curRotation()) pushHistory(turn.before);
+    turn = null;
+    rotateHandle.classList.remove("is-dragging");
+    try { rotateHandle.releasePointerCapture(ev.pointerId); } catch (_) {}
+  }
   // the saved overlayPosition setting for the style being previewed, as canvas fractions, or null
   function savedPosition() {
     var s = getStyle() || {};
@@ -555,10 +612,11 @@
   function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
 
   window.RKOverlayPreview = {
-    init: function (fn, onMoveFn, onScaleFn) {
+    init: function (fn, onMoveFn, onScaleFn, onRotateFn) {
       if (typeof fn === "function") getStyle = fn;
       if (typeof onMoveFn === "function") onMove = onMoveFn;
       if (typeof onScaleFn === "function") onScale = onScaleFn;
+      if (typeof onRotateFn === "function") onRotate = onRotateFn;
       ensureBackdrop();
     },
     // host calls this once the drag has been saved, so the poll can resume following the scene item

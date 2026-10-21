@@ -1312,6 +1312,16 @@
           </div>
         </div>
         <div class="form-row">
+          <div class="label">Rotation</div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="overlayRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees">
+              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="overlayRotation" type="range" min="-180" max="180" step="1" aria-label="Overlay rotation slider"></div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetOverlayRotation" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="label">Hue Shift</div>
           <div class="field-wrap">
             <div class="volume-control">
@@ -1994,6 +2004,7 @@
   const DEFAULT_OPEN_CLIPS_KEYBIND = { alt:true, key:"OBS_KEY_Z" };
   const DEFAULT_OVERLAY_OPACITY = 100;
   const DEFAULT_OVERLAY_SCALE = 100;
+  const DEFAULT_OVERLAY_ROTATION = 0;
   const DEFAULT_OVERLAY_HUE_SHIFT = 0;
   const DEFAULT_OVERLAY_COLOR_MULTIPLY = "#ffffff";
   const DEFAULT_OVERLAY_COLOR_ADD = "#000000";
@@ -2061,6 +2072,8 @@
     overlayOpacityValue: document.getElementById("overlayOpacityValue"),
     overlayScale: document.getElementById("overlayScale"),
     overlayScaleValue: document.getElementById("overlayScaleValue"),
+    overlayRotation: document.getElementById("overlayRotation"),
+    overlayRotationValue: document.getElementById("overlayRotationValue"),
     overlayFlipH: document.getElementById("overlayFlipH"),
     bongoMode: document.getElementById("bongoMode"),
     bongoModeRow: document.getElementById("bongoModeRow"),
@@ -2480,6 +2493,7 @@
     if (!overlayPreviewTouched &&
         !settingValueChanged("overlayOpacity") &&
         !settingValueChanged("overlayScale") &&
+        !settingValueChanged("overlayRotation") &&
         !settingValueChanged("overlayFlipH") &&
         !settingValueChanged("overlayHueShift") &&
         !settingValueChanged("overlayColorMultiply") &&
@@ -2489,6 +2503,7 @@
     const payload = {
       overlayOpacity: state.overlayOpacity ?? 100,
       overlayScale: state.overlayScale ?? 100,
+      overlayRotation: state.overlayRotation ?? 0,
       overlayFlipH: !!state.overlayFlipH,
       overlayHueShift: state.overlayHueShift ?? 0,
       overlayColorMultiply: state.overlayColorMultiply || "#ffffff",
@@ -2499,7 +2514,7 @@
       headers:{ "Content-Type":"application/json" },
       body:JSON.stringify(payload),
     });
-    ["overlayOpacity", "overlayScale", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
+    ["overlayOpacity", "overlayScale", "overlayRotation", "overlayFlipH", "overlayHueShift", "overlayColorMultiply", "overlayColorAdd"].forEach((key) => {
       if (!data.settings || !Object.prototype.hasOwnProperty.call(data.settings, key)) return;
       state[key] = data.settings[key];
       originalState[key] = data.settings[key];
@@ -3080,12 +3095,14 @@
     setComboValue(els.overlayStyle, state.overlayStyle || "input_overlay", false);
     syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, state.overlayOpacity ?? 100, clampVolume, 0, 100);
     syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, state.overlayScale ?? 100, clampOverlayScale, 50, 200);
+    syncIntegerRangeControl(els.overlayRotation, els.overlayRotationValue, state.overlayRotation ?? 0, clampHueShift, -180, 180);
     els.overlayFlipH.checked = !!state.overlayFlipH;
     setComboValue(els.bongoMode, state.bongoMode || "standard", false);
     els.bongoModeRow.hidden = state.overlayStyle !== "bongo_cat";
     syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, state.overlayHueShift ?? 0, clampHueShift, -180, 180);
     refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
     refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
+    refreshFieldResetState("overlayRotation", DEFAULT_OVERLAY_ROTATION);
     refreshFieldResetState("overlayHueShift", DEFAULT_OVERLAY_HUE_SHIFT);
     syncColorControl(els.overlayColorMultiply, els.overlayColorMultiplyValue, state.overlayColorMultiply || "#ffffff", "#ffffff");
     syncColorControl(els.overlayColorAdd, els.overlayColorAddValue, state.overlayColorAdd || "#000000", "#000000");
@@ -3179,6 +3196,7 @@
     state.overlayStyle = comboValue(els.overlayStyle);
     state.overlayOpacity = clampVolume(els.overlayOpacity.value);
     state.overlayScale = clampOverlayScale(els.overlayScale.value);
+    state.overlayRotation = clampHueShift(els.overlayRotation.value);
     state.overlayFlipH = els.overlayFlipH.checked;
     state.bongoMode = comboValue(els.bongoMode);
     state.overlayHueShift = clampHueShift(els.overlayHueShift.value);
@@ -3356,7 +3374,8 @@
   if (window.RKOverlayPreview) RKOverlayPreview.init(
     () => { try { readUi(); } catch (_) {} return state; },
     (x, y) => { setOverlayPosition(x, y); markDirty(); },
-    (pct) => { els.overlayScale.value = String(pct); els.overlayScale.dispatchEvent(new Event("input")); });
+    (pct) => { els.overlayScale.value = String(pct); els.overlayScale.dispatchEvent(new Event("input")); },
+    (degrees) => { els.overlayRotation.value = String(degrees); els.overlayRotation.dispatchEvent(new Event("input")); });
   // the mic controls write straight into state (the host contract is get/set/onChange), so Apply, Cancel and the dirty check treat them like every other field
   if (window.RKMic) RKMic.init({ get:(k) => state[k], set:(k, v) => { state[k] = v; }, onChange:() => markDirty() });
   els.screenshareGameOverridePicker.addEventListener("combochange", syncScreenshareCaptureFields);
@@ -3447,6 +3466,7 @@
   [
     [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampVolume, 0, 100, DEFAULT_OVERLAY_OPACITY, "resetOverlayOpacity"],
     [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, 50, 200, DEFAULT_OVERLAY_SCALE, "resetOverlayScale"],
+    [els.overlayRotation, els.overlayRotationValue, "overlayRotation", clampHueShift, -180, 180, DEFAULT_OVERLAY_ROTATION, "resetOverlayRotation"],
     [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, -180, 180, DEFAULT_OVERLAY_HUE_SHIFT, "resetOverlayHueShift"],
   ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
     slider.addEventListener("input", () => {
@@ -3896,11 +3916,11 @@
       }
       setUpdateReleaseLink(data.releaseUrl, true);
       if (dirty) {
-        setUpdateStatus((data.repairRequired ? "Video tools need repair." : "Update available: " + data.latestVersion + ".") + " Apply or cancel your settings changes first.", "bad");
+        setUpdateStatus((data.repairRequired ? "ReplayKit needs repair." : "Update available: " + data.latestVersion + ".") + " Apply or cancel your settings changes first.", "bad");
         return;
       }
       if (await openUpdatePrompt(data.latestVersion)) {
-        setUpdateStatus(data.repairRequired ? "Repairing the ReplayKit video tools." : "Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
+        setUpdateStatus(data.repairRequired ? "Repairing the ReplayKit installation." : "Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
       }
     } catch (e) {
       setUpdateStatus("Update check failed: " + (e.message || e), "bad");

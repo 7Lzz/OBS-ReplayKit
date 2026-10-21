@@ -362,7 +362,7 @@
         return;
       }
       // no prompt: the update installs itself, the window only reports what is happening
-      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || ("ReplayKit " + data.latestVersion)), data.repairRequired ? "Restoring the video tools." : "Installing version " + data.latestVersion + ".", "OBS restarts when it is done.");
+      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || ("ReplayKit " + data.latestVersion)), data.repairRequired ? "Repairing your ReplayKit installation." : "Installing version " + data.latestVersion + ".", "OBS restarts when it is done.");
       installUpdate();
     } catch (e) {
       failUpdate(e.message || String(e));

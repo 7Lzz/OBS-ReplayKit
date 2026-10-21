@@ -527,6 +527,7 @@ namespace ReplayKitSetup
             obj["bongoMode"] = prefs.BongoMode;
             obj["overlayOpacity"] = prefs.OverlayOpacity;
             obj["overlayScale"] = prefs.OverlayScale;
+            obj["overlayRotation"] = prefs.OverlayRotation;
             obj["overlayHueShift"] = prefs.OverlayHueShift;
             obj["overlayColorMultiply"] = prefs.OverlayColorMultiply;
             obj["overlayColorAdd"] = prefs.OverlayColorAdd;
@@ -1280,6 +1281,21 @@ namespace ReplayKitSetup
             item["bounds_rel"] = new JObject { ["x"] = 0.0, ["y"] = 0.0 };
             item["bounds_type"] = 0;
             item["bounds_align"] = 0;
+            ApplyOverlayRotation(item, canvasW, canvasH, prefs.OverlayRotation, 628, 292);
+        }
+
+        private static void ApplyOverlayRotation(JObject item, double canvasW, double canvasH, int angle, double width, double height)
+        {
+            var transform = new JObject
+            {
+                ["positionX"] = item["pos"]?["x"], ["positionY"] = item["pos"]?["y"],
+                ["scaleX"] = item["scale"]?["x"], ["scaleY"] = item["scale"]?["y"], ["alignment"] = item["align"], ["rotation"] = 0,
+            };
+            var rotated = ReplayKitShared.OverlayRotation.Rotate(transform, angle, width, height);
+            double x = rotated["positionX"].Value<double>(), y = rotated["positionY"].Value<double>();
+            item["rot"] = angle;
+            item["pos"] = new JObject { ["x"] = x, ["y"] = y };
+            item["pos_rel"] = SceneRelPos(x, y, canvasW, canvasH);
         }
 
         private static void ApplyBongoGeometry(JObject item, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
@@ -1321,6 +1337,7 @@ namespace ReplayKitSetup
             item["show_transition"] = new JObject { ["duration"] = 300 };
             item["hide_transition"] = new JObject { ["duration"] = 300 };
             item["private_settings"] = new JObject();
+            ApplyOverlayRotation(item, canvasW, canvasH, prefs.OverlayRotation, BongoCatSourceW, BongoCatSourceH);
         }
 
         private static JObject NewBongoSceneItem(int itemId, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)

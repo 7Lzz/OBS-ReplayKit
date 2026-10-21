@@ -16,6 +16,7 @@ namespace ReplayKitSetup
         [JsonProperty("overlay_style")] public string OverlayStyle { get; set; } = Prefs.DEFAULT_OVERLAY_STYLE;
         [JsonProperty("overlay_opacity")] public int OverlayOpacity { get; set; } = Prefs.DEFAULT_OVERLAY_OPACITY;
         [JsonProperty("overlay_scale")] public int OverlayScale { get; set; } = Prefs.DEFAULT_OVERLAY_SCALE;
+        [JsonProperty("overlay_rotation")] public int OverlayRotation { get; set; } = 0;
         [JsonProperty("overlay_hue_shift")] public double OverlayHueShift { get; set; } = Prefs.DEFAULT_OVERLAY_HUE_SHIFT;
         [JsonProperty("overlay_color_multiply")] public string OverlayColorMultiply { get; set; } = Prefs.DEFAULT_OVERLAY_COLOR_MULTIPLY;
         [JsonProperty("overlay_color_add")] public string OverlayColorAdd { get; set; } = Prefs.DEFAULT_OVERLAY_COLOR_ADD;
@@ -294,6 +295,7 @@ namespace ReplayKitSetup
             ["bongoMode"] = "bongo_mode",
             ["overlayOpacity"] = "overlay_opacity",
             ["overlayScale"] = "overlay_scale",
+            ["overlayRotation"] = "overlay_rotation",
             ["overlayHueShift"] = "overlay_hue_shift",
             ["overlayColorMultiply"] = "overlay_color_multiply",
             ["overlayColorAdd"] = "overlay_color_add",
@@ -454,6 +456,7 @@ namespace ReplayKitSetup
                 BongoMode = bongoMode,
                 OverlayOpacity = CoerceIntRange(Get("overlay_opacity"), DEFAULT_OVERLAY_OPACITY, OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 OverlayScale = CoerceIntRange(Get("overlay_scale"), DEFAULT_OVERLAY_SCALE, OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX),
+                OverlayRotation = CoerceIntRange(Get("overlay_rotation"), 0, -180, 180),
                 OverlayHueShift = CoerceFloatRange(Get("overlay_hue_shift"), DEFAULT_OVERLAY_HUE_SHIFT, OVERLAY_HUE_SHIFT_MIN, OVERLAY_HUE_SHIFT_MAX),
                 OverlayColorMultiply = CoerceHexColor(Get("overlay_color_multiply"), DEFAULT_OVERLAY_COLOR_MULTIPLY),
                 OverlayColorAdd = CoerceHexColor(Get("overlay_color_add"), DEFAULT_OVERLAY_COLOR_ADD),
