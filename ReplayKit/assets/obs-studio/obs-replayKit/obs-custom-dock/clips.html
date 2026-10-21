@@ -290,7 +290,7 @@
   .clip-sort-label { flex: 1 1 auto; }
   /* Selected sorting uses the same theme highlight as the other dropdowns. */
   .clip-sort-item.is-active { background: var(--selected,var(--primary)); color: var(--on-accent); }
-  .clip-sort-item.is-active:hover { background: var(--selected,var(--primary)); color: var(--on-accent); }
+  .clip-sort-item.is-active.rk-hover-row:hover { background: var(--selected,var(--primary)); color: var(--on-accent); }
   .clip-sort-check {
     width: 15px;
     height: 15px;
@@ -5678,6 +5678,12 @@
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
+  document.addEventListener("click", (event) => {
+    const inside = event.target.closest && event.target.closest(".settings-wrap");
+    document.querySelectorAll(".settings-wrap.is-open").forEach((wrap) => {
+      if (wrap !== inside) wrap.classList.remove("is-open");
+    });
+  });
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card rk-hover-card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
@@ -6328,12 +6334,6 @@
         e.stopPropagation();
         setPlaybackRate(pill.dataset.speed);
       });
-    });
-    // outside-click dismiss. limited to the document becuase the popup only exists while in fullscreen, where theres nothing outside this card to click anyway.
-    document.addEventListener("click", (e) => {
-      if (!settingsWrap || !settingsWrap.classList.contains("is-open")) return;
-      if (e.target.closest && e.target.closest(".settings-wrap")) return;
-      settingsWrap.classList.remove("is-open");
     });
 
     // volume + slider local ui updates immediately, then notifyvolumesync rewrites every other cards icon + slider so volume is truly global.
@@ -9871,6 +9871,7 @@
     const kept = keepTrimDraft();
     editorTools.closed();
     trimLanes.unload();
+    if (editorFx) editorFx.reset();
     trimProcessingVeil.classList.remove("is-open");
     trimVeil.classList.remove("is-measuring");
     trimVeil.classList.remove("is-open");

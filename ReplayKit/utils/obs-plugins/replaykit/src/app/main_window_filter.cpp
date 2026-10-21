@@ -19,9 +19,24 @@ namespace {
 QPointer<QObject> g_mainWindowCloseFilter;
 
 // turns the OBS main windows close (X) into hide-to-tray while g_closeToTray is on. narrowly scoped to the one QWidget (an app-wide filter caused a confirmed 2026-08-10 crash catching cef events mid-teardown). an ALLOWCLOSE over the ipc pipe from the helpers restart/exit routes, right before they post WM_CLOSE, opens a 60s window where the next close passes through so real quits + replaykit restarts still save geometry.
-class MainWindowCloseFilter : public QObject {
+class MainWindowCloseFilter : public QObject, public QAbstractNativeEventFilter {
 public:
-	explicit MainWindowCloseFilter(QWidget *mw) : QObject(mw), m_mw(mw) {}
+	explicit MainWindowCloseFilter(QWidget *mw) : QObject(mw), m_mw(mw)
+	{
+		qApp->installNativeEventFilter(this);
+	}
+	~MainWindowCloseFilter() override
+	{
+		if (qApp)
+			qApp->removeNativeEventFilter(this);
+	}
+	bool nativeEventFilter(const QByteArray &, void *message, qintptr *) override
+	{
+		const MSG *msg = static_cast<const MSG *>(message);
+		if (m_taskbarCreated && msg && msg->message == m_taskbarCreated && msg->hwnd == (HWND)m_mw->winId())
+			ScheduleIconRefresh();
+		return false;
+	}
 
 protected:
 	bool eventFilter(QObject *watched, QEvent *event) override
@@ -36,7 +51,7 @@ protected:
 		}
 		if (type == QEvent::Show || type == QEvent::WindowStateChange) {
 			// restoring from the tray rebuilds the taskbar button -- put our icon back on it
-			RefreshAppIcon();
+			ScheduleIconRefresh();
 			return false;
 		}
 		// a clip playing fullscreen has the window stretched over its monitor, and obs would save that as the window position
@@ -73,6 +88,15 @@ protected:
 	}
 
 private:
+	void ScheduleIconRefresh()
+	{
+		if (m_iconRefreshQueued)
+			return;
+		m_iconRefreshQueued = true;
+		QTimer::singleShot(0, this, [this]() { m_iconRefreshQueued = false; RefreshAppIcon(); });
+	}
+	const UINT m_taskbarCreated = RegisterWindowMessageW(L"TaskbarButtonCreated");
+	bool m_iconRefreshQueued = false;
 	QWidget *m_mw;
 };
 

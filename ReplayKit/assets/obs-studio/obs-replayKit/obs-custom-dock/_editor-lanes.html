@@ -1598,6 +1598,7 @@
     // a gif on the preview shows the frame of the timeline rather than running by itself, so it stops with the clip and stands on the frame the saved copy has there; its frames are decoded one at a time as the playhead reaches them, and their times are read once when it opens. it loops the way ffmpeg loops it in the saved copy, and a frame without a delay is held a tenth of a second like browsers and ffmpeg hold it
     function gifFrames(url, canvas) {
       var g = { ready: false, dead: false, times: [], total: 0, dec: null, shown: -1, busy: false, want: 0 };
+      var request = new AbortController();
       function draw(frame) {
         var ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1611,15 +1612,20 @@
         if (idx === g.shown) return;
         g.busy = true;
         g.dec.decode({ frameIndex: idx }).then(function (r) {
-          if (!g.dead) { draw(r.image); g.shown = idx; }
-          r.image.close();
-        }).catch(function () {}).then(function () { g.busy = false; pump(); });
+          try { if (!g.dead) { draw(r.image); g.shown = idx; } }
+          finally { r.image.close(); }
+        }).catch(function () { g.close(); }).then(function () { g.busy = false; pump(); });
       }
       g.show = function (t) { g.want = t; pump(); };
-      g.close = function () { g.dead = true; if (g.dec) { try { g.dec.close(); } catch (e) { /* already closed */ } } };
-      fetch(url).then(function (res) { return res.arrayBuffer(); }).then(function (buf) {
+      g.close = function () {
+        g.dead = true; request.abort();
+        if (g.dec) { try { g.dec.close(); } catch (e) { /* already closed */ } g.dec = null; }
+        g.times = []; canvas.width = canvas.height = 1;
+      };
+      fetch(url, { signal: request.signal }).then(function (res) { return res.arrayBuffer(); }).then(function (buf) {
         if (g.dead) return null;
         var dec = new ImageDecoder({ data: buf, type: "image/gif" });
+        g.dec = dec;
         return dec.tracks.ready.then(function () {
           var count = dec.tracks.selectedTrack.frameCount;
           var at = 0;
@@ -1629,11 +1635,13 @@
               chain = chain.then(function () {
                 if (g.dead) return null;
                 return dec.decode({ frameIndex: i }).then(function (r) {
-                  var d = (r.image.duration || 0) / 1e6;
-                  g.times.push(at);
-                  at += d > 0.011 ? d : 0.1;
-                  if (i === 0) { canvas.width = r.image.displayWidth; canvas.height = r.image.displayHeight; draw(r.image); g.shown = 0; }
-                  r.image.close();
+                  try {
+                    if (g.dead) return;
+                    var d = (r.image.duration || 0) / 1e6;
+                    g.times.push(at);
+                    at += d > 0.011 ? d : 0.1;
+                    if (i === 0) { canvas.width = r.image.displayWidth; canvas.height = r.image.displayHeight; draw(r.image); g.shown = 0; }
+                  } finally { r.image.close(); }
                 });
               });
             })(i);
@@ -1646,7 +1654,7 @@
             pump();
           });
         });
-      }).catch(function () { /* the picture stays on its first frame */ });
+      }).catch(function () { g.close(); });
       return g;
     }
 
@@ -1677,19 +1685,28 @@
       return { box: box, media: media, ref: l.ref, gif: gif };
     }
 
+    function destroyLayerView(view) {
+      if (view.gif) view.gif.close();
+      if (view.look) view.look.destroy();
+      if (typeof view.media.pause === "function") view.media.pause();
+      view.media.removeAttribute("src");
+      if (typeof view.media.load === "function") view.media.load();
+      view.box.remove();
+    }
+
     function paintLayers() {
       var host = dom.layerOverlay;
       if (!host) return;
       var t = nowT();
-      var playing = opts.isPlaying && opts.isPlaying();
+      var playing = !document.hidden && opts.isPlaying && opts.isPlaying();
       var live = {};
       st.layers.forEach(function (l) {
         var v = layerViews[l.id];
-        if (v && v.ref !== l.ref) { if (v.gif) v.gif.close(); v.box.remove(); v = null; }
+        if (v && v.ref !== l.ref) { destroyLayerView(v); v = null; }
         if (!v) v = layerViews[l.id] = makeLayerView(l);
         host.appendChild(v.box);
         live[l.id] = true;
-        var on = t >= l.at - 1e-6 && t < l.end;
+        var on = !document.hidden && t >= l.at - 1e-6 && t < l.end;
         v.box.hidden = !on;
         v.box.classList.toggle("is-selected", l.id === st.selected);
         v.box.style.left = (l.x * 100) + "%";
@@ -1714,12 +1731,16 @@
         if (playing && m.paused) { var p = m.play(); if (p && p.catch) p.catch(function () {}); }
         if (!playing && !m.paused) m.pause();
       });
-      Object.keys(layerViews).forEach(function (id) { if (!live[id]) { if (layerViews[id].gif) layerViews[id].gif.close(); layerViews[id].box.remove(); delete layerViews[id]; } });
+      Object.keys(layerViews).forEach(function (id) { if (!live[id]) { destroyLayerView(layerViews[id]); delete layerViews[id]; } });
       host.hidden = !st.layers.length;
       // the playhead only moves a few times a second on its own, so a gif is kept on its frame every frame while the clip plays
       if (playing && !layerRaf && st.layers.some(function (l) { return l.kind === "media" && l.gif; })) layerRaf = requestAnimationFrame(function () { layerRaf = 0; paintLayers(); });
     }
     var layerRaf = 0;
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
+      paintLayers();
+    });
 
     function layersChanged() {
       syncLayers();
@@ -4901,7 +4922,8 @@
 
     function unloadState() {
       if (dom.subOverlay) { dom.subOverlay.hidden = true; dom.subOverlay._key = ""; dom.subOverlay._lit = []; dom.subOverlay.textContent = ""; }
-      Object.keys(layerViews).forEach(function (id) { if (layerViews[id].gif) layerViews[id].gif.close(); layerViews[id].media.removeAttribute("src"); layerViews[id].box.remove(); });
+      if (layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
+      Object.keys(layerViews).forEach(function (id) { destroyLayerView(layerViews[id]); });
       layerViews = {};
       Object.keys(layerRowEls).forEach(function (id) { layerRowEls[id].remove(); });
       layerRowEls = {};

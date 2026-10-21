@@ -28,6 +28,7 @@ QIcon g_appIconDefaultMain;
 QIcon g_obsTrayIcon[3];
 // the icon on the tray is one of ours, put there for a custom icon. with the default icon the tray belongs to obs and follows what obs is doing
 bool g_trayIsOurs = false;
+qint64 g_lastTrayIconKey = 0;
 HICON g_classOrigBig = nullptr;   // obs's own class icons, captured once
 HICON g_classOrigSmall = nullptr;
 HICON g_ownedIcon = nullptr;      // the single 256px HICON we push to every slot + the class; freed on the next change
@@ -127,6 +128,19 @@ int ObsTrayState()
 		return 2;
 	const bool on = obs_frontend_recording_active() || obs_frontend_replay_buffer_active() || obs_frontend_streaming_active() || obs_frontend_virtualcam_active();
 	return on ? 1 : 0;
+}
+
+void ClearTaskbarOverlay()
+{
+	QWidget *window = (QWidget *)obs_frontend_get_main_window();
+	if (!window)
+		return;
+	ITaskbarList3 *taskbar = nullptr;
+	if (FAILED(CoCreateInstance(__uuidof(TaskbarList), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbar))))
+		return;
+	if (SUCCEEDED(taskbar->HrInit()))
+		taskbar->SetOverlayIcon((HWND)window->winId(), nullptr, nullptr);
+	taskbar->Release();
 }
 
 // kept only under the state it looks like, since obs can still be about to set the icon of the state it just reached
@@ -337,6 +351,7 @@ void CaptureAppIconDefaults()
 void RefreshTrayIcon()
 {
 	CaptureAppIconDefaults();
+	ClearTaskbarOverlay();
 
 	const bool custom = !(g_appIconPath.isEmpty() || g_appIconPath == "-");
 	QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
@@ -349,22 +364,21 @@ void RefreshTrayIcon()
 			return;
 		// the dot only rides a user-chosen icon -- on "default" obs manages its own recording indicator.
 		const bool recording = obs_frontend_recording_active() || obs_frontend_replay_buffer_active();
-		tray->setIcon(recording && g_recordingDotEnabled ? ComposeRecordingDot(base) : base);
+		const QIcon icon = recording && g_recordingDotEnabled ? ComposeRecordingDot(base) : base;
+		tray->setIcon(icon);
+		g_lastTrayIconKey = icon.cacheKey();
 		g_trayIsOurs = true;
 		return;
 	}
 
 	const int state = ObsTrayState();
-	// the dot is one switch for every icon: off keeps the plain obs icon on the tray even while obs would show its own red one, and on leaves the tray to obs, which sets the icon of each state itself. a copy of an older icon put back here is what once kept the red dot on after clipping and recording were off
-	if (!g_recordingDotEnabled && state == 1) {
-		tray->setIcon(ObsTrayIconFor(0));
-		g_trayIsOurs = true;
-	} else if (g_trayIsOurs) {
-		tray->setIcon(ObsTrayIconFor(state));
-		g_trayIsOurs = false;
-	}
-	if (!g_trayIsOurs)
+	if (tray->icon().cacheKey() != g_lastTrayIconKey)
 		RememberObsTrayIcon(tray->icon(), state);
+	// OBS may replace the tray icon while hiding or restoring its window. Reapply the current state every time.
+	g_trayIsOurs = !g_recordingDotEnabled && state == 1;
+	const QIcon icon = ObsTrayIconFor(g_trayIsOurs ? 0 : state);
+	tray->setIcon(icon);
+	g_lastTrayIconKey = icon.cacheKey();
 }
 
 // the single place that pushes the current icon (custom-or-default) to every surface; the recording dot is not part of it, RefreshTrayIcon draws that on the tray alone.

@@ -108,7 +108,7 @@
     img.src = url;
   }
   // the overlays top-left as canvas fractions -- null means "use the corner the helper transforms compute". seeded from obs, updated by dragging. posDirty means the user has dragged since the last apply, so the obs poll must not snap their edit back.
-  var posOverride = null, stageRect = null, posTimer = 0, posDirty = false;
+  var posOverride = null, stageRect = null, posTimer = 0, posRun = 0, posDirty = false;
   // the items real rect on the canvas as reported by obs, so the preview draws the same box the projector does
   var liveRect = null;
   var running = false, wired = false;
@@ -537,12 +537,13 @@
   }
 
   // obs owns the real position, so poll it while the section is on screen -- moving the item in the projector shows up here without a reload. skipped mid-drag so it cannot fight the pointer.
-  async function pollPosition() {
-    if (!running) return;
+  async function pollPosition(run) {
+    if (!running || run !== posRun) return;
     if (!drag && !resize && !turn && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
       try {
         var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
         var d = await r.json();
+        if (!running || run !== posRun) return;
         if (d && d.ok && !drag && !resize && !turn && !posDirty) {
           var changed = false;
           // mirror the projectors own resolution so the fake screen has the same aspect and the overlay covers the same fraction of it. reported even when the item cannot be resolved, so the box stays true while the overlay is off.
@@ -566,7 +567,7 @@
         }
       } catch (_) {}
     }
-    if (running) posTimer = setTimeout(pollPosition, 1200);
+    if (running && run === posRun) posTimer = setTimeout(function () { pollPosition(run); }, 1200);
   }
 
   function curScalePct() { var s = getStyle() || {}; return s.overlayScale; }
@@ -636,6 +637,7 @@
     },
     start: function () {
       running = true;
+      var run = ++posRun;
       wire();
       ensureBackdrop();
       var s = getStyle() || {};
@@ -643,10 +645,11 @@
       applyMode();
       requestAnimationFrame(layout);
       clearTimeout(posTimer);
-      posTimer = setTimeout(pollPosition, 60);
+      posTimer = setTimeout(function () { pollPosition(run); }, 60);
     },
     stop: function () {
       running = false;
+      posRun++;
       clearTimeout(posTimer); posTimer = 0;
       if (window.RKBongo) window.RKBongo.stop();
     },

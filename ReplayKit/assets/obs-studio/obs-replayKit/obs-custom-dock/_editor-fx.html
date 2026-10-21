@@ -383,6 +383,19 @@
     return { gl: gl, program: p, texture: t, vao: gl.createVertexArray(), u: u, uploaded: null };
   }
 
+  function dispose(g) {
+    if (!g) return;
+    // A current program remains alive after deletion until it is unbound.
+    g.gl.useProgram(null);
+    g.gl.bindVertexArray(null);
+    g.gl.bindTexture(g.gl.TEXTURE_2D, null);
+    g.gl.deleteTexture(g.texture);
+    g.gl.deleteProgram(g.program);
+    g.gl.deleteVertexArray(g.vao);
+    g.gl.flush();
+    g.uploaded = null;
+  }
+
   // the shader takes column-major matrices
   function cols(m) { return [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]; }
 
@@ -458,13 +471,14 @@
     video.insertAdjacentElement("afterend", canvas);
     var g = null;
     try { g = build(canvas); } catch (e) { g = null; }
+    var capable = !!g, destroyed = false, context = g && g.gl;
     var current = null;
     var handle = 0;
     var late = 0;
     // the editor shows a piece taken from another clip in an element of its own, named on the video as rkPicture, and the look goes over that one while it shows
     function draw() {
       var pic = video.rkPicture || video;
-      if (!g || !current || !pic.videoWidth || pic.readyState < 2) return;
+      if (destroyed || document.hidden || !g || !current || !pic.videoWidth || pic.readyState < 2) return;
       var dpr = window.devicePixelRatio || 1;
       var width = Math.max(2, Math.round(canvas.clientWidth * dpr)), height = Math.max(2, Math.round(canvas.clientHeight * dpr));
       if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
@@ -472,12 +486,13 @@
     }
     function loop() {
       handle = 0;
-      if (!current) return;
+      if (destroyed || document.hidden || !current) return;
       draw();
       handle = video.requestVideoFrameCallback(loop);
     }
     // a paused video presents no frames, so a change is drawn at once and again a moment later in case its frame had not arrived
     function redraw() {
+      if (destroyed || document.hidden || !current) return;
       draw();
       clearTimeout(late);
       late = setTimeout(draw, 150);
@@ -485,17 +500,55 @@
     ["seeked", "loadeddata", "pause", "play"].forEach(function (n) { video.addEventListener(n, redraw); });
     video.addEventListener("rkframe", draw);
     // the editor hides the video over a gap between its pieces, which the saved copy fills with black
-    new MutationObserver(redraw).observe(video, { attributes: true, attributeFilter: ["style"] });
-    new ResizeObserver(redraw).observe(canvas);
-    canvas.addEventListener("webglcontextlost", function (e) { e.preventDefault(); g = null; current = null; canvas.hidden = true; delete video.dataset.rkFxOwned; });
+    var mutations = new MutationObserver(redraw), resize = new ResizeObserver(redraw);
+    mutations.observe(video, { attributes: true, attributeFilter: ["style"] });
+    resize.observe(canvas);
+    function release() {
+      if (handle && typeof video.cancelVideoFrameCallback === "function") video.cancelVideoFrameCallback(handle);
+      handle = 0;
+      clearTimeout(late); late = 0;
+      dispose(g); g = null;
+      canvas.width = canvas.height = 1;
+    }
+    function lost(e) {
+      e.preventDefault();
+      release(); capable = false; current = null; canvas.hidden = true; delete video.dataset.rkFxOwned;
+    }
+    function set(resolved) {
+      if (destroyed) return;
+      current = resolved && capable && !isIdentity(resolved) ? resolved : null;
+      if (!current || document.hidden) {
+        release(); canvas.hidden = true; delete video.dataset.rkFxOwned;
+        return;
+      }
+      if (!g) { try { g = build(canvas); } catch (e) { g = null; } }
+      canvas.hidden = !g;
+      if (!g) { delete video.dataset.rkFxOwned; return; }
+      context = g.gl;
+      video.dataset.rkFxOwned = "1";
+      if (!handle && typeof video.requestVideoFrameCallback === "function") handle = video.requestVideoFrameCallback(loop);
+      redraw();
+    }
+    function visibility() { set(current); }
+    canvas.addEventListener("webglcontextlost", lost);
+    document.addEventListener("visibilitychange", visibility);
     return {
-      supported: function () { return !!g; },
-      set: function (resolved) {
-        current = resolved && g && !isIdentity(resolved) ? resolved : null;
-        canvas.hidden = !current;
-        if (current) video.dataset.rkFxOwned = "1"; else delete video.dataset.rkFxOwned;
-        if (current && !handle && typeof video.requestVideoFrameCallback === "function") handle = video.requestVideoFrameCallback(loop);
-        redraw();
+      supported: function () { return capable && !destroyed; },
+      set: set,
+      destroy: function () {
+        if (destroyed) return;
+        destroyed = true; current = null;
+        release();
+        mutations.disconnect(); resize.disconnect();
+        ["seeked", "loadeddata", "pause", "play"].forEach(function (n) { video.removeEventListener(n, redraw); });
+        video.removeEventListener("rkframe", draw);
+        document.removeEventListener("visibilitychange", visibility);
+        canvas.removeEventListener("webglcontextlost", lost);
+        delete video.dataset.rkFxOwned;
+        canvas.remove();
+        var lose = context && context.getExtension("WEBGL_lose_context");
+        if (lose) lose.loseContext();
+        context = null;
       },
     };
   }
@@ -505,10 +558,14 @@
     var canvas = document.createElement("canvas");
     var g = null;
     try { g = build(canvas); } catch (e) { g = null; }
+    var capable = !!g;
     return {
-      supported: function () { return !!g; },
+      supported: function () { return capable; },
+      clear: function () { dispose(g); g = null; canvas.width = canvas.height = 1; },
       draw: function (video, list) {
-        if (!g || !video.videoWidth || video.readyState < 2) return false;
+        if (!capable || document.hidden || !video.videoWidth || video.readyState < 2) return false;
+        if (!g) { try { g = build(canvas); } catch (e) { g = null; } }
+        if (!g) return false;
         list.forEach(function (item, i) {
           var w = item.canvas.width, h = item.canvas.height;
           if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -1008,12 +1065,12 @@
 
     // the tiles show the frame under the playhead with the colour settings as they are, the filters each with their own look, the effects on top of the filter that is set
     function queueThumbs() {
-      if (thumbQueued || !shown || els.editing || (pane !== "filters" && pane !== "effects")) return;
+      if (document.hidden || thumbQueued || !shown || els.editing || (pane !== "filters" && pane !== "effects")) return;
       thumbQueued = requestAnimationFrame(function () {
         thumbQueued = 0;
         // a clip row that is selected shows its own frames in the tiles
         var pic = (lanes.fx.picture && lanes.fx.picture()) || video;
-        if (!shown || !pic.videoWidth || !thumbs.supported()) return;
+        if (document.hidden || !shown || !pic.videoWidth || !thumbs.supported()) return;
         var state = fx();
         var h = Math.max(2, Math.round(THUMB_W * pic.videoHeight / pic.videoWidth));
         var list = [];
@@ -1035,10 +1092,27 @@
       });
     }
 
+    function clearThumbs() {
+      if (thumbQueued) cancelAnimationFrame(thumbQueued);
+      thumbQueued = 0;
+      thumbs.clear();
+      [els.lookTiles, els.effectTiles].forEach(function (tiles) {
+        Object.keys(tiles || {}).forEach(function (key) { tiles[key].canvas.width = tiles[key].canvas.height = 1; });
+      });
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) clearThumbs(); else queueThumbs();
+    });
+
     build();
     paint();
     preview.set(resolve(lanes.fx.main()));
     return {
+      reset: function () {
+        shown = false; kind = "";
+        clearTimeout(fxTimer);
+        preview.set(null); clearThumbs();
+      },
       // the tab the right panel shows while the video is selected
       pane: function () { return pane; },
       // the lanes say whenever the panel on the right is drawn what is selected: "video", "audio", "subtitle", "layer" or ""
