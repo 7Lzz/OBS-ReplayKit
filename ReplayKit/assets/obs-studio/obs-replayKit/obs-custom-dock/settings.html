@@ -234,12 +234,7 @@
     color:var(--disabled);
     cursor:default;
   }
-  .combo {
-    position:relative;
-    flex:1;
-    min-width:0;
-  }
-  .combo-button,.text-input,.spin-input,.hotkey-input {
+  .text-input,.spin-input,.hotkey-input {
     width:100%;
     height:32px;
     border:1px solid var(--field-solid,var(--field));
@@ -247,130 +242,6 @@
     background:var(--field);
     color:var(--text);
     outline:none;
-  }
-  .combo-button {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 37px 0 9px;
-    cursor:pointer;
-    text-align:left;
-    position:relative;
-  }
-  .combo-arrow {
-    position:absolute;
-    right:0;
-    top:1px;
-    width:28px;
-    height:30px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    pointer-events:none;
-  }
-  .combo-arrow svg { width:16px; height:16px; fill:currentColor; transition:transform var(--anim_menu) var(--ease_smooth); }
-  .combo.is-open .combo-arrow svg { transform:rotate(180deg); }
-  .combo-button::before {
-    content:"";
-    position:absolute;
-    top:1px;
-    bottom:1px;
-    right:26px;
-    width:1px;
-    background:var(--panel);
-    pointer-events:none;
-  }
-  .combo.is-open .combo-button {
-    border-color:var(--selected-solid,var(--selected));
-    background:var(--window);
-    border-radius:4px;
-  }
-  .combo.is-disabled .combo-button {
-    color:var(--disabled);
-    border-color:var(--field2);
-    background:var(--field2);
-    cursor:default;
-  }
-  .combo.is-disabled .combo-button::before { background:var(--field2); }
-  .combo.is-disabled .combo-arrow { opacity:.65; }
-  .combo.is-disabled .combo-menu { display:none; }
-  .combo-label {
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-  .combo-menu {
-    position:absolute;
-    z-index:20;
-    top:34px;
-    left:0;
-    right:0;
-    /* slides open from zero height and back. max-height:0 + overflow:hidden means a closed menu adds no height to .main, so a combo in the last row cant summon a phantom scrollbar. */
-    max-height:0;
-    overflow:hidden;
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:4px;
-    padding:0 3px;
-    box-shadow:0 10px 24px var(--shadow-weak);
-    opacity:0;
-    visibility:hidden;
-    pointer-events:none;
-    transform:translateY(-6px);
-    transform-origin:top center;
-    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
-  }
-  .combo.is-open .combo-menu {
-    max-height:300px;
-    overflow:auto;
-    padding:3px;
-    opacity:1;
-    visibility:visible;
-    pointer-events:auto;
-    transform:translateY(0);
-    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
-  }
-  /* "Custom" sits above the generated resolutions, set off by a divider. */
-  .combo.sep-after-first .combo-option:first-child {
-    border-bottom:1px solid var(--line2);
-    border-radius:0;
-    margin-bottom:3px;
-    padding-bottom:3px;
-  }
-  /* options fade + rise in with a short stagger. */
-  .combo.is-open .combo-option { animation:rk-option-in 200ms var(--ease_smooth) backwards; }
-  .combo.is-open .combo-option:nth-child(2) { animation-delay:26ms; }
-  .combo.is-open .combo-option:nth-child(3) { animation-delay:48ms; }
-  .combo.is-open .combo-option:nth-child(4) { animation-delay:68ms; }
-  .combo.is-open .combo-option:nth-child(n+5) { animation-delay:84ms; }
-  @keyframes rk-option-in { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
-  .combo-option {
-    min-height:28px;
-    display:flex;
-    align-items:center;
-    padding:0 10px;
-    border-radius:3px;
-    color:var(--text);
-    cursor:pointer;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-  /* the same look as the sort menu of the clips page: a hovered row gets the plain hover grey, the chosen one a light accent wash and a check, so the two never read as the same thing */
-  .combo-option:hover { background:var(--button_bg_hover); }
-  .combo-option.is-selected { position:relative; padding-right:30px; background:rgba(var(--accent-rgb),.22); }
-  .combo-option.is-selected:hover { background:rgba(var(--accent-rgb),.3); }
-  .combo-option.is-selected::after { content:""; position:absolute; right:13px; top:50%; width:4px; height:8px; margin-top:-6px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
-  .combo-option.is-disabled {
-    color:var(--muted);
-    cursor:default;
-    background:transparent;
-  }
-  .combo-option .option-blurb {
-    color:var(--muted);
-    margin-left:4px;
-    overflow:hidden;
-    text-overflow:ellipsis;
   }
   .game-rule-actions {
     width:100%;
@@ -844,6 +715,7 @@
 <!--#include scrollbar-->
 <!--#include interaction-states-->
 <!--#include switch-->
+<!--#include combo-->
 <!--#include slider-->
 <!--#include window-state-->
 </head>
@@ -2395,7 +2267,7 @@
       });
       const hotkeyGrid = page.querySelector(".hotkey-grid");
       if (hotkeyGrid) {
-        const rowMatched = Array.from(hotkeyGrid.querySelectorAll(".hotkey-row")).some((row) => !row.classList.contains("search-hidden-row"));
+        const rowMatched = Array.from(hotkeyGrid.querySelectorAll(".hotkey-row")).some((row) => !row.closest("[hidden]") && !row.classList.contains("search-hidden-row"));
         hotkeyGrid.classList.toggle("search-hidden-row", !rowMatched);
         if (rowMatched) pageMatched = true;
       }

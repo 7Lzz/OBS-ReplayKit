@@ -118,7 +118,7 @@ namespace ReplayKitHelper
                 ["lastUpdatePromptVersion"] = "",
                 ["clipSoundVolume"] = 25,
                 ["recordingSoundVolume"] = 25,
-                // the "Audio Input Capture" obs input: device is an obs wasapi endpoint id or "default", volume is 0-200 mapped onto a dedicated gain filters -30..30 db range (100 = unity, the filter itself is absent until the slider first leaves 100), noise suppression is an rnnoise filter on that input, on by default (the bundled scene ships it enabled) -- and input sensitivity is the noise gate open threshold in db (the bundled scene ships -50 open and -55 close, the floor means the gate is off).
+                // Mic volume uses a named gain filter; zero silences the input. Suppression uses RNNoise and sensitivity controls the noise gate.
                 ["micDeviceId"] = "default",
                 ["micVolume"] = 100,
                 ["micNoiseSuppression"] = true,
@@ -5060,7 +5060,7 @@ namespace ReplayKitHelper
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
-        // -- microphone: the "Audio Input Capture" input in the replaykit scene. device and volume are plain input properties, noise suppression is an obs noise_suppress_filter (rnnoise) on that same input.
+        // Microphone input and its OBS filters.
 
         internal const string MicInputName = "Audio Input Capture";
         private const string MicNoiseFilterName = "ReplayKit Noise Suppression";
@@ -5071,19 +5071,13 @@ namespace ReplayKitHelper
         private const double NoiseGateDefaultOpenDb = -26.0;
         private const double NoiseGateDefaultCloseDb = -32.0;
         private const double GateHysteresisDb = 5.0;
-        // every volume slider (mic, desktop, discord) drives its own named gain filter instead of the inputs fader -- matched by this exact name AND kind, never just kind, so a filter the user adds themselves through obs (a different name) is left completely alone rather than adopted.
+        // Nonzero levels use a named gain filter. Zero also silences the input fader without changing its mute state.
         private const string GainFilterKind = "gain_filter";
-        private const double GainDbMin = -30.0;
-        private const double GainDbMax = 30.0;
         private const string MicGainFilterName = "ReplayKit Mic Volume";
         private const string DesktopGainFilterName = "ReplayKit Desktop Volume";
         private const string DiscordGainFilterName = "ReplayKit Discord Volume";
         private static readonly string[] MicSettingKeys = { "micDeviceId", "micVolume", "micNoiseSuppression", "micInputSensitivity" };
         private static readonly string[] AudioVolumeKeys = { "desktopAudioVolume", "discordAudioVolume" };
-
-        // every volume slider is 0-200 with 100 as the untouched midpoint, mapped straight onto the gain filters own -30..30 db range so the sliders ends line up exactly with what the filter can actually do.
-        private static double GainVolumeToDb(int percent) => (percent - 100) / 100.0 * GainDbMax;
-        private static int GainVolumeFromDb(double db) => (int)Math.Round(100.0 + db / GainDbMax * 100.0, MidpointRounding.AwayFromZero);
 
         private static JToken FindGainFilter(JArray filters, string filterName) =>
             filters.FirstOrDefault(f => (f["filterKind"]?.Value<string>() ?? "") == GainFilterKind && (f["filterName"]?.Value<string>() ?? "") == filterName);
@@ -5092,7 +5086,7 @@ namespace ReplayKitHelper
         private static int GainVolumeFromFilters(JArray filters, string filterName)
         {
             var gain = FindGainFilter(filters, filterName);
-            return gain == null ? 100 : GainVolumeFromDb(gain["filterSettings"]?["db"]?.Value<double>() ?? 0.0);
+            return gain == null ? 100 : AudioVolume.FromDb(gain["filterSettings"]?["db"]?.Value<double>() ?? 0.0);
         }
 
         // same as GainVolumeFromFilters but fetches its own filter list -- for a source nothing else already reads the filters of. null means the source itself could not be read (missing input, or obs unreachable).
@@ -5103,36 +5097,53 @@ namespace ReplayKitHelper
             return GainVolumeFromFilters((JArray)list["filters"], filterName);
         }
 
-        // creates the named filter the first time the slider leaves 100 and never removes it again -- back at 100 it is retuned to 0 db (silent, no audible change) instead of deleted, since repeated add/remove of a gain filter is what preceded a real obs freeze once. a source that cannot be read (desktop and discord audio are both allowed to be silently missing, discord audio (record only) most often) is a silent no-op, not a warning.
         private static void ApplyGainVolumeLive(string sourceName, string filterName, string label, int volumePercent, List<string> applied, List<string> warnings)
         {
             var list = GetSourceFilterListLive(sourceName);
             if (list["ok"]?.Value<bool>() != true) return;
-            var filterArray = (JArray)list["filters"];
-            var existing = FindGainFilter(filterArray, filterName);
-            double db = Math.Max(GainDbMin, Math.Min(GainDbMax, GainVolumeToDb(volumePercent)));
+            var filters = (JArray)list["filters"];
+            var existing = FindGainFilter(filters, filterName);
+            var current = existing?["filterSettings"] as JObject;
+            if (existing == null && volumePercent == 100) return;
 
+            double inputLevel = 1;
+            if (volumePercent == 0 || current?[AudioVolume.SavedLevel] != null)
+            {
+                var volume = ObsWebSocket.InvokeRequest("GetInputVolume", new JObject { ["inputName"] = sourceName }, 3000);
+                if (!volume.Ok) { warnings.Add("Could not read the " + label + ": " + volume.Message); return; }
+                inputLevel = AudioVolume.Level(volume.Data?["inputVolumeMul"]);
+            }
+            var next = AudioVolume.Prepare(current, volumePercent, inputLevel, out double outputLevel);
+            bool levelChanged = inputLevel != outputLevel;
+            bool SetLevel()
+            {
+                if (!levelChanged) return true;
+                var result = ObsWebSocket.InvokeRequest("SetInputVolume", new JObject { ["inputName"] = sourceName, ["inputVolumeMul"] = outputLevel }, 3000);
+                if (!result.Ok) warnings.Add("Could not set the " + label + ": " + result.Message);
+                return result.Ok;
+            }
+
+            // Restore before removing the saved fader level, so a failed request can be retried safely.
+            if (volumePercent > 0 && !SetLevel()) return;
+            bool filterChanged = !JToken.DeepEquals(current, next);
             if (existing == null)
             {
-                if (volumePercent == 100) return; // nothing has ever touched this slider -- leave the source exactly as obs has it
                 var create = ObsWebSocket.InvokeRequest("CreateSourceFilter", new JObject
                 {
                     ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = GainFilterKind,
-                    ["filterSettings"] = new JObject { ["db"] = db },
+                    ["filterSettings"] = next,
                 }, 3000);
                 if (!create.Ok) { warnings.Add("Could not set the " + label + ": " + create.Message); return; }
-                // last in the chain, so any other filter already on the source judges the real level rather than the boosted one
-                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filterArray.Count }, 3000);
+                var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filters.Count }, 3000);
                 if (!move.Ok) warnings.Add("The " + label + " was set but the filter could not be moved to the end of the chain: " + move.Message);
-                applied.Add(label);
-                return;
             }
-
-            double current = existing["filterSettings"]?["db"]?.Value<double>() ?? 0.0;
-            if (Math.Abs(current - db) < 0.05) return; // already this close, the filter itself only keeps one decimal
-            var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = new JObject { ["db"] = db }, ["overlay"] = true }, 3000);
-            if (set.Ok) applied.Add(label);
-            else warnings.Add("Could not set the " + label + ": " + set.Message);
+            else if (filterChanged)
+            {
+                var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = next, ["overlay"] = false }, 3000);
+                if (!set.Ok) { warnings.Add("Could not set the " + label + ": " + set.Message); return; }
+            }
+            if (volumePercent == 0 && !SetLevel()) return;
+            if (filterChanged || levelChanged) applied.Add(label);
         }
 
         private static bool AudioVolumeKeysChanged(JObject previous, JObject settings) =>
@@ -5359,7 +5370,7 @@ namespace ReplayKitHelper
                 if (set.Ok) applied.Add("microphone device");
                 else warnings.Add("Could not switch the microphone: " + set.Message);
             }
-            if (live["micVolume"].Value<int>() != volume) ApplyGainVolumeLive(MicInputName, MicGainFilterName, "microphone volume", volume, applied, warnings);
+            if (live["micVolume"].Value<int>() != volume || volume == 0) ApplyGainVolumeLive(MicInputName, MicGainFilterName, "microphone volume", volume, applied, warnings);
             if (live["micNoiseSuppression"].Value<bool>() != noise) ApplyMicNoiseSuppressionLive(noise, applied, warnings);
             if (live["micInputSensitivity"].Value<int>() != sensitivity) ApplyMicGateLive(sensitivity, applied, warnings);
 

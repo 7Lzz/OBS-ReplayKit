@@ -29,7 +29,7 @@ namespace ReplayKitHelper
                 catch (InvalidOperationException ex) { return Fail(ex.Message); }
                 deviceId = settings["micDeviceId"]?.Value<string>() ?? MicDevices.DefaultId;
                 if (!MicDevices.IsValidId(deviceId)) deviceId = MicDevices.DefaultId;
-                gain = Math.Max(0, Math.Min(MicTest.VolumeMax, settings["micVolume"]?.Value<int>() ?? 100)) / 100.0;
+                gain = ReplayKitShared.AudioVolume.ToGain(Math.Max(0, Math.Min(MicTest.VolumeMax, settings["micVolume"]?.Value<int>() ?? 100)));
                 noise = settings["micNoiseSuppression"]?.Value<bool>() ?? true;
                 sensitivity = Math.Max(MicTest.SensitivityMin, Math.Min(MicTest.SensitivityMax, settings["micInputSensitivity"]?.Value<int>() ?? MicTest.SensitivityDefault));
             }

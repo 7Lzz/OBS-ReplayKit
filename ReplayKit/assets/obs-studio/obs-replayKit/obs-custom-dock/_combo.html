@@ -1,0 +1,243 @@
+<style>
+  .combo {
+    position:relative;
+    flex:1;
+    min-width:0;
+  }
+  .combo-button {
+    width:100%;
+    height:32px;
+    border:1px solid var(--field-solid,var(--button_border,var(--field)));
+    border-radius:4px;
+    background:var(--field,var(--button_bg));
+    color:var(--text);
+    outline:none;
+  }
+  .combo-button {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 37px 0 9px;
+    cursor:pointer;
+    text-align:left;
+    position:relative;
+  }
+  .combo-arrow {
+    position:absolute;
+    right:0;
+    top:1px;
+    width:28px;
+    height:30px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+  }
+  .combo-arrow svg { width:16px; height:16px; fill:currentColor; transition:transform var(--anim_menu) var(--ease_smooth); }
+  .combo.is-open .combo-arrow svg { transform:rotate(180deg); }
+  .combo-button::before {
+    content:"";
+    position:absolute;
+    top:1px;
+    bottom:1px;
+    right:26px;
+    width:1px;
+    background:var(--panel,var(--bg_card));
+    pointer-events:none;
+  }
+  .combo.is-open .combo-button {
+    border-color:var(--selected-solid,var(--primary-solid,var(--selected,var(--primary))));
+    background:var(--window,var(--bg_window));
+    border-radius:4px;
+  }
+  .combo.is-disabled .combo-button {
+    color:var(--disabled);
+    border-color:var(--field2);
+    background:var(--field2);
+    cursor:default;
+  }
+  .combo.is-disabled .combo-button::before { background:var(--field2); }
+  .combo.is-disabled .combo-arrow { opacity:.65; }
+  .combo.is-disabled .combo-menu { display:none; }
+  .combo-label {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .combo-menu {
+    position:absolute;
+    z-index:20;
+    top:34px;
+    left:0;
+    right:0;
+    /* slides open from zero height and back. max-height:0 + overflow:hidden means a closed menu adds no height to .main, so a combo in the last row cant summon a phantom scrollbar. */
+    max-height:0;
+    overflow:hidden;
+    background:var(--panel,var(--bg_card));
+    border:1px solid var(--line,var(--button_border));
+    border-radius:4px;
+    padding:0 3px;
+    box-shadow:0 10px 24px var(--shadow-weak);
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translateY(-6px);
+    transform-origin:top center;
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .combo.is-open .combo-menu {
+    max-height:300px;
+    overflow:auto;
+    padding:3px;
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:translateY(0);
+    transition:max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* "Custom" sits above the generated resolutions, set off by a divider. */
+  .combo.sep-after-first .combo-option:first-child {
+    border-bottom:1px solid var(--line2);
+    border-radius:0;
+    margin-bottom:3px;
+    padding-bottom:3px;
+  }
+  /* options fade + rise in with a short stagger. */
+  .combo.is-open .combo-option { animation:rk-option-in 200ms var(--ease_smooth) backwards; }
+  .combo.is-open .combo-option:nth-child(2) { animation-delay:26ms; }
+  .combo.is-open .combo-option:nth-child(3) { animation-delay:48ms; }
+  .combo.is-open .combo-option:nth-child(4) { animation-delay:68ms; }
+  .combo.is-open .combo-option:nth-child(n+5) { animation-delay:84ms; }
+  @keyframes rk-option-in { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
+  .combo-option {
+    min-height:28px;
+    display:flex;
+    align-items:center;
+    padding:0 10px;
+    border-radius:3px;
+    color:var(--text);
+    cursor:pointer;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  /* Selected options use the normal theme highlight and its contrasting text. */
+  .combo-option:hover { background:var(--button_bg_hover); }
+  .combo-option.is-selected { position:relative; padding-right:30px; background:var(--selected,var(--primary)); color:var(--on-accent); }
+  .combo-option.is-selected:hover { background:var(--selected,var(--primary)); color:var(--on-accent); }
+  .combo-option.is-selected::after { content:""; position:absolute; right:13px; top:50%; width:4px; height:8px; margin-top:-6px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .combo-option.is-disabled {
+    color:var(--muted);
+    cursor:default;
+    background:transparent;
+  }
+  .combo-option .option-blurb {
+    color:var(--muted);
+    margin-left:4px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .combo-option.is-selected .option-blurb { color:inherit; }
+</style>
+<script>
+(function () {
+  function bind(combo, changed) {
+    const button = combo.querySelector(".combo-button");
+    const label = combo.querySelector(".combo-label");
+    const menu = combo.querySelector(".combo-menu");
+    let options = [], value = "";
+    function close() {
+      combo.classList.remove("is-open");
+      combo.setAttribute("aria-expanded", "false");
+      menu.style.removeProperty("max-height");
+    }
+    function place() {
+      if (!combo.classList.contains("is-open")) return;
+      const rect = combo.getBoundingClientRect();
+      const below = window.innerHeight - rect.bottom - 8;
+      const above = rect.top - 8;
+      const height = Math.min(300, menu.scrollHeight + 6);
+      const up = below < height && above > below;
+      menu.style.top = up ? "auto" : "calc(100% + 2px)";
+      menu.style.bottom = up ? "calc(100% + 2px)" : "auto";
+      menu.style.maxHeight = Math.max(28, Math.min(height, up ? above : below)) + "px";
+    }
+    function open() {
+      if (!options.length) return;
+      document.querySelectorAll(".combo.is-open").forEach((other) => {
+        if (other !== combo) {
+          other.classList.remove("is-open");
+          other.setAttribute("aria-expanded", "false");
+        }
+      });
+      combo.classList.add("is-open");
+      combo.setAttribute("aria-expanded", "true");
+      place();
+    }
+    function select(next, notify) {
+      const option = options.find((entry) => entry.value === String(next)) || options[0];
+      value = option ? option.value : "";
+      label.textContent = option ? option.label : "";
+      menu.querySelectorAll(".combo-option").forEach((row) => {
+        const selected = row.dataset.value === value;
+        row.classList.toggle("is-selected", selected);
+        row.setAttribute("aria-selected", String(selected));
+      });
+      if (notify && changed) changed(value);
+    }
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (combo.classList.contains("is-open")) close(); else open();
+    });
+    menu.addEventListener("click", (event) => {
+      const row = event.target.closest(".combo-option");
+      if (!row || !menu.contains(row)) return;
+      event.stopPropagation();
+      select(row.dataset.value, true);
+      close();
+      button.focus();
+    });
+    combo.addEventListener("keydown", (event) => {
+      const key = event.key;
+      if (key === "Escape") {
+        if (!combo.classList.contains("is-open")) return;
+        event.preventDefault(); event.stopPropagation(); close(); button.focus();
+      } else if (key === "Enter" || key === " ") {
+        event.preventDefault(); event.stopPropagation();
+        if (combo.classList.contains("is-open")) close(); else open();
+      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(key) && options.length) {
+        event.preventDefault(); event.stopPropagation();
+        const current = Math.max(0, options.findIndex((entry) => entry.value === value));
+        const next = key === "Home" ? 0 : key === "End" ? options.length - 1
+          : (current + (key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+        select(options[next].value, true);
+      }
+    });
+    combo.addEventListener("focusout", (event) => { if (!combo.contains(event.relatedTarget)) close(); });
+    document.addEventListener("click", (event) => { if (!combo.contains(event.target)) close(); });
+    window.addEventListener("resize", place);
+    return {
+      get value() { return value; },
+      set value(next) { select(next, false); },
+      get options() { return options.slice(); },
+      setOptions(next) {
+        close();
+        options = next.map((entry) => ({ value:String(entry.value), label:String(entry.label) }));
+        menu.replaceChildren();
+        options.forEach((entry) => {
+          const row = document.createElement("div");
+          row.className = "combo-option";
+          row.tabIndex = -1;
+          row.setAttribute("role", "option");
+          row.dataset.value = entry.value;
+          row.textContent = entry.label;
+          menu.appendChild(row);
+        });
+        select(value, false);
+      },
+      close,
+    };
+  }
+  window.RKCombo = { bind };
+})();
+</script>

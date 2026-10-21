@@ -1484,6 +1484,7 @@ namespace ReplayKitSetup
                 }
                 ApplyDesktopAudioExclusions(src);
                 ApplyAudioMixers(src);
+                ReplayKitShared.AudioVolume.RepairSource(src);
 
                 if (MotionBlurSourceUuids.ContainsKey(src.Value<string>("name") ?? "\0"))
                 {

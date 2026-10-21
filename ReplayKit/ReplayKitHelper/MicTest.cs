@@ -1,13 +1,14 @@
 using System;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
     // the http-facing half of the mic test: at most one session, started and steered by the settings and setup pages. a session is either a silent level monitor (what the input sensitivity bar reads) or a playback test (what Mic Test plays); the page polling the level is also the keep-alive, so a page that stops polling lets the session end on its own.
     internal static class MicTest
     {
-        public const int VolumeMax = 200;
+        public const int VolumeMax = AudioVolume.Max;
 
         // input sensitivity is the noise gate open threshold in db. the floor is the lowest threshold the obs gate accepts, and that end of the slider means the gate is off.
         public const int SensitivityMin = -96;
@@ -65,7 +66,7 @@ namespace ReplayKitHelper
                 lock (Gate)
                 {
                     StopLocked();
-                    var session = MicLoopback.Start(deviceId, volumePercent / 100.0, noiseSuppression, sensitivityDb, playback, out string error);
+                    var session = MicLoopback.Start(deviceId, AudioVolume.ToGain(volumePercent), noiseSuppression, sensitivityDb, playback, out string error);
                     if (session == null) return Fail(error);
                     _session = session;
                     return new JObject { ["ok"] = true };
@@ -86,7 +87,7 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 if (_session == null || !_session.IsRunning) return Fail("The microphone test is not running.");
-                _session.SetParams(volumePercent / 100.0, noiseSuppression, sensitivityDb);
+                _session.SetParams(AudioVolume.ToGain(volumePercent), noiseSuppression, sensitivityDb);
                 return new JObject { ["ok"] = true };
             }
         }
@@ -106,7 +107,7 @@ namespace ReplayKitHelper
                 var level = session.ReadLevel();
                 var payload = Level(true, session.Playback, level.Peak, level.GatePeak, level.Rms, "");
                 // the values the session is running with right now, so a live change from the page can be confirmed instead of assumed
-                payload["volume"] = (int)Math.Round(session.Gain * 100);
+                payload["volume"] = AudioVolume.FromGain(session.Gain);
                 payload["gate"] = session.SensitivityDb;
                 payload["ns"] = session.NoiseSuppression;
                 return payload;

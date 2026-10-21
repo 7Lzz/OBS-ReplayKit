@@ -4259,7 +4259,7 @@
               }
               if (item.audio.paused) item.audio.play().catch(function () {});
             }
-            item.gain.gain.value = clamp(s.volume * part.gain, 0, 6.4) * fadeGain(s, t);
+            item.gain.gain.value = clamp(s.volume * part.gain, 0, 16) * fadeGain(s, t);
           });
         });
       });

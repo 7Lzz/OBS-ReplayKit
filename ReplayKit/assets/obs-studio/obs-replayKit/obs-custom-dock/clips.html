@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -288,9 +288,9 @@
   }
   .clip-sort-item:hover { background: var(--button_bg_hover); }
   .clip-sort-label { flex: 1 1 auto; }
-  /* the already-selected sort gets the same blue wash the app uses elsewhere for a selected row, plus the check. */
-  .clip-sort-item.is-active { background: rgba(var(--accent-rgb),.22); }
-  .clip-sort-item.is-active:hover { background: rgba(var(--accent-rgb),.3); }
+  /* Selected sorting uses the same theme highlight as the other dropdowns. */
+  .clip-sort-item.is-active { background: var(--selected,var(--primary)); color: var(--on-accent); }
+  .clip-sort-item.is-active:hover { background: var(--selected,var(--primary)); color: var(--on-accent); }
   .clip-sort-check {
     width: 15px;
     height: 15px;
@@ -2802,18 +2802,6 @@
     margin-top: 8px;
   }
   .compress-downsample-detail[hidden] { display: none !important; }
-  .compress-downsample-select {
-    appearance: none;
-    -webkit-appearance: none;
-    background: var(--grey7);
-    border: 1px solid var(--grey4-solid,var(--grey4));
-    border-radius: 6px;
-    color: var(--text);
-    font: inherit;
-    padding: 8px 10px;
-    cursor: pointer;
-  }
-  .compress-downsample-select:hover { border-color: var(--button_border_hover); }
   .compress-downsample-note {
     font-size: 11.5px;
     color: var(--text_muted);
@@ -2853,6 +2841,7 @@
   <!--#include scrollbar-->
   <!--#include interaction-states-->
   <!--#include switch-->
+  <!--#include combo-->
   <!--#include slider-->
 <!--#include tooltip-->
 <!--#include hotkey-keys-->
@@ -2916,7 +2905,10 @@
         <span>Also lower the resolution</span>
       </div>
       <div class="compress-downsample-detail" id="compress-downsample-detail" hidden>
-        <select class="compress-downsample-select" id="compress-downsample-select"></select>
+        <div class="combo" id="compress-downsample-select" tabindex="0" role="combobox" aria-expanded="false" aria-label="Resolution for compressed clip">
+          <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4z" fill="currentColor"/></svg></span></button>
+          <div class="combo-menu" role="listbox" aria-label="Resolution for compressed clip"></div>
+        </div>
         <span class="compress-downsample-note">Shrinks the clip to this size before compressing &mdash; smaller file, but the lost detail can&rsquo;t be brought back.</span>
       </div>
       <div class="row">
@@ -4880,6 +4872,7 @@
     document.body.classList.remove("is-clip-theater");
     playTheaterRestore();
     resetVideoZoom(preview.querySelector("video"));
+    resetPlaybackRate(preview.querySelector("video"));
     syncTheaterButton(preview);
     if (pendingLoadedRenderAfterTheater) {
       pendingLoadedRenderAfterTheater = false;
@@ -5547,11 +5540,20 @@
     if (preview) preview.classList.remove("is-playing", "is-video-ready");
   }
 
+  function resetPlaybackRate(video) {
+    if (!video) return;
+    video.defaultPlaybackRate = 1;
+    video.playbackRate = 1;
+    // load() can discard queued media events; synchronize the controls before teardown.
+    video.dispatchEvent(new Event("ratechange"));
+  }
+
   function abortVideoLoad(video) {
     if (!video) return;
     clearHoverPreviewTimer(video);
     clearPreviewVisualState(video);
     video.pause();
+    resetPlaybackRate(video);
     video.removeAttribute("src");
     try { video.load(); } catch {}
   }
@@ -6135,6 +6137,7 @@
         preview.classList.remove("is-idle");
         if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
         if (!isTheaterPreview(preview)) resetVideoZoom(video);
+        resetPlaybackRate(video);
       }
       // swap the fullscreen toggle icon so it always shows the action itll perform next (youtube convention): the "exit" brackets when were in fullscreen, the "enter" brackets when were out. same listener fires for both directions.
       const enterIcon = fullscreenBtn.querySelector(".fs-enter-icon");
@@ -6212,6 +6215,11 @@
       // Unloading the source restores playbackRate from defaultPlaybackRate.
       video.defaultPlaybackRate = rate;
       video.playbackRate = rate;
+      syncPlaybackRate(source);
+    }
+
+    function syncPlaybackRate(source) {
+      const rate = video.playbackRate;
       // dont stomp the input while the user is mid-edit -- theyd see their typing get rewritten character-by-character.
       if (speedCurrent && source !== "input") {
         speedCurrent.value = rate.toFixed(2);
@@ -6228,6 +6236,7 @@
         el.classList.toggle("is-active", Math.abs(v - rate) < 0.001);
       });
     }
+    video.addEventListener("ratechange", () => syncPlaybackRate());
     if (settingsBtn) {
       settingsBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -7909,6 +7918,7 @@
 
   // the clips window is hidden (not destroyed) on close now, so its js state survives a close/reopen. put every session-only bit back to a fresh-window default when its shown again. deliberately leaves alone: in-flight upload/compress tracking (bulkUpload*, localState, pendingLinkCreations -- real helper work) and favorites (persisted).
   function resetClipsWindowState() {
+    document.querySelectorAll(".card video").forEach(resetPlaybackRate);
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
     // a fresh-window reset owns the scroll position (it forces it to 0 below); drop any pending post-fullscreen restore so it cant fire late and yank the list back to where fullscreen was entered.
@@ -8108,7 +8118,7 @@
   const compressDsRow      = document.getElementById("compress-downsample-row");
   const compressDsToggle   = document.getElementById("compress-downsample-toggle");
   const compressDsDetail   = document.getElementById("compress-downsample-detail");
-  const compressDsSelect   = document.getElementById("compress-downsample-select");
+  const compressDsSelect   = RKCombo.bind(document.getElementById("compress-downsample-select"), writeCompressDsPrefs);
   const COMPRESS_DS_ON_KEY = "replaykit_compress_downsample_on";
   const COMPRESS_DS_H_KEY  = "replaykit_compress_downsample_height";
   // common share/export heights; the modal only offers the ones below the clips own height.
@@ -8126,19 +8136,16 @@
   }
   function syncCompressDsDetail() {
     compressDsDetail.hidden = !compressDsToggle.checked || compressDsRow.hidden;
+    if (compressDsDetail.hidden) compressDsSelect.close();
   }
-  // fills the select from the clips own resolution. returns false (and the caller hides the whole section) when the resolution is unknown or already at/below the smallest rung.
+  // fills the dropdown from the clips own resolution. returns false (and the caller hides the whole section) when the resolution is unknown or already at/below the smallest rung.
   function buildCompressDsOptions(srcW, srcH) {
-    compressDsSelect.innerHTML = "";
     const heights = COMPRESS_DS_LADDER.filter((h) => h < srcH);
-    if (!heights.length) return false;
-    for (const h of heights) {
+    compressDsSelect.setOptions(heights.map((h) => {
       const w = srcW && srcH ? Math.round((srcW * h / srcH) / 2) * 2 : 0;
-      const opt = document.createElement("option");
-      opt.value = String(h);
-      opt.textContent = w ? (w + " × " + h) : (h + "p");
-      compressDsSelect.appendChild(opt);
-    }
+      return { value:String(h), label:w ? (w + " × " + h) : (h + "p") };
+    }));
+    if (!heights.length) return false;
     return true;
   }
   function currentCompressScaleHeight() {
@@ -8213,6 +8220,7 @@
     if (firstEnabled) { try { firstEnabled.focus(); } catch (_) {} }
   }
   function closeCompressModePicker() {
+    compressDsSelect.close();
     compressModeVeil.classList.remove("is-open");
     pendingCompressOverwriteFile = null;
   }
@@ -8263,7 +8271,6 @@
     });
   });
   compressDsToggle.addEventListener("change", () => { syncCompressDsDetail(); writeCompressDsPrefs(); });
-  compressDsSelect.addEventListener("change", writeCompressDsPrefs);
   compressModeCancel.addEventListener("click", closeCompressModePicker);
   compressModeVeil.addEventListener("mousedown", (e) => {
     if (e.target === compressModeVeil) closeCompressModePicker();

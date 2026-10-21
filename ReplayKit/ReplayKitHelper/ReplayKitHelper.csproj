@@ -45,6 +45,7 @@
     <Compile Include="..\ReplayKitSetup\StateLayout.cs" Link="StateLayout.cs" />
     <Compile Include="..\ReplayKitSetup\VideoTools.cs" Link="VideoTools.cs" />
     <Compile Include="..\ReplayKitSetup\OverlayRotation.cs" Link="OverlayRotation.cs" />
+    <Compile Include="..\ReplayKitSetup\AudioVolume.cs" Link="AudioVolume.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

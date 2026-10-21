@@ -353,6 +353,7 @@ namespace ReplayKitSetup
                 if (!SceneSourcePatches.TryGetValue(name, out var spec)) continue;
 
                 string before = source.ToString(Formatting.None);
+                AudioVolume.RepairSource(source);
                 foreach (var kv in spec) SetNested(source, kv.Key, kv.Value);
                 if (source.ToString(Formatting.None) != before)
                 {

@@ -128,8 +128,8 @@
     cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none;
   }
   .ed-combo-option:hover, .ed-combo-option:focus-visible { background: var(--button_bg_hover); }
-  .ed-combo-option.is-selected { position: relative; padding-right: 30px; background: rgba(var(--accent-rgb), .22); }
-  .ed-combo-option.is-selected:hover, .ed-combo-option.is-selected:focus-visible { background: rgba(var(--accent-rgb), .3); }
+  .ed-combo-option.is-selected { position: relative; padding-right: 30px; background: var(--selected,var(--primary)); color: var(--on-accent); }
+  .ed-combo-option.is-selected:hover, .ed-combo-option.is-selected:focus-visible { background: var(--selected,var(--primary)); color: var(--on-accent); }
   .ed-combo-option.is-selected::after { content: ""; position: absolute; right: 13px; top: 50%; width: 4px; height: 8px; margin-top: -6px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 
   /* the subtitle being edited and the look of its row, in the panel on the right */

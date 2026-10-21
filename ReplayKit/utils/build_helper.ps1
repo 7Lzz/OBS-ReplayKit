@@ -23,6 +23,7 @@ $inputs = @($sourceFiles.FullName) + @(
     (Join-Path $repoRoot 'ReplayKitSetup\StateLayout.cs'),
     (Join-Path $repoRoot 'ReplayKitSetup\VideoTools.cs'),
     (Join-Path $repoRoot 'ReplayKitSetup\OverlayRotation.cs'),
+    (Join-Path $repoRoot 'ReplayKitSetup\AudioVolume.cs'),
     (Join-Path $outDir 'obs-replaykit.ico')
 )
 $outputs = @($requiredFiles | ForEach-Object { Join-Path $outDir $_ })
