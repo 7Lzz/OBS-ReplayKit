@@ -1,28 +1,11 @@
 <!-- shared partial (helper #include target: mic-controls). the microphone control set -- device, noise suppression, a mic test with a level meter, volume, and a discord-style input sensitivity bar -- for the setup wizard and ReplayKit Settings, so both are the same controls. uses the own classes of settings.html (.combo, .check-row, .volume-*, .field-reset, .btn); the css those need is carried here because setup.html does not define it. host: RKMic.init({ get, set, onChange }); RKMic.collect() returns the mic* fields; RKMic.refresh() repaints from the host state; RKMic.setVisible(bool) tells it whether the controls are on screen (the level monitor only runs while they are); RKMic.stopTest() is setVisible(false). the monitor stops when the window is hidden and starts again when it is shown, following RKWindow from the window-state partial (hosts include that one first). the level monitor and the test run in the helper (GET/POST /mic/*) because obs cef cannot open the microphone; the helper runs the audio through noise suppression, the noise gate and the volume like the obs mic chain does, and every control change is pushed to the running session so the preview follows the controls. -->
 <style>
-  /* lifted from settings.html so the slider keeps its quarter tick lines; identical rules in settings.html are harmless */
+  /* lifted from settings.html so the slider matches it; identical rules in settings.html are harmless */
   .volume-control { width:100%; display:grid; grid-template-columns:72px minmax(180px,1fr); align-items:center; gap:8px; }
   .volume-value { background:transparent; border-color:var(--field-solid,var(--field)); text-align:center; padding:0 8px; }
   .volume-slider-wrap { position:relative; height:32px; min-width:0; }
-  .volume-slider-wrap::before, .sens-wrap::before {
-    content:""; position:absolute; z-index:0; left:0; right:0; top:50%; height:16px; transform:translateY(-50%);
-    background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
-    background-repeat:no-repeat; background-size:100% 16px; background-position:center; pointer-events:none;
-  }
-  .volume-slider {
-    position:relative; z-index:1; width:100%; height:32px; margin:0; appearance:none; -webkit-appearance:none;
-    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
-    background-repeat:no-repeat; background-size:100% 4px; background-position:center; border:0; outline:none;
-  }
-  .volume-slider::-webkit-slider-runnable-track { height:32px; background:transparent; border:0; }
-  .volume-slider::-webkit-slider-thumb {
-    appearance:none; -webkit-appearance:none; width:21px; height:10px; border:0; border-radius:5px;
-    background:var(--text); margin-top:11px; box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25); cursor:pointer;
-  }
-  .volume-slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  /* the look of the slider is the shared one of the slider partial */
+  .volume-slider { position:relative; z-index:1; width:100%; height:32px; }
   .field-wrap:has(> .field-reset) > .volume-control { width:auto; flex:1; }
   .field-reset { flex:none; }
   .field-reset.is-default { opacity:.4; }
@@ -60,25 +43,18 @@
   .mic-note { margin-left:0; }
   .mic-note.is-bad { color:var(--danger); }
 
-  /* input sensitivity: amber left of the handle is cut off, green right of it is recorded, and the faint fill is the live mic level. the handle is the same 21px pill as the other sliders, so every position is offset by half of it to keep the colour split and the level fill lined up with the handle centre */
+  /* input sensitivity: amber left of the handle is cut off, green right of it is recorded, and the faint fill is the live mic level. the handle is the same 18px knob as the other sliders, so every position is offset by half of it to keep the colour split and the level fill lined up with the handle centre */
   .sens-wrap { position:relative; height:32px; min-width:0; --p:0; --lvl:0; --on:0; }
   .sens-track {
-    position:absolute; left:0; right:0; top:50%; height:8px; transform:translateY(-50%); border-radius:4px; overflow:hidden;
+    position:absolute; left:0; right:0; top:50%; height:4px; transform:translateY(-50%); border-radius:2px; overflow:hidden;
     background:linear-gradient(to right,
-      var(--warning,#E2A33B) 0, var(--warning,#E2A33B) calc(var(--p) * (100% - 21px) + 10.5px),
-      var(--success,#37D247) calc(var(--p) * (100% - 21px) + 10.5px), var(--success,#37D247) 100%);
+      var(--warning,#E2A33B) 0, var(--warning,#E2A33B) calc(var(--p) * (100% - 18px) + 9px),
+      var(--success,#37D247) calc(var(--p) * (100% - 18px) + 9px), var(--success,#37D247) 100%);
   }
-  .sens-level { position:absolute; left:0; top:0; bottom:0; width:calc(var(--lvl) * (100% - 21px) + 10.5px * var(--on)); background:rgba(var(--text-rgb),.34); }
-  .sens-slider {
-    position:relative; z-index:1; width:100%; height:32px; margin:0; appearance:none; -webkit-appearance:none;
-    background:transparent; border:0; outline:none; cursor:pointer;
-  }
-  .sens-slider::-webkit-slider-runnable-track { height:32px; background:transparent; border:0; }
-  .sens-slider::-webkit-slider-thumb {
-    appearance:none; -webkit-appearance:none; width:21px; height:10px; border:0; border-radius:5px;
-    background:var(--text); margin-top:11px; box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25); cursor:pointer;
-  }
-  .sens-slider:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  .sens-level { position:absolute; left:0; top:0; bottom:0; width:calc(var(--lvl) * (100% - 18px) + 9px * var(--on)); background:rgba(var(--text-rgb),.34); }
+  /* the handle is the shared one of the slider partial; the colours are drawn by .sens-track under a clear track */
+  .sens-slider { position:relative; z-index:1; width:100%; height:32px; }
+  .sens-slider.rk-range::-webkit-slider-runnable-track { background:transparent; }
 </style>
 <div class="form-row" data-search="microphone mic input device">
   <div class="label">Microphone</div>
@@ -108,7 +84,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="micVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Microphone volume">
-      <div class="volume-slider-wrap"><input class="volume-slider" id="micVolume" type="range" min="0" max="200" step="1" aria-label="Microphone volume slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="micVolume" type="range" min="0" max="200" step="1" aria-label="Microphone volume slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-mic-reset="micVolume" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -120,7 +96,7 @@
       <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels">
       <div class="sens-wrap" id="micSenseWrap">
         <div class="sens-track"><div class="sens-level" id="micSenseLevel"></div></div>
-        <input class="sens-slider" id="micSense" type="range" min="-100" max="0" step="1" aria-label="Input sensitivity slider">
+        <input class="sens-slider rk-range" id="micSense" type="range" min="-100" max="0" step="1" aria-label="Input sensitivity slider">
       </div>
     </div>
     <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>

@@ -36,6 +36,8 @@ namespace ReplayKitHelper
         public static readonly string OBS_ICON_PATH = Path.Combine(HelperRoot, "obs-replaykit.ico");
         // bundled preset icons for the Appearance tab -- HelperRoot is ...\obs-replayKit\scripts\helper, so this is ...\obs-replayKit\icons, mirrored from assets/ by the installer. drop-in extensible: any .ico/.png here shows in the picker.
         public static readonly string APP_ICONS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "icons"));
+        // fonts the subtitles of the editor can use that windows does not have, mirrored from assets/ like the icons
+        public static readonly string APP_FONTS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "fonts"));
         // custom icons the user has picked -- converted to .ico and saved here so they become deletable presets. kept out of APP_ICONS_DIR so the installers assets/ mirror never touches them and so "delete" can be gated to this dir only.
         public static readonly string USER_ICONS_DIR = Path.Combine(APP_ICONS_DIR, "user");
         // %APPDATA%\obs-studio -- APP_ICONS_DIR is ...\obs-replayKit\icons, so up two.

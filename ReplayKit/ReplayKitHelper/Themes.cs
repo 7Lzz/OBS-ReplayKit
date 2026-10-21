@@ -449,7 +449,7 @@ namespace ReplayKitHelper
                 throw new IOException("The selected OBS theme could not be saved before launch.");
         }
 
-        // startup reconciler -- only touches disk if the current themes .ovt is missing or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
+        // startup reconciler -- only touches disk if the current themes .ovt is missing or out of date or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.
         public static void EnsureObsInSync(JObject settings)
         {
             try
@@ -465,7 +465,10 @@ namespace ReplayKitHelper
                 }
                 string obsId = "com.replaykit.theme." + Slug(id);
                 string ovt = Path.Combine(Constants.OBS_CONFIG_DIR, "themes", "rk_" + Slug(id) + ".ovt");
-                if (cur != obsId || !File.Exists(ovt)) ApplyToObs(settings);
+                if (cur != obsId || !File.Exists(ovt)) { ApplyToObs(settings); return; }
+                // an updated helper may build the file differently, and obs reads it again at its next start
+                string want = BuildOvt(Resolve(settings), obsId, PresetLabel(id));
+                if (File.ReadAllText(ovt) != want) File.WriteAllText(ovt, want, new UTF8Encoding(false));
             }
             catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
         }
@@ -538,7 +541,20 @@ namespace ReplayKitHelper
                 sb.Append("QListView::item:selected, QListWidget::item:selected, QMenu::item:selected,\n");
                 sb.Append("QListView::item:selected:hover, QListWidget::item:selected:hover, QMenu::item:selected:hover,\n");
                 sb.Append("QComboBox QAbstractItemView::item:selected, QTabBar::tab:selected,\n");
-                sb.Append("SourceTreeItem[selected=\"true\"] { color: ").Append(onAccent).Append("; }\n");
+                sb.Append("QMenuBar::item:selected,\n");
+                sb.Append("QPushButton:checked, QPushButton:checked:hover, QPushButton:checked:focus,\n");
+                sb.Append("QToolButton:checked, QToolButton:checked:hover, QToolButton:checked:focus,\n");
+                sb.Append(".btn-tool:checked, .btn-tool:checked:hover, .btn-tool:checked:focus,\n");
+                sb.Append(".button-primary, .button-primary:hover, .button-primary:focus { color: ").Append(onAccent).Append("; }\n");
+                // the output buttons are styled by id, which outranks the rule above, so they are named the same way
+                var outputs = new List<string>();
+                foreach (string id in new[] { "streamButton", "recordButton", "pauseRecordButton", "replayBufferButton", "virtualCamButton", "modeSwitch", "broadcastButton" })
+                    outputs.Add("#" + id + ".state-active");
+                sb.Append(string.Join(", ", outputs)).Append(" { color: ").Append(onAccent).Append("; }\n");
+                sb.Append("QWidget { selection-color: ").Append(onAccent).Append("; }\n");
+                // a row of the sources list is a widget of its own, so its name and its eye and lock icons never see the selection and stay light; that list gets a wash of the accent with an accent edge instead of the full fill
+                string wash = Mix(t.Bg, t.Accent, 0.3);
+                sb.Append("SourceTree::item:selected, SourceTree::item:selected:hover, SourceTree::item:selected:focus { background-color: ").Append(wash).Append("; border-color: ").Append(t.Accent).Append("; }\n");
             }
             // only the window gradient goes to OBS: panel/field/accent are used as plain colours all through the generated .ovt, where a qgradient is not a valid value.
             GradientSpec windowGradient = t.GradientFor("bg");

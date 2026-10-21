@@ -465,6 +465,9 @@ if (location.protocol === "file:") {
   function reposition() {
     if (!current) return;
     var b = current.getBoundingClientRect();
+    // measured from the left edge, since a fixed box left where the last tip sat near the right edge is squeezed into what remains and would be measured narrow and tall
+    tip.style.left = "0px";
+    tip.style.top = "0px";
     var tw = tip.offsetWidth;
     var th = tip.offsetHeight;
     var edge = 6;

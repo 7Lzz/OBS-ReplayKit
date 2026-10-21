@@ -1,0 +1,1076 @@
+<!-- shared partial (helper #include target: editor-fx). the look of the video in the clip editor: the colour settings, a filter and any number of effects, the tabs on the right that set them, and the preview that draws them over the video. everything comes down to a short list of steps that the shader here draws and the helper writes as ffmpeg filters for the saved copy, in the same order and with the same arithmetic, so the preview is what gets saved; the helper only takes those numbers, in checked ranges, and the filters and effects themselves are defined here. the state lives in the lanes module with the rest of the edit, so undo and the drafts carry it -->
+<style>
+  .ed-fx-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 1; }
+  .ed-fx-canvas[hidden] { display: none; }
+  /* the tabs of the video stand against the right edge of the window the way the tools stand against the left one */
+  .ed-rail.ed-rail-r { background: var(--bg_window); border-left: 1px solid var(--grey4-solid, var(--grey4)); min-height: 0; }
+  .ed-rail.ed-rail-r[hidden] { display: none; }
+  .ed-rail-r .ed-tab[hidden] { display: none; }
+  .ed-rail-r .ed-tab[data-kind] { cursor: default; }
+  .ed-tab svg.is-line { fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .ed-fx-card[hidden] { display: none; }
+  .ed-fx-card { display: flex; flex-direction: column; }
+  .ed-fx-head { display: flex; align-items: center; gap: 8px; height: 38px; }
+  .ed-fx-head .editor-card-title { height: auto; flex: 1 1 auto; }
+  .ed-fx-pane[hidden] { display: none; }
+  .ed-fx-pane { display: flex; flex-direction: column; gap: 14px; padding-bottom: 6px; }
+  /* a tab of the card that is switched to comes in from the right, as the cards themselves do */
+  .ed-fx-pane.is-in { animation: ed-card-in 180ms var(--ease_smooth) both; }
+  .ed-fx-pane > .ed-sec + .ed-sec { border-top: 1px solid var(--hairline); padding-top: 12px; }
+  .ed-fx-pane .ed-sec-head { margin: 0; }
+  .ed-fx-pane .ed-sec-head .tl-reset { margin-left: auto; }
+  .ed-fx-pane .tl-field { margin-top: 10px; }
+  .ed-fx-pane .tl-field[hidden] { display: none; }
+  .ed-fx-card .btn.ed-fx-reset { flex: none; width: 100%; height: 32px; gap: 6px; }
+  .ed-fx-note { font-size: 12px; color: var(--text_muted); line-height: 1.4; margin: 0; }
+  .ed-fx-note:empty, .ed-fx-note[hidden] { display: none; }
+  /* the search of the filters and effects, the underlined field of the clips page */
+  .ed-fx-search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 2px; border-bottom: 1px solid var(--grey3); color: var(--text_muted); transition: border-color 100ms linear, color 100ms linear; cursor: text; }
+  .ed-fx-search:focus-within { border-bottom-color: var(--primary_light); color: var(--text); }
+  .ed-fx-search svg { width: 14px; height: 14px; fill: currentColor; flex: 0 0 14px; }
+  .ed-fx-search input { min-width: 0; width: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text); font: inherit; font-size: 12px; }
+  .ed-fx-search input::placeholder { color: var(--text_muted); opacity: 1; }
+  /* filters and effects are tiles of the frame under the playhead drawn through them, the way medal lists them */
+  .ed-fx-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; }
+  .ed-fx-tile { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--text_muted); font-size: 12px; cursor: pointer; outline: none; }
+  .ed-fx-tile[hidden] { display: none; }
+  .ed-fx-tile:hover, .ed-fx-tile.is-active, .ed-fx-tile:focus-visible { color: var(--text); }
+  .ed-fx-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px rgba(var(--text-rgb), .1); transition: box-shadow 90ms linear; }
+  .ed-fx-thumb canvas { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .ed-fx-tile:hover .ed-fx-thumb, .ed-fx-tile:focus-visible .ed-fx-thumb { box-shadow: 0 0 0 2px rgba(var(--text-rgb), .3); }
+  .ed-fx-tile.is-active .ed-fx-thumb { box-shadow: 0 0 0 2px rgb(var(--accent-rgb)); }
+  .ed-fx-tile-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* the edit button of a tile: the rounded square the custom themes have, in the see-through black of the theater button of the clip previews, in the top left corner while the tile is hovered */
+  .ed-fx-edit {
+    position: absolute; top: 5px; left: 5px; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: rgba(0, 0, 0, .55); color: #fff; cursor: pointer; opacity: 0;
+    transition: opacity var(--anim_press, 120ms) var(--ease_pop, ease-out), background-color 80ms linear;
+  }
+  .ed-fx-tile:hover .ed-fx-edit, .ed-fx-edit:focus-visible { opacity: 1; }
+  .ed-fx-edit:hover { background: rgba(0, 0, 0, .85); }
+  .ed-fx-edit svg { width: 12px; height: 12px; fill: currentColor; }
+  /* the star of a tile: the rounded square of the edit button, in the top right corner while the tile is hovered, and always once it is a favorite */
+  .ed-fx-star {
+    position: absolute; top: 5px; right: 5px; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: rgba(0, 0, 0, .55); color: #fff; cursor: pointer; opacity: 0;
+    transition: opacity var(--anim_press, 120ms) var(--ease_pop, ease-out), background-color 80ms linear, color 80ms linear;
+  }
+  .ed-fx-tile:hover .ed-fx-star, .ed-fx-star:focus-visible, .ed-fx-tile.is-favorite .ed-fx-star { opacity: 1; }
+  .ed-fx-star:hover { background: rgba(0, 0, 0, .85); }
+  .ed-fx-tile.is-favorite .ed-fx-star { color: var(--amber, #f5b301); }
+  .ed-fx-star svg { width: 13px; height: 13px; fill: currentColor; }
+  /* the favorites come first under a heading of their own, the way the clips page splits its grid */
+  .ed-fx-group-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text); margin: 2px 0 -4px; }
+  .ed-fx-group-head[hidden], .ed-fx-grid[hidden] { display: none; }
+  .ed-fx-group-head svg { width: 13px; height: 13px; fill: currentColor; flex: 0 0 13px; }
+  /* the page a filter or an effect is edited on: its settings in a box, the reset under it */
+  .ed-fx-head .ed-back { margin-left: -6px; }
+  .ed-fx-head .ed-back[hidden] { display: none; }
+  .ed-fx-box { display: flex; flex-direction: column; padding: 12px; border-radius: 8px; background: rgba(var(--text-rgb), .05); }
+  .ed-fx-box-title { font-size: 12px; color: var(--text_muted); }
+</style>
+<script>
+(function () {
+  "use strict";
+
+  // the colour settings of the color tab, at rest, and how far each goes
+  function defaultColor() { return { r: 1, g: 1, b: 1, a: 1, sat: 1, hue: 0, vib: 0, bright: 1, contrast: 1, gamma: 1 }; }
+  var COLOR_RANGES = { r: [0, 2], g: [0, 2], b: [0, 2], a: [0, 1], sat: [0, 2], hue: [-180, 180], vib: [-2, 2], bright: [0, 2], contrast: [0, 3], gamma: [0.2, 3] };
+
+  var LUMA = [0.2126, 0.7152, 0.0722];
+  var SEPIA = [0.393, 0.769, 0.189, 0.349, 0.686, 0.168, 0.272, 0.534, 0.131];
+
+  // 3x3 matrices, rows first
+  function mul(a, b) {
+    var o = [];
+    for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) o.push(a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]);
+    return o;
+  }
+  function identity() { return [1, 0, 0, 0, 1, 0, 0, 0, 1]; }
+  function lerpM(a, b, t) { return a.map(function (v, i) { return v + (b[i] - v) * t; }); }
+  // a turn of the hue about the grey axis, the matrix of the hue-rotate of css
+  function hueM(deg) {
+    var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return [
+      0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928,
+      0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283,
+      0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072,
+    ];
+  }
+  function satM(s) {
+    var o = [];
+    for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) o.push(LUMA[j] * (1 - s) + (i === j ? s : 0));
+    return o;
+  }
+  function gainM(r, g, b) { return [r, 0, 0, 0, g, 0, 0, 0, b]; }
+
+  // the filters: a look is a matrix, an offset per channel, a gamma and a contrast, taken toward no change by its intensity
+  function look(m, off, gamma, contrast) { return { m: m, off: off || [0, 0, 0], gamma: gamma || 1, contrast: contrast || 1 }; }
+  var LOOKS = [
+    ["vivid", "Vivid", look(satM(1.45), [0, 0, 0], 1, 1.12)],
+    ["warm", "Warm", look(gainM(1.12, 1.02, 0.86), [0.02, 0.01, 0], 1, 1.04)],
+    ["cool", "Cool", look(gainM(0.88, 1.0, 1.14), [0, 0.01, 0.03], 1, 1.04)],
+    ["cinematic", "Cinematic", look(mul([1.05, 0, 0, 0, 1.0, 0.02, 0, 0.04, 1.08], satM(0.82)), [0.01, 0.01, 0.03], 0.95, 1.18)],
+    ["tealorange", "Teal & Orange", look([1.15, 0.05, -0.1, -0.05, 1.05, 0.02, -0.1, 0.05, 1.12], [0, 0, 0.02], 1, 1.12)],
+    ["vintage", "Vintage", look(mul(gainM(1.06, 0.98, 0.82), satM(0.7)), [0.06, 0.04, 0.02], 1.08, 0.86)],
+    ["sepia", "Sepia", look(SEPIA, [0, 0, 0], 1, 1)],
+    ["bw", "Black & White", look(satM(0), [0, 0, 0], 1, 1.05)],
+    ["noir", "Noir", look(satM(0), [-0.03, -0.03, -0.03], 0.9, 1.45)],
+    ["faded", "Faded", look(satM(0.75), [0.09, 0.09, 0.1], 1.05, 0.8)],
+    ["cross", "Cross Process", look([1.1, 0, -0.05, -0.02, 1.08, 0, 0.05, -0.05, 0.8], [0, 0.02, 0.06], 1.05, 1.15)],
+    ["sunset", "Sunset", look(gainM(1.2, 0.95, 0.8), [0.04, 0.0, 0.02], 1.02, 1.08)],
+    ["golden", "Golden Hour", look(mul(gainM(1.15, 1.05, 0.78), satM(1.1)), [0.04, 0.02, 0], 1.05, 1.05)],
+    ["arctic", "Arctic", look(mul(gainM(0.9, 1.02, 1.18), satM(0.7)), [0.02, 0.04, 0.07], 1.08, 0.95)],
+    ["neon", "Neon", look(mul([1.05, -0.05, 0.1, -0.05, 1.0, 0.1, 0.1, -0.05, 1.15], satM(1.6)), [0, 0, 0.02], 0.95, 1.2)],
+    ["pastel", "Pastel", look(satM(0.6), [0.08, 0.07, 0.09], 1.15, 0.85)],
+    ["moody", "Moody", look(mul(gainM(0.95, 0.98, 1.05), satM(0.65)), [-0.02, -0.01, 0.01], 0.85, 1.25)],
+    ["matrix", "Retro Green", look([0.8, 0.1, 0, 0.15, 1.1, 0.05, 0, 0.1, 0.75], [0, 0.02, 0], 1, 1.1)],
+    ["rose", "Rose", look(mul(gainM(1.1, 0.94, 1.02), satM(0.9)), [0.04, 0.01, 0.03], 1.04, 0.95)],
+    ["punch", "Punch", look(satM(1.25), [-0.02, -0.02, -0.02], 0.95, 1.3)],
+  ];
+
+  // the effects: each sets some of the steps from its strength (0 to 1), and effects that share a step take the stronger value. lengths are pixels of a 1080p picture
+  var EFFECTS = [
+    ["pixelate", "Pixelate", true, function (s, a) { s.pixel = Math.max(s.pixel, Math.round(4 + 60 * a)); }],
+    ["blur", "Blur", true, function (s, a) { s.blur = Math.max(s.blur, 1 + 19 * a); }],
+    ["sharpen", "Sharpen", true, function (s, a) { s.sharp = Math.max(s.sharp, 0.2 + 2.3 * a); }],
+    ["vignette", "Vignette", true, function (s, a) { s.vignette = Math.max(s.vignette, 0.3 + 1.2 * a); }],
+    ["grain", "Grain", true, function (s, a) { s.noise = Math.max(s.noise, Math.round(10 + 50 * a)); }],
+    ["rgbsplit", "RGB Split", true, function (s, a) { s.shift = Math.max(s.shift, Math.round(2 + 18 * a)); }],
+    ["invert", "Invert", false, function (s) { s.invert = 1; }],
+    ["posterize", "Posterize", true, function (s, a) { var l = Math.round(16 - 13 * a); s.poster = s.poster ? Math.min(s.poster, l) : l; }],
+    ["thermal", "Thermal", false, function (s) { s.thermal = 1; }],
+    ["scanlines", "Scanlines", true, function (s, a) { s.scanP = 4; s.scanA = Math.max(s.scanA, 0.15 + 0.5 * a); }],
+    ["vhs", "VHS", true, function (s, a) { s.shift = Math.max(s.shift, Math.round(2 + 4 * a)); s.blur = Math.max(s.blur, 1); s.noise = Math.max(s.noise, Math.round(8 + 16 * a)); s.scanP = s.scanP || 3; s.scanA = Math.max(s.scanA, 0.1 + 0.3 * a); }],
+    ["oldfilm", "Old Film", true, function (s, a) { s.sepia = Math.max(s.sepia, 0.6 + 0.4 * a); s.noise = Math.max(s.noise, Math.round(10 + 20 * a)); s.vignette = Math.max(s.vignette, 0.6 + 0.5 * a); }],
+    ["emboss", "Emboss", false, function (s) { s.emboss = 1; }],
+    ["sketch", "Sketch", false, function (s) { s.sketch = 1; }],
+    ["zoom", "Zoom", true, function (s, a) { s.zoom = Math.max(s.zoom, 1 + a); }],
+    ["fisheye", "Fisheye", true, function (s, a) { s.lens = Math.max(s.lens, 0.1 + 0.5 * a); }],
+    ["mirror", "Mirror", false, function (s) { s.flip = 1; }],
+  ];
+  var EFFECT_START = 50;
+
+  function noSteps() { return { zoom: 1, lens: 0, flip: 0, blur: 0, pixel: 0, shift: 0, sharp: 0, emboss: 0, sketch: 0, sepia: 0, invert: 0, poster: 0, thermal: 0, vignette: 0, noise: 0, scanP: 0, scanA: 0 }; }
+
+  function lookById(id) { for (var i = 0; i < LOOKS.length; i++) if (LOOKS[i][0] === id) return LOOKS[i]; return null; }
+  function effectById(id) { for (var i = 0; i < EFFECTS.length; i++) if (EFFECTS[i][0] === id) return EFFECTS[i]; return null; }
+  function clampTo(v, range) { return Math.min(range[1], Math.max(range[0], v)); }
+
+  // what the editor keeps, checked the way anything that comes back from a draft is; the effects keep the order they were added in
+  function cleanFx(fx) {
+    var d = defaultColor();
+    var c = fx && fx.color || {};
+    var color = {};
+    Object.keys(d).forEach(function (k) {
+      var v = Number(c[k]);
+      color[k] = c[k] != null && isFinite(v) ? Math.round(clampTo(v, COLOR_RANGES[k]) * 1000) / 1000 : d[k];
+    });
+    var l = fx && fx.look;
+    var lookOut = l && lookById(l.id) ? { id: l.id, amount: Math.round(clampTo(Number(l.amount) || 0, [0, 100])) } : null;
+    var effects = [];
+    (fx && Array.isArray(fx.effects) ? fx.effects : []).forEach(function (e) {
+      if (!e || !effectById(e.id) || effects.some(function (x) { return x.id === e.id; })) return;
+      var v = Number(e.amount);
+      effects.push({ id: e.id, amount: isFinite(v) ? Math.round(clampTo(v, [0, 100])) : EFFECT_START });
+    });
+    return { color: color, look: lookOut, effects: effects };
+  }
+  function defaultFx() { return { color: defaultColor(), look: null, effects: [] }; }
+
+  function r4(v) { return Math.round(v * 10000) / 10000; }
+
+  // the numbers both sides draw from: the colour stage as a turn of the hue, a saturation and a gain per channel (three matrices, since the channel mixer of ffmpeg takes no factor past 2) with its curve, the look as a stage of its own, and the steps of the effects
+  function resolve(fx) {
+    fx = cleanFx(fx);
+    var c = fx.color;
+    var out = {
+      hue: hueM(c.hue).map(r4), sat: satM(c.sat).map(r4), gain: [c.r * c.a, c.g * c.a, c.b * c.a].map(r4),
+      vib: r4(c.vib), gamma: r4(c.gamma), bright: r4(c.bright), contrast: r4(c.contrast), look: null, steps: noSteps(),
+    };
+    var lk = fx.look && lookById(fx.look.id);
+    if (lk && fx.look.amount > 0) {
+      var t = fx.look.amount / 100, L = lk[2];
+      out.look = { m: lerpM(identity(), L.m, t).map(r4), off: L.off.map(function (v) { return r4(v * t); }), gamma: r4(1 + (L.gamma - 1) * t), contrast: r4(1 + (L.contrast - 1) * t) };
+    }
+    fx.effects.forEach(function (e) { effectById(e.id)[3](out.steps, e.amount / 100); });
+    var s = out.steps;
+    Object.keys(s).forEach(function (k) { s[k] = r4(s[k]); });
+    return out;
+  }
+
+  function plainM(m) { var one = identity(); return m.every(function (v, i) { return Math.abs(v - one[i]) < 1e-4; }); }
+
+  function isIdentity(r) {
+    var s = r.steps;
+    return plainM(r.hue) && plainM(r.sat) && r.gain.every(function (v) { return v === 1; }) && !r.vib && r.gamma === 1 && r.bright === 1 && r.contrast === 1 && !r.look &&
+      s.zoom === 1 && !s.lens && !s.flip && !s.blur && !s.pixel && !s.shift && !s.sharp && !s.emboss && !s.sketch &&
+      !s.sepia && !s.invert && !s.poster && !s.thermal && !s.vignette && !s.noise && !s.scanA;
+  }
+
+  var VERTEX = [
+    "#version 300 es",
+    "out vec2 vUv;",
+    "void main() {",
+    "  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));",
+    "  vUv = p;",
+    "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);",
+    "}",
+  ].join("\n");
+
+  // the steps in the order the helper writes them: blur, zoom, lens, mirror, pixelate, rgb split, one of emboss / sketch / sharpen, the colour stage, the look, then the finishing steps. positions are pixels of the video, y down
+  var FRAGMENT = [
+    "#version 300 es",
+    "precision highp float;",
+    "uniform sampler2D uTex;",
+    "uniform vec4 uRect;",
+    "uniform vec2 uVid;",
+    "uniform float uLod, uPix, uTime;",
+    "uniform float uZoom, uLens, uFlip, uBlurS, uBlock, uShift, uSharp, uEmboss, uSketch;",
+    "uniform mat3 uHueM, uSatM;",
+    "uniform vec3 uGain;",
+    "uniform float uVib, uGamma, uBright, uContrast;",
+    "uniform float uLookOn;",
+    "uniform mat3 uLookM;",
+    "uniform vec3 uLookOff;",
+    "uniform float uLookGamma, uLookContrast;",
+    "uniform float uSepia, uInvert, uPoster, uThermal, uVignette, uNoise, uScanPer, uScanTh, uScanA;",
+    "in vec2 vUv;",
+    "out vec4 o;",
+    "const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);",
+    "vec3 at(vec2 p, float lod) { p = clamp(p, vec2(0.5), uVid - 0.5); return textureLod(uTex, vec2(p.x / uVid.x, 1.0 - p.y / uVid.y), lod).rgb; }",
+    // the pixel of the source an output pixel shows, undoing the mirror, then the lens, then the zoom
+    "vec2 source(vec2 p) {",
+    "  vec2 c = uVid * 0.5;",
+    "  if (uFlip > 0.5) p.x = uVid.x - p.x;",
+    "  if (uLens > 0.0) { vec2 d = p - c; float r2 = dot(d, d) / dot(c, c); p = c + d * (1.0 + uLens * r2); }",
+    "  if (uZoom > 1.0) p = c + (p - c) / uZoom;",
+    "  return p;",
+    "}",
+    // a picture shrunk on screen is read as four samples spread over the screen pixel from the next finer level, the way the msaa of the clip player does, which keeps edges and text as crisp as the video shows them without its look; one sample from a coarser level would blur them
+    "vec3 fine(vec2 sp, float lod) {",
+    "  vec2 d = vec2(uPix);",
+    "  float l = max(0.0, lod - 2.0);",
+    "  return 0.25 * (at(sp + d * vec2(-0.375, -0.125), l) + at(sp + d * vec2(0.125, -0.375), l) + at(sp + d * vec2(0.375, 0.125), l) + at(sp + d * vec2(-0.125, 0.375), l));",
+    "}",
+    // the blurred source where an output pixel lands; the lens leaves black where it reaches past the picture
+    "vec3 picture(vec2 p, float lod) {",
+    "  vec2 sp = source(p);",
+    "  if (sp.x < 0.0 || sp.y < 0.0 || sp.x > uVid.x || sp.y > uVid.y) return vec3(0.0);",
+    "  if (uBlurS <= 0.0) return uPix > 1.0 && lod <= uLod + 0.001 ? fine(sp, lod) : at(sp, lod);",
+    "  float l = max(lod, log2(max(1.0, uBlurS)));",
+    "  vec3 acc = vec3(0.0); float sum = 0.0;",
+    "  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { float w = exp(-0.5 * float(i * i + j * j)); acc += w * at(sp + vec2(float(i), float(j)) * uBlurS * 1.12, l); sum += w; }",
+    "  return acc / sum;",
+    "}",
+    // blocks of the pixelate effect start at the top left and the last ones are cut by the edge; a block is the mean of 16 samples spread over it
+    "vec3 blocked(vec2 p) {",
+    "  if (uBlock <= 1.0) return picture(p, uLod);",
+    "  vec2 a = floor(p / uBlock) * uBlock;",
+    "  vec2 size = min(a + uBlock, uVid) - a;",
+    "  float l = max(uLod, log2(max(1.0, uBlock * 0.25 / max(1.0, uZoom))));",
+    "  vec3 acc = vec3(0.0);",
+    "  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) acc += picture(a + size * (vec2(float(i), float(j)) + 0.5) * 0.25, l);",
+    "  return acc * 0.0625;",
+    "}",
+    "vec3 shifted(vec2 p) {",
+    "  p = clamp(p, vec2(0.5), uVid - 0.5);",
+    "  vec3 c = blocked(p);",
+    "  if (uShift > 0.0) { c.r = blocked(clamp(p + vec2(uShift, 0.0), vec2(0.5), uVid - 0.5)).r; c.b = blocked(clamp(p - vec2(uShift, 0.0), vec2(0.5), uVid - 0.5)).b; }",
+    "  return c;",
+    "}",
+    "float hash(vec2 p, float k) { return fract(sin(dot(p, vec2(12.9898 + k, 78.233 - k)) + uTime * 43.21 + k * 7.13) * 43758.5453); }",
+    "void main() {",
+    "  vec2 s = (vUv - uRect.xy) / uRect.zw;",
+    "  if (s.x < 0.0 || s.y < 0.0 || s.x > 1.0 || s.y > 1.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }",
+    "  vec2 p = vec2(s.x, 1.0 - s.y) * uVid;",
+    "  vec2 q = floor(p) + 0.5;",
+    "  vec3 col;",
+    "  if (uEmboss > 0.5) {",
+    "    float k[9] = float[9](-2.0, -1.0, 0.0, -1.0, 1.0, 1.0, 0.0, 1.0, 2.0);",
+    "    col = vec3(0.0);",
+    "    for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++) col += k[j * 3 + i] * shifted(q + vec2(float(i - 1), float(j - 1)));",
+    "    col = clamp(col, 0.0, 1.0);",
+    "  } else if (uSketch > 0.5) {",
+    "    vec3 n[9];",
+    "    for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++) n[j * 3 + i] = shifted(q + vec2(float(i - 1), float(j - 1)));",
+    "    vec3 gx = -n[0] + n[2] - 2.0 * n[3] + 2.0 * n[5] - n[6] + n[8];",
+    "    vec3 gy = -n[0] - 2.0 * n[1] - n[2] + n[6] + 2.0 * n[7] + n[8];",
+    "    vec3 mag = min(sqrt(gx * gx + gy * gy), 1.0);",
+    "    col = 1.0 - clamp((mag - 0.1) / 0.2, 0.0, 1.0);",
+    "  } else if (uSharp > 0.0) {",
+    "    vec3 c0 = shifted(q);",
+    "    vec3 nb = shifted(q + vec2(2.0, 0.0)) + shifted(q - vec2(2.0, 0.0)) + shifted(q + vec2(0.0, 2.0)) + shifted(q - vec2(0.0, 2.0));",
+    "    col = clamp(c0 * (1.0 + uSharp) - nb * (uSharp * 0.25), 0.0, 1.0);",
+    "  } else {",
+    "    col = shifted(p);",
+    "  }",
+    // the colour stage: hue, saturation and gain, each kept in range the way 8 bit frames are, the vibrance of ffmpeg, then gamma, brightness and contrast
+    "  col = clamp(uHueM * col, 0.0, 1.0);",
+    "  col = clamp(uSatM * col, 0.0, 1.0);",
+    "  col = clamp(col * uGain, 0.0, 1.0);",
+    "  if (uVib != 0.0) {",
+    "    float mx = max(col.r, max(col.g, col.b)), mn = min(col.r, min(col.g, col.b));",
+    "    float l = dot(col, LUMA);",
+    "    float f = 1.0 + uVib * (1.0 + sign(uVib) * (mx - mn));",
+    "    col = clamp(l + (col - l) * f, 0.0, 1.0);",
+    "  }",
+    "  col = clamp((pow(col, vec3(1.0 / uGamma)) * uBright - 0.5) * uContrast + 0.5, 0.0, 1.0);",
+    "  if (uLookOn > 0.5) {",
+    "    col = clamp(uLookM * col, 0.0, 1.0);",
+    "    col = clamp((pow(clamp(col + uLookOff, 0.0, 1.0), vec3(1.0 / uLookGamma)) - 0.5) * uLookContrast + 0.5, 0.0, 1.0);",
+    "  }",
+    "  if (uSepia > 0.0) {",
+    "    mat3 sep = mat3(0.393, 0.349, 0.272, 0.769, 0.686, 0.534, 0.189, 0.168, 0.131);",
+    "    col = clamp(mix(col, sep * col, uSepia), 0.0, 1.0);",
+    "  }",
+    "  if (uInvert > 0.0) col = col * (1.0 - 2.0 * uInvert) + uInvert;",
+    "  if (uPoster > 0.0) col = floor(floor(col * 255.0 + 0.5) * uPoster / 256.0) / (uPoster - 1.0);",
+    "  if (uThermal > 0.5) { float t = dot(col, LUMA); col = clamp(vec3(3.0 * t - 1.0, 3.0 * t - 2.0, 1.0 - abs(3.0 * t - 1.0)), 0.0, 1.0); }",
+    "  if (uVignette > 0.0) { float d = length(p - uVid * 0.5) / length(uVid * 0.5); float c = d > 1.0 ? 0.0 : cos(uVignette * d); col *= c * c * c * c; }",
+    "  if (uNoise > 0.0) col = clamp(col + (vec3(hash(floor(p), 0.0), hash(floor(p), 1.0), hash(floor(p), 2.0)) - 0.5) * uNoise / 255.0, 0.0, 1.0);",
+    "  if (uScanA > 0.0 && mod(floor(p.y), uScanPer) < uScanTh) col = mix(col, vec3(0.0), uScanA);",
+    "  o = vec4(col, 1.0);",
+    "}",
+  ].join("\n");
+
+  // whole pixels of the video that the helper works out the same way: half rounds up
+  function px(v, k) { return Math.floor(v * k + 0.5); }
+
+  function compile(gl, type, source) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      var message = gl.getShaderInfoLog(shader) || "shader";
+      gl.deleteShader(shader);
+      throw new Error(message);
+    }
+    return shader;
+  }
+
+  var UNIFORMS = ["uTex", "uRect", "uVid", "uLod", "uPix", "uTime", "uZoom", "uLens", "uFlip", "uBlurS", "uBlock", "uShift", "uSharp", "uEmboss", "uSketch", "uHueM", "uSatM", "uGain", "uVib", "uGamma", "uBright", "uContrast",
+    "uLookOn", "uLookM", "uLookOff", "uLookGamma", "uLookContrast", "uSepia", "uInvert", "uPoster", "uThermal", "uVignette", "uNoise", "uScanPer", "uScanTh", "uScanA"];
+
+  // a drawing context for the shader on a canvas; null where webgl2 is missing or only drawn by the processor, which could not keep up with it
+  function build(canvas) {
+    var gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true });
+    if (!gl) return null;
+    var info = gl.getExtension("WEBGL_debug_renderer_info");
+    var renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "") : "";
+    if (/swiftshader|llvmpipe|software/i.test(renderer)) return null;
+    var p = gl.createProgram();
+    var v = compile(gl, gl.VERTEX_SHADER, VERTEX), f = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
+    gl.attachShader(p, v);
+    gl.attachShader(p, f);
+    gl.linkProgram(p);
+    gl.deleteShader(v);
+    gl.deleteShader(f);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || "program");
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    var u = {};
+    UNIFORMS.forEach(function (n) { u[n] = gl.getUniformLocation(p, n); });
+    return { gl: gl, program: p, texture: t, vao: gl.createVertexArray(), u: u, uploaded: null };
+  }
+
+  // the shader takes column-major matrices
+  function cols(m) { return [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]; }
+
+  // draws the picture of source (a video or an image) through the numbers of resolve into the canvas of g, letterboxed the way object-fit contain shows it. upload false reuses the frame already sent; blank draws a black frame of the same size, which is what a gap between the pieces of the video is
+  function render(g, source, r, width, height, upload, time, blank) {
+    var gl = g.gl;
+    var vw = source.videoWidth || source.naturalWidth || source.width, vh = source.videoHeight || source.naturalHeight || source.height;
+    if (!vw || !vh) return false;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, g.texture);
+    var want = blank ? "blank" : source;
+    if (upload || g.uploaded !== want) {
+      if (blank) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      g.uploaded = want;
+    }
+    var fit = Math.min(width / vw, height / vh);
+    var w = vw * fit / width, h = vh * fit / height;
+    var k = vh / 1080;
+    var u = g.u, st = r.steps;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
+    gl.useProgram(g.program);
+    gl.bindVertexArray(g.vao);
+    gl.uniform1i(u.uTex, 0);
+    gl.uniform4f(u.uRect, (1 - w) / 2, (1 - h) / 2, w, h);
+    gl.uniform2f(u.uVid, vw, vh);
+    gl.uniform1f(u.uLod, Math.max(0, Math.log2(1 / fit)));
+    gl.uniform1f(u.uPix, 1 / fit);
+    gl.uniform1f(u.uTime, (time || 0) % 1000);
+    gl.uniform1f(u.uZoom, st.zoom);
+    gl.uniform1f(u.uLens, st.lens);
+    gl.uniform1f(u.uFlip, st.flip);
+    gl.uniform1f(u.uBlurS, st.blur > 0 ? st.blur * k / st.zoom : 0);
+    gl.uniform1f(u.uBlock, st.pixel > 0 ? Math.max(1, px(st.pixel, k)) : 0);
+    gl.uniform1f(u.uShift, st.shift > 0 ? px(st.shift, k) : 0);
+    gl.uniform1f(u.uSharp, st.sharp);
+    gl.uniform1f(u.uEmboss, st.emboss);
+    gl.uniform1f(u.uSketch, st.sketch);
+    gl.uniformMatrix3fv(u.uHueM, false, cols(r.hue));
+    gl.uniformMatrix3fv(u.uSatM, false, cols(r.sat));
+    gl.uniform3f(u.uGain, r.gain[0], r.gain[1], r.gain[2]);
+    gl.uniform1f(u.uVib, r.vib);
+    gl.uniform1f(u.uGamma, r.gamma);
+    gl.uniform1f(u.uBright, r.bright);
+    gl.uniform1f(u.uContrast, r.contrast);
+    gl.uniform1f(u.uLookOn, r.look ? 1 : 0);
+    var L = r.look || { m: identity(), off: [0, 0, 0], gamma: 1, contrast: 1 };
+    gl.uniformMatrix3fv(u.uLookM, false, cols(L.m));
+    gl.uniform3f(u.uLookOff, L.off[0], L.off[1], L.off[2]);
+    gl.uniform1f(u.uLookGamma, L.gamma);
+    gl.uniform1f(u.uLookContrast, L.contrast);
+    gl.uniform1f(u.uSepia, st.sepia);
+    gl.uniform1f(u.uInvert, st.invert);
+    gl.uniform1f(u.uPoster, st.poster);
+    gl.uniform1f(u.uThermal, st.thermal);
+    gl.uniform1f(u.uVignette, st.vignette);
+    gl.uniform1f(u.uNoise, st.noise);
+    var per = Math.max(1, px(st.scanP, k));
+    gl.uniform1f(u.uScanPer, per);
+    gl.uniform1f(u.uScanTh, Math.max(1, Math.floor(per / 3 + 0.5)));
+    gl.uniform1f(u.uScanA, st.scanA);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return true;
+  }
+
+  // the preview of the editor: a canvas over the video that follows its frames while there is a look to show and steps aside when there is none; the antialiasing of the page leaves a video it owns alone
+  function attachPreview(video) {
+    var canvas = document.createElement("canvas");
+    canvas.className = "ed-fx-canvas";
+    canvas.hidden = true;
+    video.insertAdjacentElement("afterend", canvas);
+    var g = null;
+    try { g = build(canvas); } catch (e) { g = null; }
+    var current = null;
+    var handle = 0;
+    var late = 0;
+    // the editor shows a piece taken from another clip in an element of its own, named on the video as rkPicture, and the look goes over that one while it shows
+    function draw() {
+      var pic = video.rkPicture || video;
+      if (!g || !current || !pic.videoWidth || pic.readyState < 2) return;
+      var dpr = window.devicePixelRatio || 1;
+      var width = Math.max(2, Math.round(canvas.clientWidth * dpr)), height = Math.max(2, Math.round(canvas.clientHeight * dpr));
+      if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+      render(g, pic, current, width, height, true, performance.now() / 1000, pic === video && video.style.visibility === "hidden");
+    }
+    function loop() {
+      handle = 0;
+      if (!current) return;
+      draw();
+      handle = video.requestVideoFrameCallback(loop);
+    }
+    // a paused video presents no frames, so a change is drawn at once and again a moment later in case its frame had not arrived
+    function redraw() {
+      draw();
+      clearTimeout(late);
+      late = setTimeout(draw, 150);
+    }
+    ["seeked", "loadeddata", "pause", "play"].forEach(function (n) { video.addEventListener(n, redraw); });
+    video.addEventListener("rkframe", draw);
+    // the editor hides the video over a gap between its pieces, which the saved copy fills with black
+    new MutationObserver(redraw).observe(video, { attributes: true, attributeFilter: ["style"] });
+    new ResizeObserver(redraw).observe(canvas);
+    canvas.addEventListener("webglcontextlost", function (e) { e.preventDefault(); g = null; current = null; canvas.hidden = true; delete video.dataset.rkFxOwned; });
+    return {
+      supported: function () { return !!g; },
+      set: function (resolved) {
+        current = resolved && g && !isIdentity(resolved) ? resolved : null;
+        canvas.hidden = !current;
+        if (current) video.dataset.rkFxOwned = "1"; else delete video.dataset.rkFxOwned;
+        if (current && !handle && typeof video.requestVideoFrameCallback === "function") handle = video.requestVideoFrameCallback(loop);
+        redraw();
+      },
+    };
+  }
+
+  // one hidden canvas draws the small pictures of the filters and effects in turn, each copied into its own tile
+  function thumbRenderer() {
+    var canvas = document.createElement("canvas");
+    var g = null;
+    try { g = build(canvas); } catch (e) { g = null; }
+    return {
+      supported: function () { return !!g; },
+      draw: function (video, list) {
+        if (!g || !video.videoWidth || video.readyState < 2) return false;
+        list.forEach(function (item, i) {
+          var w = item.canvas.width, h = item.canvas.height;
+          if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+          render(g, video, item.resolved, w, h, i === 0, 0, false);
+          item.canvas.getContext("2d").drawImage(canvas, 0, 0, w, h);
+        });
+        return true;
+      },
+    };
+  }
+
+  var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.85547 0.854492C14.8259 0.854621 18.8555 4.88498 18.8555 9.85547C18.8554 12.0437 18.0729 14.0485 16.7744 15.6084L22.5625 21.3965C22.8842 21.7183 22.8843 22.2407 22.5625 22.5625C22.2407 22.8842 21.7183 22.8842 21.3965 22.5625L15.6084 16.7744C14.0485 18.0728 12.0437 18.8554 9.85547 18.8555C4.88506 18.8555 0.85573 14.8258 0.855469 9.85547C0.855469 4.8849 4.8849 0.854492 9.85547 0.854492ZM9.85547 2.50195C5.79439 2.50195 2.50195 5.79439 2.50195 9.85547C2.50221 13.9163 5.79455 17.208 9.85547 17.208C13.9163 17.2079 17.2077 13.9162 17.208 9.85547C17.208 5.79447 13.9165 2.50208 9.85547 2.50195Z"/></svg>';
+  var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>';
+  var TAB_ICONS = {
+    general: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>',
+    color: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>',
+    filters: '<svg viewBox="0 0 24 24" class="is-line" aria-hidden="true"><circle cx="9" cy="9.5" r="5.2"/><circle cx="15" cy="9.5" r="5.2"/><circle cx="12" cy="14.8" r="5.2"/></svg>',
+    effects: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2.5l1.9 5.6 5.6 1.9-5.6 1.9L10 17.5l-1.9-5.6L2.5 10l5.6-1.9zM18 13l1 2.9 3 1.1-3 1.1-1 2.9-1-2.9-3-1.1 3-1.1z"/></svg>',
+  };
+  var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"]];
+  var COLOR_GROUPS = [
+    ["Channels", [["r", "Red"], ["g", "Green"], ["b", "Blue"], ["a", "Opacity"]]],
+    ["Color", [["sat", "Saturation"], ["hue", "Hue"], ["vib", "Vibrance"]]],
+    ["Light", [["bright", "Brightness"], ["contrast", "Contrast"], ["gamma", "Gamma"]]],
+  ];
+  var PREFS_KEY = "rk-editor-fx";
+  var FAVORITES_KEY = "rk-editor-fx-favorites";
+  var THUMB_W = 192;
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
+  function paintFill(slide) {
+    var min = Number(slide.min), max = Number(slide.max);
+    slide.style.setProperty("--fill", ((Number(slide.value) - min) / (max - min) * 100) + "%");
+  }
+
+  // the tabs of the video on the right and the panels they open; o.lanes owns the state, o.side is the right panel, o.rail the bar for the tabs and o.video the preview
+  function createPanel(o) {
+    var lanes = o.lanes;
+    var video = o.video;
+    var preview = attachPreview(video);
+    var thumbs = thumbRenderer();
+    var pane = "general";
+    try { var saved = localStorage.getItem(PREFS_KEY); if (TABS.some(function (t) { return t[0] === saved; })) pane = saved; } catch (_) {}
+    // what is selected on the timeline: video, audio, subtitle or nothing; the bar shows the tabs of that and the panels of the look are only for the video
+    var kind = "";
+    var shown = false;
+    var els = { tabs: {}, panes: {}, color: {}, lookTiles: {}, effectTiles: {}, kindTabs: {}, editing: null, lastPane: "" };
+    var thumbQueued = 0;
+    var fxTimer = 0;
+
+    function fx() { return lanes.fx.get(); }
+    // a change that keeps coming (a slider being dragged) shows at once and is one step of the history once it rests
+    function write(next, record) {
+      lanes.fx.set(next, record);
+      clearTimeout(fxTimer);
+      if (record === false) fxTimer = setTimeout(function () { lanes.fx.checkpoint(); }, 600);
+    }
+
+    // one setting drawn the way the properties panel draws them: the name over a slider, with the value in a box on its right; onReset puts the reset arrow of those rows after the name
+    function field(label, range, step, format, onInput, onReset) {
+      var box = el("div", "tl-field");
+      var head = el("div", "tl-field-head");
+      head.appendChild(el("span", "tl-label", label));
+      if (onReset) {
+        var reset = el("button", "tl-reset");
+        reset.type = "button";
+        reset.setAttribute("aria-label", "Reset " + label.toLowerCase());
+        reset.dataset.tooltip = "Reset to default";
+        reset.innerHTML = icon("action/reset");
+        reset.addEventListener("click", onReset);
+        head.appendChild(reset);
+      }
+      box.appendChild(head);
+      var line = el("div", "tl-field-line");
+      var wrap = el("div", "tl-slider-wrap");
+      var slide = el("input", "tl-slider rk-range");
+      slide.type = "range";
+      slide.min = String(range[0]);
+      slide.max = String(range[1]);
+      slide.step = String(step);
+      slide.setAttribute("aria-label", label);
+      wrap.appendChild(slide);
+      var value = el("input", "tl-value");
+      value.type = "text";
+      value.inputMode = "decimal";
+      value.autocomplete = "off";
+      value.setAttribute("aria-label", label);
+      line.appendChild(wrap);
+      line.appendChild(value);
+      box.appendChild(line);
+      slide.addEventListener("input", function () { paintFill(slide); value.value = format(Number(slide.value)); onInput(Number(slide.value), false); });
+      slide.addEventListener("change", function () { clearTimeout(fxTimer); lanes.fx.checkpoint(); });
+      value.addEventListener("keydown", function (e) { if (e.key === "Enter") value.blur(); e.stopPropagation(); });
+      value.addEventListener("change", function () {
+        var v = parseFloat(String(value.value).replace(",", "."));
+        if (isFinite(v)) onInput(Math.min(range[1], Math.max(range[0], v)), true); else paint();
+      });
+      box.show = function (v) {
+        if (document.activeElement !== value) value.value = format(v);
+        if (document.activeElement !== slide) { slide.value = String(v); paintFill(slide); }
+      };
+      return box;
+    }
+    function percent(v) { return String(Math.round(v)); }
+
+    function section(title) {
+      var s = el("section", "ed-sec");
+      var head = el("div", "ed-sec-head");
+      head.appendChild(el("div", "ed-sec-title", title));
+      s.appendChild(head);
+      return s;
+    }
+
+    function buildColor(box) {
+      COLOR_GROUPS.forEach(function (group) {
+        var sec = section(group[0]);
+        group[1].forEach(function (item) {
+          var key = item[0];
+          var whole = key === "hue";
+          var f = field(item[1], COLOR_RANGES[key], whole ? 1 : 0.01, function (v) { return whole ? String(Math.round(v)) : v.toFixed(2); }, function (v, record) {
+            var next = fx();
+            next.color[key] = v;
+            write(next, record);
+          });
+          els.color[key] = f;
+          sec.appendChild(f);
+        });
+        // the reset of the general tab, for the settings of this group alone
+        var reset = el("button", "tl-reset");
+        reset.type = "button";
+        reset.setAttribute("aria-label", "Reset " + group[0].toLowerCase());
+        reset.dataset.tooltip = "Reset to default";
+        reset.innerHTML = icon("action/reset");
+        reset.addEventListener("click", function () {
+          var next = fx();
+          var d = defaultColor();
+          group[1].forEach(function (item) { next.color[item[0]] = d[item[0]]; });
+          write(next, true);
+        });
+        sec.querySelector(".ed-sec-head").appendChild(reset);
+        box.appendChild(sec);
+      });
+      var reset = el("button", "btn ed-fx-reset", "Reset to Default");
+      reset.type = "button";
+      reset.addEventListener("click", function () {
+        var next = fx();
+        next.color = defaultColor();
+        write(next, true);
+      });
+      box.appendChild(reset);
+    }
+
+    // the filters and effects starred on this computer, by id, kept apart for the two panes
+    function loadFavorites() {
+      var out = { filters: [], effects: [] };
+      try {
+        var saved = JSON.parse(localStorage.getItem(FAVORITES_KEY) || "{}");
+        if (Array.isArray(saved.filters)) out.filters = saved.filters.filter(function (id) { return !!lookById(id); });
+        if (Array.isArray(saved.effects)) out.effects = saved.effects.filter(function (id) { return !!effectById(id); });
+      } catch (_) {}
+      return out;
+    }
+    var favorites = loadFavorites();
+    function saveFavorites() { try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); } catch (_) {} }
+
+    // a tile is not a button, so the edit and star buttons can sit inside it; a tile that is on shows it by the accent border alone
+    function tile(label, onPick, onEdit, onStar) {
+      var t = el("div", "ed-fx-tile");
+      t.tabIndex = 0;
+      t.setAttribute("role", "button");
+      t.label = label;
+      var frame = el("span", "ed-fx-thumb");
+      var canvas = el("canvas");
+      frame.appendChild(canvas);
+      if (onEdit) {
+        var edit = el("button", "ed-fx-edit");
+        edit.type = "button";
+        edit.setAttribute("aria-label", "Edit " + label.toLowerCase());
+        edit.dataset.tooltip = "Edit";
+        edit.innerHTML = icon("action/edit");
+        edit.addEventListener("click", function (e) { e.stopPropagation(); onEdit(); });
+        frame.appendChild(edit);
+      }
+      if (onStar) {
+        var star = el("button", "ed-fx-star");
+        star.type = "button";
+        star.addEventListener("click", function (e) { e.stopPropagation(); onStar(); });
+        frame.appendChild(star);
+        t.star = star;
+      }
+      t.appendChild(frame);
+      t.appendChild(el("span", "ed-fx-tile-label", label));
+      t.addEventListener("click", onPick);
+      t.addEventListener("keydown", function (e) {
+        if (e.target !== t || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        onPick();
+      });
+      t.canvas = canvas;
+      return t;
+    }
+
+    function groupHead(iconName, text) {
+      var h = el("div", "ed-fx-group-head");
+      h.innerHTML = icon(iconName);
+      h.appendChild(el("span", "", text));
+      return h;
+    }
+
+    // the tiles of a pane in two grids, the favorites first, each in the order the list defines; a search hides tiles and a heading with nothing left under it
+    function tileGroups(box, kind, list) {
+      var favHead = groupHead("toggle/star", "Favorites");
+      var favGrid = el("div", "ed-fx-grid");
+      var restHead = groupHead("toggle/grid", "All " + kind);
+      var restGrid = el("div", "ed-fx-grid");
+      var search = searchBox(list, kind, heads);
+      [search, search.none, favHead, favGrid, restHead, restGrid].forEach(function (n) { box.appendChild(n); });
+      function visible(grid) { return Array.prototype.some.call(grid.children, function (t) { return !t.hidden; }); }
+      function heads() {
+        var split = favGrid.children.length > 0;
+        favHead.hidden = favGrid.hidden = !split || !visible(favGrid);
+        restHead.hidden = !split || !visible(restGrid);
+      }
+      function layout() {
+        list.forEach(function (t) {
+          var fav = !!t.favId && favorites[kind].indexOf(t.favId) >= 0;
+          t.classList.toggle("is-favorite", fav);
+          if (t.star) {
+            t.star.innerHTML = icon(fav ? "toggle/star" : "toggle/star-border");
+            t.star.dataset.tooltip = fav ? "Remove from favorites" : "Add to favorites";
+            t.star.setAttribute("aria-label", t.star.dataset.tooltip);
+          }
+          (fav ? favGrid : restGrid).appendChild(t);
+        });
+        heads();
+      }
+      layout();
+      return layout;
+    }
+
+    function starred(kind, id, layout) {
+      var list = favorites[kind];
+      var i = list.indexOf(id);
+      if (i >= 0) list.splice(i, 1); else list.push(id);
+      saveFavorites();
+      layout();
+      queueThumbs();
+    }
+
+    // a search over the tiles of a pane by their names, and a line in place of the grids when nothing matches
+    function searchBox(tiles, kind, after) {
+      var box = el("label", "ed-fx-search");
+      box.innerHTML = SEARCH_ICON;
+      var input = el("input");
+      input.type = "text";
+      input.placeholder = "Search " + kind;
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      input.setAttribute("aria-label", "Search " + kind);
+      box.appendChild(input);
+      var none = el("p", "ed-fx-note", "No " + kind + " match that.");
+      none.hidden = true;
+      input.addEventListener("input", function () {
+        var q = input.value.trim().toLowerCase();
+        var any = false;
+        tiles.forEach(function (t) { var hit = !q || t.label.toLowerCase().indexOf(q) >= 0; t.hidden = !hit; any = any || hit; });
+        none.hidden = any;
+        after();
+      });
+      input.addEventListener("keydown", function (e) { e.stopPropagation(); });
+      box.none = none;
+      return box;
+    }
+
+    // a filter is picked by its tile and let go of by the same tile; the edit button picks it as well and opens its intensity
+    function buildFilters(box) {
+      var list = [];
+      var layout = null;
+      var none = tile("None", function () { var next = fx(); next.look = null; write(next, true); });
+      els.lookTiles[""] = none;
+      list.push(none);
+      LOOKS.forEach(function (l) {
+        var t = tile(l[1], function () {
+          var next = fx();
+          next.look = next.look && next.look.id === l[0] ? null : { id: l[0], amount: 100 };
+          write(next, true);
+        }, function () { openEdit("filter", l[0]); }, function () { starred("filters", l[0], layout); });
+        t.favId = l[0];
+        els.lookTiles[l[0]] = t;
+        list.push(t);
+      });
+      layout = tileGroups(box, "filters", list);
+    }
+
+    function buildEffects(box) {
+      var list = [];
+      var layout = null;
+      EFFECTS.forEach(function (e) {
+        var t = tile(e[1], function () {
+          var next = fx();
+          var i = next.effects.findIndex(function (x) { return x.id === e[0]; });
+          if (i >= 0) next.effects.splice(i, 1); else next.effects.push({ id: e[0], amount: EFFECT_START });
+          write(next, true);
+        }, e[2] ? function () { openEdit("effect", e[0]); } : null, function () { starred("effects", e[0], layout); });
+        t.favId = e[0];
+        els.effectTiles[e[0]] = t;
+        list.push(t);
+      });
+      layout = tileGroups(box, "effects", list);
+    }
+
+    // the page of one filter or effect: its name over its setting in a box, and a reset to how it starts
+    function buildEdit(view) {
+      var box = el("div", "ed-fx-box");
+      els.editName = el("div", "ed-fx-box-title", "");
+      box.appendChild(els.editName);
+      els.editField = field("Strength", [0, 100], 1, percent, function (v, record) {
+        var next = fx();
+        if (!setAmount(next, v)) return;
+        write(next, record);
+      }, function () {
+        var next = fx();
+        if (setAmount(next, els.editing && els.editing.kind === "filter" ? 100 : EFFECT_START)) write(next, true);
+      });
+      els.editLabel = els.editField.querySelector(".tl-label");
+      box.appendChild(els.editField);
+      view.appendChild(box);
+    }
+
+    // writes the amount of what is being edited into a state, false when it is not on in that state
+    function setAmount(state, v) {
+      var ed = els.editing;
+      if (!ed) return false;
+      if (ed.kind === "filter") {
+        if (!state.look || state.look.id !== ed.id) return false;
+        state.look.amount = v;
+        return true;
+      }
+      var hit = state.effects.find(function (x) { return x.id === ed.id; });
+      if (!hit) return false;
+      hit.amount = v;
+      return true;
+    }
+
+    function amountOf(state) {
+      var ed = els.editing;
+      if (!ed) return null;
+      if (ed.kind === "filter") return state.look && state.look.id === ed.id ? state.look.amount : null;
+      var hit = state.effects.find(function (x) { return x.id === ed.id; });
+      return hit ? hit.amount : null;
+    }
+
+    // the edit button turns the filter or effect on when it was off, then opens its page
+    function openEdit(kind, id) {
+      var next = fx();
+      if (kind === "filter" && !(next.look && next.look.id === id)) {
+        next.look = { id: id, amount: 100 };
+        write(next, true);
+      } else if (kind === "effect" && !next.effects.some(function (x) { return x.id === id; })) {
+        next.effects.push({ id: id, amount: EFFECT_START });
+        write(next, true);
+      }
+      els.editing = { kind: kind, id: id };
+      paint();
+    }
+
+    function closeEdit() {
+      if (!els.editing) return;
+      els.editing = null;
+      paint();
+    }
+
+    function slideIn(node) {
+      node.classList.remove("is-in");
+      void node.offsetWidth;
+      node.classList.add("is-in");
+    }
+
+    function build() {
+      o.rail.textContent = "";
+      TABS.forEach(function (t) {
+        var b = el("button", "ed-tab");
+        b.type = "button";
+        b.dataset.tab = t[0];
+        b.innerHTML = TAB_ICONS[t[0]];
+        b.appendChild(el("span", "", t[1]));
+        b.addEventListener("click", function () { setPane(t[0]); });
+        els.tabs[t[0]] = b;
+        o.rail.appendChild(b);
+      });
+      // an audio piece or a subtitle has one panel, and its tab only says what the panel is
+      [["audio", "Audio", "editor/audio"], ["subtitle", "Subtitle", "editor/subtitles"], ["layer", "Layer", "editor/image"]].forEach(function (t) {
+        var b = el("button", "ed-tab is-active");
+        b.type = "button";
+        b.dataset.kind = t[0];
+        b.innerHTML = icon(t[2]);
+        b.appendChild(el("span", "", t[1]));
+        els.kindTabs[t[0]] = b;
+        o.rail.appendChild(b);
+      });
+      var card = el("section", "editor-card ed-fx-card");
+      card.hidden = true;
+      var head = el("div", "ed-fx-head");
+      els.back = el("button", "ed-x ed-back");
+      els.back.type = "button";
+      els.back.setAttribute("aria-label", "Back");
+      els.back.dataset.tooltip = "Back";
+      els.back.innerHTML = BACK_ICON;
+      els.back.hidden = true;
+      els.back.addEventListener("click", closeEdit);
+      head.appendChild(els.back);
+      els.title = el("div", "editor-card-title", "");
+      head.appendChild(els.title);
+      var close = el("button", "ed-x");
+      close.type = "button";
+      close.setAttribute("aria-label", "Close");
+      close.dataset.tooltip = "Close";
+      close.innerHTML = icon("editor/close");
+      close.addEventListener("click", function () { lanes.clearSelection(); });
+      head.appendChild(close);
+      card.appendChild(head);
+      els.support = el("p", "ed-fx-note", "");
+      card.appendChild(els.support);
+      ["color", "filters", "effects"].forEach(function (k) {
+        var p = el("div", "ed-fx-pane");
+        els.panes[k] = p;
+        card.appendChild(p);
+      });
+      els.editView = el("div", "ed-fx-pane");
+      els.editView.hidden = true;
+      card.appendChild(els.editView);
+      buildColor(els.panes.color);
+      buildFilters(els.panes.filters);
+      buildEffects(els.panes.effects);
+      buildEdit(els.editView);
+      // escape leaves the page of a filter or effect, and empties a search, before the editor would take it to let go of the video
+      window.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape" || !shown) return;
+        if (els.editing) { e.preventDefault(); e.stopPropagation(); closeEdit(); return; }
+        var input = e.target && e.target.closest && e.target.closest(".ed-fx-search") ? e.target : null;
+        if (input && input.value) { e.preventDefault(); e.stopPropagation(); input.value = ""; input.dispatchEvent(new Event("input")); }
+      }, true);
+      els.card = card;
+      o.side.appendChild(card);
+      if (window.RKHover) RKHover.apply(card, { control: ".btn, .ed-x" });
+      ["seeked", "loadeddata", "pause"].forEach(function (n) { video.addEventListener(n, queueThumbs); });
+    }
+
+    function setPane(name) {
+      if (name !== pane) els.editing = null;
+      pane = name;
+      try { localStorage.setItem(PREFS_KEY, name); } catch (_) {}
+      paint();
+      lanes.refreshProps();
+    }
+
+    function paint() {
+      Object.keys(els.tabs).forEach(function (k) { els.tabs[k].classList.toggle("is-active", k === pane); els.tabs[k].hidden = !shown; });
+      Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; });
+      // the bar stays while nothing is selected, empty, so the editor keeps its shape
+      o.rail.hidden = false;
+      var open = shown && pane !== "general";
+      var wasOpen = !els.card.hidden;
+      els.card.hidden = !open;
+      if (!open) { els.editing = null; els.lastPane = ""; return; }
+      var state = fx();
+      // the page of a filter or effect closes once it is turned off, by undo or anything else
+      var ed = els.editing;
+      if (ed && (ed.kind !== { filters: "filter", effects: "effect" }[pane] || amountOf(state) == null)) ed = els.editing = null;
+      var view = ed ? "edit:" + ed.kind + ":" + ed.id : pane;
+      var def = ed ? (ed.kind === "filter" ? lookById(ed.id) : effectById(ed.id)) : null;
+      els.back.hidden = !ed;
+      els.title.textContent = ed ? def[1] : { color: "Color", filters: "Filters", effects: "Effects" }[pane];
+      Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = !!ed || k !== pane; });
+      els.editView.hidden = !ed;
+      // the card comes in by itself when it was not showing; a switch inside it, to another tab or a page and back, brings the new view in the same way
+      var shownNode = ed ? els.editView : els.panes[pane];
+      Object.keys(els.panes).concat("edit").forEach(function (k) {
+        var node = k === "edit" ? els.editView : els.panes[k];
+        if (node !== shownNode || !wasOpen) node.classList.remove("is-in");
+      });
+      if (wasOpen && els.lastPane && els.lastPane !== view) slideIn(shownNode);
+      els.lastPane = view;
+      els.support.textContent = preview.supported() ? "" : "This computer cannot show the look on the preview. The saved copy still gets it.";
+      if (ed) {
+        els.editName.textContent = def[1];
+        els.editLabel.textContent = ed.kind === "filter" ? "Intensity" : "Strength";
+        els.editField.show(amountOf(state));
+        return;
+      }
+      Object.keys(els.color).forEach(function (k) { els.color[k].show(state.color[k]); });
+      var lookId = state.look ? state.look.id : "";
+      Object.keys(els.lookTiles).forEach(function (k) { els.lookTiles[k].classList.toggle("is-active", k === lookId); });
+      Object.keys(els.effectTiles).forEach(function (k) { els.effectTiles[k].classList.toggle("is-active", state.effects.some(function (e) { return e.id === k; })); });
+      queueThumbs();
+    }
+
+    // the tiles show the frame under the playhead with the colour settings as they are, the filters each with their own look, the effects on top of the filter that is set
+    function queueThumbs() {
+      if (thumbQueued || !shown || els.editing || (pane !== "filters" && pane !== "effects")) return;
+      thumbQueued = requestAnimationFrame(function () {
+        thumbQueued = 0;
+        // a clip row that is selected shows its own frames in the tiles
+        var pic = (lanes.fx.picture && lanes.fx.picture()) || video;
+        if (!shown || !pic.videoWidth || !thumbs.supported()) return;
+        var state = fx();
+        var h = Math.max(2, Math.round(THUMB_W * pic.videoHeight / pic.videoWidth));
+        var list = [];
+        function add(t, f) {
+          if (t.canvas.width !== THUMB_W || t.canvas.height !== h) { t.canvas.width = THUMB_W; t.canvas.height = h; }
+          list.push({ canvas: t.canvas, resolved: resolve(f) });
+        }
+        if (pane === "filters") {
+          Object.keys(els.lookTiles).forEach(function (k) {
+            add(els.lookTiles[k], { color: state.color, look: k ? { id: k, amount: state.look && state.look.id === k ? state.look.amount : 100 } : null, effects: [] });
+          });
+        } else {
+          EFFECTS.forEach(function (e) {
+            var on = state.effects.find(function (x) { return x.id === e[0]; });
+            add(els.effectTiles[e[0]], { color: state.color, look: state.look, effects: [{ id: e[0], amount: on ? on.amount : 70 }] });
+          });
+        }
+        thumbs.draw(pic, list);
+      });
+    }
+
+    build();
+    paint();
+    preview.set(resolve(lanes.fx.main()));
+    return {
+      // the tab the right panel shows while the video is selected
+      pane: function () { return pane; },
+      // the lanes say whenever the panel on the right is drawn what is selected: "video", "audio", "subtitle", "layer" or ""
+      selected: function (next) {
+        // the video and a clip row are both "video" but have looks of their own, so a change between them is drawn again
+        if (next === kind && next !== "video") return;
+        kind = next;
+        shown = kind === "video";
+        paint();
+        if (o.onLayout) o.onLayout();
+      },
+      // the look changed, by an edit, an undo, a draft or a clip being closed
+      changed: function () {
+        preview.set(resolve(lanes.fx.main()));
+        if (shown) paint();
+      },
+    };
+  }
+
+  window.RKEditorFx = {
+    // a look canvas for another video element, which the editor gives each clip row
+    preview: attachPreview,
+    LOOKS: LOOKS.map(function (l) { return { id: l[0], label: l[1] }; }),
+    EFFECTS: EFFECTS.map(function (e) { return { id: e[0], label: e[1], amount: e[2] }; }),
+    defaultFx: defaultFx,
+    cleanFx: cleanFx,
+    resolve: resolve,
+    isIdentity: isIdentity,
+    render: render,
+    build: build,
+    createPanel: createPanel,
+  };
+})();
+</script>

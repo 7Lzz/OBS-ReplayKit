@@ -132,7 +132,6 @@ namespace ReplayKitHelper
 
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
             try { Update.ClearStaleUpdateFolders(); } catch (Exception ex) { Log.Write("ClearStaleUpdateFolders: " + ex.Message); }
-            try { Compression.GetHelperCapabilities(refresh: true); } catch (Exception ex) { Log.Write("GetHelperCapabilities: " + ex.Message); }
 
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
             _listener = BindListener(port);
@@ -152,8 +151,6 @@ namespace ReplayKitHelper
             // the parent handle is diagnostic only -- obs can host the lua through a short-lived child process, so a failed open must not make the helper exit
             ParentWatchdog.OpenHandle();
 
-            try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
-
             // bind this process to a windows job object with kill-on-close. any worker child we spawn (compress/trim ffmpeg, etc) inherits the job automatically on windows 8+; when this process exits for any reason the kernel terminates every process still in the job, so orphaned ffmpeg workers cannot keep encoding into clip files no ui is watching.
             try
             {
@@ -164,6 +161,16 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) { Log.Write("warn: Job object setup threw: " + ex.Message); }
 
+            // requests are answered from here on while the chores below run, since obs builds its pages only once the helper answers and the probe of the encoders alone (a test encode per graphics card encoder) held every page back for seconds
+            Exception acceptFailure = null;
+            var acceptThread = new Thread(() =>
+            {
+                try { RunAcceptLoop(); }
+                catch (Exception ex) { acceptFailure = ex; Server.State.Shutdown = true; }
+            }) { Name = "accept", IsBackground = true };
+            acceptThread.Start();
+
+            try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
             try { ReplaykitSettings.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
             try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
@@ -178,9 +185,17 @@ namespace ReplayKitHelper
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
             try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
             try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
+            // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
+            var probe = new Thread(() =>
+            {
+                Thread.Sleep(15000);
+                if (Server.State.Shutdown) return;
+                try { Compression.GetHelperCapabilities(); } catch (Exception ex) { Log.Write("GetHelperCapabilities: " + ex.Message); }
+            }) { Name = "encoder-probe", IsBackground = true };
+            probe.Start();
 
-            RunAcceptLoop();
-
+            acceptThread.Join();
+            if (acceptFailure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(acceptFailure).Throw();
             return 0;
         }
 

@@ -81,8 +81,13 @@ namespace ReplayKitHelper
         // the containers of video are listed too, since the sound of a video file can be taken out and used
         private const string AudioFilter = "Audio files|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|All files (*.*)|*.*";
 
+        private const string MediaPickerTitle = "Add a GIF or image";
+        private const string MediaFilter = "GIFs and images|*.gif;*.png;*.jpg;*.jpeg|All files (*.*)|*.*";
+
+        private static string[] PickAudioFiles() => PickFiles(AudioPickerTitle, AudioFilter);
+
         // the picker of the editor: a modal dialog on a one-shot sta thread like PickPath, where several files can be chosen at once; an empty list when it is cancelled or fails
-        private static string[] PickAudioFiles()
+        private static string[] PickFiles(string title, string filter)
         {
             string[] result = new string[0];
             var t = new Thread(() =>
@@ -90,15 +95,15 @@ namespace ReplayKitHelper
                 try
                 {
                     IntPtr ownerHwnd = Native.FindReplayKitSettingsWindow();
-                    var raiser = new Thread(() => Native.RaiseOwnDialog(AudioPickerTitle)) { IsBackground = true, Name = "picker-raise" };
+                    var raiser = new Thread(() => Native.RaiseOwnDialog(title)) { IsBackground = true, Name = "picker-raise" };
                     raiser.Start();
                     System.Windows.Forms.IWin32Window owner = ownerHwnd == IntPtr.Zero ? null : new OwnerWindow(ownerHwnd);
-                    using (var d = new System.Windows.Forms.OpenFileDialog { Filter = AudioFilter, CheckFileExists = true, Multiselect = true, Title = AudioPickerTitle })
+                    using (var d = new System.Windows.Forms.OpenFileDialog { Filter = filter, CheckFileExists = true, Multiselect = true, Title = title })
                     {
                         if (d.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK) result = d.FileNames;
                     }
                 }
-                catch (Exception ex) { Log.Write("PickAudioFiles: " + ex.Message); }
+                catch (Exception ex) { Log.Write("PickFiles: " + ex.Message); }
             });
             t.SetApartmentState(ApartmentState.STA);
             t.IsBackground = true;
@@ -839,6 +844,37 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // auto subtitles: the one-time download of the speech engine and its model, and the jobs that turn a part of a clip into word timings
+            if (path == "/speech/status" || path == "/speech/install" || path == "/speech/transcribe" || path == "/speech/job" || path == "/speech/cancel")
+            {
+                bool post = path != "/speech/status" && path != "/speech/job";
+                if (req.Method != (post ? "POST" : "GET")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", (post ? "POST" : "GET") + " required"); return false; }
+                if (path == "/speech/status") HttpResponse.SendJson(stream, 200, Speech.Status());
+                else if (path == "/speech/install") HttpResponse.SendJson(stream, 200, Speech.StartInstall());
+                else if (path == "/speech/job") HttpResponse.SendJson(stream, 200, Speech.JobStatus(Q("id")));
+                else if (path == "/speech/cancel") HttpResponse.SendJson(stream, 200, Speech.Cancel(Q("id")));
+                else
+                {
+                    bool parsed = double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double from) &
+                        double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double to) &
+                        int.TryParse(Q("track"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int track);
+                    if (!parsed) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad request" }); return false; }
+                    var started = Speech.StartTranscribe(Q("file"), from, to, track, Q("language"));
+                    HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 400, started);
+                }
+                return false;
+            }
+
+            // the record tab of the editor: a voiceover from the microphone of the settings or one picked in the tab, which becomes an import once it stops
+            if (path == "/voiceover/start" || path == "/voiceover/level" || path == "/voiceover/stop")
+            {
+                bool post = path != "/voiceover/level";
+                if (req.Method != (post ? "POST" : "GET")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", (post ? "POST" : "GET") + " required"); return false; }
+                JObject answer = path == "/voiceover/start" ? Voiceover.Start(Q("device")) : path == "/voiceover/level" ? Voiceover.Level() : Voiceover.Stop(Q("keep") == "1");
+                HttpResponse.SendJson(stream, answer["ok"]?.Value<bool>() == true ? 200 : 400, answer);
+                return false;
+            }
+
             if (path == "/notifications/reader/close")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -1014,6 +1050,16 @@ namespace ReplayKitHelper
                     var hi = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" });
                     HttpResponse.SendBytes(stream, 200, "OK", hi, File.ReadAllBytes(full));
                 }
+                else HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false });
+                return false;
+            }
+
+            // the bundled fonts by file name, for the subtitles the editor previews; no folders, no traversal
+            var fontFile = Regex.Match(path, @"^/fonts/([A-Za-z0-9_-]+\.ttf)$");
+            if (fontFile.Success)
+            {
+                string full = Path.Combine(Constants.APP_FONTS_DIR, fontFile.Groups[1].Value);
+                if (File.Exists(full)) HttpResponse.SendBytes(stream, 200, "OK", new Dictionary<string, string> { ["Content-Type"] = "font/ttf", ["Cache-Control"] = "max-age=86400" }, File.ReadAllBytes(full));
                 else HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false });
                 return false;
             }
@@ -1492,6 +1538,17 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // a page of the clean shell grabbed at its right edge, bottom edge or the corner between them, which is where the window of obs is resized now that the pages reach those edges; the plugin runs the resize loop of windows inside obs, which repaints as it goes where moving the window from out here left white and stale areas
+            if (path == "/shell/resize")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string edge = Q("edge");
+                if (edge != "right" && edge != "bottom" && edge != "corner") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown edge." }); return false; }
+                bool resizing = Native.ObsMainResizable() && PipeClient.SendShellResize(edge);
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["resizing"] = resizing });
+                return false;
+            }
+
             if (path == "/window/set-size")
             {
                 // one-shot corrective resize for a window we just spawned via "chrome --app=" -- see SetWindowSizeCentereds comment for why the spawn-time --window-size flag alone is not reliable.
@@ -1706,7 +1763,7 @@ namespace ReplayKitHelper
 
             if (path == "/capabilities")
             {
-                var caps = Compression.GetHelperCapabilities();
+                var caps = Compression.GetToolPaths();
                 HttpResponse.SendJson(stream, 200, new JObject
                 {
                     ["ok"] = true,
@@ -2158,6 +2215,46 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the sound of another clip of the folder, which the library of the editor lays under the clip it put over the video
+            if (path == "/import-audio/clip")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                var clip = Clips.GetSafeClipPath(Q("name"));
+                if (clip == null || !File.Exists(clip.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "That clip was not found" }); return false; }
+                HttpResponse.SendJson(stream, 200, AudioImports.BeginFromPath(clip.Full));
+                return false;
+            }
+
+            // pictures and gifs the editor lays over the video: a shape or a sticker the page drew, files from the picker, and the file itself
+            if (path == MediaImports.UploadPath)
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                var made = MediaImports.FromUpload(req, Q("name"), out int mediaStatus);
+                HttpResponse.SendJson(stream, mediaStatus, made);
+                return false;
+            }
+
+            if (path == "/import-media/pick")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string[] pickedMedia = PickFiles(MediaPickerTitle, MediaFilter);
+                if (pickedMedia.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
+                var added = new JArray();
+                foreach (string file in pickedMedia.Take(8)) added.Add(MediaImports.FromPath(file));
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["files"] = added, ["skipped"] = pickedMedia.Length - added.Count });
+                return false;
+            }
+
+            if (path == "/import-media/file")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                string media = MediaImports.PathFor(Q("id"));
+                if (media == null) { HttpResponse.SendText(stream, 404, "Not Found", "Media not found"); return false; }
+                var mediaHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = MediaImports.ContentType(media), ["Cache-Control"] = "private, max-age=31536000, immutable" };
+                HttpResponse.SendBytes(stream, 200, "OK", mediaHeaders, File.ReadAllBytes(media));
+                return false;
+            }
+
             // the film strip of the editor: what it asks for with the name of a clip, and the picture itself, which never changes under its key
             if (path == "/clip-filmstrip")
             {
@@ -2302,6 +2399,9 @@ namespace ReplayKitHelper
                 // the audio edits of the editor come as json in the body; no body means the audio is left as it is
                 JToken audioEdit = null;
                 JToken videoEdit = null;
+                JToken subtitleEdit = null;
+                JToken lookEdit = null;
+                JToken layerEdit = null;
                 if (!string.IsNullOrWhiteSpace(req.Body))
                 {
                     try
@@ -2310,6 +2410,9 @@ namespace ReplayKitHelper
                         // a member that is null is the same as one that is not there
                         audioEdit = editBody["audio"] != null && editBody["audio"].Type != JTokenType.Null ? editBody["audio"] : null;
                         videoEdit = editBody["video"] != null && editBody["video"].Type != JTokenType.Null ? editBody["video"] : null;
+                        subtitleEdit = editBody["subtitles"] != null && editBody["subtitles"].Type != JTokenType.Null ? editBody["subtitles"] : null;
+                        lookEdit = editBody["look"] != null && editBody["look"].Type != JTokenType.Null ? editBody["look"] : null;
+                        layerEdit = editBody["layers"] != null && editBody["layers"].Type != JTokenType.Null ? editBody["layers"] : null;
                     }
                     catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad audio edit" }); return false; }
                 }
@@ -2321,7 +2424,7 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad speed" });
                         return false;
                     }
-                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit);
+                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)

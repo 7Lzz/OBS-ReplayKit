@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -108,6 +109,12 @@ namespace ReplayKitHelper
 
         private readonly string _deviceId;
         private readonly bool _playback;
+        // a voiceover writes what comes out of the chain to this wav file (16 bit, 48 khz stereo), which is what the editor imports once it stops
+        private readonly string _recordPath;
+        private FileStream _record;
+        private long _recordedFrames;
+        // a voiceover is longer than a test, and is still bounded so a forgotten one cannot fill the disk
+        public const int MaxRecordMinutes = 15;
         private readonly MicChain _chain;
         private readonly Thread _thread;
         private readonly ManualResetEvent _ready = new ManualResetEvent(false);
@@ -125,10 +132,11 @@ namespace ReplayKitHelper
         private long _framesRendered;
         private long _underruns;
 
-        private MicLoopback(string deviceId, double gain, bool noiseSuppression, int sensitivityDb, bool playback)
+        private MicLoopback(string deviceId, double gain, bool noiseSuppression, int sensitivityDb, bool playback, string recordPath)
         {
             _deviceId = deviceId;
             _playback = playback;
+            _recordPath = recordPath;
             _gain = gain;
             _chain = new MicChain(SampleRate, Channels, noiseSuppression, sensitivityDb);
             _lastTouch = Stopwatch.GetTimestamp();
@@ -152,9 +160,11 @@ namespace ReplayKitHelper
         public long Underruns => Interlocked.Read(ref _underruns);
 
         // returns null with the reason in error when the microphone, or in playback mode the output device, could not be opened.
-        public static MicLoopback Start(string deviceId, double gain, bool noiseSuppression, int sensitivityDb, bool playback, out string error)
+        public double RecordedSeconds => Interlocked.Read(ref _recordedFrames) / (double)SampleRate;
+
+        public static MicLoopback Start(string deviceId, double gain, bool noiseSuppression, int sensitivityDb, bool playback, out string error, string recordPath = null)
         {
-            var session = new MicLoopback(deviceId, gain, noiseSuppression, sensitivityDb, playback);
+            var session = new MicLoopback(deviceId, gain, noiseSuppression, sensitivityDb, playback, recordPath);
             session._thread.Start();
             bool ready = session._ready.WaitOne(4000);
             if (ready && session._startError == null) { error = null; return session; }
@@ -233,6 +243,11 @@ namespace ReplayKitHelper
                     WasapiInterop.Check(render.ReleaseBuffer(cushionFrames, WasapiInterop.BufferFlagsSilent), "prime the playback buffer");
                 }
 
+                if (_recordPath != null)
+                {
+                    _record = new FileStream(_recordPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                    WriteWavHeader(_record, 0);
+                }
                 WasapiInterop.Check(captureClient.Start(), "start the microphone");
                 captureStarted = true;
                 if (_playback)
@@ -266,6 +281,17 @@ namespace ReplayKitHelper
                 WasapiInterop.Release(captureDevice);
                 WasapiInterop.Release(enumerator);
                 if (format != IntPtr.Zero) Marshal.FreeHGlobal(format);
+                if (_record != null)
+                {
+                    try
+                    {
+                        _record.Seek(0, SeekOrigin.Begin);
+                        WriteWavHeader(_record, Interlocked.Read(ref _recordedFrames));
+                        _record.Flush(true);
+                    }
+                    catch (IOException ex) { Log.Write("MicLoopback record close: " + ex.Message); }
+                    _record.Dispose();
+                }
                 _ready.Set();
             }
         }
@@ -295,6 +321,7 @@ namespace ReplayKitHelper
                 long now = Stopwatch.GetTimestamp();
                 if (ElapsedMs(Interlocked.Read(ref _lastTouch), now) > IdleLimitMs) { _endReason = "idle"; return; }
                 if (playback && ElapsedMs(started, now) > MaxRunMinutes * 60L * 1000) { _endReason = "time limit"; return; }
+                if (_record != null && ElapsedMs(started, now) > MaxRecordMinutes * 60L * 1000) { _endReason = "time limit"; return; }
 
                 double targetGain = Volatile.Read(ref _gain);
                 while (true)
@@ -310,6 +337,7 @@ namespace ReplayKitHelper
 
                     ProcessAndMeter(scratch, (int)frames, appliedGain, targetGain);
                     appliedGain = targetGain;
+                    if (_record != null) WriteRecorded(scratch, (int)frames);
                     if (!playback) continue;
 
                     // drift between the two device clocks slowly grows the queue, so past the cap the oldest audio goes rather than letting the echo lag further behind; every count here is a whole number of frames so left and right never swap.
@@ -342,6 +370,42 @@ namespace ReplayKitHelper
                 }
 
                 Thread.Sleep(10);
+            }
+        }
+
+        private byte[] _recordBytes = new byte[0];
+
+        private void WriteRecorded(float[] samples, int frames)
+        {
+            int count = frames * Channels;
+            if (_recordBytes.Length < count * 2) _recordBytes = new byte[count * 2];
+            for (int i = 0; i < count; i++)
+            {
+                int v = (int)Math.Round(Math.Max(-1f, Math.Min(1f, samples[i])) * 32767f);
+                _recordBytes[i * 2] = (byte)(v & 0xFF);
+                _recordBytes[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+            }
+            _record.Write(_recordBytes, 0, count * 2);
+            Interlocked.Add(ref _recordedFrames, frames);
+        }
+
+        private static void WriteWavHeader(Stream stream, long frames)
+        {
+            long dataBytes = frames * Channels * 2;
+            using (var w = new BinaryWriter(stream, System.Text.Encoding.ASCII, true))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write((uint)Math.Min(uint.MaxValue, 36 + dataBytes));
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt "));
+                w.Write(16u);
+                w.Write((ushort)1);
+                w.Write((ushort)Channels);
+                w.Write((uint)SampleRate);
+                w.Write((uint)(SampleRate * Channels * 2));
+                w.Write((ushort)(Channels * 2));
+                w.Write((ushort)16);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write((uint)Math.Min(uint.MaxValue, dataBytes));
             }
         }
 

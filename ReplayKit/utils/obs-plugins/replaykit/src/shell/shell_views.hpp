@@ -9,6 +9,8 @@
 
 namespace rk {
 
+// the views the shell browser holds; projector and obs settings are native windows of their own
+bool ShellIsPageView(ShellView view);
 void ShellEndClipFullscreen();
 void ShellDropParkedObsSettings();
 // obs refuses to start any output while its settings dialog exists, so a parked one is dropped first and then runs once it is gone

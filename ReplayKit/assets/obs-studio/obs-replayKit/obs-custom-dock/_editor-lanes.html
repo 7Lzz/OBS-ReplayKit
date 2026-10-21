@@ -5,20 +5,35 @@
     flex-direction: column;
     min-height: 0;
     max-height: 48vh;
-    padding: 0 16px 16px;
+    padding: 0 12px 12px;
+  }
+  /* as medal draws it: the toolbar is a long rounded bar of its own across the editor, the panels of the editor come down onto its top edge, and the ruler and the tracks lie under it apart from it. the drag handle sits on that edge and takes no room, its grab area reaching a little above and below it */
+  .tl-card {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
   .tl-resizer {
-    flex: 0 0 12px;
-    margin: 0 -16px;
+    flex: 0 0 0;
     cursor: ns-resize;
     position: relative;
+    z-index: 6;
     touch-action: none;
+  }
+  .tl-resizer::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -5px;
+    height: 10px;
   }
   .tl-resizer::after {
     content: "";
     position: absolute;
     left: 50%;
-    top: 5px;
+    top: 3px;
     width: 46px;
     height: 3px;
     border-radius: 2px;
@@ -33,14 +48,17 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    margin-bottom: 6px;
-    padding: 3px 6px;
-    background: var(--grey7);
-    border: 1px solid rgba(var(--text-rgb), .1);
+    margin: 0 0 8px;
+    padding: 6px;
+    background: var(--ed-panel, var(--grey6));
+    border: 1px solid var(--grey4-solid, var(--grey4));
     border-radius: 8px;
   }
   .tl-group { display: flex; align-items: center; gap: 2px; }
-  .tl-fill { flex: 1 1 auto; min-width: 8px; }
+  /* the two ends take equal room, so the play group sits in the middle of the bar whatever is on either side */
+  .tl-side { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 2px; }
+  .tl-side-end { justify-content: flex-end; }
+  .tl-play-group { flex: 0 0 auto; margin: 0 8px; }
   .tl-sep { width: 1px; height: 20px; margin: 0 6px; background: rgba(var(--text-rgb), .16); flex: 0 0 auto; }
   .tl-btn {
     width: 32px;
@@ -104,7 +122,6 @@
     overflow: hidden;
     border-radius: 8px;
     background: var(--grey7);
-    border: 1px solid rgba(var(--text-rgb), .1);
   }
   .tl-frame {
     flex: 1 1 auto;
@@ -201,6 +218,56 @@
     vertical-align: top;
   }
   .tl-chip.tl-vchip { position: absolute; z-index: 5; left: 8px; top: 6px; margin: 0; }
+  /* the subtitles row sits above the video row; a cue is a block like a piece, in a warm colour of its own */
+  .tl-subs[hidden] { display: none; }
+  .tl-marquee { position: absolute; top: 2px; bottom: 2px; z-index: 6; border: 1px solid var(--selected2); border-radius: 4px; background: rgba(var(--accent-rgb), .18); pointer-events: none; }
+  .tl-chip.tl-subchip { cursor: pointer; pointer-events: auto; }
+  .tl-subrow { position: relative; height: var(--tl-track-h); margin: 0 0 6px; border-radius: 6px; background: rgba(var(--text-rgb), .035); }
+  .tl-chip.tl-subchip { position: absolute; z-index: 5; left: 8px; top: 6px; margin: 0; }
+  .tl-cue {
+    position: absolute; top: 3px; bottom: 3px; z-index: 2; box-sizing: border-box; min-width: 4px; padding: 0 8px;
+    border-radius: 4px; border: 1px solid rgba(224, 165, 55, .7); background: rgba(224, 165, 55, .2);
+    color: #fff; font-size: 11px; line-height: calc(var(--tl-track-h) - 8px); cursor: grab; touch-action: none; overflow: hidden;
+  }
+  .tl-cue:hover { border-color: rgba(224, 165, 55, 1); }
+  .tl-cue.is-selected { z-index: 3; border-color: rgba(var(--text-rgb), .95); box-shadow: 0 1px 6px rgba(0, 0, 0, .38); }
+  /* a layer is a block like a subtitle, in a cool colour of its own, alone in its row */
+  .tl-layers[hidden] { display: none; }
+  .tl-cue.tl-layer { border-color: rgba(120, 140, 255, .75); background: rgba(120, 140, 255, .22); }
+  .tl-cue.tl-layer:hover { border-color: rgba(120, 140, 255, 1); }
+  .tl-cue.tl-layer.is-selected { border-color: rgba(var(--text-rgb), .95); }
+  .tl-chip.tl-layerchip { max-width: 40%; }
+  /* a layer shows what it is along its block, its picture (a clip its thumbnail) repeated at the height of the block like the strip of the video row, under a faint wash of its colour */
+  .tl-cue.tl-layer.has-thumb { background-repeat: no-repeat, repeat-x; background-size: 100% 100%, auto 100%; background-position: 0 0, left center; }
+  .tl-cue.tl-layer.has-thumb .tl-cue-text { visibility: hidden; }
+  /* a sticker, a shape or a gif sits a little smaller with room between its copies, so they read as separate pictures */
+  .tl-cue.tl-layer.has-thumb.is-pic { background-repeat: no-repeat, space; background-size: 100% 100%, auto 78%; background-position: 0 0, center; }
+  /* a row of another clip is a video row: the same height, ground and outline as the video row, its pieces its frames edge to edge with no wash */
+  .tl-subrow.tl-layerrow.is-video { background: var(--grey8); border-radius: 5px; }
+  .tl-cue.tl-layer.is-clip { top: 0; bottom: 0; padding: 0; border-radius: 5px; border-color: var(--tl-video-line, rgba(var(--text-rgb), .3)); background-color: transparent; }
+  .tl-cue.tl-layer.is-clip:hover { border-color: rgba(var(--text-rgb), .55); }
+  .tl-cue.tl-layer.is-clip.is-selected { border-color: rgba(var(--text-rgb), .95); }
+  .tl-subrow.tl-layerrow.is-drop-target { outline: 2px dashed var(--selected2); outline-offset: -2px; }
+  .tl-box .btn.tl-wide { width: 100%; height: 32px; margin-top: 12px; --hover_grow: 1.01; --press_shrink: .99; }
+  .tl-box .btn.tl-wide + .btn.tl-wide { margin-top: 8px; }
+  /* the layers on the preview sit over the picture, under the subtitles, each placed by its centre */
+  .lay-overlay { position: absolute; z-index: 2; pointer-events: none; overflow: hidden; }
+  /* a piece of the video taken from another clip plays in an element of its own over the video, fitted into the picture the way the saved copy fits it, and under the canvas of the look, which draws it instead while there is a look */
+  .ed-piece-view { position: absolute; z-index: 1; pointer-events: none; transform-origin: 0 0; }
+  .ed-piece-view[hidden] { display: none; }
+  .ed-piece-pic { position: absolute; background: #000; overflow: hidden; }
+  .ed-piece-pic video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .lay-overlay[hidden] { display: none; }
+  .lay-item { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: grab; touch-action: none; }
+  .lay-item[hidden] { display: none; }
+  .lay-overlay.is-dragging .lay-item { cursor: grabbing; }
+  /* the overlay is inside the editor, whose rules for its videos lay them over the whole preview, so a clip here is put back in its box with more weight */
+  .lay-overlay .lay-media { position: relative; display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+  .lay-item::after { content: ""; position: absolute; inset: -2px; border: 1px dashed transparent; border-radius: 2px; pointer-events: none; transition: border-color 120ms linear; }
+  .lay-item:hover::after, .lay-item.is-selected::after { border-color: rgba(255, 255, 255, .7); }
+  .lay-item .lay-grip, .lay-item .lay-rot { opacity: 0; }
+  .lay-item:hover .lay-grip, .lay-item.is-selected .lay-grip, .lay-item:hover .lay-rot, .lay-item.is-selected .lay-rot { opacity: 1; }
+  .tl-cue-text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; user-select: none; }
   .tl-chip svg { width: 12px; height: 12px; fill: currentColor; flex: 0 0 auto; }
   .tl-chip-label { overflow: hidden; text-overflow: ellipsis; }
   .tl-h { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; z-index: 4; }
@@ -214,6 +281,10 @@
   }
   .tl-seg.is-selected .tl-h.l { left: -1px; border-radius: 5px 0 0 5px; }
   .tl-seg.is-selected .tl-h.r { right: -1px; border-radius: 0 5px 5px 0; }
+  /* a selected subtitle wears the same grips at its ends */
+  .tl-cue.is-selected .tl-h { width: min(10px, 40%); background: var(--text) url(/icons/ui/trim-grip.svg) center / 100% 100% no-repeat; }
+  .tl-cue.is-selected .tl-h.l { left: -1px; border-radius: 4px 0 0 4px; }
+  .tl-cue.is-selected .tl-h.r { right: -1px; border-radius: 0 4px 4px 0; }
   .tl-dim {
     position: absolute;
     top: 0;
@@ -268,6 +339,10 @@
   .tl-vseg:hover { border-color: rgba(var(--text-rgb), .55); }
   .tl-vseg.is-selected { z-index: 6; border-color: rgba(var(--text-rgb), .95); box-shadow: 0 1px 6px rgba(0, 0, 0, .38); }
   .tl-vseg.is-dragging { cursor: grabbing; }
+  /* a video row carried over the video lights it, and a piece of another clip carried up out of the video fades, since either one changes rows when it is let go */
+  .trim-timeline.is-drop-target .trim-filmstrip { outline: 2px dashed var(--selected2); outline-offset: -2px; }
+  .tl-vseg.is-leaving { opacity: .45; border-style: dashed; }
+  .tl-vname { position: absolute; left: 6px; top: 3px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 14px; padding: 0 5px; border-radius: 3px; background: rgba(0, 0, 0, .6); color: #fff; pointer-events: none; }
   /* a press on the video row lands on the bar over it and the piece under the pointer is found by time, so a piece takes no press itself, except at the grips it carries while it is selected: the same bright cap the cut wears, at the edges where the script asks for one */
   .tl-vseg .tl-h { display: none; }
   .tl-vseg.is-capped-l .tl-h.l, .tl-vseg.is-capped-r .tl-h.r {
@@ -291,109 +366,58 @@
   .trim-timeline .trim-bar input[type=range]::-webkit-slider-thumb { opacity: 0; pointer-events: none; }
   .trim-timeline.cut-l #trim-start::-webkit-slider-thumb, .trim-timeline.cut-r #trim-end::-webkit-slider-thumb { opacity: 1; pointer-events: auto; }
 
-  /* the properties of the selected track, drawn like the rows of the settings: the same label column, the same value field and slider, the same reset button */
+  /* the properties of the selected track, drawn the way medal draws them: the name over the control, a slider with a round knob, and the value in a box on its right */
   .tl-props[hidden] { display: none; }
   .tl-props-head { display: flex; align-items: center; gap: 8px; height: 38px; }
   .tl-props-head .editor-card-title { height: auto; flex: 0 0 auto; }
-  .tl-x { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: rgba(var(--text-rgb), .12); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
-  .tl-x:hover { background: rgba(var(--text-rgb), .22); }
-  .tl-x svg { width: 12px; height: 12px; fill: currentColor; }
   .tl-source { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
   .tl-box[hidden], .tl-box .trim-mode-row[hidden] { display: none; }
-  .tl-row {
-    display: grid;
-    grid-template-columns: 54px 60px minmax(0, 1fr) 26px;
-    align-items: center;
-    column-gap: 8px;
-    min-height: 34px;
-    margin-top: 2px;
-  }
-  .tl-row.tl-row-presets { grid-template-columns: 54px minmax(0, 1fr); margin-top: 8px; min-height: 0; }
-  .tl-label { justify-self: end; text-align: right; color: var(--text); font-size: 13px; line-height: 1.25; }
-  .tl-slider-wrap { position: relative; height: 30px; min-width: 0; }
-  .tl-slider-wrap::before {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 14px;
-    transform: translateY(-50%);
-    background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb), .34) calc(25% - .5px), rgba(var(--text-rgb), .34) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb), .34) calc(50% - .5px), rgba(var(--text-rgb), .34) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb), .34) calc(75% - .5px), rgba(var(--text-rgb), .34) calc(75% + .5px), transparent calc(75% + .5px));
-    background-repeat: no-repeat;
-    background-size: 100% 14px;
-    background-position: center;
-    pointer-events: none;
-  }
-  .tl-slider {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    height: 30px;
-    margin: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    background: linear-gradient(to right, var(--selected2) var(--fill, 0%), var(--line2) var(--fill, 0%));
-    background-repeat: no-repeat;
-    background-size: 100% 4px;
-    background-position: center;
-    border: 0;
-    outline: none;
-  }
-  .tl-slider::-webkit-slider-runnable-track { height: 30px; background: transparent; border: 0; }
-  .tl-slider::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 21px;
-    height: 10px;
-    border: 0;
-    border-radius: 5px;
-    background: var(--text);
-    margin-top: 10px;
-    box-shadow: 0 0 0 1px rgba(var(--bg-rgb), .25);
-    cursor: pointer;
-  }
-  .tl-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--selected2); }
+  .tl-field { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .tl-box > .tl-field:first-child { margin-top: 2px; }
+  .tl-field-head { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+  .tl-label { flex: 1 1 auto; min-width: 0; color: var(--text_muted); font-size: 12px; line-height: 1.25; }
+  .tl-field-line { display: grid; grid-template-columns: minmax(0, 1fr) 72px; align-items: center; column-gap: 12px; }
+  .tl-slider-wrap { position: relative; height: 24px; min-width: 0; }
+  /* the look of the slider is the shared one of the slider partial */
+  .tl-slider { position: relative; width: 100%; height: 24px; }
   .tl-value {
     width: 100%;
-    height: 30px;
-    padding: 0 8px;
+    height: 32px;
+    padding: 0 10px;
     box-sizing: border-box;
-    border: 1px solid var(--field-solid, var(--field));
-    border-radius: 4px;
-    background: transparent;
+    border: 1px solid var(--grey4-solid, var(--grey4));
+    border-radius: 6px;
+    background: var(--grey8);
     color: var(--text);
     font: inherit;
     font-size: 13px;
     font-variant-numeric: tabular-nums;
-    text-align: center;
+    text-align: left;
     outline: none;
   }
   .tl-value:focus { border-color: var(--selected2); }
   .tl-reset {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
     padding: 0;
-    border: 1px solid var(--line2);
+    border: 0;
     border-radius: 4px;
-    background: var(--button, transparent);
-    color: var(--text);
+    background: transparent;
+    color: var(--text_muted);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
   }
-  .tl-reset:hover { background: var(--button-hover, rgba(var(--text-rgb), .1)); }
-  .tl-reset svg { width: 14px; height: 14px; fill: currentColor; }
+  .tl-reset:hover { background: var(--button-hover, rgba(var(--text-rgb), .1)); color: var(--text); }
+  .tl-reset svg { width: 13px; height: 13px; fill: currentColor; }
   .tl-speeds { display: flex; gap: 6px; }
   .btn.tl-mini { flex: 0 0 auto; height: 26px; min-width: 0; padding: 0 9px; gap: 6px; }
   .tl-speeds .btn.tl-mini { flex: 1 1 0; padding: 0; }
   .btn.tl-mini.is-active { background-color: var(--primary); border-color: var(--primary_light); color: var(--on-accent); }
-  .tl-box > .tl-row:not(.tl-row-presets) + .trim-mode-row, .tl-box > .tl-row-presets + .trim-mode-row { margin-top: 8px; }
+  .tl-field .tl-speeds .btn.tl-mini { height: 32px; border-radius: 6px; }
+  .tl-box > .tl-field + .trim-mode-row { margin-top: 12px; }
   .tl-menu { position: fixed; z-index: 400; min-width: 200px; padding: 4px 0; background: var(--grey5); border: 1px solid var(--grey3); border-radius: 4px; box-shadow: 0 6px 16px rgba(0, 0, 0, .5); }
   .tl-menu .menu-item .tl-key { margin-left: auto; padding-left: 18px; color: var(--text_muted); font-size: 11px; }
 </style>
@@ -508,7 +532,7 @@
     var filmCanvas = null;
 
     function fresh() {
-      return { name: "", key: "", tracks: [], Dsrc: 0, vspeed: 1, vpitch: true, vlink: true, vsess: null, lanes: [], vsegs: [], nextId: 1, nextImport: 0, importing: 0, picking: false, peaks: {}, selected: "", clipboard: null, history: [], future: [], zoom: 1, extL: 0, extR: 0, initial: "", ready: false };
+      return { name: "", key: "", tracks: [], Dsrc: 0, vspeed: 1, vpitch: true, vlink: true, vsess: null, lanes: [], vsegs: [], subs: [], subRows: [], layers: [], fx: RKEditorFx.defaultFx(), nextId: 1, nextImport: 0, importing: 0, picking: false, peaks: {}, selected: "", clipboard: null, history: [], future: [], zoom: 1, extL: 0, extR: 0, initial: "", ready: false };
     }
 
     // time. the pieces live on the timeline of the saved clip, which is the video divided by its speed; the host talks in seconds of the video
@@ -578,6 +602,9 @@
 
     // the video is a row of pieces too: each is a cut of the source video put at a place of the timeline, and what no piece covers inside the saved clip is black. the pieces keep their order, so they never lie over each other and the video is only ever read from front to back
     function newVseg(srcStart, srcEnd, at) { return { id: newId("V"), at: r3(at), srcStart: r3(srcStart), srcEnd: r3(srcEnd) }; }
+    // a piece taken from another clip of the folder carries the name of that clip (ref), its title and its length
+    function srcMax(v) { return v.ref ? v.dur : st.Dsrc; }
+    function sameSource(from, to) { if (from.ref) { to.ref = from.ref; to.name = from.name; to.dur = from.dur; } return to; }
     function vLen(v) { return (v.srcEnd - v.srcStart) / st.vspeed; }
     function vEnd(v) { return v.at + vLen(v); }
     function findV(id) {
@@ -595,6 +622,48 @@
       return null;
     }
     function resetVideo() { st.vsegs = st.Dsrc > 0 ? [newVseg(0, st.Dsrc, 0)] : []; }
+
+    // the sound of another clip is a row of its own that is linked to that clip, as a video row or as a piece of the video: it lies where the clip lies, plays the same part of it (at the speed of the video inside the video), and goes when the clip goes. moving or cutting the sound by hand lets go of the link
+    function syncLinked() {
+      allSegs().forEach(function (h) {
+        var s = h.seg;
+        if (!s.link) return;
+        var p = s.parts[0];
+        var row = findLayer(s.link);
+        if (row && row.kind === "clip") {
+          var e = Math.min(row.src + (row.end - row.at), srcDuration(p.src));
+          if (e - row.src < MIN_LEN) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
+          s.parts = [newPart(p.src, row.src, e, 0, p.gain)];
+          s.at = row.at;
+          s.speed = 1;
+          s.pitch = true;
+          clampFades(s);
+          return;
+        }
+        var pick = findV(s.link);
+        if (!pick || !pick.seg.ref) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
+        var v = pick.seg;
+        var b = Math.min(v.srcEnd, srcDuration(p.src));
+        if (b - v.srcStart < MIN_LEN) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
+        s.parts = [newPart(p.src, v.srcStart, b, 0, p.gain)];
+        s.at = v.at;
+        s.speed = st.vspeed;
+        s.pitch = st.vpitch;
+        clampFades(s);
+      });
+    }
+    // where the clip a sound is linked to starts, or null when it is gone
+    function linkAt(id) {
+      var v = findV(id);
+      if (v) return v.seg.at;
+      var row = findLayer(id);
+      return row ? row.at : null;
+    }
+    function linkedTo(id) {
+      var out = [];
+      allSegs().forEach(function (h) { if (h.seg.link === id) out.push(h); });
+      return out;
+    }
     // the video as it was recorded: one piece, all of it, at the start of the timeline
     function naturalV() {
       var v = st.vsegs;
@@ -609,6 +678,7 @@
       var lo = 0;
       var hi = d;
       st.vsegs.forEach(function (v) { lo = Math.min(lo, v.at); hi = Math.max(hi, vEnd(v)); });
+      st.layers.forEach(function (l) { lo = Math.min(lo, l.at); hi = Math.max(hi, l.end); });
       allSegs().forEach(function (h) {
         if (h.seg.muted || h.seg.volume <= 0) return;
         lo = Math.min(lo, h.seg.at);
@@ -633,7 +703,7 @@
             return [s.parts.map(function (p) { return [p.src, r3(p.srcStart), r3(p.srcEnd), r3(p.off), r3(p.gain)]; }), r3(s.at), r3(s.volume), r3(s.fadeIn), r3(s.fadeOut), r3(s.speed), s.pitch, s.muted];
           }) };
         }),
-        v: st.vsegs.map(function (v) { return [r3(v.at), r3(v.srcStart), r3(v.srcEnd)]; }),
+        v: st.vsegs.map(function (v) { return [r3(v.at), r3(v.srcStart), r3(v.srcEnd), v.ref || ""]; }),
       });
     }
 
@@ -653,7 +723,7 @@
 
     function snapshot() {
       var b = opts.getBounds();
-      return { lanes: clone(st.lanes), vsegs: clone(st.vsegs), start: b.start, end: b.end, vspeed: st.vspeed, vpitch: st.vpitch, vlink: st.vlink };
+      return { lanes: clone(st.lanes), vsegs: clone(st.vsegs), subs: clone(st.subs), subRows: clone(st.subRows), layers: clone(st.layers), fx: clone(st.fx), start: b.start, end: b.end, vspeed: st.vspeed, vpitch: st.vpitch, vlink: st.vlink };
     }
 
     // the state the editor opens in is where undo stops, taken once the cut has been snapped and before anything was touched
@@ -692,12 +762,17 @@
       st.vsess = null;
       st.lanes = clone(snap.lanes);
       st.vsegs = clone(snap.vsegs);
+      loadSubs(snap);
+      st.layers = cleanLayers(snap.layers);
+      // a snapshot or a draft from before the look had none
+      st.fx = RKEditorFx.cleanFx(snap.fx);
+      if (opts.onFx) opts.onFx();
       st.vpitch = snap.vpitch;
       st.vlink = snap.vlink;
       st.vspeed = snap.vspeed;
       if (speedChanged) afterSpeed(pps, playX);
       opts.setBounds(snap.start, snap.end);
-      if (st.selected !== "video" && !find(st.selected) && !findV(st.selected)) st.selected = "";
+      if (st.selected !== "video" && !find(st.selected) && !findV(st.selected) && !findSub(st.selected) && !findLayer(st.selected)) st.selected = "";
       changed();
       if (opts.onEdit) opts.onEdit();
     }
@@ -717,8 +792,11 @@
 
     // everything the screen and the sound show follows the model from here
     function changed() {
+      syncLinked();
       pruneLanes();
       syncDom();
+      subsChanged();
+      layersChanged();
       syncVmode();
       paintSelection();
       drawSoon();
@@ -727,15 +805,1143 @@
       tick(true);
     }
 
-    // selection
+    // selection. subtitles can be picked several at once; the last one picked is st.selected, the one the right panel shows
+
+    var subPicked = [];
+    function pickedSubs() {
+      var ids = subPicked.filter(function (id) { return findSub(id); });
+      if (!ids.length && findSub(st.selected)) ids = [st.selected];
+      return ids;
+    }
+    function isPicked(id) { return id === st.selected || subPicked.indexOf(id) >= 0; }
+
+    function pickSubs(ids, primary) {
+      ids = ids.filter(function (id, i) { return findSub(id) && ids.indexOf(id) === i; });
+      subPicked = ids;
+      st.selected = primary && ids.indexOf(primary) >= 0 ? primary : ids[ids.length - 1] || "";
+      paintSelection();
+      renderProps();
+      refreshToolbar();
+      if (opts.onSubtitles) opts.onSubtitles();
+    }
+
+    // the host shows the tabs of what is selected on the right
+    function reportKind() {
+      var layer = findLayer(st.selected);
+      if (opts.onSelectKind) opts.onSelectKind(videoSelected() || (layer && layer.kind === "clip") ? "video" : selected() ? "audio" : findSub(st.selected) ? "subtitle" : layer ? "layer" : "");
+    }
 
     function paintSelection() {
+      reportKind();
       Object.keys(segEls).forEach(function (sid) { segEls[sid].classList.toggle("is-selected", sid === st.selected); });
+      Object.keys(subEls).forEach(function (cid) { subEls[cid].classList.toggle("is-selected", isPicked(cid)); });
       Object.keys(vsegEls).forEach(function (vid) { vsegEls[vid].classList.toggle("is-selected", vid === st.selected); });
+      Object.keys(layerEls).forEach(function (lid) { layerEls[lid].classList.toggle("is-selected", lid === st.selected); });
+      Object.keys(layerViews).forEach(function (lid) { layerViews[lid].box.classList.toggle("is-selected", lid === st.selected); });
       if (!dom.timeline) return;
       dom.timeline.classList.toggle("is-selected", videoSelected());
       paintHandles();
     }
+
+    // subtitles. a cue lives on the timeline like a piece does, in seconds of the timeline, in a row of subtitles of its own; every row has one style for all of its cues
+    var SUB_MIN = 0.2;
+    var SUB_TEXT_MAX = 300;
+    var SUB_TITLE_MAX = 40;
+    var SUB_FONTS = ["Arial", "Bahnschrift", "Comic Sans MS", "Consolas", "Courier New", "Fredoka One", "Georgia", "Impact", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
+    // sizes are pixels of a 1080p picture, so the look is the same at any size the clip is saved at
+    var SUB_RANGES = { size: [16, 200], borderWidth: [0, 20], radius: [0, 60], padX: [0, 80], padY: [0, 60], rotate: [-180, 180] };
+    var SUB_SHADOW = { offset: 6, blur: 12, alpha: 0.8 };
+    var SUB_WORD_NAMES = { white: "#ffffff", yellow: "#ffe500", green: "#3ee07a", cyan: "#36d6ff", pink: "#ff4fa3" };
+
+    function defaultRowStyle() {
+      return { font: "Arial", size: 64, color: "#ffffff", bold: true, italic: false, align: "center", position: "bottom", borderColor: "#000000", borderWidth: 4, bg: "#00000000", radius: 8, padX: 14, padY: 6, shadow: false, wordOn: true, word: "#ffe500", x: null, y: null, rotate: 0 };
+    }
+    // a row dragged on the preview has its own place, the centre of its block as fractions of the picture; null keeps it in the stack of its position
+    function cleanPlace(v) { var n = Number(v); return v != null && isFinite(n) && n >= 0 && n <= 1 ? Math.round(n * 10000) / 10000 : null; }
+
+    function subTokens(text) { var t = String(text || "").trim(); return t ? t.split(/\s+/) : []; }
+    // a cue made by the speech engine keeps the times of its words ([start, end] in seconds of the timeline), which only count while its text has as many words
+    function wordsFit(c) { return Array.isArray(c.words) && c.words.length > 0 && c.words.length === subTokens(c.text).length; }
+    function cleanWords(c) {
+      if (!Array.isArray(c.words) || c.words.length > SUB_TEXT_MAX) return null;
+      var ok = c.words.every(function (w) { return Array.isArray(w) && w.length === 2 && isFinite(w[0]) && isFinite(w[1]) && w[1] >= w[0]; });
+      if (!ok || c.words.length !== subTokens(c.text).length) return null;
+      return c.words.map(function (w) { return [r3(w[0]), r3(w[1])]; });
+    }
+    function shiftWords(words, dt) { return words.map(function (w) { return [r3(w[0] + dt), r3(w[1] + dt)]; }); }
+    function cleanColor(v, fallback) {
+      var text = String(v || "").trim().toLowerCase();
+      return /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(text) ? text : fallback;
+    }
+
+    function findSub(id) {
+      for (var i = 0; i < st.subs.length; i++) if (st.subs[i].id === id) return st.subs[i];
+      return null;
+    }
+    function findRow(id) {
+      for (var i = 0; i < st.subRows.length; i++) if (st.subRows[i].id === id) return st.subRows[i];
+      return null;
+    }
+    function rowCues(rowId) { return st.subs.filter(function (c) { return c.row === rowId; }); }
+    // a row made by hand is called after its first subtitle; a row the speech engine made keeps the name of what it listened to
+    function rowTitle(row) {
+      if (row.auto && row.title) return row.title;
+      var first = rowCues(row.id)[0];
+      var text = first ? first.text.trim().replace(/\s+/g, " ") : "";
+      return text ? text.slice(0, SUB_TITLE_MAX) : "Subtitle";
+    }
+    // rows left without a cue by a delete, a merge or an undo are gone, the way an emptied row of audio is
+    function dropEmptyRows() {
+      st.subRows = st.subRows.filter(function (r) { return st.subs.some(function (c) { return c.row === r.id; }); });
+    }
+
+    function cleanRowStyle(s) {
+      var d = defaultRowStyle();
+      if (!s || typeof s !== "object") return d;
+      var num = function (k) { var v = Number(s[k]); return isFinite(v) ? Math.round(clamp(v, SUB_RANGES[k][0], SUB_RANGES[k][1])) : d[k]; };
+      return {
+        font: SUB_FONTS.indexOf(s.font) >= 0 ? s.font : d.font,
+        size: num("size"),
+        color: cleanColor(s.color, d.color),
+        bold: typeof s.bold === "boolean" ? s.bold : d.bold,
+        italic: typeof s.italic === "boolean" ? s.italic : d.italic,
+        align: ["left", "center", "right"].indexOf(s.align) >= 0 ? s.align : d.align,
+        position: ["bottom", "middle", "top"].indexOf(s.position) >= 0 ? s.position : d.position,
+        borderColor: cleanColor(s.borderColor, d.borderColor),
+        borderWidth: num("borderWidth"),
+        bg: cleanColor(s.bg, d.bg),
+        radius: num("radius"),
+        padX: num("padX"),
+        padY: num("padY"),
+        rotate: num("rotate"),
+        shadow: typeof s.shadow === "boolean" ? s.shadow : d.shadow,
+        wordOn: typeof s.wordOn === "boolean" ? s.wordOn : d.wordOn,
+        word: cleanColor(s.word, d.word),
+        x: cleanPlace(s.x) != null && cleanPlace(s.y) != null ? cleanPlace(s.x) : null,
+        y: cleanPlace(s.x) != null && cleanPlace(s.y) != null ? cleanPlace(s.y) : null,
+      };
+    }
+
+    // the one style the subtitles had before they came in rows, as a row style, so an older draft opens looking the way it did
+    function legacyRowStyle(old) {
+      var s = defaultRowStyle();
+      if (!old) return s;
+      s.size = old.size === "small" ? 48 : old.size === "large" ? 86 : 64;
+      if (["bottom", "middle", "top"].indexOf(old.position) >= 0) s.position = old.position;
+      if (old.preset === "boxed") { s.bg = "#000000a6"; s.borderWidth = 0; s.radius = 0; s.padX = 18; }
+      if (old.preset === "highlight") s.color = "#ffe500";
+      if (old.word === "off") s.wordOn = false;
+      else if (SUB_WORD_NAMES[old.word]) s.word = SUB_WORD_NAMES[old.word];
+      return s;
+    }
+
+    // what a draft or a snapshot brings back is checked the way an edit from the page would be
+    function cleanSubRows(rows) {
+      if (!Array.isArray(rows)) return [];
+      var seen = {};
+      return rows.filter(function (r) { return r && typeof r.id === "string" && !seen[r.id] && (seen[r.id] = true); })
+        .map(function (r) { return { id: r.id, auto: !!r.auto, title: typeof r.title === "string" ? r.title.slice(0, SUB_TITLE_MAX) : "", style: cleanRowStyle(r.style) }; });
+    }
+    function cleanSubs(list, rows) {
+      if (!Array.isArray(list)) return [];
+      return list.filter(function (c) { return c && typeof c.id === "string" && typeof c.text === "string" && isFinite(c.at) && isFinite(c.end) && c.end > c.at; })
+        .map(function (c) {
+          var cue = { id: c.id, row: typeof c.row === "string" ? c.row : "", at: r3(Math.max(0, c.at)), end: r3(c.end), text: c.text.slice(0, SUB_TEXT_MAX) };
+          var words = cleanWords({ words: c.words, text: cue.text });
+          if (words) cue.words = words;
+          return cue;
+        })
+        .filter(function (c) { return rows.some(function (r) { return r.id === c.row; }); })
+        .sort(function (a, b) { return a.at - b.at; });
+    }
+    // the rows and the cues of a snapshot or a draft; one from before the rows puts every cue in one row
+    function loadSubs(snap) {
+      var rows = cleanSubRows(snap.subRows);
+      var list = snap.subs;
+      if (!snap.subRows && Array.isArray(list) && list.length) {
+        var legacy = { id: newId("R"), auto: false, title: "", style: legacyRowStyle(snap.subStyle) };
+        rows = [legacy];
+        list = list.map(function (c) { return Object.assign({}, c, { row: legacy.id }); });
+      }
+      st.subRows = rows;
+      st.subs = cleanSubs(list, rows);
+      dropEmptyRows();
+    }
+
+    function sortSubs() { st.subs.sort(function (a, b) { return a.at - b.at; }); }
+
+    // the cues on screen at a time of the timeline, one per row at most, in the order of the rows; with two of a row over one another the later one shows, as it does in the saved copy
+    function subsAt(t) {
+      var out = [];
+      st.subRows.forEach(function (row) {
+        var hit = null;
+        st.subs.forEach(function (c) { if (c.row === row.id && t >= c.at - 0.0005 && t < c.end) hit = c; });
+        if (hit) out.push({ row: row, cue: hit });
+      });
+      return out;
+    }
+
+    // a size of the 1080p reference as css, taken from the height of the picture the overlay sits on
+    function subPx(n) { return "calc(var(--sub-h, 400px) * " + (n / 1080) + ")"; }
+    function boxed(style) { return hexAlpha(style.bg) > 0; }
+    function hexAlpha(hex) { return hex.length === 9 ? parseInt(hex.slice(7, 9), 16) / 255 : 1; }
+    function cssColor(hex) {
+      var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      return "rgba(" + r + "," + g + "," + b + "," + (Math.round(hexAlpha(hex) * 1000) / 1000) + ")";
+    }
+    function layoutOf(text, style) { return opts.layoutSubtitle ? opts.layoutSubtitle(text, style) : { lines: [text], widths: [0], cell: 1.15 }; }
+
+    // one subtitle on the preview: the lines the saved copy will have, the box behind them and the words that can light up
+    function makeOverlayCue(row, cue, layout, byWord) {
+      var s = row.style;
+      var block = el("div", "sub-cue");
+      block.dataset.row = row.id;
+      block.dataset.cue = cue.id;
+      block.style.textAlign = s.align;
+      // turned about its own centre, clockwise in degrees like the saved copy
+      var turn = s.rotate ? " rotate(" + s.rotate + "deg)" : "";
+      if (s.x != null) {
+        block.classList.add("is-placed");
+        block.style.left = (s.x * 100) + "%";
+        block.style.top = (s.y * 100) + "%";
+        block.style.transform = "translate(-50%, -50%)" + turn;
+      } else {
+        block.style.alignSelf = s.align === "left" ? "flex-start" : s.align === "right" ? "flex-end" : "center";
+        if (turn) block.style.transform = turn.trim();
+      }
+      var line = el("span", "sub-line");
+      var css = line.style;
+      css.fontFamily = '"' + s.font + '", sans-serif';
+      css.fontWeight = s.bold ? "700" : "400";
+      css.fontStyle = s.italic ? "italic" : "normal";
+      css.fontSize = subPx(s.size);
+      css.lineHeight = String(layout.cell);
+      css.color = cssColor(s.color);
+      css.setProperty("--sub-word", cssColor(s.word));
+      if (s.borderWidth > 0) { css.webkitTextStroke = subPx(s.borderWidth * 2) + " " + cssColor(s.borderColor); css.paintOrder = "stroke fill"; }
+      // a soft shadow below and to the right, sized off the 1080p picture like everything else; the saved copy draws the same one as a blurred layer
+      if (s.shadow) css.textShadow = subPx(SUB_SHADOW.offset) + " " + subPx(SUB_SHADOW.offset) + " " + subPx(SUB_SHADOW.blur) + " rgba(0,0,0," + SUB_SHADOW.alpha + ")";
+      if (boxed(s)) {
+        css.background = cssColor(s.bg);
+        css.borderRadius = subPx(s.radius);
+        css.padding = subPx(s.padY) + " " + subPx(s.padX);
+      }
+      var words = [];
+      layout.lines.forEach(function (text, i) {
+        if (i) line.appendChild(document.createTextNode("\n"));
+        if (!byWord) { line.appendChild(document.createTextNode(text)); return; }
+        text.split(" ").forEach(function (part, j) {
+          if (j) line.appendChild(document.createTextNode(" "));
+          var w = el("span", "sub-word");
+          w.textContent = part;
+          words.push(w);
+          line.appendChild(w);
+        });
+      });
+      block.appendChild(line);
+      ["nw", "ne", "sw", "se"].forEach(function (corner) {
+        var grip = el("span", "sub-grip");
+        grip.dataset.corner = corner;
+        block.appendChild(grip);
+      });
+      block.appendChild(el("span", "sub-rot"));
+      return { node: block, words: words };
+    }
+
+    function paintOverlay() {
+      var box = dom.subOverlay;
+      if (!box) return;
+      var t = nowT();
+      var shown = st.ready || st.Dsrc ? subsAt(t) : [];
+      var parts = shown.map(function (h) {
+        var byWord = h.row.style.wordOn && wordsFit(h.cue);
+        return { row: h.row, cue: h.cue, byWord: byWord };
+      });
+      var key = JSON.stringify(parts.map(function (p) { return [p.row.id, p.cue.id, p.cue.text, p.byWord, p.row.style]; })) + (opts.subtitleAspect ? opts.subtitleAspect() : "");
+      if (box._key !== key) {
+        box._key = key;
+        box._lit = [];
+        box.textContent = "";
+        var groups = {};
+        ["top", "middle", "bottom"].forEach(function (pos) {
+          var g = el("div", "sub-group");
+          g.dataset.position = pos;
+          groups[pos] = g;
+          box.appendChild(g);
+        });
+        parts.forEach(function (p) {
+          var made = makeOverlayCue(p.row, p.cue, layoutOf(p.cue.text.trim(), p.row.style), p.byWord);
+          (p.row.style.x != null ? box : groups[p.row.style.position]).appendChild(made.node);
+          box._lit.push({ cue: p.cue, byWord: p.byWord, words: made.words, on: -1 });
+        });
+      }
+      // a word lights up from its start until the next one starts, the way the saved copy draws it
+      box._lit.forEach(function (l) {
+        if (!l.byWord) return;
+        var on = -1;
+        for (var i = 0; i < l.cue.words.length; i++) if (t >= l.cue.words[i][0] - 0.0005) on = i;
+        if (l.on === on) return;
+        if (l.words[l.on]) l.words[l.on].classList.remove("is-on");
+        if (l.words[on]) l.words[on].classList.add("is-on");
+        l.on = on;
+      });
+      box.hidden = !parts.length;
+    }
+
+    function makeSubEl() {
+      var node = el("div", "tl-cue");
+      node.appendChild(el("span", "tl-cue-text"));
+      node.appendChild(el("i", "tl-h l"));
+      node.appendChild(el("i", "tl-h r"));
+      return node;
+    }
+
+    function makeSubRowEl(row) {
+      var node = el("div", "tl-subrow");
+      node.dataset.row = row.id;
+      var chip = el("span", "tl-chip tl-subchip");
+      chip.innerHTML = icon("editor/subtitles");
+      chip.appendChild(el("span", "tl-chip-label"));
+      node.appendChild(chip);
+      return node;
+    }
+
+    var subEls = {};
+    var subRowEls = {};
+    function syncSubs() {
+      if (!dom.subs) return;
+      var d = D() || 1;
+      var liveRows = {};
+      st.subRows.forEach(function (row) {
+        var node = subRowEls[row.id];
+        if (!node) node = subRowEls[row.id] = makeSubRowEl(row);
+        // appending an element that is already there moves it, which keeps the rows in their order
+        dom.subs.appendChild(node);
+        liveRows[row.id] = true;
+        var label = node.querySelector(".tl-chip-label");
+        var title = rowTitle(row);
+        if (label.textContent !== title) label.textContent = title;
+      });
+      var live = {};
+      st.subs.forEach(function (c) {
+        var host = subRowEls[c.row];
+        if (!host) return;
+        var node = subEls[c.id];
+        if (!node) { node = subEls[c.id] = makeSubEl(); node.dataset.cue = c.id; }
+        if (node.parentNode !== host) host.appendChild(node);
+        live[c.id] = true;
+        node.style.left = (c.at / d * 100) + "%";
+        node.style.width = ((c.end - c.at) / d * 100) + "%";
+        node.classList.toggle("is-selected", isPicked(c.id));
+        var label = node.firstChild;
+        if (label.textContent !== c.text) label.textContent = c.text;
+        node.title = c.text;
+      });
+      Object.keys(subEls).forEach(function (id) { if (!live[id]) { subEls[id].remove(); delete subEls[id]; } });
+      Object.keys(subRowEls).forEach(function (id) { if (!liveRows[id]) { subRowEls[id].remove(); delete subRowEls[id]; } });
+      // the rows are only there while there are subtitles, so a clip without any shows just its own tracks
+      var count = st.subRows.length;
+      if (dom.subs._rows !== count) {
+        dom.subs._rows = count;
+        dom.subs.hidden = count === 0;
+        layout();
+      }
+    }
+
+    function subsChanged() {
+      syncSubs();
+      paintOverlay();
+      if (opts.onSubtitles) opts.onSubtitles();
+    }
+
+    // a press on a cue selects it, and a drag moves it (with every other picked cue) or, from an edge, moves that edge; shift or ctrl adds a cue to the pick or takes it out, the name of a row picks the whole row, and a drag beside the cues picks the ones it passes over, while a plain press there moves the playhead
+    function onSubDown(e) {
+      if (e.button !== 0) return;
+      closeMenu();
+      var rowNode = e.target.closest(".tl-subrow");
+      if (e.target.closest(".tl-subchip") && rowNode) {
+        e.preventDefault();
+        pickSubs(rowCues(rowNode.dataset.row).map(function (c) { return c.id; }));
+        return;
+      }
+      var node = e.target.closest(".tl-cue");
+      // moving the playhead keeps what is selected
+      if (!node) { if (rowNode) boxPick(e, rowNode); else seekT(seekTimeAtClient(e.clientX)); return; }
+      var cue = findSub(node.dataset.cue);
+      if (!cue) return;
+      e.preventDefault();
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        var ids = pickedSubs();
+        var at = ids.indexOf(cue.id);
+        if (at >= 0) ids.splice(at, 1); else ids.push(cue.id);
+        pickSubs(ids, at >= 0 ? ids[ids.length - 1] : cue.id);
+        return;
+      }
+      var group = pickedSubs().indexOf(cue.id) >= 0 && pickedSubs().length > 1 ? pickedSubs().map(findSub).filter(Boolean) : [cue];
+      if (group.length === 1) select(cue.id);
+      var edge = group.length === 1 ? e.target.closest(".tl-h") : null;
+      var mode = edge ? (edge.classList.contains("l") ? "l" : "r") : "move";
+      var startX = e.clientX;
+      var origs = group.map(function (c) { return { cue: c, at: c.at, end: c.end, words: c.words ? clone(c.words) : null }; });
+      var first = Math.min.apply(null, origs.map(function (o) { return o.at; }));
+      var last = Math.max.apply(null, origs.map(function (o) { return o.end; }));
+      var moved = false;
+      var move = function (ev) {
+        var pps = pxPerSec();
+        if (!pps) return;
+        var dt = (ev.clientX - startX) / pps;
+        if (!moved && Math.abs(ev.clientX - startX) < 3) return;
+        moved = true;
+        if (mode === "move") {
+          // the whole pick moves by one amount, held so that none of it leaves the video
+          dt = clamp(dt, -first, Math.max(-first, D() - last));
+          origs.forEach(function (o) {
+            o.cue.at = r3(o.at + dt);
+            o.cue.end = r3(o.end + dt);
+            if (o.words) o.cue.words = shiftWords(o.words, o.cue.at - o.at);
+          });
+        } else if (mode === "l") {
+          cue.at = r3(clamp(origs[0].at + dt, 0, origs[0].end - SUB_MIN));
+        } else {
+          cue.end = r3(clamp(origs[0].end + dt, origs[0].at + SUB_MIN, D()));
+        }
+        subsChanged();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        if (!moved) {
+          // a plain press on one cue of a pick keeps just that one
+          if (group.length > 1) select(cue.id);
+          seekT(cue.at);
+          return;
+        }
+        sortSubs();
+        commit();
+        subsChanged();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // a box dragged across a row picks the cues of that row it touches; shift keeps what was picked before
+    function boxPick(e, rowNode) {
+      e.preventDefault();
+      var rowId = rowNode.dataset.row;
+      var startX = e.clientX;
+      var t0 = timeAtClient(e.clientX);
+      var keep = e.shiftKey || e.ctrlKey || e.metaKey ? pickedSubs() : [];
+      var box = null;
+      var move = function (ev) {
+        if (!box && Math.abs(ev.clientX - startX) < 3) return;
+        if (!box) { box = el("div", "tl-marquee"); rowNode.appendChild(box); }
+        var t1 = timeAtClient(ev.clientX);
+        var a = Math.min(t0, t1), b = Math.max(t0, t1);
+        var d = D() || 1;
+        box.style.left = (a / d * 100) + "%";
+        box.style.width = ((b - a) / d * 100) + "%";
+        var hit = rowCues(rowId).filter(function (c) { return c.end > a && c.at < b; }).map(function (c) { return c.id; });
+        pickSubs(keep.concat(hit.filter(function (id) { return keep.indexOf(id) < 0; })));
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        if (box) { box.remove(); return; }
+        seekT(seekTimeAtClient(startX));
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // a subtitle on the preview is dragged to a place of its own, the way the overlay preview of the settings moves the overlay: its edges and its centre snap to the margins and the middle of the picture, shift places it freely, and it stays whole on the picture. the place belongs to the row; a press without a drag selects the subtitle
+    var PLACE_SNAP_PX = 4;
+    function snapPlace(c, half, size, near, far) {
+      var targets = [size / 2, near + half, far - half];
+      for (var i = 0; i < targets.length; i++) if (Math.abs(c - targets[i]) <= PLACE_SNAP_PX) return targets[i];
+      return c;
+    }
+    function onPlaceDown(e) {
+      var node = e.button === 0 && e.target.closest(".sub-cue");
+      if (!node) return;
+      var row = findRow(node.dataset.row);
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.target.closest(".sub-rot")) { rotateSub(e, node, row); return; }
+      var grip = e.target.closest(".sub-grip");
+      if (grip) { resizeSub(e, node, row, grip.dataset.corner); return; }
+      var box = dom.subOverlay.getBoundingClientRect();
+      var r = node.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      var start = { x: e.clientX, y: e.clientY, cx: r.left + r.width / 2 - box.left, cy: r.top + r.height / 2 - box.top, hw: r.width / 2, hh: r.height / 2 };
+      var cueId = node.dataset.cue;
+      var moved = false;
+      dom.subOverlay.classList.add("is-dragging");
+      var move = function (ev) {
+        if (!moved && Math.abs(ev.clientX - start.x) < 3 && Math.abs(ev.clientY - start.y) < 3) return;
+        moved = true;
+        var cx = start.cx + ev.clientX - start.x;
+        var cy = start.cy + ev.clientY - start.y;
+        if (!ev.shiftKey) {
+          cx = snapPlace(cx, start.hw, box.width, box.width * 0.05, box.width * 0.95);
+          cy = snapPlace(cy, start.hh, box.height, box.height * 0.07, box.height * 0.93);
+        }
+        cx = clamp(cx, Math.min(start.hw, box.width / 2), Math.max(box.width - start.hw, box.width / 2));
+        cy = clamp(cy, Math.min(start.hh, box.height / 2), Math.max(box.height - start.hh, box.height / 2));
+        row.style = cleanRowStyle(Object.assign({}, row.style, { x: cx / box.width, y: cy / box.height }));
+        subsChanged();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        dom.subOverlay.classList.remove("is-dragging");
+        if (!moved) { if (findSub(cueId)) select(cueId); return; }
+        commit();
+        subsChanged();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // a corner of a subtitle on the preview resizes it the way a corner of the overlay preview does: by how far the corner moved from where it was grabbed, both axes averaged so a diagonal pull feels even; the size is the size of the row, held to its range
+    // the stem above a subtitle turns it about its centre by the angle the pointer sweeps round that centre; it settles on the straight angles when it comes near one, and shift turns that off
+    var ROT_SNAP_DEG = 5;
+    function rotateSub(e, node, row) {
+      var r = node.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var angleAt = function (x, y) { return Math.atan2(y - cy, x - cx) * 180 / Math.PI; };
+      var start = { angle: angleAt(e.clientX, e.clientY), rotate: row.style.rotate };
+      dom.subOverlay.classList.add("is-dragging");
+      var move = function (ev) {
+        var deg = start.rotate + angleAt(ev.clientX, ev.clientY) - start.angle;
+        deg = ((deg + 180) % 360 + 360) % 360 - 180;
+        if (!ev.shiftKey) {
+          var straight = Math.round(deg / 90) * 90;
+          if (Math.abs(deg - straight) <= ROT_SNAP_DEG) deg = straight === 180 ? -180 : straight;
+        }
+        deg = Math.round(deg);
+        if (deg === row.style.rotate) return;
+        row.style = cleanRowStyle(Object.assign({}, row.style, { rotate: deg }));
+        subsChanged();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        dom.subOverlay.classList.remove("is-dragging");
+        if (row.style.rotate === start.rotate) return;
+        commit();
+        subsChanged();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    function resizeSub(e, node, row, corner) {
+      var r = node.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var start = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, size: row.style.size, sx: corner.charAt(1) === "e" ? 1 : -1, sy: corner.charAt(0) === "s" ? 1 : -1 };
+      var range = SUB_RANGES.size;
+      dom.subOverlay.classList.add("is-dragging");
+      var move = function (ev) {
+        var dw = start.sx * (ev.clientX - start.x), dh = start.sy * (ev.clientY - start.y);
+        var factor = ((start.w + dw) / start.w + (start.h + dh) / start.h) / 2;
+        var size = Math.round(clamp(start.size * factor, range[0], range[1]));
+        if (size === row.style.size) return;
+        row.style = cleanRowStyle(Object.assign({}, row.style, { size: size }));
+        subsChanged();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        dom.subOverlay.classList.remove("is-dragging");
+        if (row.style.size === start.size) return;
+        commit();
+        subsChanged();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // the cue after this one in its row, which a merge joins it to
+    function nextInRow(cue) {
+      var list = rowCues(cue.row);
+      return list[list.indexOf(cue) + 1] || null;
+    }
+
+    function mergeNext(cue) {
+      var next = nextInRow(cue);
+      if (!next) return;
+      var fit = wordsFit(cue) && wordsFit(next);
+      var words = fit ? cue.words.concat(next.words) : null;
+      cue.text = (cue.text.trim() + " " + next.text.trim()).trim().slice(0, SUB_TEXT_MAX);
+      cue.end = r3(Math.max(cue.end, next.end));
+      if (words && words.length === subTokens(cue.text).length) cue.words = words;
+      else delete cue.words;
+      st.subs.splice(st.subs.indexOf(next), 1);
+      commit();
+      subsChanged();
+    }
+
+    // every cue of one row moves into another, which keeps its own style and name
+    function mergeRows(fromId, intoId) {
+      if (fromId === intoId || !findRow(fromId) || !findRow(intoId)) return;
+      st.subs.forEach(function (c) { if (c.row === fromId) c.row = intoId; });
+      dropEmptyRows();
+      commit();
+      subsChanged();
+    }
+
+    function moveRow(rowId, dir) {
+      var i = st.subRows.findIndex(function (r) { return r.id === rowId; });
+      var j = i + dir;
+      if (i < 0 || j < 0 || j >= st.subRows.length) return;
+      var row = st.subRows.splice(i, 1)[0];
+      st.subRows.splice(j, 0, row);
+      commit();
+      subsChanged();
+    }
+
+    function removeRow(rowId) {
+      st.subs = st.subs.filter(function (c) { return c.row !== rowId; });
+      if (/^C\d+$/.test(st.selected) && !findSub(st.selected)) st.selected = "";
+      dropEmptyRows();
+      commit();
+      subsChanged();
+      paintSelection();
+    }
+
+    function onSubContext(e) {
+      e.preventDefault();
+      var node = e.target.closest(".tl-cue");
+      var cue = node ? findSub(node.dataset.cue) : null;
+      var rowNode = e.target.closest(".tl-subrow");
+      var row = cue ? findRow(cue.row) : rowNode ? findRow(rowNode.dataset.row) : null;
+      if (!row) return;
+      if (cue) select(cue.id);
+      var ri = st.subRows.indexOf(row);
+      var items = [];
+      if (cue) {
+        items.push({ label: "Merge with the next subtitle", icon: "editor/mix", disabled: !nextInRow(cue), action: function () { mergeNext(cue); } });
+      }
+      st.subRows.forEach(function (other) {
+        if (other !== row) items.push({ label: "Merge row into " + rowTitle(other), icon: "editor/mix", action: function () { mergeRows(row.id, other.id); } });
+      });
+      if (items.length) items.push("-");
+      items.push(
+        { label: "Move the row up", icon: "editor/arrow-up", disabled: ri === 0, action: function () { moveRow(row.id, -1); } },
+        { label: "Move the row down", icon: "editor/arrow-down", disabled: ri === st.subRows.length - 1, action: function () { moveRow(row.id, 1); } },
+        "-");
+      if (cue) items.push({ label: "Delete subtitle", icon: "action/trash", key: "Backspace", danger: true, action: doDelete });
+      items.push({ label: "Delete the row", icon: "action/trash", danger: true, action: function () { removeRow(row.id); } });
+      showMenu(e.clientX, e.clientY, items);
+    }
+
+    // a time of the source video as it lands on the timeline: through the piece of the video it is in when the video was cut up, else stretched by the speed; null when that moment was cut out
+    function sourceToTimeline(srcT) {
+      if (!videoEdited()) return srcT / st.vspeed;
+      for (var i = 0; i < st.vsegs.length; i++) {
+        var v = st.vsegs[i];
+        if (!v.ref && srcT >= v.srcStart && srcT < v.srcEnd) return v.at + (srcT - v.srcStart) / st.vspeed;
+      }
+      return null;
+    }
+
+    // the subtitles of the saved copy, row by row in seconds of the copy, each cue with the lines the preview broke it into; null when there are none
+    function subtitlePlan() {
+      if (!st.subs.length) return null;
+      var start = saveWindow().start;
+      var end = saveWindow().end;
+      var rows = [];
+      st.subRows.forEach(function (row) {
+        var cues = [];
+        var cell = 0;
+        rowCues(row.id).forEach(function (c) {
+          var a = Math.max(c.at, start);
+          var b = Math.min(c.end, end);
+          var text = c.text.trim();
+          if (b - a < 0.05 || !text) return;
+          var lay = layoutOf(text, row.style);
+          cell = lay.cell;
+          var cue = { start: r3(a - start), end: r3(b - start), lines: lay.lines, widths: lay.widths.map(function (w) { return Math.round(w * 10000) / 10000; }) };
+          if (row.style.wordOn && wordsFit(c)) cue.words = c.words.map(function (w) { return [r3(clamp(w[0], a, b) - start), r3(clamp(w[1], a, b) - start)]; });
+          cues.push(cue);
+        });
+        if (cues.length) rows.push({ style: clone(row.style), cell: Math.round(cell * 10000) / 10000, cues: cues });
+      });
+      return rows.length ? { rows: rows } : null;
+    }
+
+    // layers: other clips of the folder, pictures and gifs laid over the video, each for a stretch of the timeline, in a row of its own; the last one is on top. a layer is placed by its centre and its width as fractions of the picture, keeps the shape of what it shows, and has an opacity. a clip layer plays its own file from src, muted, since its sound comes in as a row of audio
+    var LAYER_MIN = 0.2;
+    var LAYER_MAX = 50;
+    var LAYER_RANGES = { w: [0.02, 4], opacity: [0, 1] };
+
+    function findLayer(id) {
+      if (!id) return null;
+      for (var i = 0; i < st.layers.length; i++) if (st.layers[i].id === id) return st.layers[i];
+      return null;
+    }
+
+    function cleanLayers(list) {
+      if (!Array.isArray(list)) return [];
+      var out = [];
+      list.forEach(function (l) {
+        if (!l || (l.kind !== "clip" && l.kind !== "media") || typeof l.ref !== "string" || !l.ref || out.length >= LAYER_MAX) return;
+        var at = Number(l.at), end = Number(l.end);
+        if (!isFinite(at) || !isFinite(end) || end - at < LAYER_MIN) return;
+        var num = function (v, lo, hi, d) { v = Number(v); return isFinite(v) ? clamp(v, lo, hi) : d; };
+        out.push({
+          id: typeof l.id === "string" && /^E\d+$/.test(l.id) ? l.id : newId("E"),
+          kind: l.kind, ref: l.ref, name: String(l.name || (l.kind === "clip" ? "Clip" : "Image")).slice(0, 80),
+          at: r3(at), end: r3(end), src: r3(num(l.src, 0, 86400, 0)), dur: r3(num(l.dur, 0, 86400, 0)),
+          x: num(l.x, -0.5, 1.5, 0.5), y: num(l.y, -0.5, 1.5, 0.5), w: num(l.w, LAYER_RANGES.w[0], LAYER_RANGES.w[1], 1),
+          aspect: num(l.aspect, 0.01, 100, 0.5625), opacity: num(l.opacity, 0, 1, 1), gif: !!l.gif, rotate: Math.round(num(l.rotate, -180, 180, 0)),
+          // the row the layer sits in, shared by the halves of a split; a clip has a look of its own like the video
+          row: typeof l.row === "string" && /^E\d+$/.test(l.row) ? l.row : "",
+          fx: l.kind === "clip" && l.fx ? RKEditorFx.cleanFx(l.fx) : null,
+        });
+      });
+      out.forEach(function (l) { if (!l.row) l.row = l.id; });
+      return groupRows(out);
+    }
+
+    // the layers of a row lie next to each other in the list, which is the order they are laid on in, the rows keeping the order of their first layer
+    function groupRows(list) {
+      var order = [];
+      list.forEach(function (l) { if (order.indexOf(l.row) < 0) order.push(l.row); });
+      var out = [];
+      order.forEach(function (row) { list.forEach(function (l) { if (l.row === row) out.push(l); }); });
+      return out;
+    }
+
+    function layerSrc(l) { return l.kind === "clip" ? opts.helper + "/file/" + encodeURIComponent(l.ref) : opts.helper + "/import-media/file?id=" + encodeURIComponent(l.ref); }
+
+    // the rows on the timeline, the top row first, each holding the layers of that row
+    var layerEls = {};
+    var layerRowEls = {};
+    function makeLayerRowEl(l) {
+      var row = el("div", "tl-subrow tl-layerrow");
+      var chip = el("span", "tl-chip tl-subchip tl-layerchip");
+      chip.innerHTML = icon(l.kind === "clip" ? "editor/video" : "editor/image");
+      chip.appendChild(el("span", "tl-chip-label"));
+      row.appendChild(chip);
+      return row;
+    }
+
+    function makeLayerNode(l) {
+      var node = el("div", "tl-cue tl-layer");
+      node.dataset.layer = l.id;
+      node.appendChild(el("span", "tl-cue-text"));
+      node.appendChild(el("i", "tl-h l"));
+      node.appendChild(el("i", "tl-h r"));
+      layerEls[l.id] = node;
+      return node;
+    }
+
+    function syncLayers() {
+      if (!dom.layers) return;
+      var d = D() || 1;
+      var liveRows = {};
+      var liveNodes = {};
+      var rows = [];
+      st.layers.forEach(function (l) { if (rows.indexOf(l.row) < 0) rows.push(l.row); });
+      rows.slice().reverse().forEach(function (key) {
+        var members = st.layers.filter(function (l) { return l.row === key; });
+        var first = members[0];
+        var row = layerRowEls[key] || (layerRowEls[key] = makeLayerRowEl(first));
+        dom.layers.appendChild(row);
+        liveRows[key] = true;
+        row.dataset.row = key;
+        row.dataset.layer = first.id;
+        row.classList.toggle("is-video", first.kind === "clip");
+        var label = row.querySelector(".tl-chip-label");
+        if (label.textContent !== first.name) label.textContent = first.name;
+        members.forEach(function (l) {
+          var node = layerEls[l.id] || makeLayerNode(l);
+          if (node.parentNode !== row) row.appendChild(node);
+          liveNodes[l.id] = true;
+          node.style.left = (l.at / d * 100) + "%";
+          node.style.width = ((l.end - l.at) / d * 100) + "%";
+          node.classList.toggle("is-selected", l.id === st.selected);
+          node.classList.toggle("is-clip", l.kind === "clip");
+          if (node.firstChild.textContent !== l.name) node.firstChild.textContent = l.name;
+          var pic = l.kind === "clip" ? opts.helper + "/thumb/" + encodeURIComponent(l.ref) : layerSrc(l);
+          if (node._pic !== pic) {
+            node._pic = pic;
+            var url = "url(\"" + pic.replace(/"/g, "%22") + "\")";
+            // a clip is its frames like the video row, a picture keeps the faint wash of its colour
+            node.style.backgroundImage = l.kind === "clip" ? "linear-gradient(transparent, transparent), " + url : "linear-gradient(rgba(120, 140, 255, .16), rgba(120, 140, 255, .16)), " + url;
+            node.classList.add("has-thumb");
+            node.classList.toggle("is-pic", l.kind !== "clip");
+          }
+        });
+      });
+      Object.keys(layerEls).forEach(function (id) { if (!liveNodes[id]) { layerEls[id].remove(); delete layerEls[id]; } });
+      Object.keys(layerRowEls).forEach(function (key) { if (!liveRows[key]) { layerRowEls[key].remove(); delete layerRowEls[key]; } });
+      if (dom.layers._rows !== rows.length) {
+        dom.layers._rows = rows.length;
+        dom.layers.hidden = rows.length === 0;
+        layout();
+      }
+    }
+
+    // a gif on the preview shows the frame of the timeline rather than running by itself, so it stops with the clip and stands on the frame the saved copy has there; its frames are decoded one at a time as the playhead reaches them, and their times are read once when it opens. it loops the way ffmpeg loops it in the saved copy, and a frame without a delay is held a tenth of a second like browsers and ffmpeg hold it
+    function gifFrames(url, canvas) {
+      var g = { ready: false, dead: false, times: [], total: 0, dec: null, shown: -1, busy: false, want: 0 };
+      function draw(frame) {
+        var ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      }
+      function pump() {
+        if (!g.ready || g.dead || g.busy) return;
+        var x = ((g.want % g.total) + g.total) % g.total;
+        var idx = 0;
+        for (var i = 1; i < g.times.length; i++) if (g.times[i] <= x + 1e-6) idx = i;
+        if (idx === g.shown) return;
+        g.busy = true;
+        g.dec.decode({ frameIndex: idx }).then(function (r) {
+          if (!g.dead) { draw(r.image); g.shown = idx; }
+          r.image.close();
+        }).catch(function () {}).then(function () { g.busy = false; pump(); });
+      }
+      g.show = function (t) { g.want = t; pump(); };
+      g.close = function () { g.dead = true; if (g.dec) { try { g.dec.close(); } catch (e) { /* already closed */ } } };
+      fetch(url).then(function (res) { return res.arrayBuffer(); }).then(function (buf) {
+        if (g.dead) return null;
+        var dec = new ImageDecoder({ data: buf, type: "image/gif" });
+        return dec.tracks.ready.then(function () {
+          var count = dec.tracks.selectedTrack.frameCount;
+          var at = 0;
+          var chain = Promise.resolve();
+          for (var i = 0; i < count; i++) {
+            (function (i) {
+              chain = chain.then(function () {
+                if (g.dead) return null;
+                return dec.decode({ frameIndex: i }).then(function (r) {
+                  var d = (r.image.duration || 0) / 1e6;
+                  g.times.push(at);
+                  at += d > 0.011 ? d : 0.1;
+                  if (i === 0) { canvas.width = r.image.displayWidth; canvas.height = r.image.displayHeight; draw(r.image); g.shown = 0; }
+                  r.image.close();
+                });
+              });
+            })(i);
+          }
+          return chain.then(function () {
+            if (g.dead) { dec.close(); return; }
+            g.dec = dec;
+            g.total = at > 0 ? at : 0.1;
+            g.ready = true;
+            pump();
+          });
+        });
+      }).catch(function () { /* the picture stays on its first frame */ });
+      return g;
+    }
+
+    // the layers on the preview: what each shows, where, and a clip or a gif kept on the frame the timeline is at
+    var layerViews = {};
+    function makeLayerView(l) {
+      var box = el("div", "lay-item");
+      box.dataset.layer = l.id;
+      var media;
+      var gif = null;
+      if (l.kind === "media" && l.gif && typeof ImageDecoder === "function") {
+        media = el("canvas", "lay-media");
+        gif = gifFrames(layerSrc(l), media);
+      } else if (l.kind === "clip") {
+        media = el("video", "lay-media");
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = "auto";
+      } else {
+        media = el("img", "lay-media");
+        media.draggable = false;
+        media.alt = "";
+      }
+      if (!gif) media.src = layerSrc(l);
+      box.appendChild(media);
+      ["nw", "ne", "sw", "se"].forEach(function (c) { var g = el("i", "sub-grip lay-grip"); g.dataset.corner = c; box.appendChild(g); });
+      box.appendChild(el("i", "sub-rot lay-rot"));
+      return { box: box, media: media, ref: l.ref, gif: gif };
+    }
+
+    function paintLayers() {
+      var host = dom.layerOverlay;
+      if (!host) return;
+      var t = nowT();
+      var playing = opts.isPlaying && opts.isPlaying();
+      var live = {};
+      st.layers.forEach(function (l) {
+        var v = layerViews[l.id];
+        if (v && v.ref !== l.ref) { if (v.gif) v.gif.close(); v.box.remove(); v = null; }
+        if (!v) v = layerViews[l.id] = makeLayerView(l);
+        host.appendChild(v.box);
+        live[l.id] = true;
+        var on = t >= l.at - 1e-6 && t < l.end;
+        v.box.hidden = !on;
+        v.box.classList.toggle("is-selected", l.id === st.selected);
+        v.box.style.left = (l.x * 100) + "%";
+        v.box.style.top = (l.y * 100) + "%";
+        v.box.style.width = (l.w * 100) + "%";
+        v.box.style.opacity = String(l.opacity);
+        v.box.style.transform = "translate(-50%, -50%) rotate(" + (l.rotate || 0) + "deg)";
+        if (v.gif) { if (on) v.gif.show(t - l.at + (l.src || 0)); return; }
+        if (l.kind !== "clip") return;
+        var m = v.media;
+        // a clip row is drawn through a look canvas of its own, like the video
+        var lookKey = l.fx ? JSON.stringify(l.fx) : "";
+        if (v.lookKey !== lookKey) {
+          v.lookKey = lookKey;
+          if (!v.look && l.fx) v.look = RKEditorFx.preview(m);
+          if (v.look) v.look.set(l.fx ? RKEditorFx.resolve(l.fx) : null);
+        }
+        if (!on) { if (!m.paused) m.pause(); return; }
+        var local = l.src + (t - l.at);
+        // a playing layer is left to run and only pulled back when it drifts; a still one is put on the exact frame
+        if (Math.abs((m.currentTime || 0) - local) > (playing ? 0.3 : 0.03)) { try { m.currentTime = local; } catch (e) { /* the file is still opening */ } }
+        if (playing && m.paused) { var p = m.play(); if (p && p.catch) p.catch(function () {}); }
+        if (!playing && !m.paused) m.pause();
+      });
+      Object.keys(layerViews).forEach(function (id) { if (!live[id]) { if (layerViews[id].gif) layerViews[id].gif.close(); layerViews[id].box.remove(); delete layerViews[id]; } });
+      host.hidden = !st.layers.length;
+      // the playhead only moves a few times a second on its own, so a gif is kept on its frame every frame while the clip plays
+      if (playing && !layerRaf && st.layers.some(function (l) { return l.kind === "media" && l.gif; })) layerRaf = requestAnimationFrame(function () { layerRaf = 0; paintLayers(); });
+    }
+    var layerRaf = 0;
+
+    function layersChanged() {
+      syncLayers();
+      paintLayers();
+    }
+
+    // a press on a layer on the timeline selects it, and a drag moves it or, from an edge, moves that edge; a clip layer cannot reach past the ends of its file
+    function onLayerDown(e) {
+      if (e.button !== 0) return;
+      closeMenu();
+      var node = e.target.closest(".tl-layer");
+      if (!node) {
+        var chip = e.target.closest(".tl-layerchip");
+        if (chip) { e.preventDefault(); select(chip.parentNode.dataset.layer); return; }
+        seekT(seekTimeAtClient(e.clientX));
+        return;
+      }
+      var l = findLayer(node.dataset.layer);
+      if (!l) return;
+      e.preventDefault();
+      select(l.id);
+      var edge = e.target.closest(".tl-h");
+      var mode = edge ? (edge.classList.contains("l") ? "l" : "r") : "move";
+      var startX = e.clientX;
+      var startY = e.clientY;
+      var o = { at: l.at, end: l.end, src: l.src };
+      var moved = false;
+      var move = function (ev) {
+        var pps = pxPerSec();
+        if (!pps) return;
+        // a row carried straight down into the video moves without going sideways
+        if (!moved && Math.abs(ev.clientX - startX) < 3 && (mode !== "move" || Math.abs(ev.clientY - startY) < 3)) return;
+        moved = true;
+        var dt = (ev.clientX - startX) / pps;
+        var guide = -1;
+        if (mode === "move") {
+          // a row goes past either end of the clip like a piece does, as long as a hand hold of it stays in reach, and up to the end of everything else so it can sit after the video; the snap pulls an end to whatever is close and lets go once the drag goes on
+          var len = o.end - o.at;
+          var vis = minVisible(len);
+          var reach = D();
+          st.vsegs.forEach(function (v) { reach = Math.max(reach, vEnd(v)); });
+          st.layers.forEach(function (x) { if (x.id !== l.id) reach = Math.max(reach, x.end); });
+          var at = clamp(o.at + dt, vis - len, Math.max(vis - len, D() - vis, reach));
+          var a = snapTo(at, l.id);
+          var b = snapTo(at + len, l.id);
+          if (a.hit >= 0 && (b.hit < 0 || Math.abs(a.t - at) <= Math.abs(b.t - (at + len)))) { at = a.t; guide = a.hit; }
+          else if (b.hit >= 0) { at = b.t - len; guide = b.hit; }
+          l.at = r3(at);
+          l.end = r3(at + len);
+          // a clip carried over the video row goes into the video when it is let go there; carried over another row it goes into that row, and above the top row into a row of its own on top
+          var r = dom.timeline ? dom.timeline.getBoundingClientRect() : null;
+          intoVideo = l.kind === "clip" && !!r && ev.clientY >= r.top && ev.clientY <= r.bottom;
+          if (dom.timeline) dom.timeline.classList.toggle("is-drop-target", intoVideo);
+          intoRow = "";
+          var rowEls = Array.prototype.slice.call(dom.layers.querySelectorAll(".tl-layerrow"));
+          rowEls.forEach(function (rowEl) {
+            var rr = rowEl.getBoundingClientRect();
+            if (ev.clientY >= rr.top && ev.clientY <= rr.bottom && rowEl.dataset.row !== l.row) intoRow = rowEl.dataset.row;
+          });
+          if (!intoRow && rowEls.length && ev.clientY < rowEls[0].getBoundingClientRect().top - 4 && st.layers.some(function (x) { return x !== l && x.row === l.row; })) intoRow = "new";
+          rowEls.forEach(function (rowEl) { rowEl.classList.toggle("is-drop-target", rowEl.dataset.row === intoRow); });
+        } else if (mode === "l") {
+          // a clip or a gif trimmed at its start starts later in itself, so the start can come back no further than its first frame
+          var cuts = l.kind === "clip" || l.gif;
+          var lo = cuts ? o.at - o.src : -Infinity;
+          var sl = snapTo(clamp(o.at + dt, lo, o.end - LAYER_MIN), l.id);
+          guide = sl.hit;
+          l.at = r3(clamp(sl.t, lo, o.end - LAYER_MIN));
+          if (cuts) l.src = r3(o.src + (l.at - o.at));
+        } else {
+          var hi = l.kind === "clip" && l.dur > 0 ? o.at + (l.dur - o.src) : Infinity;
+          var sr = snapTo(clamp(o.end + dt, o.at + LAYER_MIN, Math.max(o.at + LAYER_MIN, hi)), l.id);
+          guide = sr.hit;
+          l.end = r3(clamp(sr.t, o.at + LAYER_MIN, Math.max(o.at + LAYER_MIN, hi)));
+        }
+        setSnapGuide(guide);
+        layersChanged();
+        followLinked(l.id);
+        applyZoomWidth();
+        renderProps();
+      };
+      var intoVideo = false;
+      var intoRow = "";
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        setSnapGuide(-1);
+        if (dom.timeline) dom.timeline.classList.remove("is-drop-target");
+        dom.layers.querySelectorAll(".is-drop-target").forEach(function (n) { n.classList.remove("is-drop-target"); });
+        if (!moved) { seekT(Math.max(l.at, Math.min(nowT(), l.end - 0.01))); return; }
+        if (intoVideo) { rowToPiece(l); return; }
+        if (intoRow) { moveToRow(l, intoRow); return; }
+        commit();
+        layersChanged();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // a layer on the preview is dragged by its body and sized by a corner the way a subtitle is, its centre staying put while it is sized
+    function onLayerPlaceDown(e) {
+      var box = e.button === 0 && e.target.closest(".lay-item");
+      if (!box) return;
+      var l = findLayer(box.dataset.layer);
+      if (!l) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var area = dom.layerOverlay.getBoundingClientRect();
+      if (!area.width || !area.height) return;
+      if (st.selected !== l.id) select(l.id);
+      if (e.target.closest(".lay-rot")) { rotateLayer(e, box, l); return; }
+      var grip = e.target.closest(".lay-grip");
+      var r = box.getBoundingClientRect();
+      var start = { x: e.clientX, y: e.clientY, cx: l.x * area.width, cy: l.y * area.height, hw: r.width / 2, hh: r.height / 2, w: l.w, rx: r.left + r.width / 2, ry: r.top + r.height / 2 };
+      var moved = false;
+      dom.layerOverlay.classList.add("is-dragging");
+      var move = function (ev) {
+        if (!moved && Math.abs(ev.clientX - start.x) < 3 && Math.abs(ev.clientY - start.y) < 3) return;
+        moved = true;
+        if (grip) {
+          // the corner keeps its distance from the centre in proportion, both axes averaged so a diagonal pull feels even
+          var d0 = Math.hypot(start.x - start.rx, start.y - start.ry);
+          var d1 = Math.hypot(ev.clientX - start.rx, ev.clientY - start.ry);
+          if (d0 > 0) l.w = clamp(Math.round(start.w * d1 / d0 * 1000) / 1000, LAYER_RANGES.w[0], LAYER_RANGES.w[1]);
+        } else {
+          var cx = start.cx + ev.clientX - start.x;
+          var cy = start.cy + ev.clientY - start.y;
+          if (!ev.shiftKey) {
+            cx = snapPlace(cx, start.hw, area.width, 0, area.width);
+            cy = snapPlace(cy, start.hh, area.height, 0, area.height);
+          }
+          l.x = Math.round(clamp(cx / area.width, -0.5, 1.5) * 10000) / 10000;
+          l.y = Math.round(clamp(cy / area.height, -0.5, 1.5) * 10000) / 10000;
+        }
+        paintLayers();
+        renderProps();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        dom.layerOverlay.classList.remove("is-dragging");
+        if (moved) commit();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    // the stem above a layer turns it about its centre the way the one of a subtitle does: straight angles catch it within a few degrees, and shift turns that off
+    function rotateLayer(e, box, l) {
+      var r = box.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var angleAt = function (x, y) { return Math.atan2(y - cy, x - cx) * 180 / Math.PI; };
+      var start = { angle: angleAt(e.clientX, e.clientY), rotate: l.rotate || 0 };
+      dom.layerOverlay.classList.add("is-dragging");
+      var move = function (ev) {
+        var deg = start.rotate + angleAt(ev.clientX, ev.clientY) - start.angle;
+        deg = ((deg + 180) % 360 + 360) % 360 - 180;
+        if (!ev.shiftKey) {
+          var straight = Math.round(deg / 90) * 90;
+          if (Math.abs(deg - straight) <= ROT_SNAP_DEG) deg = straight === 180 ? -180 : straight;
+        }
+        deg = Math.round(deg);
+        if (deg === l.rotate) return;
+        l.rotate = deg;
+        paintLayers();
+        renderProps();
+      };
+      var up = function () {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        dom.layerOverlay.classList.remove("is-dragging");
+        if ((l.rotate || 0) !== start.rotate) commit();
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    }
+
+    function addLayer(l) {
+      if (st.layers.length >= LAYER_MAX) return "";
+      var at = clamp(nowT(), 0, Math.max(0, D() - LAYER_MIN));
+      var len = l.len > 0 ? l.len : 5;
+      // a clip runs its whole length, past the end of the video if it has to; a picture stops at the end
+      var end = l.kind === "clip" ? at + len : Math.min(D(), at + len);
+      if (end - at < LAYER_MIN) return "";
+      var made = cleanLayers([Object.assign({ x: 0.5, y: 0.5, opacity: 1, src: 0 }, l, { id: newId("E"), at: at, end: end })])[0];
+      if (!made) return "";
+      st.layers.push(made);
+      st.selected = made.id;
+      commit();
+      layersChanged();
+      paintSelection();
+      renderProps();
+      return made.id;
+    }
+
+    // what the saved copy asks for in layers, in seconds of the saved clip, cut to it; null while there are none in it
+    function layerPlan() {
+      if (!st.layers.length) return null;
+      var w = saveWindow();
+      var out = [];
+      st.layers.forEach(function (l) {
+        var a = Math.max(l.at, w.start), b = Math.min(l.end, w.end);
+        if (b - a < 0.05) return;
+        out.push({
+          kind: l.kind, ref: l.ref, at: r3(a - w.start), end: r3(b - w.start), src: r3(l.kind === "clip" || l.gif ? l.src + (a - l.at) : 0),
+          x: Math.round(l.x * 10000) / 10000, y: Math.round(l.y * 10000) / 10000, w: Math.round(l.w * 10000) / 10000, opacity: Math.round(l.opacity * 1000) / 1000, rotate: l.rotate || 0,
+        });
+        var look = l.fx ? RKEditorFx.resolve(l.fx) : null;
+        if (look && !RKEditorFx.isIdentity(look)) { out[out.length - 1].look = look; out[out.length - 1].aspect = Math.round(l.aspect * 10000) / 10000; }
+      });
+      return out.length ? out : null;
+    }
+
+    // the part of the timeline the saved copy is: put together piece by piece while the video was cut up or anything lies over it, else the cut
+    function composedSave() { return videoEdited() || st.layers.length > 0; }
+    function saveWindow() { return composedSave() ? windowT() : boundsT(); }
 
     // how far apart, in seconds, two pieces of a row may lie and still look as if they touch
     function touchGap() {
@@ -837,9 +2043,11 @@
 
     function select(id) {
       st.selected = id || "";
+      subPicked = findSub(st.selected) ? [st.selected] : [];
       paintSelection();
       renderProps();
       refreshToolbar();
+      if (opts.onSubtitles) opts.onSubtitles();
     }
 
     // operations
@@ -852,6 +2060,9 @@
       var right = clone(seg);
       right.id = newId("S");
       right.at = r3(t);
+      // the two halves of a linked sound would each follow the whole piece
+      delete seg.link;
+      delete right.link;
       right.fadeIn = 0;
       seg.fadeOut = 0;
       var leftParts = [];
@@ -880,10 +2091,106 @@
     function splitV(v, t) {
       if (t < v.at + MIN_LEN || t > vEnd(v) - MIN_LEN) return null;
       var cut = r3(v.srcStart + (t - v.at) * st.vspeed);
-      var right = newVseg(cut, v.srcEnd, v.at + (cut - v.srcStart) / st.vspeed);
+      var right = sameSource(v, newVseg(cut, v.srcEnd, v.at + (cut - v.srcStart) / st.vspeed));
       v.srcEnd = cut;
       st.vsegs.splice(st.vsegs.indexOf(v) + 1, 0, right);
+      // the sound of a piece from another clip is cut with it, and the second half follows the second piece
+      linkedTo(v.id).forEach(function (h) {
+        var copy = clone(h.seg);
+        copy.id = newId("S");
+        copy.link = right.id;
+        h.lane.segments.splice(h.lane.segments.indexOf(h.seg) + 1, 0, copy);
+      });
       return right;
+    }
+
+    // a piece put into the video at the time t: the video is cut there and everything from there on (pieces, sound, subtitles and video rows) moves along by its length, so nothing that was there is covered; a linked sound follows its own clip instead
+    function insertPiece(piece, t) {
+      var len = vLen(piece);
+      t = r3(t);
+      var under = vAt(t);
+      if (under && t > under.at + MIN_LEN && t < vEnd(under) - MIN_LEN) splitV(under, t);
+      st.vsegs.forEach(function (v) { if (v.at >= t - 1e-6) v.at = r3(v.at + len); });
+      if (st.ready) {
+        allSegs().forEach(function (h) { if (!h.seg.link && t > h.seg.at + MIN_LEN && t < segEnd(h.seg) - MIN_LEN) splitPiece(h, t); });
+        allSegs().forEach(function (h) { if (!h.seg.link && h.seg.at >= t - 1e-6) h.seg.at = r3(h.seg.at + len); });
+      }
+      st.subs.forEach(function (cue) {
+        if (cue.at < t - 1e-6) return;
+        cue.at = r3(cue.at + len);
+        cue.end = r3(cue.end + len);
+        if (cue.words) cue.words = cue.words.map(function (w) { return [r3(w[0] + len), r3(w[1] + len)]; });
+      });
+      st.layers.forEach(function (l) { if (l.at >= t - 1e-6) { l.at = r3(l.at + len); l.end = r3(l.end + len); } });
+      piece.at = t;
+      var i = 0;
+      while (i < st.vsegs.length && st.vsegs[i].at < piece.at) i++;
+      st.vsegs.splice(i, 0, piece);
+    }
+
+    function fxRow() { var l = findLayer(st.selected); return l && l.kind === "clip" ? l : null; }
+
+    // a layer cut at the time t: the second half stays in the same row and starts where the first ends, in its clip as well; a linked sound is cut with it
+    function splitLayer(l, t) {
+      if (!(t > l.at + LAYER_MIN && t < l.end - LAYER_MIN)) return null;
+      var right = clone(l);
+      right.id = newId("E");
+      right.at = r3(t);
+      if (l.kind === "clip" || l.gif) right.src = r3(l.src + (t - l.at));
+      l.end = r3(t);
+      st.layers.splice(st.layers.indexOf(l) + 1, 0, right);
+      linkedTo(l.id).forEach(function (h) {
+        var copy = clone(h.seg);
+        copy.id = newId("S");
+        copy.link = right.id;
+        h.lane.segments.splice(h.lane.segments.indexOf(h.seg) + 1, 0, copy);
+      });
+      return right;
+    }
+
+    // a layer let go over another row joins it, and over the top of the rows gets a row of its own on top of the others; the row higher up covers the ones under it
+    function moveToRow(l, key) {
+      st.layers.splice(st.layers.indexOf(l), 1);
+      if (key === "new") {
+        l.row = l.id;
+        st.layers.push(l);
+      } else {
+        l.row = key;
+        var last = -1;
+        st.layers.forEach(function (x, i) { if (x.row === key) last = i; });
+        st.layers.splice(last + 1, 0, l);
+      }
+      st.layers = groupRows(st.layers);
+      st.selected = l.id;
+      done();
+    }
+
+    // the sound linked to a clip goes with it when the clip changes rows
+    function moveLinks(from, to) { allSegs().forEach(function (h) { if (h.seg.link === from) h.seg.link = to; }); }
+
+    // a video row let go over the video goes into it where it starts, the same part of its clip
+    function rowToPiece(l) {
+      var at = st.layers.indexOf(l);
+      if (at < 0 || !(st.Dsrc > 0)) return;
+      var srcEnd = l.src + (l.end - l.at) * st.vspeed;
+      var piece = { id: newId("V"), at: 0, srcStart: r3(l.src), srcEnd: r3(l.dur > 0 ? Math.min(l.dur, srcEnd) : srcEnd), ref: l.ref, name: l.name, dur: l.dur, aspect: l.aspect };
+      st.layers.splice(at, 1);
+      insertPiece(piece, l.at);
+      moveLinks(l.id, piece.id);
+      st.selected = piece.id;
+      done();
+    }
+
+    // a piece of another clip carried up out of the video becomes a video row of its own where it lay, full size, and leaves black behind in the video
+    function pieceToRow(v) {
+      if (!v.ref || st.layers.length >= LAYER_MAX) return;
+      var made = cleanLayers([{ kind: "clip", ref: v.ref, name: v.name, at: v.at, end: vEnd(v), src: v.srcStart, dur: v.dur, x: 0.5, y: 0.5, w: 1, aspect: v.aspect || 0.5625, opacity: 1 }])[0];
+      if (!made) return;
+      st.vsegs.splice(st.vsegs.indexOf(v), 1);
+      st.layers.push(made);
+      moveLinks(v.id, made.id);
+      st.selected = made.id;
+      done();
     }
 
     // what the playhead cuts: the piece that is selected, or when the video as a whole is selected its piece under the playhead, or when nothing is selected everything under the playhead, the video among it
@@ -893,7 +2200,10 @@
       var first = null;
       var pickV = selectedV();
       var pickA = selected();
-      if (pickV) {
+      var pickL = findLayer(st.selected);
+      if (pickL) {
+        first = splitLayer(pickL, t);
+      } else if (pickV) {
         first = splitV(pickV.seg, t);
       } else if (pickA) {
         first = splitPiece(pickA, t);
@@ -917,6 +2227,26 @@
     }
 
     function doDelete() {
+      var layer = findLayer(st.selected);
+      if (layer) {
+        st.layers.splice(st.layers.indexOf(layer), 1);
+        st.selected = "";
+        syncLinked();
+        done();
+        refreshToolbar();
+        return;
+      }
+      var picked = pickedSubs();
+      if (picked.length) {
+        st.subs = st.subs.filter(function (c) { return picked.indexOf(c.id) < 0; });
+        st.selected = "";
+        subPicked = [];
+        dropEmptyRows();
+        commit();
+        subsChanged();
+        refreshToolbar();
+        return;
+      }
       var pickV = selectedV();
       if (pickV) {
         st.vsegs.splice(pickV.index, 1);
@@ -969,6 +2299,7 @@
       var hit = selected();
       var c = clone(st.clipboard);
       c.id = newId("S");
+      delete c.link;
       var t = at != null ? at : nowT();
       c.at = r3(clamp(t, 0, Math.max(0, D() - segLen(c))));
       var lane = laneIndex != null ? st.lanes[laneIndex] : hit ? hit.lane : st.lanes[0];
@@ -1152,6 +2483,7 @@
     }
 
     function combineInto(target, other) {
+      delete target.link;
       var at = Math.min(target.at, other.at);
       var parts = [];
       [target, other].forEach(function (s) {
@@ -1204,6 +2536,10 @@
         before = Math.max(before, -v.at);
         after = Math.max(after, vEnd(v) - d);
       });
+      st.layers.forEach(function (l) {
+        before = Math.max(before, -l.at);
+        after = Math.max(after, l.end - d);
+      });
       var past = (before > 0.001 ? before : 0) + (after > 0.001 ? after : 0);
       if (past <= 0) return 1;
       var j = past / d;
@@ -1226,6 +2562,10 @@
         st.vsegs.forEach(function (v) {
           before = Math.max(before, -v.at);
           after = Math.max(after, vEnd(v) - d);
+        });
+        st.layers.forEach(function (l) {
+          before = Math.max(before, -l.at);
+          after = Math.max(after, l.end - d);
         });
       }
       var left = before > 0.001 ? Math.ceil(before * pps) : 0;
@@ -1271,6 +2611,7 @@
       var cands = [0, D(), nowT(), b.start, b.end];
       allSegs().forEach(function (h) { if (h.seg.id !== skipId) { cands.push(h.seg.at); cands.push(segEnd(h.seg)); } });
       st.vsegs.forEach(function (v) { if (v.id !== skipId) { cands.push(v.at); cands.push(vEnd(v)); } });
+      st.layers.forEach(function (l) { if (l.id !== skipId) { cands.push(l.at); cands.push(l.end); } });
       var best = t;
       var bestD = SNAP_PX / pps;
       var hit = -1;
@@ -1375,6 +2716,10 @@
           dom.timeline.appendChild(node);
         }
         positionV(v, node);
+        var name = node.querySelector(".tl-vname");
+        if (v.ref && !name) { name = el("span", "tl-vname"); node.appendChild(name); }
+        if (name && !v.ref) name.remove();
+        else if (name && name.textContent !== v.name) name.textContent = v.name || "";
         live[v.id] = true;
       });
       Object.keys(vsegEls).forEach(function (id) { if (!live[id]) { vsegEls[id].remove(); delete vsegEls[id]; } });
@@ -1545,18 +2890,41 @@
         ctx.save();
         roundRect(ctx, x0, 0, span, h, 5);
         ctx.clip();
+        var pic = v.ref ? refThumb(v.ref) : null;
         // the cells start at the left edge of the piece, and each one shows the frame nearest to the middle of the cell
         for (var k = Math.max(0, Math.floor(-x0 / cell)); k * cell < span; k++) {
           var x = x0 + k * cell;
           if (x > w) break;
           var cw = Math.min(cell, span - k * cell);
-          var f = frameAt(clamp((v.srcStart + (k * cell + cw / 2) / pps * st.vspeed) / st.Dsrc, 0, 1));
-          if (f) ctx.drawImage(f.canvas, x, 0, cell, h);
+          if (v.ref) {
+            if (pic) drawCover(ctx, pic, x, 0, cell, h);
+          } else {
+            var f = frameAt(clamp((v.srcStart + (k * cell + cw / 2) / pps * st.vspeed) / st.Dsrc, 0, 1));
+            if (f) ctx.drawImage(f.canvas, x, 0, cell, h);
+          }
           ctx.fillStyle = "rgba(0, 0, 0, .6)";
           ctx.fillRect(x + cw - 1, 0, 1, h);
         }
         ctx.restore();
       });
+    }
+
+    // the picture of another clip for its pieces on the video row, loaded once
+    var refThumbs = {};
+    function refThumb(ref) {
+      var img = refThumbs[ref];
+      if (!img) {
+        img = refThumbs[ref] = new Image();
+        img.onload = drawSoon;
+        img.src = opts.helper + "/thumb/" + encodeURIComponent(ref);
+      }
+      return img.complete && img.naturalWidth ? img : null;
+    }
+    // drawn over the whole cell and cut to it, so a clip of another shape is never stretched
+    function drawCover(ctx, img, x, y, w, h) {
+      var k = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+      var sw = w / k, sh = h / k;
+      ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, x, y, w, h);
     }
 
     function drawNow() {
@@ -1640,6 +3008,8 @@
       var t = vt.on ? vt.T : tv / st.vspeed;
       var pct = (vt.on ? t / D() : clamp(t / D(), 0, 1)) * 100;
       if (els.playline) els.playline.style.left = pct + "%";
+      paintOverlay();
+      paintLayers();
       if (els.time) els.time.firstChild.textContent = fmt(t, 1) + " ";
       var pps = pxPerSec();
       if (pps > 0 && st.zoom > 1 && opts.isPlaying()) {
@@ -1745,18 +3115,18 @@
     function buildToolbar() {
       var tb = dom.toolbar;
       tb.textContent = "";
-      tb.appendChild(group(
+      var left = el("div", "tl-side");
+      left.appendChild(group(
         button("split", "action/content-cut", "Split at the playhead (S)", doSplit),
-        button("del", "action/trash", "Delete (Del)", doDelete),
+        button("del", "action/trash", "Delete (Backspace)", doDelete),
         button("markIn", "editor/mark-in", "Start the cut here ([)", markIn),
         button("markOut", "editor/mark-out", "End the cut here (])", markOut),
-        button("waves", "editor/waveform", "Show the waveforms", function () { prefs.waves = !prefs.waves; savePrefs(); refreshToolbar(); drawSoon(); }),
-        button("import", "editor/import-audio", IMPORT_TIP, pickAudio)
+        button("waves", "editor/waveform", "Show the waveforms", function () { prefs.waves = !prefs.waves; savePrefs(); refreshToolbar(); drawSoon(); })
       ));
       els.busy = el("div", "tl-busy");
       els.busy.textContent = "Importing audio";
-      tb.appendChild(els.busy);
-      tb.appendChild(el("span", "tl-fill"));
+      left.appendChild(els.busy);
+      tb.appendChild(left);
       var time = el("div", "tl-time");
       time.appendChild(document.createTextNode("0:00.0 "));
       var total = el("span");
@@ -1764,23 +3134,27 @@
       time.appendChild(total);
       els.time = time;
       els.total = total;
-      tb.appendChild(group(
+      // the host adds its volume and fullscreen buttons to this group
+      var playGroup = group(
         button("stop", "editor/stop", "Stop", function () { opts.stop(); }),
         button("play", "player/play", "Play and pause (Space)", function () { opts.togglePlay(); }),
         time
-      ));
-      tb.appendChild(el("span", "tl-fill"));
-      tb.appendChild(group(
+      );
+      playGroup.classList.add("tl-play-group");
+      tb.appendChild(playGroup);
+      var right = el("div", "tl-side tl-side-end");
+      right.appendChild(group(
         button("undo", "editor/undo", "Undo (Ctrl+Z)", undo),
         button("redo", "editor/redo", "Redo (Ctrl+Shift+Z)", redo)
       ));
-      tb.appendChild(el("span", "tl-sep"));
-      tb.appendChild(group(
+      right.appendChild(el("span", "tl-sep"));
+      right.appendChild(group(
         button("snap", "editor/magnet", "Snap to edges and the playhead", function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
         button("fit", "editor/fit-timeline", "Fit to zoom (0)", fitView),
         button("zoomOut", "editor/zoom-out", "Zoom out (-)", function () { setZoom(st.zoom / ZOOM_STEP); }),
         button("zoomIn", "editor/zoom-in", "Zoom in (+)", function () { setZoom(st.zoom * ZOOM_STEP); })
       ));
+      tb.appendChild(right);
     }
 
     // the whole timeline in view, from its start, with nothing left to scroll
@@ -1804,12 +3178,12 @@
       var lanes = st.ready && st.lanes.length > 0;
       var underV = st.vsegs.some(function (v) { return canSplitV(v, t); });
       var underPlayhead = (lanes && allSegs().some(function (h) { return canSplitAt(h.seg, t); })) || underV;
-      var cuttable = pickV ? canSplitV(pickV.seg, t) : hit ? canSplitAt(hit.seg, t) : st.selected === "video" ? underV : underPlayhead;
-      els.split.disabled = !(lanes || st.vsegs.length) || !cuttable;
-      els.del.disabled = !hit && !pickV;
+      var pickL = findLayer(st.selected);
+      var cuttable = pickL ? t > pickL.at + LAYER_MIN && t < pickL.end - LAYER_MIN : pickV ? canSplitV(pickV.seg, t) : hit ? canSplitAt(hit.seg, t) : st.selected === "video" ? underV : underPlayhead;
+      els.split.disabled = !(lanes || st.vsegs.length || pickL) || !cuttable;
+      els.del.disabled = !hit && !pickV && !findSub(st.selected) && !findLayer(st.selected);
       els.waves.disabled = !lanes;
-      els.import.disabled = !st.ready || st.picking;
-      els.import.dataset.tooltip = st.ready ? IMPORT_TIP : "Audio cannot be added to this clip";
+      if (opts.onSubtitles) opts.onSubtitles();
       els.waves.classList.toggle("is-active", prefs.waves);
       els.snap.classList.toggle("is-active", prefs.snap);
       els.undo.disabled = st.history.length < 2;
@@ -1838,10 +3212,10 @@
       input.style.setProperty("--fill", pct + "%");
     }
 
-    // one row of the panel: the name, the value field, the slider and the reset button, in the order of the rows of the settings. cfg holds the range, how a value is shown, how it maps to the slider and back, what a change writes and what the reset writes
+    // one setting of the panel: the name with its reset button, then the slider and the value field; cfg holds the range, how a value is shown, how it maps to the slider and back, what a change writes, what the reset writes, and what goes between the name and the slider
     function makeRow(box, cfg) {
-      var row = el("div", "tl-row");
-      var label = el("div", "tl-label");
+      var row = el("div", "tl-field");
+      var label = el("span", "tl-label");
       label.textContent = cfg.label;
       var value = el("input", "tl-value");
       value.type = "text";
@@ -1849,7 +3223,7 @@
       value.autocomplete = "off";
       value.setAttribute("aria-label", cfg.label);
       var wrap = el("div", "tl-slider-wrap");
-      var slide = el("input", "tl-slider");
+      var slide = el("input", "tl-slider rk-range");
       slide.type = "range";
       slide.min = String(cfg.min);
       slide.max = String(cfg.max);
@@ -1861,10 +3235,15 @@
       reset.setAttribute("aria-label", "Reset " + cfg.label.toLowerCase());
       reset.dataset.tooltip = "Reset to default";
       reset.innerHTML = icon("action/reset");
-      row.appendChild(label);
-      row.appendChild(value);
-      row.appendChild(wrap);
-      row.appendChild(reset);
+      var head = el("div", "tl-field-head");
+      head.appendChild(label);
+      head.appendChild(reset);
+      row.appendChild(head);
+      if (cfg.before) row.appendChild(cfg.before);
+      var line = el("div", "tl-field-line");
+      line.appendChild(wrap);
+      line.appendChild(value);
+      row.appendChild(line);
       box.appendChild(row);
       slide.addEventListener("input", function () { paintFill(slide); cfg.write(cfg.fromSlide(Number(slide.value))); });
       slide.addEventListener("change", function () { commit(); });
@@ -1881,10 +3260,8 @@
       };
     }
 
-    // the speed of a piece and the speed of the video are the same kind of row: the marks for the usual speeds, then the slider
+    // the speed of a piece and the speed of the video are the same kind of setting: the marks for the usual speeds under the name, then the slider
     function makeSpeedRow(box, write) {
-      var presets = el("div", "tl-row tl-row-presets");
-      presets.appendChild(el("div", "tl-label"));
       var strip = el("div", "tl-speeds");
       var list = SPEEDS.map(function (v) {
         var b = el("button", "btn tl-mini");
@@ -1894,10 +3271,8 @@
         strip.appendChild(b);
         return { v: v, b: b };
       });
-      presets.appendChild(strip);
-      box.appendChild(presets);
       var row = makeRow(box, {
-        label: "Speed", min: SPEED_MIN, max: SPEED_MAX, step: SPEED_STEP,
+        label: "Speed", min: SPEED_MIN, max: SPEED_MAX, step: SPEED_STEP, before: strip,
         format: function (v) { return r3(v) + "x"; },
         toSlide: function (v) { return v; },
         fromSlide: function (x) { return x; },
@@ -1978,6 +3353,44 @@
       els.speed = makeSpeedRow(audio, function (v) { editPiece(function (s) { setSpeed(s, v); }); });
       els.pitch = checkRow(audio, "Preserve pitch", function (on) { editPiece(function (s) { s.pitch = on; }); commit(); }, "Keeps the sound at its normal pitch when you change the speed, so faster parts don't sound high and squeaky.");
 
+      // the properties of a layer
+      var lay = el("div", "tl-box");
+      els.layerBox = lay;
+      lay.hidden = true;
+      root.appendChild(lay);
+      var pct = function (v) { return Math.round(v) + "%"; };
+      var same = function (v) { return v; };
+      els.lsize = makeRow(lay, {
+        label: "Size", min: 2, max: 200, step: 1, format: pct, toSlide: same, fromSlide: same,
+        write: function (v) { editLayer(function (l) { l.w = clamp(v / 100, LAYER_RANGES.w[0], LAYER_RANGES.w[1]); }); },
+        reset: 100,
+      });
+      els.llen = makeRow(lay, {
+        label: "Length", min: LAYER_MIN, max: 60, step: 0.1, format: function (v) { return r3(v) + "s"; }, toSlide: same, fromSlide: same,
+        write: function (v) { editLayer(function (l) { l.end = r3(clamp(l.at + v, l.at + LAYER_MIN, layerEndMax(l))); }); syncLayers(); },
+        reset: 5,
+      });
+      els.lrotate = makeRow(lay, {
+        label: "Rotation", min: -180, max: 180, step: 1, format: function (v) { return Math.round(v) + "\u00b0"; }, toSlide: same, fromSlide: same,
+        write: function (v) { editLayer(function (l) { l.rotate = Math.round(clamp(v, -180, 180)); }); },
+        reset: 0,
+      });
+      els.lopacity = makeRow(lay, {
+        label: "Opacity", min: 0, max: 100, step: 1, format: pct, toSlide: same, fromSlide: same,
+        write: function (v) { editLayer(function (l) { l.opacity = clamp(v / 100, 0, 1); }); },
+        reset: 100,
+      });
+      var centre = el("button", "btn tl-wide");
+      centre.type = "button";
+      centre.textContent = "Center on the video";
+      centre.addEventListener("click", function () { editLayer(function (l) { l.x = 0.5; l.y = 0.5; }); commit(); });
+      lay.appendChild(centre);
+      var drop = el("button", "btn tl-wide");
+      drop.type = "button";
+      drop.textContent = "Remove layer";
+      drop.addEventListener("click", function () { doDelete(); });
+      lay.appendChild(drop);
+
       // the properties of the video
       var vid = el("div", "tl-box");
       els.videoBox = vid;
@@ -1992,6 +3405,18 @@
         tick(true);
       }, "Keeps the sound at its normal pitch when the video speeds up, so voices don't sound high and squeaky.");
       els.vlinkRow = checkRow(vid, "Change the audio speed too", function (on) { relink(on); }, "Changes the sound's speed along with the video, so the sound stays lined up with the picture. Saving takes about as long as the clip when you change the speed, cut the video into pieces, or let the audio run past the video.");
+    }
+
+    // the furthest a layer may reach: the end of the timeline, and for a clip the end of its file
+    function layerEndMax(l) { return l.kind === "clip" && l.dur > 0 ? Math.min(D(), l.at + l.dur - l.src) : D(); }
+
+    // a change to the selected layer shows at once, the history waits for the change to end
+    function editLayer(fn) {
+      var l = findLayer(st.selected);
+      if (!l) return;
+      fn(l);
+      paintLayers();
+      renderProps();
     }
 
     // a change to the selected piece: what is on screen and what is heard follow it at once, the history waits for the change to end
@@ -2011,13 +3436,29 @@
       var root = dom.props;
       var hit = selected();
       var isVideo = videoSelected();
-      root.hidden = !hit && !isVideo;
+      var layer = findLayer(st.selected);
+      reportKind();
+      // the other tabs of the video have panels of their own
+      var general = !opts.videoPane || opts.videoPane() === "general";
+      root.hidden = !hit && !layer && !(isVideo && general);
       if (root.hidden) return;
-      els.audioBox.hidden = isVideo;
+      els.audioBox.hidden = isVideo || !!layer;
       els.videoBox.hidden = !isVideo;
+      els.layerBox.hidden = !layer;
+      if (layer) {
+        els.propsTitle.textContent = layer.kind === "clip" ? "Video" : "Layer";
+        els.source.textContent = layer.name;
+        els.lsize.show(layer.w * 100);
+        els.llen.slide.max = String(r3(Math.max(LAYER_MIN + 0.1, layerEndMax(layer) - layer.at)));
+        els.llen.show(layer.end - layer.at);
+        els.lrotate.show(layer.rotate || 0);
+        els.lopacity.show(layer.opacity * 100);
+        return;
+      }
       if (isVideo) {
         els.propsTitle.textContent = "Video";
-        els.source.textContent = "";
+        var pickV = selectedV();
+        els.source.textContent = pickV && pickV.seg.ref ? pickV.seg.name : "";
         els.vspeed.show(st.vspeed);
         els.vpitchRow.checked = st.vpitch;
         els.vlinkRow.checked = st.vlink;
@@ -2045,7 +3486,7 @@
       if (st.vsess) return;
       var pieces = {};
       allSegs().forEach(function (h) { pieces[h.seg.id] = clone(h.seg); });
-      st.vsess = { v0: st.vspeed, pps: pxPerSec(), pieces: pieces, vsegs: clone(st.vsegs) };
+      st.vsess = { v0: st.vspeed, pps: pxPerSec(), pieces: pieces, vsegs: clone(st.vsegs), subs: clone(st.subs) };
     }
 
     // the size of a second on screen stays what it was, which is what makes a slower video longer than the frame, and the playhead keeps its place on screen
@@ -2091,8 +3532,17 @@
       // the pieces of the video are the video, so they keep their place in the picture whatever the link says: a place on the timeline stretches with the speed
       st.vsegs = clone(run.vsegs);
       st.vsegs.forEach(function (v) { v.at = r3(v.at / ratio); });
+      // subtitles belong to the picture like the pieces of the video do
+      st.subs = clone(run.subs);
+      st.subs.forEach(function (c) {
+        c.at = r3(c.at / ratio);
+        c.end = r3(c.end / ratio);
+        if (c.words) c.words = c.words.map(function (w) { return [r3(w[0] / ratio), r3(w[1] / ratio)]; });
+      });
+      syncLinked();
       afterSpeed(run.pps, playX);
       syncDom();
+      subsChanged();
       paintSelection();
       layout();
       renderProps();
@@ -2113,6 +3563,7 @@
           keepVisible(seg);
           clampFades(seg);
         });
+        syncLinked();
         syncDom();
         layout();
         drawSoon();
@@ -2176,7 +3627,7 @@
           { label: "Move the row up", icon: "editor/arrow-up", disabled: hit.laneIndex === 0, action: function () { doMoveLane(hit.laneIndex, -1); } },
           { label: "Move the row down", icon: "editor/arrow-down", disabled: hit.laneIndex === st.lanes.length - 1, action: function () { doMoveLane(hit.laneIndex, 1); } },
           "-",
-          { label: "Delete", icon: "action/trash", key: "Del", danger: true, action: doDelete });
+          { label: "Delete", icon: "action/trash", key: "Backspace", danger: true, action: doDelete });
         showMenu(e.clientX, e.clientY, items);
         return;
       }
@@ -2425,7 +3876,7 @@
       closeMenu();
       var node = e.target.closest(".tl-seg");
       if (!node) {
-        if (e.button === 0) { select(""); seekT(seekTimeAtClient(e.clientX)); }
+        if (e.button === 0) seekT(seekTimeAtClient(e.clientX));
         return;
       }
       var hit = find(node.dataset.seg);
@@ -2512,7 +3963,8 @@
       var pick = findV(drag.id);
       if (!pick) return;
       var dx = e.clientX - drag.x;
-      if (!drag.moved && Math.abs(dx) < 3) return;
+      // a piece of another clip carried straight up out of the video moves without going sideways
+      if (!drag.moved && Math.abs(dx) < 3 && (!pick.seg.ref || Math.abs(e.clientY - drag.y) < 3)) return;
       drag.moved = true;
       var pps = pxPerSec();
       if (!(pps > 0)) return;
@@ -2522,7 +3974,8 @@
       var next = st.vsegs[pick.index + 1];
       var vis = minVisible(len);
       var lo = Math.max(prev ? vEnd(prev) : -Infinity, vis - len);
-      var hi = Math.min(next ? next.at - len : Infinity, D() - vis);
+      // a piece that was added after the end of the video may stay against the piece before it
+      var hi = Math.min(next ? next.at - len : Infinity, Math.max(D() - vis, prev ? vEnd(prev) : -Infinity));
       if (hi < lo) hi = lo;
       var at = clamp(drag.orig.at + dx / pps, lo, hi);
       var guide = -1;
@@ -2532,15 +3985,27 @@
       if (a.hit >= 0 && (b.hit < 0 || Math.abs(a.t - at) <= Math.abs(b.t - (at + len)))) { at = a.t; guide = a.hit; }
       else if (b.hit >= 0) { at = b.t - len; guide = b.hit; }
       v.at = r3(clamp(at, lo, hi));
+      // a piece of another clip carried up out of the video row becomes a video row of its own when it is let go
+      var r = dom.timeline ? dom.timeline.getBoundingClientRect() : null;
+      drag.leave = !!v.ref && !!r && e.clientY < r.top - 6;
+      vsegEls[v.id].classList.toggle("is-leaving", drag.leave);
       vsegEls[v.id].classList.add("is-dragging");
       setSnapGuide(guide);
       positionV(v, vsegEls[v.id]);
+      followLinked(v.id);
       applyZoomWidth();
       syncVmode();
       drawSoon();
       renderProps();
       paintHandles();
       tick(false);
+    }
+
+    // the sound linked to a piece goes along while the piece is carried or drawn out
+    function followLinked(id) {
+      if (!linkedTo(id).length) return;
+      syncLinked();
+      linkedTo(id).forEach(function (h) { if (segEls[h.seg.id]) positionSeg(h.seg, segEls[h.seg.id]); });
     }
 
     // an edge of a piece of the video is drawn in or out like the edge of a piece of the audio: the piece keeps its place in the order, stays between its neighbours and cannot be drawn out past what the video holds, and what the cut leaves open on either side turns black
@@ -2568,15 +4033,16 @@
         v.srcStart = r3(Math.max(0, o.srcStart + (at - o.at) * st.vspeed));
       } else {
         var loR = o.at + MIN_LEN;
-        var hiR = Math.max(loR, Math.min(next ? next.at : Infinity, vEnd(o) + (st.Dsrc - o.srcEnd) / st.vspeed));
+        var hiR = Math.max(loR, Math.min(next ? next.at : Infinity, vEnd(o) + (srcMax(o) - o.srcEnd) / st.vspeed));
         var sr = snapTo(clamp(vEnd(o) + dt, loR, hiR), v.id);
         guide = sr.hit;
         var end = clamp(sr.t, loR, hiR);
-        v.srcEnd = r3(Math.min(st.Dsrc, o.srcStart + (end - o.at) * st.vspeed));
+        v.srcEnd = r3(Math.min(srcMax(o), o.srcStart + (end - o.at) * st.vspeed));
       }
       vsegEls[v.id].classList.add("is-dragging");
       setSnapGuide(guide);
       positionV(v, vsegEls[v.id]);
+      followLinked(v.id);
       applyZoomWidth();
       syncVmode();
       drawSoon();
@@ -2596,9 +4062,13 @@
       showDrop(null);
       showMergeTargets([]);
       if (segEls[was.id]) segEls[was.id].classList.remove("is-dragging");
-      if (vsegEls[was.id]) vsegEls[was.id].classList.remove("is-dragging");
+      if (vsegEls[was.id]) { vsegEls[was.id].classList.remove("is-dragging"); vsegEls[was.id].classList.remove("is-leaving"); }
       if (was.lift) settleLifted(was, !!e && e.type === "pointercancel");
       if (!was.moved) return;
+      if (was.leave && findV(was.id)) { pieceToRow(findV(was.id).seg); return; }
+      // a linked sound that was moved or drawn out by hand is a sound of its own from now on
+      var heard = find(was.id);
+      if (heard) delete heard.seg.link;
       done();
     }
 
@@ -2641,7 +4111,7 @@
       showMenu(e.clientX, e.clientY, [
         { label: "Split at the playhead", icon: "action/content-cut", key: "S", disabled: !canSplitV(v, nowT()), action: doSplit },
         "-",
-        { label: "Delete", icon: "action/trash", key: "Del", danger: true, action: doDelete },
+        { label: "Delete", icon: "action/trash", key: "Backspace", danger: true, action: doDelete },
       ]);
     }
 
@@ -2701,10 +4171,10 @@
       else if (key === " " && !interactive(e.target)) { e.preventDefault(); opts.togglePlay(); }
     }
 
-    // a press that is not on the selected track, its handles, its properties, the toolbar or a scrollbar lets go of the selection. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
+    // a press that is not on the selected track, its handles, the side panels (blank space in them included), the colour picker, the toolbar or a scrollbar lets go of the selection. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
     function isOutside(target) {
       if (!target || !target.closest) return false;
-      return !target.closest(".tl-seg, .tl-vseg, .trim-bar, .tl-lanes, .tl-props, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer");
+      return !target.closest(".tl-seg, .tl-vseg, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .ed-left, .editor-side, .ed-rail-r, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer");
     }
 
     // the sound of the pieces. every part of a piece that is playing has an element of its own, taken from a pool per track
@@ -2859,12 +4329,15 @@
     // the element shows the piece under the playhead where it should be, and goes on playing it when the clock plays; a piece that goes on where the one before it ended needs no seek
     function vFollow() {
       var piece = vAt(vt.T, vt.T >= windowT().end - 0.001);
-      if (!piece) {
+      if (!piece || piece.ref) {
         showPicture(false);
         if (!native.paused.get.call(video)) native.pause.call(video);
+        if (piece) { followPiece(piece); return; }
+        hidePiece();
         vt.piece = "";
         return;
       }
+      hidePiece();
       showPicture(true);
       var src = clamp(piece.srcStart + (vt.T - piece.at) * st.vspeed, 0, st.Dsrc);
       var current = native.currentTime.get.call(video);
@@ -2879,6 +4352,80 @@
         if (!native.paused.get.call(video)) native.pause.call(video);
         if (entering || Math.abs(current - src) > 0.02) native.currentTime.set.call(video, src);
       }
+    }
+
+    // the element that plays the pieces taken from other clips, made the first time one shows; the look draws it instead of the video while it is shown
+    var pv = null;
+    function pieceView() {
+      if (pv) return pv;
+      var box = el("div", "ed-piece-view");
+      box.hidden = true;
+      var pic = el("div", "ed-piece-pic");
+      var fv = el("video");
+      fv.muted = true;
+      fv.playsInline = true;
+      fv.preload = "auto";
+      pic.appendChild(fv);
+      box.appendChild(pic);
+      var canvas = video.parentNode.querySelector(".ed-fx-canvas");
+      video.parentNode.insertBefore(box, canvas || video.nextSibling);
+      pv = { box: box, pic: pic, video: fv, ref: "" };
+      function frame() {
+        video.dispatchEvent(new Event("rkframe"));
+        if (!box.hidden && typeof fv.requestVideoFrameCallback === "function") fv.requestVideoFrameCallback(frame);
+      }
+      pv.frame = frame;
+      ["loadeddata", "seeked"].forEach(function (n) { fv.addEventListener(n, function () { video.dispatchEvent(new Event("rkframe")); }); });
+      return pv;
+    }
+    // the box lies on the video element, zoomed with it, and the picture inside it is where the video shows its own
+    function placePiece() {
+      var w = video.clientWidth, h = video.clientHeight;
+      var vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+      var k = Math.min(w / vw, h / vh);
+      pv.box.style.left = video.offsetLeft + "px";
+      pv.box.style.top = video.offsetTop + "px";
+      pv.box.style.width = w + "px";
+      pv.box.style.height = h + "px";
+      pv.box.style.transform = video.style.transform || "";
+      pv.pic.style.left = ((w - vw * k) / 2) + "px";
+      pv.pic.style.top = ((h - vh * k) / 2) + "px";
+      pv.pic.style.width = (vw * k) + "px";
+      pv.pic.style.height = (vh * k) + "px";
+    }
+    function followPiece(piece) {
+      var p = pieceView();
+      var fv = p.video;
+      if (p.ref !== piece.ref) {
+        p.ref = piece.ref;
+        fv.src = opts.helper + "/file/" + encodeURIComponent(piece.ref);
+      }
+      var wasHidden = p.box.hidden;
+      p.box.hidden = false;
+      placePiece();
+      video.rkPicture = fv;
+      if (wasHidden && typeof fv.requestVideoFrameCallback === "function") fv.requestVideoFrameCallback(p.frame);
+      if (fv.playbackRate !== st.vspeed) fv.playbackRate = st.vspeed;
+      var src = clamp(piece.srcStart + (vt.T - piece.at) * st.vspeed, 0, piece.dur || 0);
+      var entering = vt.piece !== piece.id || vt.dirty;
+      vt.piece = piece.id;
+      vt.dirty = false;
+      var current = fv.currentTime || 0;
+      if (vt.playing) {
+        var limit = entering ? 0.12 : 0.25 * Math.max(1, st.vspeed);
+        if (Math.abs(current - src) > limit) { try { fv.currentTime = src; } catch (e) { /* the file is still opening */ } }
+        if (fv.paused) { var pr = fv.play(); if (pr && pr.catch) pr.catch(function () {}); }
+      } else {
+        if (!fv.paused) fv.pause();
+        if (entering || Math.abs(current - src) > 0.02) { try { fv.currentTime = src; } catch (e) { /* the file is still opening */ } }
+      }
+    }
+    function hidePiece() {
+      if (!pv || pv.box.hidden) return;
+      pv.box.hidden = true;
+      if (!pv.video.paused) pv.video.pause();
+      video.rkPicture = null;
+      video.dispatchEvent(new Event("rkframe"));
     }
 
     function vSeek(t) {
@@ -2962,6 +4509,7 @@
       vt.playing = false;
       clearInterval(vt.timer);
       vt.timer = 0;
+      hidePiece();
       showPicture(true);
       native.currentTime.set.call(video, at * st.vspeed);
       if (resume) elementPlay();
@@ -3083,7 +4631,7 @@
     }
 
     // the audio of a file that is ready becomes a piece in a row of its own. its waveform is drawn and the element that plays it is loaded before the row is made, so audio that cannot be played never gets one
-    function placeImport(info, at, mine) {
+    function placeImport(info, at, mine, link) {
       var known = trackOfImport(info.id);
       var src = known ? known.index : IMPORT_BASE + st.nextImport;
       var peaked = known ? Promise.resolve(st.peaks[src]) : fetchPeaksFrom(opts.helper + "/import-audio/peaks?id=" + encodeURIComponent(info.id));
@@ -3095,12 +4643,16 @@
           st.peaks[src] = peaks;
         }
         return loadItem(ensureItem(src)).then(function () {
-          if (mine !== seq || !roomForRow()) return false;
+          // a piece that went while its sound was being made takes no sound
+          if (mine !== seq || (link && linkAt(link) == null) || !roomForRow()) return false;
           var start = importStart(at);
           var seg = newSeg(src, 0, r3(Math.min(peaks.duration, boundsT().end - start)), start);
+          // the sound of a piece from another clip lies on that piece, which syncLinked works out
+          if (link) { seg = newSeg(src, 0, r3(peaks.duration), linkAt(link)); seg.link = link; }
           var lane = { id: newId("L"), label: pieceLabel(seg), segments: [seg] };
           st.lanes.push(lane);
-          st.selected = seg.id;
+          // the sound of a clip arrives after the clip, which stays selected
+          if (!link) st.selected = seg.id;
           done();
           if (laneRecs[lane.id] && laneRecs[lane.id].el.scrollIntoView) laneRecs[lane.id].el.scrollIntoView({ block: "nearest" });
           return true;
@@ -3348,6 +4900,15 @@
     }
 
     function unloadState() {
+      if (dom.subOverlay) { dom.subOverlay.hidden = true; dom.subOverlay._key = ""; dom.subOverlay._lit = []; dom.subOverlay.textContent = ""; }
+      Object.keys(layerViews).forEach(function (id) { if (layerViews[id].gif) layerViews[id].gif.close(); layerViews[id].media.removeAttribute("src"); layerViews[id].box.remove(); });
+      layerViews = {};
+      Object.keys(layerRowEls).forEach(function (id) { layerRowEls[id].remove(); });
+      layerRowEls = {};
+      layerEls = {};
+      if (dom.layerOverlay) dom.layerOverlay.hidden = true;
+      if (dom.layers) { dom.layers.hidden = true; dom.layers._rows = 0; }
+      if (pv) { hidePiece(); pv.ref = ""; pv.video.removeAttribute("src"); pv.video.load(); }
       // the element is the clock again, and it shows its picture
       leaveVmode();
       showPicture(true);
@@ -3363,6 +4924,8 @@
       var hadSpeed = st.vspeed !== 1;
       st = fresh();
       pressOutside = false;
+      if (opts.onFx) opts.onFx();
+      if (opts.onSelectKind) opts.onSelectKind("");
       if (hadSpeed) {
         opts.setVideoRate(1);
         if (opts.onVideoSpeed) opts.onVideoSpeed(1);
@@ -3385,7 +4948,7 @@
     // what the saved copy asks the helper for in the audio: null while nothing was changed and the video plays at its own speed and is put together as it was recorded. the pieces are sent as they lie on the timeline, past the ends of the video included, and the helper cuts them to the saved clip. a video at another speed always needs the plan, since the audio is cut on the timeline of the saved clip
     function plan() {
       if (!st.ready) return null;
-      if (signature() === st.initial && st.vspeed === 1 && !videoEdited()) return null;
+      if (signature() === st.initial && st.vspeed === 1 && !composedSave()) return null;
       // the files brought in that a piece still uses, by number and id
       var used = [];
       st.lanes.forEach(function (l) {
@@ -3411,17 +4974,27 @@
 
     // what it asks for in the video: null while the saved copy is the cut of the video as it was recorded, else the pieces of the video and the part of the timeline that is the saved clip, which reaches past the video where audio does
     function videoPlan() {
-      if (!videoEdited()) return null;
+      if (!composedSave()) return null;
       var w = windowT();
       return {
-        pieces: st.vsegs.map(function (v) { return { at: r3(v.at), srcStart: r3(v.srcStart), srcEnd: r3(v.srcEnd) }; }),
+        pieces: st.vsegs.map(function (v) {
+          var p = { at: r3(v.at), srcStart: r3(v.srcStart), srcEnd: r3(v.srcEnd) };
+          if (v.ref) p.ref = v.ref;
+          return p;
+        }),
         window: { start: r3(w.start), end: r3(w.end) },
       };
     }
 
-    // whether the rows, the pieces or the speed differ from the clip as it was recorded; the cut is for the host to judge
+    // what the saved copy asks for in the look of the video: the numbers of the steps, or null while it is left as it was recorded
+    function lookPlan() {
+      var r = RKEditorFx.resolve(st.fx);
+      return RKEditorFx.isIdentity(r) ? null : r;
+    }
+
+    // whether the rows, the pieces, the speed or the look differ from the clip as it was recorded; the cut is for the host to judge
     function edited() {
-      return signature() !== st.initial || Math.abs(st.vspeed - 1) > 1e-6;
+      return signature() !== st.initial || Math.abs(st.vspeed - 1) > 1e-6 || st.subs.length > 0 || st.layers.length > 0 || !!lookPlan();
     }
 
     // the edit as it stands, for the host to keep as a draft: what the history takes, plus the files brought in from outside that a piece still uses, which a draft can only reach again by their ids
@@ -3528,6 +5101,25 @@
         dom.timeline.addEventListener("contextmenu", onVideoContext);
       }
       installTransport();
+      if (dom.subs) {
+        dom.subs.addEventListener("pointerdown", onSubDown);
+        dom.subs.addEventListener("contextmenu", onSubContext);
+        if (dom.subOverlay) {
+          dom.subOverlay.addEventListener("pointerdown", onPlaceDown);
+          // a press on a subtitle is the subtitle, never a click on the video under it
+          dom.subOverlay.addEventListener("click", function (e) { if (e.target.closest(".sub-cue")) e.stopPropagation(); });
+        }
+        dom.subs._rows = 0;
+      }
+      if (dom.layers) {
+        dom.layers.addEventListener("pointerdown", onLayerDown);
+        dom.layers._rows = 0;
+      }
+      if (dom.layerOverlay) {
+        dom.layerOverlay.addEventListener("pointerdown", onLayerPlaceDown);
+        // a press on a layer is the layer, never a click on the video under it
+        dom.layerOverlay.addEventListener("click", function (e) { if (e.target.closest(".lay-item")) e.stopPropagation(); });
+      }
       dom.lanes.hidden = true;
       dom.lanes.addEventListener("pointerdown", onDown);
       dom.lanes.addEventListener("contextmenu", onContext);
@@ -3598,7 +5190,176 @@
 
     buildDom();
 
+    // what the tools panel of the editor works the subtitles and the audio through
+    var subsApi = {
+      list: function () { return clone(st.subs); },
+      rows: function () { return st.subRows.map(function (r) { return { id: r.id, title: rowTitle(r), auto: r.auto, style: clone(r.style), count: rowCues(r.id).length }; }); },
+      rowOf: function (id) { var cue = findSub(id); return cue ? cue.row : ""; },
+      fonts: function () { return SUB_FONTS.slice(); },
+      ranges: function () { return clone(SUB_RANGES); },
+      defaultStyle: function () { return defaultRowStyle(); },
+      selected: function () { return findSub(st.selected) ? st.selected : ""; },
+      picked: function () { return pickedSubs(); },
+      // an empty id lets go of the selected subtitle and leaves any other selection alone
+      select: function (id) {
+        if (findSub(id)) select(id);
+        else if (!id && findSub(st.selected)) select("");
+      },
+      now: function () { return nowT(); },
+      seek: function (t) { seekT(clamp(t, 0, D())); },
+      bounds: function () { return videoEdited() ? windowT() : boundsT(); },
+      duration: function () { return D(); },
+      // a new cue at the playhead in a row of its own, as long as there is room for it, and selected
+      add: function (text) {
+        var at = clamp(nowT(), 0, Math.max(0, D() - SUB_MIN));
+        var end = Math.min(D(), at + 2);
+        if (end - at < SUB_MIN) return "";
+        var row = { id: newId("R"), auto: false, title: "", style: defaultRowStyle() };
+        st.subRows.push(row);
+        var cue = { id: newId("C"), row: row.id, at: r3(at), end: r3(end), text: String(text || "").slice(0, SUB_TEXT_MAX) };
+        st.subs.push(cue);
+        sortSubs();
+        st.selected = cue.id;
+        commit();
+        subsChanged();
+        paintSelection();
+        return cue.id;
+      },
+      // a change of text while typing is one step of the history once typing stops; the caller says when with checkpoint
+      setText: function (id, text) {
+        var cue = findSub(id);
+        if (!cue) return;
+        cue.text = String(text || "").slice(0, SUB_TEXT_MAX);
+        // fixing a word keeps the timing, adding or taking one away leaves nothing to line the words up with
+        if (cue.words && !wordsFit(cue)) delete cue.words;
+        subsChanged();
+      },
+      setTimes: function (id, at, end) {
+        var cue = findSub(id);
+        if (!cue || !isFinite(at) || !isFinite(end)) return;
+        at = clamp(at, 0, D());
+        end = clamp(end, at + SUB_MIN, D());
+        if (cue.words && Math.abs((end - at) - (cue.end - cue.at)) < 0.001) cue.words = shiftWords(cue.words, r3(at) - cue.at);
+        cue.at = r3(at);
+        cue.end = r3(end);
+        sortSubs();
+        commit();
+        subsChanged();
+      },
+      remove: function (id) {
+        var cue = findSub(id);
+        if (!cue) return;
+        st.subs.splice(st.subs.indexOf(cue), 1);
+        if (st.selected === id) st.selected = "";
+        dropEmptyRows();
+        commit();
+        subsChanged();
+        paintSelection();
+      },
+      // cues made from the words of the speech engine, in seconds of the timeline, as a new row named after what was listened to; the rows already there stay, and undo takes the new one back in one step
+      addRow: function (title, cues) {
+        var row = { id: newId("R"), auto: true, title: String(title || "Subtitles").slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
+        var made = cleanSubs(cues.map(function (c) { return { id: newId("C"), row: row.id, at: c.at, end: c.end, text: c.text, words: c.words }; }), [row]);
+        if (!made.length) return "";
+        st.subRows.push(row);
+        st.subs = st.subs.concat(made);
+        sortSubs();
+        commit();
+        subsChanged();
+        return row.id;
+      },
+      clear: function () {
+        if (!st.subs.length) return;
+        st.subs = [];
+        st.subRows = [];
+        if (/^C\d+$/.test(st.selected)) st.selected = "";
+        commit();
+        subsChanged();
+      },
+      // a style change of a row shows at once; a slider being dragged says false and the history waits for checkpoint
+      setRowStyle: function (rowId, patch, record) {
+        var row = findRow(rowId);
+        if (!row) return;
+        row.style = cleanRowStyle(Object.assign({}, row.style, patch || {}));
+        if (record !== false) commit();
+        subsChanged();
+      },
+      // every cue of a row, picked, with the one already selected kept as the one shown
+      pickRow: function (rowId) {
+        if (!findRow(rowId)) return;
+        pickSubs(rowCues(rowId).map(function (c) { return c.id; }), st.selected);
+      },
+      mergeNext: function (id) { var cue = findSub(id); if (cue) mergeNext(cue); },
+      hasNext: function (id) { var cue = findSub(id); return !!(cue && nextInRow(cue)); },
+      mergeRows: function (fromId, intoId) { mergeRows(fromId, intoId); },
+      removeRow: function (rowId) { removeRow(rowId); },
+      // the clip track of the audio piece that is selected, which the speech engine can be pointed at; null when nothing of the clip itself is selected
+      selectedTrack: function () {
+        var hit = selected();
+        if (!hit || !hit.seg.parts.length) return null;
+        var src = hit.seg.parts[0].src;
+        var track = st.tracks.find(function (t) { return t.index === src; });
+        return track && !track.importId ? track.index : null;
+      },
+      checkpoint: function () { commit(); },
+      sourceToTimeline: function (srcT) { return sourceToTimeline(srcT); },
+      // the audio tracks of the clip itself (not the files brought in), which the speech engine can listen to
+      sourceTracks: function () { return st.tracks.filter(function (t) { return !t.importId; }).map(function (t) { return { index: t.index, label: t.label }; }); },
+      // the part of the source video the saved copy shows, in seconds of the video, which is what the speech engine listens to
+      sourceRange: function () {
+        if (videoEdited()) {
+          var a = Infinity, b = 0;
+          st.vsegs.forEach(function (v) { if (!v.ref) { a = Math.min(a, v.srcStart); b = Math.max(b, v.srcEnd); } });
+          return { start: a === Infinity ? 0 : a, end: b };
+        }
+        var bb = opts.getBounds();
+        return { start: bb.start, end: bb.end };
+      },
+    };
+
     return {
+      subtitles: subsApi,
+      subtitlePlan: subtitlePlan,
+      // the look of the video, which the tabs on the right set; a slider being dragged says false and the history waits for checkpoint
+      // the look of what is selected: a clip row has its own, everything else is the look of the video
+      fx: {
+        get: function () { var row = fxRow(); return clone(row ? row.fx || RKEditorFx.defaultFx() : st.fx); },
+        set: function (next, record) {
+          var row = fxRow();
+          if (row) { row.fx = RKEditorFx.cleanFx(next); paintLayers(); }
+          else st.fx = RKEditorFx.cleanFx(next);
+          if (opts.onFx) opts.onFx();
+          if (record !== false) commit();
+        },
+        // the look of the video itself, which its preview shows whatever is selected
+        main: function () { return clone(st.fx); },
+        // the element whose frames the tiles show: the clip row that is selected, else the video
+        picture: function () { var row = fxRow(); return row && layerViews[row.id] ? layerViews[row.id].media : null; },
+        checkpoint: function () { commit(); },
+      },
+      lookPlan: lookPlan,
+      layerPlan: layerPlan,
+      // a layer put at the playhead and selected: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
+      addLayer: function (l) { return addLayer(l); },
+      clearSelection: function () { select(""); },
+      refreshProps: function () { renderProps(); },
+      importAudio: function () { if (st.ready && !st.picking) pickAudio(); },
+      // whether audio can be added right now, and what the audio tab says when it cannot
+      importState: function () { return { ready: st.ready, picking: st.picking, importing: st.importing, tip: IMPORT_TIP }; },
+      // an import the helper already made (a voiceover), placed as a row of its own starting at the time of the timeline given
+      placeImportAt: function (id, at, link) {
+        if (!st.ready) return Promise.resolve(false);
+        var mine = seq;
+        st.importing += 1;
+        setBusy();
+        return waitImport(id, mine)
+          .then(function (info) { return info ? placeImport(info, at, mine, link) : false; })
+          .catch(function (err) { importNote((err && err.message) || "The recording could not be added"); return false; })
+          .then(function (placed) {
+            if (mine === seq) { st.importing = Math.max(0, st.importing - 1); setBusy(); }
+            return placed;
+          });
+      },
       load: load,
       unload: function () { seq += 1; unloadState(); },
       plan: plan,
@@ -3648,8 +5409,8 @@
       applyMaster: applyMaster,
       setOff: function (off) { eng.off = !!off; dom.lanes.classList.toggle("is-off", !!off); dom.props.classList.toggle("is-off", !!off); tick(true); },
       resetZoom: function () { st.zoom = 1; applyZoomWidth(); dom.frame.scrollLeft = 0; },
-      onPlayState: function () { refreshToolbar(); tick(true); },
-      onSeek: function () { tick(true); refreshToolbar(); },
+      onPlayState: function () { refreshToolbar(); tick(true); paintLayers(); },
+      onSeek: function () { tick(true); refreshToolbar(); paintLayers(); },
     };
   }
 

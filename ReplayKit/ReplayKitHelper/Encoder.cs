@@ -73,11 +73,12 @@ namespace ReplayKitHelper
             ["smaller_files"] = new AmfEffort { Preset = "quality", Bf = 3 },
         };
 
+        // quick sync speaks in target usages, TU1 the slowest and best to TU7 the fastest
         private static readonly Dictionary<string, string> QsvEffortTable = new Dictionary<string, string>
         {
-            ["lower_gpu"] = "veryfast",
-            ["balanced"] = "balanced",
-            ["smaller_files"] = "slower",
+            ["lower_gpu"] = "TU7",
+            ["balanced"] = "TU4",
+            ["smaller_files"] = "TU2",
         };
 
         private static readonly Dictionary<string, string> X264EffortTable = new Dictionary<string, string>
@@ -267,7 +268,8 @@ namespace ReplayKitHelper
             {
                 ["h264"] = new Candidate
                 {
-                    ObsEncoderId = "h264_amf",
+                    // the ids obs registers for its amd encoders (obs-ffmpeg texture-amf); a name obs does not know makes recording fail to start
+                    ObsEncoderId = "h264_texture_amf",
                     Codec = "h264",
                     Backend = "amf",
                     Label = "AMF H.264",
@@ -279,7 +281,7 @@ namespace ReplayKitHelper
             {
                 av["h265"] = new Candidate
                 {
-                    ObsEncoderId = "h265_amf",
+                    ObsEncoderId = "h265_texture_amf",
                     Codec = "h265",
                     Backend = "amf",
                     Label = $"AMF HEVC ({genStr.ToUpperInvariant()})",
@@ -297,7 +299,8 @@ namespace ReplayKitHelper
             {
                 ["h264"] = new Candidate
                 {
-                    ObsEncoderId = "obs_qsv11_h264",
+                    // the h.264 quick sync encoder of obs is registered as obs_qsv11_v2
+                    ObsEncoderId = "obs_qsv11_v2",
                     Codec = "h264",
                     Backend = "qsv",
                     Label = "Quick Sync H.264",

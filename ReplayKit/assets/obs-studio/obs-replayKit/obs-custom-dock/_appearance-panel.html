@@ -27,59 +27,8 @@
     height:32px;
     min-width:0;
   }
-  .volume-slider-wrap::before {
-    content:"";
-    position:absolute;
-    z-index:0;
-    left:0;
-    right:0;
-    top:50%;
-    height:16px;
-    transform:translateY(-50%);
-    background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
-    background-repeat:no-repeat;
-    background-size:100% 16px;
-    background-position:center;
-    pointer-events:none;
-  }
-  .volume-slider {
-    position:relative;
-    z-index:1;
-    width:100%;
-    height:32px;
-    margin:0;
-    appearance:none;
-    -webkit-appearance:none;
-    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
-    background-repeat:no-repeat;
-    background-size:100% 4px;
-    background-position:center;
-    border:0;
-    outline:none;
-  }
-  .volume-slider::-webkit-slider-runnable-track {
-    height:32px;
-    background:transparent;
-    border:0;
-  }
-  .volume-slider::-webkit-slider-thumb {
-    appearance:none;
-    -webkit-appearance:none;
-    width:21px;
-    height:10px;
-    border:0;
-    border-radius:5px;
-    background:var(--text);
-    margin-top:11px;
-    box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25);
-    cursor:pointer;
-  }
-  .volume-slider:focus-visible::-webkit-slider-thumb {
-    box-shadow:0 0 0 2px var(--selected2);
-  }
+  /* the look of the slider is the shared one of the slider partial */
+  .volume-slider { position:relative; z-index:1; width:100%; height:32px; }
   .color-control {
     width:100%;
     display:grid;
@@ -221,11 +170,11 @@
                   <div class="gradient-preview" id="themeGradientPreview"></div>
                 </div>
                 <div id="themeGradientLinearControls">
-                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
+                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider rk-range" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
                 </div>
                 <div id="themeGradientRadialControls" hidden>
-                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
-                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
+                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider rk-range" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
+                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider rk-range" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
                 </div>
                 <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops"></div>
                 <div class="grad-ramp-foot">

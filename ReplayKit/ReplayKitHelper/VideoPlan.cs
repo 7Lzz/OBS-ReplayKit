@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
 {
-    // the video edits of the clip editor: the pieces of the source video that make up the saved clip, each put on the timeline of the saved clip, and the part of that timeline the saved clip is. what lies between the pieces, or past either end of them, is black. the places on the timeline are seconds of the saved clip, the source timeline divided by the speed of the video; the cuts of the pieces are seconds of the source
+    // the video edits of the clip editor: the pieces of the source video, or of other clips of the folder, that make up the saved clip, each put on the timeline of the saved clip, and the part of that timeline the saved clip is. what lies between the pieces, or past either end of them, is black. the places on the timeline are seconds of the saved clip, the source timeline divided by the speed of the video; the cuts of the pieces are seconds of their own clip
     internal sealed class VideoPlan
     {
         internal sealed class Piece
@@ -14,6 +14,8 @@ namespace ReplayKitHelper
             public double At;
             public double SrcStart;
             public double SrcEnd;
+            // the file of another clip the piece is cut from; null for the source
+            public string Path;
 
             // how long the piece is on the timeline, which the speed changes
             public double Length(double speed) => (SrcEnd - SrcStart) / speed;
@@ -29,8 +31,11 @@ namespace ReplayKitHelper
         }
 
         private const int MaxPieces = 64;
+        private const int MaxOtherClips = 8;
 
         public List<Piece> Pieces = new List<Piece>();
+        // the other clips the pieces are cut from, each read once, in the order they are first used
+        public List<string> OtherClips = new List<string>();
         // the part of the timeline that is the saved clip
         public double Start;
         public double End;
@@ -57,6 +62,7 @@ namespace ReplayKitHelper
                 End = window.Value<double?>("end") ?? double.NaN,
             };
             if (!Finite(plan.Start) || !Finite(plan.End) || plan.Start < -86400 || plan.End > 86400 || plan.End - plan.Start < 0.5) { error = "Bad video edit"; return null; }
+            var durations = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             foreach (var token in pieces)
             {
                 var po = token as JObject;
@@ -66,9 +72,26 @@ namespace ReplayKitHelper
                     SrcStart = po?.Value<double?>("srcStart") ?? double.NaN,
                     SrcEnd = po?.Value<double?>("srcEnd") ?? double.NaN,
                 };
+                double length = sourceDuration;
+                var refToken = po?["ref"];
+                if (refToken != null)
+                {
+                    var clip = refToken.Type == JTokenType.String ? Clips.GetSafeClipPath(refToken.Value<string>()) : null;
+                    if (clip == null || !System.IO.File.Exists(clip.Full)) { error = "A clip added to the video in the editor is no longer in the clip folder."; return null; }
+                    if (!durations.TryGetValue(clip.Full, out length))
+                    {
+                        if (plan.OtherClips.Count >= MaxOtherClips) { error = "The video can take pieces of " + MaxOtherClips + " other clips at most."; return null; }
+                        var info = Trim.ProbeVideo(clip.Full);
+                        if (info == null) { error = "The video of a clip added in the editor could not be read."; return null; }
+                        length = info.Duration;
+                        durations[clip.Full] = length;
+                        plan.OtherClips.Add(clip.Full);
+                    }
+                    piece.Path = clip.Full;
+                }
                 bool valid = po != null && Finite(piece.At) && Finite(piece.SrcStart) && Finite(piece.SrcEnd)
                     && piece.At >= -86400 && piece.At <= 86400
-                    && piece.SrcStart >= 0 && piece.SrcEnd - piece.SrcStart >= 0.01 && piece.SrcEnd <= sourceDuration + 0.1;
+                    && piece.SrcStart >= 0 && piece.SrcEnd - piece.SrcStart >= 0.01 && piece.SrcEnd <= length + 0.1;
                 if (!valid) { error = "Bad video edit"; return null; }
                 plan.Pieces.Add(piece);
             }
@@ -81,8 +104,8 @@ namespace ReplayKitHelper
             return plan;
         }
 
-        // the filter graph that puts the saved clip together from the source video: every piece is cut out of the source and the places no piece covers are black frames of the same size and rate, all joined one after the other. the pieces keep the order of the source, which is what keeps the decoder from having to hold frames back. reads the video of input inputIndex and ends in the label vout
-        public string BuildGraph(int inputIndex, double speed, SourceInfo info)
+        // the filter graph that puts the saved clip together: every piece is cut out of its clip and the places no piece covers are black frames of the same size and rate, all joined one after the other. the pieces of the source keep the order of the source, which is what keeps the decoder from having to hold frames back. a piece of another clip is fitted into the picture of the source with black bars where its shape differs, the way the editor shows it. reads the source from input inputIndex and the other clips from firstOther on, in the order of OtherClips, and ends in the label vout
+        public string BuildGraph(int inputIndex, int firstOther, double speed, SourceInfo info)
         {
             var chains = new List<string>();
             var labels = new List<string>();
@@ -107,7 +130,9 @@ namespace ReplayKitHelper
                 double srcA = piece.SrcStart + (a - pieceStart) * speed;
                 double srcB = piece.SrcStart + (b - pieceStart) * speed;
                 string label = "v" + labels.Count;
-                chains.Add("[" + inputIndex + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
+                int input = piece.Path == null ? inputIndex : firstOther + OtherClips.FindIndex(p => string.Equals(p, piece.Path, StringComparison.OrdinalIgnoreCase));
+                string fit = piece.Path == null ? "" : ",scale=" + info.Width + ":" + info.Height + ":force_original_aspect_ratio=decrease,pad=" + info.Width + ":" + info.Height + ":(ow-iw)/2:(oh-ih)/2:color=black";
+                chains.Add("[" + input + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + fit + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
                 cursor = b;
             }

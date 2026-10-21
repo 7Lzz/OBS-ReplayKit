@@ -4,6 +4,7 @@
 
 #include "core/main_window.hpp"
 #include "core/state.hpp"
+#include "core/theme.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
@@ -467,6 +468,16 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		// the whole window is client area: leaving the proposed rectangle as it came in and answering 0 is what removes the frame
 		*result = 0;
 		return true;
+	case WM_ERASEBKGND: {
+		// the area a resize uncovers is erased here before anything paints it, and qt answers this message without painting, which left that area white for a frame or two while the window grew; it gets the window colour instead
+		RECT rc;
+		GetClientRect(msg->hwnd, &rc);
+		HBRUSH brush = CreateSolidBrush(RGB(g_chromeBg.red(), g_chromeBg.green(), g_chromeBg.blue()));
+		FillRect(reinterpret_cast<HDC>(msg->wParam), &rc, brush);
+		DeleteObject(brush);
+		*result = 1;
+		return true;
+	}
 	case WM_NCHITTEST: {
 		QMainWindow *mw = ObsMainWindowQt();
 		if (!mw)

@@ -82,7 +82,7 @@ namespace ReplayKitHelper
             int qIdx = rawPath.IndexOf('?');
             string path = qIdx >= 0 ? rawPath.Substring(0, qIdx) : rawPath;
             // a file sent by the editor is far past what a body may hold in memory, so its route reads it off the wire itself and sets its own limit
-            bool upload = method == "POST" && path == AudioImports.UploadPath;
+            bool upload = method == "POST" && (path == AudioImports.UploadPath || path == MediaImports.UploadPath);
 
             string body = "";
             int bodyLen = 0;

@@ -376,7 +376,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             try
             {
-                string ffprobe = Compression.GetHelperCapabilities()?["ffprobe"]?.Value<string>();
+                string ffprobe = Compression.GetToolPaths()?["ffprobe"]?.Value<string>();
                 if (!string.IsNullOrEmpty(ffprobe)) return ffprobe;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }

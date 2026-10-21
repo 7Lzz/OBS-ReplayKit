@@ -324,6 +324,15 @@ if (Test-Path ""C:\IddSampleDriver"") {
                 { ok = false; log?.Invoke("warn: could not remove " + streamable + ": " + ex.Message); }
             }
 
+            // the speech engine and model of auto subtitles, fetched by the helper the first time they were used
+            string speech = Path.Combine(cacheDir, "speech");
+            if (Directory.Exists(speech))
+            {
+                try { Directory.Delete(speech, true); log?.Invoke("removed " + speech); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                { ok = false; log?.Invoke("warn: could not remove " + speech + ": " + ex.Message); }
+            }
+
             // the cached uninstaller -- usually the exe this process is running from, so it is locked; fall back to a session-manager delete-on-reboot, queued before the folder below so the folder is empty by the time that entry runs
             string exe = Config.REPLAYKIT_SETUP_EXE;
             string exeMeta = SetupCache.MetaPath(exe);

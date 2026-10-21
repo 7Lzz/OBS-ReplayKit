@@ -32,7 +32,7 @@ namespace ReplayKitHelper
         // probe the sources video bitrate in bits/sec. used by the precise trim branch to cap libx264s output so an already-compressed source cant inflate during re-encode (crf 14 alone faithfully reproduces blocking/banding from a low-bitrate input, costing more bits than the source carried -- the maxrate cap stops that). strategy: ask ffprobe for the v:0 streams bit_rate tag (cheapest, most mp4s from obs carry it). falls back to (filesize_bytes * 8) / duration_sec, knocking 10% off to ballpark the video portion (audio is typically a few hundred kbps of the total). returns 0 if both fail; callers should skip the cap in that case rather than guess.
         public static long GetVideoBitratePerSec(string path)
         {
-            var caps = Compression.GetHelperCapabilities();
+            var caps = Compression.GetToolPaths();
             string ffmpeg = caps["ffmpeg"]?.Value<string>() ?? "";
             string ffprobe = caps["ffprobe"]?.Value<string>() ?? "";
 
@@ -239,7 +239,7 @@ namespace ReplayKitHelper
                 {
                     if (Server.State.TrimKeyframeJobs.Count >= 2)
                         return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe scans are busy", RetryMs = 500 };
-                    string ffprobe = Compression.GetHelperCapabilities()["ffprobe"]?.Value<string>();
+                    string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
                         return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
                     job = StartTrimKeyframeWorkerLocked(source, ffprobe, jobKey, cacheSig);
@@ -333,7 +333,7 @@ namespace ReplayKitHelper
         // what ffprobe says about the video of a clip, which the black parts of a saved copy have to match; null when it cannot be read
         internal static VideoPlan.SourceInfo ProbeVideo(string path)
         {
-            string ffprobe = Compression.GetHelperCapabilities()["ffprobe"]?.Value<string>() ?? "";
+            string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>() ?? "";
             if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return null;
             try
             {
@@ -377,21 +377,30 @@ namespace ReplayKitHelper
         private static string SpeedFilter(double videoSpeed) => "setpts=(PTS-STARTPTS)/" + videoSpeed.ToString("0.######", CultureInfo.InvariantCulture);
 
         // the audio part of a trim command that has a plan: the audio is cut together by the filter graph from a second read of the source, which is not seeked, so the plan can use any time of the source; the video comes from the first read, and when it plays at another speed its filter is part of the same graph
-        private static void AddPlanArgs(List<string> argv, AudioPlan.Rendering rendering, double videoSpeed)
+        private static void AddPlanArgs(List<string> argv, AudioPlan.Rendering rendering, double videoSpeed, string videoTail)
         {
-            bool retimed = Math.Abs(videoSpeed - 1) > 1e-6;
+            string chain = VideoChain(videoSpeed, videoTail);
             if (rendering == null)
             {
                 argv.AddRange(new[] { "-map", "0:v:0" });
-                if (retimed) argv.AddRange(new[] { "-vf", SpeedFilter(videoSpeed) });
+                if (chain != null) argv.AddRange(new[] { "-vf", chain });
                 argv.Add("-an");
                 return;
             }
-            string graph = retimed ? "[0:v:0]" + SpeedFilter(videoSpeed) + "[vout];" + rendering.Graph : rendering.Graph;
-            argv.AddRange(new[] { "-filter_complex", graph, "-map", retimed ? "[vout]" : "0:v:0" });
+            string graph = chain != null ? "[0:v:0]" + chain + "[vout];" + rendering.Graph : rendering.Graph;
+            argv.AddRange(new[] { "-filter_complex", graph, "-map", chain != null ? "[vout]" : "0:v:0" });
             foreach (var map in rendering.Maps) argv.AddRange(new[] { "-map", map });
             argv.AddRange(new[] { "-c:a", "aac", "-b:a", "160k" });
             for (int k = 0; k < rendering.Names.Count; k++) argv.AddRange(new[] { "-metadata:s:a:" + k, "handler_name=" + rendering.Names[k] });
+        }
+
+        // the filters the video of a plain or planned save goes through: its speed first, then whatever is drawn over it; null when there are none
+        private static string VideoChain(double videoSpeed, string videoTail)
+        {
+            var parts = new List<string>();
+            if (Math.Abs(videoSpeed - 1) > 1e-6) parts.Add(SpeedFilter(videoSpeed));
+            if (videoTail != null) parts.Add(videoTail);
+            return parts.Count > 0 ? string.Join(",", parts) : null;
         }
 
         // the reads a command with a plan makes after the first read of the source: the source once more for its audio, unless the video graph reads it already or the clip has none, and then each file that was brought in from outside the clip
@@ -404,10 +413,22 @@ namespace ReplayKitHelper
         }
 
         // the parts of a trim command that has video pieces: the video and the audio are both put together by the filter graph from one read of the source, so a piece may start anywhere on the timeline, and nothing is written for a clip without audio
-        private static void AddComposedArgs(List<string> argv, string videoGraph, AudioPlan.Rendering rendering)
+        // what follows the video as it was put together, in this order: the look, the layers over it, then the subtitles over everything; null with [vout] as the label when there is nothing
+        private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, VideoPlan.SourceInfo info, string subtitles, out string label)
         {
+            var steps = new List<string>();
+            label = "[vout]";
+            if (look != null) { steps.Add(label + look + "[vlook]"); label = "[vlook]"; }
+            if (layers != null) { steps.Add(layers.Graph(firstLayerInput, label, "[vlayers]", info.Width, info.Height)); label = "[vlayers]"; }
+            if (subtitles != null) { steps.Add(label + subtitles + "[vfinal]"); label = "[vfinal]"; }
+            return steps.Count > 0 ? string.Join(";", steps) : null;
+        }
+
+        private static void AddComposedArgs(List<string> argv, string videoGraph, AudioPlan.Rendering rendering, string finish, string finalLabel)
+        {
+            if (finish != null) videoGraph += ";" + finish;
             string graph = rendering != null ? videoGraph + ";" + rendering.Graph : videoGraph;
-            argv.AddRange(new[] { "-filter_complex", graph, "-map", "[vout]" });
+            argv.AddRange(new[] { "-filter_complex", graph, "-map", finalLabel });
             if (rendering == null)
             {
                 argv.Add("-an");
@@ -419,7 +440,7 @@ namespace ReplayKitHelper
         }
 
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
-        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null)
+        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null)
         {
             // the editor offers a tenth of normal speed to five times normal
             if (double.IsNaN(videoSpeed) || double.IsInfinity(videoSpeed) || videoSpeed < 0.1 || videoSpeed > 5)
@@ -428,7 +449,14 @@ namespace ReplayKitHelper
             bool retimed = Math.Abs(videoSpeed - 1) > 1e-6;
             // video pieces with black between them are put together frame by frame as well
             bool composed = videoEdit != null;
-            if (retimed || composed) precise = true;
+            // subtitles are drawn into the frames, so they are made again as well
+            bool subtitled = subtitleEdit != null;
+            // and so is a look, which changes every pixel
+            bool looked = lookEdit != null;
+            // and so are layers, which only the graph that puts the video together lays on
+            bool layered = layerEdit != null;
+            if (layered && !composed) return new TrimResult { Ok = false, Message = "Layers need the video of the edit to be put together" };
+            if (retimed || composed || subtitled || looked || layered) precise = true;
             if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
                 return new TrimResult { Ok = false, Message = "Bad start/end" };
             if (startSec < 0) return new TrimResult { Ok = false, Message = "Start must be >= 0" };
@@ -448,7 +476,7 @@ namespace ReplayKitHelper
             var token = JobCoordinator.Token(requestId);
 
 
-            string ffmpeg = Compression.GetHelperCapabilities()["ffmpeg"]?.Value<string>();
+            string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "ffmpeg.exe not found in clip folder" };
 
             string ext = Path.GetExtension(source.Name);
@@ -532,6 +560,50 @@ namespace ReplayKitHelper
                 // the plan lives on the timeline of the saved clip, which is the source divided by the speed of the video
                 planned = plan.Build(windowStart, windowEnd, composed ? 0 : 1, Mp4Tracks.AudioSampleRates(source.Full), importInputs);
             }
+            // the subtitles live in seconds of the saved clip, and the filter sees the frames in the time of the path that made them: from 0 when the video is put together, retimed or read seeked, and in the time of the source on the plain cut, which seeks after reading (an input seek there would start the video a moment after the copied audio), so those cues move by the start of the cut; measured on rendered frames. an edit whose subtitles all fall outside the clip burns nothing
+            string subtitleDir = null;
+            string videoTail = null;
+            string subtitleFilter = null;
+            LayerPlan layerPlan = null;
+            if (layered)
+            {
+                layerPlan = LayerPlan.Parse(layerEdit, windowEnd - windowStart, out string layerError);
+                if (layerPlan == null) return new TrimResult { Ok = false, Message = layerError };
+            }
+            // the look goes on before the subtitles, which are drawn over the picture as it ends up
+            string lookFilter = null;
+            if (looked)
+            {
+                var lookPlan = VideoLook.Parse(lookEdit, out string lookError);
+                if (lookPlan == null) return new TrimResult { Ok = false, Message = lookError };
+                sourceInfo ??= ProbeVideo(source.Full);
+                if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                lookFilter = lookPlan.Filter(sourceInfo.Width, sourceInfo.Height);
+            }
+            if (subtitled)
+            {
+                var burn = SubtitleBurn.Parse(subtitleEdit, composed ? windowEnd - windowStart : duration / videoSpeed, out string subtitleError);
+                if (burn == null) return new TrimResult { Ok = false, Message = subtitleError };
+                if (burn.Count > 0)
+                {
+                    var size = sourceInfo ?? ProbeVideo(source.Full);
+                    subtitleDir = Path.Combine(Constants.SCRATCH_DIR, "subs-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(subtitleDir);
+                    double sourceTimed = !composed && !hasPlan && !retimed ? startSec : 0;
+                    // the folder is only cleaned by the finally further down, which a failed write never reaches
+                    try { burn.Write(subtitleDir, size?.Width ?? 0, size?.Height ?? 0, sourceTimed); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException)
+                    {
+                        try { Directory.Delete(subtitleDir, true); } catch (Exception cleanup) when (cleanup is IOException || cleanup is UnauthorizedAccessException) { Log.Write("Trim subtitles cleanup: " + cleanup.Message); }
+                        throw;
+                    }
+                    videoTail = burn.Filter;
+                    subtitleFilter = burn.Filter;
+                }
+            }
+            if (lookFilter != null) videoTail = videoTail != null ? lookFilter + "," + videoTail : lookFilter;
+            try
+            {
             // invariant-culture decimal formatting -- ffmpeg only accepts . as the decimal separator, never ,, regardless of system locale.
             string startStr = startSec.ToString("F3", CultureInfo.InvariantCulture);
             string durStr = duration.ToString("F3", CultureInfo.InvariantCulture);
@@ -539,6 +611,8 @@ namespace ReplayKitHelper
             string outDurStr = (composed ? windowEnd - windowStart : duration / videoSpeed).ToString("F3", CultureInfo.InvariantCulture);
             List<string> argv;
             EditEncoder encoder = null;
+            int firstLayerInput = 0;
+            int firstOtherInput = 0;
 
             if (precise)
             {
@@ -547,6 +621,14 @@ namespace ReplayKitHelper
                 {
                     argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full };
                     argv.AddRange(PlanReads(composed, audioCount, source.Full, importArgs));
+                    if (layerPlan != null)
+                    {
+                        firstLayerInput = argv.Count(a => a == "-i");
+                        argv.AddRange(layerPlan.Inputs());
+                    }
+                    // the other clips that pieces of the video come from, read once each
+                    firstOtherInput = argv.Count(a => a == "-i");
+                    foreach (string other in videoPlan.OtherClips) argv.AddRange(new[] { "-i", other });
                     argv.AddRange(new[] { "-t", outDurStr });
                 }
                 else if (hasPlan)
@@ -576,15 +658,16 @@ namespace ReplayKitHelper
                 }
                 if (composed)
                 {
-                    AddComposedArgs(argv, videoPlan.BuildGraph(0, videoSpeed, sourceInfo), planned);
+                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, sourceInfo, subtitleFilter, out string finalLabel), finalLabel);
                 }
                 else if (hasPlan)
                 {
-                    AddPlanArgs(argv, planned, videoSpeed);
+                    AddPlanArgs(argv, planned, videoSpeed, videoTail);
                 }
                 else
                 {
-                    if (retimed) argv.AddRange(new[] { "-vf", SpeedFilter(videoSpeed) });
+                    string chain = VideoChain(videoSpeed, videoTail);
+                    if (chain != null) argv.AddRange(new[] { "-vf", chain });
                     AddAudioArgs(argv, audioCount, removeAudio, videoSpeed);
                 }
                 argv.AddRange(new[] { "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", "-y", outPath });
@@ -595,7 +678,7 @@ namespace ReplayKitHelper
                 argv = new List<string> { "-hide_banner", "-loglevel", "error", "-ss", startStr, "-i", source.Full };
                 if (hasPlan) argv.AddRange(PlanReads(composed, audioCount, source.Full, importArgs));
                 argv.AddRange(new[] { "-t", durStr, "-c:v", "copy" });
-                if (hasPlan) AddPlanArgs(argv, planned, videoSpeed); else AddAudioArgs(argv, audioCount, removeAudio);
+                if (hasPlan) AddPlanArgs(argv, planned, videoSpeed, null); else AddAudioArgs(argv, audioCount, removeAudio);
                 argv.AddRange(new[] { "-avoid_negative_ts", "make_zero", "-y", outPath });
             }
 
@@ -615,7 +698,7 @@ namespace ReplayKitHelper
                     if (percent == lastPercent) return;
                     lastPercent = percent;
                     UploadState.SetUploadState(requestId: requestId, phase: "encoding", percent: percent);
-                }, token, 2 * 60 * 60 * 1000);
+                }, token, 2 * 60 * 60 * 1000, subtitleDir);
                 if (result.ExitCode != 0)
                 {
                     string combined = string.Join("\n", result.Output);
@@ -714,6 +797,14 @@ namespace ReplayKitHelper
                 EndSec = endSec,
                 DurationSec = composed ? windowEnd - windowStart : duration,
             };
+            }
+            finally
+            {
+                if (subtitleDir != null)
+                {
+                    try { Directory.Delete(subtitleDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Trim subtitles cleanup: " + ex.Message); }
+                }
+            }
         }
 
         // puts the clips file path onto the windows clipboard as CF_HDROP so it can be pasted as an actual file into discord / explorer / etc -- not the files bytes, the file reference (same thing ctrl+c on a file in explorer produces). the OLE call must run STA; connections are handled on MTA thread-pool threads now, so hop to a one-shot STA thread via StaRunner.

@@ -131,12 +131,6 @@ bool ShellCloseObsSettings()
 	return !g_obsSettingsDialog || g_obsSettingsDialog->isHidden();
 }
 
-// the views the shell browser holds; projector and obs settings are native windows of their own
-bool ShellIsPageView(ShellView view)
-{
-	return view == ShellView::Home || view == ShellView::Clips || view == ShellView::Settings || view == ShellView::Setup;
-}
-
 const char *ShellViewName(ShellView view)
 {
 	switch (view) {
@@ -271,6 +265,12 @@ void ShellCreateHost(QMainWindow *mw)
 }
 
 } // namespace
+
+// the views the shell browser holds; projector and obs settings are native windows of their own
+bool ShellIsPageView(ShellView view)
+{
+	return view == ShellView::Home || view == ShellView::Clips || view == ShellView::Settings || view == ShellView::Setup;
+}
 
 // the keyboard goes to the host window cef puts around its page, which is what makes cef take the focus for the page the way a click does; focus placed on a window below it did not give the keys to the page until a click. the page that shows is told to take it as well, since the focus of a frame is not the focus of the browser. only while the window itself is in front, so a menu or a dialog that belongs to it keeps the keyboard it has
 bool ShellFocusBrowser()
@@ -638,10 +638,11 @@ void ShellEnsureHost()
 	RunAsync([]() {
 		const bool cefReady = EnsureCefReadyBlocking();
 		bool helperUp = false;
-		for (int i = 0; cefReady && i < 120 && !helperUp; ++i) {
+		// a helper that is not listening yet refuses at once, so it is asked again soon; the pages come up the moment it answers
+		for (int i = 0; cefReady && i < 400 && !helperUp; ++i) {
 			helperUp = !HttpRequest("GET", "/version", 8767, nullptr, 800).empty();
 			if (!helperUp)
-				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+				std::this_thread::sleep_for(std::chrono::milliseconds(150));
 		}
 		QMetaObject::invokeMethod(
 			g_callbacks,

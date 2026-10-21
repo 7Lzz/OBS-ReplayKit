@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_grip.hpp"
 
+#include "core/main_window.hpp"
 #include "core/theme.hpp"
 #include "shell/shell_types.hpp"
 
@@ -45,6 +46,16 @@ void ShellGrip::paintEvent(QPaintEvent *)
 	for (int row = 0; row < 3; ++row)
 		for (int col = 0; col < 3 - row; ++col)
 			p.drawEllipse(QPointF(kShellGrip - 5.0 - col * 4.0, kShellGrip - 5.0 - row * 4.0), 1.15, 1.15);
+}
+
+void ShellStartEdgeResize(Qt::Edges edges)
+{
+	QMainWindow *mw = ObsMainWindowQt();
+	if (!mw || mw->isMaximized() || mw->isFullScreen() || !mw->windowHandle())
+		return;
+	if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
+		return;
+	mw->windowHandle()->startSystemResize(edges);
 }
 
 QPolygon ShellCornerEar()

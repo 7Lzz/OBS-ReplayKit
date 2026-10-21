@@ -933,6 +933,22 @@ namespace ReplayKitHelper
             _resizeBackgroundPrimed = true;
         }
 
+        // whether the main window of obs can be resized from the edges of the pages of the clean shell: not when maximized or covering its whole monitor in fullscreen. the plugin hands over the window over the pipe
+        public static bool ObsMainResizable()
+        {
+            long hwndVal;
+            lock (Server.State.IpcLock) hwndVal = Server.State.ObsMainWindowHwnd;
+            if (hwndVal == 0) return false;
+            var hWnd = new IntPtr(hwndVal);
+            if (!IsWindow(hWnd) || IsZoomed(hWnd) || !GetWindowRect(hWnd, out RECT rect)) return false;
+            // a window that covers its whole monitor is in fullscreen, which the edges must not undo
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            var monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return false;
+            if (rect.Left <= info.rcMonitor.Left && rect.Top <= info.rcMonitor.Top && rect.Right >= info.rcMonitor.Right && rect.Bottom >= info.rcMonitor.Bottom) return false;
+            return true;
+        }
+
         // spawns a background thread that polls GetAsyncKeyState(VK_LBUTTON) every 15ms (~66fps) and live-setwindowposs while the button stays down, clamped to [min,max] (logical pixels, scaled by the window dpi first); the corner tracks the cursor at the offset it was grabbed at, so the drag is relative and the window never jumps. deliberately not message-based (WM_NCLBUTTONDOWN) -- that was tried and found unreliable due to cross-process timing races.
         public static bool BeginResizeWindow(string needle, int minW, int minH, int maxW, int maxH)
         {

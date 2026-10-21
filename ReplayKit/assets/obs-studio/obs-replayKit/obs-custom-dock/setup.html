@@ -151,10 +151,12 @@
     min-height:28px; display:flex; align-items:center; padding:0 10px; border-radius:3px;
     color:var(--text); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .combo-option:hover,.combo-option.is-selected { background:var(--selected); color:var(--on-accent); }
-  .combo-option.is-selected { outline:1px solid rgba(var(--on-accent-rgb),.55); outline-offset:-1px; }
+  /* the same look as the sort menu of the clips page: a hovered row gets the plain hover grey, the chosen one a light accent wash and a check, so the two never read as the same thing */
+  .combo-option:hover { background:var(--button_bg_hover); }
+  .combo-option.is-selected { position:relative; padding-right:30px; background:rgba(var(--accent-rgb),.22); }
+  .combo-option.is-selected:hover { background:rgba(var(--accent-rgb),.3); }
+  .combo-option.is-selected::after { content:""; position:absolute; right:13px; top:50%; width:4px; height:8px; margin-top:-6px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
   .combo-option .option-blurb { color:var(--muted); margin-left:4px; overflow:hidden; text-overflow:ellipsis; }
-  .combo-option.is-selected .option-blurb { color:var(--on-accent); opacity:.82; }
 
   /* the switch and the rows it sits in come from the shared _switch partial */
   .check-row { min-height:34px; max-width:440px; display:flex; align-items:center; gap:8px; color:var(--text); padding:6px 12px; }
@@ -239,6 +241,7 @@
 <!--#include scrollbar-->
 <!--#include interaction-states-->
 <!--#include switch-->
+<!--#include slider-->
 <!--#include window-state-->
 </head>
 <body>

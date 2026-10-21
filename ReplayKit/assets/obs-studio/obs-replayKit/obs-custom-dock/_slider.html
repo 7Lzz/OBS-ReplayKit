@@ -1,0 +1,46 @@
+<!-- shared partial (helper #include target: slider). the slider every ReplayKit page uses, the editor and Settings alike: an input with .rk-range gets a 4px track filled with the accent up to --fill (the page sets it as a percent) and a round white handle. while it is dragged a tail trails behind the handle on the side it is moving away from, and draws back into it once the value stops changing. the track takes the theme colours; a page lays the input out itself (width, height, position) -->
+<style>
+  .rk-range { appearance:none; -webkit-appearance:none; margin:0; background:transparent; border:0; outline:none; cursor:pointer; }
+  .rk-range::-webkit-slider-runnable-track { height:4px; border:0; border-radius:2px; background:linear-gradient(to right, var(--selected2) var(--fill, 0%), var(--line2) var(--fill, 0%)); }
+  /* the shadows after the first are the tail: five shrinking, fading and softened copies of the ball laid behind it while it is dragged, so it reads like a meteor, and the ball itself squashes a little and tapers into it; at rest they sit inside the ball at nothing, the same count so the change animates */
+  .rk-range::-webkit-slider-thumb {
+    appearance:none;
+    -webkit-appearance:none;
+    box-sizing:border-box;
+    width:18px;
+    height:18px;
+    margin-top:-7px;
+    border-radius:50%;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,.3), 0 0 0 -9px rgba(255,255,255,0), 0 0 0 -9px rgba(255,255,255,0), 0 0 0 -9px rgba(255,255,255,0), 0 0 0 -9px rgba(255,255,255,0), 0 0 0 -9px rgba(255,255,255,0);
+    cursor:pointer;
+    transition:transform 300ms cubic-bezier(.34,1.45,.5,1), border-radius 300ms cubic-bezier(.34,1.45,.5,1), box-shadow 260ms ease-out;
+  }
+  .rk-range:not(:disabled):hover::-webkit-slider-thumb { transform:scale(1.08); }
+  .rk-range[data-drag][data-dir="r"]:not(:disabled)::-webkit-slider-thumb { box-shadow:0 1px 3px rgba(0,0,0,.3), -4px 0 2px -1.5px rgba(255,255,255,0.55), -8px 0 2px -3px rgba(255,255,255,0.4), -12px 0 2px -4.5px rgba(255,255,255,0.27), -16px 0 2px -6px rgba(255,255,255,0.16), -20px 0 2px -7.5px rgba(255,255,255,0.07); transition:transform 160ms ease-out, border-radius 160ms ease-out, box-shadow 90ms ease-out; transform:translateX(-1px) scale(1.12, .92); border-radius:64% 36% 36% 64% / 50%; }
+  .rk-range[data-drag][data-dir="l"]:not(:disabled)::-webkit-slider-thumb { box-shadow:0 1px 3px rgba(0,0,0,.3), 4px 0 2px -1.5px rgba(255,255,255,0.55), 8px 0 2px -3px rgba(255,255,255,0.4), 12px 0 2px -4.5px rgba(255,255,255,0.27), 16px 0 2px -6px rgba(255,255,255,0.16), 20px 0 2px -7.5px rgba(255,255,255,0.07); transition:transform 160ms ease-out, border-radius 160ms ease-out, box-shadow 90ms ease-out; transform:translateX(1px) scale(1.12, .92); border-radius:36% 64% 64% 36% / 50%; }
+  .rk-range:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
+  .rk-range:disabled { cursor:default; }
+</style>
+<script>
+(function () {
+  if (window.RKSlider) return;
+  var last = new WeakMap();
+  function isRange(el) { return !!(el && el.classList && el.classList.contains("rk-range")); }
+  document.addEventListener("pointerdown", function (e) { if (isRange(e.target)) last.set(e.target, Number(e.target.value)); }, true);
+  // only a change made by the hand counts, so a reset or a value the page puts back does not make the handle jump
+  document.addEventListener("input", function (e) {
+    var r = e.target;
+    if (!isRange(r) || !e.isTrusted) return;
+    var v = Number(r.value);
+    var was = last.has(r) ? last.get(r) : v;
+    last.set(r, v);
+    if (v === was) return;
+    r.dataset.dir = v > was ? "r" : "l";
+    r.dataset.drag = "";
+    clearTimeout(r._rkSettle);
+    r._rkSettle = setTimeout(function () { delete r.dataset.drag; }, 140);
+  }, true);
+  window.RKSlider = true;
+})();
+</script>

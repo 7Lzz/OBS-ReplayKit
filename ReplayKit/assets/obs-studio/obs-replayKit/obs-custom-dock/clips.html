@@ -328,7 +328,7 @@
     border: 1px solid var(--primary_light);
     border-radius: 6px;
     background: var(--primary);
-    color: var(--white1);
+    color: var(--on-accent);
     font: inherit;
     font-size: 12px;
     cursor: pointer;
@@ -485,8 +485,10 @@
   }
   /* the room of the scrollbar is kept whether or not the list is tall enough for one, so the cards stand at the same width on every tab and nothing resizes when a list that fits replaces one that does not */
   html:not(.rk-home) .scroll-area { scrollbar-gutter: stable; }
-  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it */
-  html.rk-embedded .scroll-area { --sb-end: 26px; }
+  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it; the page reaches that edge, so the scroller stops short of it and its scrollbar keeps off the edge */
+  html.rk-embedded .scroll-area { --sb-end: 26px; margin-right: 6px; }
+  /* the scrollbars of the timeline end before the resize corner too: they sit in the margin the timeline keeps along its right and bottom, which reaches the edge of the window */
+  html.rk-embedded .tl-area { margin: 0 -6px -6px 0; }
   /* while a clip is fullscreened, OBS CEF still wants to repaint the grid behind the fullscreen top layer when the host window maximizes/restores. keep non-active UI invisible until the transition settles so leaving fullscreen does not spend seconds repainting dozens of hidden cards. */
   body.is-clip-fullscreen .tabs,
   body.is-clip-fullscreen .section-heading,
@@ -2099,10 +2101,17 @@
   /* width fills as much of the clips window (850-2400px, per the resize bounds in 71_routes.ps1) as it can without letting the 16:9 video wrap push the modal taller than the window -- bounded by whichever of window width or the height-derived-from-16:9 is tighter. floor matches the old fixed width so the window minimum looks unchanged. */
   /* the editor is a page of its own inside the clips view: a top bar, the video with a side panel, and the timeline along the bottom, covering the whole view until cancel hands the clips back */
   #trim-veil {
-    background: var(--grey6);
+    --ed-panel: color-mix(in srgb, var(--grey6) 45%, var(--grey7));
+    background: var(--grey7);
     align-items: stretch;
     justify-content: stretch;
+    -webkit-user-select: none;
+    user-select: none;
   }
+  /* nothing of the editor highlights on a drag, apart from what is typed */
+  #trim-veil input, #trim-veil textarea { -webkit-user-select: text; user-select: text; }
+  /* the wide buttons of the editor grow and give only a little, a full-width button that scales like a small one jumps */
+  #trim-veil .editor-top .btn, .ed-tools .btn:not(.tl-mini), .ed-sub-edit .btn:not(.tl-mini), .ed-fx-card .btn { --hover_grow: 1.01; --press_shrink: .99; }
   /* the layout is there, unseen, while the clip loads, so the timeline is built at the size it will be shown at */
   #trim-veil.is-measuring { display: flex; visibility: hidden; }
   #trim-veil.is-open .modal { animation: none; }
@@ -2116,7 +2125,7 @@
     border: 0;
     border-radius: 0;
     box-shadow: none;
-    background: var(--grey6);
+    background: var(--grey7);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     overflow: hidden;
@@ -2137,41 +2146,60 @@
   .trim-modal .editor-top .trim-heading { margin: 0; justify-content: flex-start; }
   .trim-modal .editor-top .clip-name { margin: 2px 0 0; }
   .editor-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+  /* the tools on the left and the panel on the right stand against the edges of the window, square, the panels a half step lighter than the page and running into the toolbar of the timeline under them, with a hairline toward the video, like the bar over them; the timeline below needs no line, its drag handle sets it apart */
   .editor-body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(260px, 26vw, 340px);
-    gap: 16px;
-    padding: 14px 16px 0;
+    grid-template-columns: auto minmax(0, 1fr) clamp(260px, 26vw, 340px) auto;
     min-height: 0;
   }
-  .editor-stage { min-width: 0; min-height: 0; display: flex; }
-  .editor-stage .trim-video-wrap { flex: 1 1 auto; aspect-ratio: auto; border-radius: 8px; }
+  .editor-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
+  .editor-stage .trim-video-wrap { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; border-radius: 4px; }
+  /* the preview is only the picture while editing: its controls live in the toolbar, and they come back over the video in fullscreen */
+  #trim-veil .trim-video-wrap:not(:fullscreen) .player-shade,
+  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-preview-controls,
+  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-seek-overlay { display: none; }
+  .tl-toolbar .trim-volume-control { position: static; opacity: 1; }
+  /* the volume in the toolbar is always open, its slider showing */
+  .tl-toolbar .volume-control { width: 124px; background: transparent; }
+  .tl-toolbar .volume-control:hover { width: 124px; background: rgba(var(--text-rgb), .08); }
+  .tl-toolbar .volume-slider-wrap { opacity: 1; }
+  .tl-toolbar .volume-btn { color: var(--text); }
+  .tl-toolbar .icon-btn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
+  .tl-toolbar .icon-btn:hover { background: rgba(var(--text-rgb), .08); }
+  .tl-toolbar .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
   .editor-side {
     min-width: 0;
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    scrollbar-width: none;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+    padding: 4px 14px 14px;
+    background: var(--ed-panel);
+    border-left: 1px solid var(--grey4-solid, var(--grey4));
   }
-  /* a card of the side panel is a box of the settings: a step lighter than the page, no outline, a bold title, and a hairline between the groups of rows */
-  .editor-card {
-    padding: 0 14px 6px;
-    border: 0;
-    border-radius: 6px;
-    background: rgba(var(--text-rgb), .045);
-  }
+  .editor-side::-webkit-scrollbar { display: none; }
+  /* the panel slides out to the right when what was selected is let go, the way the tools panel slides out to the left, holding a still copy of the card that went for the length of the slide */
+  #trim-veil .editor-side.is-closing { animation: ed-side-out 140ms ease-in both; pointer-events: none; }
+  #trim-veil .editor-side > .editor-card.ed-side-ghost { animation: none; }
+  @keyframes ed-side-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(10px); } }
+  /* the right panel is only there while something is selected, and the video takes its room otherwise; the bar of its tabs stays */
+  .editor-body:not(:has(.editor-side > :not([hidden]))) { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .editor-side:not(:has(> :not([hidden]))) { display: none; }
+  .editor-card { flex: 0 0 auto; padding: 0; border: 0; background: transparent; }
   .editor-card-title { display: flex; align-items: center; height: 38px; font-size: 13px; font-weight: 700; color: var(--text); margin: 0; }
   .editor-card .trim-mode-row { margin: 0; border-top: 1px solid var(--hairline); }
   .editor-card .editor-card-title + .trim-mode-row { border-top: 0; }
   .editor-side .trim-tracks { margin: 0; }
   @media (max-width: 640px) {
     .editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+    .ed-left, .ed-rail-r { display: none; }
     .editor-side { max-height: 34vh; }
   }
   /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
-  #trim-processing-veil { background: var(--grey6); }
+  #trim-processing-veil { background: var(--grey7); }
   .trim-processing-modal {
     background: transparent;
     border: 0;
@@ -2825,11 +2853,14 @@
   <!--#include scrollbar-->
   <!--#include interaction-states-->
   <!--#include switch-->
+  <!--#include slider-->
 <!--#include tooltip-->
 <!--#include hotkey-keys-->
 <!--#include theme-preview-->
   <!--#include clip-player-->
+  <!--#include editor-fx-->
   <!--#include editor-lanes-->
+  <!--#include editor-tools-->
   <!--#include window-state-->
   <!--#include video-fx-->
 </head>
@@ -2917,11 +2948,14 @@
         </div>
       </header>
       <div class="editor-body">
+        <div class="ed-left" id="ed-left"></div>
         <div class="editor-stage">
         <div class="trim-video-wrap preview">
           <video id="trim-video" preload="metadata" playsinline
                  controlsList="nodownload noplaybackrate noremoteplayback"
                  disablePictureInPicture></video>
+          <div class="lay-overlay" id="trim-layer-overlay" hidden aria-hidden="true"></div>
+          <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true"></div>
           <div class="player-shade"></div>
           <div class="preview-controls trim-preview-controls">
             <div class="controls-left">
@@ -2954,7 +2988,7 @@
         </div>
         <aside class="editor-side">
           <section class="editor-card tl-props" id="tl-props" hidden></section>
-          <section class="editor-card">
+          <section class="editor-card" hidden>
             <div class="editor-card-title">Options</div>
           <div class="trim-mode-row">
             <input type="checkbox" class="rk-switch" id="trim-precise" aria-label="Frame-accurate cut">
@@ -2967,9 +3001,11 @@
           </div>
           </section>
         </aside>
+        <nav class="ed-rail ed-rail-r" id="ed-right-rail" aria-label="Selection"></nav>
       </div>
       <div class="editor-bottom" id="editor-bottom">
         <div class="tl-resizer" id="tl-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline"></div>
+        <div class="tl-card">
         <div class="tl-toolbar" id="tl-toolbar"></div>
         <div class="tl-area">
          <div class="tl-holder">
@@ -2983,6 +3019,8 @@
              </div>
              <div class="tl-tracks" id="tl-tracks">
               <div class="trim-scrubber tl-scrub-gap" id="trim-scrubber-gap" aria-label="Scrub timeline"></div>
+              <div class="tl-layers" id="tl-layers" hidden></div>
+              <div class="tl-subs" id="tl-subs" hidden></div>
               <div class="trim-timeline" aria-label="Trim timeline">
                <div class="trim-filmstrip" id="trim-filmstrip" aria-hidden="true"></div>
                <div class="trim-outside trim-outside-start" id="trim-outside-start"></div>
@@ -3003,6 +3041,7 @@
          </div>
          <div class="tl-bar is-v" id="tl-vbar" aria-hidden="true"></div>
          <div class="tl-bar is-h" id="tl-hbar" aria-hidden="true"></div>
+        </div>
         </div>
       </div>
     </div>
@@ -3161,6 +3200,7 @@
   <!--#include window-chrome-->
   <!--#include shell-nav-->
   <!--#include home-dashboard-->
+  <!--#include color-picker-->
 
 <script>
   const CLIP_HOVER_PROFILES = {
@@ -5529,7 +5569,7 @@
     if (btn) {
       btn.classList.toggle("is-favorite", fav);
       btn.dataset.tooltip = fav ? "Remove favorite" : "Favorite clip";
-      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-label", btn.dataset.tooltip);
       btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
     }
     const menuItem = card.querySelector(".favorite-menu-item");
@@ -5537,8 +5577,7 @@
     const label = menuItem.querySelector(".menu-item-label");
     const icon = menuItem.querySelector("svg");
     menuItem.classList.toggle("is-favorite", fav);
-    menuItem.title = fav ? "Remove favorite" : "Favorite";
-    menuItem.setAttribute("aria-label", menuItem.title);
+    menuItem.setAttribute("aria-label", fav ? "Remove favorite" : "Favorite");
     if (label) label.textContent = fav ? "Remove favorite" : "Favorite";
     if (icon) icon.innerHTML = fav ? ICON.STAR : ICON.STAR_BORDER;
   }
@@ -5550,14 +5589,13 @@
     const btn = card.querySelector(".select-clip-btn");
     if (btn) {
       btn.dataset.tooltip = selected ? "Deselect clip" : "Select clip";
-      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-label", btn.dataset.tooltip);
       btn.setAttribute("aria-pressed", selected ? "true" : "false");
     }
     const menuItem = card.querySelector(".select-menu-item");
     if (!menuItem) return;
     const label = menuItem.querySelector(".menu-item-label");
-    menuItem.title = selected ? "Deselect clip" : "Select clip";
-    menuItem.setAttribute("aria-label", menuItem.title);
+    menuItem.setAttribute("aria-label", selected ? "Deselect clip" : "Select clip");
     if (label) label.textContent = selected ? "Deselect" : "Select";
   }
 
@@ -5760,7 +5798,7 @@
                   <span>Open file location</span>
                 </div>
                 <div class="menu-separator"></div>
-                <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" title="Delete clip" aria-label="Delete clip">
+                <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" aria-label="Delete clip">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
                   <span class="menu-item-label">Delete</span>
                 </div>
@@ -6779,6 +6817,12 @@
     return true;
   }
 
+  // in the editor f and m belong to its video, so they only act while the pointer is over it or something in it has the focus
+  function trimVideoEngaged() {
+    const wrap = document.querySelector("#trim-veil .trim-video-wrap");
+    return !!wrap && (wrap.matches(":hover") || wrap.contains(document.activeElement));
+  }
+
   // true while a field takes the letters, so f, t and m still type in a rename box or the search field
   function typingInField() {
     const tag = (document.activeElement && document.activeElement.tagName) || "";
@@ -6796,10 +6840,13 @@
     // f = toggle fullscreen, whether or not were currently in it. outside fullscreen we promote the active / hovered card. inside we just exit. skip when focus is in an editable surface so the letter f still types in inline rename fields / search boxes. a held key is ignored after its first press, since it repeats the keydown and would flip fullscreen again and again.
     if ((e.key === "f" || e.key === "F") && !e.ctrlKey && !e.altKey && !e.metaKey) {
       if (typingInField()) return;
+      const inEditor = trimVeil.classList.contains("is-open");
+      if (inEditor && !fsEl && !trimVideoEngaged()) return;
       e.preventDefault();
       if (e.repeat) return;
       if (fsEl) tryExitFullscreen();
-      else      previewToFullscreen();
+      else if (inEditor) document.getElementById("trim-fullscreen").click();
+      else previewToFullscreen();
       return;
     }
 
@@ -6818,7 +6865,7 @@
     // m = mute and unmute, the switch of the volume buttons. only with a clip in front of the pointer, one in fullscreen or in theater mode, the editor, or a card under the pointer, so the key never changes the sound of a clip that is not there; a held key does not flip it again and again
     if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.altKey && !e.metaKey) {
       if (typingInField() || e.repeat) return;
-      if (!fsEl && !theaterPreview && !trimVeil.classList.contains("is-open") && !document.querySelector(".card:hover")) return;
+      if (!fsEl && !theaterPreview && !(trimVeil.classList.contains("is-open") && trimVideoEngaged()) && !document.querySelector(".card:hover")) return;
       e.preventDefault();
       toggleMute();
       return;
@@ -7022,14 +7069,14 @@
       // coerce to a real boolean -- CEF treats classList.toggle(cls, undefined) as a plain toggle, so `false || undefined` was flipping is-disabled ON for every eligible (never-linked) clip.
       const menuBlockReason = showCopy ? null : uploadBlockReason(clip);
       linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked || menuBlockReason));
-      linkMenuItem.title = showCopy ? "Copy Link"
+      const linkText = showCopy ? "Copy Link"
         : menuBlockReason ? menuBlockReason + " -- Streamable will not accept this clip"
         : processing ? "Processing on Streamable"
         : failed ? "Processing failed"
         : busy ? "Creating link" : "Create Link";
-      linkMenuItem.setAttribute("aria-label", linkMenuItem.title);
-      // the full reason lives in the title tooltip above -- putting it in the visible label too is what was ballooning the menus height when it wrapped across lines
-      if (label) label.textContent = menuBlockReason ? "Create Link" : linkMenuItem.title;
+      linkMenuItem.setAttribute("aria-label", linkText);
+      // the full reason stays in the aria label -- putting it in the visible label too is what was ballooning the menus height when it wrapped across lines
+      if (label) label.textContent = menuBlockReason ? "Create Link" : linkText;
       if (icon) icon.innerHTML = showCopy ? COPY_ICON : ICON.LINK;
     }
 
@@ -8808,6 +8855,11 @@
   const savePercent      = document.getElementById("save-percent");
   const saveCancel       = document.getElementById("save-cancel");
   const trimDraftNote    = document.getElementById("trim-draft-note");
+  // the tools panel is made right after the lanes, which already talk to it while they are being made
+  let editorTools = null;
+  let editorFx = null;
+  // while a voiceover records with the clip silent, both the video and the rows of the lanes play nothing
+  let recordingQuiet = false;
   const trimLanes = RKEditorLanes.create({
     video: trimVideo,
     helper: HELPER,
@@ -8824,6 +8876,10 @@
       lanes: document.getElementById("tl-lanes"),
       props: document.getElementById("tl-props"),
       timeline: document.querySelector(".tl-tracks .trim-timeline"),
+      subs: document.getElementById("tl-subs"),
+      subOverlay: document.getElementById("trim-sub-overlay"),
+      layers: document.getElementById("tl-layers"),
+      layerOverlay: document.getElementById("trim-layer-overlay"),
       vbar: document.getElementById("tl-vbar"),
       hbar: document.getElementById("tl-hbar"),
     },
@@ -8853,7 +8909,15 @@
       trimVideo.currentTime = getPlayBounds().start;
     },
     isOpen: () => trimVeil.classList.contains("is-open"),
-    master: () => (VolumeState.muted ? 0 : VolumeState.volume),
+    master: () => (recordingQuiet || VolumeState.muted ? 0 : VolumeState.volume),
+    onSubtitles: () => { if (editorTools) editorTools.refresh(); },
+    // the tabs on the right: which one of the video is open, and what is selected
+    videoPane: () => (editorFx ? editorFx.pane() : "general"),
+    onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
+    onFx: () => { if (editorFx) editorFx.changed(); syncTrimReencodeLock(); },
+    // where a subtitle breaks into lines, shared by the preview and the saved copy so both break it the same way
+    layoutSubtitle: (text, style) => RKEditorTools.layoutText(text, style, (trimVideo.videoWidth || 16) / (trimVideo.videoHeight || 9)),
+    subtitleAspect: () => (trimVideo.videoWidth || 16) + "x" + (trimVideo.videoHeight || 9),
     restore: () => applyVolume(trimVideo),
     // the default rate is set too, so the preview keeps its speed when the source is loaded again after a stall
     setVideoRate: (rate) => {
@@ -8876,6 +8940,70 @@
     },
   });
 
+  editorTools = RKEditorTools.create({
+    lanes: trimLanes,
+    helper: HELPER,
+    root: document.getElementById("ed-left"),
+    // the clips starred on the clips page, which the library of the editor lists first
+    favorites: () => favoriteNamesList(),
+    side: document.querySelector(".editor-side"),
+    video: trimVideo,
+    isPlaying: () => !trimVideo.paused && !trimVideo.ended,
+    play: () => { if (trimVideo.paused || trimVideo.ended) togglePlayback(); },
+    pause: () => { if (!trimVideo.paused) togglePlayback(); },
+    setQuiet: (on) => {
+      recordingQuiet = !!on;
+      if (recordingQuiet) trimVideo.muted = true;
+      else applyVolume(trimVideo);
+      trimLanes.applyMaster();
+    },
+    notify: (text, kind, title) => {
+      if (kind === "bad") {
+        showToast(escapeHtml(text), "bad", title);
+        return;
+      }
+      showToast(escapeHtml(text), "info");
+      scheduleToastHide(3500);
+    },
+  });
+  editorFx = RKEditorFx.createPanel({
+    lanes: trimLanes,
+    side: document.querySelector(".editor-side"),
+    rail: document.getElementById("ed-right-rail"),
+    video: trimVideo,
+  });
+  // the slide of the right panel when its last card goes. the cards are hidden by the modules that own them, so the card that went is copied as it was and stands in for it until the slide is over; a card that comes back meanwhile ends it at once
+  (() => {
+    const side = document.querySelector("#trim-veil .editor-side");
+    if (!side) return;
+    let ghost = null;
+    let timer = 0;
+    const end = () => {
+      clearTimeout(timer);
+      if (ghost) { ghost.remove(); ghost = null; }
+      side.classList.remove("is-closing");
+    };
+    const showing = () => Array.from(side.children).some((c) => c.classList.contains("editor-card") && !c.hidden && c !== ghost);
+    new MutationObserver((records) => {
+      if (showing()) { if (ghost) end(); return; }
+      if (ghost) return;
+      const gone = records.find((r) => r.target.parentNode === side && r.oldValue === null && r.target.classList.contains("editor-card") && r.target.hidden);
+      // the card of a subtitle slides out by itself before it is hidden
+      if (!gone || gone.target.classList.contains("ed-sub-edit")) return;
+      ghost = gone.target.cloneNode(true);
+      ghost.hidden = false;
+      ghost.removeAttribute("id");
+      ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+      ghost.classList.add("ed-side-ghost");
+      ghost.inert = true;
+      side.appendChild(ghost);
+      side.classList.add("is-closing");
+      timer = setTimeout(end, 140);
+    }).observe(side, { subtree: true, attributes: true, attributeFilter: ["hidden"], attributeOldValue: true });
+  })();
+  const placeSubtitles = RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-sub-overlay"));
+  RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-layer-overlay"));
+
   // a file dropped on this page while no clip is open would make the window open the file itself, so the drag is turned away here; with a clip open the editor takes it
   ["dragenter", "dragover", "drop"].forEach((name) => document.addEventListener(name, (e) => {
     if (trimVeil.classList.contains("is-open") || !e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
@@ -8887,13 +9015,15 @@
   let trimPreciseBeforeSpeed = null;
   function syncTrimReencodeLock() {
     const retimed = Math.abs(trimLanes.videoSpeed() - 1) > 1e-6;
-    const needed = retimed || trimLanes.videoEdited();
+    const subtitled = !!trimLanes.subtitlePlan();
+    const looked = !!trimLanes.lookPlan() || !!trimLanes.layerPlan();
+    const needed = retimed || trimLanes.videoEdited() || subtitled || looked;
     const row = trimPrecise.closest(".trim-mode-row");
     if (needed && trimPreciseBeforeSpeed === null) {
       trimPreciseBeforeSpeed = trimPrecise.checked;
       trimPrecise.checked = true;
       trimPrecise.disabled = true;
-      if (row) row.title = retimed ? "A copy at another speed is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
+      if (row) row.title = retimed ? "A copy at another speed is always made again frame by frame." : subtitled ? "A copy with subtitles is always made again frame by frame, since they are drawn into the picture." : looked ? "A copy with colour, filters, effects or layers is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
       trimPrecise.dispatchEvent(new Event("change"));
     } else if (!needed && trimPreciseBeforeSpeed !== null) {
       trimPrecise.disabled = false;
@@ -9588,9 +9718,27 @@
            document.webkitFullscreenElement === trimVideoWrap;
   }
 
+  // the volume and fullscreen buttons sit in the middle of the toolbar while editing and go back onto the video in fullscreen, where the toolbar is not
+  function placeTrimControls() {
+    const volume = document.querySelector("#trim-veil .trim-volume-control");
+    const middle = document.querySelector("#tl-toolbar .tl-play-group");
+    if (!volume || !middle || !trimFullscreen) return;
+    if (isTrimFullscreen()) {
+      const left = trimVideoWrap.querySelector(".controls-left");
+      const right = trimVideoWrap.querySelector(".controls-right");
+      if (left && volume.parentNode !== left) left.insertBefore(volume, left.querySelector(".time-display"));
+      if (right && trimFullscreen.parentNode !== right) right.appendChild(trimFullscreen);
+    } else {
+      if (volume.parentNode !== middle) middle.appendChild(volume);
+      if (trimFullscreen.parentNode !== middle) middle.appendChild(trimFullscreen);
+    }
+  }
+
   function syncTrimFullscreenIcon() {
+    placeTrimControls();
     if (!trimFullscreenIcon) return;
     trimFullscreenIcon.innerHTML = isTrimFullscreen() ? ICON.FULLSCREEN_EXIT : ICON.FULLSCREEN;
+    trimFullscreen.dataset.tooltip = isTrimFullscreen() ? "Exit fullscreen (F)" : "Fullscreen (F)";
   }
 
   // overwrite needs two clicks within 3s to fire -- first click "arms" the button (red fill + "click again to confirm"). avoids the browser-dock confirm() dialog while still preventing one-click destructive operations.
@@ -9631,7 +9779,8 @@
     trimPreviewActive = false;
     trimStallRecovering = false;
     trimLastProgressAt = Date.now();
-    trimPrecise.checked = !!replayKitSettings.trimPreciseDefault;
+    // the editor always cuts frame accurately; the switch and the keyframe snapping behind it stay, hidden, for when the choice comes back
+    trimPrecise.checked = true;
     trimPrecise.disabled = false;
     trimPreciseBeforeSpeed = null;
     trimRemoveAudio.checked = false;
@@ -9648,7 +9797,7 @@
     const onMeta = async () => {
       await settingsReady;
       if (trimSourceClip !== clip) return;
-      trimPrecise.checked = !!replayKitSettings.trimPreciseDefault;
+      trimPrecise.checked = true;
       const dur = isFinite(trimVideo.duration) ? trimVideo.duration : 0;
       trimStart.min = trimEnd.min = trimSeek.min = "0";
       trimStart.max = trimEnd.max = trimSeek.max = String(dur);
@@ -9679,6 +9828,9 @@
       updateSeekFill();
       trimLanes.refresh();
       trimLanes.initHistory();
+      const sourceTracks = trimLanes.subtitles.sourceTracks();
+      editorTools.opened({ name: clip.name, tracks: sourceTracks, audio: sourceTracks.length > 0 });
+      placeSubtitles();
       // an edit that was kept for this clip goes back before the editor shows, as one step that undo can take back
       let restored = false;
       const draft = await draftPromise;
@@ -9708,6 +9860,7 @@
     if (trimSaving) return false;
     // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
     const kept = keepTrimDraft();
+    editorTools.closed();
     trimLanes.unload();
     trimProcessingVeil.classList.remove("is-open");
     trimVeil.classList.remove("is-measuring");
@@ -9838,6 +9991,18 @@
   trimVideo.addEventListener("click", togglePlayback);
   trimVideo.addEventListener("play",  syncTrimPlayIcon);
   trimVideo.addEventListener("pause", syncTrimPlayIcon);
+  // the video reports its time only about four times a second, so the playhead and the time of the toolbar step by tenths of a second unevenly; while it plays they follow it every frame instead
+  let trimClockRaf = 0;
+  function trimClockFrame() {
+    trimClockRaf = 0;
+    if (trimVideo.paused || trimVideo.ended || !trimVeil.classList.contains("is-open")) return;
+    trimSeek.value = String(clampVideoTime(trimVideo.currentTime));
+    updateSeekFill();
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
+    trimClockRaf = requestAnimationFrame(trimClockFrame);
+  }
+  trimVideo.addEventListener("playing", () => { if (!trimClockRaf) trimClockRaf = requestAnimationFrame(trimClockFrame); });
   trimVideo.addEventListener("ended", syncTrimPlayIcon);
   ["play", "playing", "pause", "ended", "waiting"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onPlayState()));
   ["seeking", "seeked"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onSeek()));
@@ -10038,9 +10203,9 @@
       showToast("The draft of this clip was dropped, since the clip is not the one it was kept for.", "bad", "Draft dropped");
       return false;
     }
-    trimRemoveAudio.checked = !!edit.removeAudio;
-    trimLanes.setOff(trimRemoveAudio.checked);
-    trimPrecise.checked = !!edit.precise;
+    trimRemoveAudio.checked = false;
+    trimLanes.setOff(false);
+    trimPrecise.checked = true;
     trimPrecise.dispatchEvent(new Event("change"));
     const result = await trimLanes.applyDraft({ snap: edit.snap, imports: edit.imports });
     if (trimSourceClip !== clip) return false;
@@ -10177,7 +10342,9 @@
     const sourceName = trimSourceClip.name;
     const videoPlan = trimLanes.videoPlan();
     // pieces of video with black between them are put together frame by frame
-    const precise = trimPrecise.checked || !!videoPlan;
+    const lookPlan = trimLanes.lookPlan();
+    const layerPlan = trimLanes.layerPlan();
+    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan;
     if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
       showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
       scheduleToastHide(TOAST_ERROR_MS);
@@ -10199,6 +10366,7 @@
     const endSec   = Number(trimEnd.value);
     const removeAudio = trimRemoveAudio.checked;
     const audioPlan = removeAudio ? null : trimLanes.plan();
+    const subtitlePlan = trimLanes.subtitlePlan();
     const speed = trimLanes.videoSpeed();
     let save = null;
     try {
@@ -10214,6 +10382,9 @@
       const edit = {};
       if (audioPlan) edit.audio = audioPlan;
       if (videoPlan) edit.video = videoPlan;
+      if (subtitlePlan) edit.subtitles = subtitlePlan;
+      if (lookPlan) edit.look = lookPlan;
+      if (layerPlan) edit.layers = layerPlan;
       const res = await fetch(url, Object.keys(edit).length
         ? { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(edit) }
         : { method: "POST", cache: "no-store" });

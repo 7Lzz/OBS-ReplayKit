@@ -89,6 +89,29 @@ namespace ReplayKitHelper
             return (now - Server.State.CapabilitiesAt).TotalMinutes < (found ? 360 : 10);
         }
 
+        private static readonly object ToolPathsLock = new object();
+        private static JObject _toolPaths;
+        private static DateTime _toolPathsAt;
+
+        // where ffmpeg and ffprobe are, which most routes need and which costs nothing next to the probe of the encoders, so a route that only runs the tools never waits behind that probe; taken from the capabilities once they are made, and kept the same way they are
+        public static JObject GetToolPaths()
+        {
+            DateTime now = DateTime.UtcNow;
+            if (CapabilitiesFresh(now)) return Server.State.Capabilities;
+            lock (ToolPathsLock)
+            {
+                if (_toolPaths != null && (now - _toolPathsAt).TotalMinutes < (string.IsNullOrEmpty(_toolPaths["ffmpeg"]?.Value<string>()) ? 10 : 360)) return _toolPaths;
+                AppConfig.LoadConfig();
+                _toolPaths = new JObject
+                {
+                    ["ffmpeg"] = EnsureFfmpegAlias(FindToolInClipDirs("ffmpeg.exe")),
+                    ["ffprobe"] = FindToolInClipDirs("ffprobe.exe"),
+                };
+                _toolPathsAt = now;
+                return _toolPaths;
+            }
+        }
+
         public static JObject GetHelperCapabilities(bool refresh = false)
         {
             DateTime now = DateTime.UtcNow;
@@ -224,8 +247,8 @@ namespace ReplayKitHelper
             }
         }
 
-        public static string FindCompressionFfmpeg() => GetHelperCapabilities()["ffmpeg"]?.Value<string>() ?? "";
-        public static string FindCompressionFfprobe() => GetHelperCapabilities()["ffprobe"]?.Value<string>() ?? "";
+        public static string FindCompressionFfmpeg() => GetToolPaths()["ffmpeg"]?.Value<string>() ?? "";
+        public static string FindCompressionFfprobe() => GetToolPaths()["ffprobe"]?.Value<string>() ?? "";
 
         public sealed class NativeCaptureResult
         {
@@ -272,11 +295,12 @@ namespace ReplayKitHelper
         }
 
         // like InvokeNativeCapture, but stdout is read line by line while the child runs so a caller can follow the -progress output of ffmpeg as it is written; only stderr comes back in Output, since the progress block is no part of an error message
-        public static NativeCaptureResult InvokeNativeProgress(string exe, IEnumerable<string> arguments, Action<string> onStdoutLine, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000)
+        public static NativeCaptureResult InvokeNativeProgress(string exe, IEnumerable<string> arguments, Action<string> onStdoutLine, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000, string workingDirectory = null)
         {
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
+                WorkingDirectory = workingDirectory ?? "",
                 Arguments = ProcessArgs.Join(arguments.ToArray()),
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -384,7 +408,7 @@ namespace ReplayKitHelper
         {
             var result = new CompressMarker();
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return result;
-            string ffprobe = GetHelperCapabilities()["ffprobe"]?.Value<string>();
+            string ffprobe = GetToolPaths()["ffprobe"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return result;
             try
             {
@@ -424,7 +448,7 @@ namespace ReplayKitHelper
                 long effCap = Constants.GetEffectiveUploadCap();
                 if (effCap <= 0) return Upload.StartStreamableUpload(selected);
 
-                var caps = GetHelperCapabilities();
+                var caps = GetToolPaths();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
                 if (string.IsNullOrWhiteSpace(ffmpeg))
                 {

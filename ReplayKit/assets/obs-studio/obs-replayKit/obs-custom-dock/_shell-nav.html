@@ -23,5 +23,42 @@
     e.preventDefault();
     go(e.button === 3 ? "back" : "forward");
   }, true);
+
+  // the page reaches the right and bottom edges of the obs window, where the window used to keep a strip for resizing, so the edges of the page resize the window: a few pixels along each edge and a larger square at the corner between them. the helper does the resize and refuses a maximized or fullscreen window, after which the edges rest until the window changes size
+  var EDGE_PX = 5;
+  var CORNER_PX = 16;
+  var edgesResting = false;
+  var edgeStyle = document.createElement("style");
+  edgeStyle.textContent = 'html[data-rk-edge="right"], html[data-rk-edge="right"] * { cursor: ew-resize !important; } ' +
+    'html[data-rk-edge="bottom"], html[data-rk-edge="bottom"] * { cursor: ns-resize !important; } ' +
+    'html[data-rk-edge="corner"], html[data-rk-edge="corner"] * { cursor: nwse-resize !important; }';
+  (document.head || document.documentElement).appendChild(edgeStyle);
+  function edgeAt(x, y) {
+    if (edgesResting || document.fullscreenElement || document.webkitFullscreenElement) return "";
+    var fromRight = window.innerWidth - x, fromBottom = window.innerHeight - y;
+    if ((fromRight <= EDGE_PX && fromBottom <= CORNER_PX) || (fromBottom <= EDGE_PX && fromRight <= CORNER_PX)) return "corner";
+    if (fromRight <= EDGE_PX) return "right";
+    if (fromBottom <= EDGE_PX) return "bottom";
+    return "";
+  }
+  function showEdge(edge) {
+    if ((document.documentElement.dataset.rkEdge || "") === edge) return;
+    if (edge) document.documentElement.dataset.rkEdge = edge;
+    else delete document.documentElement.dataset.rkEdge;
+  }
+  window.addEventListener("pointermove", function (e) { if (e.buttons === 0) showEdge(edgeAt(e.clientX, e.clientY)); }, true);
+  document.documentElement.addEventListener("pointerleave", function () { showEdge(""); });
+  window.addEventListener("resize", function () { edgesResting = false; });
+  window.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0) return;
+    var edge = edgeAt(e.clientX, e.clientY);
+    if (!edge) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    fetch(base + "/shell/resize?edge=" + edge + "&t=" + Date.now(), { method: "POST", cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (data) { if (data && data.resizing === false) { edgesResting = true; showEdge(""); } })
+      .catch(function () {});
+  }, true);
 })();
 </script>

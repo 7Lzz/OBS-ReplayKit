@@ -176,6 +176,9 @@ namespace ReplayKitHelper
 
         public static void SendOpenClips() => TryWrite("OPENCLIPS");
 
+        // a page of the clean shell grabbed at an edge of the obs window: right, bottom or corner; false when the plugin is not there to hear it
+        public static bool SendShellResize(string edge) => TryWrite("SHELLRESIZE " + edge);
+
         // opens the plugin-owned Settings window. the docks own settings button routes thru here so it takes the same path as the tray row instead of a window.open popup that cef hands to the real browser. page is a tab of the settings (lowercase letters only), or empty to open it where it was left.
         public static void SendOpenSettings(string page = null) => TryWrite(string.IsNullOrEmpty(page) ? "OPENSETTINGS" : "OPENSETTINGS " + page);
 

@@ -11,7 +11,173 @@
 #include "shell/shell_views.hpp"
 #include "ui/anchored_panel.hpp"
 
+#include <QCheckBox>
+#include <QRegularExpression>
+#include <QStandardPaths>
+
 namespace rk {
+
+namespace {
+
+HBRUSH g_pageBrush = nullptr;
+QRgb g_pageBrushColor = 0;
+
+// windows fills a native window with the background of its class where it has grown and nothing is drawn yet, and the windows cef keeps under a page carry white, which flashed along the edges while the window was resized; they and the window itself take the window colour instead, again whenever the theme changes it. an earlier brush is never deleted, since a window of the same class elsewhere may still be using it
+void ShellTintBrowserWindows(QMainWindow *mw, QWidget *browser)
+{
+	if (!browser)
+		return;
+	const QRgb want = g_chromeBg.rgb();
+	if (!g_pageBrush || g_pageBrushColor != want) {
+		g_pageBrush = CreateSolidBrush(RGB(g_chromeBg.red(), g_chromeBg.green(), g_chromeBg.blue()));
+		g_pageBrushColor = want;
+	}
+	const LONG_PTR brush = (LONG_PTR)g_pageBrush;
+	auto tint = [](HWND hwnd, LPARAM b) -> BOOL {
+		if (GetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND) != b)
+			SetClassLongPtrW(hwnd, GCLP_HBRBACKGROUND, b);
+		return TRUE;
+	};
+	tint((HWND)mw->winId(), brush);
+	const HWND root = (HWND)browser->winId();
+	tint(root, brush);
+	EnumChildWindows(root, tint, brush);
+}
+
+// the icon of a source is a picture on a label, so a selected row shows it in the ink of the accent and gets the picture obs gave it back once it is let go
+QPixmap Inked(const QPixmap &pixmap, const QColor &ink)
+{
+	QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+	QPainter painter(&image);
+	painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+	painter.fillRect(image.rect(), ink);
+	painter.end();
+	QPixmap out = QPixmap::fromImage(image);
+	out.setDevicePixelRatio(pixmap.devicePixelRatio());
+	return out;
+}
+
+void InkSourceIcon(QLabel *label, bool on)
+{
+	const QVariant original = label->property("rkIcon");
+	if (on) {
+		const QPixmap pixmap = original.isValid() ? original.value<QPixmap>() : label->pixmap();
+		if (pixmap.isNull())
+			return;
+		if (!original.isValid())
+			label->setProperty("rkIcon", pixmap);
+		label->setPixmap(Inked(pixmap, g_menuOnAccent));
+	} else if (original.isValid()) {
+		label->setPixmap(original.value<QPixmap>());
+		label->setProperty("rkIcon", QVariant());
+	}
+}
+
+// the eye and the lock of a row are images of the obs theme, which no style can recolour, so copies in the ink of the accent are written to the scratch folder of replaykit and the selected rows point at those; made again only when the ink changes
+QString InkedIndicatorRules(const QColor &ink)
+{
+	static QString madeFor;
+	static QString rules;
+	if (madeFor == ink.name())
+		return rules;
+	madeFor = ink.name();
+	rules.clear();
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/source-icons");
+	QDir().mkpath(dir);
+	struct Indicator {
+		const char *kind;
+		const char *state;
+		const char *source;
+	};
+	const Indicator indicators[] = {
+		{"indicator-visibility", "checked", "theme:Dark/visible.svg"},
+		{"indicator-visibility", "unchecked", ":res/images/invisible.svg"},
+		{"indicator-lock", "checked", "theme:Dark/locked.svg"},
+		{"indicator-lock", "unchecked", ":res/images/unlocked.svg"},
+	};
+	static const QRegularExpression paint(QStringLiteral("((?:fill|stroke)\\s*[:=]\\s*\"?)#[0-9a-fA-F]{3,8}"));
+	for (const Indicator &indicator : indicators) {
+		QFile in(QString::fromLatin1(indicator.source));
+		if (!in.open(QIODevice::ReadOnly))
+			continue;
+		QString svg = QString::fromUtf8(in.readAll());
+		svg.replace(paint, QStringLiteral("\\1") + ink.name());
+		const QString path = dir + QStringLiteral("/%1-%2-%3.svg").arg(QLatin1String(indicator.kind), QLatin1String(indicator.state), ink.name().mid(1));
+		QFile out(path);
+		if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+			continue;
+		out.write(svg.toUtf8());
+		out.close();
+		// the dot classes of the obs theme are its own shorthand, so the class property is matched directly here
+		rules += QStringLiteral("SourceTreeItem[rkSelected=\"true\"] QCheckBox[class~=\"%1\"]::indicator:%2, SourceTreeItem[rkSelected=\"true\"] QCheckBox[class~=\"%1\"]::indicator:%2:hover { image:url(%3); }")
+				 .arg(QLatin1String(indicator.kind), QLatin1String(indicator.state), path);
+	}
+	return rules;
+}
+
+// a row of the sources list is a widget of its own that never hears about the selection, so each row is told with the rkSelected property, which the style of the dock turns into dark text and icons on the accent
+void MarkSelectedSources(QAbstractItemView *tree)
+{
+	QItemSelectionModel *selection = tree->selectionModel();
+	QAbstractItemModel *model = tree->model();
+	if (!selection || !model)
+		return;
+	for (int row = 0; row < model->rowCount(); row++) {
+		const QModelIndex index = model->index(row, 0);
+		QWidget *item = tree->indexWidget(index);
+		if (!item)
+			continue;
+		const bool on = selection->isSelected(index);
+		const QVariant was = item->property("rkSelected");
+		if (was.isValid() && was.toBool() == on)
+			continue;
+		item->setProperty("rkSelected", on);
+		item->style()->unpolish(item);
+		item->style()->polish(item);
+		for (QLabel *label : item->findChildren<QLabel *>()) {
+			if (label->property("class").toString() == QStringLiteral("source-icon"))
+				InkSourceIcon(label, on);
+			label->style()->unpolish(label);
+			label->style()->polish(label);
+		}
+		for (QCheckBox *box : item->findChildren<QCheckBox *>()) {
+			box->style()->unpolish(box);
+			box->style()->polish(box);
+		}
+	}
+}
+
+// the rows are made again when the scene changes or a group opens, after the model says so, so the marks are put on once those widgets exist
+void HookSourceSelection(QWidget *sourcesDock)
+{
+	static QPointer<QAbstractItemView> hooked;
+	QAbstractItemView *tree = nullptr;
+	for (QAbstractItemView *view : sourcesDock->findChildren<QAbstractItemView *>())
+		if (view->inherits("SourceTree"))
+			tree = view;
+	if (!tree || !tree->selectionModel() || !tree->model())
+		return;
+	if (hooked == tree) {
+		MarkSelectedSources(tree);
+		return;
+	}
+	hooked = tree;
+	QPointer<QAbstractItemView> guard(tree);
+	auto later = [guard]() {
+		QTimer::singleShot(0, guard, [guard]() {
+			if (guard)
+				MarkSelectedSources(guard);
+		});
+	};
+	QObject::connect(tree->selectionModel(), &QItemSelectionModel::selectionChanged, tree, later);
+	QObject::connect(tree->model(), &QAbstractItemModel::modelReset, tree, later);
+	QObject::connect(tree->model(), &QAbstractItemModel::rowsInserted, tree, later);
+	QObject::connect(tree->model(), &QAbstractItemModel::rowsMoved, tree, later);
+	QObject::connect(tree->model(), &QAbstractItemModel::layoutChanged, tree, later);
+	MarkSelectedSources(tree);
+}
+
+} // namespace
 
 // the preview display fills what the scene does not cover with a colour from the obs theme, which shows as a slab of its own inside the stage; it takes the stage colour so the projector view reads as one surface with the others
 void ShellTintPreview()
@@ -30,11 +196,16 @@ void ShellTintPreview()
 		"#sourcesToolbar { background:%2; color:%3; }"
 		"SourceTree { alternate-background-color:%1; selection-background-color:%4; selection-color:%5; }"
 		"SourceTreeItem { background:transparent; color:%3; }"
-		"SourceTree::item:selected, SourceTreeItem[selected=\"true\"] { background:%4; color:%5; }")
-		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name());
+		// the last rows stop above the resize corner, which sits over the bottom right of the window
+		"SourceTree { padding-bottom:%6px; }"
+		"SourceTree::item:selected { background:%4; }"
+		"SourceTreeItem[rkSelected=\"true\"], SourceTreeItem[rkSelected=\"true\"] QLabel { color:%5; }")
+		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name(), QString::number(kShellGrip))
+		+ InkedIndicatorRules(g_menuOnAccent);
 	if (QWidget *sources = mw->findChild<QWidget *>(QStringLiteral("sourcesDock"))) {
 		if (sources->styleSheet() != sourcesStyle)
 			sources->setStyleSheet(sourcesStyle);
+		HookSourceSelection(sources);
 	}
 	const QString contextStyle = QStringLiteral(
 		"#contextContainer, #contextSubContainer { background:%1; color:%2; }"
@@ -115,14 +286,21 @@ void ShellLayoutViews()
 	if (!mw)
 		return;
 	QRect stage;
+	QRect pageRect;
 	if (QWidget *central = mw->centralWidget()) {
 		stage = central->geometry();
 		if (QLayout *layout = central->layout())
 			stage = stage.marginsRemoved(layout->contentsMargins());
+		// a page reaches the right and bottom edges of the window, over the strip the stage keeps there for resizing, and takes that resizing over itself (the shell-nav partial); the preview and obs settings keep the strip, since they cannot
+		pageRect = stage;
+		pageRect.setRight(central->geometry().right());
+		pageRect.setBottom(central->geometry().bottom());
 	}
 	const bool coverAll = g_clipsFullscreenActive && ShellShowsClips(g_shellView);
-	if (g_shellHost)
-		g_shellHost->setGeometry(coverAll ? mw->rect() : stage);
+	if (g_shellHost) {
+		g_shellHost->setGeometry(coverAll ? mw->rect() : ShellIsPageView(g_shellView) ? pageRect : stage);
+		ShellTintBrowserWindows(mw, g_shellHost->browser);
+	}
 	for (QWidget *cover : {g_viewObsHost.data(), g_shellCurtain.data()}) {
 		if (cover)
 			cover->setGeometry(stage);

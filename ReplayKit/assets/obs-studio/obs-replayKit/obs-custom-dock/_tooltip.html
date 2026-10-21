@@ -1,8 +1,9 @@
 <!-- shared partial (helper #include target: tooltip). the modern hover tooltip every dock page uses: one js-positioned element rather than a css ::before, so it clamps into the viewport and its arrow slides to keep pointing at the control; self-wires to any [data-tooltip] element, delegated so controls created later (virtualized clip cards) are covered too; host: nothing required, optionally RKTooltip.suppressWhen(fn) to mute it for a control whose own menu is open, and RKTooltip.hide() / .reposition() for manual control; the native plugin paints the same tip for the rail and the title bar (NotifyTip in notify/notify_tip.cpp) and controls_app.html carries an inlined copy, so a change to the numbers below goes into all three -->
 <style>
+  /* above every popup a page opens, the colour picker and the menus among them, so a tip on a control inside one shows */
   #rk-tip {
     position: fixed;
-    z-index: 300;
+    z-index: 10100;
     padding: 5px 8px;
     border-radius: 3px;
     color: var(--text);
@@ -109,6 +110,9 @@
   function reposition() {
     if (!current) return;
     var b = current.getBoundingClientRect();
+    // measured from the left edge, since a fixed box left where the last tip sat near the right edge is squeezed into what remains and would be measured narrow and tall
+    tip.style.left = "0px";
+    tip.style.top = "0px";
     var tw = tip.offsetWidth;
     var th = tip.offsetHeight;
     var edge = 6;   // min gap from any window edge
@@ -152,8 +156,8 @@
   // delegated: card controls are created and recycled as a grid virtualizes, so anything wired once at load would miss every one built afterwards. mouseover/mouseout bubble, mouseenter/mouseleave do not.
   document.addEventListener("mouseover", function (e) {
     var el = e.target.closest("[data-tooltip]");
-    // menu rows carry the same labels for a11y but already show their text, so they never get a tip
-    if (!el || el === current || el.classList.contains("menu-item")) return;
+    // menu rows already show their text, so nothing inside an open menu ever gets a tip
+    if (!el || el === current || el.closest(".menu-item, .menu-dropdown, [role=menu]")) return;
     observer.disconnect();
     show(el);
     if (current) observer.observe(el, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });

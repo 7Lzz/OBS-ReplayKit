@@ -132,8 +132,10 @@
     overflow:auto;
     padding:0 10px 10px 0;
   }
-  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it */
-  html.rk-embedded .main { --sb-end:26px; }
+  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it; the page reaches the edge of the window there, and the 8px the shell keeps on the right is the whole gap, the same as the one between the tabs and the page */
+  html.rk-embedded .main { --sb-end:26px; padding-right:0; }
+  /* the buttons of the footer keep clear of the resize corner, which sits over the last 18px of the bottom right of the window */
+  html.rk-embedded .footer { padding-right:14px; }
   .page { display:none; }
   .page.is-active { display:block; }
   body.is-searching .page { display:block; }
@@ -354,15 +356,11 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .combo-option:hover,
-  .combo-option.is-selected {
-    background:var(--selected);
-    color:var(--on-accent);
-  }
-  .combo-option.is-selected {
-    outline:1px solid rgba(var(--on-accent-rgb),.55);
-    outline-offset:-1px;
-  }
+  /* the same look as the sort menu of the clips page: a hovered row gets the plain hover grey, the chosen one a light accent wash and a check, so the two never read as the same thing */
+  .combo-option:hover { background:var(--button_bg_hover); }
+  .combo-option.is-selected { position:relative; padding-right:30px; background:rgba(var(--accent-rgb),.22); }
+  .combo-option.is-selected:hover { background:rgba(var(--accent-rgb),.3); }
+  .combo-option.is-selected::after { content:""; position:absolute; right:13px; top:50%; width:4px; height:8px; margin-top:-6px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
   .combo-option.is-disabled {
     color:var(--muted);
     cursor:default;
@@ -374,7 +372,6 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .combo-option.is-selected .option-blurb { color:var(--on-accent); opacity:.82; }
   .game-rule-actions {
     width:100%;
     display:grid;
@@ -452,59 +449,8 @@
     height:32px;
     min-width:0;
   }
-  .volume-slider-wrap::before {
-    content:"";
-    position:absolute;
-    z-index:0;
-    left:0;
-    right:0;
-    top:50%;
-    height:16px;
-    transform:translateY(-50%);
-    background:
-      linear-gradient(to right, transparent 0, transparent calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% - .5px), rgba(var(--text-rgb),.34) calc(25% + .5px), transparent calc(25% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% - .5px), rgba(var(--text-rgb),.34) calc(50% + .5px), transparent calc(50% + .5px)),
-      linear-gradient(to right, transparent 0, transparent calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% - .5px), rgba(var(--text-rgb),.34) calc(75% + .5px), transparent calc(75% + .5px));
-    background-repeat:no-repeat;
-    background-size:100% 16px;
-    background-position:center;
-    pointer-events:none;
-  }
-  .volume-slider {
-    position:relative;
-    z-index:1;
-    width:100%;
-    height:32px;
-    margin:0;
-    appearance:none;
-    -webkit-appearance:none;
-    background:linear-gradient(to right, var(--selected2) var(--fill, 100%), var(--line2) var(--fill, 100%));
-    background-repeat:no-repeat;
-    background-size:100% 4px;
-    background-position:center;
-    border:0;
-    outline:none;
-  }
-  .volume-slider::-webkit-slider-runnable-track {
-    height:32px;
-    background:transparent;
-    border:0;
-  }
-  .volume-slider::-webkit-slider-thumb {
-    appearance:none;
-    -webkit-appearance:none;
-    width:21px;
-    height:10px;
-    border:0;
-    border-radius:5px;
-    background:var(--text);
-    margin-top:11px;
-    box-shadow:0 0 0 1px rgba(var(--bg-rgb),.25);
-    cursor:pointer;
-  }
-  .volume-slider:focus-visible::-webkit-slider-thumb {
-    box-shadow:0 0 0 2px var(--selected2);
-  }
+  /* the look of the slider is the shared one of the slider partial */
+  .volume-slider { position:relative; z-index:1; width:100%; height:32px; }
   /* recording audio in the audio tab: the mode of the list on a row of its own, then one row per source, and under the game audio section one row per program */
   /* the list stands in the column of the fields, under the dropdown that decides what it shows: 8px of the row, the 180px label column and the 8px gap */
   .ra-list { margin:6px 8px 0 196px; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:rgba(var(--text-rgb),.035); }
@@ -898,6 +844,7 @@
 <!--#include scrollbar-->
 <!--#include interaction-states-->
 <!--#include switch-->
+<!--#include slider-->
 <!--#include window-state-->
 </head>
 <body>
@@ -1116,7 +1063,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="screenshareSwitchDelayValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Capture switch delay in seconds">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="screenshareSwitchDelay" type="range" min="0.05" max="5" step="0.05" aria-label="Capture switch delay slider">
+                <input class="volume-slider rk-range" id="screenshareSwitchDelay" type="range" min="0.05" max="5" step="0.05" aria-label="Capture switch delay slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetScreenshareSwitchDelay" title="Reset to default">
@@ -1162,7 +1109,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="desktopAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="PC audio volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="PC audio volume slider">
+                <input class="volume-slider rk-range" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="PC audio volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetDesktopAudioVolume" title="Reset to default">
@@ -1188,7 +1135,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="discordAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Discord audio volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="discordAudioVolume" type="range" min="0" max="200" step="1" aria-label="Discord audio volume slider">
+                <input class="volume-slider rk-range" id="discordAudioVolume" type="range" min="0" max="200" step="1" aria-label="Discord audio volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetDiscordAudioVolume" title="Reset to default">
@@ -1209,7 +1156,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="clipSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Clipping sound volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="clipSoundVolume" type="range" min="0" max="100" step="1" aria-label="Clipping sound volume slider">
+                <input class="volume-slider rk-range" id="clipSoundVolume" type="range" min="0" max="100" step="1" aria-label="Clipping sound volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetClipSoundVolume" title="Reset to default">
@@ -1223,7 +1170,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="recordingSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Recording sound volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="recordingSoundVolume" type="range" min="0" max="100" step="1" aria-label="Recording sound volume slider">
+                <input class="volume-slider rk-range" id="recordingSoundVolume" type="range" min="0" max="100" step="1" aria-label="Recording sound volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetRecordingSoundVolume" title="Reset to default">
@@ -1342,7 +1289,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="overlayOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider">
+                <input class="volume-slider rk-range" id="overlayOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayOpacity" title="Reset to default">
@@ -1356,7 +1303,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="overlayScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider">
+                <input class="volume-slider rk-range" id="overlayScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayScale" title="Reset to default">
@@ -1370,7 +1317,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayHueShiftValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="overlayHueShift" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider">
+                <input class="volume-slider rk-range" id="overlayHueShift" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayHueShift" title="Reset to default">
@@ -1418,7 +1365,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="motionBlurStrengthValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Motion blur strength">
               <div class="volume-slider-wrap">
-                <input class="volume-slider" id="motionBlurStrength" type="range" min="0" max="1" step="0.001" aria-label="Motion blur strength slider">
+                <input class="volume-slider rk-range" id="motionBlurStrength" type="range" min="0" max="1" step="0.001" aria-label="Motion blur strength slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetMotionBlurStrength" title="Reset to default">
@@ -1854,11 +1801,11 @@
                   <div class="gradient-preview" id="themeGradientPreview"></div>
                 </div>
                 <div id="themeGradientLinearControls">
-                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
+                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider rk-range" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
                 </div>
                 <div id="themeGradientRadialControls" hidden>
-                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
-                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
+                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider rk-range" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
+                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider rk-range" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
                 </div>
                 <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops"></div>
                 <div class="grad-ramp-foot">
@@ -4995,7 +4942,7 @@
   }
 
   function raSliderHtml(key, volume, name) {
-    return '<div class="volume-slider-wrap"><input class="volume-slider" type="range" min="0" max="200" step="1" value="' + volume + '" data-vol="' + key +
+    return '<div class="volume-slider-wrap"><input class="volume-slider rk-range" type="range" min="0" max="200" step="1" value="' + volume + '" data-vol="' + key +
       '" style="--fill:' + (volume / 2) + '%" aria-label="' + escapeHtml(name) + ' volume"></div>';
   }
 

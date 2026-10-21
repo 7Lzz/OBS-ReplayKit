@@ -185,7 +185,7 @@ namespace ReplayKitHelper
                 // a clip with separate audio tracks goes up as a copy with the mix only, so the site gets exactly one audio track whatever it does with extra ones; the copy is a stream copy and takes seconds
                 if (Mp4Tracks.CountAudio(clipPath) > 1)
                 {
-                    string ffmpeg = Compression.GetHelperCapabilities()["ffmpeg"]?.Value<string>();
+                    string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found, so the clip could not be prepared for upload.");
                     // the copy keeps the name of the clip, in a folder of its own, since the name of the file is what the site receives
                     mixOnlyDir = tempPrefix + ".mix";

@@ -134,6 +134,16 @@ namespace ReplayKitHelper
             }
         }
 
+        // a voiceover the helper recorded itself: the wav sits in a staging folder of its own, which goes once the import is made, like an upload
+        public static JObject BeginFromRecording(string wavPath, string staging, string name)
+        {
+            string id;
+            using (var sha = SHA1.Create())
+            using (var stream = File.OpenRead(wavPath))
+                id = string.Concat(sha.ComputeHash(stream).Take(8).Select(b => b.ToString("x2")));
+            return Begin(id, name, wavPath, staging);
+        }
+
         private static JObject Skipped(string name, string message) => new JObject { ["ok"] = false, ["name"] = name, ["message"] = message };
 
         // starts the import of the bytes a page sent as the body of a request; the body is taken off the wire here, in the order it comes, into a file that is gone again once the import is made
@@ -218,7 +228,7 @@ namespace ReplayKitHelper
 
         private static void Extract(Job job, string source, string dir)
         {
-            string ffmpeg = Compression.GetHelperCapabilities()["ffmpeg"]?.Value<string>();
+            string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new ImportException("ffmpeg.exe was not found");
             ClipCache.Prune(dir);
             if (Directory.Exists(dir)) Directory.Delete(dir, true);

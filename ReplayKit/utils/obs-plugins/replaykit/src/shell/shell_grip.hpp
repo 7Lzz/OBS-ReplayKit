@@ -18,6 +18,9 @@ protected:
 	void paintEvent(QPaintEvent *) override;
 };
 
+// a page of the shell grabbed at its right edge, bottom edge or the corner between them: the window is resized by the resize loop of windows itself, as its own frame would be, which repaints as it goes. nothing happens once the button is already up, or for a maximized or fullscreen window
+void ShellStartEdgeResize(Qt::Edges edges);
+
 // the sliver between the square top left corner of the stage and its arc, as the polygon the corner window is cut to and the dip is kept clear of
 QPolygon ShellCornerEar();
 

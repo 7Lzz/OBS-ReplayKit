@@ -308,6 +308,8 @@
 
   function eligible(video) {
     if (!video.isConnected || video.readyState < 2 || !video.videoWidth || video.offsetParent === null) return false;
+    // the editor draws its own look over this video
+    if (video.dataset.rkFxOwned === "1") return false;
     var box = video.getBoundingClientRect();
     if (box.width < MIN_WIDTH || box.height < MIN_HEIGHT) return false;
     var card = video.closest(".card");

@@ -73,7 +73,7 @@ namespace ReplayKitHelper
 
         private static void Make(string source, string dir, bool gentle)
         {
-            var caps = Compression.GetHelperCapabilities();
+            var caps = Compression.GetToolPaths();
             string ffmpeg = caps["ffmpeg"]?.Value<string>();
             string ffprobe = caps["ffprobe"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg.exe was not found");
