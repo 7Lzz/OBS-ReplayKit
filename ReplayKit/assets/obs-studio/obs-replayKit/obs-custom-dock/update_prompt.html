@@ -282,7 +282,7 @@
   // every failure lands here, so a stuck-looking bar is never the end state and there is always a way forward
   function failUpdate(message) {
     stopProgressPolling();
-    setHero("Update failed", message || "The update could not be applied.", "OBS was left running.", true);
+    setHero("Update failed", message || "The update could not be applied.", "Retry or run the ReplayKit installer again.", true);
     setStatus("Update failed", "", 100, "bad");
     els.retryBtn.hidden = false;
     els.closeBtn.hidden = false;
@@ -296,7 +296,7 @@
     try {
       const data = await helperJson("update/apply", { method:"POST" });
       stopProgressPolling();
-      if (data.updateAvailable === false) {
+      if (data.updateAvailable === false && !data.installing) {
         setHero("ReplayKit is up to date", "You are on the latest version.", "");
         setStatus("Up to date", "", 100, "done");
         setTimeout(closeWindow, 1400);
@@ -304,7 +304,7 @@
       }
       setStatus("Installing update", "", 82);
       watchInstall(() => {
-        setHero("Update complete", "ReplayKit " + (latest && latest.latestVersion ? latest.latestVersion : "") + " is installed.", "OBS is back up.");
+        setHero(latest && latest.repairRequired ? "Repair complete" : "Update complete", "ReplayKit " + (latest && latest.latestVersion ? latest.latestVersion : "") + " is installed.", "OBS is back up.");
         setStatus("Done", "", 100, "done");
         setTimeout(closeWindow, 1500);
       }, failUpdate);
@@ -355,14 +355,14 @@
     try {
       const data = await helperJson("update/check?t=" + Date.now());
       latest = data;
-      if (!data.updateAvailable) {
+      if (!data.updateAvailable && !data.repairRequired) {
         setHero("ReplayKit is up to date", data.message || ("Version " + (data.installedVersion || "") + " is the latest."), "");
         setStatus("Up to date", "", 100, "done");
         setTimeout(closeWindow, 1600);
         return;
       }
       // no prompt: the update installs itself, the window only reports what is happening
-      setHero(data.releaseName || ("ReplayKit " + data.latestVersion), "Installing version " + data.latestVersion + ".", "OBS restarts when it is done.");
+      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || ("ReplayKit " + data.latestVersion)), data.repairRequired ? "Restoring the video tools." : "Installing version " + data.latestVersion + ".", "OBS restarts when it is done.");
       installUpdate();
     } catch (e) {
       failUpdate(e.message || String(e));

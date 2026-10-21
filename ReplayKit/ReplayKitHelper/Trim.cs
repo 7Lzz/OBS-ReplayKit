@@ -477,7 +477,7 @@ namespace ReplayKitHelper
 
 
             string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "ffmpeg.exe not found in clip folder" };
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "FFmpeg is missing or unavailable. Use Settings > Check for Updates or run the ReplayKit installer again to repair the video tools." };
 
             string ext = Path.GetExtension(source.Name);
             // for overwrite mode, snapshot the sources filesystem timestamps now (before the atomic replace destroys them) so they can be restored after the encode -- same rationale as the compress-overwrite path: keeps the clip in its original sort position rather than jumping to the top of the dock list every time its trimmed.

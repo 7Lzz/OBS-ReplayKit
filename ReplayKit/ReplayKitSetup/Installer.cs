@@ -607,17 +607,25 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 log?.Invoke($"warn: tool refresh pass failed: {ex.Message}");
+                problems?.Add("the video tools and plugins");
             }
 
             return count;
         }
 
-        // re-run idempotent installer functions during an auto-update; each one short-circuits when its target is already present (ffmpeg checks file hashes, elevation task checks schtasks), so new releases can plug in additional plugin installs here and existing users pick them up next auto-update. returns what the update could not bring up to date among the parts that change how replaykit behaves (the plugin and the audio plugin), so the verdict of the update can say so instead of a warning line that nobody reads
+        // Verify the video tools and refresh managed plugins on update; report any repairs that did not finish.
         public static List<string> RunUpdateDriverRefresh(Action<string> log = null)
         {
             var problems = new List<string>();
-            try { InstallObsFfmpeg(log); }
-            catch (Exception ex) { log?.Invoke($"warn: ffmpeg refresh skipped: {ex.Message}"); }
+            try
+            {
+                if (!InstallObsFfmpeg(log)) problems.Add("FFmpeg and FFprobe");
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: ffmpeg refresh failed: {ex.Message}");
+                problems.Add("FFmpeg and FFprobe");
+            }
 
             try { ShaderFilter.InstallReplaykitMotionBlurPlugin(log); }
             catch (Exception ex) { log?.Invoke($"warn: OBS Shaderfilter refresh skipped: {ex.Message}"); }

@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
@@ -256,6 +257,7 @@ namespace ReplayKitHelper
                     ["releaseName"] = latest.Name,
                     ["releaseNotes"] = latest.Body,
                     ["updateAvailable"] = cmp < 0,
+                    ["repairRequired"] = cmp == 0 && !VideoTools.IsInstalled(Constants.HelperRoot),
                     ["hashRequired"] = true,
                 };
             }
@@ -348,7 +350,7 @@ namespace ReplayKitHelper
                 var status = GetUpdateStatus(manual);
                 status["autoUpdateEnabled"] = true;
                 status["prompt"] = false;
-                if ((status["ok"]?.Value<bool>() ?? false) && (status["updateAvailable"]?.Value<bool>() ?? false) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>()))
+                if ((status["ok"]?.Value<bool>() ?? false) && ((status["updateAvailable"]?.Value<bool>() ?? false) || (status["repairRequired"]?.Value<bool>() ?? false)) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>()))
                 {
                     string dismissed = (settings["lastUpdatePromptVersion"]?.Value<string>() ?? "").Trim();
                     if (!string.IsNullOrWhiteSpace(dismissed)) dismissed = NormalizeVersion(dismissed);
@@ -403,7 +405,7 @@ namespace ReplayKitHelper
             status["startupCheck"] = true;
             status["admin"] = Elevation.IsAdmin();
             status["autoUpdateEnabled"] = true;
-            status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && (status["updateAvailable"]?.Value<bool>() ?? false) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
+            status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && ((status["updateAvailable"]?.Value<bool>() ?? false) || (status["repairRequired"]?.Value<bool>() ?? false)) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
 
             // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a fresh update window stacked on the one still showing them why the last attempt failed.
             if (status["prompt"]?.Value<bool>() ?? false)
@@ -767,7 +769,7 @@ namespace ReplayKitHelper
                 "--update-watchdog", "-LauncherPid", installerPid.ToString(),
                 "-PidFile", InstallPidPath(), "-Result", InstallResultPath(),
                 "-ObsPath", obsPath ?? "", "-TargetVersion", targetVersion ?? "",
-                "-ReleaseUrl", releaseUrl ?? ReleasePage, "-VersionPath", GetVersionPath(),
+                "-ReleaseUrl", releaseUrl ?? ReleasePage,
             };
             string cmdLine = ProcessArgs.Quote(watchdogExe) + " " + ProcessArgs.Join(args);
             int pid = Native.SpawnDetached(cmdLine, Constants.LOG_DIR);
@@ -865,7 +867,9 @@ namespace ReplayKitHelper
                 string installed = NormalizeVersion(GetInstalledVersion());
                 var latest = GetLatestRelease();
                 if (!string.IsNullOrWhiteSpace(latest.HtmlUrl)) releaseUrl = latest.HtmlUrl;
-                if (CompareVersion(installed, latest.LatestVersion) >= 0)
+                int comparison = CompareVersion(installed, latest.LatestVersion);
+                bool repairRequired = comparison == 0 && !VideoTools.IsInstalled(Constants.HelperRoot);
+                if (comparison > 0 || (comparison == 0 && !repairRequired))
                 {
                     return new JObject
                     {
@@ -892,7 +896,7 @@ namespace ReplayKitHelper
                 }
                 return new JObject
                 {
-                    ["ok"] = true, ["updateAvailable"] = true, ["installing"] = true,
+                    ["ok"] = true, ["updateAvailable"] = comparison < 0, ["repairRequired"] = repairRequired, ["installing"] = true,
                     ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
                     ["releaseUrl"] = releaseUrl,
                     ["processId"] = started["processId"],

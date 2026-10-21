@@ -118,7 +118,12 @@ namespace ReplayKitSetup
                 Add("Pin OBS tray icon", "Pins the OBS tray icon.", () => { TrayPin.PinObsTrayIcon(progress.LogLine); return (object)true; });
             else
                 Add("Skip tray icon pinning", "Leaves the tray icon default.", () => { TrayPin.UnpinObsTrayIcon(progress.LogLine); return (object)true; });
-            Add("Install video tools", "Verifies the trim/compress tools.", () => (object)Installer.InstallObsFfmpeg(progress.LogLine));
+            Add("Install video tools", "Verifies the trim/compress tools.", () =>
+            {
+                if (!Installer.InstallObsFfmpeg(progress.LogLine))
+                    throw new IOException("FFmpeg and FFprobe could not be installed or verified. Check your connection and run the installer again to repair trimming and compression.");
+                return (object)true;
+            });
             Add("Install WASD/mouse overlay", "Adds the WASD/mouse overlay plugin.",
                 () => (object)(InputOverlay.InstallInputOverlayPlugin(progress.LogLine) && InputOverlay.InstallInputOverlayPresets(progress.LogLine)));
             Add("Install Bongo Cat overlay", "Adds the Bongo Cat overlay files.",

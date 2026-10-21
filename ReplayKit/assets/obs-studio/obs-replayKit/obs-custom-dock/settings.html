@@ -3890,17 +3890,17 @@
     setUpdateReleaseLink("", false);
     try {
       const data = await helperJson("update/check?manual=1&t=" + Date.now());
-      if (!data.updateAvailable) {
+      if (!data.updateAvailable && !data.repairRequired) {
         setUpdateStatus(data.message || ("ReplayKit is up to date" + (data.installedVersion ? " (" + data.installedVersion + ")" : "")), "good");
         return;
       }
       setUpdateReleaseLink(data.releaseUrl, true);
       if (dirty) {
-        setUpdateStatus("Update available: " + data.latestVersion + ". Apply or cancel your settings changes first.", "bad");
+        setUpdateStatus((data.repairRequired ? "Video tools need repair." : "Update available: " + data.latestVersion + ".") + " Apply or cancel your settings changes first.", "bad");
         return;
       }
       if (await openUpdatePrompt(data.latestVersion)) {
-        setUpdateStatus("Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
+        setUpdateStatus(data.repairRequired ? "Repairing the ReplayKit video tools." : "Update available: " + data.latestVersion + " (installed " + data.installedVersion + ")", "good");
       }
     } catch (e) {
       setUpdateStatus("Update check failed: " + (e.message || e), "bad");

@@ -206,9 +206,12 @@ namespace ReplayKitSetup
                         return 1;
                     }
                 }
-                // the files are in and obs is back, so this is still a success; the parts that could not be updated are named so the verdict does not claim more than happened
-                string notUpdated = problems.Count == 0 ? "" : " Not updated: " + string.Join(", ", problems) + ". Run the installer again as administrator to finish.";
-                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s))." + notUpdated, releaseUrl);
+                if (problems.Count > 0)
+                {
+                    WriteResult(false, "incomplete", $"ReplayKit {VersionInfo.Version} files were installed, but the update is incomplete. Not repaired: " + string.Join(", ", problems) + ". Run the installer again to finish the repair.", releaseUrl);
+                    return 1;
+                }
+                WriteResult(true, "done", $"ReplayKit {VersionInfo.Version} installed ({count} file(s)).", releaseUrl);
                 return 0;
             }
             catch (Exception exc)

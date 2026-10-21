@@ -81,13 +81,24 @@ namespace ReplayKitHelper
             }
         }
 
-        // the encoders of a machine do not change while obs runs, so a probe that found ffmpeg is kept for hours and nobody waits for the probe again in the middle of a session; one that found nothing is repeated soon, since ffmpeg may have been put there since
-        private static bool CapabilitiesFresh(DateTime now)
+        private static bool ToolPathsFresh(JObject paths, DateTime savedAt, DateTime now)
         {
-            if (Server.State.Capabilities == null) return false;
-            bool found = !string.IsNullOrEmpty(Server.State.Capabilities["ffmpeg"]?.Value<string>());
-            return (now - Server.State.CapabilitiesAt).TotalMinutes < (found ? 360 : 10);
+            if (paths == null) return false;
+            bool found = !string.IsNullOrEmpty(paths["ffmpeg"]?.Value<string>());
+            if ((now - savedAt).TotalMinutes >= (found ? 360 : 10)) return false;
+            foreach (string name in new[] { "ffmpeg", "ffprobe" })
+            {
+                string path = paths[name]?.Value<string>();
+                if (string.IsNullOrEmpty(path))
+                {
+                    if (!string.IsNullOrEmpty(FindToolInClipDirs(name + ".exe"))) return false;
+                }
+                else if (!File.Exists(path)) return false;
+            }
+            return true;
         }
+
+        private static bool CapabilitiesFresh(DateTime now) => ToolPathsFresh(Server.State.Capabilities, Server.State.CapabilitiesAt, now);
 
         private static readonly object ToolPathsLock = new object();
         private static JObject _toolPaths;
@@ -100,7 +111,7 @@ namespace ReplayKitHelper
             if (CapabilitiesFresh(now)) return Server.State.Capabilities;
             lock (ToolPathsLock)
             {
-                if (_toolPaths != null && (now - _toolPathsAt).TotalMinutes < (string.IsNullOrEmpty(_toolPaths["ffmpeg"]?.Value<string>()) ? 10 : 360)) return _toolPaths;
+                if (ToolPathsFresh(_toolPaths, _toolPathsAt, now)) return _toolPaths;
                 AppConfig.LoadConfig();
                 _toolPaths = new JObject
                 {

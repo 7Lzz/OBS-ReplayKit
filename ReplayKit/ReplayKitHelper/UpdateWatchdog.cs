@@ -17,7 +17,6 @@ namespace ReplayKitHelper
             string obsPath = StringArg(args, "-ObsPath");
             string targetVersion = StringArg(args, "-TargetVersion");
             string releaseUrl = StringArg(args, "-ReleaseUrl");
-            string versionPath = StringArg(args, "-VersionPath");
             if (launcherPid <= 0 || string.IsNullOrWhiteSpace(resultPath)) return 1;
 
             int installerPid = 0;
@@ -34,7 +33,6 @@ namespace ReplayKitHelper
             while (DateTime.UtcNow < deadline && IsRunning(installerPid)) Thread.Sleep(3000);
             if (File.Exists(resultPath)) return 0;
 
-            string installedVersion = ReadVersion(versionPath);
             if (!IsObsRunning() && File.Exists(obsPath))
             {
                 try
@@ -48,14 +46,12 @@ namespace ReplayKitHelper
                 catch (Exception ex) { Log.Write("Update watchdog could not relaunch OBS: " + ex.Message); }
             }
 
-            bool installed = string.Equals(installedVersion, targetVersion, StringComparison.OrdinalIgnoreCase);
+            // A version file cannot confirm completion, especially during a same-version repair.
             var result = new JObject
             {
-                ["ok"] = installed,
-                ["stage"] = installed ? "done" : "aborted",
-                ["message"] = installed
-                    ? "ReplayKit " + targetVersion + " installed; OBS was restarted by the update watchdog."
-                    : "The installer stopped before it finished. OBS was restarted; the update was not applied.",
+                ["ok"] = false,
+                ["stage"] = "aborted",
+                ["message"] = "The installer stopped without confirming completion. Run the ReplayKit installer again to finish the update or repair.",
                 ["version"] = targetVersion ?? "",
                 ["releaseUrl"] = releaseUrl ?? "",
                 ["finishedAt"] = DateTime.UtcNow.ToString("o"),
@@ -66,7 +62,7 @@ namespace ReplayKitHelper
                 File.WriteAllText(resultPath, result.ToString(Formatting.None));
             }
             catch (Exception ex) { Log.Write("Update watchdog could not write result: " + ex.Message); }
-            return installed ? 0 : 1;
+            return 1;
         }
 
         private static bool IsRunning(int pid)
@@ -91,12 +87,6 @@ namespace ReplayKitHelper
         {
             try { return int.TryParse(File.ReadAllText(path).Trim(), out int pid) ? pid : 0; }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return 0; }
-        }
-
-        private static string ReadVersion(string path)
-        {
-            try { return JObject.Parse(File.ReadAllText(path))["version"]?.Value<string>() ?? ""; }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException) { return ""; }
         }
 
         private static string StringArg(string[] args, string name)

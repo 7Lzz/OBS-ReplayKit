@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -19,14 +19,13 @@ namespace ReplayKitSetup
 
         private static readonly string[] ArchiveUrls =
         {
-            // path is repo-root relative on the PUBLIC main branch -- update to ReplayKit/utils/downloads/... only once the folder reorg is actually pushed.
-            "https://github.com/7Lzz/OBS-ReplayKit/raw/refs/heads/main/utils/downloads/ffmpeg-tools.zip",
+            VideoTools.ArchiveUrl,
         };
 
         private static readonly (string Name, string Dst, string ExpectedSha256)[] Tools =
         {
-            ("ffmpeg.exe", FfmpegDst, "228d7a8556258de907fdb55f36850078ebc7680b84ec30d84ea02e99bec1d1eb"),
-            ("ffprobe.exe", FfprobeDst, "0fde260f5abd35c9cafd96f594cc76365a780c1b73a90e35b6a3409ea1db1bf0"),
+            ("ffmpeg.exe", FfmpegDst, VideoTools.FfmpegSha256),
+            ("ffprobe.exe", FfprobeDst, VideoTools.FfprobeSha256),
         };
 
         // size caps so a hijacked url/archive cant fill the users disk.
@@ -35,21 +34,7 @@ namespace ReplayKitSetup
         private const long ProgressIntervalBytes = 5L * 1024 * 1024;
         private const double ProgressIntervalSeconds = 0.5;
 
-        private static bool AlreadyInstalled() => Tools.All(t => ValidTool(t.Dst, t.ExpectedSha256));
-
-        private static string FileSha256(string path)
-        {
-            using (var sha = SHA256.Create())
-            using (var handle = File.OpenRead(path))
-            {
-                return BitConverter.ToString(sha.ComputeHash(handle)).Replace("-", "").ToLowerInvariant();
-            }
-        }
-
-        private static bool ValidTool(string path, string expectedSha256)
-        {
-            return File.Exists(path) && FileSha256(path) == expectedSha256.ToLowerInvariant();
-        }
+        private static bool AlreadyInstalled() => VideoTools.IsInstalled(HelperDir);
 
         private static string FormatSize(long numBytes)
         {
@@ -121,12 +106,12 @@ namespace ReplayKitSetup
                     return tmpPath;
                 }
             }
-            catch (Exception exc) when (exc is HttpRequestException || exc is InvalidDataException || exc is OperationCanceledException || exc is IOException)
+            catch (Exception exc) when (exc is HttpRequestException || exc is InvalidDataException || exc is OperationCanceledException || exc is IOException || exc is UnauthorizedAccessException)
             {
                 log?.Invoke($"warn: FFmpeg archive download error: {exc.Message}: {url}");
                 if (tmpPath != null && File.Exists(tmpPath))
                 {
-                    try { File.Delete(tmpPath); } catch (IOException) { }
+                    try { File.Delete(tmpPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
                 return null;
             }
@@ -143,6 +128,7 @@ namespace ReplayKitSetup
                     foreach (var e in zf.Entries) infos[Path.GetFileName(e.FullName).ToLowerInvariant()] = e;
                     foreach (var (name, dst, expectedSha256) in Tools)
                     {
+                        if (VideoTools.IsValid(dst, expectedSha256)) continue;
                         if (!infos.TryGetValue(name.ToLowerInvariant(), out var info))
                         {
                             log?.Invoke("warn: " + name + " missing from FFmpeg archive");
@@ -187,16 +173,15 @@ namespace ReplayKitSetup
                             return false;
                         }
 
-                        // File.Move does not overwrite, so the old file goes first
-                        if (File.Exists(dst)) File.Delete(dst);
-                        File.Move(tmp, dst);
+                        if (name == "ffmpeg.exe") File.Delete(Path.Combine(HelperDir, "OBSReplayKit-Encoder.exe"));
+                        File.Move(tmp, dst, true);
                         tmpPaths.Remove(tmp);
                         log?.Invoke("installed -> " + dst);
                     }
                 }
                 return AlreadyInstalled();
             }
-            catch (Exception exc) when (exc is IOException || exc is InvalidDataException)
+            catch (Exception exc) when (exc is IOException || exc is InvalidDataException || exc is UnauthorizedAccessException)
             {
                 log?.Invoke("warn: FFmpeg archive extract failed: " + exc.Message);
                 return false;
@@ -207,7 +192,7 @@ namespace ReplayKitSetup
                 {
                     if (File.Exists(tmp))
                     {
-                        try { File.Delete(tmp); } catch (IOException) { }
+                        try { File.Delete(tmp); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     }
                 }
             }
@@ -228,12 +213,12 @@ namespace ReplayKitSetup
                 {
                     if (File.Exists(archive))
                     {
-                        try { File.Delete(archive); } catch (IOException) { }
+                        try { File.Delete(archive); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     }
                 }
             }
             log?.Invoke("warn: ReplayKit ffmpeg-tools.zip was unavailable or invalid");
-            log?.Invoke("Upload ffmpeg-tools.zip to utils/downloads on the public main branch, then re-run Apply.");
+            log?.Invoke("Check your connection and run the installer again to repair the video tools.");
             return false;
         }
 
@@ -242,7 +227,7 @@ namespace ReplayKitSetup
             if (log == null) return;
             foreach (var (name, dst, expectedSha256) in Tools)
             {
-                if (ValidTool(dst, expectedSha256)) log(name + " already present at " + dst);
+                if (VideoTools.IsValid(dst, expectedSha256)) log(name + " already present at " + dst);
                 else if (File.Exists(dst)) log("warn: " + name + " hash mismatch; replacing it");
             }
         }
@@ -272,8 +257,7 @@ namespace ReplayKitSetup
             bool ok = InstallTools(log);
             if (!ok)
             {
-                log?.Invoke("ffmpeg install SKIPPED -- compress / trim will be unavailable");
-                log?.Invoke("Make the GitHub ZIP URL public, then re-run Apply.");
+                log?.Invoke("FFmpeg and FFprobe could not be installed or verified; trimming and compression are unavailable.");
             }
             return ok;
         }
