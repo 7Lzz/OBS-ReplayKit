@@ -926,7 +926,6 @@
       var close = el("button", "ed-x");
       close.type = "button";
       close.setAttribute("aria-label", "Close");
-      close.dataset.tooltip = "Close";
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { lanes.clearSelection(); });
       head.appendChild(close);

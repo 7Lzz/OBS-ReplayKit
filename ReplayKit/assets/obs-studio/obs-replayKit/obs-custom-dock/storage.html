@@ -50,11 +50,11 @@
   .sub b { color:var(--text); font-weight:600; }
   .sub .sep { display:inline-block; width:1px; height:11px; margin:0 8px -1px; background:var(--grey3); }
   .x {
-    position:absolute; top:12px; right:-10px; width:30px; height:30px; padding:0; border:0; border-radius:50%;
-    display:flex; align-items:center; justify-content:center; background:var(--grey3); color:var(--text); cursor:pointer;
+    position:absolute; top:12px; right:-10px; width:26px; height:26px; padding:0; border:0; border-radius:var(--border_radius,4px);
+    display:grid; place-items:center; background:transparent; color:var(--text_muted); cursor:pointer;
     transition:background-color 90ms linear, transform var(--anim_press) var(--ease_pop);
   }
-  .x:hover { background:var(--line2); }
+  .x:hover { background:var(--button_bg_hover,var(--grey3)); color:var(--text); }
   .x:active { transform:scale(.94); }
   .x svg { width:14px; height:14px; }
 
@@ -218,7 +218,7 @@
     <header class="top">
       <h1>Free-up Space</h1>
       <button class="x" type="button" id="close" aria-label="Close">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/></svg>
       </button>
       <p class="sub" id="sub">&nbsp;</p>
     </header>

@@ -969,7 +969,6 @@
       var close = el("button", "ed-x");
       close.type = "button";
       close.setAttribute("aria-label", "Close");
-      close.dataset.tooltip = "Close";
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { subs.select(""); });
       head.appendChild(close);
@@ -1126,7 +1125,6 @@
       var close = el("button", "ed-x");
       close.type = "button";
       close.setAttribute("aria-label", "Close");
-      close.dataset.tooltip = "Close";
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", closeLibrary);
       head.appendChild(close);
@@ -1615,7 +1613,6 @@
       var close = el("button", "ed-x");
       close.type = "button";
       close.setAttribute("aria-label", "Close the panel");
-      close.dataset.tooltip = "Close";
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { prefs.open = false; savePrefs(); paintTabs(); });
       head.appendChild(els.title);
