@@ -3158,7 +3158,7 @@
       // the host adds its volume and fullscreen buttons to this group
       var playGroup = group(
         button("stop", "editor/stop", "Stop", function () { opts.stop(); }),
-        button("play", "player/play", "Play and pause (Space)", function () { opts.togglePlay(); }),
+        button("play", "editor/play", "Play and pause (Space)", function () { opts.togglePlay(); }),
         time
       );
       playGroup.classList.add("tl-play-group");
@@ -3216,7 +3216,7 @@
       var playing = !!opts.isPlaying();
       if (playing !== playShown) {
         playShown = playing;
-        els.play.innerHTML = icon(playing ? "player/pause" : "player/play");
+        els.play.innerHTML = icon(playing ? "editor/pause" : "editor/play");
       }
       // the total is where the saved clip ends on the ruler, which is past the end of the video where pieces reach past it
       if (els.total) els.total.textContent = "/ " + fmt(vt.on ? windowT().end : D(), 1);

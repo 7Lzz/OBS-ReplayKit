@@ -199,9 +199,17 @@ namespace ReplayKitHelper
         private static Process[] GetProcessesByNames(params string[] names)
         {
             var list = new List<Process>();
+            int currentPid = Process.GetCurrentProcess().Id;
             foreach (var name in names)
             {
-                try { list.AddRange(Process.GetProcessesByName(name)); }
+                try
+                {
+                    foreach (var process in Process.GetProcessesByName(name))
+                    {
+                        if (process.Id == currentPid) process.Dispose();
+                        else list.Add(process);
+                    }
+                }
                 catch (InvalidOperationException) { }
             }
             return list.ToArray();

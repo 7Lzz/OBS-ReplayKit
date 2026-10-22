@@ -243,9 +243,7 @@ namespace ReplayKitHelper
                     notify = settings["linkNotificationEnabled"]?.Value<bool>() ?? true;
                 }
                 catch (InvalidOperationException) { }
-                string exePath = Process.GetCurrentProcess().MainModule.FileName;
-                string cmdLine = ProcessArgs.Quote(exePath) +
-                    " --transcode-poll" +
+                string cmdLine = ProcessArgs.Quote(ProcessHost.HelperExecutable) + " --transcode-poll" +
                     " -Shortcode " + ProcessArgs.Quote(shortcode) +
                     " -ClipName " + ProcessArgs.Quote(clipName) +
                     " -DbPath " + ProcessArgs.Quote(dbPath) +

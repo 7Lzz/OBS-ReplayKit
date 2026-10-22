@@ -553,7 +553,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
 
             int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
-            string exe = Process.GetCurrentProcess().MainModule.FileName;
+            string exe = ProcessHost.HelperExecutable;
             var argList = new List<string> { "--update-window", "-Port", port.ToString() };
             if (!string.IsNullOrWhiteSpace(version)) { argList.Add("-Version"); argList.Add(version); }
             // the window process has no settings loaded -- hand it the active themes window colour so the pre-paint frame (before the page renders) matches the Appearance tab; the border is the dwm system default
@@ -760,7 +760,7 @@ namespace ReplayKitHelper
         // the watchdog is a detached copy of this helper exe, since the installer replaces the one in scripts\helper while it runs
         private static void StartUpdateWatchdog(int installerPid, string obsPath, string targetVersion, string releaseUrl)
         {
-            string source = Process.GetCurrentProcess().MainModule.FileName;
+            string source = ProcessHost.HelperExecutable;
             string watchdogDir = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "watchdog-" + Guid.NewGuid().ToString("N"));
             string watchdogExe = Path.Combine(watchdogDir, "OBSReplayKit-watchdog.exe");
             try

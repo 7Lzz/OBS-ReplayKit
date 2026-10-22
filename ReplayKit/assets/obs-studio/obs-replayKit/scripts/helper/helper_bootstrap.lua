@@ -52,6 +52,9 @@ ffi.cdef[[
     );
     BOOL CloseHandle(HANDLE hObject);
     DWORD GetLastError(void);
+    HANDLE GetModuleHandleA(LPCSTR lpModuleName);
+    void* GetProcAddress(HANDLE hModule, LPCSTR lpProcName);
+    DWORD GetModuleFileNameA(HANDLE hModule, LPSTR lpFilename, DWORD nSize);
     void Sleep(DWORD dwMilliseconds);
     unsigned long long GetTickCount64(void);
 
@@ -286,7 +289,7 @@ local function win_quote(arg)
     return out .. string.rep("\\", slashes * 2) .. '"'
 end
 
-local function spawn_hidden(cmdline)
+local function spawn_hidden(cmdline, stay_in_job)
     local si = ffi.new("STARTUPINFOA")
     si.cb = ffi.sizeof("STARTUPINFOA")
     -- create_no_window alone allows powershell.exe to briefly flash a console window on some windows builds before it self-hides. the documented "zero flash" pattern is to also set startf_useshowwindow + wshowwindow=sw_hide in startupinfo, which tells the os to hide the window at the kernel level from the very first scheduling tick. note: do not combine with detached_process -- that means "no console at all" and breaks powershells startup (its init queries the console handle).
@@ -296,9 +299,10 @@ local function spawn_hidden(cmdline)
     local buf = ffi.new("char[?]", #cmdline + 1)
     ffi.copy(buf, cmdline)
     local flags = CREATE_NO_WINDOW + CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS
+    if stay_in_job then flags = CREATE_NO_WINDOW end
     local ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, flags, nil, nil, si, pi)
     -- some restrictive job policies deny breakaway. The compiled helper still works in that case, so retry with the ordinary launch flags.
-    if ok == 0 then
+    if ok == 0 and not stay_in_job then
         buf = ffi.new("char[?]", #cmdline + 1)
         ffi.copy(buf, cmdline)
         ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, CREATE_NO_WINDOW, nil, nil, si, pi)
@@ -384,6 +388,21 @@ end
 -- set to true once weve successfully launched the helper this session. re-spawn attempts are skipped while its true (the os port-bind would just fail anyway). stays false if the launch errored so the next helper_request() retries after a failed helper launch.
 local helper_started = false
 
+local function helper_command()
+    local module = kernel32.GetModuleHandleA(nil)
+    if module ~= nil and kernel32.GetProcAddress(module, "ProcessHostVersion") ~= nil then
+        local buffer = ffi.new("char[32768]")
+        local length = kernel32.GetModuleFileNameA(module, buffer, ffi.sizeof(buffer))
+        if length == 0 or length >= ffi.sizeof(buffer) then
+            log(obs.LOG_ERROR, "The shared OBS helper host is missing")
+            return nil
+        end
+        local host = ffi.string(buffer, length)
+        return win_quote(host) .. ' --replaykit-helper', true
+    end
+    return win_quote(helper_path()), false
+end
+
 -- runs the startup update check in the compiled helper, so the prompt also appears while obs is minimized
 local update_bootstrap_started = false
 local function start_update_bootstrap()
@@ -393,8 +412,10 @@ local function start_update_bootstrap()
         log(obs.LOG_INFO, "Helper missing; skipping startup update check: " .. helper)
         return false
     end
-    local cmd = win_quote(helper) .. ' --update-startup-check -Port ' .. HTTP_PORT
-    local ok, err = spawn_hidden(cmd)
+    local command, hosted = helper_command()
+    if not command then return false end
+    local cmd = command .. ' --update-startup-check -Port ' .. HTTP_PORT
+    local ok, err = spawn_hidden(cmd, hosted)
     if not ok then
         log(obs.LOG_ERROR, "Update bootstrap spawn failed. Win32 error: " .. tostring(err))
         return false
@@ -412,8 +433,10 @@ local function spawn_helper()
     end
     if not write_helper_config() then return false end
 
-    local cmd = win_quote(helper) .. ' -ConfigPath ' .. win_quote(helper_config_path())
-    local ok, err = spawn_hidden(cmd)
+    local command, hosted = helper_command()
+    if not command then return false end
+    local cmd = command .. ' -ConfigPath ' .. win_quote(helper_config_path())
+    local ok, err = spawn_hidden(cmd, hosted)
     if not ok then
         log(obs.LOG_ERROR, "Could not start ReplayKit helper. Win32 error: " .. tostring(err))
         return false

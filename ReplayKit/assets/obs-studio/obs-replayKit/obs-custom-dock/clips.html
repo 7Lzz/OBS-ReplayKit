@@ -3334,6 +3334,8 @@
     FOLDER_OPEN: _svgInner(_RKI["action/folder-open"]),
     PLAY: _svgInner(_RKI["player/play"]),
     PAUSE: _svgInner(_RKI["player/pause"]),
+    EDITOR_PLAY: _svgInner(_RKI["editor/play"]),
+    EDITOR_PAUSE: _svgInner(_RKI["editor/pause"]),
     FULLSCREEN_EXIT: _svgInner(_RKI["player/fullscreen-exit"]),
     SETTINGS: _svgInner(_RKI["action/gear"]),
     OPEN_EDITOR: _svgInner(_RKI["action/open-editor"]),
@@ -9736,7 +9738,7 @@
 
   function syncTrimPlayIcon() {
     const paused = trimVideo.paused || trimVideo.ended;
-    trimPlayPauseIcn.innerHTML = paused ? ICON.PLAY : ICON.PAUSE;
+    trimPlayPauseIcn.innerHTML = paused ? ICON.EDITOR_PLAY : ICON.EDITOR_PAUSE;
     trimVideoWrap.classList.toggle("is-paused", paused);
   }
 

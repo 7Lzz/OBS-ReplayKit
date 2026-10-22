@@ -31,7 +31,7 @@ namespace ReplayKitHelper
         public static readonly int MAX_CONNECTION_THREADS = Math.Max(6, Environment.ProcessorCount);
 
         // the folder the running exe lives in, where the setup puts ffmpeg/ffprobe next to the helper
-        public static readonly string HelperRoot = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+        public static readonly string HelperRoot = Path.GetDirectoryName(typeof(Program).Assembly.Location);
         // bundled next to the helper exe by the setup wizard, not extracted from obs64.exe at runtime -- Icon.ExtractAssociatedIcon only ever returns a single low-res frame, so dock/toast/window icons would look blurry next to the real multi-resolution icon the setup exe uses.
         public static readonly string OBS_ICON_PATH = Path.Combine(HelperRoot, "obs-replaykit.ico");
         // bundled preset icons for the Appearance tab -- HelperRoot is ...\obs-replayKit\scripts\helper, so this is ...\obs-replayKit\icons, mirrored from assets/ by the installer. drop-in extensible: any .ico/.png here shows in the picker.

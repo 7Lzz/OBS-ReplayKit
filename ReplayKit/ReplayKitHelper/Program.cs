@@ -23,10 +23,16 @@ namespace ReplayKitHelper
         private static readonly object CrashLogLock = new object();
         private static Timer _crashSentinelTimer;
 
-        private static int Main(string[] args)
+        internal static int Main(string[] args)
         {
             System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
+            if (args.Length == 1 && args[0] == "--host-info")
+            {
+                Console.WriteLine(new JObject { ["hosted"] = ProcessHost.Hosted, ["helperRoot"] = Constants.HelperRoot,
+                    ["assembly"] = ProcessHost.HelperExecutable, ["command"] = ProcessHost.CommandLine(new[] { "--host-info" }) }.ToString(Newtonsoft.Json.Formatting.None));
+                return 0;
+            }
             if (args.Length == 1 && string.Equals(args[0], "--prepare-theme", StringComparison.OrdinalIgnoreCase))
             {
                 try
