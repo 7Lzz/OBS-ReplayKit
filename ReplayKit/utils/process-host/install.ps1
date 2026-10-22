@@ -7,7 +7,7 @@ param(
     [string]$Components = ''
 )
 $ErrorActionPreference = 'Stop'
-if (-not $Components) { $Components = Join-Path $PSScriptRoot '../../../build/process-host/components' }
+if (-not $Components) { $Components = Join-Path $PSScriptRoot '../../../build/process-host/unpackaged-components' }
 
 function FullPath([string]$path) {
     $full = [IO.Path]::GetFullPath($path).TrimEnd('\')
@@ -85,7 +85,8 @@ if ($Mode -eq 'Prepare') {
         $files += [pscustomobject]@{Root='obs'; Path=$relative; Source=$source}
     }
     $assets = FullPath (Join-Path $PSScriptRoot '../../assets/obs-studio/obs-replayKit')
-    foreach ($relative in @('scripts/helper/OBSReplayKit.exe', 'scripts/helper/helper_bootstrap.lua')) {
+    foreach ($relative in @('scripts/helper/OBSReplayKit.exe', 'scripts/helper/helper_bootstrap.lua',
+        'icons/player/play.svg', 'icons/player/pause.svg', 'icons/editor/play.svg', 'icons/editor/pause.svg')) {
         $files += [pscustomobject]@{Root='runtime'; Path=$relative; Source=(Within $assets $relative)}
     }
     $dock = Within $assets 'obs-custom-dock'
@@ -143,7 +144,8 @@ foreach ($file in $manifest.Files) {
         if ($file.Path -notin $nativePaths) { throw 'Unexpected OBS target in backup.' }
         $root = $ObsRoot
     } elseif ($file.Root -eq 'runtime') {
-        if ($file.Path -notin @('scripts/helper/OBSReplayKit.exe', 'scripts/helper/helper_bootstrap.lua') -and
+        if ($file.Path -notin @('scripts/helper/OBSReplayKit.exe', 'scripts/helper/helper_bootstrap.lua',
+            'icons/player/play.svg', 'icons/player/pause.svg', 'icons/editor/play.svg', 'icons/editor/pause.svg') -and
             -not $file.Path.StartsWith('obs-custom-dock/', [StringComparison]::Ordinal)) { throw 'Unexpected runtime target in backup.' }
         $root = $ReplayKitRoot
     } elseif ($file.Root -eq 'cache') {

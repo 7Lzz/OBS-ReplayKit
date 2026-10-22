@@ -6,6 +6,7 @@
 #include <QPaintEvent>
 #include <QPoint>
 #include <QResizeEvent>
+#include <QRect>
 #include <QString>
 #include <QWidget>
 
@@ -39,6 +40,8 @@ public:
 	void SetAccount(const ShellAccountButton::Account &account);
 	// the arrows after the logo: one is dimmed while the history has nowhere to go that way
 	void SetNavigation(bool canGoBack, bool canGoForward);
+	void SetPage(const QString &page);
+	void RestoreTitle();
 	// the menu of the circle is up, so the shell reads the account every second instead of every half minute
 	bool AccountPanelOpen() const;
 	// starts the browsers of the menus that hang off the bar out of sight, one after another, so the first open of each finds a page that is up; true while one of them is still to come or on its way
@@ -59,6 +62,10 @@ private:
 	static constexpr int kDividerGap = 1;
 	static constexpr int kBellGap = 9;
 	QMainWindow *m_mw = nullptr;
+	QString m_page;
+	QString m_originalTitle;
+	QRect m_pageRect;
+	bool m_settingTitle = false;
 	QPoint m_pressPos;
 	bool m_pressArmed = false;
 	ShellNavButton *m_back = nullptr;

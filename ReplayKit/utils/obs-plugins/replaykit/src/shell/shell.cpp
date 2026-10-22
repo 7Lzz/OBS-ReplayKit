@@ -126,6 +126,7 @@ void ShellBuild()
 		return;
 	g_shellTitle = new ShellTitleBar(mw);
 	g_shellRail = new ShellRail(mw);
+	ShellUpdateTitle();
 	// the stage starts covered: home is the landing view and its page is still on its way
 	QWidget *curtain = new ShellCurtain(mw);
 	g_shellCurtain = curtain;
@@ -180,6 +181,8 @@ void ShellStart()
 // takes the app-wide filters back out while the code they point into is still loaded
 void ShellStop()
 {
+	if (g_shellTitle)
+		g_shellTitle->RestoreTitle();
 	if (g_shellTimer)
 		g_shellTimer->stop();
 	if (g_shellFrameFilter) {

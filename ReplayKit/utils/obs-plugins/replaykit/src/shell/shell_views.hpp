@@ -23,6 +23,8 @@ bool ShellActivate(ShellView view);
 bool ShellSetupLocked();
 void ShellReclaimForeground();
 void ShellHostShown(const std::string &name);
+void ShellUpdateTitle();
+void ShellSetEditor(ShellView view, bool active);
 void ShellOpenSettingsPage(const QString &page);
 void ShellEnsureHost();
 // asks the shell page for a sign of life and reloads it when none comes for several tries in a row. suspicious starts the count part way, for a moment when the page should answer at once

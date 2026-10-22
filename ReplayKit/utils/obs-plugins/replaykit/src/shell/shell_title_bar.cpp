@@ -4,6 +4,7 @@
 
 #include "app/obs_actions.hpp"
 #include "core/app_icon.hpp"
+#include "core/state.hpp"
 #include "core/theme.hpp"
 #include "notify/notify_button.hpp"
 #include "shell/shell_badge.hpp"
@@ -42,6 +43,14 @@ QString ShellClipLengthText(int seconds)
 ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	: QWidget(mw), m_mw(mw)
 {
+	m_originalTitle = mw->windowTitle();
+	QObject::connect(mw, &QWidget::windowTitleChanged, this, [this](const QString &title) {
+		if (m_settingTitle)
+			return;
+		m_originalTitle = title;
+		if (g_shellOn && !m_page.isEmpty())
+			SetPage(m_page);
+	});
 	// the arrows of a browser, after the logo: the shell keeps the history and they walk it
 	m_back = new ShellNavButton(ShellNavButton::Kind::Back, this);
 	m_back->onPress = []() { ShellHistoryGo(-1); };
@@ -81,6 +90,27 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 ShellTitleBar::~ShellTitleBar()
 {
 	delete m_hotkeys;
+}
+
+void ShellTitleBar::RestoreTitle()
+{
+	m_settingTitle = true;
+	if (m_mw && !m_originalTitle.isEmpty())
+		m_mw->setWindowTitle(m_originalTitle);
+}
+
+void ShellTitleBar::SetPage(const QString &page)
+{
+	if (m_page != page) {
+		m_page = page;
+		update();
+	}
+	const QString title = QStringLiteral("OBS ReplayKit \u2014 %1").arg(page);
+	if (m_mw && m_mw->windowTitle() != title) {
+		m_settingTitle = true;
+		m_mw->setWindowTitle(title);
+		m_settingTitle = false;
+	}
 }
 
 void ShellTitleBar::SetLabels(const QString &recordKeybind, const QString &clipKeybind, int replaySeconds)
@@ -191,6 +221,7 @@ void ShellTitleBar::LayoutChildren()
 		badge->setVisible(x + badge->width() <= right);
 		x += badge->width() + 8;
 	}
+	m_pageRect = QRect(x + 8, 0, qMax(0, right - x - 8), h);
 	// a badge that changed width or moved takes its menu along
 	if (m_hotkeys)
 		m_hotkeys->Follow();
@@ -260,6 +291,8 @@ void ShellTitleBar::paintEvent(QPaintEvent *)
 
 	// logo in the rail column: the real obs logo, or the icon the appearance tab picked, the same one the taskbar shows
 	const bool active = m_mw && m_mw->isActiveWindow();
+	p.setPen(ChromeInk(active ? 0.8 : 0.5));
+	p.drawText(m_pageRect, Qt::AlignLeft | Qt::AlignVCenter, p.fontMetrics().elidedText(m_page, Qt::ElideRight, m_pageRect.width()));
 	const qreal dpr = devicePixelRatioF();
 	const QPixmap logo = ShellLogoPixmap(26, dpr);
 	if (!logo.isNull()) {

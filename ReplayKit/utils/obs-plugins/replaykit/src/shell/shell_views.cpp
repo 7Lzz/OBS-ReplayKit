@@ -2,6 +2,8 @@
 #include "prelude.hpp"
 #include "shell/shell_views.hpp"
 
+#include <QLineEdit>
+
 #include "core/async.hpp"
 #include "core/cef_host.hpp"
 #include "core/dev_log.hpp"
@@ -20,6 +22,7 @@
 #include "shell/shell_notify_reader.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
+#include "shell/shell_title_bar.hpp"
 #include "windows/obs_settings.hpp"
 
 namespace rk {
@@ -40,6 +43,8 @@ constexpr int kFirstRaiseSettleMs = 140;
 // pings of the page that go unanswered in a row before it is taken for dead
 constexpr int kHostMissLimit = 4;
 bool g_setupForeground = false;
+bool g_homeEditor = false;
+bool g_clipsEditor = false;
 
 bool ShellMainWindowIsForeground();
 
@@ -244,6 +249,9 @@ void ShellArmHostBackstop(int delayMs)
 // builds the browser under the preview, where it loads and paints unseen. it is created only once cef is up and the helper answers, and its page comes up when it reports that its first page is on screen
 void ShellCreateHost(QMainWindow *mw)
 {
+	g_homeEditor = false;
+	g_clipsEditor = false;
+	ShellUpdateTitle();
 	ShellPage *page = new ShellPage(mw);
 	QVBoxLayout *layout = new QVBoxLayout(page);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -251,6 +259,15 @@ void ShellCreateHost(QMainWindow *mw)
 	QCefWidget *browser = g_cef->create_widget(page, "http://127.0.0.1:8767/shell-view", nullptr);
 	layout->addWidget(browser);
 	page->browser = browser;
+	QLineEdit *status = new QLineEdit(page);
+	status->hide();
+	QObject::connect(browser, SIGNAL(titleChanged(QString)), status, SLOT(setText(QString)));
+	QObject::connect(status, &QLineEdit::textChanged, page, [](const QString &title) {
+		if (title == QLatin1String("rk-status:home:editor") || title == QLatin1String("rk-status:home:page"))
+			ShellSetEditor(ShellView::Home, title.endsWith(QLatin1String(":editor")));
+		else if (title == QLatin1String("rk-status:clips:editor") || title == QLatin1String("rk-status:clips:page"))
+			ShellSetEditor(ShellView::Clips, title.endsWith(QLatin1String(":editor")));
+	});
 	g_shellHost = page;
 	g_hostRequested = ShellView::Home;
 	ShellLayoutViews();
@@ -265,6 +282,34 @@ void ShellCreateHost(QMainWindow *mw)
 }
 
 } // namespace
+
+void ShellUpdateTitle()
+{
+	if (!g_shellOn || !g_shellTitle)
+		return;
+	QString page;
+	switch (g_shellView) {
+	case ShellView::Home: page = g_homeEditor ? QStringLiteral("Editor") : QStringLiteral("Home"); break;
+	case ShellView::Clips: page = g_clipsEditor ? QStringLiteral("Editor") : QStringLiteral("Clips"); break;
+	case ShellView::Projector: page = QStringLiteral("Projector"); break;
+	case ShellView::Settings: page = QStringLiteral("Settings"); break;
+	case ShellView::ObsSettings: page = QStringLiteral("OBS Settings"); break;
+	case ShellView::Setup: page = QStringLiteral("Setup"); break;
+	}
+	g_shellTitle->SetPage(page);
+}
+
+void ShellSetEditor(ShellView view, bool active)
+{
+	if (view == ShellView::Home)
+		g_homeEditor = active;
+	else if (view == ShellView::Clips)
+		g_clipsEditor = active;
+	else
+		return;
+	if (g_shellView == view)
+		ShellUpdateTitle();
+}
 
 // the views the shell browser holds; projector and obs settings are native windows of their own
 bool ShellIsPageView(ShellView view)
@@ -323,6 +368,9 @@ void ShellReloadHost()
 	if (g_hostReloadTimer.isValid() && g_hostReloadTimer.elapsed() < 30000)
 		return;
 	g_hostReloadTimer.restart();
+	g_homeEditor = false;
+	g_clipsEditor = false;
+	ShellUpdateTitle();
 	blog(LOG_WARNING, "[replaykit] shell page stopped answering, reloading it");
 	ShellEndClipFullscreen();
 	g_hostReady = false;
@@ -499,6 +547,7 @@ static void ActivateNow(ShellView view, bool coverUp)
 	const bool enteringProjector = view == ShellView::Projector && g_shellView != ShellView::Projector;
 	DevLog("view %d -> %d (0 home, 1 projector, 2 clips, 3 settings, 4 setup, 5 obs settings)", int(g_shellView), int(view));
 	g_shellView = view;
+	ShellUpdateTitle();
 	if (!ShellShowsClips(view))
 		ShellEndClipFullscreen();
 	ShellSuspendPreview(view == ShellView::ObsSettings);

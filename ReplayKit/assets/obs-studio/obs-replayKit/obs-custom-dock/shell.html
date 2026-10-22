@@ -82,6 +82,33 @@
   }
   function dispatchAll() { Object.keys(frames).forEach(function (k) { dispatch(frames[k]); }); }
 
+  function updateStatus() {
+    if (active !== "home" && active !== "clips") { document.title = "ReplayKit"; return; }
+    var editor = false;
+    var f = frames[active];
+    if (f && f.loaded) {
+      var doc = f.el.contentDocument;
+      editor = ["trim-veil", "trim-processing-veil"].some(function (id) {
+        var el = doc && doc.getElementById(id);
+        return el && el.classList.contains("is-open");
+      });
+    }
+    document.title = "rk-status:" + active + (editor ? ":editor" : ":page");
+  }
+
+  function watchEditor(f) {
+    if (f.statusObserver) f.statusObserver.disconnect();
+    if (f.name !== "home" && f.name !== "clips") return;
+    var doc = f.el.contentDocument;
+    if (!doc) return;
+    f.statusObserver = new MutationObserver(function () { if (active === f.name) updateStatus(); });
+    ["trim-veil", "trim-processing-veil"].forEach(function (id) {
+      var el = doc.getElementById(id);
+      if (el) f.statusObserver.observe(el, { attributes: true, attributeFilter: ["class"] });
+    });
+    if (active === f.name) updateStatus();
+  }
+
   function ensure(name) {
     var f = frames[name];
     if (f) return f;
@@ -92,6 +119,7 @@
     mark(name + "Requested");
     el.addEventListener("load", function () {
       f.loaded = true;
+      watchEditor(f);
       mark(name + "Loaded");
       // a page that loaded behind the scenes must not start polling as if it were showing
       dispatch(f);
@@ -189,6 +217,7 @@
       frames[k].el.inert = k !== name;
     });
     active = name;
+    updateStatus();
     mark(name + "Shown");
     dispatchAll();
     var f = frames[name];
@@ -261,6 +290,7 @@
   function park() {
     wanted = "";
     active = "";
+    updateStatus();
     parked = true;
     // the preview is on top of this browser now, and the page it left comes back under no cover
     undip();

@@ -4,7 +4,7 @@ param(
     [string]$OutDir = ''
 )
 $ErrorActionPreference = 'Stop'
-if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '../../../build/process-host/components' }
+if (-not $OutDir) { $OutDir = Join-Path $PSScriptRoot '../../../build/process-host/unpackaged-components' }
 $obsExe = Join-Path $ObsRoot 'bin/64bit/obs64.exe'
 $version = (Get-Item -LiteralPath $obsExe).VersionInfo.FileVersion
 if ($version -notmatch '^(\d+\.\d+\.\d+)(?:\.\d+)?$') { throw "Unsupported OBS version: $version" }
