@@ -139,8 +139,8 @@ namespace ReplayKitHelper
                     SizeCap = Constants.ANON_SIZE_CAP,
                     RetentionDays = Constants.ANON_RETENTION_DAYS,
                 };
+                ClearAuthBlob();
             }
-            ClearAuthBlob();
         }
 
         // validate an existing session by hitting /api/v1/me. returns the user object on success, null otherwise. called at startup from the dpapi-stored blob; if streamables session has expired the stored auth gets dropped.

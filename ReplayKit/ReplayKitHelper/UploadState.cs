@@ -189,7 +189,15 @@ namespace ReplayKitHelper
             }
             // every atomic-write .tmp sidecar (clips_db.json, clips_index.json, replaykit_settings.json, obss own ini/json, ...) lands in scratch, not next to its real file -- catch anything a crash left behind mid-write with one broad sweep, scoped to just this ReplayKit-owned dir.
             if (Directory.Exists(Constants.SCRATCH_DIR))
+            {
                 found.AddRange(SafeEnumerateFiles(Constants.SCRATCH_DIR, "*.tmp"));
+                // A detached status poll lasts at most thirty minutes; older private cookie copies are abandoned.
+                foreach (string file in SafeEnumerateFiles(Constants.SCRATCH_DIR, "streamable_poll_*.cookies.txt"))
+                {
+                    try { if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-1)) found.Add(file); }
+                    catch (IOException) { } catch (UnauthorizedAccessException) { }
+                }
+            }
             // sweep the clip folder for crashed-worker leftovers (sidecars from cross-volume finalize + older naming patterns).
             try
             {

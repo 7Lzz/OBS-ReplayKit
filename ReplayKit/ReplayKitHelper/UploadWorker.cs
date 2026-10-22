@@ -169,7 +169,7 @@ namespace ReplayKitHelper
             }
         }
 
-        public static UploadOutcome Run(string requestId, string clipPath, string authJar, bool requireAuth, int progressBase, int progressSpan, bool quiet = false, CancellationToken cancelToken = default(CancellationToken))
+        public static UploadOutcome Run(string requestId, string clipPath, string authCookies, bool requireAuth, int progressBase, int progressSpan, bool quiet = false, CancellationToken cancelToken = default(CancellationToken))
         {
             string tempPrefix = Path.Combine(Constants.SCRATCH_DIR, "streamable_" + requestId);
             string jar = tempPrefix + ".cookies.txt";
@@ -203,18 +203,17 @@ namespace ReplayKitHelper
                 // cookie jar shared between step 1 (which sets the session cookie) and step 3 (which needs it -- transcode returns 403 without it).
                 try { if (File.Exists(jar)) File.Delete(jar); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
-                // if given a signed-in cookie jar, seed the session jar with its contents so step 1 goes out authenticated. its copied rather than just -bd so curl can still -c into it (streamable issues additional session cookies during upload).
+                // The job owns the starting session, even if the account changes during compression.
                 bool signedIn = false;
-                if (requireAuth && (string.IsNullOrWhiteSpace(authJar) || !File.Exists(authJar)))
+                if (requireAuth && string.IsNullOrWhiteSpace(authCookies))
                     throw new InvalidOperationException("Signed-in Streamable session is unavailable. Sign out and sign in again.");
-                if (!string.IsNullOrWhiteSpace(authJar))
+                if (!string.IsNullOrWhiteSpace(authCookies))
                 {
-                    if (!File.Exists(authJar)) throw new InvalidOperationException("Signed-in Streamable session file is missing. Sign out and sign in again.");
                     try
                     {
-                        File.Copy(authJar, jar, true);
+                        File.WriteAllText(jar, authCookies, Encoding.ASCII);
                         signedIn = true;
-                        Log.Write("Auth: using signed-in session cookies from " + authJar, "upload", requestId);
+                        Log.Write("Auth: using the upload's starting session", "upload", requestId);
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                     {

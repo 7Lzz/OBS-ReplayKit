@@ -8,7 +8,7 @@ namespace ReplayKitHelper
     // starts a local compress-overwrite job (CompressOverwriteWorker) and resolves the job state once it finishes
     internal static class CompressOverwrite
     {
-        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0)
+        public static JObject StartCompressOverwriteFile(Clips.SafeClipPath selected, string mode = "smaller", int scaleHeight = 0, long? expectedSize = null, DateTime? expectedWriteTime = null)
         {
             AppConfig.LoadConfig();
             string requestId = UploadState.NewRequestId();
@@ -22,6 +22,13 @@ namespace ReplayKitHelper
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-overwrite", out string busy))
             {
                 if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
+
+                var current = new FileInfo(selected.Full);
+                long sourceSize = current.Length;
+                DateTime sourceWriteTime = current.LastWriteTimeUtc;
+                if ((expectedSize.HasValue && sourceSize != expectedSize.Value) ||
+                    (expectedWriteTime.HasValue && sourceWriteTime != expectedWriteTime.Value))
+                    return new JObject { ["ok"] = false, ["message"] = "The selected clip changed; select it again." };
 
                 var caps = Compression.GetHelperCapabilities();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
@@ -37,8 +44,7 @@ namespace ReplayKitHelper
                 string ext = Path.GetExtension(selected.Name);
                 // encode into %temp% so the in-flight file never shows in the clip folder. the worker handles cross-volume safely with a sidecar copy + atomic rename on the source volume.
                 string tempPath = Path.Combine(Constants.SCRATCH_DIR, "replaykit_compress_" + requestId + ext);
-                long preBytes = 0;
-                try { preBytes = new FileInfo(selected.Full).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                long preBytes = sourceSize;
 
                 UploadState.SetUploadState(
                     requestId: requestId, state: "compressing", active: true, clipName: selected.Name,
@@ -53,7 +59,7 @@ namespace ReplayKitHelper
                 string selectedName = selected.Name;
                 int scale = scaleHeight;
 
-                reservation.Start(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale),
+                reservation.Start(() => CompressOverwriteWorker.Run(requestId, ffmpeg, sourceFull, tempPath, duration, mode, preBytes, caps, fastEncoder, smallerEncoder, scale, sourceWriteTime),
                     t => OnCompressOverwriteComplete(t, requestId, tempPath));
 
                 return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId };

@@ -91,7 +91,13 @@ namespace ReplayKitSetup
         {
             string path = Path.Combine(Config.REPLAYKIT_CONFIG, "version.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path, JsonConvert.SerializeObject(new JObject { ["version"] = VersionInfo.Version }, Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(temporary, JsonConvert.SerializeObject(new JObject { ["version"] = VersionInfo.Version }, Formatting.Indented) + "\n", new System.Text.UTF8Encoding(false));
+                File.Move(temporary, path, true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
             log?.Invoke($"ReplayKit version -> {VersionInfo.Version}");
             return path;
         }

@@ -29,11 +29,11 @@ namespace ReplayKitHelper
             public string Full;
         }
 
-        public static SafeClipPath GetSafeClipPath(string raw)
+        public static SafeClipPath GetSafeClipPath(string raw, string folder = null)
         {
             string name = GetSafeFilename(raw);
             if (name == null) return null;
-            string root = Path.GetFullPath(AppConfig.GetClipDir());
+            string root = Path.GetFullPath(folder ?? AppConfig.GetClipDir());
             string full = Path.GetFullPath(Path.Combine(root, name));
             string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString()) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
@@ -52,7 +52,11 @@ namespace ReplayKitHelper
         // deletes one clip for good, the way the clips page does, so the storage card can delete a list of them with the same checks: the name has to resolve inside the clip folder, and a clip that an upload, trim or compression holds is left alone
         public static DeleteResult DeleteClip(string rawName)
         {
-            var selected = GetSafeClipPath(rawName);
+            return DeleteClip(GetSafeClipPath(rawName));
+        }
+
+        internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null)
+        {
             if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = "Clip not found" };
             string requestId = UploadState.NewRequestId();
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy))
@@ -60,7 +64,16 @@ namespace ReplayKitHelper
                 if (reservation == null) return new DeleteResult { Status = 409, Name = selected.Name, Message = busy };
                 try
                 {
-                    JobCoordinator.Commit(requestId, () => File.Delete(selected.Full));
+                    JobCoordinator.Commit(requestId, () =>
+                    {
+                        var safe = GetSafeClipPath(selected.Name, Path.GetDirectoryName(selected.Full));
+                        var current = new FileInfo(selected.Full);
+                        if (safe == null || !string.Equals(safe.Full, selected.Full, StringComparison.OrdinalIgnoreCase) ||
+                            !current.Exists || (size.HasValue && current.Length != size.Value) ||
+                            (writeTime.HasValue && current.LastWriteTimeUtc != writeTime.Value))
+                            throw new IOException("The selected clip changed; review the library again.");
+                        File.Delete(selected.Full);
+                    });
                     UpdateDb(db => db.Remove(selected.Name), Path.GetDirectoryName(selected.Full));
                     EditDrafts.Forget(selected.Full);
                     return new DeleteResult { Status = 200, Name = selected.Name };
@@ -178,7 +191,7 @@ namespace ReplayKitHelper
         }
 
         // the transcode fields are optional so an upload records its url and the initial still-processing state in one write, keeping the cmp_* fields
-        public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null, string sourcePath = null)
+        public static void MarkUploaded(string name, string url, string shortcode = null, bool? ready = null, int? transcodeStatus = null, int? transcodePercent = null, string sourcePath = null, int? retentionDays = null)
         {
             // UpdateDb coordinates this mutation with detached pollers as well as helper requests.
             UpdateDb(db =>
@@ -188,7 +201,7 @@ namespace ReplayKitHelper
                 {
                     ["url"] = url,
                     ["uploaded_at"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    ["retention_days"] = Constants.GetEffectiveRetentionDays(),
+                    ["retention_days"] = retentionDays ?? Constants.GetEffectiveRetentionDays(),
                 };
                 if (shortcode != null) entry["shortcode"] = shortcode;
                 if (ready.HasValue) entry["ready"] = ready.Value;
@@ -510,14 +523,14 @@ namespace ReplayKitHelper
             return outList;
         }
 
-        public static JObject ReadClipUiState()
+        public static JObject ReadClipUiState(string folder = null)
         {
             var state = new JObject { ["favorites"] = new JArray(), ["sort"] = "newest" };
             string path = AppConfig.GetClipUiStatePath();
             if (!File.Exists(path)) return state;
             try
             {
-                var parsed = ClipStore.ReadFolder(path, AppConfig.GetClipDir(), data => data);
+                var parsed = ClipStore.ReadFolder(path, folder ?? AppConfig.GetClipDir(), data => data);
                 state["favorites"] = new JArray(NormalizeFavoriteClipNames(parsed["favorites"]));
                 state["sort"] = NormalizeClipSort(parsed["sort"]?.ToString());
             }
@@ -528,22 +541,41 @@ namespace ReplayKitHelper
             return state;
         }
 
-        public static JObject SaveClipUiState(JObject state)
+        public static JObject SaveClipUiState(JObject state, string folderKey)
         {
-            var safe = new JObject
+            lock (SettingsStore.Gate)
+            {
+                string folder = AppConfig.GetClipDir();
+                if (!string.Equals(folderKey, ClipStore.FolderKey(folder), StringComparison.Ordinal))
+                    throw new InvalidOperationException("The clip folder changed. Reload the favorites before saving.");
+                var safe = new JObject
+                {
+                    ["favorites"] = new JArray(NormalizeFavoriteClipNames(state?["favorites"])),
+                    ["sort"] = NormalizeClipSort(state?["sort"]?.ToString()),
+                };
+                string path = AppConfig.GetClipUiStatePath();
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                ClipStore.UpdateFolder(path, folder, data =>
+                {
+                    if (!string.Equals(state?.Value<string>("revision"), ClipUiRevision(data), StringComparison.Ordinal))
+                        throw new InvalidOperationException("Favorites changed in another view. Reload them before saving.");
+                    data["favorites"] = safe["favorites"].DeepClone();
+                    data["sort"] = safe["sort"].DeepClone();
+                    return true;
+                });
+                return safe;
+            }
+        }
+
+        private static string ClipUiRevision(JObject state)
+        {
+            var normalized = new JObject
             {
                 ["favorites"] = new JArray(NormalizeFavoriteClipNames(state?["favorites"])),
                 ["sort"] = NormalizeClipSort(state?["sort"]?.ToString()),
             };
-            string path = AppConfig.GetClipUiStatePath();
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            ClipStore.UpdateFolder(path, AppConfig.GetClipDir(), data =>
-            {
-                data["favorites"] = safe["favorites"].DeepClone();
-                data["sort"] = safe["sort"].DeepClone();
-                return true;
-            });
-            return safe;
+            using (var hash = System.Security.Cryptography.SHA256.Create())
+                return Convert.ToBase64String(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(normalized.ToString(Formatting.None))));
         }
 
         // the numbers the home page shows next to its recent clips row: how many clips there are, how much space they take, which days this week they were saved on, and how much room is left on the drive they live on. built from the same cached snapshot the clips list serves, so polling it is cheap.
@@ -589,8 +621,14 @@ namespace ReplayKitHelper
 
         public static JObject GetClipUiStatePayload()
         {
-            string path = AppConfig.GetClipUiStatePath();
-            return new JObject { ["ok"] = true, ["exists"] = File.Exists(path), ["state"] = ReadClipUiState() };
+            lock (SettingsStore.Gate)
+            {
+                string path = AppConfig.GetClipUiStatePath();
+                string folder = AppConfig.GetClipDir();
+                bool exists = File.Exists(path);
+                var state = ReadClipUiState(folder);
+                return new JObject { ["ok"] = true, ["exists"] = exists, ["folderKey"] = ClipStore.FolderKey(folder), ["revision"] = ClipUiRevision(state), ["state"] = state };
+            }
         }
 
         public static JObject SaveClipUiStateFromJson(string body)
@@ -599,7 +637,8 @@ namespace ReplayKitHelper
             JObject incoming;
             try { incoming = JObject.Parse(body); }
             catch (JsonException) { throw new InvalidOperationException("Invalid clip state."); }
-            return new JObject { ["ok"] = true, ["state"] = SaveClipUiState(incoming) };
+            var state = SaveClipUiState(incoming, incoming.Value<string>("folderKey"));
+            return new JObject { ["ok"] = true, ["revision"] = ClipUiRevision(state), ["state"] = state };
         }
 
         private static double GetDurationSortValue(JObject clip)

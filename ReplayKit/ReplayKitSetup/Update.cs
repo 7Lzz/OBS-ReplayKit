@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -36,8 +37,33 @@ namespace ReplayKitSetup
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
         private static string ResultFile() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_result.json");
 
-        internal static void RecordSetupResult(bool complete) => WriteResult(complete, complete ? "done" : "incomplete",
-            complete ? "ReplayKit setup completed." : "ReplayKit setup is incomplete. Run the installer again to finish the repair.");
+        private static string PendingFile() => Path.Combine(Config.REPLAYKIT_CONFIG, StateLayout.UpdatePendingFile);
+
+        internal static void RecordSetupResult(bool complete)
+        {
+            if (complete) File.Delete(PendingFile());
+            WriteResult(complete, complete ? "done" : "incomplete",
+                complete ? "ReplayKit setup completed." : "ReplayKit setup is incomplete. Run the installer again to finish the repair.");
+        }
+
+        private static void MarkUpdatePending()
+        {
+            string path = PendingFile();
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
+                    var payload = new JObject { ["version"] = VersionInfo.Version, ["startedAt"] = DateTime.UtcNow.ToString("o") };
+                    byte[] bytes = new UTF8Encoding(false).GetBytes(payload.ToString(Formatting.None));
+                    file.Write(bytes, 0, bytes.Length);
+                    file.Flush(true);
+                }
+                File.Move(temporary, path, true);
+            }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
 
         private static void WriteResult(bool ok, string stage, string message, string releaseUrl = ReleasePage)
         {
@@ -185,6 +211,7 @@ namespace ReplayKitSetup
                     return 1;
                 }
 
+                MarkUpdatePending();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
                 // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
@@ -197,6 +224,7 @@ namespace ReplayKitSetup
                 var problems = new List<string>();
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
+                if (problems.Count == 0) File.Delete(PendingFile());
 
                 if (relaunch)
                 {

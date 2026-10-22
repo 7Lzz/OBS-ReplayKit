@@ -452,12 +452,13 @@ namespace ReplayKitHelper
             if (selected == null || !File.Exists(selected.Full))
                 return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
 
+            var auth = Upload.CaptureAuth();
+            long effCap = auth.SizeCap;
+            if (effCap <= 0) return Upload.StartStreamableUpload(selected, auth: auth);
+
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-upload", out string busy))
             {
                 if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
-
-                long effCap = Constants.GetEffectiveUploadCap();
-                if (effCap <= 0) return Upload.StartStreamableUpload(selected);
 
                 var caps = GetToolPaths();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
@@ -479,7 +480,7 @@ namespace ReplayKitHelper
                 }
 
                 // compression shrinks bytes, not runtime -- a clip over streamables 10-min free limit still fails transcode, so stop it here too.
-                if (Upload.SubjectToStreamableDurationLimit() && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
+                if (auth.DurationLimited && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
                 {
                     int total = (int)Math.Round(duration);
                     string msg = "Clip is " + (total / 60) + ":" + (total % 60).ToString("D2") + " long. Streamable's limit is 10 minutes -- trim it shorter first.";
@@ -507,14 +508,6 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = sizeMb, ["capMb"] = capMb };
                 }
 
-                var auth = Upload.ResolveUploadAuthJar();
-                if (!auth["ok"].Value<bool>())
-                {
-                    string msg = auth["message"]?.Value<string>() ?? "";
-                    UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
-                    return new JObject { ["ok"] = false, ["message"] = msg };
-                }
-
                 Directory.CreateDirectory(Constants.COMPRESS_TMP_DIR);
                 string safeBase = Regex.Replace(Path.GetFileNameWithoutExtension(selected.Name), "[^A-Za-z0-9_.-]+", "_");
                 if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "clip";
@@ -529,15 +522,13 @@ namespace ReplayKitHelper
                 Log.Write("Start-CompressedStreamableUpload clip=" + selected.Name + " ffmpeg=" + ffmpeg + " ffprobe=" + ffprobe +
                     " metadata=" + metadata.Source + " targetKbps=" + totalKbps + " videoKbps=" + videoKbps + " audioKbps=" + audioKbps, "compress", requestId);
 
-                bool authRequired = auth["required"]?.Value<bool>() ?? false;
-                string authJarPath = authRequired ? auth["path"]?.Value<string>() : null;
                 string selectedName = selected.Name;
                 string selectedFull = selected.Full;
 
-                reservation.Start(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, authJarPath, authRequired), t =>
+                reservation.Start(() => CompressedUploadWorker.Run(requestId, ffmpeg, selectedFull, tempOut, passLog, effCap, videoKbps, audioKbps, duration, auth.Cookies, auth.Required), t =>
                 {
                     try { if (File.Exists(tempOut)) File.Delete(tempOut); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                    Upload.HandleUploadCompletion(t, requestId, selectedName, sourcePath: selectedFull);
+                    Upload.HandleUploadCompletion(t, requestId, selectedName, sourcePath: selectedFull, auth: auth);
                 });
 
                 return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = "Compressing temp copy and uploading" };

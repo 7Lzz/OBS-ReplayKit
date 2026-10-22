@@ -67,11 +67,15 @@ namespace ReplayKitHelper
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
+        internal static string FolderKey(string folder)
+        {
+            using (var hash = SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(folder).TrimEnd('\\', '/').ToUpperInvariant()))).Replace("-", "");
+        }
+
         private static JObject Folder(JObject db, string folder, out bool created)
         {
-            string key;
-            using (var hash = SHA256.Create())
-                key = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFullPath(folder).TrimEnd('\\', '/').ToUpperInvariant()))).Replace("-", "");
+            string key = FolderKey(folder);
             created = false;
             if (db["_folders"] != null && !(db["_folders"] is JObject)) throw new Newtonsoft.Json.JsonException("Invalid clip folder metadata.");
             var folders = db["_folders"] as JObject;

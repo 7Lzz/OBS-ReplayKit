@@ -240,6 +240,7 @@ namespace ReplayKitHelper
 
         private static bool NeedsRepair(string version)
         {
+            if (File.Exists(Path.Combine(GetReplayKitRootDir(), StateLayout.UpdatePendingFile))) return true;
             if (!VideoTools.IsInstalled(Constants.HelperRoot)) return true;
             var result = GetInstallResult();
             return result["present"]?.Value<bool>() == true && result["installOk"]?.Value<bool>() == false &&

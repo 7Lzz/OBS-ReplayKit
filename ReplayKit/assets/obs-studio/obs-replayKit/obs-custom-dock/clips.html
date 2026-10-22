@@ -3479,7 +3479,10 @@
     return localState.has(name) && Date.now() - (optimisticStateAt.get(name) || 0) < OPTIMISTIC_STATE_GRACE_MS;
   }
   const selectedClipNames = new Set();
-  let favoriteNames = loadFavoriteNames();
+  let favoriteNames = new Set();
+  let favoriteFolderKey = "", favoriteRevision = "", favoriteChange = 0, favoriteHydration = 0;
+  let migratingFavorites = false;
+  let favoriteSaving = false;
   let resolvedFavoriteClips = [];
   let favoriteResolveKey = "";
   let favoriteResolveVersion = 0;
@@ -3765,17 +3768,8 @@
 
   function loadFavoriteNames() {
     try {
-      const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      // one-time migration from the old key name -- once real data lands under the new key this branch never runs again.
-      if (raw === null) {
-        const legacy = localStorage.getItem(LEGACY_FAVORITES_STORAGE_KEY);
-        if (legacy !== null) {
-          localStorage.setItem(FAVORITES_STORAGE_KEY, legacy);
-          localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
-          const parsed = JSON.parse(legacy || "[]");
-          return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
-        }
-      }
+      if (!favoriteFolderKey) return new Set();
+      const raw = localStorage.getItem("replaykit.favoriteClips.v2:" + favoriteFolderKey);
       const parsed = JSON.parse(raw || "[]");
       return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
     } catch {
@@ -3785,7 +3779,7 @@
 
   function saveFavoriteNames() {
     try {
-      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favoriteNames)));
+      if (favoriteFolderKey) localStorage.setItem("replaykit.favoriteClips.v2:" + favoriteFolderKey, JSON.stringify(Array.from(favoriteNames)));
     } catch {}
   }
 
@@ -4028,13 +4022,13 @@
 
   function setFavorite(name, enabled) {
     name = String(name || "");
-    if (!name) return;
+    if (!name || !clipStateHydrated || !favoriteFolderKey) return;
+    favoriteChange++;
     if (enabled) favoriteNames.add(name);
     else {
       favoriteNames.delete(name);
       resolvedFavoriteClips = resolvedFavoriteClips.filter(clip => clip && clip.name !== name);
     }
-    saveFavoriteNames();
     scheduleClipUiStateSave();
     favoriteResolveKey = "";
     scheduleFavoriteResolve(0);
@@ -4042,10 +4036,10 @@
 
   function transferFavorite(oldName, newName) {
     if (!isFavorite(oldName) || !newName || oldName === newName) return;
+    favoriteChange++;
     favoriteNames.delete(oldName);
     favoriteNames.add(newName);
     resolvedFavoriteClips = resolvedFavoriteClips.filter(clip => clip && clip.name !== oldName);
-    saveFavoriteNames();
     scheduleClipUiStateSave();
     favoriteResolveKey = "";
     scheduleFavoriteResolve(0);
@@ -4079,42 +4073,71 @@
 
   async function saveClipUiState() {
     clipStateSaveTimer = 0;
+    if (!favoriteFolderKey) return;
+    if (favoriteSaving) { scheduleClipUiStateSave(); return; }
+    favoriteSaving = true;
+    const folderKey = favoriteFolderKey, change = favoriteChange;
+    let refresh = false;
     try {
-      await fetch(CLIP_STATE_URL + "?t=" + Date.now(), {
+      const res = await fetch(CLIP_STATE_URL + "?t=" + Date.now(), {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          folderKey,
+          revision: favoriteRevision,
           favorites: favoriteNamesList(),
         }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { refresh = true; throw new Error(data.message || "Could not save favorites"); }
+      if (folderKey === favoriteFolderKey) favoriteRevision = data.revision;
+      if (folderKey === favoriteFolderKey && change === favoriteChange) saveFavoriteNames();
+      if (migratingFavorites && folderKey === favoriteFolderKey) {
+        migratingFavorites = false;
+        localStorage.removeItem(FAVORITES_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
+      }
     } catch {
-      // localStorage remains the compatibility fallback if the helper is temporarily offline.
+      showToast("Could not save favorites. Try again.", "error");
+      scheduleToastHide(TOAST_ERROR_MS);
+    } finally {
+      favoriteSaving = false;
+      if (refresh) { clearTimeout(clipStateSaveTimer); clipStateSaveTimer = 0; hydrateClipUiState(); }
+      else if (change !== favoriteChange) scheduleClipUiStateSave(0);
     }
   }
 
   async function hydrateClipUiState() {
-    const localFavorites = favoriteNamesList();
+    if (clipStateSaveTimer || favoriteSaving) return;
+    const run = ++favoriteHydration, change = favoriteChange;
     try {
       const res = await fetch(CLIP_STATE_URL + "?t=" + Date.now(), { cache: "no-store" });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
+      if (run !== favoriteHydration || change !== favoriteChange) return;
+      if (!data || !data.ok || !/^[A-F0-9]{64}$/.test(data.folderKey || "")) throw new Error("Invalid favorites folder");
       const state = data && data.state ? data.state : {};
       const serverExists = !!(data && data.exists);
       const serverFavorites = normalizeFavoriteList(state.favorites);
-      const merged = new Set(serverFavorites);
-      for (const name of localFavorites) merged.add(name);
-
-      const nextFavorites = new Set(Array.from(merged));
+      favoriteFolderKey = data.folderKey;
+      favoriteRevision = data.revision;
+      const nextFavorites = new Set(serverFavorites);
+      if (!serverExists) {
+        for (const name of loadFavoriteNames()) nextFavorites.add(name);
+        try {
+          const legacy = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || localStorage.getItem(LEGACY_FAVORITES_STORAGE_KEY) || "[]");
+          for (const name of normalizeFavoriteList(legacy)) nextFavorites.add(name);
+          migratingFavorites = true;
+        } catch {}
+      }
       const favoritesChanged = !favoriteSetEquals(favoriteNames, nextFavorites);
 
       favoriteNames = nextFavorites;
       saveFavoriteNames();
       clipStateHydrated = true;
 
-      const needsSeed = !serverExists
-        || serverFavorites.length !== nextFavorites.size
-        || serverFavorites.some(name => !nextFavorites.has(name));
+      const needsSeed = !serverExists;
       if (needsSeed) scheduleClipUiStateSave(0);
 
       if (favoritesChanged) {
@@ -4134,6 +4157,10 @@
       if (HOME_MODE && homeRenderedOnce) renderLoadedClips(loadedClips);
     }
   }
+
+  window.addEventListener("storage", (event) => {
+    if (favoriteFolderKey && event.key === "replaykit.favoriteClips.v2:" + favoriteFolderKey) hydrateClipUiState();
+  });
 
   function clipSortLabel(value) {
     return CLIP_SORT_LABELS[value] || CLIP_SORT_LABELS.newest;
@@ -8022,7 +8049,7 @@
       poll();
       queueVirtualRender(true);
       // the clips view may have changed favorites while this one was hidden
-      if (HOME_MODE) hydrateClipUiState();
+      hydrateClipUiState();
     }
   });
 

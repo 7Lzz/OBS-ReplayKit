@@ -27,7 +27,7 @@ namespace ReplayKitHelper
         public static CompressOverwriteResult Run(
             string requestId, string ffmpeg, string sourcePath, string tempPath,
             double durationSec, string mode, long preBytes, JObject caps, string fastEncoder, string smallerEncoder,
-            int scaleHeight = 0)
+            int scaleHeight = 0, DateTime? expectedWriteTime = null)
         {
             var token = JobCoordinator.Token(requestId);
             token.ThrowIfCancellationRequested();
@@ -44,6 +44,9 @@ namespace ReplayKitHelper
             try
             {
                 var srcInfo = new FileInfo(sourcePath);
+                if (!srcInfo.Exists || srcInfo.Length != preBytes ||
+                    (expectedWriteTime.HasValue && srcInfo.LastWriteTimeUtc != expectedWriteTime.Value))
+                    return new CompressOverwriteResult { Ok = false, Message = "The selected clip changed; select it again." };
                 if (srcInfo.Exists) { origLastWrite = srcInfo.LastWriteTimeUtc; origCreation = srcInfo.CreationTimeUtc; }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }

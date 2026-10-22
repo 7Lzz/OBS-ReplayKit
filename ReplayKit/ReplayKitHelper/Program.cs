@@ -109,7 +109,14 @@ namespace ReplayKitHelper
             // a poll started by an older helper knows nothing of these two, and does what it always did
             bool copyLink = GetNamedArg(args, "-CopyLink") != "0";
             bool notify = GetNamedArg(args, "-Notify") != "0";
-            return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar, quiet, copyLink, notify);
+            try { return TranscodePollWorker.Run(shortcode, clipName, dbPath, api, logPath, cookieJar, quiet, copyLink, notify); }
+            finally
+            {
+                if (GetNamedArg(args, "-DeleteCookieJar") == "1" &&
+                    string.Equals(Path.GetDirectoryName(cookieJar), Constants.SCRATCH_DIR, StringComparison.OrdinalIgnoreCase) &&
+                    System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(cookieJar), @"^streamable_poll_[a-f0-9]{32}\.cookies\.txt$"))
+                    try { File.Delete(cookieJar); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
         }
 
         private static int RunServer(string[] args)

@@ -176,9 +176,25 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["removed"] = removed, ["freedBytes"] = freed, ["freedText"] = FormatBytes(freed) };
         }
 
+        private sealed class SelectedClip
+        {
+            public Clips.SafeClipPath Path;
+            public long Size;
+            public DateTime WriteTime;
+        }
+
+        private static SelectedClip SelectClip(string name, string folder, long size)
+        {
+            var selected = Clips.GetSafeClipPath(name, folder);
+            if (selected == null) throw new IOException("The selected clip is no longer available.");
+            var file = new FileInfo(selected.Full);
+            if (!file.Exists || file.Length != size) throw new IOException("The selected clip changed; review the library again.");
+            return new SelectedClip { Path = selected, Size = size, WriteTime = file.LastWriteTimeUtc };
+        }
+
         private sealed class TrimPlan
         {
-            public readonly List<KeyValuePair<string, long>> Victims = new List<KeyValuePair<string, long>>();
+            public readonly List<SelectedClip> Victims = new List<SelectedClip>();
             public long Bytes;
             public long Over;
             // the favourites hold the rest: even with every other clip gone the library would still be over the limit
@@ -190,6 +206,7 @@ namespace ReplayKitHelper
         private static TrimPlan BuildTrimPlan()
         {
             var plan = new TrimPlan();
+            string folder = Path.GetFullPath(AppConfig.GetClipDir());
             long limitBytes = ReplaykitSettings.GetStorageLimitGb() * BytesPerGb;
             if (limitBytes <= 0) return plan;
             var clips = Clips.GetClipsList();
@@ -208,13 +225,16 @@ namespace ReplayKitHelper
             {
                 if (plan.Bytes >= plan.Over) break;
                 long size = clip["size"]?.Value<long>() ?? 0;
-                plan.Victims.Add(new KeyValuePair<string, long>(clip["name"].Value<string>(), size));
+                plan.Victims.Add(SelectClip(clip["name"].Value<string>(), folder, size));
                 plan.Bytes += size;
             }
             plan.Insufficient = plan.Bytes < plan.Over;
-            using (var sha = SHA1.Create())
+            if (!string.Equals(folder, Path.GetFullPath(AppConfig.GetClipDir()), StringComparison.OrdinalIgnoreCase))
+                throw new IOException("The clip folder changed; review the library again.");
+            using (var sha = SHA256.Create())
             {
-                var text = string.Join("\n", plan.Victims.Select(v => v.Key + "|" + v.Value.ToString(CultureInfo.InvariantCulture)));
+                var text = folder.ToUpperInvariant() + "|" + limitBytes.ToString(CultureInfo.InvariantCulture) + "\n" +
+                    string.Join("\n", plan.Victims.Select(v => v.Path.Full.ToUpperInvariant() + "|" + v.Size.ToString(CultureInfo.InvariantCulture) + "|" + v.WriteTime.Ticks.ToString(CultureInfo.InvariantCulture)));
                 plan.Token = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-", "").ToLowerInvariant();
             }
             return plan;
@@ -247,8 +267,8 @@ namespace ReplayKitHelper
             long freed = 0;
             foreach (var victim in plan.Victims)
             {
-                var result = Clips.DeleteClip(victim.Key);
-                if (result.Status == 200) { deleted++; freed += victim.Value; }
+                var result = Clips.DeleteClip(victim.Path, victim.Size, victim.WriteTime);
+                if (result.Status == 200) { deleted++; freed += victim.Size; }
                 else failed++;
             }
             RefreshFolderSizes(true);
@@ -274,7 +294,7 @@ namespace ReplayKitHelper
 
         private sealed class CompressBatch
         {
-            public readonly List<KeyValuePair<string, long>> Clips = new List<KeyValuePair<string, long>>();
+            public readonly List<SelectedClip> Clips = new List<SelectedClip>();
             public long TotalBytes;
             // the sizes the finished clips had before they were compressed, so the share done is by bytes and one long clip is not counted like a short one
             public long FinishedBytes;
@@ -352,6 +372,7 @@ namespace ReplayKitHelper
         {
             if (names == null || names.Count == 0)
                 return new JObject { ["ok"] = false, ["message"] = "Pick at least one clip." };
+            string folder = Path.GetFullPath(AppConfig.GetClipDir());
             var known = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
             foreach (var clip in Clips.GetClipsList())
             {
@@ -364,13 +385,15 @@ namespace ReplayKitHelper
                 string name = token?.Type == JTokenType.String ? token.Value<string>() : null;
                 if (string.IsNullOrEmpty(name) || !known.TryGetValue(name, out var clip)) continue;
                 if ((clip["cmp_mode"]?.Value<string>() ?? "") == "slow") continue;
-                if (batch.Clips.Any(c => string.Equals(c.Key, name, StringComparison.OrdinalIgnoreCase))) continue;
+                if (batch.Clips.Any(c => string.Equals(c.Path.Name, name, StringComparison.OrdinalIgnoreCase))) continue;
                 long size = clip["size"]?.Value<long>() ?? 0;
-                batch.Clips.Add(new KeyValuePair<string, long>(clip["name"].Value<string>(), size));
+                batch.Clips.Add(SelectClip(clip["name"].Value<string>(), folder, size));
                 batch.TotalBytes += size;
             }
             if (batch.Clips.Count == 0)
                 return new JObject { ["ok"] = false, ["message"] = "None of those clips can be compressed any further." };
+            if (!string.Equals(folder, Path.GetFullPath(AppConfig.GetClipDir()), StringComparison.OrdinalIgnoreCase))
+                return new JObject { ["ok"] = false, ["message"] = "The clip folder changed; select the clips again." };
             lock (CompressGate)
             {
                 if (_compress != null && _compress.Running)
@@ -431,14 +454,14 @@ namespace ReplayKitHelper
                     lock (CompressGate)
                     {
                         if (batch.Cancelled) break;
-                        batch.Current = entry.Key;
-                        batch.CurrentBytes = entry.Value;
+                        batch.Current = entry.Path.Name;
+                        batch.CurrentBytes = entry.Size;
                         batch.CurrentPercent = 0;
                     }
                     bool ok = CompressOne(batch, entry);
                     lock (CompressGate)
                     {
-                        batch.FinishedBytes += entry.Value;
+                        batch.FinishedBytes += entry.Size;
                         if (ok) batch.Done++;
                         else if (!batch.Cancelled) batch.Failed++;
                         batch.Current = "";
@@ -465,15 +488,16 @@ namespace ReplayKitHelper
         }
 
         // one clip through the worker of the clips page, waiting for its job to end. true when it was compressed
-        private static bool CompressOne(CompressBatch batch, KeyValuePair<string, long> entry)
+        private static bool CompressOne(CompressBatch batch, SelectedClip entry)
         {
-            var selected = Clips.GetSafeClipPath(entry.Key);
+            var selected = Clips.GetSafeClipPath(entry.Path.Name, Path.GetDirectoryName(entry.Path.Full));
             if (selected == null || !File.Exists(selected.Full)) return false;
             JObject started = null;
             // another job can hold a slot for a moment, so the clip waits for it a little instead of failing
             for (int attempt = 0; attempt < 30; attempt++)
             {
-                started = CompressOverwrite.StartCompressOverwriteFile(selected, "smaller", 0);
+                lock (CompressGate) { if (batch.Cancelled) return false; }
+                started = CompressOverwrite.StartCompressOverwriteFile(selected, "smaller", 0, entry.Size, entry.WriteTime);
                 if (started["ok"]?.Value<bool>() == true || started["busy"]?.Value<bool>() != true) break;
                 lock (CompressGate) { if (batch.Cancelled) return false; }
                 Thread.Sleep(2000);
@@ -521,9 +545,9 @@ namespace ReplayKitHelper
                 if (state == "error") lock (CompressGate) batch.Error = error;
                 return false;
             }
-            long after = entry.Value;
+            long after = entry.Size;
             try { after = new FileInfo(selected.Full).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            lock (CompressGate) batch.SavedBytes += Math.Max(0, entry.Value - after);
+            lock (CompressGate) batch.SavedBytes += Math.Max(0, entry.Size - after);
             return true;
         }
 

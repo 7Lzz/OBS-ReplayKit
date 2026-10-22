@@ -12,6 +12,7 @@ namespace ReplayKitShared
         public const string HelperConfigFile = "helper_config.json";
         public const string ClipsDbFile = "clips_db.json";
         public const string ClipsIndexFile = "clips_index.json";
+        public const string UpdatePendingFile = "update_pending.json";
 
         private sealed class Entry
         {

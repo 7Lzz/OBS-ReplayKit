@@ -60,7 +60,7 @@ namespace ReplayKitHelper
         public static UploadOutcome Run(
             string requestId, string ffmpeg, string inputPath, string tempPath, string passLog,
             long capBytes, int videoKbps, int audioKbps, double durationSec,
-            string authJar, bool requireAuth)
+            string authCookies, bool requireAuth)
         {
             try
             {
@@ -86,7 +86,7 @@ namespace ReplayKitHelper
                 Log.Write("Uploading compressed temp copy (" + Math.Round(fi.Length / 1024.0 / 1024.0, 2) + " MB)", "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "uploading", phase: "uploading", percent: 95);
 
-                return UploadWorker.Run(requestId, tempPath, authJar, requireAuth, 95, 4, false, JobCoordinator.Token(requestId));
+                return UploadWorker.Run(requestId, tempPath, authCookies, requireAuth, 95, 4, false, JobCoordinator.Token(requestId));
             }
             catch (Exception ex)
             {
