@@ -310,6 +310,12 @@ void ShellProjectorSetup()
 		notice->installEventFilter(new KeepHidden(notice));
 		notice->hide();
 	}
+	// with the notice kept hidden and the preview off the canvas has nothing that wants to grow, so the layout split the spare height with the toolbar and it stretched; the toolbar keeps its own height instead
+	if (QWidget *context = mw->findChild<QWidget *>(QStringLiteral("contextContainer"))) {
+		QSizePolicy policy = context->sizePolicy();
+		policy.setVerticalPolicy(QSizePolicy::Fixed);
+		context->setSizePolicy(policy);
+	}
 }
 
 void ShellProjectorPrepare()

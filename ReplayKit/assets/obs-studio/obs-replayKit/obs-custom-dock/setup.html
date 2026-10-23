@@ -110,24 +110,16 @@
   .form-row.is-stacked-row { align-items:start; }
   .label { justify-self:end; text-align:right; color:var(--text); line-height:1.25; }
   .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
+  /* a slider runs the full width of the field column under the value box, the way the settings page lays them out */
+  .form-row:has(> .field-wrap > .volume-control) { grid-template-columns:var(--rk-label-col, 180px) 64px minmax(0,1fr) auto; grid-template-areas:"label value . reset" ". slider slider slider"; row-gap:4px; padding-top:8px; padding-bottom:8px; }
+  .form-row:has(> .field-wrap > .volume-control) > .label { grid-area:label; }
+  .form-row:has(> .field-wrap > .volume-control) > .field-wrap,
+  .form-row:has(> .field-wrap > .volume-control) .volume-control { display:contents; }
+  .form-row:has(> .field-wrap > .volume-control) .volume-value { grid-area:value; }
+  .form-row:has(> .field-wrap > .volume-control) .field-reset { grid-area:reset; }
+  .form-row:has(> .field-wrap > .volume-control) :is(.volume-slider-wrap, .sens-wrap) { grid-area:slider; }
   .hint { color:var(--muted); font-size:12px; margin-left:4px; }
 
-  .info-dot {
-    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
-    display:inline-flex; vertical-align:middle;
-    border:0; background:transparent; color:var(--muted);
-    cursor:help; -webkit-user-select:none; user-select:none;
-    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
-  }
-  .info-dot::before {
-    content:""; width:100%; height:100%; background-color:currentColor;
-    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
-    mask:url(/icons/ui/info.svg) center / contain no-repeat;
-  }
-  .info-dot:hover { color:var(--text); transform:scale(1.12); }
-  .info-dot:active { transform:scale(.94); }
-  .info-dot:focus { outline:none; }
-  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
 
   .text-input,.spin-input,.hotkey-input {
     width:100%; height:32px;
@@ -292,7 +284,7 @@
       </div>
       <div id="recordingAdvanced" hidden>
         <div class="form-row">
-          <div class="label">Recording Buffer <button class="info-dot" type="button" aria-label="About the recording buffer" title="Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on."></button></div>
+          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on.</span></div>
           <div class="field-wrap">
             <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false" aria-label="Recording buffer"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
           </div>

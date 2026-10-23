@@ -32,7 +32,8 @@
 
   /* the window is the card: the plugin gives it round corners and a border through the system, so the page only fills it, in the colour the plugin looks for to tell a painted card from an empty one */
   .card { position:absolute; inset:0; display:flex; flex-direction:column; background:var(--grey6); }
-  .card.is-opening { animation:rk-open 240ms ease-out; }
+  /* the card fades in with the dim the plugin lays under it */
+  .card.is-opening { animation:rk-open 280ms var(--ease_smooth, ease-out) both; }
   @keyframes rk-open { from { opacity:0; } to { opacity:1; } }
 
   .top { position:relative; flex:none; padding:18px 60px 12px 24px; border-bottom:1px solid var(--grey3); }
@@ -114,6 +115,7 @@
     els.link.hidden = true;
     url = "";
   }
+
 
   // the window is reused: the plugin calls this with the notification to show each time it opens the card
   window.__replaykitShowReader = async function (id) {

@@ -72,8 +72,8 @@ namespace ReplayKitHelper
                     }
                     if (kind == "clip")
                     {
-                        var clip = Clips.GetSafeClipPath(reference);
-                        if (clip == null || !File.Exists(clip.Full)) { error = "A clip added in the editor is no longer in the clip folder."; return null; }
+                        var clip = Clips.GetEditorSource(reference);
+                        if (clip == null || !File.Exists(clip.Full)) { error = VideoImports.IsRef(reference) ? "A video added in the editor was moved or changed. Add it again." : "A clip added in the editor is no longer in the clip folder."; return null; }
                         layer.Path = clip.Full;
                         layer.Clip = true;
                     }

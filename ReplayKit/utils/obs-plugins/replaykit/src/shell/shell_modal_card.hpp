@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QJsonObject>
 #include <QPointer>
+#include <QVariantAnimation>
 #include <QString>
 #include <QWidget>
 #include <functional>
@@ -41,7 +42,8 @@ public:
 	void Follow();
 	// showScript replaces the one of the spec for this open
 	void Open(const std::string &showScript = std::string());
-	void Close();
+	// animated when the card is dismissed, at once when another card or the obs window takes its place
+	void Close(bool animate = true);
 	// whether the card is open and shows nothing, and how many times it was built again for that
 	QJsonObject Probe();
 	// deletes the windows; runs before cef shuts down
@@ -49,7 +51,11 @@ public:
 
 	void OnPagePressedOutside() { Close(); }
 	void OnHostMoved();
-	void OnHostGone() { Close(); }
+	void OnHostGone()
+	{
+		Close(false);
+		HideCurtain();
+	}
 
 private:
 	bool EnsureBuilt();
@@ -62,7 +68,9 @@ private:
 	void StartCardWarm();
 	bool CardLooksEmpty();
 	void CheckCardPainted(int run);
-	void OpenFresh();
+	void HideCurtain();
+	// fades the dim to level, 0 to 1, and runs done once it is there
+	void FadeCurtain(qreal level, int ms, std::function<void()> done = nullptr);
 	void WaitForPage(int run);
 
 	ModalCardSpec m_spec;
@@ -79,6 +87,9 @@ private:
 	std::string m_waitingScript;
 	// what the last open showed, so a card built again after opening empty shows it again
 	std::string m_lastScript;
+	QPointer<QVariantAnimation> m_fade;
+	// the card is gone and the dim is fading out after it
+	bool m_closing = false;
 	int m_run = 0;
 	qint64 m_warmMs = -1;
 	int m_heals = 0;

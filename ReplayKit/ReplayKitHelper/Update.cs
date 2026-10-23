@@ -296,6 +296,20 @@ namespace ReplayKitHelper
         private static Timer pollTimer;
         private static int pollRunning;
         private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(30);
+        // the version the periodic check found while obs was open, for the badge of the title bar; empty when there is none
+        private static volatile string readyVersion = "";
+
+        public static string ReadyVersion => readyVersion;
+
+        // sdk mode shows the badge for a version of its own choosing, to see how it looks, or takes it away with an empty one; the next periodic check puts the real state back
+        public static JObject PreviewBadge(string version)
+        {
+            version = (version ?? "").Trim();
+            if (version.Length > 0 && !Regex.IsMatch(version, @"^[0-9A-Za-z.\-]{1,32}$")) return new JObject { ["ok"] = false, ["message"] = "Bad version." };
+            readyVersion = version;
+            WriteUpdateDebug("sdk: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
+            return new JObject { ["ok"] = true, ["updateReady"] = version };
+        }
 
         public static void StartPolling()
         {
@@ -329,14 +343,12 @@ namespace ReplayKitHelper
                     WriteUpdateDebug("periodic update check failed: " + status["message"]);
                     return;
                 }
-                if (status["prompt"]?.Value<bool>() != true) return;
-                string version = status["latestVersion"]?.Value<string>();
-                lock (Server.State.UpdateCheckLock)
-                {
-                    if (pollTimer == null || Server.State.UpdateApplyInProgress || StartupPromptSuppressedBecause(version) != null) return;
-                    var opened = OpenUpdatePromptWindow(version);
-                    if (opened["ok"]?.Value<bool>() != true) WriteUpdateDebug("periodic update prompt failed: " + opened["message"]);
-                }
+                // only the check at startup updates by itself; one found while obs is open is shown as the badge of the title bar, which opens the update window when it is clicked
+                bool ready = status["autoUpdateEnabled"]?.Value<bool>() == true &&
+                    (status["updateAvailable"]?.Value<bool>() == true || status["repairRequired"]?.Value<bool>() == true);
+                string version = ready ? status["latestVersion"]?.Value<string>() ?? "" : "";
+                if (version != readyVersion) WriteUpdateDebug("periodic update check: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
+                readyVersion = version;
             }
             catch (Exception ex) { WriteUpdateDebug("periodic update check failed: " + ex.Message); }
             finally { Interlocked.Exchange(ref pollRunning, 0); }

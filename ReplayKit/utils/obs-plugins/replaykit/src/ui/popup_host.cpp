@@ -37,20 +37,22 @@ QString Page(const QString &url)
 
 void Call(const char *method, const QJsonArray &args)
 {
-	if (!browser)
+	if (!browser || parked)
 		return;
 	QByteArray values = QJsonDocument(args).toJson(QJsonDocument::Compact);
 	values = values.mid(1, values.size() - 2);
-	browser->executeJavaScript("window.RKPopup && window.RKPopup." + std::string(method) + "(" + values.toStdString() + ");");
+	RunBrowserScript(browser, "window.RKPopup && window.RKPopup." + std::string(method) + "(" + values.toStdString() + ");");
 }
 
 } // namespace
 
 QWidget *PopupHost::Prepare(QWidget *owner)
 {
+	if (!CefOpen())
+		return nullptr;
 	if (window)
 		return window;
-	if (!owner || !CefOpen() || !g_cef->initialized())
+	if (!owner || !g_cef->initialized())
 		return nullptr;
 	QWidget *host = ObsMainWindowQt();
 	window = new QWidget(host ? host : owner);
@@ -138,8 +140,12 @@ void PopupHost::Release(const void *owner)
 	if (!Owns(owner))
 		return;
 	Call("park", {});
-	if (window)
+	if (window) {
 		window->hide();
+		// the owner it was lent to can be deleted next (a card that is built again deletes its dim), and windows destroys the windows a window owns along with it, the browser inside included, so it goes back to the obs window
+		if (QWidget *host = window->parentWidget())
+			SetWindowLongPtrW((HWND)window->winId(), GWLP_HWNDPARENT, (LONG_PTR)host->winId());
+	}
 	active = nullptr;
 	activeUrl.clear();
 	suspend = nullptr;

@@ -142,7 +142,7 @@ void ShowClips()
 	}
 	if (g_clipsWindow) {
 		if (!g_clipsWindow->isVisible() && g_clipsBrowser)
-			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
+			RunBrowserScript(g_clipsBrowser, "window.__replaykitResetClips && window.__replaykitResetClips();");
 		UnminimizeClips();
 		g_clipsWindow->show();
 		g_clipsWindow->raise();
@@ -187,7 +187,7 @@ void ToggleClips()
 			return;
 		}
 		if (g_clipsBrowser)
-			g_clipsBrowser->executeJavaScript("window.__replaykitResetClips && window.__replaykitResetClips();");
+			RunBrowserScript(g_clipsBrowser, "window.__replaykitResetClips && window.__replaykitResetClips();");
 		UnminimizeClips();
 		g_clipsWindow->show();
 		g_clipsWindow->raise();

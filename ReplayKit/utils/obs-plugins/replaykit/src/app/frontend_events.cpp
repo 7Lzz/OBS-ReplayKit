@@ -34,7 +34,6 @@ namespace {
 // synchronously deletes our cef widgets before obs_module_unload, mirroring how OBSBasic.cpp deletes extraBrowsers early, to dodge upstream race obsproject/obs-browser#353 where cef can still be mid-teardown when the browser-manager thread is joined -- direct delete not deleteLater becuase a deferred one wouldnt run before applicationShutdown anyway
 void CloseCefWidgetsBeforeShutdown()
 {
-	CefCloseForShutdown();
 	AnchoredPanel::DestroyAll();
 	StorageModalDestroy();
 	NotifyReaderDestroy();
@@ -62,6 +61,7 @@ NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
+		CefCloseForShutdown();
 		PatchBrowserDockTitleInUserIni(); // fires after obs already wrote user.ini, so this rename sticks
 		PrepareDocksForNextLaunch();
 		if (g_projectorPublishTimer)

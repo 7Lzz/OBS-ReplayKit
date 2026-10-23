@@ -106,6 +106,9 @@ void ShellApplySettings(const std::string &settingsBody)
 	if (!g_shellOn || !g_shellTitle)
 		return;
 	g_shellTitle->SetLabels(g_titleRecordLabel, g_titleClipLabel, JsonIntField(settingsBody, "replaySeconds", 0));
+	// only the short read of the poll carries it, so a full read of the settings leaves the badge as it is
+	if (settingsBody.find("\"updateReady\":") != std::string::npos)
+		g_shellTitle->SetUpdateReady(QString::fromStdString(ExtractJsonStringField(settingsBody, "updateReady")));
 }
 
 // switches the process into the clean shell. must run before the main window has a native window: a frameless flag set later makes qt recreate it while obs is using it

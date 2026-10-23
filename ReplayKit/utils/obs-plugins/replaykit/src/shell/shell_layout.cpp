@@ -190,6 +190,17 @@ void ShellTintPreview()
 		preview = mw->findChild<QWidget *>(QStringLiteral("preview"));
 	if (preview)
 		preview->setProperty("displayBackgroundColor", g_chromeBg);
+	// the canvas editor keeps a 1px ring around the preview that nothing paints, so it showed whatever obs settings left in the window backing store under it
+	static QPointer<QWidget> canvasEditor;
+	if (!canvasEditor)
+		canvasEditor = mw->findChild<QWidget *>(QStringLiteral("canvasEditor"));
+	if (canvasEditor) {
+		const QString canvasStyle = QStringLiteral("#canvasEditor { background:%1; }").arg(g_chromeBg.name());
+		if (canvasEditor->styleSheet() != canvasStyle) {
+			canvasEditor->setAttribute(Qt::WA_StyledBackground, true);
+			canvasEditor->setStyleSheet(canvasStyle);
+		}
+	}
 	const QString sourcesStyle = QStringLiteral(
 		"QDockWidget#sourcesDock, #dockWidgetContents_6, #sourcesFrame, SourceTree { background:%1; color:%3; }"
 		"QDockWidget::title { background:%2; color:%3; border:none; }"
@@ -207,11 +218,13 @@ void ShellTintPreview()
 			sources->setStyleSheet(sourcesStyle);
 		HookSourceSelection(sources);
 	}
+	// the theme gives the toolbar a 4px top margin that nothing paints, so whatever obs settings left there in the window backing store stayed on screen above it; the gap is drawn as a top border in the stage colour instead
 	const QString contextStyle = QStringLiteral(
 		"#contextContainer, #contextSubContainer { background:%1; color:%2; }"
+		"#contextContainer { margin-top:0px; border-top:4px solid %6; border-top-left-radius:0px; border-top-right-radius:0px; }"
 		"QLabel { color:%2; } QPushButton { background:%3; color:%2; border:1px solid %4; }"
 		"QPushButton:hover { background:%4; } QPushButton:disabled { color:%5; }")
-		.arg(g_menuPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name());
+		.arg(g_menuPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name(), g_chromeBg.name());
 	if (QWidget *context = mw->findChild<QWidget *>(QStringLiteral("contextContainer"))) {
 		if (context->styleSheet() != contextStyle)
 			context->setStyleSheet(contextStyle);

@@ -63,7 +63,7 @@
           <div class="trim-mode-row">
             <input type="checkbox" class="rk-switch" id="trim-precise" aria-label="Frame-accurate cut">
             <span>Frame-accurate cut</span>
-            <button class="info-dot" type="button" aria-label="About frame-accurate trim" data-tooltip="Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it's off, cuts are instant, but a clip may start slightly earlier than you chose."></button>
+            <span class="control-note">Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it&#x27;s off, cuts are instant, but a clip may start slightly earlier than you chose.</span>
           </div>
           <div class="trim-mode-row" title="Drops the audio stream from the edited output.">
             <input type="checkbox" class="rk-switch" id="trim-remove-audio" aria-label="Remove audio">
@@ -235,6 +235,7 @@ window.__rkEditorApi = (function () {
     // the tabs on the right: which one of the video is open, and what is selected
     videoPane: () => (editorFx ? editorFx.pane() : "general"),
     onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
+    onPanel: () => { if (editorFx) editorFx.refresh(); },
     onFx: () => { if (editorFx) editorFx.changed(); syncTrimReencodeLock(); },
     // where a subtitle breaks into lines, shared by the preview and the saved copy so both break it the same way
     layoutSubtitle: (text, style) => RKEditorTools.layoutText(text, style, (trimVideo.videoWidth || 16) / (trimVideo.videoHeight || 9)),
@@ -1490,14 +1491,14 @@ window.__rkEditorApi = (function () {
     const isNew = !hasDraft(name);
     draftsByName.set(name, { savedAt: Math.floor(Date.now() / 1000), duration: edit.duration });
     if (isNew) draftsChanged();
-    fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
+    queueDraftWrite(() => fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
       method: "POST",
       cache: "no-store",
       // a request that must outlive the page may not carry much, and a draft that is bigger just goes the plain way
       keepalive: !!final && body.length < 60000,
       headers: { "Content-Type": "application/json" },
       body,
-    }).then((res) => {
+    })).then((res) => {
       if (!res.ok) trimDraftSent = "";
       else if (!final) showTrimDraftNote();
     }).catch(() => { trimDraftSent = ""; });

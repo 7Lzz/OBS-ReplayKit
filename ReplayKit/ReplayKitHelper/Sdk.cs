@@ -39,6 +39,7 @@ namespace ReplayKitHelper
 
         static Sdk()
         {
+            Register("update.badge", "shows the update button of the title bar for args.version (9.9.9 when left out) as if the update check had found it, or takes it away with args.clear; the next update check, every 30 minutes, puts the real state back", args => Update.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "9.9.9"));
             Register("helper.info", "version, process id, uptime and the switches that matter of the helper", HelperInfo);
             Register("settings.get", "the settings, or only the keys named in args.keys", SettingsGet);
             Register("settings.set", "saves the settings in args.values the way the settings page does", SettingsSet);

@@ -45,21 +45,11 @@
   .ovp-hint { display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:4px; }
   .ovp-hint-text { font-size:10.5px; color:var(--muted); }
   /* the dot styling + the wrapping tooltip variant live here so the partial looks the same in Settings and in the wizard */
-  .ovp-hint .info-dot {
-    position:relative; width:14px; height:14px; padding:0; flex:none; border:0; border-radius:50%;
-    background:transparent; color:var(--muted); cursor:help; transition:transform 120ms, color 120ms;
-  }
-  .ovp-hint .info-dot::before {
-    content:"i"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    border:1px solid currentColor; border-radius:50%; font-size:9px; font-style:italic; font-weight:700; line-height:1;
-  }
-  .ovp-hint .info-dot:hover { color:var(--text); transform:scale(1.12); }
-  .ovp-hint .info-dot:focus { outline:none; }
 </style>
 <div class="ovp-wrap">
   <div class="ovp-hint">
     <span class="ovp-hint-text">Drag to position</span>
-    <button class="info-dot" type="button" aria-label="About positioning the overlay" title="Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply."></button>
+    <span class="control-note">Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply.</span>
   </div>
   <div class="ovp-screen" id="ovpScreen">
     <div class="ovp-off" id="ovpOff" hidden>Input overlay is off</div>
@@ -294,6 +284,7 @@
   var drag = null;
   // committed drags and resizes so ctrl+z steps back and ctrl+shift+z / ctrl+y forward. each entry is { pos, scale, rotation }: pos a {x,y} canvas-fraction override or null for the corner obs / the saved setting produces, scale the size slider value. a fresh edit clears the redo stack.
   var moveUndo = [], moveRedo = [], MOVE_HISTORY_MAX = 60;
+  var historyHandled = false;
   function clearMoveHistory() { moveUndo.length = 0; moveRedo.length = 0; }
   function snapshot(pos) { return { pos: pos ? { x: pos.x, y: pos.y } : null, scale: clampNum(curScalePct(), SCALE_MIN, SCALE_MAX, 100), rotation:curRotation() }; }
   function pushHistory(entry) {
@@ -408,6 +399,7 @@
     applyHistoryEntry(moveRedo.pop());
   }
   function onHistoryKey(ev) {
+    if (historyHandled) return;
     if (!(ev.ctrlKey || ev.metaKey)) return;
     // ev.key is layout-aware (ev.code "KeyZ" is the physical QWERTY slot -- wrong on AZERTY etc.)
     var k = (ev.key || "").toLowerCase();
@@ -613,7 +605,8 @@
   function normHex(v, dflt) { v = String(v || "").trim().toLowerCase(); return /^#[0-9a-f]{6}$/.test(v) ? v : dflt; }
 
   window.RKOverlayPreview = {
-    init: function (fn, onMoveFn, onScaleFn, onRotateFn) {
+    init: function (fn, onMoveFn, onScaleFn, onRotateFn, handlesHistory) {
+      historyHandled = handlesHistory === true;
       if (typeof fn === "function") getStyle = fn;
       if (typeof onMoveFn === "function") onMove = onMoveFn;
       if (typeof onScaleFn === "function") onScale = onScaleFn;

@@ -15,27 +15,9 @@
   .form-row[hidden] { display:none; }
   .combo.sep-after-first .combo-option:first-child { border-bottom:1px solid var(--line2); border-radius:0; margin-bottom:3px; padding-bottom:3px; }
 
-  /* small i that reveals the note for a control in the shared tooltip; the same rules as settings.html so setup.html gets the identical icon */
-  .info-dot {
-    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
-    display:inline-flex; vertical-align:middle;
-    border:0; background:transparent; color:var(--muted);
-    cursor:help; -webkit-user-select:none; user-select:none;
-    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
-  }
-  .info-dot::before {
-    content:""; width:100%; height:100%; background-color:currentColor;
-    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
-    mask:url(/icons/ui/info.svg) center / contain no-repeat;
-  }
-  .info-dot:hover { color:var(--text); transform:scale(1.12); }
-  .info-dot:active { transform:scale(.94); }
-  .info-dot:focus { outline:none; }
-  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
 
   .mic-test { flex:1; min-width:0; display:flex; align-items:center; gap:12px; }
   .mic-test .btn { flex:none; min-width:104px; }
-  .mic-test .info-dot { margin-left:-4px; }
   /* thin fixed-width bars whose count follows the row width, so a wider window gets more bars instead of fatter ones; the leftover space is spread across the gaps so the row ends flush. --t is the bar position from 0 to 1 and blends the lit colour from warning to success */
   .mic-meter { flex:1; min-width:0; height:32px; display:flex; align-items:center; justify-content:space-between; }
   .mic-meter i { flex:none; width:3px; height:24px; border-radius:2px; background:var(--line); transition:background 70ms linear; }
@@ -70,7 +52,7 @@
   <div class="field-wrap">
     <div class="mic-test">
       <button class="btn is-primary" type="button" id="micTestBtn">Mic Test</button>
-      <button class="info-dot" type="button" aria-label="About the mic test" title="Plays your microphone back to you, with your volume, sensitivity, and noise settings applied."></button>
+      <span class="control-note">Plays your microphone back to you, with your volume, sensitivity, and noise settings applied.</span>
       <div class="mic-meter" id="micMeter" role="img" aria-label="Microphone level"></div>
     </div>
   </div>
@@ -104,7 +86,7 @@
 </div>
 <div class="form-row tight" data-search="noise suppression noise removal background noise keyboard fan">
   <div></div>
-  <div class="check-row"><input type="checkbox" id="micNoise" aria-label="Noise suppression"><span>Noise suppression</span><button class="info-dot" type="button" aria-label="About noise suppression" title="Reduces background noise like keyboard clicks and fans from your microphone."></button></div>
+  <div class="check-row"><input aria-label="Noise suppression" id="micNoise" type="checkbox"/><span>Noise suppression<span class="control-note">Reduces background noise like keyboard clicks and fans from your microphone.</span></span></div>
 </div>
 <script>
 (function () {
@@ -351,7 +333,7 @@
   function kickMeter() { if (!meterTimer) meterTimer = setInterval(frame, 33); }
 
   function testOn() { return desired === "test" && mode === "test"; }
-  // the guidance lives in the info icons, so this row only appears when something went wrong
+  // the guidance is shown beside the controls, so this row only appears when something went wrong
   function renderNote() {
     note.textContent = noteError;
     noteRow.hidden = !noteError;

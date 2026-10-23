@@ -115,7 +115,7 @@ namespace ReplayKitSetup
         public const bool DEFAULT_DEBUG_LOGGING_ENABLED = false;
         public const bool DEFAULT_CLIP_NOTIFICATION = true;
         public const bool DEFAULT_RECORDING_NOTIFICATION = true;
-        public const bool DEFAULT_TRIM_PRECISE = false;
+        public const bool DEFAULT_TRIM_PRECISE = true;
         // the pc audio, discord and the microphone as tracks of their own in every recording, next to the mixed track 1; on for a new install, and DefaultsMigration turns it on once for an install that existed before
         public const bool DEFAULT_SEPARATE_AUDIO_TRACKS = true;
         public const int DEFAULT_CLIP_SOUND_VOLUME = 25;
@@ -499,7 +499,7 @@ namespace ReplayKitSetup
                 PinObsTrayIcon = CoerceBool(Get("pin_obs_tray_icon"), DEFAULT_PIN_OBS_TRAY_ICON),
                 ClipNotificationEnabled = CoerceBool(Get("clip_notification_enabled"), DEFAULT_CLIP_NOTIFICATION),
                 RecordingNotificationEnabled = CoerceBool(Get("recording_notification_enabled"), DEFAULT_RECORDING_NOTIFICATION),
-                TrimPreciseDefault = CoerceBool(Get("trim_precise_default"), DEFAULT_TRIM_PRECISE),
+                TrimPreciseDefault = DEFAULT_TRIM_PRECISE,
                 DebugLoggingEnabled = CoerceBool(Get("debug_logging_enabled"), DEFAULT_DEBUG_LOGGING_ENABLED),
                 ClipSoundVolume = CoerceIntRange(Get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, 0, 100),
                 RecordingSoundVolume = CoerceIntRange(Get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, 0, 100),

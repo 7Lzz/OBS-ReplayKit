@@ -41,6 +41,9 @@ namespace ReplayKitHelper
             return new SafeClipPath { Name = name, Full = full };
         }
 
+        // what the editor reads a clip by: a clip of the folder, or a video picked from outside it; only routes that read go through this, never the ones that delete or rename
+        public static SafeClipPath GetEditorSource(string raw) => VideoImports.IsRef(raw) ? VideoImports.Resolve(raw) : GetSafeClipPath(raw);
+
         public sealed class DeleteResult
         {
             // the http status the delete route answers with: 200 deleted, 404 not there, 409 another operation holds the clip, 500 the delete failed

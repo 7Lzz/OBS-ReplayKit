@@ -5,10 +5,10 @@
       border-color 90ms linear, color 90ms linear, opacity 120ms linear;
   }
   .rk-hover-control:not(:disabled):not(.is-disabled):not(.is-busy):not(.is-progress):not(.is-flashing):not(.is-armed):hover {
-    transform: scale(var(--hover_grow, 1.04));
+    transform: scale(min(var(--hover_grow, 1.04), var(--rk-hover-limit, 1.04)));
   }
   .rk-hover-control:not(:disabled):not(.is-disabled):not(.is-busy):not(.is-progress):not(.is-flashing):not(.is-armed):active {
-    transform: scale(var(--press_shrink, .97));
+    transform: scale(max(var(--press_shrink, .97), var(--rk-press-limit, .97)));
   }
   .rk-hover-control:focus-visible { outline: 2px solid var(--primary_light, var(--primary)); outline-offset: 2px; }
 
@@ -38,13 +38,35 @@
 <script>
 (function () {
   var profiles = ["control", "overlay", "row", "accent", "danger", "nav", "card", "surface"];
+  var observed = new WeakSet();
+  var resize = new ResizeObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var element = entry.target;
+      if (!element.isConnected) {
+        resize.unobserve(element);
+        observed.delete(element);
+        return;
+      }
+      var size = Math.max(element.offsetWidth, element.offsetHeight);
+      if (!size) return;
+      // Limit growth to 3px and shrinkage to 4px across the whole button.
+      element.style.setProperty("--rk-hover-limit", String(1 + 3 / size));
+      element.style.setProperty("--rk-press-limit", String(1 - 4 / size));
+    });
+  });
   window.RKHover = {
     apply: function (root, mappings) {
       if (!root || !mappings) return;
       profiles.forEach(function (profile) {
         var selector = mappings[profile];
         if (typeof selector !== "string" || !selector) return;
-        root.querySelectorAll(selector).forEach(function (element) { element.classList.add("rk-hover-" + profile); });
+        root.querySelectorAll(selector).forEach(function (element) {
+          element.classList.add("rk-hover-" + profile);
+          if (profile === "control" && !observed.has(element)) {
+            observed.add(element);
+            resize.observe(element);
+          }
+        });
       });
     },
   };

@@ -488,7 +488,6 @@ if (location.protocol === "file:") {
     attach();
     current = el;
     label.textContent = el.dataset.tooltip;
-    tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
     tip.classList.add("is-shown");
     reposition();
   }
@@ -517,19 +516,6 @@ if (location.protocol === "file:") {
     if (e.relatedTarget && current.contains(e.relatedTarget)) return;
     observer.disconnect();
     hide();
-  });
-  document.addEventListener("focusin", function (e) {
-    var dot = e.target.closest(".info-dot[data-tooltip]");
-    if (dot) show(dot);
-  });
-  document.addEventListener("focusout", function (e) {
-    if (e.target.closest(".info-dot[data-tooltip]")) hide();
-  });
-  document.addEventListener("click", function (e) {
-    var dot = e.target.closest(".info-dot[data-tooltip]");
-    if (!dot) return;
-    e.preventDefault();
-    show(dot);
   });
   document.addEventListener("mousedown", function (e) {
     if (current && current.contains(e.target)) return;

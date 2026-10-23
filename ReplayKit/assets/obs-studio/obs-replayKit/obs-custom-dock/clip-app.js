@@ -86,14 +86,13 @@ const CLIP_HOVER_PROFILES = {
   const PENDING_LINK_CREATION_MS = 20 * 60 * 1000;
   // after a cancel the helper can still report the old job as active (or as error=Cancelled) for a poll or two -- ignore that jobs status this long so the instant card repaint isnt undone.
   const CANCEL_GRACE_MS = 8000;
-  const replayKitSettings = { trimPreciseDefault: false, showCodecTags: false, editorAutoplay: false, editorLoopPreview: false, editorSeekStep: 5, editorWheelZoom: true, editorZoomScaling: "smooth", clipAntialiasing: "none" };
+  const replayKitSettings = { showCodecTags: false, editorAutoplay: false, editorLoopPreview: false, editorSeekStep: 5, editorWheelZoom: true, editorZoomScaling: "smooth", clipAntialiasing: "none" };
 
   async function loadReplayKitSettings() {
     try {
       const res = await fetch(HELPER + "/settings?t=" + Date.now(), { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok && data.settings) {
-        replayKitSettings.trimPreciseDefault = !!data.settings.trimPreciseDefault;
         replayKitSettings.editorAutoplay = !!data.settings.editorAutoplay;
         replayKitSettings.editorLoopPreview = !!data.settings.editorLoopPreview;
         replayKitSettings.editorSeekStep = Number(data.settings.editorSeekStep) > 0 ? Number(data.settings.editorSeekStep) : 5;
@@ -674,12 +673,28 @@ const CLIP_HOVER_PROFILES = {
     return draftsByName.has(String(name || ""));
   }
 
-  // the list the helper keeps, read when the page starts, when it is shown again and after anything that changes a draft
+  // draft writes reach the helper one after another, so a save still on its way cannot land after the delete that followed it and bring the draft back
+  let draftWrites = Promise.resolve();
+  let draftEpoch = 0;
+  let draftReadSeq = 0;
+  function queueDraftWrite(send) {
+    draftEpoch++;
+    const run = draftWrites.then(send, send);
+    draftWrites = run.then(() => {}, () => {});
+    return run;
+  }
+
+  // the list the helper keeps, read when the page starts, when it is shown again and after anything that changes a draft; it is read after the writes of this page and only the newest read counts, and a draft kept or dropped while it was on its way makes it old, so it is read again
   async function refreshDrafts() {
+    const seq = ++draftReadSeq;
     try {
+      await draftWrites;
+      const epoch = draftEpoch;
       const res = await fetch(HELPER + "/drafts?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok || seq !== draftReadSeq) return;
       const data = await res.json();
+      if (seq !== draftReadSeq) return;
+      if (epoch !== draftEpoch) { refreshDrafts(); return; }
       draftsByName.clear();
       for (const row of (Array.isArray(data && data.drafts) ? data.drafts : [])) {
         if (row && row.name) draftsByName.set(String(row.name), { savedAt: Number(row.savedAt) || 0, duration: Number(row.duration) || 0 });
@@ -781,7 +796,7 @@ const CLIP_HOVER_PROFILES = {
   // a draft is gone: told to the helper, and out of the list of the page. the helper is told even when the page did not know of it, since the list may not have been read yet
   function forgetDraft(name) {
     const known = draftsByName.delete(name);
-    fetch(HELPER + "/drafts/delete?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { method: "POST", cache: "no-store" }).catch(() => {});
+    queueDraftWrite(() => fetch(HELPER + "/drafts/delete?file=" + encodeURIComponent(name) + "&t=" + Date.now(), { method: "POST", cache: "no-store" })).catch(() => {});
     if (!known) return;
     draftsChanged();
     rerenderCard(name);

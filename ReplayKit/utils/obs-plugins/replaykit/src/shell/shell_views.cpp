@@ -330,6 +330,8 @@ bool ShellIsPageView(ShellView view)
 // the keyboard goes to the host window cef puts around its page, which is what makes cef take the focus for the page the way a click does; focus placed on a window below it did not give the keys to the page until a click. the page that shows is told to take it as well, since the focus of a frame is not the focus of the browser. only while the window itself is in front, so a menu or a dialog that belongs to it keeps the keyboard it has
 bool ShellFocusBrowser()
 {
+	if (!CefOpen())
+		return false;
 	QMainWindow *mw = ObsMainWindowQt();
 	if (!g_shellOn || !mw || !g_shellHost || !g_shellHost->browser || !g_hostOnTop || GetForegroundWindow() != (HWND)mw->winId())
 		return false;
@@ -396,7 +398,7 @@ void ShellRestartHost(bool fromPark)
 void ShellParkLater(int gen, int delayMs)
 {
 	QTimer::singleShot(delayMs, g_callbacks, [gen]() {
-		if (gen != g_parkGen || g_hostParked || !g_shellOn || !g_shellHost || !g_shellHost->browser || !g_hostReady)
+		if (!CefOpen() || gen != g_parkGen || g_hostParked || !g_shellOn || !g_shellHost || !g_shellHost->browser || !g_hostReady)
 			return;
 		QMainWindow *mw = ObsMainWindowQt();
 		if (mw && mw->isVisible() && !mw->isMinimized())
@@ -420,7 +422,7 @@ void ShellParkLater(int gen, int delayMs)
 // the page starts over the way it does after a launch: the stage is covered until the page says its first view is on screen, and the view that was asked for is put up again from there. a browser is never torn down for this, only reloaded
 void ShellReloadHost()
 {
-	if (!g_shellOn || !g_shellHost || !g_shellHost->browser)
+	if (!CefOpen() || !g_shellOn || !g_shellHost || !g_shellHost->browser)
 		return;
 	// a reload that did not bring the page back is not repeated every few seconds
 	if (g_hostReloadTimer.isValid() && g_hostReloadTimer.elapsed() < 30000)
@@ -433,6 +435,8 @@ void ShellReloadHost()
 
 void ShellHostWindowShown(bool shown)
 {
+	if (!CefOpen())
+		return;
 	const int gen = ++g_parkGen;
 	if (!shown) {
 		ShellParkLater(gen, kParkAfterMs);
@@ -455,6 +459,8 @@ bool ShellHostParked()
 // a page whose renderer died stays blank until the browser is reloaded and nothing tells the plugin, so the page is asked for a sign of life: it answers through the helper (RKShell.ping, /shell/ping, SHELLPONG on the pipe). silence only counts against the page once an answer has come back at least once, since a helper that does not know the route never answers, and only while the helper itself is up
 void ShellProbeHost(bool suspicious)
 {
+	if (!CefOpen())
+		return;
 	QMainWindow *mw = ObsMainWindowQt();
 	if (!g_shellOn || !g_shellHost || !g_hostReady || !mw || !mw->isVisible() || mw->isMinimized()) {
 		g_hostPingMisses = 0;

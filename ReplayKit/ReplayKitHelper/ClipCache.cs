@@ -87,7 +87,7 @@ namespace ReplayKitHelper
                 {
                     DateTime last = Directory.GetLastWriteTimeUtc(dir);
                     bool done = File.Exists(Path.Combine(dir, DoneMarker));
-                    bool import = Path.GetFileName(kind) == "imports" || Path.GetFileName(kind) == "media";
+                    bool import = Path.GetFileName(kind) == "imports" || Path.GetFileName(kind) == "media" || Path.GetFileName(kind) == "videos";
                     bool inDraft = import && (referenced == null || referenced.Contains(dir));
                     list.Add(new Entry { Path = dir, IsDir = true, Bytes = BytesOf(SafeFiles(dir, SearchOption.AllDirectories)), LastUse = last, Busy = inDraft || !done && now - last < UnfinishedGrace });
                 }

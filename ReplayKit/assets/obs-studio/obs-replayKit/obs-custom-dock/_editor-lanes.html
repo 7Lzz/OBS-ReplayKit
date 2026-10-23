@@ -828,6 +828,15 @@
     }
 
     // the host shows the tabs of what is selected on the right
+    // the panel of what is selected was closed with its x: it stays closed while that stays selected, the tab beside it opens it again, and anything else picked shows its own
+    var panelClosedFor = "";
+    function panelClosed() { return !!st.selected && panelClosedFor === st.selected; }
+    function setPanelClosed(closed) {
+      panelClosedFor = closed ? st.selected : "";
+      renderProps();
+      if (opts.onPanel) opts.onPanel();
+    }
+
     function reportKind() {
       var layer = findLayer(st.selected);
       if (opts.onSelectKind) opts.onSelectKind(videoSelected() || (layer && layer.kind === "clip") ? "video" : selected() ? "audio" : findSub(st.selected) ? "subtitle" : layer ? "layer" : "");
@@ -1938,6 +1947,8 @@
       st.layers.push(made);
       st.selected = made.id;
       commit();
+      // the sound of a clip arrives later and joins this step, so one undo takes the clip and its sound back together
+      st.layerStep = { id: made.id, snap: st.history[st.history.length - 1] };
       layersChanged();
       paintSelection();
       renderProps();
@@ -3309,7 +3320,7 @@
       };
     }
 
-    // tip is the note of the info icon after the name, which the rows of the settings have in the same place
+    // Keep the explanation beneath the switch label.
     function checkRow(box, text, onChange, tip) {
       var label = el("div", "trim-mode-row");
       var input = el("input", "rk-switch");
@@ -3320,11 +3331,7 @@
       label.appendChild(input);
       label.appendChild(span);
       if (tip) {
-        var dot = el("button", "info-dot");
-        dot.type = "button";
-        dot.setAttribute("aria-label", "About " + text.toLowerCase());
-        dot.dataset.tooltip = tip;
-        label.appendChild(dot);
+        span.appendChild(el("span", "control-note", tip));
       }
       input.addEventListener("change", function () { onChange(input.checked); });
       box.appendChild(label);
@@ -3343,7 +3350,7 @@
       close.type = "button";
       close.setAttribute("aria-label", "Close");
       close.innerHTML = icon("editor/close");
-      close.addEventListener("click", function () { select(""); });
+      close.addEventListener("click", function () { setPanelClosed(true); });
       head.appendChild(els.propsTitle);
       head.appendChild(els.source);
       head.appendChild(close);
@@ -3461,6 +3468,7 @@
       var isVideo = videoSelected();
       var layer = findLayer(st.selected);
       reportKind();
+      if (panelClosed()) { root.hidden = true; return; }
       // the other tabs of the video have panels of their own
       var general = !opts.videoPane || opts.videoPane() === "general";
       root.hidden = !hit && !layer && !(isVideo && general);
@@ -4676,6 +4684,9 @@
           st.lanes.push(lane);
           // the sound of a clip arrives after the clip, which stays selected
           if (!link) st.selected = seg.id;
+          // nothing was done since the clip came in, so its step is taken over by the clip with its sound
+          if (link && st.layerStep && st.layerStep.id === link && st.history.length > 1 && st.history[st.history.length - 1] === st.layerStep.snap) st.history.pop();
+          st.layerStep = null;
           done();
           if (laneRecs[lane.id] && laneRecs[lane.id].el.scrollIntoView) laneRecs[lane.id].el.scrollIntoView({ block: "nearest" });
           return true;
@@ -4952,6 +4963,7 @@
       dom.props.classList.remove("is-off");
       var hadSpeed = st.vspeed !== 1;
       st = fresh();
+      panelClosedFor = "";
       pressOutside = false;
       if (opts.onFx) opts.onFx();
       if (opts.onSelectKind) opts.onSelectKind("");
@@ -5371,6 +5383,9 @@
       // a layer put at the playhead and selected: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
       addLayer: function (l) { return addLayer(l); },
       clearSelection: function () { select(""); },
+      panelClosed: panelClosed,
+      closePanel: function () { setPanelClosed(true); },
+      openPanel: function () { setPanelClosed(false); },
       refreshProps: function () { renderProps(); },
       importAudio: function () { if (st.ready && !st.picking) pickAudio(); },
       // whether audio can be added right now, and what the audio tab says when it cannot

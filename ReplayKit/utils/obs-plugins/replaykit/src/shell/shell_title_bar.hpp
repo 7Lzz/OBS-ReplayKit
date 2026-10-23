@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include "shell/shell_account.hpp"
+#include "shell/shell_title_button.hpp"
 
 namespace rk {
 
@@ -19,6 +20,24 @@ class ShellBadge;
 class ShellHotkeyMenu;
 class ShellNavButton;
 class ShellWinButton;
+
+// the yellow badge left of the bell, its icon and then "ReplayKit <version> Available": a newer release was found while obs was open, and a click opens the update window, since only the check at startup updates by itself
+class ShellUpdateButton : public ShellTitleButton {
+public:
+	explicit ShellUpdateButton(QWidget *parent);
+	// the version that is ready, or empty to take the button away
+	void SetVersion(const QString &version);
+	const QString &Version() const { return m_version; }
+
+protected:
+	void PaintGlyph(QPainter &p, const QRectF &pill, qreal hover) override;
+
+private:
+	static QFont LabelFont();
+	QString Label() const { return QStringLiteral("ReplayKit %1 Available").arg(m_version); }
+
+	QString m_version;
+};
 
 // logo cell above the rail column, the back and forward arrows and the badges after it, the bell + account circle + window controls on the right. everything else is caption: the frame filter answers HTCAPTION for any point over this widget that no child covers
 class ShellTitleBar : public QWidget {
@@ -41,6 +60,8 @@ public:
 	// the arrows after the logo: one is dimmed while the history has nowhere to go that way
 	void SetNavigation(bool canGoBack, bool canGoForward);
 	void SetPage(const QString &page);
+	// the release the update check found while obs was open, empty when there is none
+	void SetUpdateReady(const QString &version);
 	void RestoreTitle();
 	// the menu of the circle is up, so the shell reads the account every second instead of every half minute
 	bool AccountPanelOpen() const;
@@ -75,6 +96,7 @@ private:
 	ShellBadge *m_rec = nullptr;
 	// the menu the right button opens under either badge
 	ShellHotkeyMenu *m_hotkeys = nullptr;
+	ShellUpdateButton *m_update = nullptr;
 	NotifyButton *m_bell = nullptr;
 	ShellAccountButton *m_account = nullptr;
 	ShellWinButton *m_min = nullptr;

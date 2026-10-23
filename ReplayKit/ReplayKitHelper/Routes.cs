@@ -84,6 +84,9 @@ namespace ReplayKitHelper
         private const string MediaPickerTitle = "Add a GIF or image";
         private const string MediaFilter = "GIFs and images|*.gif;*.png;*.jpg;*.jpeg|All files (*.*)|*.*";
 
+        private const string VideoPickerTitle = "Add a video";
+        private const string VideoFilter = "Videos|*.mp4;*.m4v;*.mov;*.mkv;*.webm|All files (*.*)|*.*";
+
         private static string[] PickAudioFiles() => PickFiles(AudioPickerTitle, AudioFilter);
 
         // the picker of the editor: a modal dialog on a one-shot sta thread like PickPath, where several files can be chosen at once; an empty list when it is cancelled or fails
@@ -2254,9 +2257,19 @@ namespace ReplayKitHelper
             if (path == "/import-audio/clip")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                var clip = Clips.GetSafeClipPath(Q("name"));
+                var clip = Clips.GetEditorSource(Q("name"));
                 if (clip == null || !File.Exists(clip.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "That clip was not found" }); return false; }
                 HttpResponse.SendJson(stream, 200, AudioImports.BeginFromPath(clip.Full));
+                return false;
+            }
+
+            // a video from outside the clip folder for the library of the editor, read where it lies
+            if (path == "/import-video/pick")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string[] pickedVideo = PickFiles(VideoPickerTitle, VideoFilter);
+                if (pickedVideo.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
+                HttpResponse.SendJson(stream, 200, VideoImports.FromPath(pickedVideo[0]));
                 return false;
             }
 

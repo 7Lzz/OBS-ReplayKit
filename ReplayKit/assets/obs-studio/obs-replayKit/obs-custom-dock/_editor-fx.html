@@ -607,7 +607,6 @@
     ["Color", [["sat", "Saturation"], ["hue", "Hue"], ["vib", "Vibrance"]]],
     ["Light", [["bright", "Brightness"], ["contrast", "Contrast"], ["gamma", "Gamma"]]],
   ];
-  var PREFS_KEY = "rk-editor-fx";
   var FAVORITES_KEY = "rk-editor-fx-favorites";
   var THUMB_W = 192;
 
@@ -624,8 +623,8 @@
     var video = o.video;
     var preview = attachPreview(video);
     var thumbs = thumbRenderer();
+    // every edit starts on general, so the tab picked last is not kept
     var pane = "general";
-    try { var saved = localStorage.getItem(PREFS_KEY); if (TABS.some(function (t) { return t[0] === saved; })) pane = saved; } catch (_) {}
     // what is selected on the timeline: video, audio, subtitle or nothing; the bar shows the tabs of that and the panels of the look are only for the video
     var kind = "";
     var shown = false;
@@ -969,7 +968,7 @@
         b.dataset.tab = t[0];
         b.innerHTML = TAB_ICONS[t[0]];
         b.appendChild(el("span", "", t[1]));
-        b.addEventListener("click", function () { setPane(t[0]); });
+        b.addEventListener("click", function () { if (lanes.panelClosed()) lanes.openPanel(); setPane(t[0]); });
         els.tabs[t[0]] = b;
         o.rail.appendChild(b);
       });
@@ -978,6 +977,7 @@
         var b = el("button", "ed-tab is-active");
         b.type = "button";
         b.dataset.kind = t[0];
+        b.addEventListener("click", function () { if (lanes.panelClosed()) lanes.openPanel(); });
         b.innerHTML = icon(t[2]);
         b.appendChild(el("span", "", t[1]));
         els.kindTabs[t[0]] = b;
@@ -1000,7 +1000,7 @@
       close.type = "button";
       close.setAttribute("aria-label", "Close");
       close.innerHTML = icon("editor/close");
-      close.addEventListener("click", function () { lanes.clearSelection(); });
+      close.addEventListener("click", function () { lanes.closePanel(); });
       head.appendChild(close);
       card.appendChild(head);
       els.support = el("p", "ed-fx-note", "");
@@ -1033,17 +1033,18 @@
     function setPane(name) {
       if (name !== pane) els.editing = null;
       pane = name;
-      try { localStorage.setItem(PREFS_KEY, name); } catch (_) {}
       paint();
       lanes.refreshProps();
     }
 
     function paint() {
-      Object.keys(els.tabs).forEach(function (k) { els.tabs[k].classList.toggle("is-active", k === pane); els.tabs[k].hidden = !shown; });
-      Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; });
+      // a panel closed with its x leaves its tabs in the bar with none of them lit
+      var closed = lanes.panelClosed();
+      Object.keys(els.tabs).forEach(function (k) { els.tabs[k].classList.toggle("is-active", !closed && k === pane); els.tabs[k].hidden = !shown; });
+      Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; els.kindTabs[k].classList.toggle("is-active", !closed); });
       // the bar stays while nothing is selected, empty, so the editor keeps its shape
       o.rail.hidden = false;
-      var open = shown && pane !== "general";
+      var open = shown && pane !== "general" && !closed;
       var wasOpen = !els.card.hidden;
       els.card.hidden = !open;
       if (!open) { els.editing = null; els.lastPane = ""; return; }
@@ -1125,12 +1126,15 @@
     preview.set(resolve(lanes.fx.main()));
     return {
       reset: function () {
-        shown = false; kind = "";
+        shown = false; kind = ""; pane = "general"; els.editing = null;
         clearTimeout(fxTimer);
         preview.set(null); clearThumbs();
+        paint();
       },
       // the tab the right panel shows while the video is selected
       pane: function () { return pane; },
+      // the lanes say when the panel of what is selected was closed or opened again
+      refresh: function () { paint(); },
       // the lanes say whenever the panel on the right is drawn what is selected: "video", "audio", "subtitle", "layer" or ""
       selected: function (next) {
         // the video and a clip row are both "video" but have looks of their own, so a change between them is drawn again

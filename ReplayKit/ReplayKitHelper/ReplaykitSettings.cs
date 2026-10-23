@@ -102,7 +102,7 @@ namespace ReplayKitHelper
                 ["sdkMode"] = false,
                 // the native plugin writes what the interface does (views, panels, the preview) to the obs log, on top of development mode
                 ["logInterfaceEvents"] = false,
-                ["trimPreciseDefault"] = false,
+                ["trimPreciseDefault"] = true,
                 // the saves that make the video again are encoded by an nvidia card when there is one, in the recording codec; off keeps them on the processor
                 ["trimGpuEncode"] = true,
                 ["showCodecTags"] = false,
@@ -515,7 +515,7 @@ namespace ReplayKitHelper
                 ["developmentMode"] = developmentMode,
                 ["sdkMode"] = GetBoolSetting(data, "sdkMode", defaults["sdkMode"].Value<bool>()),
                 ["logInterfaceEvents"] = GetBoolSetting(data, "logInterfaceEvents", defaults["logInterfaceEvents"].Value<bool>()),
-                ["trimPreciseDefault"] = GetBoolSetting(data, "trimPreciseDefault", defaults["trimPreciseDefault"].Value<bool>()),
+                ["trimPreciseDefault"] = true,
                 ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
                 ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
@@ -5844,7 +5844,7 @@ namespace ReplayKitHelper
             lock (SettingsStore.Gate)
             {
                 var settings = ReadSettings();
-                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings) };
+                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings), ["updateReady"] = Update.ReadyVersion };
             }
         }
 

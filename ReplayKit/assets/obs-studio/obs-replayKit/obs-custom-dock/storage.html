@@ -38,7 +38,8 @@
 
   /* the window is the card: the plugin gives it round corners and a border through the system, so the page only fills it */
   .card { position:absolute; inset:0; display:flex; flex-direction:column; background:var(--grey6); }
-  .card.is-opening { animation:rk-open 240ms ease-out; }
+  /* the card fades in with the dim the plugin lays under it */
+  .card.is-opening { animation:rk-open 280ms var(--ease_smooth, ease-out) both; }
   @keyframes rk-open { from { opacity:0; } to { opacity:1; } }
   .scroll { flex:1; min-height:0; overflow-y:auto; padding:0 24px 12px; display:flex; flex-direction:column; }
   /* the limit row is the foot of the card, so what is left over sits between it and the compress list instead of under everything */
@@ -67,23 +68,7 @@
   .hint { color:var(--text_muted); font-size:12px; }
   .hint b { color:var(--text); font-weight:600; }
 
-  /* small "i" that reveals the note of a section in the shared tooltip, the same one the replaykit settings use */
-  .info-dot {
-    flex:none; margin-left:6px; padding:0; width:15px; height:15px;
-    display:inline-flex; vertical-align:middle;
-    border:0; background:transparent; color:var(--text_muted);
-    cursor:help; -webkit-user-select:none; user-select:none;
-    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
-  }
-  .info-dot::before {
-    content:""; width:100%; height:100%; background-color:currentColor;
-    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
-    mask:url(/icons/ui/info.svg) center / contain no-repeat;
-  }
-  .info-dot:hover { color:var(--text); transform:scale(1.12); }
-  .info-dot:active { transform:scale(.94); }
-  .info-dot:focus { outline:none; }
-  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--primary_light); }
+  #cmpPick { margin-top:10px; }
 
   .bar { display:flex; height:22px; border-radius:4px; overflow:hidden; background:var(--window); border:1px solid var(--grey3); }
   .seg { height:100%; min-width:0; transition:width 260ms var(--ease_smooth); }
@@ -103,27 +88,8 @@
 
   .row { display:flex; align-items:center; justify-content:space-between; gap:18px; }
 
-  .dd { position:relative; flex:none; }
-  .dd-btn {
-    display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:132px; height:34px; padding:0 10px 0 12px;
-    border:1px solid var(--grey3); border-radius:6px; background:var(--window); font-size:12.5px; font-weight:600; cursor:pointer;
-    transition:border-color 90ms linear;
-  }
-  .dd-btn:hover, .dd.is-open .dd-btn { border-color:var(--line2); }
-  .dd-btn svg { width:12px; height:12px; flex:none; fill:currentColor; opacity:.7; transition:transform 200ms var(--ease_smooth); }
-  .dd.is-open .dd-btn svg { transform:rotate(180deg); }
-  .dd-menu {
-    position:absolute; right:0; z-index:5; min-width:100%; padding:4px 0; border:1px solid var(--grey3); border-radius:6px;
-    background:var(--grey5); box-shadow:0 8px 20px rgba(0, 0, 0, .45); overflow-y:auto;
-    opacity:0; visibility:hidden; pointer-events:none; transform:translateY(-6px);
-    transition:opacity 130ms ease, transform 200ms var(--ease_smooth), visibility 0s linear 200ms;
-  }
-  .dd-menu.is-up { bottom:calc(100% + 4px); transform:translateY(6px); }
-  .dd-menu.is-down { top:calc(100% + 4px); }
-  .dd.is-open .dd-menu { opacity:1; visibility:visible; pointer-events:auto; transform:none; transition:opacity 110ms ease, transform 200ms var(--ease_smooth); }
-  .dd-item { display:block; width:100%; padding:7px 14px; border:0; background:transparent; text-align:left; font-size:12.5px; cursor:pointer; white-space:nowrap; }
-  .dd-item:hover { background:var(--button_bg_hover); }
-  .dd-item.is-current { font-weight:700; }
+  /* the shared dropdown fills its row by default; here it sits at the end of the title row */
+  .row > .limit-combo { flex:none; width:150px; }
 
   .custom { display:none; align-items:center; gap:8px; margin-top:12px; }
   .custom.is-shown { display:flex; }
@@ -191,7 +157,11 @@
   .cmp-row .nm { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12.5px; }
   .cmp-row .sz { flex:none; font-size:12px; color:var(--text_muted); font-variant-numeric:tabular-nums; }
   .cmp-empty { padding:14px 12px; font-size:12.5px; color:var(--text_muted); border:1px solid var(--grey3); border-radius:6px; background:var(--window); }
-  .cmp-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+  .cmp-foot { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
+  .cmp-summary { min-width:0; display:flex; flex-direction:column; gap:4px; line-height:1.45; }
+  .cmp-estimate { color:var(--text_muted); font-size:12px; }
+  .cmp-estimate b { color:var(--text); font-weight:600; }
+  .cmp-foot > .btn { flex:none; }
   .callout { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--warning); border-radius:6px; background:rgba(226, 163, 59, .09); font-size:12.5px; line-height:1.5; }
   .callout .bang { flex:none; width:18px; height:18px; margin-top:1px; border-radius:50%; background:var(--warning); color:#1b1b1f; font-weight:800; font-size:12px; line-height:18px; text-align:center; }
   .callout p { margin:0; }
@@ -211,6 +181,7 @@
 <!--#include scrollbar-->
 <!--#include interaction-states-->
 <!--#include tooltip-->
+<!--#include combo-->
 </head>
 <body>
 <div class="card is-opening" id="card">
@@ -234,10 +205,10 @@
 
     <section class="sec" id="cmpSec">
       <div class="sec-head">
-        <h2>Compress Clips<button class="info-dot" type="button" aria-label="About compressing clips" title="Makes your biggest clips smaller, with very little loss in quality. Each smaller clip replaces the original. Clips that can't get any smaller aren't shown."></button></h2>
+        <h2>Compress Clips</h2>
         <div class="switch" id="cmpFavSwitch">
           <label class="sw-hit"><input type="checkbox" id="cmpSkipFav" checked aria-label="Skip favorites"><span class="sw"></span></label>
-          <span>Skip favorites<button class="info-dot" type="button" aria-label="About skipping favorites" title="Hides your favorite clips from this list so they're never changed. Turn it off to see them too."></button></span>
+          <span>Skip favorites</span>
         </div>
       </div>
 
@@ -250,8 +221,11 @@
           <button class="link cmp-more" type="button" id="cmpMore" hidden>Show more clips</button>
         </div>
         <div class="cmp-foot" id="cmpFoot" hidden>
-          <span class="hint"><span id="cmpPicked"></span><button class="info-dot" type="button" id="cmpEstInfo" aria-label="About the estimate"></button></span>
-          <button class="btn is-primary" type="button" id="cmpGo">Compress</button>
+          <div class="cmp-summary">
+            <span class="hint" id="cmpPicked"></span>
+            <span class="cmp-estimate" id="cmpEstInfo" hidden>Estimated savings: <b id="cmpEstimateValue"></b></span>
+          </div>
+          <button class="btn is-primary" type="button" id="cmpGo" aria-describedby="cmpEstInfo">Compress</button>
         </div>
       </div>
 
@@ -295,13 +269,8 @@
 
     <section class="sec">
       <div class="row">
-        <h2>Set a Storage Limit<button class="info-dot" type="button" aria-label="About the storage limit" title="Pick how much space your clips can use. If you go over, ReplayKit offers to delete your oldest clips. You always confirm first, and favorites are never deleted."></button></h2>
-        <div class="dd" id="dd">
-          <button class="dd-btn" type="button" id="ddBtn"><span id="ddLabel">No Limit</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
-          </button>
-          <div class="dd-menu is-up" id="ddMenu"></div>
-        </div>
+        <h2>Set a Storage Limit</h2>
+        <div class="combo limit-combo" id="limitCombo" role="combobox" aria-expanded="false" aria-label="Storage limit"><button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
       </div>
       <div class="custom" id="custom">
         <input id="customGb" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Storage limit in GB">
@@ -328,12 +297,17 @@
   // 1 TB is written out in GB since the setting is in GB; anything else is typed in through Custom
   const PRESETS = [[25, "25 GB"], [50, "50 GB"], [100, "100 GB"], [250, "250 GB"], [500, "500 GB"], [1024, "1 TB"]];
   const $ = (id) => document.getElementById(id);
+  // the arrow of the shared dropdown is one of the icons the helper hands every page as RK_ICONS
+  document.querySelectorAll("svg[data-i]").forEach((el) => {
+    const full = (window.RK_ICONS || {})[el.dataset.i];
+    if (full) el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+  });
   const els = {
     card:$("card"), sub:$("sub"), bar:$("bar"), legend:$("legend"), library:$("library"), close:$("close"),
-    dd:$("dd"), ddBtn:$("ddBtn"), ddLabel:$("ddLabel"), ddMenu:$("ddMenu"), custom:$("custom"), customGb:$("customGb"), customSet:$("customSet"), customCancel:$("customCancel"),
+    limitCombo:$("limitCombo"), custom:$("custom"), customGb:$("customGb"), customSet:$("customSet"), customCancel:$("customCancel"),
     over:$("over"), overText:$("overText"), overActions:$("overActions"), limitStatus:$("limitStatus"),
     skipFav:$("cmpSkipFav"), pick:$("cmpPick"), empty:$("cmpEmpty"), list:$("cmpList"), foot:$("cmpFoot"), picked:$("cmpPicked"), go:$("cmpGo"),
-    tools:$("cmpTools"), all:$("cmpAll"), none:$("cmpNone"), more:$("cmpMore"), estInfo:$("cmpEstInfo"), confirmSum:$("cmpConfirmSum"),
+    tools:$("cmpTools"), all:$("cmpAll"), none:$("cmpNone"), more:$("cmpMore"), estInfo:$("cmpEstInfo"), estimateValue:$("cmpEstimateValue"), confirmSum:$("cmpConfirmSum"),
     confirm:$("cmpConfirm"), start:$("cmpStart"), back:$("cmpBack"),
     run:$("cmpRun"), arc:$("cmpArc"), pct:$("cmpPct"), runTitle:$("cmpTitle"), runCurrent:$("cmpCurrent"), runSaved:$("cmpSaved"), stop:$("cmpStop"),
     done:$("cmpDone"), doneText:$("cmpDoneText"), ok:$("cmpOk"), cmpStatus:$("cmpStatus"),
@@ -394,10 +368,7 @@
   });
 
   function renderLimit(s) {
-    els.ddLabel.textContent = limitName(s.limitGb);
-    els.ddMenu.innerHTML = '<button class="dd-item' + (!s.limitGb ? " is-current" : "") + '" type="button" data-gb="0">No Limit</button>' +
-      PRESETS.map((p) => '<button class="dd-item' + (s.limitGb === p[0] ? " is-current" : "") + '" type="button" data-gb="' + p[0] + '">' + p[1] + "</button>").join("") +
-      '<button class="dd-item" type="button" data-gb="custom">Custom...</button>';
+    showLimit(s.limitGb);
     if (s.state === "over" && !plan) {
       els.over.classList.add("is-shown");
       els.overText.innerHTML = "Your library is <b>" + s.overText + "</b> over the limit.";
@@ -420,22 +391,21 @@
     try { render(await helperJson("/storage/summary?" + (fresh ? "fresh=1&" : "") + "t=" + Date.now())); } catch (_) {}
   }
 
-  function closeMenu() { els.dd.classList.remove("is-open"); }
-
-  els.ddBtn.addEventListener("click", () => {
-    if (els.dd.classList.contains("is-open")) { closeMenu(); return; }
-    // opens on the side with more room and is never taller than that room, so no item is cut off by the edge of the card
-    const rect = els.ddBtn.getBoundingClientRect();
-    const roomDown = window.innerHeight - rect.bottom - 12;
-    const roomUp = rect.top - 12;
-    const natural = els.ddMenu.scrollHeight + 2;
-    const up = roomDown < natural && roomUp > roomDown;
-    els.ddMenu.style.maxHeight = Math.min(natural, Math.max(120, up ? roomUp : roomDown)) + "px";
-    els.ddMenu.classList.toggle("is-up", up);
-    els.ddMenu.classList.toggle("is-down", !up);
-    els.dd.classList.add("is-open");
-  });
-  document.addEventListener("pointerdown", (e) => { if (!els.dd.contains(e.target)) closeMenu(); }, true);
+  // the storage limit is the shared dropdown of the other pages. a limit typed in through Custom gets an entry of its own, and the list is only rebuilt when that entry changes, since a rebuild closes the menu and the card refreshes on its own while it is open
+  const limitCombo = RKCombo.bind(els.limitCombo, pickLimit, { menuKeys:true });
+  let limitOptionsKey = null;
+  function showLimit(gb) {
+    const custom = gb && !PRESETS.some((p) => p[0] === gb) ? gb : 0;
+    const key = String(custom);
+    if (key !== limitOptionsKey) {
+      limitOptionsKey = key;
+      const options = [{ value:"0", label:"No Limit" }].concat(PRESETS.map((p) => ({ value:String(p[0]), label:p[1] })));
+      if (custom) options.push({ value:String(custom), label:limitName(custom) });
+      options.push({ value:"custom", label:"Custom..." });
+      limitCombo.setOptions(options);
+    }
+    limitCombo.value = String(gb || 0);
+  }
 
   async function saveLimit(gb) {
     setStatus(els.limitStatus, "");
@@ -449,11 +419,10 @@
     }
   }
 
-  els.ddMenu.addEventListener("click", (e) => {
-    const item = e.target.closest(".dd-item");
-    if (!item) return;
-    closeMenu();
-    if (item.dataset.gb === "custom") {
+  function pickLimit(value) {
+    if (value === "custom") {
+      // Custom is a way to type a size, not a limit, so the dropdown keeps showing the limit that is set
+      limitCombo.value = String(summary && summary.limitGb ? summary.limitGb : 0);
       els.custom.classList.add("is-shown");
       els.customGb.value = summary && summary.limitGb ? String(summary.limitGb) : "";
       els.customGb.focus();
@@ -461,8 +430,8 @@
       return;
     }
     els.custom.classList.remove("is-shown");
-    saveLimit(parseInt(item.dataset.gb, 10) || 0);
-  });
+    saveLimit(parseInt(value, 10) || 0);
+  }
 
   function applyCustom() {
     const gb = parseInt(els.customGb.value, 10);
@@ -518,7 +487,7 @@
   // compress clips. phase is what the section shows: the list to pick from, the note before it starts, the run, or its result limit is how many of the biggest clips are listed, more come a page at a time; a clip that shows up after the first page starts unticked, so a long list is never picked by accident
   const CMP_PAGE = 8;
   const CMP_MAX = 50;
-  const cmp = { phase:"pick", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, eligible:0, loadedOnce:false, basis:null };
+  const cmp = { phase:"pick", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, eligible:0, loadedOnce:false };
   const RING = 219.9;
 
   function showPhase(phase) {
@@ -588,14 +557,9 @@
   function renderPickedFoot() {
     const count = cmp.picked.size;
     const estimate = pickedEstimate();
-    els.picked.innerHTML = count ? "<b>" + count + "</b> selected, " + formatBytes(pickedBytes()) + (estimate ? ", could save about <b>" + formatBytes(estimate) + "</b>" : "") : "Pick the clips to compress";
+    els.picked.innerHTML = count ? "<b>" + count + "</b> selected · " + formatBytes(pickedBytes()) : "Pick the clips to compress";
     els.estInfo.hidden = !count || !estimate;
-    if (cmp.basis) {
-      const share = Math.round(cmp.basis.fraction * 100);
-      els.estInfo.dataset.tooltip = cmp.basis.history
-        ? "This is a guess based on your earlier compressions, which saved about " + share + "% on average across " + cmp.basis.samples + " clip" + (cmp.basis.samples === 1 ? "" : "s") + ". Every clip is different, so the real savings can vary."
-        : "This is a guess. You haven't compressed any clips yet, so it assumes about half. The real savings depend on the clip, and game footage often shrinks even more.";
-    }
+    els.estimateValue.textContent = count && estimate ? formatBytes(estimate) : "";
     els.go.disabled = count === 0 || !!(summary && summary.busy);
     els.go.textContent = count ? "Compress " + count + " clip" + (count === 1 ? "" : "s") : "Compress";
   }
@@ -609,7 +573,6 @@
       cmp.loadedOnce = true;
       cmp.clips = Array.isArray(data.clips) ? data.clips : [];
       cmp.eligible = data.eligible || 0;
-      cmp.basis = { fraction:data.savedFraction || 0.5, history:!!data.estimateFromHistory, samples:data.estimateSamples || 0 };
       // the first page starts ticked; a clip that was listed before keeps its tick, and one that only shows up now (more clips, favorites let back in) starts unticked
       const kept = new Set();
       cmp.clips.forEach((c) => { if (firstPage || (previous.has(c.name) && cmp.picked.has(c.name))) kept.add(c.name); });
@@ -719,7 +682,7 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (els.dd.classList.contains("is-open")) { closeMenu(); return; }
+    if (els.limitCombo.classList.contains("is-open")) { limitCombo.close(); return; }
     closeCard();
   });
 
@@ -730,7 +693,7 @@
     setStatus(els.limitStatus, "");
     setStatus(els.cmpStatus, "");
     els.custom.classList.remove("is-shown");
-    closeMenu();
+    limitCombo.close();
     els.card.classList.remove("is-opening");
     void els.card.offsetWidth;
     els.card.classList.add("is-opening");

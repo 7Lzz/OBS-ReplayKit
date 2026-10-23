@@ -2,9 +2,14 @@
 #include "prelude.hpp"
 #include "shell/shell_title_bar.hpp"
 
+#include <QPainterPath>
+#include <QRegularExpression>
+
 #include "app/clip_buffer.hpp"
 #include "app/obs_actions.hpp"
 #include "core/app_icon.hpp"
+#include "core/async.hpp"
+#include "core/helper_client.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "notify/notify_button.hpp"
@@ -42,9 +47,84 @@ QString ShellClipLengthText(int seconds)
 
 } // namespace
 
+namespace {
+
+constexpr qreal kUpdatePadLeft = 9.0;
+constexpr qreal kUpdateIcon = 14.0;
+constexpr qreal kUpdateGap = 7.0;
+constexpr qreal kUpdatePadRight = 11.0;
+
+} // namespace
+
+ShellUpdateButton::ShellUpdateButton(QWidget *parent) : ShellTitleButton(kHeight, parent)
+{
+	hide();
+	SetTip(QStringLiteral("Click to install"));
+	onPress = [this]() {
+		const QString version = m_version;
+		// the version goes into the address as it is, so only the characters a release tag uses are let through
+		if (version.isEmpty() || version.contains(QRegularExpression(QStringLiteral("[^0-9A-Za-z.\-]"))))
+			return;
+		const std::string path = "/update/open-prompt?version=" + version.toStdString();
+		RunAsync([path]() { HttpRequest("POST", path.c_str(), 8767, "", 5000); });
+	};
+}
+
+void ShellUpdateButton::SetVersion(const QString &version)
+{
+	if (version == m_version)
+		return;
+	m_version = version;
+	if (!version.isEmpty())
+		setFixedWidth(qCeil(kUpdatePadLeft + kUpdateIcon + kUpdateGap + QFontMetricsF(LabelFont()).horizontalAdvance(Label()) + kUpdatePadRight));
+	if (version.isEmpty())
+		ClearHover();
+	setVisible(!version.isEmpty());
+	update();
+}
+
+void ShellUpdateButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
+{
+	// a warning wash under the glyph at all times, a little stronger under the pointer
+	QColor wash = g_chromeWarning;
+	wash.setAlphaF(0.16 + 0.12 * hover);
+	p.setPen(Qt::NoPen);
+	p.setBrush(wash);
+	p.drawRoundedRect(pill, kRadius, kRadius);
+	// an arrow down into a tray, then the words
+	const QPointF c(pill.left() + kUpdatePadLeft + kUpdateIcon / 2.0, pill.center().y());
+	QPen pen(g_chromeWarning, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+	p.setPen(pen);
+	p.setBrush(Qt::NoBrush);
+	p.drawLine(QPointF(c.x(), c.y() - 6.0), QPointF(c.x(), c.y() + 2.0));
+	QPainterPath head;
+	head.moveTo(c.x() - 4.0, c.y() - 2.0);
+	head.lineTo(c.x(), c.y() + 2.0);
+	head.lineTo(c.x() + 4.0, c.y() - 2.0);
+	p.drawPath(head);
+	QPainterPath tray;
+	tray.moveTo(c.x() - 6.0, c.y() + 2.5);
+	tray.lineTo(c.x() - 6.0, c.y() + 6.0);
+	tray.lineTo(c.x() + 6.0, c.y() + 6.0);
+	tray.lineTo(c.x() + 6.0, c.y() + 2.5);
+	p.drawPath(tray);
+	p.setFont(LabelFont());
+	const qreal textX = pill.left() + kUpdatePadLeft + kUpdateIcon + kUpdateGap;
+	p.drawText(QRectF(textX, pill.top(), pill.right() - textX, pill.height()), Qt::AlignVCenter | Qt::AlignLeft, Label());
+}
+
+QFont ShellUpdateButton::LabelFont()
+{
+	QFont f(QStringLiteral("Segoe UI"));
+	f.setPixelSize(12);
+	f.setWeight(QFont::DemiBold);
+	return f;
+}
+
 ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	: QWidget(mw), m_mw(mw)
 {
+	QObject::connect(qGuiApp, &QGuiApplication::focusWindowChanged, this, [this](QWindow *) { update(); });
 	m_originalTitle = mw->windowTitle();
 	QObject::connect(mw, &QWidget::windowTitleChanged, this, [this](const QString &title) {
 		if (m_settingTitle)
@@ -79,6 +159,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_rec->onContextMenu = [this]() { m_hotkeys->Toggle(m_rec, ShellHotkeyMenu::Kind::Record); };
 	m_rec->onEnter = [this]() { m_hotkeys->Prepare(m_rec, ShellHotkeyMenu::Kind::Record); };
 
+	m_update = new ShellUpdateButton(this);
 	m_bell = new NotifyButton(mw, this);
 	g_notifyButtons.append(QPointer<NotifyButton>(m_bell));
 	m_account = new ShellAccountButton(mw, this);
@@ -113,6 +194,14 @@ void ShellTitleBar::SetPage(const QString &page)
 		m_mw->setWindowTitle(title);
 		m_settingTitle = false;
 	}
+}
+
+void ShellTitleBar::SetUpdateReady(const QString &version)
+{
+	if (version == m_update->Version())
+		return;
+	m_update->SetVersion(version);
+	LayoutChildren();
 }
 
 void ShellTitleBar::SetLabels(const QString &recordKeybind, const QString &clipKeybind, int replaySeconds)
@@ -220,6 +309,11 @@ void ShellTitleBar::LayoutChildren()
 	right -= m_account->width() + 2;
 	m_bell->move(right - m_bell->width(), (h - m_bell->height()) / 2);
 	right -= m_bell->width() + 2;
+	// switched on, whether or not the window is on screen right now
+	if (!m_update->isHidden()) {
+		m_update->move(right - m_update->width(), (h - m_update->height()) / 2);
+		right -= m_update->width() + 2;
+	}
 	right -= 10;
 
 	// the arrows right after the logo cell, then the badges; a badge that would run into the right group is hidden rather than overlapped
@@ -302,7 +396,9 @@ void ShellTitleBar::paintEvent(QPaintEvent *)
 	p.fillRect(QRect(width() - kShellCtlW * 3 - kDividerGap, (height() - kDividerH) / 2, 1, kDividerH), ChromeInk(0.13));
 
 	// logo in the rail column: the real obs logo, or the icon the appearance tab picked, the same one the taskbar shows
-	const bool active = m_mw && m_mw->isActiveWindow();
+	// Menus take activation from the main window but still belong to its window group.
+	const HWND foreground = GetForegroundWindow();
+	const bool active = m_mw && foreground && GetAncestor(foreground, GA_ROOTOWNER) == (HWND)m_mw->winId();
 	p.setPen(ChromeInk(active ? 0.8 : 0.5));
 	p.drawText(m_pageRect, Qt::AlignLeft | Qt::AlignVCenter, p.fontMetrics().elidedText(m_page, Qt::ElideRight, m_pageRect.width()));
 	const qreal dpr = devicePixelRatioF();

@@ -1,5 +1,7 @@
 <!-- shared partial (helper #include target: slider). the slider every ReplayKit page uses, the editor and Settings alike: an input with .rk-range gets a 4px track filled with the accent up to --fill (the page sets it as a percent) and a round white handle. while it is dragged a tail trails behind the handle on the side it is moving away from, and draws back into it once the value stops changing. the track takes the theme colours; a page lays the input out itself (width, height, position) -->
 <style>
+  /* the tick marks of a slider: the two ends and every sixth between, behind the track so they show above and below it, inset by half the handle so they line up with where the handle stops; the settings rows, the rows of recording audio and the fields of the editor carry them */
+  .form-row > .field-wrap > .volume-control > .volume-slider-wrap::before, .ra-row .volume-slider-wrap::before, .tl-slider-wrap::before { content:""; position:absolute; left:9px; right:9px; top:50%; height:10px; margin-top:-5px; background:linear-gradient(to right, rgba(var(--text-rgb), .22) 1px, transparent 1px) 0 0 / calc((100% - 1px) / 6) 100% repeat-x; pointer-events:none; }
   .rk-range { appearance:none; -webkit-appearance:none; margin:0; background:transparent; border:0; outline:none; cursor:pointer; }
   .rk-range::-webkit-slider-runnable-track { height:4px; border:0; border-radius:2px; background:linear-gradient(to right, var(--selected2) var(--fill, 0%), var(--line2) var(--fill, 0%)); }
   /* the shadows after the first are the tail: five shrinking, fading and softened copies of the ball laid behind it while it is dragged, so it reads like a meteor, and the ball itself squashes a little and tapers into it; at rest they sit inside the ball at nothing, the same count so the change animates */
@@ -17,17 +19,26 @@
     transition:transform 300ms cubic-bezier(.34,1.45,.5,1), border-radius 300ms cubic-bezier(.34,1.45,.5,1), box-shadow 260ms ease-out;
   }
   .rk-range:not(:disabled):hover::-webkit-slider-thumb { transform:scale(1.08); }
-  .rk-range[data-drag][data-dir="r"]:not(:disabled)::-webkit-slider-thumb { box-shadow:0 1px 3px rgba(0,0,0,.3), -4px 0 2px -1.5px rgba(255,255,255,0.55), -8px 0 2px -3px rgba(255,255,255,0.4), -12px 0 2px -4.5px rgba(255,255,255,0.27), -16px 0 2px -6px rgba(255,255,255,0.16), -20px 0 2px -7.5px rgba(255,255,255,0.07); transition:transform 160ms ease-out, border-radius 160ms ease-out, box-shadow 90ms ease-out; transform:translateX(-1px) scale(1.12, .92); border-radius:64% 36% 36% 64% / 50%; }
-  .rk-range[data-drag][data-dir="l"]:not(:disabled)::-webkit-slider-thumb { box-shadow:0 1px 3px rgba(0,0,0,.3), 4px 0 2px -1.5px rgba(255,255,255,0.55), 8px 0 2px -3px rgba(255,255,255,0.4), 12px 0 2px -4.5px rgba(255,255,255,0.27), 16px 0 2px -6px rgba(255,255,255,0.16), 20px 0 2px -7.5px rgba(255,255,255,0.07); transition:transform 160ms ease-out, border-radius 160ms ease-out, box-shadow 90ms ease-out; transform:translateX(1px) scale(1.12, .92); border-radius:36% 64% 64% 36% / 50%; }
+  /* how strong the tail and the squash are follows how fast the handle moves: --rk-k runs from 0 for a nudge to 1 at the cap, and --rk-t is the same with the sign of the side the tail trails on */
+  .rk-range[data-drag]:not(:disabled)::-webkit-slider-thumb { box-shadow:0 1px 3px rgba(0,0,0,.3), calc(var(--rk-t, 0) * 4px) 0 2px -1.5px rgba(255,255,255,calc(var(--rk-k, 0) * .62)), calc(var(--rk-t, 0) * 8px) 0 2px -3px rgba(255,255,255,calc(var(--rk-k, 0) * .46)), calc(var(--rk-t, 0) * 12px) 0 2px -4.5px rgba(255,255,255,calc(var(--rk-k, 0) * .32)), calc(var(--rk-t, 0) * 16px) 0 2px -6px rgba(255,255,255,calc(var(--rk-k, 0) * .2)), calc(var(--rk-t, 0) * 20px) 0 2px -7.5px rgba(255,255,255,calc(var(--rk-k, 0) * .09)); transition:transform 160ms ease-out, border-radius 160ms ease-out, box-shadow 90ms ease-out; transform:translateX(calc(var(--rk-t, 0) * 1px)) scale(calc(1.08 + var(--rk-k, 0) * .05), calc(1.08 - var(--rk-k, 0) * .19)); }
+  .rk-range[data-drag][data-dir="r"]:not(:disabled)::-webkit-slider-thumb { border-radius:calc(50% + var(--rk-k, 0) * 14%) calc(50% - var(--rk-k, 0) * 14%) calc(50% - var(--rk-k, 0) * 14%) calc(50% + var(--rk-k, 0) * 14%) / 50%; }
+  .rk-range[data-drag][data-dir="l"]:not(:disabled)::-webkit-slider-thumb { border-radius:calc(50% - var(--rk-k, 0) * 14%) calc(50% + var(--rk-k, 0) * 14%) calc(50% + var(--rk-k, 0) * 14%) calc(50% - var(--rk-k, 0) * 14%) / 50%; }
   .rk-range:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 2px var(--selected2); }
   .rk-range:disabled { cursor:default; }
 </style>
 <script>
 (function () {
   if (window.RKSlider) return;
+  // below SLOW the handle moves with no tail at all, at FAST and above the tail is at its fullest and goes no further; both in pixels a millisecond
+  var SLOW = 0.06, FAST = 1.2;
   var last = new WeakMap();
+  var motion = new WeakMap();
   function isRange(el) { return !!(el && el.classList && el.classList.contains("rk-range")); }
-  document.addEventListener("pointerdown", function (e) { if (isRange(e.target)) last.set(e.target, Number(e.target.value)); }, true);
+  document.addEventListener("pointerdown", function (e) {
+    if (!isRange(e.target)) return;
+    last.set(e.target, Number(e.target.value));
+    motion.set(e.target, { at: performance.now(), speed: 0 });
+  }, true);
   // only a change made by the hand counts, so a reset or a value the page puts back does not make the handle jump
   document.addEventListener("input", function (e) {
     var r = e.target;
@@ -36,10 +47,24 @@
     var was = last.has(r) ? last.get(r) : v;
     last.set(r, v);
     if (v === was) return;
+    var now = performance.now();
+    var m = motion.get(r) || { at: now - 16, speed: 0 };
+    var span = (Number(r.max) || 100) - (Number(r.min) || 0);
+    var moved = span > 0 ? Math.abs(v - was) / span * r.getBoundingClientRect().width : 0;
+    // smoothed over the last few steps, so one uneven input event does not make the tail flicker
+    m.speed = m.speed * 0.5 + (moved / Math.max(8, now - m.at)) * 0.5;
+    m.at = now;
+    motion.set(r, m);
+    var k = Math.min(1, Math.max(0, (m.speed - SLOW) / (FAST - SLOW)));
+    r.style.setProperty("--rk-k", k.toFixed(3));
+    r.style.setProperty("--rk-t", (v > was ? -k : k).toFixed(3));
     r.dataset.dir = v > was ? "r" : "l";
     r.dataset.drag = "";
     clearTimeout(r._rkSettle);
-    r._rkSettle = setTimeout(function () { delete r.dataset.drag; }, 140);
+    r._rkSettle = setTimeout(function () {
+      delete r.dataset.drag;
+      m.speed = 0;
+    }, 140);
   }, true);
   window.RKSlider = true;
 })();

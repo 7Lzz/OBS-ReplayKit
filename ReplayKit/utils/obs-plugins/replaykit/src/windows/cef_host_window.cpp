@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "windows/cef_host_window.hpp"
 
+#include "core/cef_host.hpp"
 #include "core/state.hpp"
 #include "ui/anchored_panel.hpp"
 
@@ -12,9 +13,7 @@ namespace {
 // cef does not reliably tell a page that its own window was hidden or shown again (clips.html and settings.html both carry fallbacks for that), so the window says it outright as a dom event the page can listen for
 void TellPageWindowShown(QCefWidget *browser, bool shown)
 {
-	if (!browser)
-		return;
-	browser->executeJavaScript(shown ? "window.dispatchEvent(new CustomEvent('replaykit-window', { detail: { shown: true } }));"
+	RunBrowserScript(browser, shown ? "window.dispatchEvent(new CustomEvent('replaykit-window', { detail: { shown: true } }));"
 					 : "window.dispatchEvent(new CustomEvent('replaykit-window', { detail: { shown: false } }));");
 }
 

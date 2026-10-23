@@ -25,6 +25,9 @@ constexpr int kCardMargin = 40;
 constexpr DWORD kCornerPreference = 33;
 constexpr DWORD kBorderColor = 34;
 constexpr DWORD kCornerRound = 2;
+// the dim fades in under the card as it opens, and out once the card is gone when it closes
+constexpr int kFadeInMs = 220;
+constexpr int kFadeOutMs = 180;
 
 QWidget *ObsHost()
 {
@@ -42,7 +45,7 @@ public:
 	}
 
 protected:
-	void paintEvent(QPaintEvent *) override { QPainter(this).fillRect(rect(), QColor(0, 0, 0, 150)); }
+	void paintEvent(QPaintEvent *) override { QPainter(this).fillRect(rect(), QColor(0, 0, 0, qRound(150 * m_level))); }
 	// a click on the dim is a click outside the card
 	void mousePressEvent(QMouseEvent *) override { m_owner->OnPagePressedOutside(); }
 	// the title bar under the dim stays a place to drag the window from, and the dim and the card follow it
@@ -55,8 +58,17 @@ protected:
 		return true;
 	}
 
+public:
+	qreal Level() const { return m_level; }
+	void SetLevel(qreal level)
+	{
+		m_level = level;
+		update();
+	}
+
 private:
 	ModalCard *m_owner;
+	qreal m_level = 1.0;
 };
 
 // keeps the dim and the card on the obs window while it moves or resizes, and takes them away when it hides or minimizes
@@ -229,7 +241,7 @@ void ModalCard::StartCardWarm()
 		++m_run;
 		m_openWaits = false;
 		m_waitingScript.clear();
-		Close();
+		Close(false);
 		PopupHost::Release(this);
 	}))
 		return;
@@ -312,12 +324,15 @@ void ModalCard::CheckCardPainted(int run)
 		return;
 	}
 	if (m_heals >= 2) {
-		blog(LOG_WARNING, "[replaykit] the %s is still empty after being built again, leaving it", m_spec.name);
+		blog(LOG_WARNING, "[replaykit] the %s is still empty after its page was loaded again, leaving it", m_spec.name);
 		return;
 	}
 	m_heals++;
-	blog(LOG_WARNING, "[replaykit] the %s opened empty, building it again (%d)", m_spec.name, m_heals);
-	OpenFresh();
+	blog(LOG_WARNING, "[replaykit] the %s opened empty, loading its page again (%d)", m_spec.name, m_heals);
+	// the page is loaded again where it is, in the window that stays up: the window and its browser are shared with the menus of the title bar, and hiding it to build it again could leave all of them empty. the open replays once the page is back
+	PopupHost::Reload(m_spec.url);
+	RunScript(m_lastScript);
+	QTimer::singleShot(1500, m_curtain.data(), [this, run]() { CheckCardPainted(run); });
 }
 
 void ModalCard::Prepare()
@@ -342,7 +357,7 @@ QJsonObject ModalCard::WarmReport() const
 
 bool ModalCard::IsOpen() const
 {
-	return PopupHost::Owns(this) && m_curtain && m_curtain->isVisible();
+	return PopupHost::Owns(this) && m_curtain && m_curtain->isVisible() && !m_closing;
 }
 
 void ModalCard::Follow()
@@ -386,7 +401,7 @@ void ModalCard::Open(const std::string &showScript)
 		++m_run;
 		m_openWaits = false;
 		m_waitingScript.clear();
-		Close();
+		Close(false);
 		PopupHost::Release(this);
 	}))
 		return;
@@ -399,8 +414,13 @@ void ModalCard::Open(const std::string &showScript)
 	const int run = m_run;
 	StyleCard();
 	Sync();
+	// a dim still fading out from the last close fades back in from where it is
+	m_closing = false;
+	if (!m_curtain->isVisible())
+		static_cast<Curtain *>(m_curtain.data())->SetLevel(0.0);
 	m_curtain->show();
 	m_card->show();
+	FadeCurtain(1.0, kFadeInMs);
 	PopupHost::SetOwner(this, m_curtain);
 	m_card->raise();
 	m_card->activateWindow();
@@ -410,19 +430,30 @@ void ModalCard::Open(const std::string &showScript)
 	QTimer::singleShot(500, m_curtain.data(), [this, run]() { CheckCardPainted(run); });
 }
 
-// the card is thrown away and built again, and the open that comes of it waits for the new page like any first open
-void ModalCard::OpenFresh()
+void ModalCard::FadeCurtain(qreal level, int ms, std::function<void()> done)
 {
-	Close();
-	Destroy();
-	PopupHost::Reload(m_spec.url);
-	m_ready = m_warming = m_gaveUp = m_blind = false;
-	m_openWaits = true;
-	m_waitingScript = m_lastScript;
-	StartCardWarm();
+	if (m_fade)
+		m_fade->stop();
+	auto *curtain = static_cast<Curtain *>(m_curtain.data());
+	if (!curtain) {
+		if (done)
+			done();
+		return;
+	}
+	auto *fade = new QVariantAnimation(curtain);
+	fade->setStartValue(curtain->Level());
+	fade->setEndValue(level);
+	fade->setDuration(ms);
+	fade->setEasingCurve(level > 0.5 ? QEasingCurve::OutCubic : QEasingCurve::InOutQuad);
+	QObject::connect(fade, &QVariantAnimation::valueChanged, curtain, [curtain](const QVariant &value) { curtain->SetLevel(value.toReal()); });
+	if (done)
+		QObject::connect(fade, &QVariantAnimation::finished, curtain, std::move(done));
+	m_fade = fade;
+	fade->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
-void ModalCard::Close()
+// the card goes at once, so it never shows half faded or empty, and is closed from here on; only the dim fades out after it
+void ModalCard::Close(bool animate)
 {
 	m_openWaits = false;
 	m_waitingScript.clear();
@@ -431,11 +462,29 @@ void ModalCard::Close()
 	RunScript(m_spec.hideScript);
 	DevLog("%s closed", m_spec.name);
 	PopupHost::Release(this);
-	m_curtain->hide();
 	if (QWidget *host = m_curtain->parentWidget())
 		host->activateWindow();
 	if (m_spec.onClosed)
 		m_spec.onClosed();
+	if (!animate) {
+		HideCurtain();
+		return;
+	}
+	m_closing = true;
+	FadeCurtain(0.0, kFadeOutMs, [this]() {
+		if (m_closing)
+			HideCurtain();
+	});
+}
+
+void ModalCard::HideCurtain()
+{
+	// stopped rather than deleted, since this can run from the finished signal of that same fade, and a stopped fade deletes itself later
+	if (m_fade)
+		m_fade->stop();
+	m_closing = false;
+	if (m_curtain)
+		m_curtain->hide();
 }
 
 // reads the screen where the card is: the page fills the card with its colour right out to the edges, so when none of the points just inside the edge has it the browser is putting nothing on the window and the dim shows through
@@ -446,7 +495,8 @@ QJsonObject ModalCard::Probe()
 
 void ModalCard::Destroy()
 {
-	Close();
+	Close(false);
+	HideCurtain();
 	PopupHost::Release(this);
 	++m_run;
 	m_warming = false;

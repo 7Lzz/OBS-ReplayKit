@@ -393,34 +393,6 @@
   #bulk-upload.is-running { color: var(--on-accent); background: var(--primary); }
   #bulk-upload.is-running:hover { background: var(--primary_light); }
   /* the bulk toolbar tooltip is a single js-positioned element (see showBulkTip) -- these buttons hug the window's left edge so a css-only tooltip either clips or has to be left-anchored off-center. js clamps the box into the viewport and slides the arrow to keep it pointing at the button. */
-  .info-dot {
-    flex: none;
-    margin-left: 4px;
-    padding: 0;
-    width: 15px;
-    height: 15px;
-    display: inline-flex;
-    vertical-align: middle;
-    border: 0;
-    background: transparent;
-    color: var(--text_muted, #969696);
-    cursor: help;
-    -webkit-user-select: none;
-    user-select: none;
-    transition: transform var(--anim_press) var(--ease_pop), color 90ms ease;
-  }
-  .info-dot::before {
-    content: "";
-    width: 100%;
-    height: 100%;
-    background-color: currentColor;
-    -webkit-mask: url(/icons/ui/info.svg) center / contain no-repeat;
-    mask: url(/icons/ui/info.svg) center / contain no-repeat;
-  }
-  .info-dot:hover { color: var(--text); transform: scale(1.12); }
-  .info-dot:active { transform: scale(.94); }
-  .info-dot:focus { outline: none; }
-  .info-dot:focus-visible { color: var(--text); border-radius: 50%; box-shadow: 0 0 0 2px var(--selected2, #476bd7); }
   .bulk-clear {
     height: 30px;
     padding: 0 7px;
@@ -2670,7 +2642,7 @@
     background: var(--text);
     clip-path: path("M1.6 0H11.4Q13 0 13 1.6V7.4L6.5 13L0 7.4V1.6Q0 0 1.6 0Z");
   }
-  /* a yes or no option of the editor: the name on the left, the info icon after it and the switch at the far end, the switch itself coming from the shared _switch partial */
+  /* a yes or no option of the editor: the name on the left, its explanation below and the switch at the far end, the switch itself coming from the shared _switch partial */
   .trim-mode-row {
     display: flex;
     align-items: center;
@@ -2682,8 +2654,7 @@
     user-select: none;
   }
   .trim-mode-row > span { order: 1; min-width: 0; }
-  .trim-mode-row > .info-dot { order: 2; }
-  .trim-mode-row:has(input:disabled) { opacity: .6; }
+.trim-mode-row:has(input:disabled) { opacity: .6; }
   .trim-mode-row:has(input:disabled) input { cursor: default; }
 
   /* compress mode picker */

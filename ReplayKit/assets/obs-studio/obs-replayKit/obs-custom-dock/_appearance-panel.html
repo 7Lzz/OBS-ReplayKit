@@ -104,23 +104,6 @@
 
   /* the floating colour picker lives in the shared _color-picker partial now */
 
-  /* small "i" that reveals an item's note in the shared tooltip on hover, keyboard focus or click. */
-  .info-dot {
-    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
-    display:inline-flex; vertical-align:middle;
-    border:0; background:transparent; color:var(--muted);
-    cursor:help; -webkit-user-select:none; user-select:none;
-    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
-  }
-  .info-dot::before {
-    content:""; width:100%; height:100%; background-color:currentColor;
-    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
-    mask:url(/icons/ui/info.svg) center / contain no-repeat;
-  }
-  .info-dot:hover { color:var(--text); transform:scale(1.12); }
-  .info-dot:active { transform:scale(.94); }
-  .info-dot:focus { outline:none; }
-  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
   .theme-preview-row { margin-top:8px; }
   .theme-preview-row .btn { height:26px; padding:0 10px; font-size:12px; }
   .theme-section-hint { color:var(--muted); font-size:10px; font-weight:400; }
@@ -148,7 +131,7 @@
           <div class="label">Custom theme</div>
           <div class="field-wrap is-stacked">
             <div class="theme-section">
-              <div class="theme-section-title"><span>Base colors <button class="info-dot" type="button" aria-label="About base colors" title="Click a color square to change that color."></button></span></div>
+              <div class="theme-section-title"><span>Base colors <span class="control-note">Click a color square to change that color.</span></span></div>
               <div class="theme-editor" id="themeEditor">
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
                 <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
@@ -161,7 +144,7 @@
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Gradients <button class="info-dot" type="button" aria-label="About gradients" title="Lets an area fade between colors instead of using one solid color."></button></span></div>
+              <div class="theme-section-title"><span>Gradients <span class="control-note">Lets an area fade between colors instead of using one solid color.</span></span></div>
               <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
               <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></div>
               <div class="gradient-editor" id="themeGradientEditor" hidden>
@@ -185,7 +168,7 @@
             </div>
             <div class="theme-section">
               <div class="theme-section-title"><span>Window behavior</span></div>
-              <div class="check-row"><input type="checkbox" id="themeCustomDark" aria-label="Use dark icons, menus and native controls"><span>Use dark icons, menus and native controls</span><button class="info-dot" type="button" aria-label="About dark icons and native controls" title="Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light."></button></div>
+              <div class="check-row"><input aria-label="Use dark icons, menus and native controls" id="themeCustomDark" type="checkbox"/><span>Use dark icons, menus and native controls<span class="control-note">Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light.</span></span></div>
             </div>
             <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
               <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
@@ -215,10 +198,10 @@
         <div class="form-row tight">
           <div></div>
           <div class="check-row">
-            <input type="checkbox" id="appIconRecordingDot" aria-label="Show recording dot">
-            <span>Show recording dot</span>
-            <button class="info-dot" type="button" aria-label="About the recording dot" title="Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere."></button>
-          </div>
+<input aria-label="Show recording dot" id="appIconRecordingDot" type="checkbox"/>
+<span>Show recording dot<span class="control-note">Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere.</span></span>
+
+</div>
         </div>
       </div>
 <script>

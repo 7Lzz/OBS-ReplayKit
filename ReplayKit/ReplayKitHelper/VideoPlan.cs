@@ -76,8 +76,8 @@ namespace ReplayKitHelper
                 var refToken = po?["ref"];
                 if (refToken != null)
                 {
-                    var clip = refToken.Type == JTokenType.String ? Clips.GetSafeClipPath(refToken.Value<string>()) : null;
-                    if (clip == null || !System.IO.File.Exists(clip.Full)) { error = "A clip added to the video in the editor is no longer in the clip folder."; return null; }
+                    var clip = refToken.Type == JTokenType.String ? Clips.GetEditorSource(refToken.Value<string>()) : null;
+                    if (clip == null || !System.IO.File.Exists(clip.Full)) { error = refToken.Type == JTokenType.String && VideoImports.IsRef(refToken.Value<string>()) ? "A video added to the video in the editor was moved or changed. Add it again." : "A clip added to the video in the editor is no longer in the clip folder."; return null; }
                     if (!durations.TryGetValue(clip.Full, out length))
                     {
                         if (plan.OtherClips.Count >= MaxOtherClips) { error = "The video can take pieces of " + MaxOtherClips + " other clips at most."; return null; }

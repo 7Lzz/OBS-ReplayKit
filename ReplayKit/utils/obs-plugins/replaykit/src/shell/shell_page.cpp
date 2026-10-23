@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_page.hpp"
 
+#include "core/cef_host.hpp"
 #include "core/theme.hpp"
 #include "shell/shell_views.hpp"
 
@@ -10,8 +11,7 @@ namespace rk {
 // runs a script in the shell browser. the page defines RKShell, so every call is guarded to be harmless if it lands before the page exists
 void ShellRunJs(QCefWidget *browser, const std::string &js)
 {
-	if (browser)
-		browser->executeJavaScript(js);
+	RunBrowserScript(browser, js);
 }
 
 ShellPage::ShellPage(QWidget *parent)

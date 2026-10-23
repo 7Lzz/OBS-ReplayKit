@@ -40,6 +40,13 @@ void CefCloseForShutdown()
 	g_cefClosed = true;
 }
 
+void RunBrowserScript(QCefWidget *browser, const std::string &script)
+{
+	// Closing a CEF widget runs a nested event loop while its main frame is disappearing.
+	if (CefOpen() && browser)
+		browser->executeJavaScript(script);
+}
+
 // background-thread only, can block for real time on a cold start -- waits for cefs background thread so widgets never hit the "first open only" white window race from being created before cef is ready
 bool EnsureCefReadyBlocking()
 {

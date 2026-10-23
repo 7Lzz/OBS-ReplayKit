@@ -267,7 +267,7 @@ namespace ReplayKitHelper
             // reqId lets start/end/error log lines for the same call be matched up -- this function otherwise writes nothing on a fast/happy path, so a stuck or failed preview would leave no trace at all.
             string reqId = Guid.NewGuid().ToString("N").Substring(0, 8);
             var sw = Stopwatch.StartNew();
-            var selected = Clips.GetSafeClipPath(rawName);
+            var selected = Clips.GetEditorSource(rawName);
             if (selected == null)
             {
                 Log.Write("Serve-Preview[" + reqId + "] BAD-FILENAME raw=" + rawName);
@@ -430,7 +430,7 @@ namespace ReplayKitHelper
 
         public static void ServeThumbnail(Stream stream, string rawName)
         {
-            var selected = Clips.GetSafeClipPath(rawName);
+            var selected = Clips.GetEditorSource(rawName);
             if (selected == null || !File.Exists(selected.Full))
             {
                 var hh = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" });

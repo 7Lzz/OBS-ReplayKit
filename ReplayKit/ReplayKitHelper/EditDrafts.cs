@@ -235,6 +235,7 @@ namespace ReplayKitHelper
                             string id = field.Value.Value<string>();
                             if (AudioImports.IsId(id)) paths.Add(Path.Combine(ClipCache.KindDir("imports"), id));
                             if (MediaImports.IsId(id)) paths.Add(Path.Combine(ClipCache.KindDir("media"), id));
+                            if (VideoImports.IsRef(id)) paths.Add(VideoImports.DirFor(id));
                         }
                     }
                     return paths;

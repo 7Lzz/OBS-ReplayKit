@@ -1,5 +1,12 @@
 <!-- shared partial (helper #include target: tooltip). the modern hover tooltip every dock page uses: one js-positioned element rather than a css ::before, so it clamps into the viewport and its arrow slides to keep pointing at the control; self-wires to any [data-tooltip] element, delegated so controls created later (virtualized clip cards) are covered too; host: nothing required, optionally RKTooltip.suppressWhen(fn) to mute it for a control whose own menu is open, and RKTooltip.hide() / .reposition() for manual control; the native plugin paints the same tip for the rail and the title bar (NotifyTip in notify/notify_tip.cpp) and controls_app.html carries an inlined copy, so a change to the numbers below goes into all three -->
 <style>
+  .control-note { display:block; min-width:0; max-width:100%; margin-top:5px; color:var(--muted,var(--text_muted,#969696)); font-size:12px; line-height:1.5; font-weight:400; white-space:normal; overflow-wrap:anywhere; text-align:left; }
+  .control-note:empty, .control-note[hidden] { display:none; }
+  :is(.check-row,.trim-mode-row) > span:has(.control-note) { flex:1; min-width:0; }
+  .form-row > .control-note { grid-column:2; margin-top:0; }
+  :is(.ed-row,.ed-sec-head,.ovp-hint,.mic-test):has(> .control-note) { flex-wrap:wrap; }
+  .ed-sec-head:has(> .control-note) { height:auto; min-height:26px; }
+  :is(.ed-row,.ed-sec-head,.ovp-hint,.mic-test) > .control-note { flex:0 0 100%; order:3; margin-top:0; }
   /* above every popup a page opens, the colour picker and the menus among them, so a tip on a control inside one shows */
   #rk-tip {
     position: fixed;
@@ -32,7 +39,6 @@
   /* the hairline is the text colour at low alpha, white on a dark theme */
   #rk-tip .rk-tip-edge { fill: none; stroke: rgba(var(--text-rgb, 255, 255, 255), .16); stroke-width: 1; stroke-linejoin: miter; }
   #rk-tip .rk-tip-text { position: relative; }
-  /* multi-line variant for the info-dot notes -- same ground, shadow, arrow and pop, just wraps. */
   #rk-tip.tip-rich {
     white-space: normal;
     max-width: 264px;
@@ -135,7 +141,6 @@
     attach();
     current = el;
     label.textContent = el.dataset.tooltip;
-    tip.classList.toggle("tip-rich", el.classList.contains("info-dot"));
     tip.classList.add("is-shown");
     reposition();
   }
@@ -168,21 +173,6 @@
     observer.disconnect();
     hide();
   });
-  // info-dots also answer to the focus a tab hands them, and to a click (swallowed so a dot inside a label never toggles its checkbox).
-  document.addEventListener("focusin", function (e) {
-    var dot = e.target.closest(".info-dot[data-tooltip]");
-    if (dot) show(dot);
-  });
-  document.addEventListener("focusout", function (e) {
-    if (e.target.closest(".info-dot[data-tooltip]")) hide();
-  });
-  document.addEventListener("click", function (e) {
-    var dot = e.target.closest(".info-dot[data-tooltip]");
-    if (!dot) return;
-    e.preventDefault();
-    show(dot);
-  });
-  // hide on any click EXCEPT one on the tipped control itself -- clicking it is about to change its tooltip, and the observer will swap the text live.
   document.addEventListener("mousedown", function (e) {
     if (current && current.contains(e.target)) return;
     hide();
@@ -220,5 +210,40 @@
     // fn(el) -> true to mute the tip for that control, e.g. while its own menu is open
     suppressWhen: function (fn) { if (typeof fn === "function") suppress = fn; },
   };
+})();
+</script>
+<script>
+(function () {
+  var count = 0;
+  function prepareNotes(root) {
+    if (root.nodeType !== 1 && root.nodeType !== 9) return;
+    var notes = Array.from(root.querySelectorAll(".control-note:not([data-note-ready])"));
+    if (root.nodeType === 1 && root.matches(".control-note:not([data-note-ready])")) notes.unshift(root);
+    notes.forEach(function (note) {
+      if (!note.isConnected) return;
+      note.dataset.noteReady = "true";
+      if (!note.id) {
+        var id;
+        do { id = "control-note-" + (++count); } while (document.getElementById(id));
+        note.id = id;
+      }
+      var row = note.closest(".form-row, .ed-row, .trim-mode-row, .check-row");
+      if (!row || note.closest(".theme-section-title, .ed-sec-head, .ovp-hint")) return;
+      if (note.closest(".label") && !note.closest(".page")) row.appendChild(note);
+      var controls = row.classList.contains("ed-row") ? row.querySelectorAll("input, select, button, [role=combobox]")
+        : [row.querySelector("input, select, [role=combobox], .mic-test > button")];
+      controls.forEach(function (control) {
+        if (control) control.setAttribute("aria-describedby", [control.getAttribute("aria-describedby"), note.id].filter(Boolean).join(" "));
+      });
+    });
+  }
+  function start() {
+    prepareNotes(document);
+    new MutationObserver(function (changes) {
+      changes.forEach(function (change) { change.addedNodes.forEach(prepareNotes); });
+    }).observe(document.body, { childList:true, subtree:true });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once:true });
+  else start();
 })();
 </script>

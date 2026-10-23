@@ -93,44 +93,7 @@
   .ed-gen.is-working .ed-gen-fill { opacity: 1; }
   .ed-gen.is-working .ed-gen-cancel { display: grid; }
 
-  /* the dropdown of the settings page: a field with the arrow set off on the right, and a menu that slides open under it */
-  .ed-combo { position: relative; flex: 1 1 auto; min-width: 0; }
-  .ed-combo-btn {
-    position: relative; width: 100%; height: 32px; display: flex; align-items: center; padding: 0 37px 0 9px;
-    border: 1px solid var(--grey4); border-radius: 4px; background: var(--grey4); color: var(--text);
-    font: inherit; font-size: 12px; text-align: left; cursor: pointer; outline: none;
-  }
-  .ed-combo-btn::before { content: ""; position: absolute; top: 1px; bottom: 1px; right: 26px; width: 1px; background: var(--grey6); pointer-events: none; }
-  .ed-combo-btn:focus-visible { border-color: var(--primary_light); }
-  .ed-combo-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ed-combo-arrow { position: absolute; right: 0; top: 1px; width: 28px; height: 30px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-  .ed-combo-arrow svg { width: 16px; height: 16px; fill: currentColor; transition: transform var(--anim_menu) var(--ease_smooth); }
-  .ed-combo.is-open .ed-combo-arrow svg { transform: rotate(180deg); }
-  .ed-combo.is-open .ed-combo-btn { border-color: var(--primary); background: var(--grey7); }
-  .ed-combo-menu {
-    position: absolute; z-index: 20; top: 34px; left: 0; right: 0; max-height: 0; overflow: hidden; overscroll-behavior: contain;
-    background: var(--grey6); border: 1px solid var(--grey4); border-radius: 4px; padding: 0 3px; box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
-    opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-6px); transform-origin: top center;
-    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 150ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
-  }
-  .ed-combo.is-open .ed-combo-menu {
-    max-height: 260px; overflow: auto; padding: 3px; opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0);
-    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
-  }
-  .ed-combo.is-open .ed-combo-option { animation: ed-option-in 200ms var(--ease_smooth) backwards; }
-  .ed-combo.is-open .ed-combo-option:nth-child(2) { animation-delay: 26ms; }
-  .ed-combo.is-open .ed-combo-option:nth-child(3) { animation-delay: 48ms; }
-  .ed-combo.is-open .ed-combo-option:nth-child(4) { animation-delay: 68ms; }
-  .ed-combo.is-open .ed-combo-option:nth-child(n+5) { animation-delay: 84ms; }
-  @keyframes ed-option-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
-  .ed-combo-option {
-    min-height: 28px; display: flex; align-items: center; padding: 0 10px; border-radius: 3px; color: var(--text); font-size: 12px;
-    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none;
-  }
-  .ed-combo-option:hover, .ed-combo-option:focus-visible { background: var(--button_bg_hover); }
-  .ed-combo-option.is-selected { position: relative; padding-right: 30px; background: var(--selected,var(--primary)); color: var(--on-accent); }
-  .ed-combo-option.is-selected:hover, .ed-combo-option.is-selected:focus-visible { background: var(--selected,var(--primary)); color: var(--on-accent); }
-  .ed-combo-option.is-selected::after { content: ""; position: absolute; right: 13px; top: 50%; width: 4px; height: 8px; margin-top: -6px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .ed-tools .combo-button, .ed-sub-edit .combo-button { font:inherit; font-size:12px; }
 
   /* the subtitle being edited and the look of its row, in the panel on the right */
   .ed-sub-edit[hidden] { display: none; }
@@ -163,18 +126,21 @@
   .ed-lib-veil { position: fixed; inset: 0; z-index: 75; display: grid; place-items: center; background: rgba(0, 0, 0, .55); animation: ed-lib-fade 140ms linear both; }
   .ed-lib-veil[hidden] { display: none; }
   @keyframes ed-lib-fade { from { opacity: 0; } to { opacity: 1; } }
-  .ed-lib { display: flex; flex-direction: column; width: min(940px, calc(100vw - 48px)); height: min(660px, calc(100vh - 64px)); background: var(--grey6); border: 1px solid var(--grey4); border-radius: 10px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); animation: ed-lib-in 180ms var(--ease_smooth) both; overflow: hidden; }
+  .ed-lib { display: flex; flex-direction: column; width: min(940px, calc(100vw - 48px)); max-height: calc(100vh - 64px); background: var(--grey6); border: 1px solid var(--grey4); border-radius: 10px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); animation: ed-lib-in 180ms var(--ease_smooth) both; overflow: hidden; }
   @keyframes ed-lib-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
   .ed-lib-head { display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; border-bottom: 1px solid var(--hairline); }
   .ed-lib-title { font-size: 15px; font-weight: 700; color: var(--text); flex: 0 0 auto; }
-  .ed-lib-head .ed-fx-search { flex: 1 1 auto; max-width: 320px; margin-left: auto; }
+  .ed-lib-head .ed-fx-search { flex: 0 1 160px; width: 160px; min-width: 0; }
+  /* the buttons of the library sit after a divider beside its name; the sort and the search keep to the right, the sort trigger and menu being the ones of the clips page */
+  .ed-lib-divider { flex: 0 0 1px; width: 1px; height: 20px; background: var(--hairline); }
+  .ed-lib-head .clip-sort-wrap.ed-lib-sort { margin-left: auto; margin-right: -6px; }
   /* the shared scrollbar of the dock, its outline a step lighter than this card so it shows; its room is kept so the cards never change width when it comes */
-  .ed-lib-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; margin-right: 6px; padding: 16px 8px 18px 18px; --sb-outline: var(--grey5); }
+  .ed-lib-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; margin-right: 6px; padding: 16px 8px 12px 18px; --sb-outline: var(--grey5); }
   .ed-lib-head-row { display: flex; align-items: center; gap: 6px; margin: 2px 0 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text); }
   .ed-lib-head-row svg { width: 13px; height: 13px; fill: currentColor; }
   .ed-lib-head-row[hidden], .ed-lib-grid[hidden] { display: none; }
   .ed-lib-grid + .ed-lib-head-row { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--hairline); }
-  .ed-lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; }
+  .ed-lib-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
   .ed-lib-card { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
   .ed-lib-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--grey8); box-shadow: 0 0 0 1px rgba(var(--text-rgb), .08); transition: box-shadow 90ms linear; }
   .ed-lib-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -209,8 +175,8 @@
 
   /* the voiceover, laid out like the recorder of medal: the microphone, the time, the level, then the button */
   .ed-rec { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .ed-rec .ed-combo { width: 100%; }
-  .ed-mic-note { align-self: stretch; font-size: 12px; color: var(--text_muted); margin: -2px 0 2px; line-height: 1.4; }
+  .ed-rec .combo { width:100%; flex:none; }
+  .ed-mic-note { align-self: stretch; font-size: 12px; color: var(--text_muted); margin:0; min-height:2.8em; line-height:1.4; }
   .ed-mic-note:empty { display: none; }
   .ed-rec-time { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); margin-top: 6px; }
   .ed-wave { align-self: stretch; height: 44px; border-radius: 6px; background: var(--grey6); display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 10px; overflow: hidden; }
@@ -420,8 +386,9 @@
   function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
   function hovers(root) { if (window.RKHover) RKHover.apply(root, HOVERS); }
   function loadPrefs() {
-    var d = { tab: "subtitles", open: true, language: "auto", length: "normal", hear: false, mic: "", shapeColor: "#ffffff" };
-    try { var p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); Object.keys(d).forEach(function (k) { if (typeof p[k] === typeof d[k]) d[k] = p[k]; }); } catch (_) {}
+    var d = { tab: "subtitles", open: false, language: "auto", length: "normal", hear: false, mic: "", shapeColor: "#ffffff" };
+    // every edit starts with no panel open and white shapes, so the panel open last and the shape colour are not read back
+    try { var p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); Object.keys(d).forEach(function (k) { if (k !== "tab" && k !== "open" && k !== "shapeColor" && typeof p[k] === typeof d[k]) d[k] = p[k]; }); } catch (_) {}
     return d;
   }
   function fmt(t) {
@@ -434,12 +401,8 @@
     var m = Math.floor(t / 60), s = t % 60;
     return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
   }
-  function infoDot(text) {
-    var b = el("button", "info-dot");
-    b.type = "button";
-    b.setAttribute("aria-label", "More info");
-    b.dataset.tooltip = text;
-    return b;
+  function note(text) {
+    return el("span", "control-note", text);
   }
   function hexAlpha(hex) { return hex && hex.length === 9 ? parseInt(hex.slice(7, 9), 16) / 255 : 1; }
   function cssColor(hex) {
@@ -514,107 +477,30 @@
     return out;
   }
 
-  // the dropdown of the settings page, rebuilt here since the clips page has none of its own; options are [value, label, font to show it in]
-  function makeCombo(onPick) {
-    var wrap = el("div", "ed-combo");
-    var btn = el("button", "ed-combo-btn");
-    btn.type = "button";
-    btn.setAttribute("aria-haspopup", "listbox");
-    btn.setAttribute("aria-expanded", "false");
-    var label = el("span", "ed-combo-label", "");
-    var arrow = el("span", "ed-combo-arrow");
+  function makeCombo(onPick, onPreview) {
+    var wrap = el("div", "combo");
+    wrap.setAttribute("role", "combobox");
+    wrap.setAttribute("aria-expanded", "false");
+    var button = el("button", "combo-button");
+    button.type = "button";
+    button.setAttribute("aria-haspopup", "listbox");
+    var label = el("span", "combo-label");
+    var arrow = el("span", "combo-arrow");
     arrow.innerHTML = icon("nav/combo-arrow");
-    btn.appendChild(label);
-    btn.appendChild(arrow);
-    var menu = el("div", "ed-combo-menu");
+    button.append(label, arrow);
+    var menu = el("div", "combo-menu");
     menu.setAttribute("role", "listbox");
-    wrap.appendChild(btn);
-    wrap.appendChild(menu);
-    var options = [];
-    var value = "";
-
-    function onOutside(e) { if (!wrap.contains(e.target)) close(); }
-    function onKey(e) {
-      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); btn.focus(); return; }
-      // a letter goes to the next option that starts with it, from the one in focus, so pressing it again walks through them; the editor never sees it
-      if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        var letter = e.key.toLowerCase();
-        var all = Array.prototype.slice.call(menu.children);
-        var from = all.indexOf(document.activeElement);
-        if (from < 0) from = all.findIndex(function (r) { return r.classList.contains("is-selected"); });
-        for (var n = 1; n <= all.length; n++) {
-          var row = all[(from + n + all.length) % all.length];
-          if (row.textContent.trim().toLowerCase().charAt(0) === letter) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: "nearest" }); break; }
-        }
-        return;
-      }
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      e.preventDefault();
-      var rows = Array.prototype.slice.call(menu.children);
-      var i = rows.indexOf(document.activeElement);
-      i = e.key === "ArrowDown" ? Math.min(rows.length - 1, i + 1) : Math.max(0, i - 1);
-      if (rows[i]) rows[i].focus();
-    }
-    function open() {
-      if (wrap.classList.contains("is-open") || !options.length) return;
-      wrap.classList.add("is-open");
-      btn.setAttribute("aria-expanded", "true");
-      document.addEventListener("pointerdown", onOutside, true);
-      // on the window, so escape closes the menu before the editor sees it and lets go of the selection
-      window.addEventListener("keydown", onKey, true);
-      var on = menu.querySelector(".is-selected");
-      if (on) on.scrollIntoView({ block: "nearest" });
-    }
-    function close() {
-      if (!wrap.classList.contains("is-open")) return;
-      wrap.classList.remove("is-open");
-      btn.setAttribute("aria-expanded", "false");
-      document.removeEventListener("pointerdown", onOutside, true);
-      window.removeEventListener("keydown", onKey, true);
-    }
-    function paint() {
-      var hit = options.find(function (o) { return o[0] === value; });
-      label.textContent = hit ? hit[1] : "";
-      label.style.fontFamily = hit && hit[2] ? '"' + hit[2] + '", sans-serif' : "";
-      Array.prototype.forEach.call(menu.children, function (row) {
-        var on = row.dataset.value === value;
-        row.classList.toggle("is-selected", on);
-        row.setAttribute("aria-selected", on ? "true" : "false");
-      });
-    }
-    btn.addEventListener("click", function () { if (wrap.classList.contains("is-open")) close(); else open(); });
-
-    wrap.setOptions = function (list, v) {
-      options = list;
-      menu.textContent = "";
-      list.forEach(function (o) {
-        var row = el("div", "ed-combo-option", o[1]);
-        row.dataset.value = o[0];
-        row.tabIndex = -1;
-        row.setAttribute("role", "option");
-        row.title = o[1];
-        if (o[2]) row.style.fontFamily = '"' + o[2] + '", sans-serif';
-        var pick = function () {
-          value = o[0];
-          paint();
-          close();
-          btn.focus();
-          onPick(value);
-        };
-        row.addEventListener("click", pick);
-        row.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
-        menu.appendChild(row);
-      });
-      wrap.setValue(v);
+    wrap.append(button, menu);
+    var control = RKCombo.bind(wrap, onPick, { menuKeys:true, preview:onPreview, signal:EDITOR_SIGNAL });
+    wrap.setOptions = function (list, value) {
+      control.setOptions(list.map(function (entry) {
+        return { value:entry[0], label:entry[1], font:entry[2] || "", description:entry[3] || "" };
+      }));
+      control.value = value;
     };
-    wrap.setValue = function (v) {
-      value = options.some(function (o) { return o[0] === v; }) ? v : (options[0] ? options[0][0] : "");
-      paint();
-    };
-    wrap.value = function () { return value; };
-    wrap.close = close;
+    wrap.setValue = function (value) { control.value = value; };
+    wrap.value = function () { return control.value; };
+    wrap.close = control.close;
     return wrap;
   }
 
@@ -707,9 +593,9 @@
     function row(label, control, info) {
       var r = el("div", "ed-row");
       var name = el("span", "ed-row-label", label);
-      if (info) name.appendChild(infoDot(info));
       r.appendChild(name);
       r.appendChild(control);
+      if (info) r.appendChild(note(info));
       return r;
     }
 
@@ -717,7 +603,7 @@
       var s = el("section", "ed-sec");
       var head = el("div", "ed-sec-head");
       head.appendChild(el("div", "ed-sec-title", title));
-      if (info) { s.info = infoDot(info); head.appendChild(s.info); }
+      if (info) { s.info = note(info); head.appendChild(s.info); }
       s.appendChild(head);
       s.head = head;
       return s;
@@ -928,12 +814,11 @@
       return box;
     }
 
-    // the colour new shapes are drawn in, kept between sessions; the tiles show it
+    // the colour new shapes are drawn in for this edit; the tiles show it
     function setShapeColor(v) {
       v = String(v || "").slice(0, 7).toLowerCase();
       if (!/^#[0-9a-f]{6}$/.test(v)) return;
       prefs.shapeColor = v;
-      savePrefs();
       els.shapeColor.show(v);
       els.shapeTiles.forEach(function (t) { t.paintShape(); });
     }
@@ -1106,7 +991,111 @@
       pane.appendChild(s);
     }
 
-    // the library: the clips of the folder, newest first, searched by name; the one picked becomes a video row of its own at the playhead, full size over the video, with its sound in a row linked to it, and it can be carried down into the video
+    var LIB_SORT_GROUPS = { length: { base: "Length", members: ["shortest", "longest"] }, filesize: { base: "File size", members: ["smallest", "biggest"] } };
+    var LIB_SORT_LABELS = { newest: "Newest", oldest: "Oldest", longest: "Longest", shortest: "Shortest", biggest: "Biggest", smallest: "Smallest" };
+    var LIB_SORT_ICON = "<svg class=\"clip-sort-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.59934 2.30001L9.89679 5.90001C10.1964 6.4 9.7969 7 9.29745 7H8.2V17.0001H9.29745C9.79689 17.0001 10.1964 17.6001 9.89679 18.1L7.59934 21.7C7.29967 22.1001 6.70033 22.1001 6.40067 21.7L4.10322 18.1C3.80356 17.6001 4.20311 17.0001 4.70256 17.0001H5.8V7H4.70256C4.20311 7 3.80356 6.4 4.10322 5.90001L6.40067 2.30001C6.70033 1.9 7.29967 1.9 7.59934 2.30001ZM12.5 6.3C11.8373 6.3 11.3 6.83725 11.3 7.5C11.3 8.16274 11.8373 8.7 12.5 8.7H20.5C21.1628 8.7 21.7 8.16274 21.7 7.5C21.7 6.83725 21.1628 6.3 20.5 6.3H12.5ZM11.3 12C11.3 11.3373 11.8373 10.8 12.5 10.8H17C17.6628 10.8 18.2 11.3373 18.2 12C18.2 12.6628 17.6628 13.2 17 13.2H12.5C11.8373 13.2 11.3 12.6628 11.3 12ZM12.5 14.8C11.8373 14.8 11.3 15.3372 11.3 16C11.3 16.6627 11.8373 17.2 12.5 17.2H15C15.6627 17.2 16.2 16.6627 16.2 16C16.2 15.3372 15.6627 14.8 15 14.8H12.5Z\" fill=\"currentColor\"/></svg>";
+    var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z\"/></svg>";
+    var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z\" fill=\"currentColor\"/></svg>";
+    var LIB_SORT_CARET = "<svg class=\"clip-sort-caret\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z\"/></svg>";
+    var LIB_FOLDER_ICON = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z\"/></svg>";
+
+    // the sort of the clips page, the same trigger and menu: newest and oldest, and length and file size that each open to their two ways
+    function buildLibrarySort() {
+      var wrap = el("div", "clip-sort-wrap ed-lib-sort");
+      var trigger = el("button", "clip-sort-trigger");
+      trigger.type = "button";
+      trigger.setAttribute("aria-haspopup", "menu");
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.setAttribute("aria-label", "Sort by");
+      trigger.setAttribute("data-tooltip", "Sort by");
+      trigger.innerHTML = LIB_SORT_ICON + LIB_SORT_CHEVRON;
+      var menu = el("div", "clip-sort-menu");
+      menu.setAttribute("role", "menu");
+      menu.setAttribute("aria-label", "Sort clips");
+      menu.appendChild(el("div", "clip-sort-heading", "Sort by"));
+      var items = [];
+      function item(value, sub) {
+        var b = el("button", "clip-sort-item" + (sub ? " clip-sort-subitem" : ""));
+        b.type = "button";
+        b.dataset.sort = value;
+        b.setAttribute("role", "menuitemradio");
+        b.innerHTML = '<span class="clip-sort-label"></span>' + LIB_SORT_CHECK;
+        b.firstChild.textContent = LIB_SORT_LABELS[value];
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          close();
+          if (els.lib.sort === value) return;
+          els.lib.sort = value;
+          paint();
+          sortLibrary();
+        });
+        items.push(b);
+        return b;
+      }
+      menu.appendChild(item("newest"));
+      menu.appendChild(item("oldest"));
+      Object.keys(LIB_SORT_GROUPS).forEach(function (key) {
+        var g = el("div", "clip-sort-group");
+        g.dataset.group = key;
+        var row = el("button", "clip-sort-item clip-sort-grouprow");
+        row.type = "button";
+        row.setAttribute("aria-haspopup", "true");
+        row.setAttribute("aria-expanded", "false");
+        row.innerHTML = '<span class="clip-sort-label"></span>' + LIB_SORT_CARET;
+        row.firstChild.textContent = LIB_SORT_GROUPS[key].base;
+        // one group open at a time, so the menu stays short
+        row.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var open = !g.classList.contains("is-expanded");
+          menu.querySelectorAll(".clip-sort-group").forEach(function (other) { setGroup(other, other === g && open); });
+        });
+        var sub = el("div", "clip-sort-sub");
+        sub.setAttribute("role", "group");
+        LIB_SORT_GROUPS[key].members.slice().reverse().forEach(function (v) { sub.appendChild(item(v, true)); });
+        g.appendChild(row);
+        g.appendChild(sub);
+        menu.appendChild(g);
+      });
+      wrap.appendChild(trigger);
+      wrap.appendChild(menu);
+      function setGroup(g, on) {
+        g.classList.toggle("is-expanded", on);
+        g.querySelector(".clip-sort-grouprow").setAttribute("aria-expanded", on ? "true" : "false");
+      }
+      function paint() {
+        var sort = els.lib ? els.lib.sort : "newest";
+        items.forEach(function (b) { var on = b.dataset.sort === sort; b.classList.toggle("is-active", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+        menu.querySelectorAll(".clip-sort-group").forEach(function (g) {
+          var group = LIB_SORT_GROUPS[g.dataset.group];
+          var member = group.members.indexOf(sort) >= 0 ? sort : "";
+          g.classList.toggle("has-active", !!member);
+          g.querySelector(".clip-sort-grouprow .clip-sort-label").textContent = member ? group.base + ": " + LIB_SORT_LABELS[member] : group.base;
+        });
+      }
+      function close() {
+        wrap.classList.remove("is-open");
+        trigger.setAttribute("aria-expanded", "false");
+      }
+      trigger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (wrap.classList.contains("is-open")) { close(); return; }
+        paint();
+        // on open only the group that holds the sort in use is disclosed
+        menu.querySelectorAll(".clip-sort-group").forEach(function (g) { setGroup(g, g.classList.contains("has-active")); });
+        wrap.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+      });
+      document.addEventListener("click", function (e) {
+        if (wrap.classList.contains("is-open") && !wrap.contains(e.target)) close();
+      }, { signal: EDITOR_SIGNAL });
+      wrap.paint = paint;
+      wrap.close = close;
+      wrap.isOpen = function () { return wrap.classList.contains("is-open"); };
+      return wrap;
+    }
+
+
+    // the library: the clips of the folder, sorted like the clips page and searched by name, or a video from anywhere on the computer through the folder button; the one picked becomes a video row of its own at the playhead, full size over the video, with its sound in a row linked to it, and it can be carried down into the video
     function buildLibrary() {
       var veil = el("div", "ed-lib-veil");
       veil.hidden = true;
@@ -1115,11 +1104,21 @@
       card.setAttribute("aria-label", "Library");
       var head = el("div", "ed-lib-head");
       head.appendChild(el("div", "ed-lib-title", "Library"));
+      head.appendChild(el("span", "ed-lib-divider"));
+      var folder = el("button", "clip-sort-trigger clip-folder-btn");
+      folder.type = "button";
+      folder.setAttribute("aria-label", "Add a video from the computer");
+      folder.setAttribute("data-tooltip", "Add a video from the computer");
+      folder.innerHTML = LIB_FOLDER_ICON;
+      folder.addEventListener("click", pickVideo);
+      head.appendChild(folder);
+      var sort = buildLibrarySort();
+      head.appendChild(sort);
       var search = el("label", "ed-fx-search");
       search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M9.86.85a9 9 0 0 1 6.92 14.76l5.78 5.79a.82.82 0 1 1-1.16 1.16l-5.79-5.79A9 9 0 1 1 9.86.85zm0 1.65a7.35 7.35 0 1 0 0 14.7 7.35 7.35 0 0 0 0-14.7z"/></svg>';
       var input = el("input");
       input.type = "text";
-      input.placeholder = "Search clips";
+      input.placeholder = "Search";
       input.autocomplete = "off";
       input.spellcheck = false;
       input.setAttribute("aria-label", "Search clips");
@@ -1154,10 +1153,15 @@
         if (e.key !== "Escape" || veil.hidden) return;
         e.preventDefault();
         e.stopPropagation();
+        // the sort menu goes first, then the library
+        if (sort.isOpen()) { sort.close(); return; }
         closeLibrary();
       }, { capture: true, signal: EDITOR_SIGNAL });
-      els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, clips: [], cards: [] };
-      if (window.RKHover) RKHover.apply(card, { control: ".ed-x" });
+      els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, sortMenu: sort, sort: "newest", clips: [], cards: [] };
+      var resize = new ResizeObserver(sizeLibrary);
+      resize.observe(card);
+      if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { resize.disconnect(); }, { once: true });
+      if (window.RKHover) RKHover.apply(card, { control: ".ed-x, .clip-sort-trigger", row: ".clip-sort-item" });
     }
 
     function openLibrary() {
@@ -1165,6 +1169,9 @@
       var lib = els.lib;
       lib.veil.hidden = false;
       lib.input.value = "";
+      lib.sort = "newest";
+      lib.sortMenu.close();
+      lib.sortMenu.paint();
       lib.empty.textContent = "Loading clips...";
       lib.grid.textContent = "";
       lib.favGrid.textContent = "";
@@ -1172,18 +1179,41 @@
       requestAnimationFrame(function () { lib.input.focus(); });
       fetch(o.helper + "/clips?t=" + Date.now(), { cache: "no-store" }).then(function (res) { return res.json(); }).then(function (list) {
         lib.clips = (Array.isArray(list) ? list : []).filter(function (c) { return c && c.name && c.duration > 0; });
-        lib.clips.sort(function (a, b) { return (b.mtime || 0) - (a.mtime || 0); });
         // the favorites of the clips page come first, the way that page splits its grid
         var favs = o.favorites ? o.favorites() : [];
         lib.cards = lib.clips.map(libraryCard);
-        lib.cards.forEach(function (c) { c.favorite = favs.indexOf(c.clipName) >= 0; (c.favorite ? lib.favGrid : lib.grid).appendChild(c); });
-        paintLibrary();
+        lib.cards.forEach(function (c) { c.favorite = favs.indexOf(c.clipName) >= 0; });
+        sortLibrary();
       }).catch(function () {
         lib.empty.textContent = "The clips could not be listed.";
       });
     }
 
+    // the cards are put back in the order picked, each in its own grid
+    function sortLibrary() {
+      var lib = els.lib;
+      var key = {
+        newest: function (c) { return -(c.mtime || 0); }, oldest: function (c) { return c.mtime || 0; },
+        longest: function (c) { return -(c.duration || 0); }, shortest: function (c) { return c.duration || 0; },
+        biggest: function (c) { return -(c.size || 0); }, smallest: function (c) { return c.size || 0; },
+      }[lib.sort] || function (c) { return -(c.mtime || 0); };
+      lib.cards.sort(function (a, b) { return key(a.clip) - key(b.clip) || a.clipName.localeCompare(b.clipName); });
+      lib.cards.forEach(function (c) { (c.favorite ? lib.favGrid : lib.grid).appendChild(c); });
+      paintLibrary();
+    }
+
+    // a video from outside the clip folder, read where it lies; it is laid on like a clip of the library
+    function pickVideo() {
+      if (!clip) return;
+      fetch(o.helper + "/import-video/pick", { method: "POST", cache: "no-store" }).then(function (res) { return res.json(); }).then(function (r) {
+        if (!r || r.cancelled || !clip) return;
+        if (!r.ok || typeof r.ref !== "string") throw new Error(r.message || "The video could not be added");
+        addClipLayer({ name: r.ref, duration: r.duration, width: r.width, height: r.height }, r.name || "Video");
+      }).catch(function (err) { o.notify((err && err.message) || "The video could not be added", "bad", "Library"); });
+    }
+
     function closeLibrary() {
+      els.lib.sortMenu.close();
       els.lib.veil.hidden = true;
       els.lib.grid.textContent = "";
       els.lib.favGrid.textContent = "";
@@ -1205,6 +1235,7 @@
       card.appendChild(el("span", "ed-lib-name", title));
       card.title = title;
       card.clipName = c.name;
+      card.clip = c;
       card.searchText = title.toLowerCase();
       card.addEventListener("click", function () { addClipLayer(c, title); });
       return card;
@@ -1219,6 +1250,19 @@
       lib.favHead.hidden = lib.favGrid.hidden = !split || favShown === 0;
       lib.restHead.hidden = !split || shown - favShown === 0;
       lib.empty.textContent = lib.clips.length === 0 ? "There are no clips in the clip folder yet." : shown === 0 ? "No clips match that." : "";
+      sizeLibrary();
+    }
+
+    function sizeLibrary() {
+      var lib = els.lib;
+      if (!lib || lib.veil.hidden) return;
+      var first = lib.favGrid.hidden ? lib.grid : lib.favGrid;
+      var card = Array.from(first.children).find(function (item) { return !item.hidden; });
+      if (!card) return;
+      var height = card.offsetTop - lib.body.offsetTop;
+      height += card.offsetHeight * 2 + parseFloat(getComputedStyle(first).rowGap);
+      height += parseFloat(getComputedStyle(lib.body).paddingBottom);
+      lib.body.style.height = Math.ceil(height) + "px";
     }
 
     function addClipLayer(c, title) {
@@ -1562,10 +1606,11 @@
 
     function buildRecord(pane) {
       var box = el("div", "ed-rec");
-      els.mic = makeCombo(function (v) { prefs.mic = v; savePrefs(); paintMicNote(); });
-      box.appendChild(els.mic);
+      els.mic = makeCombo(function (v) { prefs.mic = v; savePrefs(); }, function (option) {
+        els.micNote.textContent = option ? option.description || option.label : "";
+      });
       els.micNote = el("p", "ed-mic-note", "");
-      box.appendChild(els.micNote);
+      box.append(els.micNote, els.mic);
       els.recTime = el("div", "ed-rec-time", "");
       box.appendChild(els.recTime);
       els.wave = el("div", "ed-wave");
@@ -1923,10 +1968,6 @@
       });
     }
 
-    function paintMicNote() {
-      els.micNote.textContent = els.mic.value() ? "" : "Uses the noise suppression and input sensitivity from Settings > Audio.";
-    }
-
     // the default is the microphone of the settings with its whole chain; any other one is recorded as it comes in
     function loadMics() {
       helperJson("/settings").then(function (d) {
@@ -1935,14 +1976,14 @@
           var devices = m.devices || [];
           var hit = devices.find(function (x) { return x.value === id; });
           var name = hit ? (hit.value === "default" && hit.blurb ? hit.blurb : hit.label) : "";
-          var list = [["", "Default" + (name ? " - " + name : "")]];
-          devices.forEach(function (x) { list.push([x.value, x.value === "default" && x.blurb ? "Windows default - " + x.blurb : x.label]); });
+          var list = [["", "Settings microphone", "", (name ? name + ". " : "") + "Uses Settings > Audio processing."]];
+          devices.forEach(function (x) {
+            list.push([x.value, x.value === "default" ? "Windows default" : x.label, "", (x.blurb || x.label) + ". Records this device directly."]);
+          });
           els.mic.setOptions(list, prefs.mic);
-          paintMicNote();
         });
       }).catch(function () {
-        els.mic.setOptions([["", "Default"]], "");
-        paintMicNote();
+        els.mic.setOptions([["", "Settings microphone", "", "Uses noise suppression and input sensitivity from Settings > Audio."]], "");
       });
     }
 
@@ -1971,6 +2012,12 @@
       if (job.busy) cancelJob();
       closeCombos();
       clip = null;
+      prefs.open = false;
+      view = "home";
+      elView = "home";
+      if (els.shapeColor) setShapeColor("#ffffff");
+      else prefs.shapeColor = "#ffffff";
+      paintTabs();
       refresh();
     }
 

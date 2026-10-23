@@ -419,9 +419,10 @@ void AnchoredPanel::Finish()
 {
 	m_closing = false;
 	DevLog("panel closed: %s", m_title.toUtf8().constData());
+	// hidden before the cut is taken off, or the whole panel shows for a frame after it rolled up
 	if (PopupHost::Owns(this)) {
-		ClearReveal();
 		PopupHost::Release(this);
+		ClearReveal();
 	}
 	if (m_anchor.setOpen)
 		m_anchor.setOpen(false);
