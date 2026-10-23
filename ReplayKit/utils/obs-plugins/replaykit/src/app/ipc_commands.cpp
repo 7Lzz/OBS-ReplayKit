@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "app/ipc_commands.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "app/obs_actions.hpp"
 #include "app/obs_menu.hpp"
 #include "app/sdk_commands.hpp"
@@ -62,6 +63,19 @@ void PipeDispatchLine(const std::string &line)
 	} else if (line.rfind("SDK ", 0) == 0) {
 		// a command of the local command channel; it is queued to the interface thread and its answer goes back to the helper over http
 		SdkDispatch(line.substr(4));
+	} else if (line == "CLIPBUFFER on" || line == "CLIPBUFFER off" || line == "CLIPBUFFER toggle") {
+		// the disk clip buffer, turned on, off or over for the helper, which answers the replay buffer requests while it is the buffer in use
+		const std::string state = line.substr(11);
+		QMetaObject::invokeMethod(g_callbacks, [state]() {
+			if (state == "toggle")
+				ClipBufferToggle();
+			else if (state == "on" && !ClipBufferActive())
+				ClipBufferStart();
+			else if (state == "off" && ClipBufferActive())
+				ClipBufferStop();
+		}, Qt::QueuedConnection);
+	} else if (line == "CLIPSAVE") {
+		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
 	} else if (line == "OPENSETUP") {
 		QMetaObject::invokeMethod(g_callbacks, []() { ShowSetup(false); }, Qt::QueuedConnection);
 	} else if (line == "OPENSETUPQUIET") {

@@ -248,11 +248,18 @@ function script_update(settings)
     load_runtime_settings()
 end
 
+-- the disk clip buffer of the ReplayKit plugin saves without obs, so it says so with a signal of its own
+local function on_disk_clip_saved(cd)
+    show_popup("clip")
+end
+
 function script_load(settings)
     script_update(settings)
     obs.obs_frontend_add_event_callback(on_event)
+    obs.signal_handler_connect(obs.obs_get_signal_handler(), "replaykit_clip_saved", on_disk_clip_saved)
 end
 
 function script_unload()
     obs.obs_frontend_remove_event_callback(on_event)
+    obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "replaykit_clip_saved", on_disk_clip_saved)
 end

@@ -15,6 +15,7 @@
 #include <map>
 #include <mutex>
 
+#include "app/clip_buffer.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
@@ -92,6 +93,7 @@ QJsonObject UiState(const QJsonObject &)
 	out["panelsOpen"] = AnchoredPanel::ShownCount();
 	out["warmUp"] = QJsonObject{{"panels", AnchoredPanel::WarmReport()}, {"storageCard", StorageModalWarmReport()}};
 	out["popupHost"] = PopupHost::Probe();
+	out["clipBuffer"] = ClipBufferProbe();
 	out["hostParked"] = ShellHostParked();
 	out["pageHostReady"] = g_hostReady;
 	out["setupPending"] = g_setupPending;

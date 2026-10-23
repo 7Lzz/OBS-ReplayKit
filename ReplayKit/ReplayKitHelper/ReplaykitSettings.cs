@@ -45,6 +45,8 @@ namespace ReplayKitHelper
                 ["recordingScaleMode"] = DefaultRecordingScaleMode(),
                 ["downscaleHeight"] = 1080,
                 ["downscaleFilter"] = "lanczos",
+                // where the clip buffer is kept: recommended picks disk or memory from the installed memory, see ClipBuffer
+                ["recordingBuffer"] = ClipBuffer.Recommended,
                 // which kinds of capture show the mouse cursor in recordings and clips
                 ["showCursorDisplayCapture"] = true,
                 ["showCursorGameCapture"] = true,
@@ -472,6 +474,7 @@ namespace ReplayKitHelper
                 ["recordingScaleMode"] = GetEnumSetting(data, "recordingScaleMode", defaults["recordingScaleMode"].Value<string>(), new[] { "native", "downscale" }),
                 ["downscaleHeight"] = GetIntSetting(data, "downscaleHeight", defaults["downscaleHeight"].Value<int>(), 240, 4320),
                 ["downscaleFilter"] = GetEnumSetting(data, "downscaleFilter", defaults["downscaleFilter"].Value<string>(), new[] { "bilinear", "area", "bicubic", "lanczos" }),
+                ["recordingBuffer"] = GetEnumSetting(data, "recordingBuffer", defaults["recordingBuffer"].Value<string>(), new[] { ClipBuffer.Recommended, ClipBuffer.Disk, ClipBuffer.Memory }),
                 ["showCursorDisplayCapture"] = GetBoolSetting(data, "showCursorDisplayCapture", defaults["showCursorDisplayCapture"].Value<bool>()),
                 ["showCursorGameCapture"] = GetBoolSetting(data, "showCursorGameCapture", defaults["showCursorGameCapture"].Value<bool>()),
                 ["showCursorWindowCapture"] = GetBoolSetting(data, "showCursorWindowCapture", defaults["showCursorWindowCapture"].Value<bool>()),
@@ -5841,7 +5844,7 @@ namespace ReplayKitHelper
             lock (SettingsStore.Gate)
             {
                 var settings = ReadSettings();
-                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings) };
+                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings) };
             }
         }
 
@@ -5872,6 +5875,8 @@ namespace ReplayKitHelper
                     ["ok"] = true,
                     ["settings"] = settings,
                     ["menuColors"] = ActiveMenuColors(settings),
+                    ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings),
+                    ["systemMemoryGb"] = ClipBuffer.SystemMemoryGb,
                     // drives Install vs Uninstall on the Share Preview audio row in the Uninstall box
                     ["shareAudioInstalled"] = IsShareAudioDriverInstalled(),
                     ["options"] = new JObject
@@ -5896,6 +5901,7 @@ namespace ReplayKitHelper
                             new JObject { ["value"] = "downscale", ["label"] = "Downscale", ["blurb"] = "Shrink the recording to the size below. Lighter on the GPU and smaller files, slightly softer." }
                         ),
                         ["downscaleResolutions"] = BuildDownscaleResolutionList(),
+                        ["recordingBuffers"] = ClipBuffer.Options(),
                         ["downscaleFilters"] = new JArray(
                             new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = "Sharpest, 36-sample. Default." },
                             new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = "16-sample, slightly softer than Lanczos." },

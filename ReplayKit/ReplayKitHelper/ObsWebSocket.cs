@@ -151,6 +151,9 @@ namespace ReplayKitHelper
 
         public static ObsWebSocketResult InvokeRequest(string requestType, JToken requestData = null, int timeoutMs = 3000)
         {
+            // with the clip buffer on disk the replay buffer requests are answered by the plugin, which owns that buffer, and obs never starts its own
+            var routed = ClipBuffer.TryInvoke(requestType);
+            if (routed != null) return routed;
             var settings = GetObsWebSocketSettings();
 
             // the whole connect-reuse-or-fresh + send + receive cycle runs under one lock -- the request/response matching below has no way to tell two concurrent callers requests apart on a shared socket, so at most one request can be in flight on it at a time regardless of how many callers fire one.

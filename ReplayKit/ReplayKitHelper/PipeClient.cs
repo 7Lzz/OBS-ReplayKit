@@ -196,6 +196,10 @@ namespace ReplayKitHelper
         // one of the obs menu bar menus (File, Edit, ...) by its position, dropped open at the pointer
         public static void SendObsMenu(int index) { if (index >= 0 && index < 20) TryWrite("OBSMENU " + index); }
 
+        // the disk clip buffer lives in the plugin: it is turned on, off or over, and asked to save the last stretch it holds
+        public static bool SendClipBuffer(string state) => (state == "on" || state == "off" || state == "toggle") && TryWrite("CLIPBUFFER " + state);
+        public static bool SendClipSave() => TryWrite("CLIPSAVE");
+
         // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which obs-websocket cannot do
         public static void SendGroupInputOverlay() => TryWrite("GROUPINPUTOVERLAY");
 

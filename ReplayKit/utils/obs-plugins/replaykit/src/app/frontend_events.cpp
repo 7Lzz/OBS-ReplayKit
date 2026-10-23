@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "app/frontend_events.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
 #include "app/settings_poll.hpp"
@@ -76,6 +77,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		if (g_geoPollTimer)
 			g_geoPollTimer->stop();
 		ShellStop();
+		ClipBufferShutdown();
 		ClearShellBootMark();
 		// final geometry capture while the windows are still up and positioned (CloseCefWidgets deletes Clips next).
 		if (g_clipsWindow)
@@ -86,6 +88,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		return;
 	}
 
+	ClipBufferOnFrontendEvent(event);
 	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
 	// another profile has its own hotkeys and clip length
 	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED)

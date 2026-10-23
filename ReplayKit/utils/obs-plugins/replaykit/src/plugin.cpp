@@ -1,6 +1,7 @@
 // obs module entry points of the native replaykit plugin -- everything else lives in the rk namespace under src/ (the window shell, tray menu, notification bell, hotkeys and the pipe to the helper)
 #include "prelude.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "app/frontend_events.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/sdk_commands.hpp"
@@ -22,6 +23,7 @@ bool obs_module_load(void)
 	using namespace rk;
 	RegisterBongo();
 	g_callbacks = new QObject();
+	ClipBufferInit();
 	StartWorkers();
 	StartReplayKitCrashReporter();
 	InstallOpenClipsHotkeyFilter();
@@ -57,6 +59,7 @@ void obs_module_unload(void)
 	ForgetProjectorTimer();
 	RemoveNotifyTrackFilter();
 	RemoveOpenClipsHotkey();
+	ClipBufferShutdown();
 	RemoveMainWindowCloseFilter();
 	StopReplayKitCrashReporter();
 }

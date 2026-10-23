@@ -5,6 +5,7 @@
 #include <QCryptographicHash>
 #include <QJsonObject>
 
+#include "app/clip_buffer.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 
@@ -126,7 +127,7 @@ int ObsTrayState()
 {
 	if (obs_frontend_recording_active() && obs_frontend_recording_paused())
 		return 2;
-	const bool on = obs_frontend_recording_active() || obs_frontend_replay_buffer_active() || obs_frontend_streaming_active() || obs_frontend_virtualcam_active();
+	const bool on = obs_frontend_recording_active() || ClipBufferActive() || obs_frontend_streaming_active() || obs_frontend_virtualcam_active();
 	return on ? 1 : 0;
 }
 

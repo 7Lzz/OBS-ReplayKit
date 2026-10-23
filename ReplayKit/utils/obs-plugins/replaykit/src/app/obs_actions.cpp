@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "app/obs_actions.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
@@ -165,12 +166,7 @@ void ToggleRecording()
 
 void ToggleReplayBuffer()
 {
-	bool active = obs_frontend_replay_buffer_active();
-	blog(LOG_INFO, "[replaykit] ToggleReplayBuffer: active=%d -> calling %s", active, active ? "stop" : "start");
-	if (active)
-		obs_frontend_replay_buffer_stop();
-	else
-		ShellStartOutputWhenFree([]() { obs_frontend_replay_buffer_start(); });
+	ClipBufferToggle();
 }
 
 // the members keep their place, and the group starts at their top left corner with scale 1, so the transform the helper sets on Group next means the same as in the scene file it writes

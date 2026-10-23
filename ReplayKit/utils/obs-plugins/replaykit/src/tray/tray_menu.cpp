@@ -4,6 +4,7 @@
 
 #include <QJsonObject>
 
+#include "app/clip_buffer.hpp"
 #include "app/obs_actions.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
@@ -201,7 +202,7 @@ void RefreshActionRowText()
 	if (g_recordRow)
 		g_recordRow->nameLabel->setText(obs_frontend_recording_active() ? "Stop Recording" : "Start Recording");
 	if (g_replayBufferRow)
-		g_replayBufferRow->nameLabel->setText(obs_frontend_replay_buffer_active() ? "Stop Clipping" : "Start Clipping");
+		g_replayBufferRow->nameLabel->setText(ClipBufferActive() ? "Stop Clipping" : "Start Clipping");
 }
 
 // obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox and the record/clipping rows keybind chip right before each show instead of polling on a timer nobody is watching

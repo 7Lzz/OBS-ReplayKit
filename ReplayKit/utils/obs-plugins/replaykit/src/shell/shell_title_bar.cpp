@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_title_bar.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "app/obs_actions.hpp"
 #include "core/app_icon.hpp"
 #include "core/state.hpp"
@@ -62,8 +63,8 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_clip->SetLabel(QStringLiteral("Clip"));
 	m_clip->onClick = [this]() {
 		m_hotkeys->Hide();
-		if (obs_frontend_replay_buffer_active())
-			obs_frontend_replay_buffer_save();
+		if (ClipBufferActive())
+			ClipBufferSave();
 		else
 			ShellOpenSettingsPage(QStringLiteral("output"));
 	};
@@ -125,7 +126,7 @@ void ShellTitleBar::SetLabels(const QString &recordKeybind, const QString &clipK
 
 void ShellTitleBar::RefreshStates()
 {
-	const bool clipping = obs_frontend_replay_buffer_active();
+	const bool clipping = ClipBufferActive();
 	const bool recording = obs_frontend_recording_active();
 	const bool paused = recording && obs_frontend_recording_paused();
 

@@ -18,6 +18,7 @@ set(REPLAYKIT_SOURCES
     src/app/frontend_events.cpp
     src/app/ipc_commands.cpp
     src/app/main_window_filter.cpp
+    src/app/clip_buffer.cpp
     src/app/obs_actions.cpp
     src/app/obs_menu.cpp
     src/app/sdk_commands.cpp

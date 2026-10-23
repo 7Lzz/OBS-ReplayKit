@@ -1465,6 +1465,15 @@
 
     <section class="page" id="page-advanced">
       <div class="box">
+        <div class="box-title">Recording</div>
+        <div class="form-row">
+          <div class="label">Recording Buffer <button class="info-dot" type="button" aria-label="About the recording buffer" title="Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on."></button></div>
+          <div class="field-wrap">
+            <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="box">
         <div class="box-title">General</div>
         <div class="form-row">
           <div class="label">Streamable account</div>
@@ -1918,6 +1927,7 @@
     compressionMode: document.getElementById("compressionMode"),
     codecPreference: document.getElementById("codecPreference"),
     recordingScaleMode: document.getElementById("recordingScaleMode"),
+    recordingBuffer: document.getElementById("recordingBuffer"),
     captureDisplay: document.getElementById("captureDisplay"),
     downscaleTarget: document.getElementById("downscaleTarget"),
     downscaleTargetRow: document.getElementById("downscaleTargetRow"),
@@ -2945,6 +2955,7 @@
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
     setComboValue(els.codecPreference, state.codecPreference || "auto", false);
     setComboValue(els.recordingScaleMode, state.recordingScaleMode || "native", false);
+    setComboValue(els.recordingBuffer, state.recordingBuffer || "recommended", false);
     setComboValue(els.captureDisplay, state.captureDisplay || "primary", false);
     setComboValue(els.downscaleFilter, state.downscaleFilter || "lanczos", false);
     {
@@ -3055,6 +3066,7 @@
     state.compressionMode = comboValue(els.compressionMode);
     state.codecPreference = comboValue(els.codecPreference);
     state.recordingScaleMode = comboValue(els.recordingScaleMode) || "native";
+    state.recordingBuffer = comboValue(els.recordingBuffer) || "recommended";
     state.captureDisplay = comboValue(els.captureDisplay) || "primary";
     state.downscaleFilter = comboValue(els.downscaleFilter) || "lanczos";
     {
@@ -3219,7 +3231,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -3610,6 +3622,7 @@
       fillCombo(els.compressionMode, data.options.compressionModes || []);
       fillCombo(els.codecPreference, data.options.codecs || []);
       fillCombo(els.recordingScaleMode, data.options.recordingScaleModes || []);
+      fillCombo(els.recordingBuffer, data.options.recordingBuffers || []);
       fillCombo(els.captureDisplay, data.options.captureDisplays || [{ value:"primary", label:"Primary display" }]);
       fillCombo(els.downscaleTarget, [
         { value: "custom", label: "Custom…" },

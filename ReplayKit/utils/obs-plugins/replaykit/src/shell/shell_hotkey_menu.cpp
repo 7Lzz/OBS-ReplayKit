@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_hotkey_menu.hpp"
 
+#include "app/clip_buffer.hpp"
 #include "core/state.hpp"
 #include "shell/shell_badge.hpp"
 #include "ui/anchored_panel.hpp"
@@ -30,7 +31,7 @@ ShellHotkeyMenu::~ShellHotkeyMenu()
 QString ShellHotkeyMenu::UrlFor(Kind kind, int tabWidth, int opens)
 {
 	// clip: whether obs is keeping clips right now, so the switch of the clip menu is right on its first frame and not after the page has asked obs
-	return QStringLiteral("http://127.0.0.1:8767/hotkey-menu#kind=%1&tab=%2&open=%3&clip=%4").arg(QLatin1String(KindName(kind))).arg(tabWidth).arg(opens).arg(obs_frontend_replay_buffer_active() ? 1 : 0);
+	return QStringLiteral("http://127.0.0.1:8767/hotkey-menu#kind=%1&tab=%2&open=%3&clip=%4").arg(QLatin1String(KindName(kind))).arg(tabWidth).arg(opens).arg(ClipBufferActive() ? 1 : 0);
 }
 
 void ShellHotkeyMenu::Prepare(ShellBadge *badge, Kind kind)
@@ -73,7 +74,7 @@ void ShellHotkeyMenu::Toggle(ShellBadge *badge, Kind kind)
 	const QString kindName = QLatin1String(KindName(kind));
 	const QString width = QString::number(badge->width());
 	auto call = [&](bool fresh) {
-		return QStringLiteral("window.__replaykitShowHotkeyMenu && window.__replaykitShowHotkeyMenu('%1', %2, %3, %4);").arg(kindName, fresh ? QStringLiteral("true") : QStringLiteral("false"), width, obs_frontend_replay_buffer_active() ? QStringLiteral("true") : QStringLiteral("false"));
+		return QStringLiteral("window.__replaykitShowHotkeyMenu && window.__replaykitShowHotkeyMenu('%1', %2, %3, %4);").arg(kindName, fresh ? QStringLiteral("true") : QStringLiteral("false"), width, ClipBufferActive() ? QStringLiteral("true") : QStringLiteral("false"));
 	};
 	panel->Toggle(anchor, call(true));
 

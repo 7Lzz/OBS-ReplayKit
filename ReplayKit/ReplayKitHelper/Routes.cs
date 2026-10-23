@@ -574,9 +574,32 @@ namespace ReplayKitHelper
             if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html", framed); return false; }
 
+            // the plugin, which owns the disk clip buffer, says whether it runs; once on every change and again with each settings poll, so a helper that restarted learns it within a second
+            if (path == "/clip-buffer/state")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                ClipBuffer.ReportDiskState(QFlag("active"));
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
+            // the plugin hands over the pieces of the disk buffer that cover the clip, and they are joined into the clip itself
+            if (path == "/clip-buffer/save")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    var result = ClipBuffer.SaveSegments(JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body));
+                    HttpResponse.SendJson(stream, result["ok"]?.Value<bool>() == true ? 200 : 409, result);
+                }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save request was not valid." }); }
+                return false;
+            }
+
             if (path == "/settings/native")
             {
                 if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                if (query.ContainsKey("clip")) ClipBuffer.ReportDiskState(QFlag("clip"));
                 try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetNativeSettingsPayload()); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;

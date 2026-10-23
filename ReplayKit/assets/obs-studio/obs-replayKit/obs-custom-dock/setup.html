@@ -112,6 +112,23 @@
   .field-wrap { min-width:0; display:flex; align-items:center; gap:6px; }
   .hint { color:var(--muted); font-size:12px; margin-left:4px; }
 
+  .info-dot {
+    flex:none; margin-left:4px; padding:0; width:15px; height:15px;
+    display:inline-flex; vertical-align:middle;
+    border:0; background:transparent; color:var(--muted);
+    cursor:help; -webkit-user-select:none; user-select:none;
+    transition:transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content:""; width:100%; height:100%; background-color:currentColor;
+    -webkit-mask:url(/icons/ui/info.svg) center / contain no-repeat;
+    mask:url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color:var(--text); transform:scale(1.12); }
+  .info-dot:active { transform:scale(.94); }
+  .info-dot:focus { outline:none; }
+  .info-dot:focus-visible { color:var(--text); border-radius:50%; box-shadow:0 0 0 2px var(--selected2,#476BD7); }
+
   .text-input,.spin-input,.hotkey-input {
     width:100%; height:32px;
     border:1px solid var(--field);
@@ -269,6 +286,18 @@
         <div class="label">Recording Quality</div>
         <div class="field-wrap"><div class="combo" id="recordingPreset" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
       </div>
+      <div class="form-row">
+        <div></div>
+        <div class="field-wrap"><button class="btn" type="button" id="toggleAdvanced" aria-expanded="false" aria-controls="recordingAdvanced">Show advanced</button></div>
+      </div>
+      <div id="recordingAdvanced" hidden>
+        <div class="form-row">
+          <div class="label">Recording Buffer <button class="info-dot" type="button" aria-label="About the recording buffer" title="Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on."></button></div>
+          <div class="field-wrap">
+            <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false" aria-label="Recording buffer"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="panel" data-step="3" hidden>
@@ -416,6 +445,9 @@
     browseClipDir: document.getElementById("browseClipDir"),
     recordingPreset: document.getElementById("recordingPreset"),
     captureDisplay: document.getElementById("captureDisplay"),
+    recordingBuffer: document.getElementById("recordingBuffer"),
+    toggleAdvanced: document.getElementById("toggleAdvanced"),
+    recordingAdvanced: document.getElementById("recordingAdvanced"),
     replaySeconds: document.getElementById("replaySeconds"),
     clipKeybind: document.getElementById("clipKeybind"),
     recordingKeybind: document.getElementById("recordingKeybind"),
@@ -427,6 +459,7 @@
     clipDir: "",
     recordingPreset: "balanced",
     captureDisplay: "primary",
+    recordingBuffer: "recommended",
     replaySeconds: 90,
     clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
     recordingKeybind: {},
@@ -521,6 +554,13 @@
   document.addEventListener("click", () => closeCombos());
   els.recordingPreset.addEventListener("combochange", () => { state.recordingPreset = comboValue(els.recordingPreset); });
   els.captureDisplay.addEventListener("combochange", () => { state.captureDisplay = comboValue(els.captureDisplay) || "primary"; });
+  els.recordingBuffer.addEventListener("combochange", () => { state.recordingBuffer = comboValue(els.recordingBuffer) || "recommended"; });
+  els.toggleAdvanced.addEventListener("click", () => {
+    const open = els.recordingAdvanced.hidden;
+    els.recordingAdvanced.hidden = !open;
+    els.toggleAdvanced.setAttribute("aria-expanded", open ? "true" : "false");
+    els.toggleAdvanced.textContent = open ? "Hide advanced" : "Show advanced";
+  });
 
   // ---- clip length (mm:ss like settings.html) ----
   function readReplaySeconds() {
@@ -741,6 +781,7 @@
       clipDir: state.clipDir,
       recordingPreset: state.recordingPreset,
       captureDisplay: state.captureDisplay,
+      recordingBuffer: state.recordingBuffer,
       replaySeconds: state.replaySeconds,
       clipNotificationSeconds: state.replaySeconds,
       clipKeybind: state.clipKeybind,
@@ -795,6 +836,7 @@
       if (typeof g.clipDir === "string") state.clipDir = g.clipDir;
       if (g.recordingPreset) state.recordingPreset = g.recordingPreset;
       if (typeof g.captureDisplay === "string" && g.captureDisplay) state.captureDisplay = g.captureDisplay;
+      if (typeof g.recordingBuffer === "string" && g.recordingBuffer) state.recordingBuffer = g.recordingBuffer;
       if (Number.isFinite(g.replaySeconds)) state.replaySeconds = g.replaySeconds;
       if (g.clipKeybind && g.clipKeybind.key) state.clipKeybind = g.clipKeybind;
       if (g.recordingKeybind && g.recordingKeybind.key) state.recordingKeybind = g.recordingKeybind;
@@ -816,6 +858,8 @@
     setComboValue(els.recordingPreset, state.recordingPreset, false);
     fillCombo(els.captureDisplay, opts.captureDisplays || [{ value:"primary", label:"Primary display" }]);
     setComboValue(els.captureDisplay, state.captureDisplay, false);
+    fillCombo(els.recordingBuffer, opts.recordingBuffers || [{ value:"recommended", label:"Recommended" }, { value:"disk", label:"Disk" }, { value:"memory", label:"Memory" }]);
+    setComboValue(els.recordingBuffer, state.recordingBuffer, false);
 
     els.clipDir.value = state.clipDir;
     els.replaySeconds.value = replaySecondsLabel(state.replaySeconds);

@@ -4,6 +4,7 @@
 
 #include <QApplication>
 
+#include "app/clip_buffer.hpp"
 #include "app/sdk_commands.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/async.hpp"
@@ -191,7 +192,8 @@ void PollHelperSettings()
 	g_fullSyncDue = false;
 	g_openClipsHotkeyRequestInFlight = true;
 	RunAsync([full]() {
-		std::string settingsBody = HttpRequest("GET", full ? "/settings" : "/settings/native", 8767, nullptr, 3000);
+		const std::string nativePath = "/settings/native" + ClipBufferPollQuery();
+		std::string settingsBody = HttpRequest("GET", full ? "/settings" : nativePath.c_str(), 8767, nullptr, 3000);
 		QMetaObject::invokeMethod(g_callbacks, [settingsBody, full]() {
 			g_openClipsHotkeyRequestInFlight = false;
 			// a helper that did not answer is asked for the full read again next time
@@ -211,6 +213,7 @@ void PollHelperSettings()
 			RefreshTitleKeybindBadges(settingsBody);
 			ShellApplySettings(settingsBody);
 			ApplyLayoutSetting(settingsBody);
+			ClipBufferApplySettings(settingsBody);
 		}, Qt::QueuedConnection);
 	});
 }
