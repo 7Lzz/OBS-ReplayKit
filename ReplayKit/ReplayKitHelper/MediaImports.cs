@@ -67,11 +67,23 @@ namespace ReplayKitHelper
                 // the path comes from the dialog of this helper, and anything that is not a plain file on a drive or a share is turned away all the same
                 if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path) || Path.GetPathRoot(path).Length < 3 || path.StartsWith(@"\\.\", StringComparison.Ordinal) || path.StartsWith(@"\\?\", StringComparison.Ordinal))
                     return Fail(name, "That file cannot be used");
-                var info = new FileInfo(path);
-                if (!info.Exists) return Fail(name, "That file was not found");
-                if (info.Length <= 0) return Fail(name, "That file is empty");
-                if (info.Length > MaxBytes) return Fail(name, "That file is larger than 50 MB");
-                return Store(File.ReadAllBytes(info.FullName), name);
+                if (!File.Exists(path)) return Fail(name, "That file was not found");
+                using (var input = File.OpenRead(path))
+                {
+                    if (input.Length <= 0) return Fail(name, "That file is empty");
+                    if (input.Length > MaxBytes) return Fail(name, "That file is larger than 50 MB");
+                    return Receive(name, (output, hash) =>
+                    {
+                        var buffer = new byte[65536];
+                        int count;
+                        while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            output.Write(buffer, 0, count);
+                            hash.TransformBlock(buffer, 0, count, null, 0);
+                        }
+                        hash.TransformFinalBlock(new byte[0], 0, 0);
+                    });
+                }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
             {
@@ -88,14 +100,9 @@ namespace ReplayKitHelper
             if (req.UploadLength > MaxBytes) { status = 413; return Fail(name, "That file is larger than 50 MB"); }
             try
             {
-                using (var ms = new MemoryStream())
-                using (var sha = SHA1.Create())
-                {
-                    Connection.CopyUploadBody(req, ms, sha);
-                    var made = Store(ms.ToArray(), name);
-                    if (made.Value<bool>("ok") != true) status = 400;
-                    return made;
-                }
+                var made = Receive(name, (output, hash) => Connection.CopyUploadBody(req, output, hash));
+                if (made.Value<bool>("ok") != true) status = 400;
+                return made;
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException)
             {
@@ -105,13 +112,35 @@ namespace ReplayKitHelper
             }
         }
 
-        // the same bytes twice are one import
-        private static JObject Store(byte[] bytes, string name)
+        private static JObject Receive(string name, Action<Stream, HashAlgorithm> copy)
         {
-            string ext = Sniff(bytes, bytes.Length);
-            if (ext == null) return Fail(name, "Only GIF, PNG and JPEG files can be added");
-            string id;
-            using (var sha = SHA1.Create()) id = string.Concat(sha.ComputeHash(bytes).Take(8).Select(b => b.ToString("x2")));
+            Directory.CreateDirectory(Root);
+            string temp = Path.Combine(Root, Guid.NewGuid().ToString("N") + ".tmp");
+            try
+            {
+                string ext, id;
+                using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 65536))
+                using (var hash = SHA1.Create())
+                {
+                    copy(file, hash);
+                    file.Position = 0;
+                    var head = new byte[8];
+                    ext = Sniff(head, file.Read(head, 0, head.Length));
+                    if (ext == null) return Fail(name, "Only GIF, PNG and JPEG files can be added");
+                    id = string.Concat(hash.Hash.Take(8).Select(b => b.ToString("x2")));
+                }
+                return Store(temp, id, ext, name);
+            }
+            finally
+            {
+                try { File.Delete(temp); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("MediaImports: temporary file cleanup failed: " + ex.Message); }
+            }
+        }
+
+        // The temporary file is on the cache volume, so publishing never copies the payload again.
+        private static JObject Store(string temp, string id, string ext, string name)
+        {
             string dir = Path.Combine(Root, id);
             lock (StoreGate)
             {
@@ -120,7 +149,7 @@ namespace ReplayKitHelper
                     ClipCache.Prune(dir);
                     if (Directory.Exists(dir)) Directory.Delete(dir, true);
                     Directory.CreateDirectory(dir);
-                    File.WriteAllBytes(Path.Combine(dir, "media" + ext), bytes);
+                    File.Move(temp, Path.Combine(dir, "media" + ext));
                     File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "ok");
                 }
             }

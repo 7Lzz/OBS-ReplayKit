@@ -3,6 +3,7 @@
 #include "shell/shell_page.hpp"
 
 #include "core/theme.hpp"
+#include "shell/shell_views.hpp"
 
 namespace rk {
 
@@ -27,12 +28,14 @@ void ShellPage::showEvent(QShowEvent *event)
 {
 	QWidget::showEvent(event);
 	ShellRunJs(browser, "window.RKShell && RKShell.windowShown(true);");
+	ShellHostWindowShown(true);
 }
 
 void ShellPage::hideEvent(QHideEvent *event)
 {
 	QWidget::hideEvent(event);
 	ShellRunJs(browser, "window.RKShell && RKShell.windowShown(false);");
+	ShellHostWindowShown(false);
 }
 
 } // namespace rk

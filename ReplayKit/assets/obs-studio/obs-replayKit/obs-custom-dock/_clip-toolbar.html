@@ -1,0 +1,95 @@
+  <div class="tabs" id="clip-tabs" role="tablist" aria-label="Clip filters">
+    <div class="bulk-actions" id="bulk-actions" hidden>
+      <button class="bulk-icon-btn" type="button" id="bulk-upload" data-tooltip="Upload" aria-label="Upload selected clips">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 18.25H14.99C14.58 18.25 14.24 17.91 14.24 17.5C14.24 17.09 14.58 16.75 14.99 16.75H16.5C19.12 16.75 21.25 14.62 21.25 12C21.25 9.38 19.12 7.25 16.5 7.25H15C14.59 7.25 14.25 6.91 14.25 6.5C14.25 6.09 14.58 5.75 15 5.75H16.5C19.95 5.75 22.75 8.55 22.75 12C22.75 15.45 19.95 18.25 16.5 18.25Z"/><path d="M9 18.25H7.5C4.05 18.25 1.25 15.45 1.25 12C1.25 8.55 4.05 5.75 7.5 5.75H9C9.41 5.75 9.75 6.09 9.75 6.5C9.75 6.91 9.41 7.25 9 7.25H7.5C4.88 7.25 2.75 9.38 2.75 12C2.75 14.62 4.88 16.75 7.5 16.75H9C9.41 16.75 9.75 17.09 9.75 17.5C9.75 17.91 9.41 18.25 9 18.25Z"/><path d="M16 12.75H8C7.59 12.75 7.25 12.41 7.25 12C7.25 11.59 7.59 11.25 8 11.25H16C16.41 11.25 16.75 11.59 16.75 12C16.75 12.41 16.41 12.75 16 12.75Z"/></svg>
+      </button>
+      <button class="bulk-icon-btn" type="button" id="bulk-compress" data-tooltip="Compress" aria-label="Compress selected clips">
+        <svg viewBox="0 0 24 24" id="bulk-compress-icon" aria-hidden="true"></svg>
+      </button>
+      <button class="bulk-icon-btn bulk-delete" type="button" id="bulk-delete" data-tooltip="Delete" aria-label="Delete selected clips">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.60033 7.51634C4.30034 7.51634 4.10035 7.82671 4.10035 8.13707L5.50031 21.069C5.6003 21.5863 6.10029 22.0001 6.60027 22.0001H17.3C17.8999 22.0001 18.3999 21.5863 18.3999 21.069L19.9999 8.13707C19.9999 7.82671 19.7999 7.51634 19.4999 7.51634H4.60033ZM8.40022 20.2414C8.00023 20.2414 7.60024 19.931 7.50025 19.5172L6.70027 10.62C6.70027 10.2062 7.00026 9.79236 7.50025 9.79236C7.90023 9.79236 8.30022 10.1027 8.40022 10.5165L9.2002 19.4137C9.1002 19.8275 8.80021 20.1379 8.40022 20.2414ZM12.9001 19.4137C12.9001 19.8275 12.5001 20.2414 12.1001 20.2414C11.7001 20.2414 11.3001 19.931 11.3001 19.4137V10.5165C11.3001 10.1027 11.7001 9.6889 12.1001 9.6889C12.5001 9.6889 12.9001 9.99927 12.9001 10.5165V19.4137ZM16.6 19.5172C16.6 19.931 16.2 20.2414 15.7 20.2414C15.3 20.2414 14.9 19.8275 15 19.4137L15.9 10.5165C15.9 10.1027 16.3 9.79236 16.8 9.79236C17.2 9.79236 17.5999 10.2062 17.4999 10.62L16.6 19.5172Z"/><path d="M19.9995 4.06911C19.9995 3.75874 19.6995 3.44838 19.3995 3.44838H14.6997L14.1997 2.41382C14.0997 2.31037 14.0997 2.20691 13.9997 2.10346C13.7997 2 13.6997 2 13.5997 2H10.3998C10.2998 2 10.0998 2 9.99982 2.10346C9.89982 2.20691 9.79983 2.31037 9.79983 2.41382L9.19984 3.44838H4.59998C4.29999 3.44838 4 3.75874 4 4.06911V4.89675C4 5.20712 4.29999 5.51748 4.59998 5.51748H19.3995C19.6995 5.51748 19.9995 5.20712 19.9995 4.89675V4.06911Z"/></svg>
+      </button>
+    </div>
+    <div class="tab-group">
+      <button class="tab is-active" type="button" data-filter="all">
+        <svg data-i="toggle/grid" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">All<span class="count" hidden></span></span>
+      </button>
+      <button class="tab" type="button" data-filter="favorites">
+        <svg data-i="toggle/star" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Favorites<span class="count" hidden></span></span>
+      </button>
+      <button class="tab" type="button" data-filter="linked">
+        <svg data-i="action/link" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Linked<span class="count" hidden></span></span>
+      </button>
+      <button class="tab" type="button" data-filter="drafts">
+        <svg data-i="action/open-editor" viewBox="0 0 24 24" aria-hidden="true"></svg>
+        <span class="tab-text">Drafts<span class="count" hidden></span></span>
+      </button>
+    </div>
+    <div class="tab-actions">
+      <div class="bulk-summary" id="bulk-summary" hidden>
+        <span class="bulk-summary-count" id="bulk-count">0 selected</span>
+        <span class="bulk-summary-size" id="bulk-size"></span>
+      </div>
+      <button class="bulk-clear" type="button" id="bulk-clear" hidden>Clear</button>
+      <button class="bulk-clear bulk-stop" type="button" id="bulk-upload-stop" hidden>Stop uploads</button>
+      <button class="clip-sort-trigger clip-folder-btn" type="button" id="clip-folder-btn" data-tooltip="Open clips folder" aria-label="Open clips folder">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+      </button>
+      <div class="clip-sort-wrap" id="clip-sort">
+      <button class="clip-sort-trigger" type="button" id="clip-sort-button"
+              aria-haspopup="menu" aria-expanded="false" aria-label="Sort by" data-tooltip="Sort by">
+        <svg class="clip-sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.59934 2.30001L9.89679 5.90001C10.1964 6.4 9.7969 7 9.29745 7H8.2V17.0001H9.29745C9.79689 17.0001 10.1964 17.6001 9.89679 18.1L7.59934 21.7C7.29967 22.1001 6.70033 22.1001 6.40067 21.7L4.10322 18.1C3.80356 17.6001 4.20311 17.0001 4.70256 17.0001H5.8V7H4.70256C4.20311 7 3.80356 6.4 4.10322 5.90001L6.40067 2.30001C6.70033 1.9 7.29967 1.9 7.59934 2.30001ZM12.5 6.3C11.8373 6.3 11.3 6.83725 11.3 7.5C11.3 8.16274 11.8373 8.7 12.5 8.7H20.5C21.1628 8.7 21.7 8.16274 21.7 7.5C21.7 6.83725 21.1628 6.3 20.5 6.3H12.5ZM11.3 12C11.3 11.3373 11.8373 10.8 12.5 10.8H17C17.6628 10.8 18.2 11.3373 18.2 12C18.2 12.6628 17.6628 13.2 17 13.2H12.5C11.8373 13.2 11.3 12.6628 11.3 12ZM12.5 14.8C11.8373 14.8 11.3 15.3372 11.3 16C11.3 16.6627 11.8373 17.2 12.5 17.2H15C15.6627 17.2 16.2 16.6627 16.2 16C16.2 15.3372 15.6627 14.8 15 14.8H12.5Z" fill="currentColor"/></svg>
+        <svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        <span class="clip-sort-spinner" aria-hidden="true"></span>
+      </button>
+      <div class="clip-sort-menu" id="clip-sort-menu" role="menu" aria-label="Sort clips">
+        <div class="clip-sort-heading">Sort by</div>
+        <button class="clip-sort-item" type="button" data-sort="newest" role="menuitemradio" aria-checked="false">
+          <span class="clip-sort-label">Newest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+        </button>
+        <button class="clip-sort-item" type="button" data-sort="oldest" role="menuitemradio" aria-checked="false">
+          <span class="clip-sort-label">Oldest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+        </button>
+        <div class="clip-sort-group" data-group="length">
+          <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
+            <span class="clip-sort-label">Length</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </button>
+          <div class="clip-sort-sub" role="group">
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="longest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Longest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="clip-sort-group" data-group="filesize">
+          <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
+            <span class="clip-sort-label">File size</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </button>
+          <div class="clip-sort-sub" role="group">
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="biggest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Biggest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+            <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
+              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+       </div>
+       </div>
+       <label class="clip-search" for="clip-search-input">
+         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.85547 0.854492C14.8259 0.854621 18.8555 4.88498 18.8555 9.85547C18.8554 12.0437 18.0729 14.0485 16.7744 15.6084L22.5625 21.3965C22.8842 21.7183 22.8843 22.2407 22.5625 22.5625C22.2407 22.8842 21.7183 22.8842 21.3965 22.5625L15.6084 16.7744C14.0485 18.0728 12.0437 18.8554 9.85547 18.8555C4.88506 18.8555 0.85573 14.8258 0.855469 9.85547C0.855469 4.8849 4.8849 0.854492 9.85547 0.854492ZM9.85547 2.50195C5.79439 2.50195 2.50195 5.79439 2.50195 9.85547C2.50221 13.9163 5.79455 17.208 9.85547 17.208C13.9163 17.2079 17.2077 13.9162 17.208 9.85547C17.208 5.79447 13.9165 2.50208 9.85547 2.50195Z"/></svg>
+         <input class="clip-search-input" id="clip-search-input" type="text" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search clips">
+       </label>
+       <button class="tab-action" type="button" id="compress-all-btn" hidden
+              title="Fast-compress every clip that isn't already compressed.">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 22h2v-7l3 3 1.41-1.41L12 11.17l-5.41 5.42L8 18l3-3v7zm2-20h-2v7l-3-3-1.41 1.41L12 12.83l5.41-5.42L16 6l-3 3V2z"/></svg>
+        <span id="compress-all-label">Compress All</span>
+      </button>
+    </div>
+  </div>
+

@@ -7,6 +7,7 @@
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "notify/notify_button.hpp"
+#include "notify/notify_panel.hpp"
 #include "shell/shell_badge.hpp"
 #include "shell/shell_frame.hpp"
 #include "shell/shell_history.hpp"
@@ -189,6 +190,16 @@ bool ShellTitleBar::WarmNext()
 		return true;
 	}
 	return false;
+}
+
+bool ShellTitleBar::TogglePopup(const QString &name)
+{
+	if (name == QLatin1String("account")) m_account->TogglePanel();
+	else if (name == QLatin1String("notifications")) ShowNotificationPanel(m_bell);
+	else if (name == QLatin1String("clip")) m_hotkeys->Toggle(m_clip, ShellHotkeyMenu::Kind::Clip);
+	else if (name == QLatin1String("record")) m_hotkeys->Toggle(m_rec, ShellHotkeyMenu::Kind::Record);
+	else return false;
+	return true;
 }
 
 bool ShellTitleBar::IsCaptionAt(const QPoint &inTitle) const

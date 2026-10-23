@@ -225,6 +225,7 @@ namespace ReplayKitSetup
                 int count = Installer.InstallReplaykitRuntimeUpdate(LogBoth, problems);
                 LogBoth($"runtime update copied {count} file(s)");
                 if (problems.Count == 0) File.Delete(PendingFile());
+                Startup.RefreshObsStartup(LogBoth);
 
                 if (relaunch)
                 {

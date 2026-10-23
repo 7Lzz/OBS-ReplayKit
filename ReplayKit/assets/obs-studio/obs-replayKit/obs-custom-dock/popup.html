@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>ReplayKit popup</title>
+<style>
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--grey6,#272A33); }
+  iframe { position:absolute; inset:0; width:100%; height:100%; border:0; opacity:0; pointer-events:none; }
+  iframe.on { opacity:1; pointer-events:auto; z-index:1; }
+</style></head><body>
+<script>
+(function () {
+  "use strict";
+  const pages = new Map();
+  const hooks = {
+    "/hotkey-menu": ["__replaykitShowHotkeyMenu", "__replaykitHotkeyMenuHidden"],
+    "/notifications-view": ["__replaykitShowNotifications", ""],
+    "/account-menu": ["__replaykitShowAccount", ""],
+    "/storage-view": ["__replaykitShowStorage", "__replaykitHideStorage"],
+    "/notification-reader-view": ["__replaykitShowReader", "__replaykitHideReader"]
+  };
+  let active = "";
+  function find(raw) {
+    const url = new URL(raw, location.href);
+    if (url.origin !== location.origin || !Object.hasOwn(hooks, url.pathname)) throw new Error("Unknown popup page");
+    return { page: pages.get(url.pathname), url };
+  }
+  function report() { document.title = "rk-popup-ready:" + Array.from(pages).filter(([, p]) => p.ready).map(([path]) => path).sort().join(","); }
+  function hide(page) {
+    page.el.classList.remove("on");
+    page.el.inert = true;
+    const hook = hooks[page.path][1];
+    if (page.ready && hook && typeof page.el.contentWindow[hook] === "function") page.el.contentWindow[hook]();
+  }
+  function url(raw) {
+    const target = find(raw), page = target.page;
+    page.hash = target.url.hash;
+    if (page.ready && page.el.contentWindow.location.hash !== page.hash) page.el.contentWindow.location.hash = page.hash;
+  }
+  function select(raw) {
+    const target = find(raw);
+    url(raw);
+    for (const page of pages.values()) {
+      if (page === target.page) { page.el.classList.add("on"); page.el.inert = false; }
+      else if (page.path === active) hide(page);
+    }
+    active = target.url.pathname;
+    if (target.page.ready) target.page.el.contentWindow.focus();
+  }
+  function run(raw, script) {
+    const page = find(raw).page;
+    if (page.ready) page.el.contentWindow.eval(script);
+    else page.pending.push(script);
+  }
+  function park() { for (const page of pages.values()) hide(page); active = ""; }
+  function reload(raw) {
+    const page = find(raw).page;
+    page.ready = false;
+    page.pending = [];
+    report();
+    page.el.src = page.path + "?embedded=1" + page.hash;
+  }
+  for (const path of Object.keys(hooks)) {
+    const el = document.createElement("iframe");
+    el.title = path.slice(1);
+    el.inert = true;
+    const page = { path, el, hash: "", ready: false, pending: [] };
+    pages.set(path, page);
+    el.addEventListener("load", () => {
+      const w = el.contentWindow;
+      if (typeof w[hooks[path][0]] !== "function") return;
+      let sent = false;
+      const done = () => {
+        if (sent) return;
+        sent = true;
+        page.ready = true;
+        if (w.location.hash !== page.hash) w.location.hash = page.hash;
+        if (active !== path) hide(page);
+        else w.focus();
+        for (const script of page.pending.splice(0)) w.eval(script);
+        report();
+      };
+      requestAnimationFrame(() => requestAnimationFrame(done));
+      setTimeout(done, 500);
+    });
+    el.src = path + "?embedded=1";
+    document.body.appendChild(el);
+  }
+  window.RKPopup = { select, url, run, park, reload };
+})();
+</script></body></html>

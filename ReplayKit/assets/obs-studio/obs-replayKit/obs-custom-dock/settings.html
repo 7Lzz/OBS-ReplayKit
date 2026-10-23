@@ -2349,6 +2349,9 @@
     return dirtyReports;
   }
 
+  // the shell drops a view that has been out of sight for a while, and unsaved edits or an apply on its way would go with it
+  window.__rkCanUnload = () => !dirty && !applyInFlight;
+
   function markDirty() {
     dirty = JSON.stringify(state) !== JSON.stringify(originalState) || Object.keys(pendingLive).length > 0;
     updateApplyButton();

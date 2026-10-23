@@ -1,6 +1,7 @@
 // frameless cef window that hangs off a title bar button
 #include "prelude.hpp"
 #include "ui/anchored_panel.hpp"
+#include "ui/popup_host.hpp"
 
 #include <QEasingCurve>
 #include <QJsonArray>
@@ -53,7 +54,7 @@ QList<AnchoredPanel *> AnchoredPanel::s_panels;
 AnchoredPanel *AnchoredPanel::s_active = nullptr;
 
 AnchoredPanel::AnchoredPanel(QWidget *owner, const QString &title, const QString &url, const QSize &size)
-	: m_owner(owner), m_title(title), m_url(url), m_size(size)
+	: QObject(nullptr), m_owner(owner), m_title(title), m_url(url), m_size(size)
 {
 	s_panels.append(this);
 }
@@ -65,64 +66,53 @@ AnchoredPanel::~AnchoredPanel()
 		StopClickAway();
 	StopRoll();
 	delete m_rollTimer.data();
-	if (m_window)
-		delete m_window.data();
+	++m_warmRun;
+	PopupHost::Release(this);
 }
 
 bool AnchoredPanel::IsShown() const
 {
 	// a window that is up out of sight for its page to start is not a panel on screen
-	return m_window && m_window->isVisible() && !m_warming;
+	return PopupHost::Owns(this) && m_window && m_window->isVisible() && !m_warming;
 }
 
 // the window is owned by the window its button sits in: an owned top-level always sits directly above its owner and never over unrelated apps, and Qt does not hide an unrelated parentless tool with it
 bool AnchoredPanel::EnsureBuilt()
 {
-	if (m_window)
-		return true;
-	// a widget created before cef has finished starting is the one that comes up white the first time
-	if (!CefOpen() || !g_cef->initialized() || !m_owner)
-		return false;
-	QWidget *panel = new QWidget(m_owner);
-	panel->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
-	panel->setWindowTitle(m_title);
-	panel->resize(m_size);
-	// paints under cef before its first frame, so the gap is the panel colour rather than white
-	panel->setAutoFillBackground(true);
-	QPalette pal = panel->palette();
-	pal.setColor(QPalette::Window, g_notifySurface);
-	panel->setPalette(pal);
-
-	QVBoxLayout *layout = new QVBoxLayout(panel);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QCefWidget *browser = g_cef->create_widget(panel, m_url.toStdString(), nullptr);
-	layout->addWidget(browser);
-	m_window = panel;
-	m_browser = browser;
-	m_blind = !CefWatchPageReady(browser, panel, [this]() { OnPageReady(); });
-	return true;
+	m_window = PopupHost::Prepare(m_owner);
+	m_browser = PopupHost::Browser();
+	return !m_window.isNull();
 }
+
+bool AnchoredPanel::Warmed() const { return PopupHost::Ready(m_url) || m_gaveUp; }
 
 void AnchoredPanel::SetUrl(const QString &url)
 {
 	m_url = url;
-	if (m_browser)
-		m_browser->setURL(url.toStdString());
+	PopupHost::SetUrl(url);
 }
 
 void AnchoredPanel::RunScript(const QString &script)
 {
-	if (m_browser)
-		m_browser->executeJavaScript(script.toStdString());
+	PopupHost::Run(m_url, script);
 }
 
 // the browser inside a cef widget is only made when the widget is first shown, so a panel that was built without being shown still opened onto a white window that its page then had to fill. shown out of sight until the page says it is up, the first open finds what every later one does
 void AnchoredPanel::Warm()
 {
-	if (m_ready || m_gaveUp || m_warming)
+	if (Warmed() || m_warming)
+		return;
+	if (PopupHost::Occupied() && !PopupHost::Owns(this) && !m_pendingOpen)
 		return;
 	QWidget *owner = m_owner;
 	if (!owner || !owner->isVisible() || owner->isMinimized() || !EnsureBuilt())
+		return;
+	if (!PopupHost::Acquire(this, owner, m_url, QSize(680, 640), [this]() {
+		m_warming = false;
+		++m_warmRun;
+		m_pendingOpen = nullptr;
+		Hide(false);
+	}))
 		return;
 	QWidget *panel = m_window;
 	m_warming = true;
@@ -132,9 +122,11 @@ void AnchoredPanel::Warm()
 	panel->setAttribute(Qt::WA_ShowWithoutActivating, true);
 	panel->move(CefOutOfSight(owner));
 	panel->show();
+	PopupHost::SetOwner(this, owner);
+	WaitForPage(run);
 	blog(LOG_INFO, "[replaykit] panel warm-up started: %s%s", m_title.toUtf8().constData(), m_blind ? " (its page cannot report, waiting a fixed time)" : "");
 	// the wait is bounded, so a page that never says it is up cannot hold an open back for long
-	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, panel, [this, run]() {
+	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, this, [this, run]() {
 		if (!m_warming || run != m_warmRun)
 			return;
 		if (m_blind) {
@@ -147,6 +139,17 @@ void AnchoredPanel::Warm()
 	});
 }
 
+void AnchoredPanel::WaitForPage(int run)
+{
+	if (!m_warming || run != m_warmRun || !PopupHost::Owns(this))
+		return;
+	if (PopupHost::Ready(m_url)) {
+		OnPageReady();
+		return;
+	}
+	QTimer::singleShot(25, this, [this, run]() { WaitForPage(run); });
+}
+
 void AnchoredPanel::OnPageReady()
 {
 	m_ready = true;
@@ -156,7 +159,7 @@ void AnchoredPanel::OnPageReady()
 	blog(LOG_INFO, "[replaykit] panel page is up after %lld ms: %s", m_warmMs, m_title.toUtf8().constData());
 	// left up a moment longer, so the page has been drawn to the window once before it is hidden
 	const int run = m_warmRun;
-	QTimer::singleShot(kCefWarmSettleMs, m_window.data(), [this, run]() {
+	QTimer::singleShot(kCefWarmSettleMs, this, [this, run]() {
 		if (m_warming && run == m_warmRun)
 			EndWarm();
 	});
@@ -165,10 +168,8 @@ void AnchoredPanel::OnPageReady()
 void AnchoredPanel::EndWarm()
 {
 	m_warming = false;
-	if (m_window) {
-		m_window->hide();
-		m_window->setAttribute(Qt::WA_ShowWithoutActivating, false);
-	}
+	if (PopupHost::Owns(this)) m_window->setAttribute(Qt::WA_ShowWithoutActivating, false);
+	PopupHost::Release(this);
 	if (!m_pendingOpen)
 		return;
 	std::function<void()> open = std::move(m_pendingOpen);
@@ -182,8 +183,9 @@ QJsonArray AnchoredPanel::WarmReport()
 	for (const AnchoredPanel *panel : s_panels) {
 		QJsonObject one;
 		one["panel"] = panel->m_title;
-		one["built"] = !panel->m_window.isNull();
-		one["ready"] = panel->m_ready;
+		one["built"] = PopupHost::Browser() != nullptr;
+		one["ready"] = PopupHost::Ready(panel->m_url);
+		one["shared"] = true;
 		one["warming"] = panel->m_warming;
 		one["gaveUp"] = panel->m_gaveUp;
 		one["blind"] = panel->m_blind;
@@ -245,6 +247,10 @@ void AnchoredPanel::Roll(int toHeight, std::function<void()> done)
 
 void AnchoredPanel::RollTick()
 {
+	if (!PopupHost::Owns(this)) {
+		StopRoll();
+		return;
+	}
 	// the clock starts at the first step and not at the call that asked for the roll: opening a window does work after that call (showing it, waking its page), and a clock that had run through it would start the roll with a jump
 	if (!m_rollStarted) {
 		m_rollStarted = true;
@@ -363,6 +369,17 @@ void AnchoredPanel::Toggle(const Anchor &anchor, const QString &script)
 			other->Hide(false);
 	if (IsShown() && m_anchor.key != anchor.key)
 		Hide(false);
+	if (!PopupHost::Acquire(this, m_owner, m_url, m_size, [this]() {
+		m_warming = false;
+		++m_warmRun;
+		m_pendingOpen = nullptr;
+		Hide(false);
+	}))
+		return;
+	m_window->setWindowTitle(m_title);
+	QPalette ground = m_window->palette();
+	ground.setColor(QPalette::Window, g_notifySurface);
+	m_window->setPalette(ground);
 
 	m_anchor = anchor;
 	m_tabWidth = -1;
@@ -377,6 +394,7 @@ void AnchoredPanel::Toggle(const Anchor &anchor, const QString &script)
 	}
 	Follow();
 	m_window->show();
+	PopupHost::SetOwner(this, m_owner);
 	// showing can cause Qt to apply an initial platform placement, so it is anchored once more afterwards to keep the seam exact
 	Follow();
 	const QPointer<QWidget> rolling = m_window;
@@ -401,9 +419,9 @@ void AnchoredPanel::Finish()
 {
 	m_closing = false;
 	DevLog("panel closed: %s", m_title.toUtf8().constData());
-	if (m_window) {
-		m_window->hide();
+	if (PopupHost::Owns(this)) {
 		ClearReveal();
+		PopupHost::Release(this);
 	}
 	if (m_anchor.setOpen)
 		m_anchor.setOpen(false);
@@ -538,15 +556,17 @@ void AnchoredPanel::DestroyAll()
 	StopClickAway();
 	for (AnchoredPanel *panel : s_panels) {
 		panel->StopRoll();
-		if (panel->m_window)
-			delete panel->m_window.data();
+		panel->m_warming = false;
+		++panel->m_warmRun;
+		panel->m_pendingOpen = nullptr;
+		PopupHost::Release(panel);
 	}
 }
 
 void AnchoredPanel::SetGround(const QColor &color)
 {
 	for (AnchoredPanel *panel : s_panels) {
-		if (!panel->m_window)
+		if (!panel->m_window || (PopupHost::Occupied() && !PopupHost::Owns(panel)))
 			continue;
 		QPalette pal = panel->m_window->palette();
 		pal.setColor(QPalette::Window, color);

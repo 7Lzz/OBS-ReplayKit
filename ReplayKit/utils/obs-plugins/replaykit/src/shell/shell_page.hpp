@@ -21,7 +21,7 @@ public:
 	explicit ShellPage(QWidget *parent);
 
 protected:
-	// minimize, tray and restore reach the pages inside as a shown / hidden signal, so they stop polling while nobody can see them
+	// minimize, tray and restore reach the pages inside as a shown / hidden signal, so they stop polling while nobody can see them, and a window hidden for a while has its browsers parked
 	void showEvent(QShowEvent *event) override;
 	void hideEvent(QHideEvent *event) override;
 };

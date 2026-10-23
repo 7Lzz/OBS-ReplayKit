@@ -424,6 +424,8 @@
 <script>
 (function () {
   "use strict";
+  // everything this puts on the window or the document goes when the clips page unloads the editor
+  var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
 
   // the shortest a piece can be cut down to, in seconds
   var MIN_LEN = 0.05;
@@ -1740,7 +1742,7 @@
     document.addEventListener("visibilitychange", function () {
       if (document.hidden && layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
       paintLayers();
-    });
+    }, { signal: EDITOR_SIGNAL });
 
     function layersChanged() {
       syncLayers();
@@ -4899,7 +4901,7 @@
         st.key = info.key || "";
         st.tracks = info.tracks || [];
         stage("Drawing the waveforms");
-        return Promise.all(st.tracks.map(function (t) { return fetchPeaks(t.index).then(function (p) { st.peaks[t.index] = p; }); }))
+        return Promise.all(st.tracks.map(function (t) { return fetchPeaks(t.index).then(function (p) { if (mine === seq) st.peaks[t.index] = p; }); }))
           .then(function () {
             if (mine !== seq) return false;
             stage("Loading the tracks");
@@ -4921,6 +4923,11 @@
     }
 
     function unloadState() {
+      Object.keys(refThumbs).forEach(function (ref) {
+        refThumbs[ref].onload = null;
+        refThumbs[ref].removeAttribute("src");
+      });
+      refThumbs = {};
       if (dom.subOverlay) { dom.subOverlay.hidden = true; dom.subOverlay._key = ""; dom.subOverlay._lit = []; dom.subOverlay.textContent = ""; }
       if (layerRaf) { cancelAnimationFrame(layerRaf); layerRaf = 0; }
       Object.keys(layerViews).forEach(function (id) { destroyLayerView(layerViews[id]); });
@@ -5165,21 +5172,21 @@
         watcher.observe(dom.frame);
         watcher.observe(dom.content);
       }
-      document.addEventListener("keydown", onKey, true);
-      document.addEventListener("dragenter", onDragEnter, true);
-      document.addEventListener("dragover", onDragOver, true);
-      document.addEventListener("dragleave", onDragLeave, true);
-      document.addEventListener("drop", onDrop, true);
+      document.addEventListener("keydown", onKey, { capture: true, signal: EDITOR_SIGNAL });
+      document.addEventListener("dragenter", onDragEnter, { capture: true, signal: EDITOR_SIGNAL });
+      document.addEventListener("dragover", onDragOver, { capture: true, signal: EDITOR_SIGNAL });
+      document.addEventListener("dragleave", onDragLeave, { capture: true, signal: EDITOR_SIGNAL });
+      document.addEventListener("drop", onDrop, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("pointerdown", function (e) {
         if (menu && !menu.contains(e.target)) closeMenu();
         pressOutside = !!st.selected && opts.isOpen() && isOutside(e.target);
-      }, true);
+      }, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("click", function (e) {
         var was = pressOutside;
         pressOutside = false;
         if (was && st.selected && isOutside(e.target)) select("");
-      }, true);
-      window.addEventListener("blur", closeMenu);
+      }, { capture: true, signal: EDITOR_SIGNAL });
+      window.addEventListener("blur", closeMenu, { signal: EDITOR_SIGNAL });
       // the height of the timeline is set by dragging the bar above it, which trades space with the video
       dom.resizer.addEventListener("pointerdown", function (e) {
         e.preventDefault();

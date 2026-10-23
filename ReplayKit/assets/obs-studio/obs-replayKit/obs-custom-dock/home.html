@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="theme-color" content="#1D1F26" />
+<meta name="msapplication-navbutton-color" content="#1D1F26" />
+<title>Home</title>
+  <link rel="icon" type="image/svg+xml" href="http://127.0.0.1:8767/obs-icon.svg?v=3" />
+<!--#include clip-style-->
+  <link rel="stylesheet" href="rk-theme.css" />
+  <!--#include scrollbar-->
+  <!--#include interaction-states-->
+  <!--#include switch-->
+  <!--#include combo-->
+  <!--#include slider-->
+<!--#include tooltip-->
+<!--#include hotkey-keys-->
+<!--#include theme-preview-->
+  <!--#include clip-player-->
+  <!--#include window-state-->
+  <!--#include video-fx-->
+</head>
+<body data-view="home">
+  <!--#include clip-dialogs-->
+  <!--#include clip-content-->
+  <!--#include window-chrome-->
+  <!--#include shell-nav-->
+  <!--#include home-dashboard-->
+  <!--#include color-picker-->
+
+<script src="/clip-app.js?v=__RK_CLIP_APP_VERSION__"></script>
+<script>
+// keeps the display awake while a clip plays, whether it is a card preview, the editor or a fullscreen view. the helper holds a windows display request for as long as this page keeps saying so and lets go 45 s after the last word, so a page that dies mid-play cannot pin the screen on
+(function () {
+  var base = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  var id = "p" + Math.random().toString(36).slice(2, 12);
+  var playing = new Set();
+  var told = false;
+  var lastTold = 0;
+  var beat = 0;
+  var stopTimer = 0;
+
+  function shown() { return window.RKWindow ? window.RKWindow.up() : !document.hidden; }
+  function anyPlaying() {
+    playing.forEach(function (v) { if (!v.isConnected || v.paused || v.ended) playing.delete(v); });
+    return playing.size > 0 && shown();
+  }
+  function tell(on) {
+    lastTold = Date.now();
+    fetch(base + "/power/playing?src=" + id + "&state=" + (on ? 1 : 0), { method: "POST", cache: "no-store", keepalive: true }).catch(function () {});
+  }
+  function evaluate() {
+    if (anyPlaying()) {
+      clearTimeout(stopTimer);
+      stopTimer = 0;
+      if (!told || Date.now() - lastTold >= 15000) { told = true; tell(true); }
+      if (!beat) beat = setInterval(evaluate, 5000);
+      return;
+    }
+    if (told && !stopTimer) {
+      // a few seconds of grace so a preview that stops and starts as the pointer moves does not flap the request
+      stopTimer = setTimeout(function () {
+        stopTimer = 0;
+        if (anyPlaying()) return;
+        told = false;
+        clearInterval(beat);
+        beat = 0;
+        tell(false);
+      }, 3000);
+    }
+  }
+
+  document.addEventListener("playing", function (e) {
+    if (e.target instanceof HTMLMediaElement) { playing.add(e.target); evaluate(); }
+  }, true);
+  ["pause", "ended", "emptied", "abort", "error"].forEach(function (name) {
+    document.addEventListener(name, function (e) { if (playing.delete(e.target)) evaluate(); }, true);
+  });
+  document.addEventListener("visibilitychange", evaluate);
+  if (window.RKWindow) window.RKWindow.onChange(evaluate);
+  window.addEventListener("pagehide", function () { if (told) tell(false); });
+})();
+</script>
+</body>
+</html>

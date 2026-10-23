@@ -688,12 +688,16 @@
 
   // ---- step navigation ---- set when the user drags the overlay in the projector, so Finish knows to push a position at the scene item
   let step = 1;
+  // a wizard that was moved past its welcome step holds choices the user made, so the shell keeps its page until it is finished
+  let wizardMoved = false;
+  window.__rkCanUnload = () => !wizardMoved || step === "done";
   const crumbs = Array.from(document.querySelectorAll(".wiz-tabs .tab"));
   function setTabsDisabled(off) { crumbs.forEach((c) => { c.disabled = off; }); }
   function showStep(n) {
     if (step === 2) state.clipDir = els.clipDir.value.trim();
     if (step === 3) commitReplaySeconds(readReplaySeconds());
     step = n;
+    if (n !== 1) wizardMoved = true;
     els.panels.forEach((p) => { p.hidden = p.dataset.step !== String(n); });
     const done = n === "done";
     crumbs.forEach((c) => { c.classList.toggle("is-active", !done && Number(c.dataset.step) === n); });

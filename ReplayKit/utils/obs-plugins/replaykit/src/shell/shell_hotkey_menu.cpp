@@ -78,7 +78,7 @@ void ShellHotkeyMenu::Toggle(ShellBadge *badge, Kind kind)
 	panel->Toggle(anchor, call(true));
 
 	// a page can miss a script, while it is still loading or waking up after a long hide, so the open is sent again a moment later
-	const QPointer<QWidget> window = panel->Window();
+	const QPointer<AnchoredPanel> window = panel;
 	const QString again = call(false);
 	for (const int delay : {250, 900}) {
 		QTimer::singleShot(delay, g_callbacks, [panel, window, badge = target, again]() {

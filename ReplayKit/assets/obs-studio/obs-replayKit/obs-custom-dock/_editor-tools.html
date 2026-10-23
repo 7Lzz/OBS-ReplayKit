@@ -258,6 +258,8 @@
 <script>
 (function () {
   "use strict";
+  // everything this puts on the window or the document goes when the clips page unloads the editor
+  var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
 
   var LANGUAGES = [
     ["auto", "Detect automatically"], ["en", "English"], ["es", "Spanish"], ["pt", "Portuguese"], ["fr", "French"], ["de", "German"], ["it", "Italian"],
@@ -622,6 +624,7 @@
     var prefs = loadPrefs();
     var root = o.root;
     var els = {};
+    var built = false;
     var job = { run: 0, id: "", timer: 0, busy: false, listenAt: 0, listenTau: 0 };
     var rec = { on: false, starting: false, timer: 0, startT: 0, t0: 0, lag: 0, idle: 0, peaks: [] };
     var clip = null;
@@ -1152,7 +1155,7 @@
         e.preventDefault();
         e.stopPropagation();
         closeLibrary();
-      }, true);
+      }, { capture: true, signal: EDITOR_SIGNAL });
       els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, clips: [], cards: [] };
       if (window.RKHover) RKHover.apply(card, { control: ".ed-x" });
     }
@@ -1459,10 +1462,10 @@
       t.searchText = (x.name + " " + x.search + " sticker").toLowerCase();
       var img = el("img");
       img.alt = "";
+      img.loading = "lazy";
       if (x.kind === "text") {
         (document.fonts ? document.fonts.load('120px "Fredoka One"') : Promise.resolve()).catch(function () {}).then(function () { img.src = drawTextSticker(x.data, 220).toDataURL("image/png"); });
       } else if (x.kind === "3d") {
-        img.loading = "lazy";
         img.src = fluentUrl(x.data);
       } else {
         var code = x.data[0];
@@ -1637,7 +1640,7 @@
     // what follows the model of the lanes; the lanes call refresh far more often than anything changes, so it is batched to a frame
 
     function refresh() {
-      if (refreshQueued) return;
+      if (!built || refreshQueued) return;
       refreshQueued = requestAnimationFrame(function () { refreshQueued = 0; paint(); });
     }
 
@@ -1944,7 +1947,12 @@
     }
 
     // the host tells when a clip is opened and closed
+    function prepare() {
+      if (!built) { build(); built = true; }
+    }
+
     function opened(info) {
+      prepare();
       clip = info;
       // everything the clip hears is the default; a clip with tracks of its own can be listened to one track at a time, which helps when the game drowns out the voice
       var tracks = (info.tracks || []).map(function (t) { return [String(t.index), t.label]; });
@@ -1957,6 +1965,7 @@
     }
 
     function closed() {
+      if (!built) return;
       if (els.lib && !els.lib.veil.hidden) closeLibrary();
       if (rec.on) stopRecording(false);
       if (job.busy) cancelJob();
@@ -1965,8 +1974,7 @@
       refresh();
     }
 
-    build();
-    return { refresh: refresh, opened: opened, closed: closed, recording: function () { return rec.on || rec.starting; } };
+    return { prepare: prepare, refresh: refresh, opened: opened, closed: closed, recording: function () { return rec.on || rec.starting; } };
   }
 
   // keeps the overlay of the subtitles on the picture of the video: the element letterboxes the video, so the overlay takes the box the picture is drawn in and its height sets the size of the text
@@ -1984,7 +1992,7 @@
     }
     video.addEventListener("loadedmetadata", place);
     if (window.ResizeObserver) new ResizeObserver(place).observe(video);
-    window.addEventListener("resize", place);
+    window.addEventListener("resize", place, { signal: EDITOR_SIGNAL });
     place();
     return place;
   }

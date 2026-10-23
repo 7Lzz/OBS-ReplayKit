@@ -17,7 +17,9 @@ namespace ReplayKitSetup
         public const string OBS_START_ARGS =
             "--background-color=ff272a33 " +
             "--default-background-color=ff272a33 " +
-            "--disable-direct-composition-video-overlays";
+            "--disable-direct-composition-video-overlays " +
+            // one renderer for every page of the same site and a v8 that favours size over speed, to keep the browser of the window small; obs passes its launch flags on to its browser
+            "--process-per-site --js-flags=--optimize-for-size";
 
         // best detected obs executable path, or null.
         public static string FindObsExe() => Config.FindObsExeCandidate();

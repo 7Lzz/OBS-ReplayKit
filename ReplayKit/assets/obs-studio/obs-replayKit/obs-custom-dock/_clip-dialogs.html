@@ -1,0 +1,74 @@
+<div class="modal-veil" id="compress-veil">
+    <div class="modal" id="compress-modal">
+      <h2>Clip is too big for Streamable</h2>
+      <div class="body" id="compress-body"></div>
+      <div class="row">
+        <button class="btn"         type="button" id="compress-cancel">Cancel</button>
+        <button class="btn primary" type="button" id="compress-go">Compress</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="compress-all-veil">
+    <div class="modal" id="compress-all-modal">
+      <h2>Compress all clips</h2>
+      <div class="body" id="compress-all-body"></div>
+      <div class="row">
+        <button class="btn"         type="button" id="compress-all-cancel">Cancel</button>
+        <button class="btn primary" type="button" id="compress-all-go">Compress all</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="compress-mode-veil">
+    <div class="modal compress-mode-modal" id="compress-mode-modal">
+      <h2>Compress clip</h2>
+      <div class="clip-name" id="compress-mode-clip-name"></div>
+      <div class="compress-mode-warning" role="note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm0 5.5L19.5 19h-15L12 7.5zM11 11v4h2v-4h-2zm0 5v2h2v-2h-2z"/></svg>
+        <span>Replaces the original file on disk &mdash; this can&rsquo;t be undone.</span>
+      </div>
+      <div class="compress-mode-locked" role="note">
+        This clip is <b>already at maximum compression</b> (Smaller mode).
+        Re-encoding wouldn&rsquo;t reduce the size further, only the quality.
+      </div>
+      <div class="compress-mode-list">
+        <button type="button" class="compress-mode-card" data-mode="fast">
+          <span class="title">Fast</span>
+          <span class="blurb">Quick re-encode. Smaller than the original; finishes in roughly clip-length time.</span>
+          <span class="reason">Already compressed in Fast mode &mdash; choose Smaller for further reduction.</span>
+        </button>
+        <button type="button" class="compress-mode-card" data-mode="smaller">
+          <span class="title">Smaller</span>
+          <span class="blurb">Slower re-encode for a smaller file. Roughly 30-50% smaller than Fast; takes 2-4&times; longer.</span>
+          <span class="reason">Already at maximum compression.</span>
+        </button>
+      </div>
+      <div class="compress-downsample-row" id="compress-downsample-row" hidden>
+        <input type="checkbox" class="rk-switch" id="compress-downsample-toggle" aria-label="Also lower the resolution">
+        <span>Also lower the resolution</span>
+      </div>
+      <div class="compress-downsample-detail" id="compress-downsample-detail" hidden>
+        <div class="combo" id="compress-downsample-select" tabindex="0" role="combobox" aria-expanded="false" aria-label="Resolution for compressed clip">
+          <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4z" fill="currentColor"/></svg></span></button>
+          <div class="combo-menu" role="listbox" aria-label="Resolution for compressed clip"></div>
+        </div>
+        <span class="compress-downsample-note">Shrinks the clip to this size before compressing &mdash; smaller file, but the lost detail can&rsquo;t be brought back.</span>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" id="compress-mode-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="trim-processing-veil">
+    <div class="modal trim-processing-modal" id="trim-processing-modal">
+      <div class="trim-processing-spinner"></div>
+      <div class="trim-processing-label">Processing clip&hellip;</div>
+      <div class="trim-processing-stage" id="trim-processing-stage"></div>
+      <button type="button" class="btn" id="trim-processing-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="trim-veil"></div>
+  <div class="modal-veil" id="save-veil"></div>

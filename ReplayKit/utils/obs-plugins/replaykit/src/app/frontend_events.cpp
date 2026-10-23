@@ -19,6 +19,7 @@
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
+#include "ui/popup_host.hpp"
 #include "shell/shell.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_notify_reader.hpp"
@@ -36,6 +37,7 @@ void CloseCefWidgetsBeforeShutdown()
 	AnchoredPanel::DestroyAll();
 	StorageModalDestroy();
 	NotifyReaderDestroy();
+	PopupHost::Destroy();
 	if (g_shellTimer)
 		g_shellTimer->stop();
 	if (g_shellHost)

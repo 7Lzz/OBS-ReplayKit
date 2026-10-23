@@ -46,6 +46,7 @@ public:
 	bool AccountPanelOpen() const;
 	// starts the browsers of the menus that hang off the bar out of sight, one after another, so the first open of each finds a page that is up; true while one of them is still to come or on its way
 	bool WarmNext();
+	bool TogglePopup(const QString &name);
 
 protected:
 	void resizeEvent(QResizeEvent *event) override;

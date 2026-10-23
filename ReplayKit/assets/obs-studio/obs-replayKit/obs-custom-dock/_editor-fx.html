@@ -76,6 +76,8 @@
 <script>
 (function () {
   "use strict";
+  // everything this puts on the window or the document goes when the clips page unloads the editor
+  var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
 
   // the colour settings of the color tab, at rest, and how far each goes
   function defaultColor() { return { r: 1, g: 1, b: 1, a: 1, sat: 1, hue: 0, vib: 0, bright: 1, contrast: 1, gamma: 1 }; }
@@ -470,8 +472,16 @@
     canvas.hidden = true;
     video.insertAdjacentElement("afterend", canvas);
     var g = null;
-    try { g = build(canvas); } catch (e) { g = null; }
-    var capable = !!g, destroyed = false, context = g && g.gl;
+    var capable = null, destroyed = false, context = null;
+    function supported() {
+      if (destroyed) return false;
+      if (capable === null) {
+        try { g = build(canvas); } catch (e) { g = null; }
+        capable = !!g;
+        context = g && g.gl;
+      }
+      return capable;
+    }
     var current = null;
     var handle = 0;
     var late = 0;
@@ -516,7 +526,7 @@
     }
     function set(resolved) {
       if (destroyed) return;
-      current = resolved && capable && !isIdentity(resolved) ? resolved : null;
+      current = resolved && !isIdentity(resolved) && supported() ? resolved : null;
       if (!current || document.hidden) {
         release(); canvas.hidden = true; delete video.dataset.rkFxOwned;
         return;
@@ -531,9 +541,9 @@
     }
     function visibility() { set(current); }
     canvas.addEventListener("webglcontextlost", lost);
-    document.addEventListener("visibilitychange", visibility);
+    document.addEventListener("visibilitychange", visibility, { signal: EDITOR_SIGNAL });
     return {
-      supported: function () { return capable && !destroyed; },
+      supported: supported,
       set: set,
       destroy: function () {
         if (destroyed) return;
@@ -557,13 +567,19 @@
   function thumbRenderer() {
     var canvas = document.createElement("canvas");
     var g = null;
-    try { g = build(canvas); } catch (e) { g = null; }
-    var capable = !!g;
+    var capable = null;
+    function supported() {
+      if (capable === null) {
+        try { g = build(canvas); } catch (e) { g = null; }
+        capable = !!g;
+      }
+      return capable;
+    }
     return {
-      supported: function () { return capable; },
+      supported: supported,
       clear: function () { dispose(g); g = null; canvas.width = canvas.height = 1; },
       draw: function (video, list) {
-        if (!capable || document.hidden || !video.videoWidth || video.readyState < 2) return false;
+        if (document.hidden || !video.videoWidth || video.readyState < 2 || !supported()) return false;
         if (!g) { try { g = build(canvas); } catch (e) { g = null; } }
         if (!g) return false;
         list.forEach(function (item, i) {
@@ -1007,7 +1023,7 @@
         if (els.editing) { e.preventDefault(); e.stopPropagation(); closeEdit(); return; }
         var input = e.target && e.target.closest && e.target.closest(".ed-fx-search") ? e.target : null;
         if (input && input.value) { e.preventDefault(); e.stopPropagation(); input.value = ""; input.dispatchEvent(new Event("input")); }
-      }, true);
+      }, { capture: true, signal: EDITOR_SIGNAL });
       els.card = card;
       o.side.appendChild(card);
       if (window.RKHover) RKHover.apply(card, { control: ".btn, .ed-x" });
@@ -1102,7 +1118,7 @@
     }
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) clearThumbs(); else queueThumbs();
-    });
+    }, { signal: EDITOR_SIGNAL });
 
     build();
     paint();

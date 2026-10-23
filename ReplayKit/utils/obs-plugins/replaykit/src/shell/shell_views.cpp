@@ -23,6 +23,8 @@
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_title_bar.hpp"
+#include "shell/shell.hpp"
+#include "ui/popup_host.hpp"
 #include "windows/obs_settings.hpp"
 
 namespace rk {
@@ -45,6 +47,13 @@ constexpr int kHostMissLimit = 4;
 bool g_setupForeground = false;
 bool g_homeEditor = false;
 bool g_clipsEditor = false;
+// how long the window sits hidden before the browsers are parked, and how often a page that still holds work is asked again
+constexpr int kParkAfterMs = 30000;
+constexpr int kParkRetryMs = 10000;
+bool g_hostParked = false;
+// the shell page says through its title that it holds no view any more, which is when parking it loses nothing
+bool g_hostEmpty = false;
+int g_parkGen = 0;
 
 bool ShellMainWindowIsForeground();
 
@@ -263,7 +272,8 @@ void ShellCreateHost(QMainWindow *mw)
 	status->hide();
 	QObject::connect(browser, SIGNAL(titleChanged(QString)), status, SLOT(setText(QString)));
 	QObject::connect(status, &QLineEdit::textChanged, page, [](const QString &title) {
-		if (title == QLatin1String("rk-status:home:editor") || title == QLatin1String("rk-status:home:page"))
+		g_hostEmpty = title == QLatin1String("rk-status:empty");
+		if (title ==QLatin1String("rk-status:home:editor") || title == QLatin1String("rk-status:home:page"))
 			ShellSetEditor(ShellView::Home, title.endsWith(QLatin1String(":editor")));
 		else if (title == QLatin1String("rk-status:clips:editor") || title == QLatin1String("rk-status:clips:page"))
 			ShellSetEditor(ShellView::Clips, title.endsWith(QLatin1String(":editor")));
@@ -359,6 +369,54 @@ void ShellRaiseGrip()
 		g_shellGrip->raise();
 }
 
+namespace {
+
+// the page starts over the way it does after a launch, by a reload or, for a parked browser, by the new browser the widget builds at the shell page as soon as it is shown
+void ShellRestartHost(bool fromPark)
+{
+	g_homeEditor = false;
+	g_clipsEditor = false;
+	ShellUpdateTitle();
+	g_hostReady = false;
+	g_hostOnTop = false;
+	g_hostEmpty = false;
+	g_hostShown = ShellView::Home;
+	g_hostRequested = ShellView::Home;
+	g_hostPingMisses = 0;
+	++g_hostWaitGen;
+	g_hostVisibleTimer.restart();
+	if (!fromPark)
+		g_shellHost->browser->reloadPage();
+	if (ShellIsPageView(g_shellView))
+		ShellSurfacePage();
+	ShellArmHostBackstop(5000);
+}
+
+// once the window has sat hidden a while and the shell page has let go of every view, both browsers are closed the way obs closes the browser of a hidden dock, so their renderers exit; the widgets are never destroyed, since tearing a cef widget down mid-session is what spun obs before. a page that still holds work keeps its view, and is asked again a little later
+void ShellParkLater(int gen, int delayMs)
+{
+	QTimer::singleShot(delayMs, g_callbacks, [gen]() {
+		if (gen != g_parkGen || g_hostParked || !g_shellOn || !g_shellHost || !g_shellHost->browser || !g_hostReady)
+			return;
+		QMainWindow *mw = ObsMainWindowQt();
+		if (mw && mw->isVisible() && !mw->isMinimized())
+			return;
+		if (!g_hostEmpty || PopupHost::Occupied()) {
+			ShellParkLater(gen, kParkRetryMs);
+			return;
+		}
+		g_hostParked = true;
+		g_hostReady = false;
+		g_hostOnTop = false;
+		++g_hostWaitGen;
+		g_shellHost->browser->closeBrowser();
+		PopupHost::Park();
+		blog(LOG_INFO, "[replaykit] shell and popup browsers parked while the window is hidden");
+	});
+}
+
+} // namespace
+
 // the page starts over the way it does after a launch: the stage is covered until the page says its first view is on screen, and the view that was asked for is put up again from there. a browser is never torn down for this, only reloaded
 void ShellReloadHost()
 {
@@ -368,22 +426,30 @@ void ShellReloadHost()
 	if (g_hostReloadTimer.isValid() && g_hostReloadTimer.elapsed() < 30000)
 		return;
 	g_hostReloadTimer.restart();
-	g_homeEditor = false;
-	g_clipsEditor = false;
-	ShellUpdateTitle();
 	blog(LOG_WARNING, "[replaykit] shell page stopped answering, reloading it");
 	ShellEndClipFullscreen();
-	g_hostReady = false;
-	g_hostOnTop = false;
-	g_hostShown = ShellView::Home;
-	g_hostRequested = ShellView::Home;
-	g_hostPingMisses = 0;
-	++g_hostWaitGen;
-	g_hostVisibleTimer.restart();
-	g_shellHost->browser->reloadPage();
-	if (ShellIsPageView(g_shellView))
-		ShellSurfacePage();
-	ShellArmHostBackstop(5000);
+	ShellRestartHost(false);
+}
+
+void ShellHostWindowShown(bool shown)
+{
+	const int gen = ++g_parkGen;
+	if (!shown) {
+		ShellParkLater(gen, kParkAfterMs);
+		return;
+	}
+	if (!g_hostParked || !g_shellHost || !g_shellHost->browser)
+		return;
+	g_hostParked = false;
+	blog(LOG_INFO, "[replaykit] shell and popup browsers coming back from parked");
+	PopupHost::Unpark();
+	ShellWarmAgain();
+	ShellRestartHost(true);
+}
+
+bool ShellHostParked()
+{
+	return g_hostParked;
 }
 
 // a page whose renderer died stays blank until the browser is reloaded and nothing tells the plugin, so the page is asked for a sign of life: it answers through the helper (RKShell.ping, /shell/ping, SHELLPONG on the pipe). silence only counts against the page once an answer has come back at least once, since a helper that does not know the route never answers, and only while the helper itself is up

@@ -50,8 +50,7 @@
   "use strict";
 
   var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
-  // home is the clips page in its reduced form: the newest clips under a header
-  var VIEWS = { home: "/clips-view?home=1", clips: "/clips-view", settings: "/settings-view", setup: "/setup-view" };
+  var VIEWS = { home: "/home-view", clips: "/clips-view", settings: "/settings-view", setup: "/setup-view" };
   var frames = {};
   // the view a show() is still waiting on, so a page that loads late does not steal the screen from a later choice
   var wanted = "";
@@ -127,6 +126,7 @@
     });
     el.src = VIEWS[name] + (VIEWS[name].indexOf("?") < 0 ? "?" : "&") + "embedded=1";
     document.body.appendChild(el);
+    if (document.title === "rk-status:empty") updateStatus();
     return f;
   }
 
@@ -156,8 +156,9 @@
     setTimeout(function () { if (el.classList.contains("out")) el.classList.remove("on", "out"); }, 170);
     return true;
   }
-  // nothing has been on screen yet at the start, and the curtain of the plugin covers that wait already
-  function anyShown() { return Object.keys(frames).some(function (k) { return frames[k].shownOnce; }); }
+  // nothing has been on screen yet at the start, and the curtain of the plugin covers that wait already; kept here and not on the frames, since a frame that showed may have been unloaded since
+  var everShown = false;
+  function anyShown() { return everShown; }
 
   // the very first reveal of a page waits for the page to say its first round of data is in (window.__rkReady), so what shows first is the finished page and not its loading state; later reveals flip at once
   function apply(name) {
@@ -199,7 +200,7 @@
     entering = "";
     clearTimeout(enterTimer);
     var covered = hideSkeleton(true);
-    frames[name].shownOnce = true;
+    everShown = true;
     if (!comingBack && !covered && before && before !== name && windowUp) {
       dipSwap(name);
       return;
@@ -306,6 +307,8 @@
   function windowShown(up) {
     windowUp = !!up;
     dispatchAll();
+    // the page on display was unloaded while the window sat in the tray, so it comes back behind the placeholder
+    if (windowUp && active && !frames[active]) show(active);
   }
 
   // a veil with a spinner over whatever page is showing, for as long as the plugin builds a native window; false takes it away
@@ -356,16 +359,33 @@
     fetch(HELPER + "/shell/leave-settings?to=" + encodeURIComponent(target), { method: "POST", cache: "no-store" }).catch(function () {});
   }
 
+  // a view out of sight for this long is dropped, and show() loads it again behind the placeholder the next time it is asked for. the page on display stays while the window is up, also under the preview, and goes too once the window has sat in the tray that long; a page that says it holds work of its own (__rkCanUnload) always stays
+  var IDLE_UNLOAD_MS = 30000;
+  function sweep() {
+    var now = performance.now();
+    Object.keys(frames).forEach(function (k) {
+      var f = frames[k];
+      var onDisplay = k === active || k === wanted || f.el.classList.contains("on");
+      if (k === entering || (windowUp && onDisplay) || f.seen === undefined) { f.seen = now; return; }
+      if (!f.loaded || now - f.seen < IDLE_UNLOAD_MS) return;
+      try {
+        var w = f.el.contentWindow;
+        if (typeof w.__rkCanUnload === "function" && !w.__rkCanUnload()) return;
+      } catch (_) { return; }
+      if (f.statusObserver) f.statusObserver.disconnect();
+      delete frames[k];
+      f.el.remove();
+    });
+    // with no view left the plugin may park this whole browser while the window sits in the tray
+    if (!Object.keys(frames).length && document.title !== "rk-status:empty") document.title = "rk-status:empty";
+  }
+  setInterval(sweep, 5000);
+
   window.RKShell = { show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
 
-  // home is the landing page; the rest load one after another behind it so the first click on any of them finds a painted page. each starts the moment the one before it has loaded, with no fixed waits in between, since the first click can come right after the window opens
+  // home is the landing page and clips loads right behind it, since the first click right after the window opens is usually there; settings and setup load on their first visit
   show("home");
-  var home = ensure("home");
-  home.waiters.push(function () {
-    var clips = ensure("clips");
-    var toSettings = function () { setTimeout(function () { ensure("settings"); }, 50); };
-    if (clips.loaded) toSettings(); else clips.waiters.push(toSettings);
-  });
+  ensure("home").waiters.push(function () { ensure("clips"); });
 })();
 </script>
 <!--#include shell-nav-->

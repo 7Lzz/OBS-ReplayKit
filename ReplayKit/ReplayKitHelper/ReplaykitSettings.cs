@@ -3036,7 +3036,7 @@ namespace ReplayKitHelper
             try
             {
                 shortcut.TargetPath = obsPath;
-                shortcut.Arguments = "--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays";
+                shortcut.Arguments = "--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays --process-per-site --js-flags=--optimize-for-size";
                 shortcut.WorkingDirectory = Path.GetDirectoryName(obsPath);
                 shortcut.IconLocation = obsPath + ",0";
                 shortcut.Description = "Start OBS ReplayKit when Windows signs in.";

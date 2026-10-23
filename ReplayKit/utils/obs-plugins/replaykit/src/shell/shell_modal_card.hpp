@@ -63,6 +63,7 @@ private:
 	bool CardLooksEmpty();
 	void CheckCardPainted(int run);
 	void OpenFresh();
+	void WaitForPage(int run);
 
 	ModalCardSpec m_spec;
 	QPointer<QWidget> m_curtain;

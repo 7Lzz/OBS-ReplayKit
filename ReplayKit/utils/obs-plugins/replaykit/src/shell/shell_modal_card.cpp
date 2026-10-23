@@ -13,6 +13,7 @@
 #include "shell/shell_state.hpp"
 #include "shell/shell_views.hpp"
 #include "ui/anchored_panel.hpp"
+#include "ui/popup_host.hpp"
 
 namespace rk {
 
@@ -144,8 +145,7 @@ void ModalCard::OnHostMoved()
 
 void ModalCard::RunScript(const std::string &script)
 {
-	if (m_browser && !script.empty())
-		m_browser->executeJavaScript(script);
+	PopupHost::Run(m_spec.url, QString::fromStdString(script));
 }
 
 // the card is a plain top-level window, so windows 11 rounds its corners and draws its border itself; a page inside it could not have round corners of its own, cef windows are opaque
@@ -161,10 +161,10 @@ void ModalCard::StyleCard()
 void ModalCard::EndCardWarm()
 {
 	m_warming = false;
-	if (m_card) {
-		m_card->hide();
+	if (PopupHost::Owns(this) && m_card) {
 		m_card->setAttribute(Qt::WA_ShowWithoutActivating, false);
 	}
+	PopupHost::Release(this);
 	if (ShellSetupLocked())
 		ShellReclaimForeground();
 	// the page starts its polling when it loads, the way it does when the card opens, and a card that is not up has no use for it
@@ -186,7 +186,7 @@ void ModalCard::OnCardPageReady()
 	blog(LOG_INFO, "[replaykit] %s page is up after %lld ms", m_spec.name, m_warmMs);
 	// left up a moment longer, so the page has been drawn to the window once before it is hidden
 	const int run = m_run;
-	QTimer::singleShot(kCefWarmSettleMs, m_card.data(), [this, run]() {
+	QTimer::singleShot(kCefWarmSettleMs, m_curtain.data(), [this, run]() {
 		if (m_warming && run == m_run)
 			EndCardWarm();
 	});
@@ -194,6 +194,7 @@ void ModalCard::OnCardPageReady()
 
 bool ModalCard::EnsureBuilt()
 {
+	m_ready = PopupHost::Ready(m_spec.url);
 	if (m_card)
 		return true;
 	QWidget *host = ObsHost();
@@ -201,23 +202,12 @@ bool ModalCard::EnsureBuilt()
 		return false;
 
 	m_curtain = new Curtain(host, this);
-	m_card = new QWidget(m_curtain);
-	m_card->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
-	m_card->setWindowTitle(m_spec.windowTitle);
-	m_card->resize(m_spec.width, m_spec.height);
-	// paints under cef before its first frame, so the gap is the card colour rather than white
-	m_card->setAutoFillBackground(true);
-	QPalette pal = m_card->palette();
-	pal.setColor(QPalette::Window, g_menuPanel);
-	m_card->setPalette(pal);
-	QVBoxLayout *layout = new QVBoxLayout(m_card);
-	layout->setContentsMargins(0, 0, 0, 0);
-	QCefWidget *browser = g_cef->create_widget(m_card, m_spec.url.toStdString(), nullptr);
-	layout->addWidget(browser);
-	m_browser = browser;
-	m_blind = !CefWatchPageReady(browser, m_card, [this]() { OnCardPageReady(); });
-	m_card->createWinId();
-	StyleCard();
+	m_card = PopupHost::Prepare(host);
+	m_browser = PopupHost::Browser();
+	if (!m_card) {
+		delete m_curtain.data();
+		return false;
+	}
 
 	m_hostFilter = new HostFilter(host, this);
 	host->installEventFilter(m_hostFilter);
@@ -226,10 +216,22 @@ bool ModalCard::EnsureBuilt()
 
 void ModalCard::StartCardWarm()
 {
+	m_ready = PopupHost::Ready(m_spec.url);
 	if (m_ready || m_gaveUp || m_warming)
+		return;
+	if (PopupHost::Occupied() && !PopupHost::Owns(this) && !m_openWaits)
 		return;
 	QWidget *host = ObsHost();
 	if (!host || !host->isVisible() || host->isMinimized() || !EnsureBuilt())
+		return;
+	if (!PopupHost::Acquire(this, m_curtain, m_spec.url, QSize(680, 640), [this]() {
+		m_warming = false;
+		++m_run;
+		m_openWaits = false;
+		m_waitingScript.clear();
+		Close();
+		PopupHost::Release(this);
+	}))
 		return;
 	m_warming = true;
 	m_warmMs = -1;
@@ -238,9 +240,11 @@ void ModalCard::StartCardWarm()
 	m_card->setAttribute(Qt::WA_ShowWithoutActivating, true);
 	m_card->move(CefOutOfSight(host));
 	m_card->show();
+	PopupHost::SetOwner(this, m_curtain);
+	WaitForPage(run);
 	blog(LOG_INFO, "[replaykit] %s warm-up started%s", m_spec.name, m_blind ? " (its page cannot report, waiting a fixed time)" : "");
 	// the wait is bounded, so a page that never says it is up cannot hold the card back for long
-	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, m_card.data(), [this, run]() {
+	QTimer::singleShot(m_blind ? kCefWarmBlindMs : kCefWarmCapMs, m_curtain.data(), [this, run]() {
 		if (!m_warming || run != m_run)
 			return;
 		if (m_blind) {
@@ -251,6 +255,17 @@ void ModalCard::StartCardWarm()
 		}
 		EndCardWarm();
 	});
+}
+
+void ModalCard::WaitForPage(int run)
+{
+	if (!m_warming || run != m_run || !PopupHost::Owns(this))
+		return;
+	if (PopupHost::Ready(m_spec.url)) {
+		OnCardPageReady();
+		return;
+	}
+	QTimer::singleShot(25, m_curtain.data(), [this, run]() { WaitForPage(run); });
 }
 
 // looks at the screen over the card and says whether the page painted it: the page fills the card with its colour out to the edges, so a card with none of that colour at the points just inside its edge has a browser that put nothing on the window and the dim shows through. points that another window covers do not count, and a grab that is all black says nothing
@@ -312,6 +327,7 @@ void ModalCard::Prepare()
 
 bool ModalCard::WarmNext()
 {
+	m_ready = PopupHost::Ready(m_spec.url);
 	if (m_ready || m_gaveUp)
 		return false;
 	if (!m_warming)
@@ -326,7 +342,7 @@ QJsonObject ModalCard::WarmReport() const
 
 bool ModalCard::IsOpen() const
 {
-	return m_curtain && m_curtain->isVisible();
+	return PopupHost::Owns(this) && m_curtain && m_curtain->isVisible();
 }
 
 void ModalCard::Follow()
@@ -365,6 +381,19 @@ void ModalCard::Open(const std::string &showScript)
 		m_openWaits = false;
 		m_waitingScript.clear();
 	}
+	if (!PopupHost::Acquire(this, m_curtain, m_spec.url, QSize(m_spec.width, m_spec.height), [this]() {
+		m_warming = false;
+		++m_run;
+		m_openWaits = false;
+		m_waitingScript.clear();
+		Close();
+		PopupHost::Release(this);
+	}))
+		return;
+	m_card->setWindowTitle(m_spec.windowTitle);
+	QPalette ground = m_card->palette();
+	ground.setColor(QPalette::Window, g_menuPanel);
+	m_card->setPalette(ground);
 	DevLog("%s opened", m_spec.name);
 	m_lastScript = script;
 	const int run = m_run;
@@ -372,12 +401,13 @@ void ModalCard::Open(const std::string &showScript)
 	Sync();
 	m_curtain->show();
 	m_card->show();
+	PopupHost::SetOwner(this, m_curtain);
 	m_card->raise();
 	m_card->activateWindow();
 	if (m_browser)
 		m_browser->setFocus();
 	RunScript(script);
-	QTimer::singleShot(500, m_card.data(), [this, run]() { CheckCardPainted(run); });
+	QTimer::singleShot(500, m_curtain.data(), [this, run]() { CheckCardPainted(run); });
 }
 
 // the card is thrown away and built again, and the open that comes of it waits for the new page like any first open
@@ -385,6 +415,7 @@ void ModalCard::OpenFresh()
 {
 	Close();
 	Destroy();
+	PopupHost::Reload(m_spec.url);
 	m_ready = m_warming = m_gaveUp = m_blind = false;
 	m_openWaits = true;
 	m_waitingScript = m_lastScript;
@@ -399,7 +430,7 @@ void ModalCard::Close()
 		return;
 	RunScript(m_spec.hideScript);
 	DevLog("%s closed", m_spec.name);
-	m_card->hide();
+	PopupHost::Release(this);
 	m_curtain->hide();
 	if (QWidget *host = m_curtain->parentWidget())
 		host->activateWindow();
@@ -415,12 +446,18 @@ QJsonObject ModalCard::Probe()
 
 void ModalCard::Destroy()
 {
+	Close();
+	PopupHost::Release(this);
+	++m_run;
+	m_warming = false;
 	if (m_hostFilter) {
 		delete m_hostFilter;
 		m_hostFilter = nullptr;
 	}
 	if (m_curtain)
 		delete m_curtain.data();
+	m_card.clear();
+	m_browser.clear();
 }
 
 } // namespace rk

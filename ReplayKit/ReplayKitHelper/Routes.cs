@@ -557,18 +557,22 @@ namespace ReplayKitHelper
 
             if (Regex.IsMatch(path, @"^/(?:controls\.html)?$")) { HttpResponse.ServeHtml(stream, "controls.html"); return false; }
             if (Regex.IsMatch(path, @"^/controls_app\.html$")) { HttpResponse.ServeHtml(stream, "controls_app.html"); return false; }
-            // the clean layout frames these inside its shell page (?embedded=1), which needs same-origin framing; the popup windows load them on their own and keep the DENY
+            // the clean layout frames these inside its shell page and popup.html frames the menus and cards (?embedded=1), which needs same-origin framing; a page loaded on its own keeps the DENY
             bool framed = QFlag("embedded");
-            if (Regex.IsMatch(path, @"^/clips-view$|^/clips\.html$")) { HttpResponse.ServeHtml(stream, "clips.html", framed); return false; }
+            if (path == "/clip-app.js") { HttpResponse.ServeDockScript(stream); return false; }
+            if (path == "/home-view") { HttpResponse.ServeHtml(stream, "home.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/clips-view$|^/clips\.html$")) { HttpResponse.ServeHtml(stream, QFlag("home") ? "home.html" : "clips.html", framed); return false; }
+            if (path == "/popup-view") { HttpResponse.ServeHtml(stream, "popup.html"); return false; }
+            if (path == "/editor-view") { HttpResponse.ServeHtml(stream, "editor.html"); return false; }
             if (Regex.IsMatch(path, @"^/settings-view$|^/settings\.html$")) { HttpResponse.ServeHtml(stream, "settings.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/setup-view$|^/setup\.html$")) { HttpResponse.ServeHtml(stream, "setup.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/shell-view$|^/shell\.html$")) { HttpResponse.ServeHtml(stream, "shell.html"); return false; }
             if (Regex.IsMatch(path, @"^/update-prompt$|^/update-prompt\.html$")) { HttpResponse.ServeHtml(stream, "update_prompt.html"); return false; }
-            if (Regex.IsMatch(path, @"^/notifications-view$|^/notifications\.html$")) { HttpResponse.ServeHtml(stream, "notifications.html"); return false; }
-            if (Regex.IsMatch(path, @"^/account-menu$|^/account-menu\.html$")) { HttpResponse.ServeHtml(stream, "account-menu.html"); return false; }
-            if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html"); return false; }
-            if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html"); return false; }
-            if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html"); return false; }
+            if (Regex.IsMatch(path, @"^/notifications-view$|^/notifications\.html$")) { HttpResponse.ServeHtml(stream, "notifications.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/account-menu$|^/account-menu\.html$")) { HttpResponse.ServeHtml(stream, "account-menu.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html", framed); return false; }
 
             if (path == "/settings/native")
             {
@@ -2259,7 +2263,7 @@ namespace ReplayKitHelper
                 string media = MediaImports.PathFor(Q("id"));
                 if (media == null) { HttpResponse.SendText(stream, 404, "Not Found", "Media not found"); return false; }
                 var mediaHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = MediaImports.ContentType(media), ["Cache-Control"] = "private, max-age=31536000, immutable" };
-                HttpResponse.SendBytes(stream, 200, "OK", mediaHeaders, File.ReadAllBytes(media));
+                HttpResponse.SendFile(stream, 200, "OK", mediaHeaders, media);
                 return false;
             }
 

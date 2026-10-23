@@ -74,7 +74,7 @@ if (-not (Test-Path -LiteralPath $ObsPath)) { exit 1 }
 
 $workDir = [System.IO.Path]::GetDirectoryName($ObsPath)
 # $args is an automatic variable in powershell (holds the scripts unbound argv). use a different name so we dont shadow it.
-$obsArgs = '--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays'
+$obsArgs = '--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays --process-per-site --js-flags=--optimize-for-size'
 
 # useshellexecute=true so the relaunch goes through the shell -- inherits our admin token (we were spawned by the admin helper) without prompting for uac, and isnt parented to this powershell process (whose console we want gone as soon as obs is back up).
 $psi = New-Object System.Diagnostics.ProcessStartInfo

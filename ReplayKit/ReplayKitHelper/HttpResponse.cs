@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -47,11 +48,10 @@ namespace ReplayKitHelper
 
         public static void SendFile(Stream stream, int status, string statusText, Dictionary<string, string> headers, string path)
         {
-            var fi = new FileInfo(path);
-            var head = FormatHttpResponse(status, statusText, headers, fi.Length);
-            stream.Write(head, 0, head.Length);
             using (var fs = File.OpenRead(path))
             {
+                var head = FormatHttpResponse(status, statusText, headers, fs.Length);
+                stream.Write(head, 0, head.Length);
                 var buf = new byte[65536];
                 int n;
                 while ((n = fs.Read(buf, 0, buf.Length)) > 0) stream.Write(buf, 0, n);
@@ -95,16 +95,15 @@ namespace ReplayKitHelper
         }
 
         // splice the active themes :root override in right before </head> so every dock page loads themed. no-op on the default theme and if the markup has no </head>.
-        private static byte[] InjectThemeStyle(byte[] html)
+        private static string InjectThemeStyle(string html)
         {
             try
             {
                 string tag = Themes.DockStyleTag(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings()));
                 if (string.IsNullOrEmpty(tag)) return html;
-                string s = System.Text.Encoding.UTF8.GetString(html);
-                int i = s.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+                int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
                 if (i < 0) return html;
-                return new UTF8Encoding(false).GetBytes(s.Substring(0, i) + tag + s.Substring(i));
+                return html.Insert(i, tag);
             }
             catch { return html; }
         }
@@ -146,14 +145,13 @@ namespace ReplayKitHelper
         private static readonly Regex _partialRe = new Regex(@"<!--#include ([a-z][a-z0-9-]{0,40})-->", RegexOptions.Compiled);
 
         // splice shared dock fragments in: every "<!--#include NAME-->" becomes the contents of obs-custom-dock/_NAME.html. runs before InjectThemeStyle/InjectDockIcons so a partials own data-i / RK_ICONS references still get picked up.
-        private static byte[] InjectPartials(byte[] html)
+        private static string InjectPartials(string html)
         {
             try
             {
-                string s = System.Text.Encoding.UTF8.GetString(html);
-                if (s.IndexOf("<!--#include ", StringComparison.Ordinal) < 0) return html;
+                if (html.IndexOf("<!--#include ", StringComparison.Ordinal) < 0) return html;
                 string[] roots = { AppConfig.GetDockDir(), AppConfig.GetDefaultDockDir() };
-                string outp = _partialRe.Replace(s, m =>
+                return _partialRe.Replace(html, m =>
                 {
                     string name = m.Groups[1].Value;
                     foreach (var root in roots)
@@ -165,23 +163,21 @@ namespace ReplayKitHelper
                     }
                     return ""; // unknown partial -> drop the placeholder rather than ship a literal comment
                 });
-                return new UTF8Encoding(false).GetBytes(outp);
             }
             catch { return html; }
         }
 
-        private static byte[] InjectDockIcons(byte[] html)
+        private static string InjectDockIcons(string html)
         {
             try
             {
-                string s = System.Text.Encoding.UTF8.GetString(html);
                 // only pages that actually read the map (clips.html, settings.html) -- skips update_prompt / sign-in-loader
-                if (s.IndexOf("RK_ICONS", StringComparison.Ordinal) < 0 && s.IndexOf("data-i=", StringComparison.Ordinal) < 0) return html;
+                if (html.IndexOf("RK_ICONS", StringComparison.Ordinal) < 0 && html.IndexOf("data-i=", StringComparison.Ordinal) < 0) return html;
                 string tag = DockIconTag();
                 if (string.IsNullOrEmpty(tag)) return html;
-                int i = s.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+                int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
                 if (i < 0) return html;
-                return new UTF8Encoding(false).GetBytes(s.Substring(0, i) + tag + s.Substring(i));
+                return html.Insert(i, tag);
             }
             catch { return html; }
         }
@@ -200,10 +196,14 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        byte[] bytes = File.ReadAllBytes(f);
-                        bytes = InjectPartials(bytes);
-                        bytes = InjectThemeStyle(bytes);
-                        bytes = InjectDockIcons(bytes);
+                        string html = InjectDockIcons(InjectThemeStyle(InjectPartials(File.ReadAllText(f))));
+                        if (html.Contains("__RK_CLIP_APP_VERSION__"))
+                        {
+                            using (var input = File.OpenRead(DockScriptPath()))
+                            using (var hash = SHA256.Create())
+                                html = html.Replace("__RK_CLIP_APP_VERSION__", BitConverter.ToString(hash.ComputeHash(input)).Replace("-", "").ToLowerInvariant());
+                        }
+                        byte[] bytes = new UTF8Encoding(false).GetBytes(html);
                         var h = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
                         // only the pages the obs window frames inside its own shell page get this, and it still refuses every other origin; everything else keeps the DENY
                         if (sameOriginFrame) h["X-Frame-Options"] = "SAMEORIGIN";
@@ -214,6 +214,30 @@ namespace ReplayKitHelper
                 }
             }
             SendText(stream, 404, "Not Found", filename + " not found");
+        }
+
+        private static string DockScriptPath()
+        {
+            foreach (string root in new[] { AppConfig.GetDockDir(), AppConfig.GetDefaultDockDir() })
+            {
+                if (string.IsNullOrEmpty(root)) continue;
+                string path = Path.Combine(root, "clip-app.js");
+                if (File.Exists(path)) return path;
+            }
+            throw new FileNotFoundException("Clip browser script was not found.");
+        }
+
+        public static void ServeDockScript(Stream stream)
+        {
+            try
+            {
+                SendFile(stream, 200, "OK", GetNoStoreHeaders(new Dictionary<string, string>
+                {
+                    ["Content-Type"] = "application/javascript; charset=utf-8",
+                    ["Cache-Control"] = "private, max-age=31536000, immutable"
+                }), DockScriptPath());
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { SendText(stream, 404, "Not Found", "Script not found"); }
         }
 
         // scrubbing fires a burst of overlapping range requests that each abort the last, so a slot usually frees within milliseconds and a short wait clears almost all of them; the check and the claim happen under one lock so a burst can never pass the cap together

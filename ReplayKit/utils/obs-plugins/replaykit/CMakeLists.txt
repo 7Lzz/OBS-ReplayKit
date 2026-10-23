@@ -79,6 +79,7 @@ set(REPLAYKIT_SOURCES
     src/tray/tray_menu.cpp
 
     src/ui/anchored_panel.cpp
+    src/ui/popup_host.cpp
     src/ui/confirm_dialog.cpp
 
     src/windows/cef_host_window.cpp

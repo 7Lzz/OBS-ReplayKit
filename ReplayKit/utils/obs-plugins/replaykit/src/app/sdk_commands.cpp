@@ -25,9 +25,12 @@
 #include "shell/shell_projector.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
+#include "shell/shell_notify_reader.hpp"
+#include "shell/shell_title_bar.hpp"
 #include "shell/shell_views.hpp"
 #include "tray/tray_menu.hpp"
 #include "ui/anchored_panel.hpp"
+#include "ui/popup_host.hpp"
 
 namespace rk {
 
@@ -88,6 +91,8 @@ QJsonObject UiState(const QJsonObject &)
 	out["storageCardOpen"] = StorageModalIsOpen();
 	out["panelsOpen"] = AnchoredPanel::ShownCount();
 	out["warmUp"] = QJsonObject{{"panels", AnchoredPanel::WarmReport()}, {"storageCard", StorageModalWarmReport()}};
+	out["popupHost"] = PopupHost::Probe();
+	out["hostParked"] = ShellHostParked();
 	out["pageHostReady"] = g_hostReady;
 	out["setupPending"] = g_setupPending;
 	out["setupLocked"] = ShellSetupLocked();
@@ -115,6 +120,29 @@ QJsonObject UiView(const QJsonObject &args)
 		return Fail(QStringLiteral("args.view is home, projector, clips, settings, setup or obs-settings."));
 	ShellOpenView(view, false);
 	return UiState(QJsonObject());
+}
+
+QJsonObject UiPopup(const QJsonObject &args)
+{
+	const QString name = args.value("name").toString();
+	if (name == QLatin1String("close")) {
+		AnchoredPanel::HideAll();
+		StorageModalClose();
+		NotifyReaderClose();
+		return UiState({});
+	}
+	QMainWindow *mw = ObsMainWindowQt();
+	if (!g_shellTitle || !mw || !mw->isVisible() || mw->isMinimized() || ShellSetupLocked())
+		return Fail(QStringLiteral("The shell is not available for a popup."));
+	if (name == QLatin1String("storage")) StorageModalOpen();
+	else if (name == QLatin1String("reader")) {
+		const QString id = args.value("id").toString();
+		if (!QRegularExpression(QStringLiteral("\\A[a-zA-Z0-9_.-]{1,80}\\z")).match(id).hasMatch())
+			return Fail(QStringLiteral("A valid notification ID is required."));
+		NotifyReaderOpen(id.toStdString());
+	} else if (!g_shellTitle->TogglePopup(name))
+		return Fail(QStringLiteral("args.name is account, notifications, clip, record, storage, reader or close."));
+	return UiState({});
 }
 
 // shows the window of obs or sends it to the tray the way the tray icon does, so a command that needs it on screen can bring it there and put it back
@@ -415,6 +443,7 @@ void RegisterBuiltins()
 	SdkRegister("commands", "the commands of the native plugin", Commands);
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
 	SdkRegister("ui.view", "shows a view: args.view is home, projector, clips, settings, setup or obs-settings", UiView);
+	SdkRegister("ui.popup", "opens a shell popup using args.name: account, notifications, clip, record, storage, reader (args.id) or close; reports the shared surface", UiPopup);
 	SdkRegister("ui.window", "shows the window of obs or sends it to the tray: args.mode is show or hide", UiWindow);
 	SdkRegister("ui.reload-page", "reloads the page of the shell browser the way the watchdog does when it stops answering", UiReloadPage);
 	SdkRegister("ui.preview", "turns the preview on or off: args.on", UiPreview);

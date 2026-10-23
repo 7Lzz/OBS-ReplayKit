@@ -1,0 +1,2831 @@
+<style>
+  :root {
+    --border_radius: 4px;
+    --font_size: 13px;
+    --font_family: "Segoe UI", system-ui, sans-serif;
+    --grey1: #5B6273;
+    --grey3: #464B59;
+    --grey4: #3C404D;
+    --grey5: #2F323C;
+    --grey6: #272A33;
+    --grey7: #1D1F26;
+    --grey8: #13141A;
+    --blue2: #476BD7;
+    --blue3: #284CB8;
+    --green: #37D247;
+    --red: #E33B57;
+    --amber: #E2A33B;
+    --white1: #FFFFFF;
+    --white5: #969696;
+    --bg_window: var(--grey7);
+    --bg_card: var(--grey5);
+    --text: var(--white1);
+    --text_muted: var(--white5);
+    --button_bg: var(--grey4);
+    --button_bg_hover: var(--grey3);
+    --button_bg_down: var(--grey7);
+    --button_border: var(--button_bg-solid,var(--button_bg));
+    --button_border_hover: var(--grey1);
+    --primary: var(--blue3);
+    --primary_light: var(--blue2);
+    --link_accent: #4D96EE;
+    --on-accent: #ffffff;
+    --on-accent-rgb: 255, 255, 255;
+    --text-rgb: 255, 255, 255;
+    --bg-rgb: 29, 31, 38;
+    --accent-rgb: 40, 76, 184;
+    --danger-rgb: 227, 59, 87;
+    --hairline: rgba(var(--text-rgb),.08);
+    --overlay-soft: rgba(var(--text-rgb),.06);
+    --overlay-strong: rgba(var(--text-rgb),.14);
+    --shadow: rgba(0,0,0,.45);
+    --shadow-weak: rgba(0,0,0,.28);
+    /* shared motion language. ease_pop is a light overshoot for taps/pops; ease_smooth is a long decelerating ease-out for panels that should glide into place and settle. */
+    --ease_pop: cubic-bezier(.2, .7, .3, 1);
+    --ease_smooth: cubic-bezier(.16, 1, .3, 1);
+    --anim_press: 130ms;
+    --anim_menu: 200ms;
+    --hover_grow: 1.03;
+    --press_shrink: .96;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--bg_window);
+    color: var(--text);
+    font-family: var(--font_family);
+    font-size: var(--font_size);
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  .tabs {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    background: var(--bg_window);
+    border-bottom: 1px solid var(--grey4-solid,var(--grey4));
+    overflow: visible;
+  }
+  .tab-group,
+  .tab-actions {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  /* the filters are a bold label with an icon in front, and only the one that is on is filled: the soft wash of the text colour the sidebar rail puts behind its selected icon, with the corner of the clip cards where the rail has a circle. the hover and press scale of a button comes from the shared control profile (CLIP_HOVER_PROFILES), nothing slides between tabs and the fill just changes */
+  .tab-group {
+    position: relative;
+    gap: 4px;
+    transition: transform 140ms ease;
+  }
+  body.is-selection-mode .tab-group { transform: translateX(2px); }
+  .tab-actions {
+    gap: 6px;
+    margin-left: auto;
+  }
+  /* the same three strengths the rail uses: the icon and label at 62% of the text colour at rest and full when hovered or on, the wash behind at 8% on hover, 13% pressed and 16% for the tab that is on */
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 14px 0 11px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(var(--text-rgb), .62);
+    font: inherit;
+    font-size: var(--font_size);
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    /* the shared control profile reads these two; the tabs are wide and sit close together, so they get a gentler grow and press than the other buttons */
+    --hover_grow: 1.02;
+    --press_shrink: .985;
+  }
+  .tab:hover {
+    background: rgba(var(--text-rgb), .08);
+    color: rgb(var(--text-rgb));
+  }
+  .tab:active { background: rgba(var(--text-rgb), .13); }
+  .tab.is-active,
+  .tab.is-active:hover,
+  .tab.is-active:active {
+    background: rgba(var(--text-rgb), .16);
+    color: rgb(var(--text-rgb));
+  }
+  .tab svg { width: 16px; height: 16px; flex: 0 0 auto; fill: currentColor; }
+  /* the label and its count are one span so both sit on one baseline; as flex items of their own they were centred by their boxes and the smaller type came out a little higher than the label. the span goes up a pixel because the font puts its letters low in the line box, so the letters meet the centre of the icon */
+  .tab-text {
+    position: relative;
+    top: -1px;
+  }
+  .tab .count {
+    margin-left: 6px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    opacity: .75;
+  }
+  .clip-sort-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  /* trigger = sorting glyph + a chevron that flips on open. no "Sort: Newest" text, no resting box -- just the glyph, a faint surface on hover. when the menu is open it takes on the menu's surface and squares its bottom edge so the panel below reads as one connected shape. */
+  .clip-sort-trigger {
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    transition: background-color 90ms linear, border-color 90ms linear;
+  }
+  .clip-sort-trigger:hover { background: var(--grey5); }
+  .clip-folder-btn { width: 32px; padding: 0; }
+  .clip-folder-btn svg { width: 18px; height: 18px; }
+  .clip-sort-wrap.is-open .clip-sort-trigger {
+    background: var(--grey5);
+    border-color: var(--grey3);
+    border-bottom-color: transparent;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    color: var(--text);
+    transform: none;
+    /* sit above the fixed menu (z 10000) so the trigger's border-less bottom overlaps and hides the menu's top border across the trigger's width -- that's what makes the seam disappear. */
+    position: relative;
+    z-index: 10001;
+  }
+  .clip-sort-trigger:focus-visible {
+    outline: none;
+    border-color: var(--primary_light);
+  }
+  .clip-sort-trigger svg { fill: currentColor; }
+  .clip-sort-icon { width: 16px; height: 16px; flex: 0 0 16px; }
+  .clip-sort-chevron {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+    opacity: .65;
+    transition: transform var(--anim_menu) var(--ease_smooth);
+  }
+  .clip-sort-wrap.is-open .clip-sort-chevron { transform: rotate(180deg); }
+  .clip-sort-wrap.is-loading .clip-sort-icon,
+  .clip-sort-wrap.is-loading .clip-sort-chevron { display: none; }
+  .clip-sort-spinner {
+    display: none;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(var(--text-rgb),.22);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: clip-sort-spin .8s linear infinite;
+  }
+  .clip-sort-wrap.is-loading .clip-sort-spinner { display: inline-block; }
+  @keyframes clip-sort-spin { to { transform: rotate(360deg); } }
+  .clip-search {
+    width: 160px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px;
+    border-bottom: 1px solid var(--grey3);
+    color: var(--text_muted);
+    transition: border-color 100ms linear, color 100ms linear;
+  }
+  .clip-search:focus-within { border-bottom-color: var(--primary_light); color: var(--text); }
+  .clip-search svg { width: 14px; height: 14px; fill: currentColor; flex: 0 0 14px; }
+  .clip-search-input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+  }
+  .clip-search-input::placeholder { color: var(--text_muted); opacity: 1; }
+  /* panel surface, border + row hover are copied from .menu-dropdown (the card right-click menu) so the two menus read identically. no shadow. anchored `position:absolute` to .clip-sort-wrap with `right:0` so the layout engine keeps the panel's right edge pixel-flush with the trigger's -- no js placement math to drift sub-pixel. `top:calc(100% - 1px)` laps the trigger's bottom border; the open trigger (z 10001) paints over that overlap so the seam vanishes. */
+  .clip-sort-menu {
+    position: absolute;
+    top: calc(100% - 1px);
+    right: 0;
+    left: auto;
+    min-width: 194px;
+    max-height: 320px;
+    background: var(--grey5);
+    border: 1px solid var(--grey3);
+    border-radius: 4px;
+    border-top-right-radius: 0;
+    padding: 4px 0;
+    box-shadow: none;
+    overflow-y: auto;
+    z-index: 10000;
+    /* stays in the dom both ways. closed: clipped to nothing from its top edge + faded + inert. open: the clip window drops open so the panel unrolls out of the trigger. visibility flips only after the close settles so it cant be tabbed or hit while hidden. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    clip-path: inset(0 0 100% 0);
+    transition: opacity 120ms ease, clip-path 190ms var(--ease_smooth), visibility 0s linear 190ms;
+  }
+  .clip-sort-wrap.is-open .clip-sort-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    clip-path: inset(0 0 0 0);
+    transition: opacity 90ms ease, clip-path 190ms var(--ease_smooth);
+  }
+  .clip-sort-heading {
+    padding: 6px 14px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    color: var(--text_muted);
+    user-select: none;
+  }
+  /* no per-row stagger -- the panel just glides, same as the card right-click menu. */
+  .clip-sort-item {
+    width: 100%;
+    padding: 7px 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .clip-sort-item:hover { background: var(--button_bg_hover); }
+  .clip-sort-label { flex: 1 1 auto; }
+  /* Selected sorting uses the same theme highlight as the other dropdowns. */
+  .clip-sort-item.is-active { background: var(--selected,var(--primary)); color: var(--on-accent); }
+  .clip-sort-item.is-active.rk-hover-row:hover { background: var(--selected,var(--primary)); color: var(--on-accent); }
+  .clip-sort-check {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+    flex: 0 0 15px;
+    margin-left: auto;
+    opacity: 0;
+  }
+  .clip-sort-item.is-active .clip-sort-check { opacity: 1; }
+  /* Length / File size: a row that discloses two sub-options instead of being a sort itself. */
+  .clip-sort-caret {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+    flex: 0 0 13px;
+    margin-left: auto;
+    opacity: .5;
+    transition: transform var(--anim_menu) var(--ease_smooth);
+  }
+  .clip-sort-grouprow[aria-expanded="true"] .clip-sort-caret { transform: rotate(180deg); }
+  .clip-sort-sub {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height var(--anim_menu) var(--ease_smooth), opacity 120ms ease;
+  }
+  .clip-sort-group.is-expanded .clip-sort-sub { max-height: 84px; opacity: 1; }
+  /* --rk-row-padding overrides rk-hover-rows own 14px default so its hover nudge starts from this rows real resting indent instead of snapping back to the top-level items -- without it the hover state pulls a subitem 12px to the left instead of nudging it 2px right. */
+  .clip-sort-subitem { padding-left: 28px; --rk-row-padding: 28px; }
+  .clip-sort-subitem .clip-sort-label { font-size: 11.5px; }
+  /* Compress all is grouped with sorting as a batch action, so the filters stay a single calm segmented control. */
+  .tab-action {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--primary_light);
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--on-accent);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  #compress-all-btn[hidden] { display: none !important; }
+  .bulk-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    animation: bulk-actions-in 220ms var(--ease_smooth) both;
+  }
+  .bulk-actions[hidden] { display: none !important; }
+  .bulk-actions::after {
+    content: "";
+    width: 1px;
+    height: 20px;
+    margin-left: 7px;
+    background: var(--grey4);
+  }
+  .bulk-summary {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 78px;
+    margin-left: 3px;
+    font-size: 11px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  .bulk-summary[hidden] { display: none !important; }
+  .bulk-summary-count { color: var(--white1); }
+  .bulk-summary-size { margin-top: 2px; color: var(--text_muted); font-variant-numeric: tabular-nums; }
+  @keyframes bulk-actions-in {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .bulk-count {
+    padding: 0 5px;
+    color: var(--text_muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .bulk-icon-btn {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--white1);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bulk-icon-btn:hover { background: var(--grey5); color: var(--text); }
+  .bulk-icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+  .bulk-icon-btn.bulk-delete { color: var(--red); }
+  .bulk-icon-btn.bulk-delete:hover { color: var(--red); background: rgba(227, 59, 87, .15); }
+  .bulk-icon-btn.bulk-delete.is-armed { color: var(--text); background: var(--red); }
+  .bulk-icon-btn:disabled { opacity: .5; cursor: progress; pointer-events: none; }
+  /* upload button doubles as Stop while the queue drains -- keep it lit and clickable so the tooltip progress reads and a second click halts scheduling. */
+  #bulk-upload.is-running { color: var(--on-accent); background: var(--primary); }
+  #bulk-upload.is-running:hover { background: var(--primary_light); }
+  /* the bulk toolbar tooltip is a single js-positioned element (see showBulkTip) -- these buttons hug the window's left edge so a css-only tooltip either clips or has to be left-anchored off-center. js clamps the box into the viewport and slides the arrow to keep it pointing at the button. */
+  .info-dot {
+    flex: none;
+    margin-left: 4px;
+    padding: 0;
+    width: 15px;
+    height: 15px;
+    display: inline-flex;
+    vertical-align: middle;
+    border: 0;
+    background: transparent;
+    color: var(--text_muted, #969696);
+    cursor: help;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: transform var(--anim_press) var(--ease_pop), color 90ms ease;
+  }
+  .info-dot::before {
+    content: "";
+    width: 100%;
+    height: 100%;
+    background-color: currentColor;
+    -webkit-mask: url(/icons/ui/info.svg) center / contain no-repeat;
+    mask: url(/icons/ui/info.svg) center / contain no-repeat;
+  }
+  .info-dot:hover { color: var(--text); transform: scale(1.12); }
+  .info-dot:active { transform: scale(.94); }
+  .info-dot:focus { outline: none; }
+  .info-dot:focus-visible { color: var(--text); border-radius: 50%; box-shadow: 0 0 0 2px var(--selected2, #476bd7); }
+  .bulk-clear {
+    height: 30px;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--white1);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .bulk-clear:hover { color: var(--white1); background: var(--grey5); }
+  .bulk-clear:disabled { opacity: .5; cursor: progress; pointer-events: none; }
+  /* transient "stop the whole upload run" button, sits next to Clear while the queue drains. */
+  .bulk-stop { color: var(--red); font-variant-numeric: tabular-nums; }
+  .bulk-stop:hover { color: var(--red); background: rgba(var(--danger-rgb), .15); }
+  .bulk-stop[hidden] { display: none !important; }
+  .tab-action:hover {
+    background: var(--primary_light);
+    border-color: var(--primary_light);
+    color: var(--on-accent);
+  }
+  .tab-action:disabled,
+  .tab-action.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .tab-action svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    flex: 0 0 14px;
+  }
+  .tab-action.is-running {
+    background: var(--primary);
+    border-color: var(--primary_light);
+    color: var(--on-accent);
+    cursor: progress;
+  }
+  .tab-action .progress {
+    color: rgba(var(--on-accent-rgb), 0.72);
+    margin-left: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px;
+    overflow-anchor: none;
+  }
+  /* the room of the scrollbar is kept whether or not the list is tall enough for one, so the cards stand at the same width on every tab and nothing resizes when a list that fits replaces one that does not */
+  html:not(.rk-home) .scroll-area { scrollbar-gutter: stable; }
+  /* inside the obs window the resize grip sits over the last 18px of the right edge, so the track of this scrollbar stops above it; the page reaches that edge, so the scroller stops short of it and its scrollbar keeps off the edge */
+  html.rk-embedded .scroll-area { --sb-end: 26px; margin-right: 6px; }
+  /* the scrollbars of the timeline end before the resize corner too: they sit in the margin the timeline keeps along its right and bottom, which reaches the edge of the window */
+  html.rk-embedded .tl-area { margin: 0 -6px -6px 0; }
+  /* while a clip is fullscreened, OBS CEF still wants to repaint the grid behind the fullscreen top layer when the host window maximizes/restores. keep non-active UI invisible until the transition settles so leaving fullscreen does not spend seconds repainting dozens of hidden cards. */
+  body.is-clip-fullscreen .tabs,
+  body.is-clip-fullscreen .section-heading,
+  body.is-clip-fullscreen #empty,
+  body.is-clip-fullscreen #toast,
+  body.is-clip-fullscreen #grid .card:not(.is-fullscreen-card),
+  body.is-clip-fullscreen .home-shelves :is(.home-head, .home-hero-info, .card:not(.is-fullscreen-card)),
+  body.is-clip-fullscreen #favorites-grid .card:not(.is-fullscreen-card) {
+    visibility: hidden;
+  }
+  body.is-clip-fullscreen .scroll-area {
+    overflow: hidden;
+  }
+  /* theater mode keeps the player inside the Clips window, but promotes the selected card into a wide stage below the tabs. */
+  body.is-clip-theater .section-heading,
+  body.is-clip-theater #empty,
+  body.is-clip-theater #toast,
+  body.is-clip-theater #grid .card:not(.is-theater-card),
+  body.is-clip-theater .home-shelves :is(.home-head, .home-hero-info, .card:not(.is-theater-card)),
+  body.is-clip-theater #favorites-grid .card:not(.is-theater-card) {
+    visibility: hidden;
+  }
+  body.is-clip-theater .scroll-area { overflow: hidden; }
+  body.is-clip-theater #grid { contain: none; }
+  .card.is-theater-card {
+    position: fixed !important;
+    z-index: 40;
+    /* !important -- `#grid .card { left:0; top:0 }` (id selector) otherwise beats this shorthand left/top and pins the stage flush to the top-left wall while right/bottom keep their 14px. */
+    inset: 58px 14px 14px !important;
+    width: auto !important;
+    height: auto !important;
+    transform: none !important;
+    translate: 0 0;
+    contain: none;
+  }
+  /* the stage animates on the standalone scale/opacity properties, not transform -- the rule above pins transform to none !important to beat `#grid .card`'s translate, so a transform-based entrance would never render. */
+  @keyframes clip-theater-in {
+    from { opacity: 0; scale: .985; }
+    to { opacity: 1; scale: 1; }
+  }
+  .card.is-theater-card { animation: clip-theater-in 170ms var(--ease_smooth) both; }
+  /* leaving theatre removes the classes that would have animated, so the grid coming back gets the exit motion instead -- one animation on the scroll container rather than one per card, which matters with the virtualised grid. */
+  @keyframes clip-theater-restore {
+    from { opacity: 0; scale: .994; }
+    to { opacity: 1; scale: 1; }
+  }
+  body.is-theater-restoring .scroll-area { animation: clip-theater-restore 170ms var(--ease_smooth) both; }
+  .card.is-theater-card .preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    aspect-ratio: auto;
+    border-radius: 5px 5px 0 0;
+  }
+  .card.is-theater-card .preview-media,
+  .card.is-theater-card .preview video {
+    border-radius: 5px 5px 0 0;
+  }
+  .card.is-theater-card .preview video {
+    object-fit: contain;
+    opacity: 1;
+  }
+  .grid {
+    display: grid;
+    /* the columns of every list of cards: as many as fit of at least 330px, sharing the row; min(330px, 100%) gives a narrow popup one card as wide as its content, since a hard floor there pushed the right edge behind overflow-x. the virtual list (#grid) does not work out columns of its own, it reads these tracks back */
+    grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
+    gap: 14px;
+    align-items: start;
+    overflow-anchor: none;
+  }
+  /* the virtual list is a grid of the rule above like every other list; only the cards near the screen exist, so the window script places each one on a track the grid worked out instead of the grid flowing them */
+  #grid {
+    position: relative;
+    min-height: 0;
+    contain: layout style;
+  }
+  #grid .card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    min-width: 0;
+    max-width: 100%;
+    width: var(--virtual-card-width, 260px);
+    transform: translate3d(var(--virtual-card-x, 0px), var(--virtual-card-y, 0px), 0);
+  }
+  /* favorites sub-section above the main virtualized grid. hidden by defualt; render() toggles `is-shown` on both the heading and the grid when the all filter is active and theres at least one favorite. same goes for the "all clips" heading -- it only shows in that case to seperate the two sub-sections visually. */
+  .favorites-grid { display: none; margin-bottom: 18px; }
+  /* the home view: this page with a big player for the newest clip and two shelves of clips under the header that RKHomeDashboard draws, and no toolbar. a clip is its player with the name and the age under it, without the card, the menus or the buttons of the clips view */
+  .rk-home .tabs, .rk-home #favorites-heading, .rk-home #favorites-grid, .rk-home #rest-heading, .rk-home .select-clip-btn, .rk-home .favorite-btn, .rk-home .codec-badge, .rk-home .card .actions { display: none !important; }
+  .rk-home .card .icon-mini-btn, .rk-home .card .title-actions, .rk-home .card .meta .size, .rk-home .card .meta .dot, .rk-home .card .meta .link-status, .rk-home .home-hero .card .body { display: none !important; }
+  .rk-home .card .body { padding: 10px 6px 4px; }
+  .rk-home .home-hero .card.is-theater-card .body { display: block !important; }
+  .rk-home .card { background: none; border: 0; border-radius: 10px; box-shadow: none; }
+  .home-shelves { display: none; }
+  .rk-home .home-shelves.is-shown { display: block; }
+  .home-section { min-width: 0; }
+  .home-section[hidden] { display: none; }
+  .home-section + .home-section { margin-top: 26px; }
+  .home-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin: 0 2px 10px; }
+  .home-kicker, .home-h2 { margin: 0; line-height: 28px; }
+  .home-kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text_muted); }
+  .home-h2 { font-size: 15px; font-weight: 700; }
+  .home-see { display: inline-flex; align-items: center; gap: 2px; height: 28px; margin-right: -8px; padding: 0 6px 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text_muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .home-see:hover { background: rgba(var(--text-rgb, 255, 255, 255), .08); color: var(--text); }
+  .home-see svg { width: 16px; height: 16px; fill: currentColor; }
+  /* the player takes up to 640px or 62% of the row, whichever is less, and what is left is the line of facts about the clip */
+  .home-hero { display: grid; grid-template-columns: minmax(0, min(640px, 62%)) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .home-hero-player, .home-hero-info { min-width: 0; }
+  .home-hero-info { max-width: 420px; }
+  .home-hero-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 18px; font-weight: 600; line-height: 24px; }
+  .home-hero-age { margin-top: 2px; color: var(--text_muted); font-size: 12.5px; line-height: 18px; }
+  .home-hero-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 18px; margin: 14px 0 0; padding-top: 14px; border-top: 1px solid var(--hairline); font-size: 13px; }
+  .home-hero-facts dt { color: var(--text_muted); }
+  .home-hero-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .home-row { display: grid; grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 560px) {
+    .home-hero { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  }
+  .rk-home .preview, .rk-home .preview-media, .rk-home .preview .thumb, .rk-home .preview video, .rk-home .play-overlay, .rk-home .player-shade { border-radius: 10px; }
+  .rk-home .preview { overflow: hidden; }
+  .rk-home .card.is-theater-card { inset: 14px !important; }
+  .rk-home .card.is-theater-card .preview, .rk-home .card.is-theater-card .preview-media, .rk-home .card.is-theater-card .preview video { border-radius: 10px; }
+  .favorites-grid.is-shown { display: grid; }
+  .section-heading {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    margin: 4px 4px 10px 4px;
+  }
+  .section-heading.is-shown { display: flex; animation: rk-fade-in 240ms var(--ease_smooth) backwards; }
+  .section-heading svg { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink: 0; }
+  /* divider above "all clips" so the favorites-vs-rest boundary reads clearly even with both headings now sharing the same bold white style. same border colour as every other hairline in this file (inputs, cards, toasts) for consistency. */
+  .section-heading-rest {
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--grey4-solid,var(--grey4));
+  }
+  .virtual-spacer {
+    height: 0;
+    pointer-events: none;
+    overflow-anchor: none;
+  }
+  .empty {
+    color: var(--text_muted);
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .empty.error { color: var(--red); }
+  .empty .hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text_muted);
+  }
+  .empty code {
+    background: var(--grey8);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .card {
+    position: relative;
+    background: var(--bg_card);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-radius: 6px;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    /* hover lift uses `translate` (the individual property, integer px, vertical only) so it composes with the translate3d that positions virtualized cards and can never drift a card sideways. the thumbnail does the "grow" instead -- it scales inside .previews overflow:clip so the card box, and the progress bar glued to its bottom edge, never move relative to each other. `transform` itself stays untransitioned so a recycled card snaps to its new slot. */
+    translate: 0 0;
+    transition: translate 160ms var(--ease_smooth), box-shadow 200ms var(--ease_smooth), border-color 100ms linear, opacity 150ms linear;
+    overflow-anchor: none;
+    /* keep card layout isolated without content-visibility. OBS CEF can flicker grid children after maximize/restore when content-visibility:auto is combined with virtualized rows and lazy media. */
+    contain: layout style;
+  }
+  .card.menu-open { z-index: 20; }
+  .preview {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: clip;
+    /* the scrub dot is centred on the (bottom-flush) progress bar, so part of it naturally sits past .previews own bottom edge -- that overhang onto the card body below is the intended look, not a bug, so this margin lets it render instead of getting cut off. overflow:hidden cant do this (no clip-margin concept); overflow:clip can. */
+    overflow-clip-margin: 6px;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+  }
+  /* groups the thumb + video into one layer under the overlay controls. */
+  .preview-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 5px 5px 0 0;
+  }
+  .preview:is(:fullscreen, .rk-fs) .preview-media,
+  .preview:-webkit-full-screen .preview-media { border-radius: 0; }
+  .preview .thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    border-radius: 5px 5px 0 0;
+  }
+  .preview video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    opacity: 0;
+    transition: opacity 80ms linear;
+    border-radius: 5px 5px 0 0;
+    will-change: transform;
+  }
+  /* the fullscreen target is the .preview container now (not the <video> itself), so the browser doesnt fire its built-in dblclick=exit-fullscreen shortcut. we size the container to 100%/100% and let the video letterbox-fit inside it. */
+  .preview:is(:fullscreen, .rk-fs),
+  .preview:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+  .preview:is(:fullscreen, .rk-fs) video,
+  .preview:-webkit-full-screen video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    opacity: 1;
+    border-radius: 0;
+  }
+  .preview:is(:fullscreen, .rk-fs) .theater-btn,
+  .preview:-webkit-full-screen .theater-btn { display: none; }
+  .preview:is(:fullscreen, .rk-fs) .select-clip-btn,
+  .preview:-webkit-full-screen .select-clip-btn,
+  .preview:is(:fullscreen, .rk-fs) .favorite-btn,
+  .preview:-webkit-full-screen .favorite-btn { display: none; }
+  .preview.is-playing.is-video-ready video {
+    opacity: 1;
+  }
+  /* resting cards just get a light dim so the thumbnail reads as "not playing" -- no play glyph. it lifts on hover. */
+  .preview .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.28);
+    opacity: 1;
+    transition: opacity 160ms linear;
+    pointer-events: none;
+  }
+  .card:hover .preview .play-overlay,
+  .preview.is-playing .play-overlay { opacity: 0; }
+
+  /* preview controls (volume + fullscreen, bottom of preview) - float over the video, fade in on card hover so resting cards look clean. the two halves (left = volume, right = fullscreen) sit above the progress bar. */
+  .preview-controls {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 4;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms linear;
+    /* everything in here floats on the video -- keep it white regardless of theme */
+    color: #fff;
+  }
+  .card:hover .preview-controls { opacity: 1; pointer-events: auto; }
+
+  .icon-btn {
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    /* sits on the video thumbnail -- fixed white icon on a dark pill, independent of the theme */
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 80ms linear;
+  }
+  .icon-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  .icon-btn svg  { width: 16px; height: 16px; fill: currentColor; display: block; }
+  .favorite-btn {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    z-index: 5;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 80ms linear, color 80ms linear;
+  }
+  .favorite-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  /* filled star (favorited) renders in youtube-/imdb-style gold so it reads at a glance against the dark card; outline state keeps the white-on-translucent look so its visible without competing for attention with the play button. */
+  .favorite-btn.is-favorite { color: var(--amber); }
+  .favorite-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    display: block;
+  }
+  /* a card of the drafts tab carries the edit icon over its whole picture, faint, as the mark of what it is. it goes the moment the card is hovered or its clip plays, so it never sits on the video the person came to look at */
+  .draft-mark { display: none; }
+  .card.is-draft-card .draft-mark {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    color: #fff;
+    opacity: .22;
+    transition: opacity 160ms linear;
+  }
+  .card.is-draft-card .draft-mark svg {
+    width: min(45%, 170px);
+    height: auto;
+    aspect-ratio: 1;
+    fill: currentColor;
+    filter: drop-shadow(0 2px 10px rgba(0, 0, 0, .45));
+  }
+  .card.is-draft-card:hover .draft-mark,
+  .card.is-draft-card .preview.is-playing .draft-mark { opacity: 0; }
+  /* the way from the home view into the clips view: a small round button in the corner of a clip, shown while the pointer is on it */
+  .locate-btn { display: none; }
+  .rk-home .locate-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 5;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms linear, background-color 80ms linear;
+  }
+  .rk-home .card:hover .locate-btn,
+  .rk-home .locate-btn:focus-visible { opacity: 1; }
+  .rk-home .locate-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  .rk-home .locate-btn svg { width: 17px; height: 17px; fill: currentColor; display: block; }
+  .rk-home .preview:is(:fullscreen, .rk-fs) .locate-btn,
+  .rk-home .card.is-theater-card .locate-btn { display: none; }
+  /* the clip the clips view was opened on: a soft ring, a faint glow and a wash behind the title, all in the text colour like the wash of the tab that is on, that come up and fade, once */
+  @keyframes rk-locate {
+    0% { box-shadow: 0 0 0 0 rgba(var(--text-rgb), 0), 0 0 0 0 rgba(var(--text-rgb), 0), inset 0 0 0 999px rgba(var(--text-rgb), 0); }
+    14% { box-shadow: 0 0 0 3px rgba(var(--text-rgb), .5), 0 0 22px 4px rgba(var(--text-rgb), .16), inset 0 0 0 999px rgba(var(--text-rgb), .16); }
+    70% { box-shadow: 0 0 0 3px rgba(var(--text-rgb), .4), 0 0 18px 3px rgba(var(--text-rgb), .12), inset 0 0 0 999px rgba(var(--text-rgb), .12); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--text-rgb), 0), 0 0 0 0 rgba(var(--text-rgb), 0), inset 0 0 0 999px rgba(var(--text-rgb), 0); }
+  }
+  .card.is-located { animation: rk-locate 2400ms var(--ease_smooth) 1 both; }
+  /* multi-select lives on the opposite corner from Favorite: a quiet empty circle becomes a checked blue control, then the toolbar exposes the bulk operations. */
+  .select-clip-btn {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    z-index: 5;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .select-clip-btn:hover { background: transparent; }
+  .select-clip-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.35; }
+  /* transparent-white (not `none`) so the fill can animate to solid when the card is ticked. */
+  .select-clip-btn .select-ring { fill: rgba(var(--text-rgb), 0); transition: fill 140ms linear, stroke 140ms linear; }
+  /* the check just fades + eases up to full size when a card is ticked -- no overshoot/bounce. */
+  .select-clip-btn .select-check {
+    fill: none;
+    opacity: 0;
+    scale: 0.7;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: opacity 110ms ease, scale 150ms var(--ease_smooth);
+  }
+  .select-clip-btn,
+  .favorite-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms linear, background-color 80ms linear;
+  }
+  .card:hover .select-clip-btn,
+  .card:hover .favorite-btn,
+  .card.is-selected .select-clip-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .card.is-selected { border-color: var(--primary-solid,var(--primary)); box-shadow: 0 0 0 1px var(--primary-solid,var(--primary)); }
+  .card.is-selected .select-clip-btn { background: transparent; }
+  .card.is-selected .select-clip-btn .select-ring { display: block; fill: var(--primary); stroke: var(--primary); }
+  .card.is-selected .select-clip-btn .select-check { stroke: var(--on-accent); stroke-width: 1.55; opacity: 1; scale: 1; }
+  body.is-selection-mode .card:not(.is-selected) { opacity: .58; }
+  body.is-selection-mode .card:not(.is-selected):hover { opacity: .78; }
+  body.is-selection-mode .card { cursor: pointer; }
+
+  /* volume "pill": icon and slider live inside one rounded container that expands on hover. no gap, no absolute positioning, no dead zone -- moving the cursor from the icon to the slider keeps the pill hovered the whole way. */
+  .volume-control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 28px;
+    width: 28px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: width 200ms var(--ease_smooth), background-color 80ms linear;
+  }
+  .volume-control:hover {
+    width: 124px;
+    background: rgba(0, 0, 0, 0.85);
+  }
+  .volume-btn {
+    flex: 0 0 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .volume-btn svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  /* youtube-style speaker waves: every arc + the mute X live in the svg at once, hidden by default. the
+     button's data-level (set by syncVolumeUi) reveals just as many as the current volume warrants, and each
+     one eases in/out from the speaker edge on its own -- so 24%->50% grows only the 2nd arc, 50%->24% retracts
+     only the 2nd arc, etc. no re-render, no restaged animation. */
+  .volume-btn .vol-wave,
+  .volume-btn .vol-x {
+    transform-box: fill-box;
+    opacity: 0;
+    scale: 0.3;
+    transition: opacity 170ms ease, scale 260ms var(--ease_smooth);
+  }
+  .volume-btn .vol-wave { transform-origin: left center; }
+  .volume-btn .vol-x { transform-origin: center; }
+  .volume-btn:not([data-level="1"]):not([data-level="2"]):not([data-level="3"]) .vol-x { opacity: 1; scale: 1; }
+  .volume-btn:is([data-level="1"], [data-level="2"], [data-level="3"]) .vol-wave-1,
+  .volume-btn:is([data-level="2"], [data-level="3"]) .vol-wave-2,
+  .volume-btn[data-level="3"] .vol-wave-3 { opacity: 1; scale: 1; }
+  .volume-slider-wrap {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 12px 0 2px;
+    min-width: 0;
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .volume-control:hover .volume-slider-wrap { opacity: 1; }
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(var(--text-rgb), 0.3);
+    border-radius: 2px;
+    outline: none;
+    margin: 0;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: none;
+  }
+
+  /* duration badge: bottom-right pill on the thumbnail, youtube-style. hidden until the js probe fills it in (probeduration reads the video metadata when the card scrolls into view). stays visible in fullscreen but auto-hides with the rest of the overlay via the is-idle rule. */
+  .duration-badge {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    z-index: 3;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    border-radius: 3px;
+    pointer-events: none;
+    line-height: 1.3;
+    display: none;
+  }
+  .duration-badge.is-ready { display: block; }
+  /* the badge is a "thumbnail garnish" -- it shouldnt sit on top of the actual video. hide it whenever the user has expressed intent to watch: .card:hover -- mouse is over the card. the hover preview will start playing in a moment; hide immediately so the badge doesnt lag behind the user and sit on top of live frames. .preview.is-playing -- belt-and-suspenders for the case where playback was started without a hover (programmatic / fullscreen). .preview:fullscreen -- bottom bars "0:36 / 1:00" is the source of truth in fullscreen. wins over .is-ready via the longer selector chain alone; no !important needed. */
+  .card:hover .duration-badge.is-ready,
+  .preview.is-playing .duration-badge.is-ready,
+  .preview:is(:fullscreen, .rk-fs) .duration-badge.is-ready,
+  .preview:-webkit-full-screen .duration-badge.is-ready {
+    display: none;
+  }
+  /* codec badge: same thumbnail-garnish treatment as the duration badge, mirrored to the bottom-left corner. red tint is the one state worth a second look -- hevc still tagged hev1, meaning this specific clip hasnt gone thru the auto-fix yet and may not play on an iphone. */
+  .codec-badge {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    z-index: 3;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 3px;
+    pointer-events: none;
+    line-height: 1.3;
+    display: none;
+  }
+  .codec-badge.is-ready { display: block; }
+  .codec-badge.is-unfixed { background: rgba(227, 59, 87, 0.55); }
+  .card:hover .codec-badge.is-ready,
+  .preview.is-playing .codec-badge.is-ready,
+  .preview:is(:fullscreen, .rk-fs) .codec-badge.is-ready,
+  .preview:-webkit-full-screen .codec-badge.is-ready {
+    display: none;
+  }
+
+  /* duration progress bar at the very bottom of the preview. always visible -- the empty bar tells you "this is a video", the fill animates while a hover preview plays. in fullscreen the bar is also a click + drag scrubber (handler wired in buildcard). */
+  /* hit area only, fixed size -- big enough to grab comfortably at any time. the visible bar is the ::before track below, not this element, on purpose: a bottom-anchored box whose height is both transitioned and left to auto-resolve its top (top: auto + bottom: 0 + height) never actually repaints on chromium even though getcomputedstyle reports the new height correctly -- confirmed by disabling the transition, which unstuck it immediately. explicitly animating top+height together (like the fullscreen bar below already does) sidesteps that entirely, so the growing pieces here do the same instead of animating this elements own height. */
+  .progress-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 8px;
+    z-index: 3;
+    cursor: pointer;
+  }
+  .progress-bar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.75);
+    transition: top 80ms linear, height 80ms linear;
+  }
+  /* grows the bar a bit and reveals the scrub dot below, same idea as the fullscreen bar -- 3px is fine to look at but too thin to reliably grab with a mouse. top+height move together so the bottom edge (top+height) stays fixed at 8px, i.e. the track stays flush with the bottom of the hit area (and .previews visible bottom edge) on both sides of the grow. */
+  .progress-bar:hover::before,
+  .progress-bar.is-scrubbing::before {
+    top: 3px;
+    height: 5px;
+  }
+  /* scoped to .progress-bar -- this used to be a bare .progress-fill selector, which also matched the unrelated .progress-fill span inside the compress/upload button (.btn.is-progress) since they share a class name. its unscoped top/height leaked into that button through the cascade (higher-specificity .btn.is-progress .progress-fill never set its own height to override it), collapsing the fill into a 3px strip pinned to the top instead of covering the button. confirmed 2026-08-11. */
+  .progress-bar .progress-fill {
+    position: absolute;
+    left: 0;
+    top: 5px;
+    height: 3px;
+    width: 0%;
+    background: var(--primary_light);
+    /* no css transition on width: its repainted every animation frame from the requestanimationframe loop in buildcard(), so easing would just lag the bar behind the real playhead. top/height do transition, same reasoning as ::before above. */
+    transition: top 80ms linear, height 80ms linear;
+  }
+  .progress-bar:hover .progress-fill,
+  .progress-bar.is-scrubbing .progress-fill {
+    top: 3px;
+    height: 5px;
+  }
+  /* dock-sized scrub dot, hidden until the bar is hovered or being dragged -- scaled down version of the fullscreen one below (same anchor-to-fill-edge trick). centred on the fill itself (top:50%), which is bottom-flush against .previews edge, so the dot naturally straddles that edge and overhangs a little onto the card body below -- thats the intended look, not a bug; .previews overflow-clip-margin (see .preview) is what lets that overhang actually render instead of getting cut off. */
+  .progress-scrub-dot {
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary_light);
+    pointer-events: none;
+    transition: transform 80ms ease-out;
+  }
+  .progress-bar:hover .progress-scrub-dot,
+  .progress-bar.is-scrubbing .progress-scrub-dot {
+    transform: translateY(-50%) scale(1);
+  }
+  /* fullscreen-only player chrome (youtube-style) - when the .preview container is the fullscreen element (not the <video>), theres no native browser hud to fall back on. we build one that mirrors youtubes bottom-bar shape: a single transparent panel running edge-to-edge along the bottom of the viewport, holding a thin progress bar with a scrub dot up top and a row of [play/pause | volume | time text ........ fs] under it. a dark gradient fades the bottom 25% of the video so light scenes dont make the controls illegible. hide-from-dock: every element added for the fullscreen player (play-toggle-btn, time-display, settings gear) carries `display: none` here -- the fullscreen rules below switch them on. progress-scrub-dot is not in this list anymore -- it has its own dock-visible styling above. */
+  .preview .play-toggle-btn,
+  .preview .time-display,
+  .preview .settings-wrap { display: none; }
+  .preview:is(:fullscreen, .rk-fs) .settings-wrap,
+  .preview:-webkit-full-screen .settings-wrap {
+    display: inline-flex;
+    position: relative;
+  }
+  /* youtube-style playback-speed popup. anchored above the gear, opens on .is-open. the styling matches the rest of the docks dark-glass menus (auth menu, card more-menu) -- subtle translucent black background, no flashy accent border. */
+  /* playback-speed popup -- styled 1:1 with youtubes actual ytp-variable-speed-panel. values pulled from getcomputedstyle(.ytp-settings-menu) on a live youtube.com page: 60% black background (not super transparent, not backdrop-blur), 12px radius, no shadow, no border. inner controls are subtle translucent-white pills/chips at 10% alpha (20% when active), no borders. the obs-blue accent is kept only on the active pill so the player chrome reads as "youtube but ours". */
+  .settings-menu {
+    position: absolute;
+    right: 0;
+    /* sit above the progress bar (at bottom:56px in fullscreen). */
+    bottom: calc(100% + 20px);
+    width: 330px;                /* YouTubes exact value */
+    background: rgba(0, 0, 0, 0.6);
+    border: 0;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: none;
+    color: rgb(238, 238, 238);
+    z-index: 10;
+    /* sits above the gear, so it grows up out of its bottom edge and eases back down to close -- mirror of the menus that drop. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(10px) scale(.96);
+    transform-origin: bottom center;
+    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .settings-wrap.is-open .settings-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* header: gear glyph + "playback speed" label. no divider line -- youtube uses generous whitespace instead. */
+  .settings-menu .menu-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgb(238, 238, 238);
+    border: 0;
+  }
+  .settings-menu .menu-header svg {
+    width: 12px;
+    height: 18px;
+    fill: currentColor;
+  }
+  /* big centred current-value readout. youtube uses font-weight: 900 for the "1.00x" -- a very heavy display weight that makes the value stand out without taking up extra room. the number itself is now an <input> so the user can type any custom rate; the "x" suffix is a static sibling so they cant accidentally edit or delete it. */
+  .speed-current {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 900;
+    color: rgb(238, 238, 238);
+    font-variant-numeric: tabular-nums;
+    margin: 20px 16px 12px;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 1px;
+  }
+  .speed-current-value {
+    /* strip all defualt <input> chrome so it reads as plain text. */
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    width: 5ch;             /* fits "16.00" -- the longest possible readout, since tofixed(2) always shows 2 decimals and speed_max is 16 -- without clipping the last digit */
+    cursor: text;
+    /* underline always shown so its clear this number is clickable/editable, not just a label; brightens further on focus. */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    transition: border-color 80ms linear;
+  }
+  .speed-current-value:focus {
+    border-bottom-color: rgba(255, 255, 255, 0.85);
+  }
+  .speed-current-unit {
+    margin-left: 1px;
+  }
+  /* slider row: [-] [========o========] [+]. */
+  .speed-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    margin-bottom: 16px;
+  }
+  .speed-step-btn {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 0;
+    border-radius: 16px;
+    color: #fff;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 80ms ease-out;
+  }
+  .speed-step-btn:hover  { background: rgba(255, 255, 255, 0.20); }
+  .speed-step-btn:active { background: rgba(255, 255, 255, 0.28); }
+  .speed-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: 0;
+  }
+  /* quick-select preset pills. youtube renders them as a strip of chips with 10% white background and 16px radius. pills flex to share the row evenly (rather than a fixed 53px) so however many there are, they still fill the fixed-width menu -- needed once the 10x pill joined the original five. active pill flips to obs blue (our accent) rather than youtubes subtle 20% white -- single sharp brand colour across the chrome. */
+  .speed-pills {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+    justify-content: space-between;
+  }
+  .speed-pill {
+    flex: 1;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 0;
+    border-radius: 16px;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 80ms ease-out;
+  }
+  .speed-pill:hover { background: rgba(255, 255, 255, 0.20); }
+  .speed-pill.is-active {
+    background: var(--primary);
+    color: var(--on-accent);
+  }
+
+  /* center play/pause flash. pops in with a quick scale+fade-out every time the user toggles playback via click on the video surface, the play-toggle button, or the space key. mirrors the youtube indicator. js adds .is-flashing for 500 ms. */
+  .center-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 46px;
+    height: 46px;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 350ms ease-out, transform 350ms ease-out;
+  }
+  .center-pulse svg { width: 22px; height: 22px; fill: var(--text); }
+  /* the dock preview is small, so the flash matches the old resting play button; give it room in fullscreen. */
+  .preview:is(:fullscreen, .rk-fs) .center-pulse,
+  .preview:-webkit-full-screen .center-pulse { width: 76px; height: 76px; }
+  .preview:is(:fullscreen, .rk-fs) .center-pulse svg,
+  .preview:-webkit-full-screen .center-pulse svg { width: 38px; height: 38px; }
+  .center-pulse.is-flashing {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+    transition: opacity 80ms linear, transform 80ms linear;
+  }
+
+  /* the shaded backdrop that sits behind the controls when fullscreen. kept short (covers only the control strip + progress bar, not anything above) so it doesnt bleed dark into the settings popup that pops above the gear. earlier this was 110px tall, which meant the popup -- at bottom:64px from the screen, on top of the still-opaque part of the gradient -- read as opaque even at 28% alpha. now the shade tops out at 64px; the popup sits above that and gets the real video as its backdrop. */
+  .preview .player-shade {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 64px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(to top,
+                  rgba(0, 0, 0, 0.85) 0%,
+                  rgba(0, 0, 0, 0.50) 60%,
+                  rgba(0, 0, 0, 0) 100%);
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .preview:is(:fullscreen, .rk-fs) .player-shade,
+  .preview:-webkit-full-screen .player-shade { opacity: 1; }
+
+  /* theater mode: match the fullscreen player -- controls always shown over a shade, and the seek scrubber lifted
+     above the controls row instead of sitting flush at the very bottom of the stage. */
+  .card.is-theater-card .preview-controls { opacity: 1; pointer-events: auto; }
+  .card.is-theater-card .player-shade { opacity: 1; }
+  .card.is-theater-card .progress-bar { bottom: 42px; height: 12px; }
+  .card.is-theater-card .progress-fill { background: var(--primary_light); }
+
+  /* hoist the controls row to a youtube-like bottom bar: edge-to-edge, play/volume/time on the left, fullscreen on the right. */
+  .preview:is(:fullscreen, .rk-fs) .preview-controls,
+  .preview:-webkit-full-screen .preview-controls {
+    opacity: 1;
+    pointer-events: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 8px;
+    gap: 0;
+  }
+  .preview:is(:fullscreen, .rk-fs) .controls-left,
+  .preview:-webkit-full-screen .controls-left {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preview:is(:fullscreen, .rk-fs) .controls-right,
+  .preview:-webkit-full-screen .controls-right {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .preview:is(:fullscreen, .rk-fs) .play-toggle-btn,
+  .preview:-webkit-full-screen .play-toggle-btn,
+  .preview:is(:fullscreen, .rk-fs) .time-display,
+  .preview:-webkit-full-screen .time-display { display: inline-flex; }
+
+  /* big-target icon buttons -- youtubes are about 36 px tall; we match. the hover background is subtle so it doesnt compete with the gradient backdrop. */
+  .preview:is(:fullscreen, .rk-fs) .preview-controls .icon-btn,
+  .preview:-webkit-full-screen .preview-controls .icon-btn,
+  .preview:is(:fullscreen, .rk-fs) .play-toggle-btn,
+  .preview:-webkit-full-screen .play-toggle-btn {
+    background: transparent;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .preview:is(:fullscreen, .rk-fs) .preview-controls .icon-btn:hover,
+  .preview:-webkit-full-screen .preview-controls .icon-btn:hover,
+  .preview:is(:fullscreen, .rk-fs) .play-toggle-btn:hover,
+  .preview:-webkit-full-screen .play-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+  .preview:is(:fullscreen, .rk-fs) .preview-controls .icon-btn svg,
+  .preview:-webkit-full-screen .preview-controls .icon-btn svg,
+  .preview:is(:fullscreen, .rk-fs) .play-toggle-btn svg,
+  .preview:-webkit-full-screen .play-toggle-btn svg {
+    width: 22px; height: 22px; fill: currentColor;
+  }
+  .play-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  /* youtube-style time text: tabular numerics so the seconds tick doesnt shift the layout. uses css variable substitution so the content is js-controlled via setproperty on the badge. */
+  .time-display {
+    align-items: center;
+    color: #fff;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    padding: 0 8px;
+    line-height: 36px;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  }
+
+  /* volume cluster: in fullscreen the slider is collapsed by defualt and expands on hover/focus of the volume button -- the same trick youtube uses. the existing .volume-slider-wrap css handles most of this; we just make the cluster blend with the new bar. */
+  .preview:is(:fullscreen, .rk-fs) .volume-control,
+  .preview:-webkit-full-screen .volume-control { background: transparent; }
+
+  /* the progress bar is the players seek scrubber in fullscreen. place it above the controls row instead of in its own strip at the bottom of the screen -- the youtube look. */
+  .preview:is(:fullscreen, .rk-fs) .progress-bar,
+  .preview:-webkit-full-screen .progress-bar {
+    left: 0;
+    right: 0;
+    bottom: 51px;
+    height: 14px;
+    cursor: pointer;
+    background: transparent;
+    border-radius: 0;
+    z-index: 4;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar::before,
+  .preview:-webkit-full-screen .progress-bar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 0;
+    transition: top 80ms linear, height 80ms linear;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover::before,
+  .preview:-webkit-full-screen .progress-bar:hover::before,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing::before,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing::before {
+    top: 4px;
+    height: 6px;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-fill,
+  .preview:-webkit-full-screen .progress-fill {
+    background: var(--primary_light);
+    border-radius: 0;
+    transition: none;
+    position: absolute;  /* anchor the scrub dot to the fills edge */
+    left: 0;
+    top: 5px;
+    height: 4px;
+    z-index: 2;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover .progress-fill,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-fill,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing .progress-fill,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-fill {
+    top: 4px;
+    height: 6px;
+  }
+  /* youtube-style hover preview fill: a translucent white band that follows the cursors x position along the bar, indicating where a click will seek to. js writes the width onto the element via a css variable on each pointermove; css does the rest. sits behind the real progress fill so it cant visually overpower it when both are present. */
+  .preview:is(:fullscreen, .rk-fs) .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-hover-fill {
+    display: block;
+    position: absolute;
+    left: 0; top: 5px;
+    height: 4px;
+    width: var(--hover-fill, 0%);
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 0;
+    pointer-events: none;
+    z-index: 1;
+    transition: none;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-fill,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing .progress-hover-fill,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-hover-fill {
+    top: 4px;
+    height: 6px;
+  }
+  .preview .progress-hover-fill { display: none; }
+  /* time tooltip floating above the cursor when hovering the bar. */
+  .preview .progress-hover-time { display: none; }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover .progress-hover-time,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-time,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing .progress-hover-time,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-hover-time {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    left: var(--hover-x, 0px);
+    padding: 3px 7px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-radius: 3px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  /* scrub dot riding the playhead. lives inside the .progress-fill so its right:-7px anchor lines up with the playheads actual x position. previously the dot was a sibling of .progress-fill anchored to the right edge of the whole .progress-bar -- which meant it sat at the end of the bar regardless of playback position. hidden by defualt, revealed on bar hover. */
+  .preview:is(:fullscreen, .rk-fs) .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-scrub-dot {
+    display: block;
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary_light);
+    pointer-events: none;
+    transition: transform 80ms ease-out;
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-bar:hover .progress-scrub-dot,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing .progress-scrub-dot,
+  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-scrub-dot {
+    transform: translateY(-50%) scale(1);
+  }
+
+  /* auto-hide after a few seconds of mouse idleness so the controls dont sit on top of the video forever. .is-idle is toggled from js based on a mousemove timer. */
+  .preview:is(:fullscreen, .rk-fs).is-idle,
+  .preview:-webkit-full-screen.is-idle { cursor: none; }
+  .preview:is(:fullscreen, .rk-fs).is-idle .preview-controls,
+  .preview:-webkit-full-screen.is-idle .preview-controls,
+  .preview:is(:fullscreen, .rk-fs).is-idle .progress-bar,
+  .preview:-webkit-full-screen.is-idle .progress-bar,
+  .preview:is(:fullscreen, .rk-fs).is-idle .player-shade,
+  .preview:-webkit-full-screen.is-idle .player-shade {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms linear;
+  }
+
+  /* title row (name + edit pencil + delete + 3-dot menu) */
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .name {
+    /* dont grow -- the name sizes to its text so the pencil sits right next to it. can still shrink (with ellipsis) when the filename is too long for the card. */
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 0;
+  }
+  .name-edit-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--grey7);
+    border: 1px solid var(--button_border_hover);
+    border-radius: 3px;
+    padding: 1px 4px;
+    outline: none;
+  }
+  /* static extension chip next to the rename input -- not an input, so it cant be typed into, and user-select:none keeps a drag-select from grabbing it either. darker fill than the input reads as "this part isnt editable" without needing a label to say so. */
+  .name-edit-ext {
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text_muted);
+    background: var(--grey8);
+    border: 1px solid var(--button_border);
+    border-radius: 3px;
+    padding: 1px 4px;
+    user-select: none;
+    cursor: default;
+  }
+  /* title-row icons are always visible -- the cursor doesnt need to be on the card for them to make sense (the user might already be looking at the card to know they want to rename / open folder). */
+  .icon-mini-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--text_muted);
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 80ms linear, background-color 80ms linear;
+  }
+  .icon-mini-btn:hover { color: var(--text); background: var(--button_bg_hover); }
+  .icon-mini-btn svg   { width: 14px; height: 14px; fill: currentColor; display: block; }
+  .title-actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .icon-mini-btn.delete-btn {
+    color: var(--red);
+    overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: width 140ms ease, color 80ms linear, background-color 80ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  /* same hover-grow / press-shrink as every other button. transform composes with the armed-state width animation without disturbing it; the armed (confirm) state opts back out below. */
+  .icon-mini-btn.delete-btn:hover {
+    color: var(--red);
+    background: rgba(var(--danger-rgb), 0.16);
+    transform: scale(var(--hover_grow));
+  }
+  .icon-mini-btn.delete-btn:active { transform: scale(var(--press_shrink)); }
+  .icon-mini-btn.delete-btn.is-armed { transform: none; }
+  .icon-mini-btn.delete-btn svg {
+    transition: width 140ms ease, opacity 80ms linear;
+  }
+  .delete-confirm-text {
+    display: inline-block;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    transform: translateX(-4px);
+    transition: max-width 140ms ease, opacity 80ms linear, transform 140ms ease;
+  }
+  /* armed state: the trash icon has been clicked once and is waiting for a second click to confirm. */
+  .icon-mini-btn.delete-btn.is-armed,
+  .icon-mini-btn.delete-btn.is-armed:hover {
+    width: 64px;
+    background: var(--red);
+    color: #fff;
+  }
+  .icon-mini-btn.delete-btn.is-armed svg {
+    width: 0;
+    opacity: 0;
+  }
+  .icon-mini-btn.delete-btn.is-armed .delete-confirm-text {
+    max-width: 48px;
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* dropdown for the card actions. pointer placement is calculated in JS for both a three-dot click and a card right-click. */
+  .menu-container { position: static; flex-shrink: 0; }
+  .menu-dropdown {
+    position: absolute;
+    top: var(--menu-top, 0px);
+    left: var(--menu-left, 0px);
+    right: auto;
+    min-width: 190px;
+    background: var(--grey5);
+    border: 1px solid var(--grey3);
+    border-radius: 4px;
+    padding: 4px 0;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    /* same glide as the sort menu -- kept in the dom, faded + lifted + shrunk from its top edge while closed, eased down into place on open. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-10px) scale(.96);
+    transform-origin: top left;
+    transition: opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .menu-dropdown.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  /* group labels plus a left icon rail let the eye jump to a group by its name and then to a row by its glyph -- the icons used to sit a whole menu width from the text they described and one row had none, which broke the column; label style matches .clip-sort-heading so the two menus stay related */
+  .menu-heading {
+    padding: 8px 14px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    color: var(--text_muted);
+    user-select: none;
+  }
+  .menu-heading:first-child { padding-top: 5px; }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .menu-item svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+  .menu-item:hover { background: var(--button_bg_hover); }
+  .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
+  /* the share group (Create Link, Copy to clipboard) carries the blue accent on its icons only, the row text stays white like every other row */
+  .menu-item.share-menu-item .menu-item-icon { color: var(--link_accent); }
+  .menu-item.share-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
+  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--amber); }
+  .menu-separator {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--grey4);
+  }
+  .menu-item.delete-menu-item { color: var(--red); }
+  .menu-item.delete-menu-item:hover { background: rgba(227, 59, 87, 0.16); color: var(--red); }
+  .menu-item.delete-menu-item.is-armed,
+  .menu-item.delete-menu-item.is-armed:hover { background: var(--red); color: var(--text); }
+
+  /* link icon inside action buttons */
+  .btn .btn-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+  .body {
+    padding: 8px 10px 6px;
+    min-width: 0;
+  }
+  .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .meta {
+    font-size: 11px;
+    color: var(--text_muted);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .meta .dot {
+    width: 3px;
+    height: 3px;
+    background: var(--text_muted);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .meta .size,
+  .meta .age,
+  .meta .dot {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .meta .link-status {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--green);
+  }
+  .meta .link-status.is-expiring { color: var(--amber); }
+  .actions {
+    min-height: 40px;
+    padding: 0 10px;
+    display: flex;
+    gap: 6px;
+    background: var(--grey4);
+    border-top: 0;
+    border-radius: 0 0 5px 5px;
+  }
+  .actions .action-link-btn {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    height: 40px;
+    padding: 0 2px;
+    border-color: transparent;
+    background: transparent;
+  }
+  .actions .action-link-btn:hover,
+  .actions .action-link-btn.is-flashing {
+    background: transparent;
+    border-color: transparent;
+    color: var(--link_accent);
+  }
+  .actions .action-link-btn,
+  .actions .action-link-btn:hover,
+  .actions .action-link-btn:active {
+    transform: none !important;
+    scale: 1 !important;
+    transition: color 80ms linear;
+  }
+  .actions.is-progress {
+    padding: 0;
+    background: var(--grey4);
+  }
+  /* the dotted corner of a card, the one the corner of the window has: dragging it makes every card bigger or smaller together. quiet until the pointer is on the card, and gone in the home view, in theater mode and in fullscreen */
+  .card-resize {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 0 1px 1px 0;
+    cursor: nwse-resize;
+    color: var(--text);
+    opacity: .4;
+    touch-action: none;
+    transition: opacity 120ms linear;
+    /* only the lower right half of its box, where the dots are, answers the pointer: the X of an upload bar or of a failed link sits right beside it and keeps its whole box */
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  }
+  .card:hover .card-resize { opacity: .65; }
+  .card .card-resize:hover { opacity: 1; }
+  /* a clip that was only just saved has no picture yet: its card says it is being processed in place of the grey tile, and the player stays out of reach until the picture is there */
+  .processing-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--grey8);
+    color: var(--text_muted);
+    font-size: 12px;
+    border-radius: 5px 5px 0 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 200ms linear, visibility 0s linear 200ms;
+  }
+  .rk-home .processing-overlay { border-radius: 10px; }
+  .card.is-processing .processing-overlay { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 120ms linear; }
+  .processing-spinner {
+    width: 26px;
+    height: 26px;
+    border: 3px solid rgba(var(--text-rgb), .16);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: clip-sort-spin .8s linear infinite;
+  }
+  .card.is-processing .preview { cursor: default; }
+  .card.is-processing .play-overlay, .card.is-processing .player-shade, .card.is-processing .preview-controls, .card.is-processing .progress-bar, .card.is-processing .center-pulse, .card.is-processing .duration-badge { display: none !important; }
+  .card-resize svg { width: 14px; height: 14px; fill: currentColor; display: block; pointer-events: none; }
+  .rk-home .card-resize, .card.is-theater-card .card-resize { display: none; }
+  /* while a drag of the corner runs the cursor stays the corner cursor wherever the pointer is, nothing under it reacts, and the cards do not play their hover motion as the rows move */
+  html.is-card-resizing, html.is-card-resizing * { cursor: nwse-resize !important; user-select: none !important; }
+  html.is-card-resizing .card { pointer-events: none; transition: none !important; translate: 0 0 !important; }
+  /* a chosen size is the same for every list: columns of that width, left aligned, and the room that is left stays empty */
+  html.rk-card-sized .grid { grid-template-columns: repeat(auto-fill, min(var(--rk-card-w), 100%)); justify-content: start; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button_bg);
+    color: var(--text);
+    border: 1px solid var(--button_border);
+    border-radius: var(--border_radius);
+    height: 30px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    transition: background-color 60ms linear, border-color 60ms linear;
+    user-select: none;
+    flex: 1;
+  }
+  .btn:hover {
+    background-color: var(--button_bg_hover);
+    border-color: var(--button_border_hover);
+  }
+  .btn:active { background-color: var(--button_bg_down); }
+  /* :disabled blocks pointer events natively; .is-busy is used by the "uploading x% - cancel" button which must remain clickable so the user can cancel. buttons that should be fully locked also set the `disabled` attribute, so this split is safe. */
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: progress;
+    pointer-events: none;
+  }
+  .actions .action-link-btn.is-blocked {
+    opacity: .55;
+    cursor: not-allowed;
+    pointer-events: auto;
+  }
+  .btn.is-busy {
+    opacity: 0.6;
+    cursor: progress;
+  }
+  .btn.is-flashing,
+  .btn.primary {
+    background-color: var(--primary);
+    border-color: var(--primary_light);
+    color: var(--on-accent);
+  }
+  .btn.primary:hover { background-color: var(--primary_light); }
+  /* in-card progress readout shown during compress / upload. its a plain div, not a button -- only the trailing X (.progress-cancel) is clickable, so the bar no longer swallows clicks or flips the whole control to a red Cancel the instant the pointer touches it. a real .progress-fill child holds the blue fill, kept out of pointer-events so the X stays hittable. no text -- the bar itself is the readout. */
+  .btn.is-progress {
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    height: 38px;
+    padding: 0 30px 0 12px;
+    background-color: transparent;
+    border-color: transparent;
+    border-radius: 0 0 5px 5px;
+    cursor: default;
+  }
+  /* the div still matches .btn:hover/.btn:active -- pin the resting look so hovering the bar doesnt shift it. */
+  .btn.is-progress:hover,
+  .btn.is-progress:active {
+    background-color: transparent;
+    border-color: transparent;
+  }
+  .btn.is-progress .progress-track {
+    position: absolute;
+    left: 12px;
+    right: 34px;
+    top: 50%;
+    height: 6px;
+    transform: translateY(-50%);
+    border-radius: 3px;
+    background: var(--grey3);
+    overflow: hidden;
+  }
+  /* width is driven frame-by-frame from updateDisplayProgress -- no css width transition, it only fought the raf and added ~600ms of lag. */
+  .btn.is-progress .progress-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: var(--link_accent);
+    border-radius: inherit;
+    transition: background-color 60ms linear;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* finalizing: bytes are all sent; the bar holds at 99 while the quick transcode-trigger call finishes. a faint sheen keeps it from reading as stalled -- no text, no jump to 100. */
+  .btn.is-progress.is-finalizing .progress-fill {
+    background-image: linear-gradient(100deg, transparent 20%, rgba(var(--on-accent-rgb), .22) 50%, transparent 80%);
+    background-size: 220% 100%;
+    animation: progress-sheen 1s linear infinite;
+  }
+  @keyframes progress-sheen { from { background-position: 140% 0; } to { background-position: -60% 0; } }
+  /* streamable transcode readout -- same bar mechanism as upload but amber, full-width (no cancel X, you cant cancel a server-side transcode), and the link stays uncopyable until it finishes. */
+  .btn.is-progress.is-transcode { padding: 0 12px; }
+  .btn.is-progress.is-transcode .progress-track { right: 12px; }
+  .btn.is-progress.is-transcode .progress-fill { background: var(--amber); }
+  .btn.is-progress > .btn-icon,
+  .btn.is-progress > .btn-label {
+    display: none;
+  }
+  /* The cancel target keeps a comfortable hit area while only its close icon is visible. */
+  .btn.is-progress > .progress-cancel {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    /* above the resize corner (3) for the few pixels where the two boxes still touch */
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: color 80ms ease-out;
+  }
+  .btn.is-progress > .progress-cancel:hover { background: transparent; color: var(--red); }
+  .btn.is-progress > .progress-cancel svg { width: 10px; height: 10px; fill: currentColor; }
+  /* "remove link" X on a failed upload -- same treatment as the upload bar cancel X, pushed to the right end of the action row. */
+  .actions .link-remove-btn {
+    position: relative;
+    z-index: 4;
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text_muted);
+    cursor: pointer;
+    transition: color 80ms ease-out;
+  }
+  .actions .link-remove-btn:hover { background: transparent; color: var(--red); }
+  .actions .link-remove-btn svg { width: 10px; height: 10px; fill: currentColor; }
+  .toast {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    background: var(--grey6);
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    max-width: 380px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    z-index: 60;
+    display: none;
+  }
+  .toast.is-shown { display: block; }
+  .toast.is-info  { color: var(--text); border-color: var(--grey4-solid,var(--grey4)); }
+  /* an error is told in a popup over everything, the editor included, shaped like the confirm sheet the obs window draws; it waits until it is read */
+  /* with the veil class named too, or the 40 of .modal-veil further down wins and the popup would only sit over the editor by its place in the page */
+  .modal-veil.popup-veil { z-index: 80; }
+  .popup-card { width: min(400px, calc(100vw - 48px)); min-width: min(330px, calc(100vw - 48px)); padding: 18px 20px 16px; border-radius: 6px; }
+  .popup-head { display: flex; align-items: flex-start; gap: 10px; }
+  .popup-head svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; fill: var(--red); }
+  .popup-card h2 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+  .popup-body { margin-top: 8px; font-size: 13px; line-height: 1.5; max-height: 42vh; overflow: auto; overflow-wrap: anywhere; white-space: pre-line; user-select: text; }
+  .popup-body[hidden] { display: none; }
+  .popup-card .row { margin-top: 16px; }
+  .popup-card .row .btn { min-width: 84px; }
+
+  /* the save popup: the editor is locked behind it while the copy or the new original is written, and it follows the encode of the helper. it sits over the editor and the toast and under an error popup */
+  #save-veil { z-index: 70; }
+  /* a save that is over in a moment never shows the card: the page is locked at once, and the card only comes up when the wait is long enough to notice */
+  #save-veil.is-quiet { background: transparent; animation: none; }
+  #save-veil.is-quiet .save-modal { visibility: hidden; animation: none; }
+  .save-modal { width: 380px; max-width: calc(100vw - 48px); }
+  .save-modal [hidden] { display: none; }
+  .save-modal .clip-name { margin: 2px 0 14px; font-size: 12px; color: var(--text_muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .save-track { position: relative; height: 6px; border-radius: 3px; background: var(--grey3); overflow: hidden; }
+  .save-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: var(--link_accent); transition: width 300ms linear; }
+  /* until the helper reports a position the bar slides instead of sitting empty */
+  .save-track.is-waiting .save-fill { width: 34%; transition: none; animation: save-slide 1.15s ease-in-out infinite; }
+  @keyframes save-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+  .save-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .save-percent { color: var(--text_muted); }
+  .save-note { margin-top: 10px; }
+  /* the quiet line in the editor bar that says the edit is being kept as a draft */
+  .trim-draft-note { margin-left: 10px; font-size: 11px; font-weight: 400; color: var(--text_muted); opacity: 0; transition: opacity 240ms linear; pointer-events: none; }
+  .trim-draft-note.is-shown { opacity: .85; }
+  .meta .link-status.is-draft { color: var(--text_muted); }
+
+  /* "compress this clip" modal */
+  .modal-veil {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-veil.is-open { display: flex; }
+  .modal {
+    width: 360px;
+    background: var(--grey6);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-radius: 8px;
+    padding: 18px 18px 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  }
+  .modal h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  .modal .body { color: var(--text_muted); font-size: 12.5px; line-height: 1.5; }
+  .modal .body code {
+    background: var(--grey8);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
+  .modal .row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .modal .row .btn { flex: 0 0 auto; }
+
+  /* trim modal */
+  /* width fills as much of the clips window (850-2400px, per the resize bounds in 71_routes.ps1) as it can without letting the 16:9 video wrap push the modal taller than the window -- bounded by whichever of window width or the height-derived-from-16:9 is tighter. floor matches the old fixed width so the window minimum looks unchanged. */
+  /* the editor is a page of its own inside the clips view: a top bar, the video with a side panel, and the timeline along the bottom, covering the whole view until cancel hands the clips back */
+  #trim-veil {
+    --ed-panel: color-mix(in srgb, var(--grey6) 45%, var(--grey7));
+    background: var(--grey7);
+    align-items: stretch;
+    justify-content: stretch;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* nothing of the editor highlights on a drag, apart from what is typed */
+  #trim-veil input, #trim-veil textarea { -webkit-user-select: text; user-select: text; }
+  /* the wide buttons of the editor grow and give only a little, a full-width button that scales like a small one jumps */
+  #trim-veil .editor-top .btn, .ed-tools .btn:not(.tl-mini), .ed-sub-edit .btn:not(.tl-mini), .ed-fx-card .btn { --hover_grow: 1.01; --press_shrink: .99; }
+  /* the layout is there, unseen, while the clip loads, so the timeline is built at the size it will be shown at */
+  #trim-veil.is-measuring { display: flex; visibility: hidden; }
+  #trim-veil.is-open .modal { animation: none; }
+  .trim-modal {
+    /* every track of the timeline, the video row and the audio rows alike, is this tall */
+    --tl-track-h: 40px;
+    --trim-strip-h: var(--tl-track-h);
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--grey7);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+  }
+  /* the bar over the editor is the bar over the clips and the projector: the window colour with a hairline under it, and as tall as the tab bar (51px, the hairline included) */
+  .editor-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 51px;
+    padding: 0 14px;
+    background: var(--bg_window);
+    border-bottom: 1px solid var(--grey4-solid, var(--grey4));
+  }
+  .editor-cancel { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .editor-cancel svg { width: 14px; height: 14px; display: block; }
+  .editor-title { flex: 1 1 auto; min-width: 0; }
+  .trim-modal .editor-top .trim-heading { margin: 0; justify-content: flex-start; }
+  .trim-modal .editor-top .clip-name { margin: 2px 0 0; }
+  .editor-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+  /* the tools on the left and the panel on the right stand against the edges of the window, square, the panels a half step lighter than the page and running into the toolbar of the timeline under them, with a hairline toward the video, like the bar over them; the timeline below needs no line, its drag handle sets it apart */
+  .editor-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) clamp(260px, 26vw, 340px) auto;
+    min-height: 0;
+  }
+  .editor-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
+  .editor-stage .trim-video-wrap { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; border-radius: 4px; }
+  /* the preview is only the picture while editing: its controls live in the toolbar, and they come back over the video in fullscreen */
+  #trim-veil .trim-video-wrap:not(:fullscreen) .player-shade,
+  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-preview-controls,
+  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-seek-overlay { display: none; }
+  .tl-toolbar .trim-volume-control { position: static; opacity: 1; }
+  /* the volume in the toolbar is always open, its slider showing */
+  .tl-toolbar .volume-control { width: 124px; background: transparent; }
+  .tl-toolbar .volume-control:hover { width: 124px; background: rgba(var(--text-rgb), .08); }
+  .tl-toolbar .volume-slider-wrap { opacity: 1; }
+  .tl-toolbar .volume-btn { color: var(--text); }
+  .tl-toolbar .icon-btn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
+  .tl-toolbar .icon-btn:hover { background: rgba(var(--text-rgb), .08); }
+  .tl-toolbar .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+  .editor-side {
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 14px 14px;
+    background: var(--ed-panel);
+    border-left: 1px solid var(--grey4-solid, var(--grey4));
+  }
+  .editor-side::-webkit-scrollbar { display: none; }
+  /* the panel slides out to the right when what was selected is let go, the way the tools panel slides out to the left, holding a still copy of the card that went for the length of the slide */
+  #trim-veil .editor-side.is-closing { animation: ed-side-out 140ms ease-in both; pointer-events: none; }
+  #trim-veil .editor-side > .editor-card.ed-side-ghost { animation: none; }
+  @keyframes ed-side-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(10px); } }
+  /* the right panel is only there while something is selected, and the video takes its room otherwise; the bar of its tabs stays */
+  .editor-body:not(:has(.editor-side > :not([hidden]))) { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .editor-side:not(:has(> :not([hidden]))) { display: none; }
+  .editor-card { flex: 0 0 auto; padding: 0; border: 0; background: transparent; }
+  .editor-card-title { display: flex; align-items: center; height: 38px; font-size: 13px; font-weight: 700; color: var(--text); margin: 0; }
+  .editor-card .trim-mode-row { margin: 0; border-top: 1px solid var(--hairline); }
+  .editor-card .editor-card-title + .trim-mode-row { border-top: 0; }
+  .editor-side .trim-tracks { margin: 0; }
+  @media (max-width: 640px) {
+    .editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+    .ed-left, .ed-rail-r { display: none; }
+    .editor-side { max-height: 34vh; }
+  }
+  /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
+  #trim-processing-veil { background: var(--grey7); }
+  .trim-processing-modal {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 28px 24px;
+  }
+  .trim-processing-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(var(--text-rgb),.18);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: trim-processing-spin .8s linear infinite;
+  }
+  @keyframes trim-processing-spin { to { transform: rotate(360deg); } }
+  .trim-processing-label {
+    color: var(--text_muted);
+    font-size: 13px;
+  }
+  .trim-processing-stage {
+    min-height: 15px;
+    margin-top: -8px;
+    color: var(--text_muted);
+    font-size: 11px;
+    opacity: .75;
+    font-variant-numeric: tabular-nums;
+  }
+  .trim-modal .clip-name {
+    font-size: 12px;
+    color: var(--text_muted);
+    margin: -2px 0 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .trim-modal .trim-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .trim-modal .trim-heading h2 { margin: 0; }
+  .trim-modal .trim-heading span {
+    color: var(--text_muted);
+    font-size: 12px;
+  }
+  @media (max-width: 760px) {
+    .trim-modal .trim-heading span { display: none; }
+  }
+  /* the video sits inside a wrapper so we can absolutely-position a youtube-style seek overlay and a centered play/pause icon over it without affecting layout of the surrounding modal. locked to 16:9 so a non-16:9 clip letterboxes inside a consistent frame instead of resizing the wrap to match its own aspect ratio. */
+  .trim-video-wrap {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .trim-modal video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    display: block;
+    will-change: transform;
+  }
+  /* centered play/pause button -- visible on hover, fades out so the user can see the underlying frame while scrubbing. */
+  .trim-playpause-btn {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms linear;
+    z-index: 2;
+  }
+  .trim-video-wrap:hover .trim-playpause-btn,
+  .trim-video-wrap.is-paused .trim-playpause-btn { opacity: 1; }
+  .trim-playpause-btn svg { width: 28px; height: 28px; fill: currentColor; display: block; }
+  /* youtube-style seek overlay on the bottom edge of the video. track is faint until the user hovers the video, then brightens. the thumb stays small and circular like youtubes. */
+  .trim-seek-overlay {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 22px;
+    background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0));
+    z-index: 3;
+  }
+  .trim-seek-track {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 6px;
+    height: 4px;
+    background: rgba(var(--text-rgb), 0.28);
+  }
+  .trim-seek-fill {
+    position: absolute;
+    left: 0;
+    bottom: 6px;
+    height: 4px;
+    background: var(--primary_light);
+    pointer-events: none;
+  }
+  .trim-seek-overlay input[type=range] {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 16px;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 4px;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--white1);
+    border: none;
+    cursor: grab;
+    margin-top: -4px;
+  }
+  .trim-seek-overlay input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+  .trim-volume-control {
+    position: absolute;
+    left: 8px;
+    bottom: 28px;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .trim-video-wrap:hover .trim-volume-control,
+  .trim-video-wrap.is-paused .trim-volume-control { opacity: 1; }
+  /* the editor preview deliberately reuses the clip-card player chrome: one bottom control row, the same circular buttons, the same expanding volume control, and the same blue progress treatment. trim handles live on the separate timeline below, so this player only moves the playhead. */
+  .trim-video-wrap.preview .trim-preview-controls {
+    opacity: 0;
+    pointer-events: none;
+    bottom: 10px;
+  }
+  /* card hover previews intentionally keep their <video> transparent until lazy playback is ready. the editor already owns a loaded video, so it must stay visible at every play state. */
+  .trim-video-wrap.preview video { opacity: 1; }
+  /* a zoomed in video keeps its pixels sharp when the editor setting asks for it */
+  html[data-editor-zoom="sharp"] #trim-video[data-zoom] { image-rendering: pixelated; }
+  .trim-video-wrap.preview:hover .trim-preview-controls,
+  .trim-video-wrap.preview.is-paused .trim-preview-controls {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .trim-video-wrap .controls-left,
+  .trim-video-wrap .controls-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .trim-video-wrap .play-toggle-btn,
+  .trim-video-wrap .time-display { display: inline-flex; }
+  .trim-video-wrap .trim-playpause-btn {
+    position: static;
+    transform: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .55);
+    color: #fff;
+    opacity: 1;
+  }
+  .trim-video-wrap .trim-playpause-btn:hover { background: rgba(0, 0, 0, .85); }
+  .trim-video-wrap .trim-playpause-btn svg { width: 16px; height: 16px; }
+  .trim-video-wrap .trim-volume-control {
+    position: static;
+    opacity: 1;
+  }
+  .trim-video-wrap .trim-seek-overlay {
+    left: 0;
+    right: 0;
+    bottom: 43px;
+    height: 14px;
+    background: transparent;
+    border-radius: 0;
+    z-index: 4;
+  }
+  .trim-video-wrap .trim-seek-overlay::before {
+    top: 5px;
+    height: 4px;
+    background: rgba(255, 255, 255, .25);
+    border-radius: 0;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover::before,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing::before {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-seek-fill {
+    top: 5px;
+    bottom: auto;
+    height: 4px;
+    border-radius: 0;
+    z-index: 2;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .trim-seek-fill,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .trim-seek-fill {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-progress-hover {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 5px;
+    height: 4px;
+    background: rgba(var(--text-rgb), .35);
+    border-radius: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .trim-progress-hover,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .trim-progress-hover {
+    top: 4px;
+    height: 6px;
+  }
+  .trim-video-wrap .trim-seek-overlay:hover .progress-hover-time,
+  .trim-video-wrap .trim-seek-overlay.is-scrubbing .progress-hover-time {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: var(--hover-x, 0px);
+    transform: translateX(-50%);
+    padding: 3px 7px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, .78);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  /* danger-tinted "overwrite original" button. the first click "arms" it (turns red + text changes to "click again to confirm"); a second click within 3s actualy fires. avoids the ugly browser confirm() dialog. */
+  .btn.danger-action {
+    background-color: transparent;
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn.danger-action:hover {
+    background-color: rgba(var(--danger-rgb), 0.12);
+    border-color: var(--red);
+  }
+  .btn.danger-action.is-armed {
+    background-color: var(--red);
+    color: #fff;
+    border-color: var(--red);
+  }
+  .btn.danger-action.is-armed:hover {
+    background-color: var(--red);
+    color: #fff;
+  }
+  /* Medal-like edit rail: the actual controls remain native ranges for keyboard/accessibility, while the filmstrip makes the cut points readable at a glance. */
+  .trim-timeline {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .trim-time-ruler {
+    position: absolute;
+    z-index: 5;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 33px;
+    color: rgba(var(--text-rgb), .62);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .trim-time-mark {
+    position: absolute;
+    top: 1px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .trim-time-mark::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    height: 8px;
+    border-left: 1px solid rgba(var(--text-rgb), .42);
+  }
+  .trim-time-minor {
+    position: absolute;
+    top: 24px;
+    width: 1px;
+    height: 4px;
+    background: rgba(var(--text-rgb), .24);
+    transform: translateX(-.5px) scaleX(.6);
+  }
+  /* the frames of the clip are drawn by the timeline into one canvas for the part of it in view, every frame as wide as the strip is tall, so a zoom never stretches one */
+  .trim-filmstrip {
+    position: relative;
+    display: block;
+    height: var(--trim-strip-h, 40px);
+    background: var(--grey8);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .trim-outside {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    background: rgba(5, 6, 9, .68);
+    pointer-events: none;
+  }
+  .trim-outside-start { left: 0; }
+  .trim-outside-end { right: 0; }
+  /* dual-handle range lives over the previews. its selected span adds the bright, bounded edit state instead of pretending the small slider is the whole workflow. */
+  .trim-bar {
+    position: relative;
+    height: var(--trim-strip-h, 38px);
+    margin: calc(-1 * var(--trim-strip-h, 38px)) 0 0;
+    z-index: 4;
+  }
+  .trim-bar::before {
+    display: none;
+  }
+  .trim-bar-track {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0; right: 0;
+    bottom: 0;
+    border: 0;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .trim-bar-range {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    background: transparent;
+    border: 1px solid rgba(var(--text-rgb), .95);
+    border-radius: 5px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, .38);
+    pointer-events: none;
+  }
+  .trim-keyframe-marks {
+    display: none;
+    position: absolute;
+    z-index: 6;
+    left: 0;
+    right: 0;
+    top: -11px;
+    height: 8px;
+    transform: none;
+    pointer-events: none;
+  }
+  .trim-bar.is-snapping .trim-keyframe-marks { display: block; }
+  .trim-snap-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 8px;
+    border-radius: 1px;
+    background: var(--blue2);
+    box-shadow: none;
+    transform: translateX(-50%);
+  }
+  .trim-scrubber {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    cursor: ew-resize;
+  }
+  .trim-bar input[type=range] {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--trim-strip-h, 38px);
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+  }
+  .trim-bar input[type=range]::-webkit-slider-runnable-track {
+    background: transparent;
+    height: var(--trim-strip-h, 38px);
+    border: 0;
+  }
+  .trim-bar input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: var(--trim-strip-h, 38px);
+    border: 0;
+    border-radius: 0;
+    background: var(--text);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 1px 6px rgba(0,0,0,.45);
+    cursor: pointer;
+    pointer-events: auto;
+    margin-top: 0;
+  }
+  /* keep the trim outline thin and continuous across the entire selected clip. each compact white endcap only gets one short center grip stroke, instead of a line that reaches the top and bottom edges. */
+  #trim-start::-webkit-slider-thumb {
+    border-radius: 5px 0 0 5px;
+    background-color: var(--text);
+    background-image: url(/icons/ui/trim-grip.svg);
+    background-size: 100% 100%;
+  }
+  #trim-end::-webkit-slider-thumb {
+    border-radius: 0 5px 5px 0;
+    background-color: var(--text);
+    background-image: url(/icons/ui/trim-grip.svg);
+    background-size: 100% 100%;
+  }
+  .trim-bar input[type=range]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--blue2);
+  }
+  .trim-bar input[type=range]::-webkit-slider-thumb:active { cursor: pointer; }
+  /* current playhead is separate from the cut handles: click or drag anywhere on the frames to move it without changing what will be kept. it is a white head in the ruler, between the time marks and the ticks and barely glowing, then a gap, then a plain line that runs on over the tracks */
+  .trim-playhead {
+    position: absolute;
+    z-index: 7;
+    top: 31px;
+    bottom: 0;
+    width: 2px;
+    background: var(--text);
+    pointer-events: none;
+    transform: translateX(-1px);
+  }
+  .trim-playhead::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    width: 26px;
+    height: 26px;
+    margin-left: -13px;
+    background: radial-gradient(circle closest-side, rgba(var(--text-rgb), .16) 0, rgba(var(--text-rgb), .05) 55%, rgba(var(--text-rgb), 0) 100%);
+  }
+  .trim-playhead::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -18px;
+    width: 13px;
+    height: 13px;
+    margin-left: -6.5px;
+    background: var(--text);
+    clip-path: path("M1.6 0H11.4Q13 0 13 1.6V7.4L6.5 13L0 7.4V1.6Q0 0 1.6 0Z");
+  }
+  /* a yes or no option of the editor: the name on the left, the info icon after it and the switch at the far end, the switch itself coming from the shared _switch partial */
+  .trim-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    user-select: none;
+  }
+  .trim-mode-row > span { order: 1; min-width: 0; }
+  .trim-mode-row > .info-dot { order: 2; }
+  .trim-mode-row:has(input:disabled) { opacity: .6; }
+  .trim-mode-row:has(input:disabled) input { cursor: default; }
+
+  /* compress mode picker */
+  /* two stacked cards, each one click-to-pick. title + one-line trade-off blurb so the user doesnt have to remember which mode is which. */
+  .compress-mode-modal .clip-name {
+    font-size: 12px;
+    color: var(--text_muted);
+    margin: -2px 0 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .compress-mode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .compress-mode-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--grey7);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    font: inherit;
+    transition: background 80ms linear, border-color 80ms linear;
+  }
+  .compress-mode-card:hover,
+  .compress-mode-card:focus-visible {
+    background: var(--grey5);
+    border-color: var(--button_border_hover);
+    outline: none;
+  }
+  .compress-mode-card .title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .compress-mode-card .blurb {
+    font-size: 11.5px;
+    color: var(--text_muted);
+    line-height: 1.4;
+  }
+  /* sits between the filename and the mode cards. visible warning that this flow replaces the source file -- the per-card blurbs talk about encode strategy, this one-liner makes the destructive nature of the operation impossible to miss. matches other destructive actions across the dock. */
+  .compress-mode-warning {
+    font-size: 12px;
+    color: var(--red);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .compress-mode-warning svg {
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+  /* disabled mode card -- used when the clip is already compressed in a way that makes this mode pointless (e.g. fast on an already-fast-compressed clip, or any mode on an already-slow-compressed clip). greyed out, no hover, no click. */
+  .compress-mode-card.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .compress-mode-card .reason {
+    display: none;
+    font-size: 11.5px;
+    color: var(--text_muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .compress-mode-card.is-disabled .reason { display: block; }
+  /* banner shown when the clip is already at maximum compression (slow) and no further compression would improve it. */
+  .compress-mode-locked {
+    display: none;
+    font-size: 12px;
+    color: var(--text_muted);
+    line-height: 1.5;
+    padding: 10px 12px;
+    background: var(--grey7);
+    border: 1px solid var(--grey4-solid,var(--grey4));
+    border-radius: 6px;
+  }
+  .compress-mode-locked b { color: var(--text); font-weight: 600; }
+  .compress-mode-modal.is-locked .compress-mode-list,
+  .compress-mode-modal.is-locked .compress-mode-warning { display: none; }
+  .compress-mode-modal.is-locked .compress-mode-locked { display: block; }
+  /* optional resolution reduction, folded into the same encode. persisted per clips window (localStorage), not a ReplayKit setting. */
+  .compress-downsample-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--text);
+    --sw-w: 34px;
+    --sw-h: 19px;
+  }
+  .compress-downsample-row > span { order: 1; min-width: 0; }
+  .compress-downsample-row[hidden] { display: none !important; }
+  .compress-downsample-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .compress-downsample-detail[hidden] { display: none !important; }
+  .compress-downsample-note {
+    font-size: 11.5px;
+    color: var(--text_muted);
+    line-height: 1.4;
+  }
+  .compress-mode-modal.is-locked .compress-downsample-row,
+  .compress-mode-modal.is-locked .compress-downsample-detail { display: none; }
+
+  /* controls that are mid-operation or locked shouldnt react to the pointer. ordered
+     after the hover/active rules above so the equal-specificity opt-out wins. */
+  .btn:disabled,
+  .btn.is-busy,
+  .btn.is-progress,
+  .btn.is-flashing,
+  .tab-action:disabled,
+  .tab-action.is-disabled,
+  .tab-action.is-running,
+  .bulk-icon-btn:disabled,
+  .bulk-clear:disabled,
+  .btn.danger-action.is-armed,
+  .compress-mode-card.is-disabled {
+    transform: none;
+  }
+
+  /* modals + toast: settle in rather than snapping. the veil fades, the panel rises into it. */
+  @keyframes rk-veil-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rk-modal-in { from { opacity: 0; transform: translateY(10px) scale(.965); } to { opacity: 1; transform: none; } }
+  @keyframes rk-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  /* per-row fade + rise for menus that open -- staggered via nth-child delays at each menu. */
+  @keyframes rk-menu-item { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @keyframes rk-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .modal-veil.is-open { animation: rk-veil-in 130ms ease both; }
+  .modal-veil.is-open .modal { animation: rk-modal-in 190ms var(--ease_pop) both; }
+  .toast.is-shown { animation: rk-toast-in 160ms var(--ease_pop) both; }
+</style>

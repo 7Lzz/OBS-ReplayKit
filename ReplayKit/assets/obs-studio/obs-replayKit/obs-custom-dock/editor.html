@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html><head>
+<!--#include editor-fx-->
+<!--#include editor-lanes-->
+<!--#include editor-tools-->
+</head><body>
+  <div class="modal-veil" id="trim-veil">
+    <div class="modal trim-modal" id="trim-modal">
+      <header class="editor-top">
+        <button class="btn editor-cancel" type="button" id="trim-cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cancel</button>
+        <div class="editor-title">
+          <div class="trim-heading"><h2>Edit clip</h2><span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span></div>
+          <div class="clip-name" id="trim-clip-name"></div>
+        </div>
+        <div class="editor-actions">
+          <button class="btn danger-action" type="button" id="trim-overwrite">Overwrite original</button>
+          <button class="btn primary"       type="button" id="trim-save">Save copy</button>
+        </div>
+      </header>
+      <div class="editor-body">
+        <div class="ed-left" id="ed-left"></div>
+        <div class="editor-stage">
+        <div class="trim-video-wrap preview">
+          <video id="trim-video" preload="metadata" playsinline
+                 controlsList="nodownload noplaybackrate noremoteplayback"
+                 disablePictureInPicture></video>
+          <div class="lay-overlay" id="trim-layer-overlay" hidden aria-hidden="true"></div>
+          <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true"></div>
+          <div class="player-shade"></div>
+          <div class="preview-controls trim-preview-controls">
+            <div class="controls-left">
+              <button class="trim-playpause-btn play-toggle-btn" id="trim-playpause" type="button"
+                      aria-label="Play/Pause">
+                <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
+              </button>
+              <div class="trim-volume-control volume-control">
+                <!-- syncVolumeUi swaps this for the shared VOLUME_ICON (speaker + wave arcs + mute X) on first sync, well before the edit modal is opened. -->
+                <button class="volume-btn" id="trim-volume-btn" type="button" data-level="0"></button>
+                <div class="volume-slider-wrap">
+                  <input type="range" class="volume-slider" id="trim-volume-slider" min="0" max="100" step="1" value="60">
+                </div>
+              </div>
+              <span class="time-display"><span id="trim-current-time">0:00</span> / <span id="trim-total-time">0:00</span></span>
+            </div>
+            <div class="controls-right">
+              <button class="icon-btn" id="trim-fullscreen" type="button" aria-label="Toggle fullscreen">
+                <svg viewBox="0 0 24 24" id="trim-fullscreen-icon"><path d="M10 3H3V10C3 10.26 3.10 10.51 3.29 10.70C3.48 10.89 3.73 11 4 11C4.26 11 4.51 10.89 4.70 10.70C4.89 10.51 5 10.26 5 10V6.41L9.29 10.70L9.36 10.77C9.56 10.92 9.80 11.00 10.04 10.99C10.29 10.98 10.52 10.87 10.70 10.70C10.87 10.52 10.98 10.29 10.99 10.04C11.00 9.80 10.92 9.56 10.77 9.36L10.70 9.29L6.41 5H10C10.26 5 10.51 4.89 10.70 4.70C10.89 4.51 11 4.26 11 4C11 3.73 10.89 3.48 10.70 3.29C10.51 3.10 10.26 3 10 3ZM20 13C19.73 13 19.48 13.10 19.29 13.29C19.10 13.48 19 13.73 19 14V17.58L14.70 13.29L14.63 13.22C14.43 13.07 14.19 12.99 13.95 13.00C13.70 13.01 13.47 13.12 13.29 13.29C13.12 13.47 13.01 13.70 13.00 13.95C12.99 14.19 13.07 14.43 13.22 14.63L13.29 14.70L17.58 19H14C13.73 19 13.48 19.10 13.29 19.29C13.10 19.48 13 19.73 13 20C13 20.26 13.10 20.51 13.29 20.70C13.48 20.89 13.73 21 14 21H21V14C21 13.73 20.89 13.48 20.70 13.29C20.51 13.10 20.26 13 20 13Z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="trim-seek-overlay progress-bar">
+            <div class="progress-hover-fill trim-progress-hover" id="trim-progress-hover"></div>
+            <div class="trim-seek-fill progress-fill" id="trim-seek-fill"><div class="progress-scrub-dot"></div></div>
+            <div class="progress-hover-time" id="trim-progress-time"></div>
+            <input type="hidden" id="trim-seek" min="0" max="100" value="0">
+          </div>
+        </div>
+        </div>
+        <aside class="editor-side">
+          <section class="editor-card tl-props" id="tl-props" hidden></section>
+          <section class="editor-card" hidden>
+            <div class="editor-card-title">Options</div>
+          <div class="trim-mode-row">
+            <input type="checkbox" class="rk-switch" id="trim-precise" aria-label="Frame-accurate cut">
+            <span>Frame-accurate cut</span>
+            <button class="info-dot" type="button" aria-label="About frame-accurate trim" data-tooltip="Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it's off, cuts are instant, but a clip may start slightly earlier than you chose."></button>
+          </div>
+          <div class="trim-mode-row" title="Drops the audio stream from the edited output.">
+            <input type="checkbox" class="rk-switch" id="trim-remove-audio" aria-label="Remove audio">
+            <span>Remove audio</span>
+          </div>
+          </section>
+        </aside>
+        <nav class="ed-rail ed-rail-r" id="ed-right-rail" aria-label="Selection"></nav>
+      </div>
+      <div class="editor-bottom" id="editor-bottom">
+        <div class="tl-resizer" id="tl-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline"></div>
+        <div class="tl-card">
+        <div class="tl-toolbar" id="tl-toolbar"></div>
+        <div class="tl-area">
+         <div class="tl-holder">
+          <div class="tl-frame" id="tl-frame">
+           <div class="tl-content" id="tl-content">
+            <div class="tl-axis" id="tl-axis">
+             <div class="tl-ruler">
+              <div class="trim-time-ruler" id="trim-time-ruler" aria-hidden="true"></div>
+              <div class="trim-scrubber" id="trim-scrubber" aria-label="Scrub timeline"></div>
+              <div class="trim-playhead" id="trim-playhead" aria-hidden="true"></div>
+             </div>
+             <div class="tl-tracks" id="tl-tracks">
+              <div class="trim-scrubber tl-scrub-gap" id="trim-scrubber-gap" aria-label="Scrub timeline"></div>
+              <div class="tl-layers" id="tl-layers" hidden></div>
+              <div class="tl-subs" id="tl-subs" hidden></div>
+              <div class="trim-timeline" aria-label="Trim timeline">
+               <div class="trim-filmstrip" id="trim-filmstrip" aria-hidden="true"></div>
+               <div class="trim-outside trim-outside-start" id="trim-outside-start"></div>
+               <div class="trim-outside trim-outside-end" id="trim-outside-end"></div>
+               <div class="trim-bar">
+                <div class="trim-bar-track"></div>
+                <div class="trim-bar-range" id="trim-range-fill"></div>
+                <div class="trim-keyframe-marks" id="trim-keyframe-marks"></div>
+                <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0" aria-label="Trim start">
+                <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100" aria-label="Trim end">
+               </div>
+              </div>
+              <div class="tl-lanes" id="tl-lanes" hidden></div>
+             </div>
+            </div>
+           </div>
+          </div>
+         </div>
+         <div class="tl-bar is-v" id="tl-vbar" aria-hidden="true"></div>
+         <div class="tl-bar is-h" id="tl-hbar" aria-hidden="true"></div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-veil" id="save-veil">
+    <div class="modal save-modal" id="save-modal" role="alertdialog" aria-modal="true" aria-labelledby="save-title" aria-describedby="save-note">
+      <h2 id="save-title">Saving a copy</h2>
+      <div class="clip-name" id="save-clip-name"></div>
+      <div class="save-track is-waiting" id="save-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="save-fill" id="save-fill"></div></div>
+      <div class="save-line"><span id="save-stage">Starting</span><span class="save-percent" id="save-percent"></span></div>
+      <div class="body save-note" id="save-note">Editing is locked until this is done.</div>
+      <div class="row"><button class="btn" type="button" id="save-cancel">Cancel save</button></div>
+    </div>
+  </div>
+
+<script>
+// the editor runs in a scope of its own and hangs everything it puts on the window, the document or the veils of the clips page off one signal, so the clips page can unload it whole once it sits closed and the collector can take all of it
+window.__rkEditorApi = (function () {
+  const EDITOR_SIGNAL = window.__rkEditorScope.signal;
+  // trim modal -- ffmpeg stream-copy via post /trim. dual-handle range: two <input type="range"> elements share the same track. css makes the inputs pointer-events:none and only the thumbs recieve clicks, so the two handles never block each other and the underlying highlight bar reflects the selected window.
+  const trimProcessingCancel = document.getElementById("trim-processing-cancel");
+  const trimClipName     = document.getElementById("trim-clip-name");
+  const trimVideoWrap    = document.querySelector(".trim-video-wrap");
+  const trimVideo        = document.getElementById("trim-video");
+  const trimPlayPauseBtn = document.getElementById("trim-playpause");
+  const trimPlayPauseIcn = document.getElementById("trim-playpause-icon");
+  const trimStart        = document.getElementById("trim-start");
+  const trimEnd          = document.getElementById("trim-end");
+  const trimSeek         = document.getElementById("trim-seek");
+  const trimSeekFill     = document.getElementById("trim-seek-fill");
+  const trimProgressBar  = document.querySelector(".trim-seek-overlay");
+  const trimProgressHover = document.getElementById("trim-progress-hover");
+  const trimProgressTime = document.getElementById("trim-progress-time");
+  const trimRangeFill    = document.getElementById("trim-range-fill");
+  const trimFilmstrip    = document.getElementById("trim-filmstrip");
+  const trimTimeRuler    = document.getElementById("trim-time-ruler");
+  const trimOutsideStart = document.getElementById("trim-outside-start");
+  const trimOutsideEnd   = document.getElementById("trim-outside-end");
+  const trimScrubber     = document.getElementById("trim-scrubber");
+  const trimScrubberGap  = document.getElementById("trim-scrubber-gap");
+  const trimPlayhead     = document.getElementById("trim-playhead");
+  const trimBar          = document.querySelector(".trim-bar");
+  const trimKeyframeMarks = document.getElementById("trim-keyframe-marks");
+  const trimCurrentTime  = document.getElementById("trim-current-time");
+  const trimTotalTime    = document.getElementById("trim-total-time");
+  const trimFullscreen   = document.getElementById("trim-fullscreen");
+  const trimFullscreenIcon = document.getElementById("trim-fullscreen-icon");
+  const trimCancel       = document.getElementById("trim-cancel");
+  const trimSave         = document.getElementById("trim-save");
+  const trimOverwrite    = document.getElementById("trim-overwrite");
+  const trimPrecise      = document.getElementById("trim-precise");
+  const trimRemoveAudio  = document.getElementById("trim-remove-audio");
+  const trimVolumeBtn    = document.getElementById("trim-volume-btn");
+  const trimVolumeSlider = document.getElementById("trim-volume-slider");
+  const trimProcessingStage = document.getElementById("trim-processing-stage");
+  const saveTitle        = document.getElementById("save-title");
+  const saveClipName     = document.getElementById("save-clip-name");
+  const saveTrack        = document.getElementById("save-track");
+  const saveFill         = document.getElementById("save-fill");
+  const saveStage        = document.getElementById("save-stage");
+  const savePercent      = document.getElementById("save-percent");
+  const saveCancel       = document.getElementById("save-cancel");
+  const trimDraftNote    = document.getElementById("trim-draft-note");
+  // the tools panel is made right after the lanes, which already talk to it while they are being made
+  let editorTools = null;
+  let editorFx = null;
+  // while a voiceover records with the clip silent, both the video and the rows of the lanes play nothing
+  let recordingQuiet = false;
+  const trimLanes = RKEditorLanes.create({
+    video: trimVideo,
+    helper: HELPER,
+    dom: {
+      toolbar: document.getElementById("tl-toolbar"),
+      bottom: document.getElementById("editor-bottom"),
+      resizer: document.getElementById("tl-resizer"),
+      frame: document.getElementById("tl-frame"),
+      content: document.getElementById("tl-content"),
+      axis: document.getElementById("tl-axis"),
+      ruler: trimTimeRuler,
+      tracks: document.getElementById("tl-tracks"),
+      strip: trimFilmstrip,
+      lanes: document.getElementById("tl-lanes"),
+      props: document.getElementById("tl-props"),
+      timeline: document.querySelector(".tl-tracks .trim-timeline"),
+      subs: document.getElementById("tl-subs"),
+      subOverlay: document.getElementById("trim-sub-overlay"),
+      layers: document.getElementById("tl-layers"),
+      layerOverlay: document.getElementById("trim-layer-overlay"),
+      vbar: document.getElementById("tl-vbar"),
+      hbar: document.getElementById("tl-hbar"),
+    },
+    getBounds: () => getTrimBounds(),
+    setBounds: (start, end) => {
+      setTrimRangeValue(trimStart, start);
+      setTrimRangeValue(trimEnd, end);
+      updateTrimUi();
+      updateSeekFill();
+    },
+    getTime: () => trimVideo.currentTime || 0,
+    seek: (t) => {
+      trimPreviewActive = false;
+      previewSeek(t, false);
+      trimSeek.value = String(t);
+      updateSeekFill();
+      updateTrimPlayhead();
+      syncTrimTimeDisplay();
+    },
+    // the length the handles of the cut run over, which is what the video was measured to be when it was opened; the video element goes on to report a slightly different length once more of the file is read
+    duration: () => Number(trimEnd.max) || Number(trimVideo.duration) || Number(trimSeek.max) || 0,
+    isPlaying: () => !trimVideo.paused && !trimVideo.ended,
+    togglePlay: () => togglePlayback(),
+    stop: () => {
+      trimPreviewActive = false;
+      try { trimVideo.pause(); } catch {}
+      trimVideo.currentTime = getPlayBounds().start;
+    },
+    isOpen: () => trimVeil.classList.contains("is-open"),
+    master: () => (recordingQuiet || VolumeState.muted ? 0 : VolumeState.volume),
+    onSubtitles: () => { if (editorTools) editorTools.refresh(); },
+    // the tabs on the right: which one of the video is open, and what is selected
+    videoPane: () => (editorFx ? editorFx.pane() : "general"),
+    onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
+    onFx: () => { if (editorFx) editorFx.changed(); syncTrimReencodeLock(); },
+    // where a subtitle breaks into lines, shared by the preview and the saved copy so both break it the same way
+    layoutSubtitle: (text, style) => RKEditorTools.layoutText(text, style, (trimVideo.videoWidth || 16) / (trimVideo.videoHeight || 9)),
+    subtitleAspect: () => (trimVideo.videoWidth || 16) + "x" + (trimVideo.videoHeight || 9),
+    restore: () => applyVolume(trimVideo),
+    // the default rate is set too, so the preview keeps its speed when the source is loaded again after a stall
+    setVideoRate: (rate) => {
+      trimVideo.defaultPlaybackRate = rate;
+      trimVideo.playbackRate = rate;
+    },
+    onVideoSpeed: () => syncTrimReencodeLock(),
+    // an edit of the pieces, the cut or the audio can change whether the saved copy has to be made frame by frame
+    onEdit: () => { syncTrimReencodeLock(); scheduleTrimDraft(); },
+    // the save buttons wait while audio is being added
+    onBusy: () => updateTrimUi(),
+    notify: (text, kind, title) => {
+      // a refusal of something that was asked for (a file that cannot be added) is a popup with room for every line; a hint along the way stays a toast
+      if (kind === "bad") {
+        showToast(Array.isArray(text) ? text.map(escapeHtml).join("<br>") : escapeHtml(text), "bad", title);
+        return;
+      }
+      showToast(text, "info");
+      scheduleToastHide(3500);
+    },
+  });
+
+  editorTools = RKEditorTools.create({
+    lanes: trimLanes,
+    helper: HELPER,
+    root: document.getElementById("ed-left"),
+    // the clips starred on the clips page, which the library of the editor lists first
+    favorites: () => favoriteNamesList(),
+    side: document.querySelector(".editor-side"),
+    video: trimVideo,
+    isPlaying: () => !trimVideo.paused && !trimVideo.ended,
+    play: () => { if (trimVideo.paused || trimVideo.ended) togglePlayback(); },
+    pause: () => { if (!trimVideo.paused) togglePlayback(); },
+    setQuiet: (on) => {
+      recordingQuiet = !!on;
+      if (recordingQuiet) trimVideo.muted = true;
+      else applyVolume(trimVideo);
+      trimLanes.applyMaster();
+    },
+    notify: (text, kind, title) => {
+      if (kind === "bad") {
+        showToast(escapeHtml(text), "bad", title);
+        return;
+      }
+      showToast(escapeHtml(text), "info");
+      scheduleToastHide(3500);
+    },
+  });
+  editorFx = RKEditorFx.createPanel({
+    lanes: trimLanes,
+    side: document.querySelector(".editor-side"),
+    rail: document.getElementById("ed-right-rail"),
+    video: trimVideo,
+  });
+  // the slide of the right panel when its last card goes. the cards are hidden by the modules that own them, so the card that went is copied as it was and stands in for it until the slide is over; a card that comes back meanwhile ends it at once
+  (() => {
+    const side = document.querySelector("#trim-veil .editor-side");
+    if (!side) return;
+    let ghost = null;
+    let timer = 0;
+    const end = () => {
+      clearTimeout(timer);
+      if (ghost) { ghost.remove(); ghost = null; }
+      side.classList.remove("is-closing");
+    };
+    const showing = () => Array.from(side.children).some((c) => c.classList.contains("editor-card") && !c.hidden && c !== ghost);
+    new MutationObserver((records) => {
+      if (showing()) { if (ghost) end(); return; }
+      if (ghost) return;
+      const gone = records.find((r) => r.target.parentNode === side && r.oldValue === null && r.target.classList.contains("editor-card") && r.target.hidden);
+      // the card of a subtitle slides out by itself before it is hidden
+      if (!gone || gone.target.classList.contains("ed-sub-edit")) return;
+      ghost = gone.target.cloneNode(true);
+      ghost.hidden = false;
+      ghost.removeAttribute("id");
+      ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+      ghost.classList.add("ed-side-ghost");
+      ghost.inert = true;
+      side.appendChild(ghost);
+      side.classList.add("is-closing");
+      timer = setTimeout(end, 140);
+    }).observe(side, { subtree: true, attributes: true, attributeFilter: ["hidden"], attributeOldValue: true });
+  })();
+  const placeSubtitles = RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-sub-overlay"));
+  RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-layer-overlay"));
+
+  // a file dropped on this page while no clip is open would make the window open the file itself, so the drag is turned away here; with a clip open the editor takes it
+  ["dragenter", "dragover", "drop"].forEach((name) => document.addEventListener(name, (e) => {
+    if (trimVeil.classList.contains("is-open") || !e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "none";
+  }, { signal: EDITOR_SIGNAL }));
+
+  // a copy at another speed, with the video cut into pieces, or with audio reaching past the video is always made again frame by frame, so the frame-accurate switch is on and locked while that is so and goes back to what it was after
+  let trimPreciseBeforeSpeed = null;
+  function syncTrimReencodeLock() {
+    const retimed = Math.abs(trimLanes.videoSpeed() - 1) > 1e-6;
+    const subtitled = !!trimLanes.subtitlePlan();
+    const looked = !!trimLanes.lookPlan() || !!trimLanes.layerPlan();
+    const needed = retimed || trimLanes.videoEdited() || subtitled || looked;
+    const row = trimPrecise.closest(".trim-mode-row");
+    if (needed && trimPreciseBeforeSpeed === null) {
+      trimPreciseBeforeSpeed = trimPrecise.checked;
+      trimPrecise.checked = true;
+      trimPrecise.disabled = true;
+      if (row) row.title = retimed ? "A copy at another speed is always made again frame by frame." : subtitled ? "A copy with subtitles is always made again frame by frame, since they are drawn into the picture." : looked ? "A copy with colour, filters, effects or layers is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
+      trimPrecise.dispatchEvent(new Event("change"));
+    } else if (!needed && trimPreciseBeforeSpeed !== null) {
+      trimPrecise.disabled = false;
+      trimPrecise.checked = trimPreciseBeforeSpeed;
+      trimPreciseBeforeSpeed = null;
+      if (row) row.removeAttribute("title");
+      trimPrecise.dispatchEvent(new Event("change"));
+    }
+    updateTrimUi();
+    syncTrimTimeDisplay();
+  }
+
+  enableCursorZoom(trimVideoWrap, trimVideo, () => !!trimSourceClip && replayKitSettings.editorWheelZoom);
+
+  // minimum trimmed length the backend will accept.
+  const TRIM_MIN_SECONDS = 0.5;
+  const TRIM_SNAP_EDGE_GUARD_PX = 10;
+  const TRIM_SNAP_MIN_GAP_PX = 8;
+  const TRIM_SNAP_MAX_MARKS = 96;
+  const TRIM_SNAP_DENSE_HIDE_THRESHOLD = 60;
+  // how long trimVideo can go without a timeupdate while it should be playing before we treat it as stuck and reload -- long enough that normal scrub-triggered stalls never trip it, short enough that a genuinely failed chunk does not look like a hang to the user.
+  const TRIM_STALL_TIMEOUT_MS = 2500;
+  // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
+  let trimPreviewActive = false;
+  let trimSourceClip = null;
+  // the save that is running, or null: the editor cannot be closed or changed while there is one
+  // the draft of the open editor: armed once the editor is up, and what was last sent, so an edit that did not change is not sent again
+  let trimDraftArmed = false;
+  let trimDraftTimer = 0;
+  let trimDraftSent = "";
+  let trimDraftNoteTimer = 0;
+  const TRIM_DRAFT_DELAY_MS = 900;
+  let trimSnapPoints = [];
+  let trimSnapDuration = 0;
+  let trimSnapRequestSeq = 0;
+  let trimSnapSkipped = false;
+  let trimThumbnailRequestSeq = 0;
+  let trimTimelineScrubbing = false;
+  let trimPlayerScrubbing = false;
+  // true if trimVideo was mid-playback when a drag-scrub started, so it can resume on release instead of staying paused
+  let trimScrubResumePlay = false;
+  // last time trimVideo actually advanced while it should have been playing -- a range request that fails mid-scrub doesnt reliably fire a JS-visible error on an already-loading video, it just stops advancing and sits on its last decoded frame since <video> never retries a failed range request on its own, so its watched on a timer below rather than off network events.
+  let trimLastProgressAt = 0;
+  let trimStallRecovering = false;
+  const trimSnapFetchCache = new Map();
+
+  function fmtTrimTime(s) {
+    if (!isFinite(s)) s = 0;
+    const sign = s < -0.005 ? "-" : "";
+    s = Math.abs(s);
+    const minutes = Math.floor(s / 60);
+    const seconds = s - minutes * 60;
+    // m:ss.cc -- centiseconds give the user a sense of precision without overwhelming the display.
+    const ss = seconds.toFixed(2).padStart(5, "0");
+    return sign + minutes + ":" + ss;
+  }
+
+  function fmtTimelineTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    const minutes = Math.floor(s / 60);
+    const seconds = Math.floor(s - minutes * 60);
+    return minutes + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function clearTrimTimeline() {
+    if (trimFilmstrip) trimFilmstrip.style.backgroundImage = "";
+    trimLanes.setFilmstrip(null);
+    trimLanes.setVideoTint("");
+    if (trimTimeRuler) trimTimeRuler.replaceChildren();
+    if (trimOutsideStart) trimOutsideStart.style.width = "0%";
+    if (trimOutsideEnd) trimOutsideEnd.style.width = "0%";
+    if (trimPlayhead) trimPlayhead.style.left = "0%";
+  }
+
+  // the ruler is drawn by the lanes module, for the part of the timeline that is in view
+  function renderTrimTimeRuler() {
+    trimLanes.refresh();
+  }
+
+  // capture the same source video into small canvases instead of requesting a second set of video streams. the helper limits simultaneous file previews, and keeping this on trimVideo lets the editor stay responsive on a large clip folder.
+  function captureTrimFrame(canvas, time, requestSeq) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = 0;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        trimVideo.removeEventListener("seeked", finish);
+        requestAnimationFrame(() => {
+          let captured = false;
+          if (requestSeq === trimThumbnailRequestSeq && trimVideo.readyState >= 2) {
+            try {
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(trimVideo, 0, 0, canvas.width, canvas.height);
+              captured = true;
+            } catch (_) {}
+          }
+          resolve(captured);
+        });
+      };
+      trimVideo.addEventListener("seeked", finish, { once: true });
+      // A cold range request for a long local recording can take longer than the old 700ms limit. wait long enough for a decodable frame, then keep a real thumbnail fallback rather than leaving a gray canvas behind.
+      timer = setTimeout(finish, 1500);
+      try { trimVideo.currentTime = time; } catch (_) { finish(); }
+    });
+  }
+
+  // the average colour of the frames, as a faint tint for the outline of the video row: the hue and the saturation of the clip, lifted to a lightness that reads on the dark strip. a clip that is grey stays grey
+  function trimFilmTint(film) {
+    const probe = document.createElement("canvas");
+    probe.width = probe.height = 8;
+    const pctx = probe.getContext("2d", { willReadFrequently: true });
+    let r = 0, g = 0, b = 0, n = 0;
+    for (const f of film.frames) {
+      if (!f.ok) continue;
+      try {
+        pctx.drawImage(f.canvas, 0, 0, 8, 8);
+        const px = pctx.getImageData(0, 0, 8, 8).data;
+        for (let k = 0; k < px.length; k += 4) { r += px[k]; g += px[k + 1]; b += px[k + 2]; n++; }
+      } catch (_) { return ""; }
+    }
+    if (!n) return "";
+    r /= 255 * n; g /= 255 * n; b /= 255 * n;
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b), d = hi - lo;
+    let h = 0;
+    if (d > 0) {
+      if (hi === r) h = ((g - b) / d) % 6;
+      else if (hi === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+    }
+    const l = (hi + lo) / 2;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    const sat = s < 0.08 ? 0 : Math.min(0.85, Math.max(0.3, s * 1.3));
+    return "hsla(" + Math.round(h) + ", " + Math.round(sat * 100) + "%, 66%, .55)";
+  }
+
+  // the frames of the film strip as the helper made them ahead of time and keeps them: one picture holding all of them, which takes a fraction of the time that seeking the video for every frame does, and nothing at all the next time the clip is opened. null when the helper has none or cannot make one, and the frames are then captured from the video as they always were
+  async function loadHelperFilmstrip(clip, requestSeq) {
+    if (!clip || !clip.name) return null;
+    const deadline = Date.now() + 15000;
+    let info = null;
+    while (Date.now() < deadline) {
+      if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return null;
+      try {
+        const res = await fetch(HELPER + "/clip-filmstrip?name=" + encodeURIComponent(clip.name) + "&t=" + Date.now(), { cache: "no-store" });
+        info = await res.json();
+      } catch (_) { return null; }
+      if (!info || !info.ok || info.error) return null;
+      if (info.ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    if (!info || !info.ready || !Array.isArray(info.times) || !info.times.length) return null;
+    const sprite = new Image();
+    const loaded = await new Promise((resolve) => {
+      sprite.onload = () => resolve(true);
+      sprite.onerror = () => resolve(false);
+      sprite.src = HELPER + "/film-strip?key=" + encodeURIComponent(info.key);
+    });
+    if (!loaded || !sprite.naturalWidth || !sprite.naturalHeight) return null;
+    const count = info.times.length;
+    const tileW = sprite.naturalWidth / count;
+    const tileH = sprite.naturalHeight;
+    const aspect = tileW / tileH;
+    const frames = info.times.map((time, i) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = Math.max(40, Math.round(160 / aspect));
+      canvas.getContext("2d").drawImage(sprite, i * tileW, 0, tileW, tileH, 0, 0, canvas.width, canvas.height);
+      return { t: Number(time), canvas, ok: true };
+    });
+    return { aspect, frames };
+  }
+
+  async function buildTrimFilmstrip(clip, duration, onProgress) {
+    const requestSeq = ++trimThumbnailRequestSeq;
+    clearTrimTimeline();
+    renderTrimTimeRuler();
+    if (!trimFilmstrip || !(duration > 0)) return;
+    // the strip is made of frames as wide as the strip is tall, so a frame is never stretched; these are the frames the timeline draws from, and a zoomed timeline shows the nearest of them in every cell. one frame per cell of the timeline at its widest fit
+    const stripHeight = trimFilmstrip.clientHeight || 40;
+    const stripWidth = trimFilmstrip.clientWidth || Math.max(480, window.innerWidth - 32);
+    const aspect = trimVideo.videoWidth > 0 && trimVideo.videoHeight > 0 ? trimVideo.videoWidth / trimVideo.videoHeight : 16 / 9;
+    const frameCount = Math.max(6, Math.min(28, Math.round(stripWidth / (stripHeight * aspect))));
+    const film = { aspect, frames: [] };
+    // what shows where a frame is not in yet, or never comes: the thumbnail of the clip, tiled
+    const fallbackUrl = clip ? thumbUrlFor(clip) : "";
+    if (fallbackUrl) {
+      trimFilmstrip.style.backgroundImage = 'url("' + fallbackUrl.replace(/"/g, "%22") + '")';
+      trimFilmstrip.style.backgroundSize = "auto 100%";
+      trimFilmstrip.style.backgroundRepeat = "repeat-x";
+    }
+    const made = await loadHelperFilmstrip(clip, requestSeq);
+    if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
+    if (made) {
+      trimLanes.setFilmstrip(made);
+      trimLanes.setVideoTint(trimFilmTint(made));
+      return;
+    }
+    for (let i = 0; i < frameCount; i++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = Math.max(40, Math.round(160 / aspect));
+      film.frames.push({ t: Math.max(0, Math.min(duration - 0.04, duration * (i + 0.5) / frameCount)), canvas, ok: false });
+    }
+    trimLanes.setFilmstrip(film);
+    for (let i = 0; i < film.frames.length; i++) {
+      if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
+      film.frames[i].ok = await captureTrimFrame(film.frames[i].canvas, film.frames[i].t, requestSeq);
+      if (onProgress) onProgress(i + 1, film.frames.length);
+      trimLanes.setFilmstrip(film);
+    }
+    if (requestSeq !== trimThumbnailRequestSeq || !trimSourceClip) return;
+    trimLanes.setVideoTint(trimFilmTint(film));
+    try { trimVideo.currentTime = 0; } catch (_) {}
+  }
+
+  function trimDuration() {
+    return Math.max(0, Number(trimEnd.value) - Number(trimStart.value));
+  }
+
+  function getTrimBounds() {
+    const duration = Math.max(0, Number(trimVideo.duration) || Number(trimEnd.max) || 0);
+    const start = Math.max(0, Math.min(duration, Number(trimStart.value) || 0));
+    const end = Math.max(start, Math.min(duration, Number(trimEnd.value) || duration));
+    return { start, end };
+  }
+
+  // what the preview plays between: the cut, or while the timeline plays by itself the saved clip, which may reach past the video on either side
+  function getPlayBounds() {
+    return trimLanes.windowBounds() || getTrimBounds();
+  }
+
+  function clampTrimPreviewTime(time) {
+    const { start, end } = getTrimBounds();
+    return Math.max(start, Math.min(end, Number(time) || start));
+  }
+
+  // what the player counts: the video, or while the timeline plays by itself the saved clip, which may reach past the video on either side
+  function playSpan() {
+    const saved = trimLanes.windowBounds();
+    if (saved) return saved;
+    return { start: 0, end: Math.max(0, Number(trimVideo.duration) || Number(trimSeek.max) || 0) };
+  }
+
+  function clampVideoTime(time) {
+    const span = playSpan();
+    return Math.max(span.start, Math.min(span.end, Number(time) || 0));
+  }
+
+  // fastseek() is the right primitive for scrubbing: it returns immediately and the browser decodes the nearest seekable point. plain currenttime= forces a precise decode which lags noticeably while the user is dragging. fall back to currenttime when fastseek isnt availible.
+  function previewSeek(t, stayInTrimRange) {
+    if (!isFinite(t)) return;
+    t = stayInTrimRange === false ? clampVideoTime(t) : clampTrimPreviewTime(t);
+    if (trimVideo.fastSeek) {
+      try { trimVideo.fastSeek(t); return; } catch {}
+    }
+    trimVideo.currentTime = t;
+  }
+
+  function updateSeekFill() {
+    const saved = trimLanes.windowBounds();
+    if (saved) {
+      const length = saved.end - saved.start;
+      const at = Math.max(saved.start, Math.min(saved.end, Number(trimVideo.currentTime) || 0));
+      trimSeekFill.style.width = length > 0 ? (((at - saved.start) / length) * 100) + "%" : "0%";
+      return;
+    }
+    const min = Number(trimSeek.min) || 0;
+    const max = Number(trimSeek.max) || 0;
+    const span = max - min;
+    if (span <= 0) { trimSeekFill.style.width = "0%"; return; }
+    const value = Math.max(min, Math.min(max, Number(trimSeek.value) || min));
+    trimSeekFill.style.width = (((value - min) / span) * 100) + "%";
+  }
+
+  // exact same progress-bar interaction as clip cards, but it moves the editor playhead instead of a hover-preview loop. the hidden input keeps the existing trim playback and keyboard code using one source of truth without putting a permanent native thumb on screen.
+  function scrubTrimPlayer(clientX) {
+    if (!trimProgressBar) return;
+    const rect = trimProgressBar.getBoundingClientRect();
+    const span = playSpan();
+    const duration = span.end - span.start;
+    if (!(duration > 0) || rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = span.start + ratio * duration;
+    trimPreviewActive = false;
+    // no pause here -- it fires on every pointermove during a drag. the pointerdown handler below pauses once (if it was playing) and the pointerup/cancel handler resumes it, so skipping never leaves playback stuck paused.
+    previewSeek(time, false);
+    trimSeek.value = String(time);
+    updateSeekFill();
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
+  }
+
+  function updateTrimProgressHover(clientX) {
+    if (!trimProgressBar) return;
+    const rect = trimProgressBar.getBoundingClientRect();
+    const xPx = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const ratio = rect.width > 0 ? xPx / rect.width : 0;
+    trimProgressBar.style.setProperty("--hover-x", xPx + "px");
+    if (trimProgressHover) trimProgressHover.style.width = (ratio * 100) + "%";
+    if (trimProgressTime) {
+      const span = playSpan();
+      trimProgressTime.textContent = formatDuration(ratio * (span.end - span.start) / trimLanes.videoSpeed());
+    }
+  }
+
+  if (trimProgressBar) {
+    trimProgressBar.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      trimPlayerScrubbing = true;
+      // pause for the drag (still frame per position instead of racing playback), resumed in stopTrimPlayerScrub if it was actually playing
+      trimScrubResumePlay = !trimVideo.paused;
+      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
+      trimProgressBar.classList.add("is-scrubbing");
+      try { trimProgressBar.setPointerCapture(e.pointerId); } catch (_) {}
+      scrubTrimPlayer(e.clientX);
+      updateTrimProgressHover(e.clientX);
+    });
+    trimProgressBar.addEventListener("pointermove", (e) => {
+      if (trimPlayerScrubbing) scrubTrimPlayer(e.clientX);
+      updateTrimProgressHover(e.clientX);
+    });
+    trimProgressBar.addEventListener("pointerleave", () => {
+      if (trimProgressHover && !trimPlayerScrubbing) trimProgressHover.style.width = "0%";
+    });
+    const stopTrimPlayerScrub = (e) => {
+      trimPlayerScrubbing = false;
+      trimProgressBar.classList.remove("is-scrubbing");
+      try { trimProgressBar.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
+    };
+    trimProgressBar.addEventListener("pointerup", stopTrimPlayerScrub);
+    trimProgressBar.addEventListener("pointercancel", stopTrimPlayerScrub);
+  }
+
+  function updateTrimPlayhead() {
+    if (!trimPlayhead) return;
+    const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
+    const value = Math.max(0, Math.min(max, Number(trimSeek.value) || 0));
+    // while the timeline plays by itself the playhead may be in the room made for the pieces that reach past the video
+    const ratio = max > 0 ? (trimLanes.windowBounds() ? (Number(trimVideo.currentTime) || 0) : value) / max : 0;
+    trimPlayhead.style.left = (ratio * 100) + "%";
+    trimPlayhead.dataset.time = fmtTimelineTime(ratio * max / trimLanes.videoSpeed());
+    trimPlayhead.classList.toggle("is-at-start", ratio < 0.035);
+    trimPlayhead.classList.toggle("is-at-end", ratio > 0.965);
+    trimLanes.setPlayhead(value);
+  }
+
+  // keep the playhead independent from the cut handles. the timeline is a normal editor scrub surface: click or drag the frames to inspect a moment, then only move a handle when that is the edit you intend.
+  function scrubTrimTimeline(clientX) {
+    if (!trimFilmstrip) return;
+    const rect = trimFilmstrip.getBoundingClientRect();
+    const max = Number(trimSeek.max) || Number(trimVideo.duration) || 0;
+    if (!(max > 0) || rect.width <= 0) return;
+    const saved = trimLanes.windowBounds();
+    const ratio = (clientX - rect.left) / rect.width;
+    const time = saved ? Math.max(saved.start, Math.min(saved.end, ratio * max)) : Math.max(0, Math.min(1, ratio)) * max;
+    trimPreviewActive = false;
+    // no pause here -- same reasoning as scrubTrimPlayer above, this also runs on every pointermove during the drag.
+    previewSeek(time, false);
+    trimSeek.value = String(time);
+    updateSeekFill();
+    updateTrimPlayhead();
+  }
+
+  // the ruler and the strip of room between the ruler and the first track both scrub the timeline
+  [trimScrubber, trimScrubberGap].forEach((scrubber) => {
+    if (!scrubber) return;
+    scrubber.addEventListener("pointerdown", (e) => {
+      if (!trimSourceClip) return;
+      e.preventDefault();
+      trimTimelineScrubbing = true;
+      // pause for the drag (still frame per position instead of racing playback), resumed in stopTimelineScrub if it was actually playing
+      trimScrubResumePlay = !trimVideo.paused;
+      if (trimScrubResumePlay) { try { trimVideo.pause(); } catch {} }
+      try { scrubber.setPointerCapture(e.pointerId); } catch (_) {}
+      scrubTrimTimeline(e.clientX);
+    });
+    scrubber.addEventListener("pointermove", (e) => {
+      if (trimTimelineScrubbing) scrubTrimTimeline(e.clientX);
+    });
+    const stopTimelineScrub = (e) => {
+      trimTimelineScrubbing = false;
+      try { scrubber.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
+    };
+    scrubber.addEventListener("pointerup", stopTimelineScrub);
+    scrubber.addEventListener("pointercancel", stopTimelineScrub);
+  });
+
+  function resetTrimSnapPoints() {
+    trimSnapPoints = [];
+    trimSnapDuration = 0;
+    trimSnapSkipped = false;
+    trimStart.step = trimEnd.step = "0.01";
+    if (trimKeyframeMarks) trimKeyframeMarks.replaceChildren();
+    if (trimBar) trimBar.classList.remove("is-snapping");
+  }
+
+  function normalizeTrimSnapPoints(points, duration) {
+    const max = Math.max(0, Number(duration) || 0);
+    const values = [0];
+    (points || []).forEach((raw) => {
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0 || value > max) return;
+      values.push(value);
+    });
+    if (max > 0) values.push(max);
+    values.sort((a, b) => a - b);
+    const out = [];
+    values.forEach((value) => {
+      if (!out.length || Math.abs(value - out[out.length - 1]) > 0.001) {
+        out.push(value);
+      }
+    });
+    return out;
+  }
+
+  function isTrimSnapActive() {
+    return !trimPrecise.checked && trimSnapPoints.length > 1 && trimSnapDuration > 0;
+  }
+
+  function skipTrimSnapPoints() {
+    resetTrimSnapPoints();
+    trimSnapSkipped = true;
+    syncTrimSnapMode(false);
+  }
+
+  function trimSnapCacheKey(clipName, mtime, size) {
+    return String(clipName || "") + "\n" + String(mtime || "") + "\n" + String(size || "");
+  }
+
+  function pickVisibleTrimSnapMarks(width) {
+    const drawable = trimSnapPoints.filter((value) => value > 0.001 && value < trimSnapDuration - 0.001);
+    if (!drawable.length || width <= 0) return [];
+    // every keyframe stays visible on short clips. Long clips are downsampled to one mark per readable on-screen slot so the ruler remains a guide instead of turning into a solid blue stripe.
+    const maxMarks = Math.max(24, Math.min(TRIM_SNAP_MAX_MARKS, Math.floor(width / TRIM_SNAP_MIN_GAP_PX)));
+    const stride = Math.max(1, Math.ceil(drawable.length / maxMarks));
+    const marks = [];
+    let lastPx = -Infinity;
+    for (let i = 0; i < drawable.length; i += stride) {
+      const value = drawable[i];
+      const px = (value / trimSnapDuration) * width;
+      if (px - lastPx < TRIM_SNAP_MIN_GAP_PX) continue;
+      marks.push(value);
+      lastPx = px;
+    }
+    return marks;
+  }
+
+  function rememberTrimSnapFetch(key, promise) {
+    trimSnapFetchCache.set(key, { promise });
+    while (trimSnapFetchCache.size > 48) {
+      const oldest = trimSnapFetchCache.keys().next().value;
+      trimSnapFetchCache.delete(oldest);
+    }
+  }
+
+  function fetchTrimSnapPoints(clipName, mtime, size, duration) {
+    const key = trimSnapCacheKey(clipName, mtime, size);
+    const cached = trimSnapFetchCache.get(key);
+    if (cached) return cached.promise;
+    const promise = (async () => {
+      const durationParam = Number.isFinite(duration) ? ("&duration=" + encodeURIComponent(duration.toFixed(3))) : "";
+      for (let attempt = 0; attempt < 240; attempt++) {
+        const res = await fetch(HELPER + "/trim/keyframes?file=" + encodeURIComponent(clipName) + durationParam + "&t=" + Date.now(), { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 202 || data.pending) {
+          const retryMs = Math.max(250, Math.min(2000, Number(data.retryMs) || 500));
+          await new Promise((resolve) => setTimeout(resolve, retryMs));
+          continue;
+        }
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "keyframe probe failed");
+        }
+        return {
+          keyframes: data.keyframes || [],
+          count: Number(data.count) || 0,
+          cached: !!data.cached,
+          probeMs: Number(data.probeMs) || 0
+        };
+      }
+      throw new Error("keyframe probe timed out");
+    })()
+      .catch((err) => {
+        trimSnapFetchCache.delete(key);
+        throw err;
+      });
+    rememberTrimSnapFetch(key, promise);
+    return promise;
+  }
+
+  function renderTrimSnapMarks() {
+    if (!trimKeyframeMarks || !trimBar) return;
+    trimKeyframeMarks.replaceChildren();
+    const dense = trimSnapPoints.length > TRIM_SNAP_DENSE_HIDE_THRESHOLD;
+    trimBar.classList.toggle("is-snapping", isTrimSnapActive() && !dense);
+    if (!isTrimSnapActive() || dense) return;
+    const width = trimBar.getBoundingClientRect().width || trimBar.clientWidth || 0;
+    const drawable = pickVisibleTrimSnapMarks(width);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < drawable.length; i++) {
+      const mark = document.createElement("span");
+      mark.className = "trim-snap-mark";
+      mark.style.left = ((drawable[i] / trimSnapDuration) * 100).toFixed(4) + "%";
+      frag.appendChild(mark);
+    }
+    trimKeyframeMarks.appendChild(frag);
+  }
+
+  function snapIndexAtOrAfter(value) {
+    let lo = 0;
+    let hi = trimSnapPoints.length - 1;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (trimSnapPoints[mid] < value) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  function nearestTrimSnap(value) {
+    if (!isTrimSnapActive()) return value;
+    const next = snapIndexAtOrAfter(value);
+    const prev = Math.max(0, next - 1);
+    const a = trimSnapPoints[prev];
+    const b = trimSnapPoints[next];
+    if (Math.abs(value - a) <= Math.abs(b - value)) return a;
+    return b;
+  }
+
+  function trimSnapAtOrAfter(value) {
+    if (!isTrimSnapActive()) return value;
+    return trimSnapPoints[snapIndexAtOrAfter(value)];
+  }
+
+  function trimSnapAtOrAfterVisible(value) {
+    if (!isTrimSnapActive()) return value;
+    const first = snapIndexAtOrAfter(value);
+    const width = trimBar.getBoundingClientRect().width || trimBar.clientWidth || 0;
+    if (width <= 0) return trimSnapPoints[first];
+    for (let index = first; index < trimSnapPoints.length - 1; index++) {
+      const px = (trimSnapPoints[index] / trimSnapDuration) * width;
+      // do not lock a handle to a keyframe the user cannot actually see because it sits beneath the endcap.
+      if (px >= TRIM_SNAP_EDGE_GUARD_PX && px <= width - TRIM_SNAP_EDGE_GUARD_PX) {
+        return trimSnapPoints[index];
+      }
+    }
+    return trimSnapPoints[first];
+  }
+
+  function trimSnapAtOrBefore(value) {
+    if (!isTrimSnapActive()) return value;
+    const next = snapIndexAtOrAfter(value);
+    if (trimSnapPoints[next] > value && next > 0) return trimSnapPoints[next - 1];
+    return trimSnapPoints[next];
+  }
+
+  function setTrimRangeValue(input, value) {
+    input.value = Math.max(0, value).toFixed(3);
+  }
+
+  function snapTrimSelection(activeHandle) {
+    if (!isTrimSnapActive()) {
+      clampHandles(activeHandle === "start");
+      return;
+    }
+    let s = Number(trimStart.value);
+    let e = Number(trimEnd.value);
+    if (activeHandle === "end") {
+      e = nearestTrimSnap(e);
+      if (e - s < TRIM_MIN_SECONDS) {
+        s = trimSnapAtOrBefore(e - TRIM_MIN_SECONDS);
+      }
+    } else if (activeHandle === "start") {
+      // when the start handle leaves zero, use the first keyframe the user can see instead of repeatedly resolving back to a hidden edge keyframe. this keeps fast trims keyframe-safe without making the first drag look stuck.
+      s = s > 0.001 ? trimSnapAtOrAfterVisible(s) : 0;
+      if (e - s < TRIM_MIN_SECONDS) {
+        e = trimSnapAtOrAfter(s + TRIM_MIN_SECONDS);
+      }
+    } else {
+      s = nearestTrimSnap(s);
+      e = nearestTrimSnap(e);
+      if (e - s < TRIM_MIN_SECONDS) {
+        e = trimSnapAtOrAfter(s + TRIM_MIN_SECONDS);
+        if (e - s < TRIM_MIN_SECONDS) s = trimSnapAtOrBefore(e - TRIM_MIN_SECONDS);
+      }
+    }
+    if (e - s < TRIM_MIN_SECONDS) {
+      s = 0;
+      e = Math.min(trimSnapDuration, Math.max(TRIM_MIN_SECONDS, trimSnapDuration));
+    }
+    setTrimRangeValue(trimStart, s);
+    setTrimRangeValue(trimEnd, e);
+  }
+
+  async function loadTrimSnapPoints(clipName, duration, snapAfterLoad, mtime, size) {
+    const seq = ++trimSnapRequestSeq;
+    resetTrimSnapPoints();
+    if (!clipName || !(duration > 0)) return;
+    try {
+      const data = await fetchTrimSnapPoints(clipName, mtime, size, duration);
+      if (seq !== trimSnapRequestSeq || !trimSourceClip || trimSourceClip.name !== clipName) return;
+      trimSnapDuration = duration;
+      trimSnapPoints = normalizeTrimSnapPoints(data.keyframes || [], duration);
+      syncTrimSnapMode(snapAfterLoad);
+    } catch (e) {
+      if (seq === trimSnapRequestSeq) {
+        skipTrimSnapPoints();
+        if (!trimPrecise.checked) {
+          showToast("Fast trim snap points unavailable; using normal fast trim.", "info");
+          scheduleToastHide(3000);
+        }
+      }
+    }
+  }
+
+  function syncTrimSnapMode(snapCurrent) {
+    trimStart.step = trimEnd.step = isTrimSnapActive() ? "any" : "0.01";
+    renderTrimSnapMarks();
+    if (snapCurrent && isTrimSnapActive()) {
+      snapTrimSelection("both");
+      trimSeek.value = trimStart.value;
+      updateTrimUi();
+      updateSeekFill();
+    }
+  }
+
+  if (trimBar && window.ResizeObserver) {
+    const trimSnapResizeObserver = new ResizeObserver(() => renderTrimSnapMarks());
+    trimSnapResizeObserver.observe(trimBar);
+  } else {
+    window.addEventListener("resize", renderTrimSnapMarks, { signal: EDITOR_SIGNAL });
+  }
+
+  function updateTrimUi() {
+    const max = Number(trimEnd.max) || 0;
+    const s = Number(trimStart.value);
+    const rawEnd = Number(trimEnd.value);
+    // the handles move on a grid of hundredths and a clip hardly ever ends on one, so a handle that was left at the end rests a hair short of it; that hair is the end, and shown as a gap it would read as a dark bar at the end of the tracks
+    const e = max - rawEnd > 0 && max - rawEnd < 0.0105 ? max : rawEnd;
+    // the cut is shown on the timeline of the saved copy, which is the video divided by its speed
+    const rate = trimLanes.videoSpeed();
+    trimSeek.min = "0";
+    trimSeek.max = String(max);
+    trimSeek.value = String(clampVideoTime(trimSeek.value));
+    updateTrimPlayhead();
+    if (max > 0) {
+      const sPct = (s / max) * 100;
+      const ePct = (e / max) * 100;
+      trimRangeFill.style.left  = sPct + "%";
+      trimRangeFill.style.width = Math.max(0, ePct - sPct) + "%";
+      if (trimOutsideStart) trimOutsideStart.style.width = sPct + "%";
+      if (trimOutsideEnd) trimOutsideEnd.style.width = Math.max(0, 100 - ePct) + "%";
+      trimLanes.showBounds(s, e);
+    } else {
+      trimRangeFill.style.width = "0%";
+      if (trimOutsideStart) trimOutsideStart.style.width = "0%";
+      if (trimOutsideEnd) trimOutsideEnd.style.width = "0%";
+    }
+    const valid = (e - s) >= TRIM_MIN_SECONDS;
+    const importing = trimLanes.busy();
+    const free = !trimSaving && !importing;
+    trimSave.disabled = !valid || !free;
+    trimOverwrite.disabled = !valid || !free;
+    [trimSave, trimOverwrite].forEach((button) => {
+      if (importing) button.title = "Wait until the audio has been added";
+      else button.removeAttribute("title");
+    });
+  }
+
+  function syncTrimPlayIcon() {
+    const paused = trimVideo.paused || trimVideo.ended;
+    trimPlayPauseIcn.innerHTML = paused ? ICON.EDITOR_PLAY : ICON.EDITOR_PAUSE;
+    trimVideoWrap.classList.toggle("is-paused", paused);
+  }
+
+  function syncTrimTimeDisplay() {
+    const saved = trimLanes.windowBounds();
+    const duration = saved ? saved.end - saved.start : Number(trimVideo.duration) || Number(trimSeek.max) || 0;
+    const current = (trimVideo.currentTime || 0) - (saved ? saved.start : 0);
+    const rate = trimLanes.videoSpeed();
+    if (trimTotalTime) trimTotalTime.textContent = formatDuration(duration / rate);
+    if (trimCurrentTime) trimCurrentTime.textContent = formatDuration(current / rate);
+  }
+
+  function isTrimFullscreen() {
+    return document.fullscreenElement === trimVideoWrap ||
+           document.webkitFullscreenElement === trimVideoWrap;
+  }
+
+  // the volume and fullscreen buttons sit in the middle of the toolbar while editing and go back onto the video in fullscreen, where the toolbar is not
+  function placeTrimControls() {
+    const volume = document.querySelector("#trim-veil .trim-volume-control");
+    const middle = document.querySelector("#tl-toolbar .tl-play-group");
+    if (!volume || !middle || !trimFullscreen) return;
+    if (isTrimFullscreen()) {
+      const left = trimVideoWrap.querySelector(".controls-left");
+      const right = trimVideoWrap.querySelector(".controls-right");
+      if (left && volume.parentNode !== left) left.insertBefore(volume, left.querySelector(".time-display"));
+      if (right && trimFullscreen.parentNode !== right) right.appendChild(trimFullscreen);
+    } else {
+      if (volume.parentNode !== middle) middle.appendChild(volume);
+      if (trimFullscreen.parentNode !== middle) middle.appendChild(trimFullscreen);
+    }
+  }
+
+  function syncTrimFullscreenIcon() {
+    placeTrimControls();
+    if (!trimFullscreenIcon) return;
+    trimFullscreenIcon.innerHTML = isTrimFullscreen() ? ICON.FULLSCREEN_EXIT : ICON.FULLSCREEN;
+    trimFullscreen.dataset.tooltip = isTrimFullscreen() ? "Exit fullscreen (F)" : "Fullscreen (F)";
+  }
+
+  // overwrite needs two clicks within 3s to fire -- first click "arms" the button (red fill + "click again to confirm"). avoids the browser-dock confirm() dialog while still preventing one-click destructive operations.
+  let overwriteArmed = false;
+  let overwriteArmTimer = 0;
+  function disarmOverwrite() {
+    overwriteArmed = false;
+    if (overwriteArmTimer) { clearTimeout(overwriteArmTimer); overwriteArmTimer = 0; }
+    trimOverwrite.classList.remove("is-armed");
+    trimOverwrite.textContent = "Overwrite original";
+  }
+
+  function openTrimModal(clip) {
+    if (!clip || !clip.name || trimSaving) return;
+    // the real editor stays closed and this stands in for it until onMeta below fires -- popping the actual trim-veil open early would show stale slider positions and an unloaded video (left over from whatever clip was edited last) for a beat before they snap to the right values.
+    trimProcessingVeil.classList.add("is-open");
+    trimVeil.classList.add("is-measuring");
+    // a grid cards hover-preview video is tracked independently of trimVideo and nothing here used to stop it -- if the pointer was still over a card when Edit was clicked, that cards <video> kept streaming right alongside trimVideo, uncoordinated and sometimes hitting the same file; the old single-threaded helper mostly hid this, but the multithreaded one can actually run both requests at once, which was driving the intermittent stuck-preview freeze.
+    if (activePreview) {
+      abortVideoLoad(activePreview);
+      activePreview = null;
+    }
+    // the editor settings are read again as it opens, since they may have changed since this page last looked
+    const settingsReady = loadReplayKitSettings();
+    trimSourceClip = clip;
+    // a draft that was kept for this clip is read while the clip loads
+    const draftPromise = hasDraft(clip.name) ? fetchDraft(clip.name) : Promise.resolve(null);
+    trimDraftArmed = false;
+    trimDraftSent = "";
+    trimLanes.resetZoom();
+    trimProcessingStage.textContent = "Reading the clip";
+    resetVideoZoom(trimVideo);
+    trimClipName.textContent = clip.name;
+    trimSave.disabled = true;
+    trimSave.textContent = "Save copy";
+    trimOverwrite.disabled = true;
+    disarmOverwrite();
+    trimPreviewActive = false;
+    trimStallRecovering = false;
+    trimLastProgressAt = Date.now();
+    // the editor always cuts frame accurately; the switch and the keyframe snapping behind it stay, hidden, for when the choice comes back
+    trimPrecise.checked = true;
+    trimPrecise.disabled = false;
+    trimPreciseBeforeSpeed = null;
+    trimRemoveAudio.checked = false;
+    trimSnapRequestSeq++;
+    resetTrimSnapPoints();
+    applyVolume(trimVideo);
+    syncVolumeUi(trimVolumeBtn, trimVolumeSlider);
+    syncTrimPlayIcon();
+    syncTrimTimeDisplay();
+    syncTrimFullscreenIcon();
+    // wait for metadata so we know the real duration before sizing the sliders. the /file endpoint serves range requests, so preload metadata is cheap (a few kb of moov atom, not the whole clip). v=mtime cache-busts; matches the per-card preview url.
+    trimVideo.src = clipPreviewUrlFor(clip);
+    trimVideo.currentTime = 0;
+    const onMeta = async () => {
+      await settingsReady;
+      if (trimSourceClip !== clip) return;
+      trimPrecise.checked = true;
+      const dur = isFinite(trimVideo.duration) ? trimVideo.duration : 0;
+      trimStart.min = trimEnd.min = trimSeek.min = "0";
+      trimStart.max = trimEnd.max = trimSeek.max = String(dur);
+      trimStart.value = "0";
+      trimEnd.value   = String(dur);
+      trimSeek.value  = "0";
+      updateTrimUi();
+      updateSeekFill();
+      syncTrimTimeDisplay();
+      // the preview frames, the audio tracks with their waveforms and the keyframes are all prepared while the loading screen is up, and the editor shows once every one of them is in -- otherwise the timeline fills in piece by piece in front of the user, which is what this screen exists to hide. each part guards itself against a clip that was closed or replaced meanwhile.
+      trimProcessingStage.textContent = "Building the preview";
+      const filmstripPromise = buildTrimFilmstrip(clip, dur, (done, total) => {
+        trimProcessingStage.textContent = "Building the preview " + done + "/" + total;
+      });
+      const lanesPromise = trimLanes.load(clip.name, {
+        stage: (text) => { if (trimSourceClip === clip) trimProcessingStage.textContent = text; },
+        note: (text) => showToast(escapeHtml(text), "bad", "The audio could not be loaded"),
+      });
+      editorTools.prepare();
+      if (!trimPrecise.checked) {
+        await loadTrimSnapPoints(clip.name, dur, true, clip.mtime, clip.size);
+      } else {
+        syncTrimSnapMode(false);
+      }
+      await Promise.all([filmstripPromise.catch(() => {}), lanesPromise.catch(() => false)]);
+      // the user couldve cancelled (or opened a different clip) while the parts above were in flight -- dont pop the menu open behind them at that point.
+      if (trimSourceClip !== clip) return;
+      trimSeek.value = "0";
+      updateSeekFill();
+      trimLanes.refresh();
+      trimLanes.initHistory();
+      const sourceTracks = trimLanes.subtitles.sourceTracks();
+      editorTools.opened({ name: clip.name, tracks: sourceTracks, audio: sourceTracks.length > 0 });
+      placeSubtitles();
+      // an edit that was kept for this clip goes back before the editor shows, as one step that undo can take back
+      let restored = false;
+      const draft = await draftPromise;
+      if (draft) {
+        trimProcessingStage.textContent = "Putting your edits back";
+        restored = await restoreTrimDraft(clip, draft, dur);
+        if (trimSourceClip !== clip) return;
+      }
+      trimProcessingVeil.classList.remove("is-open");
+      trimVeil.classList.remove("is-measuring");
+      trimVeil.classList.add("is-open");
+      // the snap marks were already computed above while the trim bar was still display:none (0 width, so pickVisibleTrimSnapMarks drew nothing even though snapping is active) -- now that the bar actually has real layout, redraw them for real.
+      renderTrimSnapMarks();
+      trimDraftSent = restored ? JSON.stringify(buildTrimDraft()) : "";
+      trimDraftArmed = true;
+      if (restored) {
+        showToast("Your unsaved edits are back", "info");
+        scheduleToastHide(3200);
+      }
+      if (replayKitSettings.editorAutoplay && !editorHeldAway && !document.hidden) togglePlayback();
+    };
+    trimVideo.addEventListener("loadedmetadata", onMeta, { once: true });
+  }
+
+  function closeTrimModal() {
+    // a save in progress keeps the editor up, and the save closes it when the file is written
+    if (trimSaving) return false;
+    // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
+    const kept = keepTrimDraft();
+    editorTools.closed();
+    trimLanes.unload();
+    if (editorFx) editorFx.reset();
+    trimProcessingVeil.classList.remove("is-open");
+    trimVeil.classList.remove("is-measuring");
+    trimVeil.classList.remove("is-open");
+    trimPreviewActive = false;
+    trimTimelineScrubbing = false;
+    trimPlayerScrubbing = false;
+    if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
+    disarmOverwrite();
+    try { trimVideo.pause(); } catch {}
+    resetVideoZoom(trimVideo);
+    // release the streaming connection back to the helper -- otherwise the /file slot stays occupied (helper caps concurrent previews).
+    trimVideo.removeAttribute("src");
+    try { trimVideo.load(); } catch {}
+    trimSourceClip = null;
+    trimSnapRequestSeq++;
+    trimThumbnailRequestSeq++;
+    resetTrimSnapPoints();
+    clearTrimTimeline();
+    return kept;
+  }
+
+  function clampHandles(activeWasStart) {
+    // keep at least trim_min_seconds between the two handles. whichever handle the user just moved is the one we anchor to; the other gets pushed.
+    const s = Number(trimStart.value);
+    const e = Number(trimEnd.value);
+    if (e - s < TRIM_MIN_SECONDS) {
+      if (activeWasStart) {
+        trimStart.value = Math.max(0, e - TRIM_MIN_SECONDS);
+      } else {
+        const max = Number(trimEnd.max);
+        trimEnd.value = Math.min(max, s + TRIM_MIN_SECONDS);
+      }
+    }
+  }
+
+  // moving a trim handle seeks the preview to that cut point without changing the free video playhead behavior.
+  trimStart.addEventListener("input", () => {
+    snapTrimSelection("start");
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(Number(trimStart.value));
+    trimSeek.value = trimStart.value;
+    updateTrimUi();
+    updateSeekFill();
+  });
+  trimStart.addEventListener("change", () => {
+    trimVideo.currentTime = Number(trimStart.value);
+    trimLanes.checkpoint();
+  });
+  trimEnd.addEventListener("input", () => {
+    snapTrimSelection("end");
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(Number(trimEnd.value));
+    trimSeek.value = trimEnd.value;
+    updateTrimUi();
+    updateSeekFill();
+  });
+  trimEnd.addEventListener("change", () => {
+    trimVideo.currentTime = Number(trimEnd.value);
+    trimLanes.checkpoint();
+  });
+  trimRemoveAudio.addEventListener("change", () => {
+    trimLanes.setOff(trimRemoveAudio.checked);
+    scheduleTrimDraft();
+  });
+  trimPrecise.addEventListener("change", () => {
+    scheduleTrimDraft();
+    if (!trimPrecise.checked && trimSourceClip) {
+      const dur = Number(trimEnd.max) || Number(trimVideo.duration) || 0;
+      if (trimSnapPoints.length > 1) {
+        syncTrimSnapMode(true);
+      } else {
+        loadTrimSnapPoints(trimSourceClip.name, dur, true, trimSourceClip.mtime, trimSourceClip.size);
+      }
+    } else {
+      syncTrimSnapMode(false);
+    }
+  });
+
+  // the video bar is a free playhead: it may seek outside the trimmed range without changing either handle.
+  trimSeek.addEventListener("input", () => {
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    previewSeek(Number(trimSeek.value), false);
+    updateSeekFill();
+    updateTrimPlayhead();
+  });
+  trimSeek.addEventListener("change", () => {
+    trimVideo.currentTime = clampVideoTime(trimSeek.value);
+  });
+
+  trimVideo.addEventListener("timeupdate", () => {
+    trimLastProgressAt = Date.now();
+    const { start, end } = getPlayBounds();
+    if (trimPreviewActive && (trimVideo.currentTime < start || trimVideo.currentTime >= end)) {
+      if (replayKitSettings.editorLoopPreview && trimVideo.currentTime >= end) {
+        // the loop setting sends the preview back to the start handle and lets it keep playing
+        trimVideo.currentTime = start;
+      } else {
+        trimVideo.pause();
+        trimVideo.currentTime = trimVideo.currentTime < start ? start : end;
+        trimPreviewActive = false;
+      }
+    }
+    trimSeek.value = String(clampVideoTime(trimVideo.currentTime));
+    updateSeekFill();
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
+  });
+
+  // click the centered play/pause button or the video itself to toggle playback (youtube convention). pause/play events keep the icon and wrappers .is-paused class in sync.
+  function togglePlayback() {
+    if (trimVideo.paused || trimVideo.ended) {
+      const { start, end } = getPlayBounds();
+      if (trimVideo.currentTime < start || trimVideo.currentTime >= end) {
+        trimVideo.currentTime = start;
+      }
+      trimPreviewActive = true;
+      trimVideo.play().catch(() => {});
+    } else {
+      trimPreviewActive = false;
+      trimVideo.pause();
+    }
+  }
+  trimPlayPauseBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePlayback(); });
+  trimVideo.addEventListener("click", togglePlayback);
+  trimVideo.addEventListener("play",  syncTrimPlayIcon);
+  trimVideo.addEventListener("pause", syncTrimPlayIcon);
+  // the video reports its time only about four times a second, so the playhead and the time of the toolbar step by tenths of a second unevenly; while it plays they follow it every frame instead
+  let trimClockRaf = 0;
+  function trimClockFrame() {
+    trimClockRaf = 0;
+    if (trimVideo.paused || trimVideo.ended || !trimVeil.classList.contains("is-open")) return;
+    trimSeek.value = String(clampVideoTime(trimVideo.currentTime));
+    updateSeekFill();
+    updateTrimPlayhead();
+    syncTrimTimeDisplay();
+    trimClockRaf = requestAnimationFrame(trimClockFrame);
+  }
+  trimVideo.addEventListener("playing", () => { if (!trimClockRaf) trimClockRaf = requestAnimationFrame(trimClockFrame); });
+  trimVideo.addEventListener("ended", syncTrimPlayIcon);
+  ["play", "playing", "pause", "ended", "waiting"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onPlayState()));
+  ["seeking", "seeked"].forEach((name) => trimVideo.addEventListener(name, () => trimLanes.onSeek()));
+  // a selection that runs to the very end of the clip ends the video before a time update can catch the end handle, so the loop setting is honored here too
+  trimVideo.addEventListener("ended", () => {
+    if (!replayKitSettings.editorLoopPreview || !trimPreviewActive) return;
+    trimVideo.currentTime = getPlayBounds().start;
+    trimVideo.play().catch(() => {});
+  });
+  trimVideo.addEventListener("loadedmetadata", syncTrimTimeDisplay);
+  document.addEventListener("fullscreenchange", syncTrimFullscreenIcon, { signal: EDITOR_SIGNAL });
+  document.addEventListener("webkitfullscreenchange", syncTrimFullscreenIcon, { signal: EDITOR_SIGNAL });
+  const blockTrimFullscreenDblclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+  };
+  trimVideo.addEventListener("dblclick", blockTrimFullscreenDblclick, true);
+  trimVideoWrap.addEventListener("dblclick", blockTrimFullscreenDblclick, true);
+  if (trimFullscreen) {
+    trimFullscreen.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isTrimFullscreen()) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        return;
+      }
+      // keep this synchronous with the button gesture; delaying it behind playback leaves CEF treating it as a stale request and it falls back to host-window maximize.
+      if (trimVideoWrap.requestFullscreen) trimVideoWrap.requestFullscreen().catch(() => {});
+      else if (trimVideoWrap.webkitRequestFullscreen) trimVideoWrap.webkitRequestFullscreen();
+      try { trimFullscreen.blur(); } catch {}
+    });
+  }
+
+  // recovers a preview stuck on a frame because the range request it was waiting on failed and nothing retried it -- reloads at the same position instead of leaving the user stuck until they close and reopen the whole modal. guarded by trimStallRecovering so an error event and the watchdog below cant both fire a recovery for the same stall.
+  function recoverStalledTrimPreview() {
+    if (trimStallRecovering || !trimSourceClip) return;
+    trimStallRecovering = true;
+    const resumeTime = trimVideo.currentTime;
+    const wasPreviewing = trimPreviewActive;
+    const clip = trimSourceClip;
+    const onRecovered = () => {
+      trimVideo.currentTime = resumeTime;
+      trimPreviewActive = wasPreviewing;
+      trimVideo.play().catch(() => {});
+      trimLastProgressAt = Date.now();
+      trimStallRecovering = false;
+    };
+    trimVideo.addEventListener("loadedmetadata", onRecovered, { once: true });
+    // fresh cache-bust, not clip.mtime -- this is specifically forcing a brand new connection rather than any chance of the browser reusing whatever the failed one left behind.
+    trimVideo.src = HELPER + "/file/" + encodeURIComponent(clip.name) + "?v=" + Date.now();
+  }
+  trimVideo.addEventListener("error", () => {
+    if (trimVeil.classList.contains("is-open") && !trimVideo.paused) recoverStalledTrimPreview();
+  });
+  const trimStallTimer = setInterval(() => {
+    if (!trimVeil.classList.contains("is-open")) return;
+    if (trimStallRecovering || trimVideo.paused || trimVideo.ended || !trimVideo.src) return;
+    if (Date.now() - trimLastProgressAt < TRIM_STALL_TIMEOUT_MS) return;
+    recoverStalledTrimPreview();
+  }, 1000);
+  EDITOR_SIGNAL.addEventListener("abort", () => clearInterval(trimStallTimer));
+  document.addEventListener("keydown", (e) => {
+    if (!trimVeil.classList.contains("is-open") ||
+        (e.key !== "ArrowLeft" && e.key !== "ArrowRight") ||
+        e.ctrlKey || e.altKey || e.metaKey) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" ||
+        (document.activeElement && document.activeElement.isContentEditable)) return;
+    const span = playSpan();
+    if (span.end - span.start <= 0) return;
+    e.preventDefault();
+    const delta = e.key === "ArrowRight" ? replayKitSettings.editorSeekStep : -replayKitSettings.editorSeekStep;
+    // a single keypress has nothing to race, unlike a drag scrub -- no pause needed, so playback just keeps going
+    trimPreviewActive = false;
+    const target = Math.max(span.start, Math.min(span.end, trimVideo.currentTime + delta));
+    trimVideo.currentTime = target;
+    trimSeek.value = String(target);
+    updateSeekFill();
+    if (target >= getPlayBounds().end && !trimVideo.paused) {
+      trimVideo.pause();
+      trimPreviewActive = false;
+    }
+  }, { signal: EDITOR_SIGNAL });
+  syncVolumeUi(trimVolumeBtn, trimVolumeSlider);
+  trimVolumeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleMute();
+  });
+  trimVolumeSlider.addEventListener("input", () => {
+    VolumeState.volume = Math.max(0, Math.min(1, trimVolumeSlider.value / 100));
+    VolumeState.muted = (VolumeState.volume === 0);
+    notifyVolumeSync();
+  });
+
+  trimCancel.addEventListener("click", () => { if (closeTrimModal()) tellTrimDraftKept(); });
+  trimProcessingCancel.addEventListener("click", closeTrimModal, { signal: EDITOR_SIGNAL });
+  trimProcessingVeil.addEventListener("mousedown", (e) => {
+    if (e.target === trimProcessingVeil) closeTrimModal();
+  }, { signal: EDITOR_SIGNAL });
+  // escape backs out of the editor (or its loading screen) from anywhere on the page, not only when focus sits inside it -- capture phase so the theater view behind it does not also close on the same key; a press that already left fullscreen (the embedded stand-in clears its element and prevents default first) is not a second press for the editor
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (!trimVeil.classList.contains("is-open") && !trimProcessingVeil.classList.contains("is-open")) return;
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (closeTrimModal()) tellTrimDraftKept();
+  }, { capture: true, signal: EDITOR_SIGNAL });
+
+  // the draft of the open editor. nothing is kept or dropped until the editor is up and the edit that was kept earlier is back, so a half built editor can never take a draft away
+  function trimEdited() {
+    const max = Number(trimEnd.max) || 0;
+    const cut = Math.abs(Number(trimStart.value)) > 0.05 || (max > 0 && Math.abs(max - Number(trimEnd.value)) > 0.05);
+    return cut || trimRemoveAudio.checked || trimLanes.edited();
+  }
+
+  function buildTrimDraft() {
+    const lanes = trimLanes.draft();
+    return {
+      v: 1,
+      duration: Math.round((Number(trimEnd.max) || 0) * 1000) / 1000,
+      precise: trimPreciseBeforeSpeed !== null ? !!trimPreciseBeforeSpeed : !!trimPrecise.checked,
+      removeAudio: !!trimRemoveAudio.checked,
+      snap: lanes.snap,
+      imports: lanes.imports,
+    };
+  }
+
+  function showTrimDraftNote() {
+    if (!trimDraftNote) return;
+    trimDraftNote.classList.add("is-shown");
+    if (trimDraftNoteTimer) clearTimeout(trimDraftNoteTimer);
+    trimDraftNoteTimer = setTimeout(() => {
+      trimDraftNoteTimer = 0;
+      trimDraftNote.classList.remove("is-shown");
+    }, 2200);
+  }
+
+  function scheduleTrimDraft() {
+    if (!trimDraftArmed) return;
+    if (trimDraftTimer) clearTimeout(trimDraftTimer);
+    trimDraftTimer = setTimeout(() => sendTrimDraft(false), TRIM_DRAFT_DELAY_MS);
+  }
+
+  // sends the edit to the helper, or drops the draft when everything was taken back. false when there is nothing to keep
+  function sendTrimDraft(final) {
+    if (trimDraftTimer) {
+      clearTimeout(trimDraftTimer);
+      trimDraftTimer = 0;
+    }
+    if (!trimDraftArmed || !trimSourceClip) return false;
+    const name = trimSourceClip.name;
+    if (!trimEdited()) {
+      trimDraftSent = "";
+      if (hasDraft(name)) forgetDraft(name);
+      return false;
+    }
+    const edit = buildTrimDraft();
+    const body = JSON.stringify(edit);
+    if (body === trimDraftSent) return true;
+    trimDraftSent = body;
+    const isNew = !hasDraft(name);
+    draftsByName.set(name, { savedAt: Math.floor(Date.now() / 1000), duration: edit.duration });
+    if (isNew) draftsChanged();
+    fetch(HELPER + "/drafts/save?file=" + encodeURIComponent(name) + "&t=" + Date.now(), {
+      method: "POST",
+      cache: "no-store",
+      // a request that must outlive the page may not carry much, and a draft that is bigger just goes the plain way
+      keepalive: !!final && body.length < 60000,
+      headers: { "Content-Type": "application/json" },
+      body,
+    }).then((res) => {
+      if (!res.ok) trimDraftSent = "";
+      else if (!final) showTrimDraftNote();
+    }).catch(() => { trimDraftSent = ""; });
+    return true;
+  }
+
+  // the editor is being left, whichever way: what was changed goes to the helper now. true when something was kept
+  function keepTrimDraft() {
+    const wasArmed = trimDraftArmed;
+    const kept = sendTrimDraft(true);
+    trimDraftArmed = false;
+    return wasArmed && kept;
+  }
+
+  function tellTrimDraftKept() {
+    showToast("Your edits are kept in Drafts", "info");
+    scheduleToastHide(3200);
+  }
+
+  // puts a kept edit into the editor that is loading. a clip that is not the length it was when the edit was kept (it was replaced behind the editor) cannot take it, since the cuts would fall in the wrong places
+  async function restoreTrimDraft(clip, draft, dur) {
+    const edit = draft && draft.edit;
+    if (!edit || edit.v !== 1 || !edit.snap) return false;
+    if (Math.abs((Number(edit.duration) || 0) - dur) > 0.35) {
+      forgetDraft(clip.name);
+      showToast("The draft of this clip was dropped, since the clip is not the one it was kept for.", "bad", "Draft dropped");
+      return false;
+    }
+    trimRemoveAudio.checked = false;
+    trimLanes.setOff(false);
+    trimPrecise.checked = true;
+    trimPrecise.dispatchEvent(new Event("change"));
+    const result = await trimLanes.applyDraft({ snap: edit.snap, imports: edit.imports });
+    if (trimSourceClip !== clip) return false;
+    syncTrimReencodeLock();
+    if (!result.ok) {
+      showToast("The draft of this clip could not be put back, and it is still kept.", "bad", "Draft not restored");
+      return false;
+    }
+    trimVideo.currentTime = Number(trimStart.value) || 0;
+    trimSeek.value = trimStart.value;
+    updateSeekFill();
+    updateTrimUi();
+    if (result.dropped.length) {
+      showToast("Audio that was added to this edit is no longer there, so it was left out:<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", "Some audio is missing");
+    }
+    return true;
+  }
+
+  // the save: the editor is locked and a popup follows the encode until the helper answers, so nothing can change under the copy or the new original that is being written
+  const SAVE_QUIET_MS = 300;
+  const SAVE_POLL_MS = 400;
+  const SAVE_POLL_TIMEOUT_MS = 5000;
+  // a helper that has said nothing for this long is given up on, so the editor never stays locked for good behind a save nobody is answering
+  const SAVE_LOST_MS = 30000;
+
+  function paintTrimSave(save) {
+    const finishing = save.phase === "finishing";
+    const percent = finishing ? Math.max(save.percent, 98) : save.percent;
+    const known = percent > 1;
+    saveTrack.classList.toggle("is-waiting", !known);
+    saveFill.style.width = known ? percent + "%" : "";
+    saveTrack.setAttribute("aria-valuenow", known ? String(percent) : "0");
+    savePercent.textContent = known ? percent + "%" : "";
+    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.precise ? "Re-encoding the video" : "Cutting the clip";
+    // once the file is being put in place there is nothing left to take back
+    saveCancel.hidden = finishing;
+    saveCancel.disabled = save.stopping;
+    saveCancel.textContent = save.stopping ? "Stopping..." : "Cancel save";
+  }
+
+  function beginTrimSave(clipName, mode, precise) {
+    const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "", stopping: false, quietTimer: 0 };
+    trimSaving = save;
+    // nothing keeps playing under the save, and a view in fullscreen would hide the popup
+    trimPreviewActive = false;
+    try { trimVideo.pause(); } catch {}
+    if (isTrimFullscreen()) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+    disarmOverwrite();
+    if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch {} }
+    trimVeil.inert = true;
+    saveTitle.textContent = mode === "overwrite" ? "Overwriting the original" : "Saving a copy";
+    saveClipName.textContent = clipName;
+    saveClipName.title = clipName;
+    paintTrimSave(save);
+    saveVeil.classList.add("is-open", "is-quiet");
+    save.quietTimer = setTimeout(() => {
+      save.quietTimer = 0;
+      if (trimSaving === save) saveVeil.classList.remove("is-quiet");
+    }, SAVE_QUIET_MS);
+    updateTrimUi();
+    pollTrimSave(save);
+    return save;
+  }
+
+  function endTrimSave(save) {
+    if (!save || trimSaving !== save) return;
+    trimSaving = null;
+    if (save.quietTimer) clearTimeout(save.quietTimer);
+    saveVeil.classList.remove("is-open", "is-quiet");
+    trimVeil.inert = false;
+    updateTrimUi();
+  }
+
+  // the position of the encode comes from the job the helper keeps for the clip; the request itself answers once, when the file is written
+  async function pollTrimSave(save) {
+    let lastAnswer = Date.now();
+    while (trimSaving === save) {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), SAVE_POLL_TIMEOUT_MS);
+      try {
+        const res = await fetch(HELPER + "/status?t=" + Date.now(), { cache: "no-store", signal: ctl.signal });
+        lastAnswer = Date.now();
+        const status = res.ok ? await res.json().catch(() => null) : null;
+        if (trimSaving !== save) return;
+        const jobs = status && Array.isArray(status.jobs) ? status.jobs : [];
+        const job = jobs.find((j) => j && j.kind === "trim" && j.active && j.clipName === save.clipName);
+        if (job) {
+          save.requestId = job.requestId || save.requestId;
+          save.percent = Math.max(save.percent, Number(job.percent) || 0);
+          save.phase = job.phase || "";
+          paintTrimSave(save);
+        }
+      } catch {} finally {
+        clearTimeout(timer);
+      }
+      if (trimSaving === save && Date.now() - lastAnswer > SAVE_LOST_MS) {
+        // what the helper says about this save later belongs to no editor any more
+        save.abandoned = true;
+        endTrimSave(save);
+        showToast("Trim failed: ReplayKit's helper stopped answering, so the save may not have finished. Check the clip before editing it again.");
+        scheduleToastHide(TOAST_ERROR_MS);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, SAVE_POLL_MS));
+    }
+  }
+
+  saveCancel.addEventListener("click", async () => {
+    const save = trimSaving;
+    if (!save || save.stopping || save.phase === "finishing") return;
+    save.stopping = true;
+    paintTrimSave(save);
+    let url = HELPER + "/cancel-upload?t=" + Date.now() + "&file=" + encodeURIComponent(save.clipName);
+    if (save.requestId) url += "&requestId=" + encodeURIComponent(save.requestId);
+    let taken = false;
+    try {
+      const res = await fetch(url, { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      taken = res.ok && data.ok !== false;
+    } catch {}
+    // the helper was already past the point where a save can be taken back, so it carries on to the end
+    if (!taken && trimSaving === save) {
+      save.stopping = false;
+      paintTrimSave(save);
+    }
+  });
+
+  // single submit helper -- both buttons funnel thru here with a diffrent mode.
+  async function submitTrim(mode) {
+    if (trimSaving || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
+    const sourceName = trimSourceClip.name;
+    const videoPlan = trimLanes.videoPlan();
+    // pieces of video with black between them are put together frame by frame
+    const lookPlan = trimLanes.lookPlan();
+    const layerPlan = trimLanes.layerPlan();
+    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan;
+    if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
+      showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
+      scheduleToastHide(TOAST_ERROR_MS);
+      return;
+    }
+    // audio that is still being added is not in a row yet, so the copy would be made without it and nothing would say so
+    if (trimLanes.busy()) {
+      showToast("Wait until the audio has been added, then save.", "bad", "Audio is still loading");
+      scheduleToastHide(TOAST_ERROR_MS);
+      return;
+    }
+    if (!precise) {
+      snapTrimSelection("both");
+      trimSeek.value = trimStart.value;
+      updateTrimUi();
+      updateSeekFill();
+    }
+    const startSec = Number(trimStart.value);
+    const endSec   = Number(trimEnd.value);
+    const removeAudio = trimRemoveAudio.checked;
+    const audioPlan = removeAudio ? null : trimLanes.plan();
+    const subtitlePlan = trimLanes.subtitlePlan();
+    const speed = trimLanes.videoSpeed();
+    let save = null;
+    try {
+      save = beginTrimSave(sourceName, mode, precise);
+      const url = HELPER + "/trim?file=" + encodeURIComponent(sourceName) +
+                  "&start=" + startSec.toFixed(3) +
+                  "&end="   + endSec.toFixed(3) +
+                  "&mode="  + encodeURIComponent(mode) +
+                  "&precise=" + (precise ? "1" : "0") +
+                  "&removeAudio=" + (removeAudio ? "1" : "0") +
+                  (speed !== 1 ? "&speed=" + speed.toFixed(3) : "") +
+                  "&t=" + Date.now();
+      const edit = {};
+      if (audioPlan) edit.audio = audioPlan;
+      if (videoPlan) edit.video = videoPlan;
+      if (subtitlePlan) edit.subtitles = subtitlePlan;
+      if (lookPlan) edit.look = lookPlan;
+      if (layerPlan) edit.layers = layerPlan;
+      const res = await fetch(url, Object.keys(edit).length
+        ? { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(edit) }
+        : { method: "POST", cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (save.abandoned) {
+        scheduleNextPoll(50);
+        return;
+      }
+      if (data.cancelled) {
+        // nothing was written, and the editor is as it was left
+        endTrimSave(save);
+        showToast("Save cancelled, nothing was changed", "info");
+        scheduleToastHide(3000);
+        return;
+      }
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || ("HTTP " + res.status));
+      }
+      endTrimSave(save);
+      // the edit is written, so what was kept for it is spent
+      trimDraftArmed = false;
+      if (trimDraftTimer) {
+        clearTimeout(trimDraftTimer);
+        trimDraftTimer = 0;
+      }
+      forgetDraft(sourceName);
+      closeTrimModal();
+      // under this name there is another file now, and a favorite that was read earlier still describes the old one
+      if (mode === "overwrite" && isFavorite(sourceName)) refreshFavoriteClips();
+      const msg = mode === "overwrite"
+        ? ("Overwrote " + escapeHtml(sourceName))
+        : ("Saved as " + escapeHtml(data.name));
+      showToast(msg, "info");
+      scheduleToastHide(3500);
+      scheduleNextPoll(50);
+    } catch (e) {
+      if (save && save.abandoned) return;
+      endTrimSave(save || trimSaving);
+      showToast("Trim failed: " + (e.message || e));
+      scheduleToastHide(TOAST_ERROR_MS);
+    }
+  }
+
+  // while a save runs every key is turned away, so nothing of the edit can change under the encode; a file dragged onto the page is turned away too, or the window would open it
+  window.addEventListener("keydown", (e) => {
+    if (!trimSaving) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true, signal: EDITOR_SIGNAL });
+  ["dragenter", "dragover", "drop"].forEach((name) => window.addEventListener(name, (e) => {
+    if (!trimSaving) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
+  }, { capture: true, signal: EDITOR_SIGNAL }));
+  trimSave.addEventListener("click", () => {
+    disarmOverwrite();
+    submitTrim("copy");
+  });
+  // first click arms (3s window), second click fires. mirrors the "double-click to confirm" pattern in githubs "delete repository" flow -- visually obvious without an os dialog.
+  trimOverwrite.addEventListener("click", () => {
+    if (trimOverwrite.disabled) return;
+    if (!overwriteArmed) {
+      overwriteArmed = true;
+      trimOverwrite.classList.add("is-armed");
+      trimOverwrite.textContent = "Click again to confirm";
+      overwriteArmTimer = setTimeout(disarmOverwrite, 3000);
+      return;
+    }
+    disarmOverwrite();
+    submitTrim("overwrite");
+  });
+
+
+  return {
+    open: openTrimModal,
+    close: closeTrimModal,
+    pause() { try { trimVideo.pause(); } catch {} },
+    // the parts of the editor let go of their pictures, canvases and videos before the page drops the markup
+    release() {
+      try { editorTools.closed(); } catch {}
+      try { trimLanes.unload(); } catch {}
+      try { if (editorFx) editorFx.reset(); } catch {}
+    },
+  };
+})();
+window.__replaykitEditorReady = true;
+</script>
+</body></html>

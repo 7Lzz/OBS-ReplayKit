@@ -22,7 +22,7 @@ class QJsonArray;
 namespace rk {
 
 // a panel that reads as one shape with the button that opened it: the button paints itself as an open tab and the page draws the rest. it is built once and then shown and hidden, since a fresh cef widget per open paints white before the page lands. a Qt::Tool rather than a Qt::Popup, because a popup grabs the mouse and the page inside would never receive a click
-class AnchoredPanel {
+class AnchoredPanel : public QObject {
 public:
 	// which edge of the panel lines up with the same edge of the tab: the bell hangs its panel to the left of it, a badge hangs it to the right
 	enum class Edge { Left, Right };
@@ -73,7 +73,7 @@ public:
 	void Warm();
 	bool Warming() const { return m_warming; }
 	// the page is up, or the wait for it was given up on
-	bool Warmed() const { return m_ready || m_gaveUp; }
+	bool Warmed() const;
 
 	// a window that closes or changes page takes the panels that hang off it along at once
 	static void HideOwnedBy(QWidget *owner);
@@ -106,6 +106,7 @@ private:
 	static void DismissTick();
 	void OnPageReady();
 	void EndWarm();
+	void WaitForPage(int run);
 
 	QPointer<QWidget> m_owner;
 	QPointer<QWidget> m_window;

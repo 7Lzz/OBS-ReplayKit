@@ -196,6 +196,7 @@ namespace ReplayKitHelper
             try { ToastNotify.EnsureRegistered(Upload.ResolveToastIconPath()); } catch (Exception ex) { Log.Write("ToastNotify.EnsureRegistered: " + ex.Message); }
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
             try { StartCrashSentinelSweep(); } catch (Exception ex) { Log.Write("StartCrashSentinelSweep: " + ex.Message); }
+            try { IdleMemory.Start(); } catch (Exception ex) { Log.Write("IdleMemory.Start: " + ex.Message); }
             try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
             try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
@@ -442,7 +443,7 @@ namespace ReplayKitHelper
                 var psi = new ProcessStartInfo
                 {
                     FileName = obsPath,
-                    Arguments = "--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays",
+                    Arguments = "--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays --process-per-site --js-flags=--optimize-for-size",
                     WorkingDirectory = Path.GetDirectoryName(obsPath),
                     UseShellExecute = true,
                 };
@@ -459,6 +460,7 @@ namespace ReplayKitHelper
         {
             Update.StopPolling();
             _crashSentinelTimer?.Dispose();
+            IdleMemory.Stop();
             try { PipeClient.Stop(); } catch { }
             try { AppConfig.StopClipFolderWatcher(); } catch (Exception ex) { Log.Write("StopClipFolderWatcher: " + ex.Message); }
             try { _listener?.Stop(); } catch (SocketException) { }

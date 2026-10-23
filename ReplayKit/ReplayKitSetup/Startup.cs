@@ -121,6 +121,14 @@ namespace ReplayKitSetup
             }
         }
 
+        // an update can bring new launch flags, and a startup shortcut written by an older version would keep starting obs without them; a shortcut that is not there stays away, since that was the users choice
+        public static void RefreshObsStartup(Action<string> log = null)
+        {
+            string shortcutPath = StartupShortcutPath();
+            if (shortcutPath == null || !File.Exists(shortcutPath)) return;
+            if (CreateStartupShortcut(log)) log?.Invoke("Windows startup: shortcut refreshed");
+        }
+
         // add or remove obs replaykit from the current users windows startup apps.
         public static bool ConfigureObsStartup(bool enabled, Action<string> log = null)
         {
