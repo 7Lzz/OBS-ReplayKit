@@ -20,6 +20,7 @@
 #include "shell/shell_hotkey_menu.hpp"
 #include "shell/shell_nav_button.hpp"
 #include "shell/shell_projector.hpp"
+#include "shell/shell_quick_menu.hpp"
 #include "shell/shell_state.hpp"
 #include "ui/anchored_panel.hpp"
 #include "shell/shell_types.hpp"
@@ -55,6 +56,36 @@ constexpr qreal kUpdateGap = 7.0;
 constexpr qreal kUpdatePadRight = 11.0;
 
 } // namespace
+
+ShellLogoButton::ShellLogoButton(QWidget *parent) : ShellTitleButton(kWidth, parent)
+{
+	SetTip(QStringLiteral("Quick actions"));
+}
+
+void ShellLogoButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
+{
+	// the real obs logo, or the icon the appearance tab picked, the same one the taskbar shows; it keeps its look when the window is not in front, the way the rest of the bar does
+	const qreal dpr = devicePixelRatioF();
+	constexpr int kLogo = 22;
+	const QPixmap logo = ShellLogoPixmap(kLogo, dpr);
+	const QPointF at(pill.left() + 6.0, pill.center().y() - kLogo / 2.0);
+	if (!logo.isNull())
+		p.drawPixmap(at, logo);
+	// the arrow points down and turns to point up while the menu hangs open under the button
+	const QPointF c(pill.right() - 10.0, pill.center().y());
+	QPen pen(ChromeInk(0.7 + 0.3 * hover), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+	p.save();
+	p.setPen(pen);
+	p.setBrush(Qt::NoBrush);
+	p.translate(c);
+	p.rotate(180.0 * OpenTurn());
+	QPainterPath arrow;
+	arrow.moveTo(-3.5, -1.75);
+	arrow.lineTo(0.0, 1.75);
+	arrow.lineTo(3.5, -1.75);
+	p.drawPath(arrow);
+	p.restore();
+}
 
 ShellUpdateButton::ShellUpdateButton(QWidget *parent) : ShellTitleButton(kHeight, parent)
 {
@@ -139,6 +170,9 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_forward = new ShellNavButton(ShellNavButton::Kind::Forward, this);
 	m_forward->onPress = []() { ShellHistoryGo(1); };
 	m_hotkeys = new ShellHotkeyMenu(mw);
+	m_quick = new ShellQuickMenu(mw);
+	m_logo = new ShellLogoButton(this);
+	m_logo->onPress = [this]() { m_quick->Toggle(m_logo); };
 	m_clip = new ShellBadge(this);
 	m_clip->SetLabel(QStringLiteral("Clip"));
 	m_clip->onClick = [this]() {
@@ -173,6 +207,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 ShellTitleBar::~ShellTitleBar()
 {
 	delete m_hotkeys;
+	delete m_quick;
 }
 
 void ShellTitleBar::RestoreTitle()
@@ -271,7 +306,7 @@ bool ShellTitleBar::WarmNext()
 {
 	// the two badges share one menu, which is made for the clip badge
 	m_hotkeys->Prepare(m_clip, ShellHotkeyMenu::Kind::Clip);
-	AnchoredPanel *panels[] = {m_bell->EnsurePanel(), m_hotkeys->Panel(), m_account->EnsurePanel()};
+	AnchoredPanel *panels[] = {m_bell->EnsurePanel(), m_hotkeys->Panel(), m_account->EnsurePanel(), m_quick->Prepare()};
 	for (AnchoredPanel *panel : panels) {
 		if (!panel || panel->Warmed())
 			continue;
@@ -288,6 +323,7 @@ bool ShellTitleBar::TogglePopup(const QString &name)
 	else if (name == QLatin1String("notifications")) ShowNotificationPanel(m_bell);
 	else if (name == QLatin1String("clip")) m_hotkeys->Toggle(m_clip, ShellHotkeyMenu::Kind::Clip);
 	else if (name == QLatin1String("record")) m_hotkeys->Toggle(m_rec, ShellHotkeyMenu::Kind::Record);
+	else if (name == QLatin1String("quick")) m_quick->Toggle(m_logo);
 	else return false;
 	return true;
 }
@@ -316,8 +352,10 @@ void ShellTitleBar::LayoutChildren()
 	}
 	right -= 10;
 
-	// the arrows right after the logo cell, then the badges; a badge that would run into the right group is hidden rather than overlapped
-	int x = kShellRailW + 2;
+	// the logo button stands a little in from the edge of the window, so its menu does not hug the edge, and the arrows follow it
+	m_logo->move(kLogoInset, (h - m_logo->height()) / 2);
+	// the arrows right after the logo, then the badges; a badge that would run into the right group is hidden rather than overlapped
+	int x = qMax(kShellRailW + 2, m_logo->x() + m_logo->width() + 6);
 	m_back->move(x, (h - m_back->height()) / 2);
 	x += m_back->width() + 2;
 	m_forward->move(x, (h - m_forward->height()) / 2);
@@ -331,6 +369,8 @@ void ShellTitleBar::LayoutChildren()
 	// a badge that changed width or moved takes its menu along
 	if (m_hotkeys)
 		m_hotkeys->Follow();
+	if (m_quick)
+		m_quick->Follow();
 	// the bell too: an embedded control has no window of its own to tell its panel that it moved
 	AnchoredPanel::FollowAll();
 }
@@ -395,18 +435,9 @@ void ShellTitleBar::paintEvent(QPaintEvent *)
 	// a short vertical hairline sets the window controls apart from the bell, the way medal separates its own; centred between the circle of the account and the minimize glyph, and the edge of the wash of the minimize button, see kDividerGap
 	p.fillRect(QRect(width() - kShellCtlW * 3 - kDividerGap, (height() - kDividerH) / 2, 1, kDividerH), ChromeInk(0.13));
 
-	// logo in the rail column: the real obs logo, or the icon the appearance tab picked, the same one the taskbar shows
-	// Menus take activation from the main window but still belong to its window group.
-	const HWND foreground = GetForegroundWindow();
-	const bool active = m_mw && foreground && GetAncestor(foreground, GA_ROOTOWNER) == (HWND)m_mw->winId();
-	p.setPen(ChromeInk(active ? 0.8 : 0.5));
+	// the name of the page keeps its colour when the window is not in front, so nothing in the bar greys out
+	p.setPen(ChromeInk(0.8));
 	p.drawText(m_pageRect, Qt::AlignLeft | Qt::AlignVCenter, p.fontMetrics().elidedText(m_page, Qt::ElideRight, m_pageRect.width()));
-	const qreal dpr = devicePixelRatioF();
-	const QPixmap logo = ShellLogoPixmap(26, dpr);
-	if (!logo.isNull()) {
-		p.setOpacity(active ? 1.0 : 0.6);
-		p.drawPixmap(QPointF((kShellRailW - 26) / 2.0, (height() - 26) / 2.0), logo);
-	}
 }
 
 } // namespace rk

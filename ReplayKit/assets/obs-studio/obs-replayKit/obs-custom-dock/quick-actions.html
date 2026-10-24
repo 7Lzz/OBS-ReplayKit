@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Quick Actions</title>
+<style>
+  /* fallbacks only -- the helper injects the real theme tokens above this block */
+  :root {
+    --window:#1D1F26;
+    --grey3:#464B59;
+    --grey5:#2F323C;
+    --grey6:#272A33;
+    --text:#ffffff;
+    --text_muted:#969696;
+    --button_bg_hover:#464B59;
+    --text-rgb:255, 255, 255;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --tab-width:44px;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:transparent; color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; color:inherit; }
+
+  /* the whole window is the panel; the logo above it is drawn as the open tab, so the top border is left off under it */
+  .panel {
+    position:absolute; inset:0;
+    background:var(--grey5); border:1px solid var(--grey3);
+    border-radius:0 4px 4px 4px;
+  }
+  /* --tab-width is the width of the logo button, set by the plugin; the strip paints over the top border under it in the header colour, so the tab and the header row read as one shape */
+  .panel::after {
+    content:""; position:absolute; z-index:3; top:-1px; left:0;
+    width:calc(var(--tab-width) - 2px); max-width:calc(100% - 2px); height:1px;
+    background:var(--grey6);
+  }
+  .clip { position:absolute; inset:0; overflow:hidden; border-radius:0 3px 3px 3px; display:flex; flex-direction:column; }
+  .clip.is-opening { animation:rk-unroll 190ms var(--ease_smooth); }
+  @keyframes rk-unroll { from { clip-path:inset(0 0 100% 0); } to { clip-path:inset(0 0 0 0); } }
+
+  .head { flex:none; height:40px; display:flex; align-items:center; padding:0 14px; background:var(--grey6); border-bottom:1px solid var(--grey3); }
+  .head-title { font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--text_muted); text-transform:uppercase; }
+  /* the plugin sizes the window from the same numbers: 34 a row, 9 a divider, 6 above and below the list */
+  .list { flex:1; padding:6px 0; }
+  .item { width:100%; height:34px; display:flex; align-items:center; gap:10px; padding:0 14px; border:0; background:transparent; font-size:12.5px; text-align:left; cursor:pointer; white-space:nowrap; transition:background-color 90ms linear; }
+  .item:hover { background:var(--button_bg_hover); }
+  .item:disabled { opacity:.45; cursor:default; background:transparent; }
+  /* the icons come from all over the app, each drawn on a grid of its own; the page fits every one to the same box (see fitIcons), so they all show at one size */
+  .item svg { flex:none; width:16px; height:16px; overflow:visible; }
+  .item span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .sep { height:1px; margin:4px 0; background:var(--grey3); }
+</style>
+<!--#include theme-preview-->
+</head>
+<body>
+<div class="panel">
+  <div class="clip is-opening" id="clip">
+    <div class="head"><span class="head-title" id="title">Quick actions</span></div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+  })();
+
+  const HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
+  const els = { clip:document.getElementById("clip"), list:document.getElementById("list"), title:document.getElementById("title") };
+  let state = { view:"", title:"", groups:[] };
+  // the count of the open the address carries, so a second call for the same open does not run the unroll again after the window has already unrolled
+  let shownOpen = "";
+
+  // the plugin puts the menu in the address: the view it was opened in, its title and the actions in groups, so the page never has to ask anyone and the first frame is already right
+  function readAddress() {
+    const params = new URLSearchParams(location.hash.slice(1));
+    const tab = Number(params.get("tab"));
+    if (tab > 0) document.documentElement.style.setProperty("--tab-width", tab + "px");
+    try {
+      const menu = JSON.parse(params.get("menu") || "{}");
+      state = { view:String(menu.view || ""), title:String(menu.title || "Quick actions"), groups:Array.isArray(menu.groups) ? menu.groups : [] };
+    } catch (_) {
+      state = { view:"", title:"Quick actions", groups:[] };
+    }
+  }
+
+  // a bare cross reaches every corner of its box and reads bigger than a round or square icon of the same size
+  const OPTICAL = { "editor/close": 0.72 };
+
+  function icon(name) {
+    const svg = (window.RK_ICONS || {})[name];
+    return svg ? svg.replace(/^<svg/i, '<svg aria-hidden="true" data-optical="' + (OPTICAL[name] || 1) + '"') : "";
+  }
+
+  function render() {
+    els.title.textContent = state.title;
+    els.list.replaceChildren();
+    state.groups.forEach((group, index) => {
+      if (index > 0) {
+        const sep = document.createElement("div");
+        sep.className = "sep";
+        els.list.appendChild(sep);
+      }
+      (Array.isArray(group) ? group : []).forEach((action) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "item";
+        item.disabled = !!action.disabled;
+        item.innerHTML = icon(String(action.icon || ""));
+        const label = document.createElement("span");
+        label.textContent = String(action.label || "");
+        item.appendChild(label);
+        item.addEventListener("click", () => {
+          fetch(HELPER + "/quick-actions/run?view=" + encodeURIComponent(state.view) + "&id=" + encodeURIComponent(String(action.id || "")), { method:"POST", cache:"no-store" }).catch(() => {});
+        });
+        els.list.appendChild(item);
+      });
+    });
+  }
+
+  // every icon is fitted to the box by what it really draws rather than by the grid it was drawn on, which leaves some icons with wide margins and others with none: the drawing is measured and the view box set square around it with the same small margin for all
+  function fitIcons() {
+    els.list.querySelectorAll(".item svg").forEach((svg) => {
+      let box;
+      try { box = svg.getBBox(); } catch (_) { return; }
+      if (!box || box.width <= 0 || box.height <= 0) return;
+      const stroked = svg.getAttribute("stroke") && svg.getAttribute("stroke") !== "none";
+      const size = Math.max(box.width, box.height);
+      // a drawing of lines reaches half a line past what it measures
+      const pad = size * 0.06 + (stroked ? Number(svg.getAttribute("stroke-width") || 0) / 2 : 0);
+      const side = (size + pad * 2) / (Number(svg.dataset.optical) || 1);
+      svg.setAttribute("viewBox", [box.x + box.width / 2 - side / 2, box.y + box.height / 2 - side / 2, side, side].map((n) => n.toFixed(3)).join(" "));
+    });
+  }
+
+  // the window is reused, so the plugin calls this on every open: read the address again and replay the unroll
+  window.__replaykitShowQuickActions = function () {
+    readAddress();
+    render();
+    fitIcons();
+    const open = new URLSearchParams(location.hash.slice(1)).get("open") || "";
+    if (open === shownOpen) return;
+    shownOpen = open;
+    els.clip.classList.remove("is-opening");
+    void els.clip.offsetWidth;
+    els.clip.classList.add("is-opening");
+  };
+  window.addEventListener("hashchange", () => { readAddress(); render(); fitIcons(); });
+
+  readAddress();
+  render();
+</script>
+</body>
+</html>

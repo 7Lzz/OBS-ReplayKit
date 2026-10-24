@@ -18,8 +18,19 @@ namespace rk {
 class NotifyButton;
 class ShellBadge;
 class ShellHotkeyMenu;
+class ShellQuickMenu;
 class ShellNavButton;
 class ShellWinButton;
+
+// the logo in the cell above the rail, a button with a small arrow that opens the quick action menu under it; the arrow turns over while the menu is open
+class ShellLogoButton : public ShellTitleButton {
+public:
+	static constexpr int kWidth = 50;
+	explicit ShellLogoButton(QWidget *parent);
+
+protected:
+	void PaintGlyph(QPainter &p, const QRectF &pill, qreal hover) override;
+};
 
 // the yellow badge left of the bell, its icon and then "ReplayKit <version> Available": a newer release was found while obs was open, and a click opens the update window, since only the check at startup updates by itself
 class ShellUpdateButton : public ShellTitleButton {
@@ -83,6 +94,7 @@ private:
 	// the line sits right against the minimize cell, so its hover wash starts at the line and the line reads as the edge of it, and the bell ends kBellGap before the line: the circle of the account is then about 18 px from the line, the same as the minimize glyph is on the other side (18 px into its cell)
 	static constexpr int kDividerGap = 1;
 	static constexpr int kBellGap = 9;
+	static constexpr int kLogoInset = 12;
 	QMainWindow *m_mw = nullptr;
 	QString m_page;
 	QString m_originalTitle;
@@ -96,6 +108,8 @@ private:
 	ShellBadge *m_rec = nullptr;
 	// the menu the right button opens under either badge
 	ShellHotkeyMenu *m_hotkeys = nullptr;
+	ShellLogoButton *m_logo = nullptr;
+	ShellQuickMenu *m_quick = nullptr;
 	ShellUpdateButton *m_update = nullptr;
 	NotifyButton *m_bell = nullptr;
 	ShellAccountButton *m_account = nullptr;

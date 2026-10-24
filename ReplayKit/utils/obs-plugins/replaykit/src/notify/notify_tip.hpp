@@ -22,7 +22,8 @@ public:
 	enum class Side { Below, Right };
 
 	// anchor is the control in global coords. mirrors positionBulkTip: 8px below it, arrow on the controls centre clamped 10px inside the tip, and the whole box kept 6px clear of the screen edge. Side::Right is for the icon rail: the tip sits beside the control with the arrow on its left edge
-	void ShowFor(const QString &text, const QRect &anchorGlobal, Side side = Side::Below);
+	// within, when given, is the window the tip stays inside, besides the screen
+	void ShowFor(const QString &text, const QRect &anchorGlobal, Side side = Side::Below, const QRect &within = QRect());
 
 	// the tip goes the way the page tip does when the pointer leaves it, fading and settling back over the same 100 and 130 ms; hide() takes it off at once, for when something else opens in its place
 	void Leave();

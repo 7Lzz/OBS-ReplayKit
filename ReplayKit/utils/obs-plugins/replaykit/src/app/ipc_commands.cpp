@@ -16,6 +16,7 @@
 #include "shell/shell_history.hpp"
 #include "shell/shell_notify_reader.hpp"
 #include "shell/shell_page.hpp"
+#include "shell/shell_quick_menu.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
@@ -74,6 +75,15 @@ void PipeDispatchLine(const std::string &line)
 			else if (state == "off" && ClipBufferActive())
 				ClipBufferStop();
 		}, Qt::QueuedConnection);
+	} else if (line.rfind("QUICKACTION ", 0) == 0) {
+		// a pick from the quick action menu: the view it was made in and the action, both checked again where they are carried out
+		const std::string rest = line.substr(12);
+		const size_t space = rest.find(' ');
+		if (space != std::string::npos) {
+			const QString view = QString::fromStdString(rest.substr(0, space));
+			const QString id = QString::fromStdString(rest.substr(space + 1));
+			QMetaObject::invokeMethod(g_callbacks, [view, id]() { ShellQuickMenu::Run(view, id); }, Qt::QueuedConnection);
+		}
 	} else if (line == "CLIPSAVE") {
 		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
 	} else if (line == "OPENSETUP") {

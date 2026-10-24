@@ -272,6 +272,54 @@ namespace ReplayKitHelper
             public string Name;
             public List<string> Args;
             public bool Hardware;
+
+            // a bitrate picked in the render settings replaces the constant quality the encoder works to by default with that rate, held there by the rate control
+            public void SetBitrate(int kbps)
+            {
+                string rate = kbps + "k", buffer = (kbps * 2) + "k";
+                int crf = Args.IndexOf("-crf");
+                if (crf >= 0) Args.RemoveRange(crf, 2);
+                int cq = Args.IndexOf("-cq");
+                if (cq >= 0) Args.RemoveRange(cq, 2);
+                int bv = Args.IndexOf("-b:v");
+                if (bv >= 0) Args.RemoveRange(bv, 2);
+                Args.AddRange(new[] { "-b:v", rate, "-maxrate", rate, "-bufsize", buffer });
+            }
+        }
+
+        // the render settings of the editor: the short side of the picture in pixels, the frame rate and the video bitrate in kbps, each 0 to keep what the video has
+        public sealed class RenderOptions
+        {
+            public int Height;
+            public int Fps;
+            public int BitrateKbps;
+            public bool Any => Height > 0 || Fps > 0 || BitrateKbps > 0;
+
+            private static readonly int[] Heights = { 0, 720, 1080, 1440, 2160 };
+            private static readonly int[] Rates = { 0, 24, 30, 60, 120, 144 };
+
+            public static bool Valid(RenderOptions o) => o != null && Array.IndexOf(Heights, o.Height) >= 0 && Array.IndexOf(Rates, o.Fps) >= 0 && o.BitrateKbps >= 0 && o.BitrateKbps <= 200000;
+
+            // the size a frame of width x height comes out at: its short side at Height, the long side following the shape, both even
+            public (int W, int H) Size(int width, int height)
+            {
+                if (Height <= 0 || width <= 0 || height <= 0) return (width, height);
+                double k = (double)Height / Math.Min(width, height);
+                return (Math.Max(2, (int)Math.Round(width * k / 2) * 2), Math.Max(2, (int)Math.Round(height * k / 2) * 2));
+            }
+
+            // the last step of the picture: scaled to its size and brought to its frame rate; null when both are kept
+            public string Filter(int width, int height)
+            {
+                var steps = new List<string>();
+                if (Height > 0 && width > 0 && height > 0)
+                {
+                    var size = Size(width, height);
+                    if (size.W != width || size.H != height) steps.Add("scale=" + size.W + ":" + size.H + ":flags=lanczos,setsar=1");
+                }
+                if (Fps > 0) steps.Add("fps=" + Fps);
+                return steps.Count > 0 ? string.Join(",", steps) : null;
+            }
         }
 
         // libx264 is what these saves always used, and it stays the answer whenever the card cannot do better
@@ -415,7 +463,7 @@ namespace ReplayKitHelper
         // the parts of a trim command that has video pieces: the video and the audio are both put together by the filter graph from one read of the source, so a piece may start anywhere on the timeline, and nothing is written for a clip without audio
         // what follows the video as it was put together, in this order: the look, the layers over it, then the subtitles over everything; null with [vout] as the label when there is nothing
         // the picture is cut to its aspect first, so the look, the layers and the subtitles are all laid out on the frame that is saved, the way the editor shows them; width and height are that frame
-        private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, int width, int height, string subtitles, string frame, out string label)
+        private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, int width, int height, string subtitles, string frame, out string label, string output = null)
         {
             var steps = new List<string>();
             label = "[vout]";
@@ -423,6 +471,7 @@ namespace ReplayKitHelper
             if (look != null) { steps.Add(label + look + "[vlook]"); label = "[vlook]"; }
             if (layers != null) { steps.Add(layers.Graph(firstLayerInput, label, "[vlayers]", width, height)); label = "[vlayers]"; }
             if (subtitles != null) { steps.Add(label + subtitles + "[vfinal]"); label = "[vfinal]"; }
+            if (output != null) { steps.Add(label + output + "[vrender]"); label = "[vrender]"; }
             return steps.Count > 0 ? string.Join(";", steps) : null;
         }
 
@@ -481,8 +530,10 @@ namespace ReplayKitHelper
         }
 
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
-        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1)
+        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1, RenderOptions render = null)
         {
+            render ??= new RenderOptions();
+            if (!RenderOptions.Valid(render)) return new TrimResult { Ok = false, Message = "Bad render settings" };
             if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = "Unknown aspect ratio" };
             bool screenshot = string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase);
             bool framed = aspect != "original";
@@ -507,7 +558,8 @@ namespace ReplayKitHelper
             // and so are layers, which only the graph that puts the video together lays on
             bool layered = layerEdit != null;
             if (layered && !composed) return new TrimResult { Ok = false, Message = "Layers need the video of the edit to be put together" };
-            if (retimed || composed || subtitled || looked || layered || framed || screenshot) precise = true;
+            // a picture of another size, rate or bitrate is made again as well
+            if (retimed || composed || subtitled || looked || layered || framed || screenshot || render.Any) precise = true;
             if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
                 return new TrimResult { Ok = false, Message = "Bad start/end" };
             if (startSec < 0) return new TrimResult { Ok = false, Message = "Start must be >= 0" };
@@ -682,6 +734,19 @@ namespace ReplayKitHelper
             if (lookFilter != null) videoTail = videoTail != null ? lookFilter + "," + videoTail : lookFilter;
             // the cut to the aspect comes first, the same as in the graph of a put together video
             if (!composed && frameFilter != null) videoTail = videoTail != null ? frameFilter + "," + videoTail : frameFilter;
+            // and the size and rate of the render come last, on the finished picture
+            string renderFilter = null;
+            if (render.Any && !screenshot)
+            {
+                if (frameW <= 0 || frameH <= 0)
+                {
+                    sourceInfo ??= ProbeVideo(source.Full);
+                    if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                    (frameW, frameH) = (sourceInfo.Width, sourceInfo.Height);
+                }
+                renderFilter = render.Filter(frameW, frameH);
+                if (!composed && renderFilter != null) videoTail = videoTail != null ? videoTail + "," + renderFilter : renderFilter;
+            }
             try
             {
             // invariant-culture decimal formatting -- ffmpeg only accepts . as the decimal separator, never ,, regardless of system locale.
@@ -729,9 +794,15 @@ namespace ReplayKitHelper
                 else
                     argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full, "-ss", startStr, "-t", durStr };
                 encoder = PickEditEncoder(ext);
+                if (render.BitrateKbps > 0) encoder.SetBitrate(render.BitrateKbps);
                 argv.AddRange(encoder.Args);
-                long srcBps = GetVideoBitratePerSec(source.Full);
-                if (srcBps > 0)
+                // a bitrate picked in the render settings is the rate, so the cap that keeps a quality encode under the source is not added to it
+                long srcBps = render.BitrateKbps > 0 ? 0 : GetVideoBitratePerSec(source.Full);
+                if (render.BitrateKbps > 0)
+                {
+                    Log.Write("Trim rate: " + render.BitrateKbps + "k from the render settings");
+                }
+                else if (srcBps > 0)
                 {
                     // floor at 200 kbps so a near-empty clip cant drive the cap so low the encoder produces unwatchable output.
                     long kbps = Math.Max(200, (long)Math.Floor(srcBps / 1000.0));
@@ -745,7 +816,7 @@ namespace ReplayKitHelper
                 }
                 if (composed)
                 {
-                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, frameW > 0 ? frameW : sourceInfo.Width, frameH > 0 ? frameH : sourceInfo.Height, subtitleFilter, frameFilter, out string finalLabel), finalLabel);
+                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, frameW > 0 ? frameW : sourceInfo.Width, frameH > 0 ? frameH : sourceInfo.Height, subtitleFilter, frameFilter, out string finalLabel, renderFilter), finalLabel);
                 }
                 else if (hasPlan)
                 {

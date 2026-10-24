@@ -60,6 +60,8 @@ public:
 
 	// builds the window and its widget without showing it; the browser inside is only made once the window is shown, which Warm does out of sight
 	bool EnsureBuilt();
+	// the size the window takes on its next open, for a panel whose content changes with what it shows
+	void SetSize(const QSize &size) { m_size = size; }
 	// points the page at another address; the pages that take their state from the fragment of it read it again from there, which reaches them even when a script sent to the page is lost
 	void SetUrl(const QString &url);
 	// opens the panel under the anchor, or closes it when it is already open for that anchor; one open for another anchor gives way at once. the script runs once the panel is up, for the page hook that re-reads its data

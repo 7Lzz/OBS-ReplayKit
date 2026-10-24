@@ -200,6 +200,9 @@ namespace ReplayKitHelper
         public static bool SendClipBuffer(string state) => (state == "on" || state == "off" || state == "toggle") && TryWrite("CLIPBUFFER " + state);
         public static bool SendClipSave() => TryWrite("CLIPSAVE");
 
+        // a pick of the quick action menu, for the view it was made in; both parts are checked by the route before they get here
+        public static bool SendQuickAction(string view, string id) => TryWrite("QUICKACTION " + view + " " + id);
+
         // the plugin groups WASD Overlay + Mouse Overlay of the current scene into Group, which obs-websocket cannot do
         public static void SendGroupInputOverlay() => TryWrite("GROUPINPUTOVERLAY");
 

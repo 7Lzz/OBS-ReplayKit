@@ -69,9 +69,9 @@ void ShowNotificationPanel(NotifyButton *bell)
 		RECT bellRect;
 		return GetWindowRect((HWND)button->winId(), &bellRect) && PtInRect(&bellRect, pt);
 	};
-	anchor.setOpen = [button](bool) {
+	anchor.setOpen = [button](bool open) {
 		if (button)
-			button->update();
+			button->SetOpen(open);
 	};
 	anchor.onHidden = []() { PollNotificationCount(); };
 	anchor.raiseControl = [button]() {

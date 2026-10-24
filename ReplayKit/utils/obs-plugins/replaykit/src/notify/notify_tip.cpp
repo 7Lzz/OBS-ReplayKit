@@ -83,7 +83,7 @@ void NotifyTip::Leave()
 	Animate(0.0);
 }
 
-void NotifyTip::ShowFor(const QString &text, const QRect &anchorGlobal, Side side)
+void NotifyTip::ShowFor(const QString &text, const QRect &anchorGlobal, Side side, const QRect &within)
 {
 	m_text = text;
 	m_side = side;
@@ -118,6 +118,8 @@ void NotifyTip::ShowFor(const QString &text, const QRect &anchorGlobal, Side sid
 			left = qBound(avail.left() + kEdge, left, avail.right() - w - kEdge);
 			top = qMin(top, avail.bottom() - (bodyH + kArrow) - kEdge);
 		}
+		if (within.isValid() && within.width() > w + kEdge * 2)
+			left = qBound(within.left() + kEdge, left, within.right() - w - kEdge);
 		m_arrowX = qBound(qreal(10.0), qreal(centre - left), qreal(w - 10.0));
 		move(left - kShadow, top - kShadow);
 	}

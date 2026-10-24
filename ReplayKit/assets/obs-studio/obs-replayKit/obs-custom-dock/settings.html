@@ -2536,6 +2536,27 @@
   // set while an apply/save round-trip is in flight. a resolution change re-applies OBS video settings live (stop outputs -> obs_reset_video -> restart), and letting a second one start before the first finishes can deadlock OBS -- so Apply stays disabled until the current one returns, even if the form goes dirty again.
   let applyInFlight = false;
 
+  // what the quick action menu under the logo offers on this page: Save does what Apply does and Cancel what Cancel does; the helper keeps the list for the plugin, sent again only when it changed
+  // var, since updateApplyButton can run before this line has during the first load of the page
+  var quickSent = "";
+  function publishQuickActions() {
+    const actions = [
+      { id:"save", label:"Save", icon:"action/save", disabled:els.applyBtn.disabled },
+      { id:"cancel", label:"Cancel", icon:"editor/close" },
+      { id:"undo", label:"Undo", icon:"editor/undo", disabled:document.getElementById("undoSettingsBtn").disabled },
+      { id:"redo", label:"Redo", icon:"editor/redo", disabled:document.getElementById("redoSettingsBtn").disabled },
+    ];
+    const body = JSON.stringify({ actions });
+    if (body === quickSent) return;
+    quickSent = body;
+    fetch(HELPER + "/quick-actions/state?view=settings", { method:"POST", cache:"no-store", headers:{ "Content-Type":"application/json" }, body }).catch(() => { quickSent = ""; });
+  }
+  window.__rkQuickAction = function (id) {
+    if (id === "save" && !els.applyBtn.disabled) els.applyBtn.click();
+    else if (id === "cancel") document.getElementById("cancelBtn").click();
+    else if (id === "undo" || id === "redo") document.getElementById(id + "SettingsBtn").click();
+  };
+
   function updateApplyButton() {
     const restart = dirty && needsObsRestart();
     els.applyBtn.textContent = restart ? "Apply & Restart" : "Apply";
@@ -2543,6 +2564,7 @@
     els.applyBtn.disabled = !dirty || applyInFlight;
     updateHistoryButtons();
     reportDirty();
+    publishQuickActions();
   }
 
   // inside the obs window the plugin holds a switch to another view while this page has unsaved edits and asks __rkConfirmLeave instead, so it is told every time that changes
@@ -2575,6 +2597,7 @@
   function updateHistoryButtons() {
     document.getElementById("undoSettingsBtn").disabled = applyInFlight || !settingsHistory.past.length;
     document.getElementById("redoSettingsBtn").disabled = applyInFlight || !settingsHistory.future.length;
+    publishQuickActions();
   }
 
   function resetSettingsHistory() {

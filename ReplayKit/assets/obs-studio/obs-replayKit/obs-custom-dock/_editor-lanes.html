@@ -3224,6 +3224,7 @@
       els.snap.classList.toggle("is-active", prefs.snap);
       els.undo.disabled = st.history.length < 2;
       els.redo.disabled = st.future.length === 0;
+      if (opts.onHistory) opts.onHistory();
       var lowest = minZoom();
       els.zoomOut.disabled = st.zoom <= lowest + 0.001;
       els.fit.disabled = st.zoom <= lowest + 0.001;
@@ -5386,6 +5387,11 @@
       // a layer put at the playhead and selected: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it
       addLayer: function (l) { return addLayer(l); },
       clearSelection: function () { select(""); },
+      // the undo and redo of the toolbar, for the quick action menu of the title bar
+      undo: function () { undo(); },
+      redo: function () { redo(); },
+      canUndo: function () { return st.history.length >= 2; },
+      canRedo: function () { return st.future.length > 0; },
       panelClosed: panelClosed,
       closePanel: function () { setPanelClosed(true); },
       openPanel: function () { setPanelClosed(false); },

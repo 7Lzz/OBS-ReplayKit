@@ -6,6 +6,7 @@
 #include "core/theme.hpp"
 #include "notify/notify_panel.hpp"
 #include "notify/notify_tip.hpp"
+#include "shell/shell_title_button.hpp"
 #include "ui/anchored_panel.hpp"
 
 namespace rk {
@@ -158,6 +159,12 @@ bool NotifyButton::nativeEvent(const QByteArray &, void *message, qintptr *resul
 	return true;
 }
 
+void NotifyButton::SetOpen(bool open)
+{
+	AnimateTurn(this, m_turnAnim, m_turn, open ? 1.0 : 0.0);
+	update();
+}
+
 void NotifyButton::paintEvent(QPaintEvent *)
 {
 	QPainter p(this);
@@ -214,12 +221,10 @@ void NotifyButton::paintEvent(QPaintEvent *)
 		QRectF box(25.0, midY - 6.0, 12.0, 12.0);
 		p.save();
 		p.setOpacity(0.65);
-		if (open) {
-			// flips on open, same as .clip-sort-wrap.is-open .clip-sort-chevron
-			p.translate(box.center());
-			p.rotate(180.0);
-			p.translate(-box.center());
-		}
+		// turns on open, same as .clip-sort-wrap.is-open .clip-sort-chevron
+		p.translate(box.center());
+		p.rotate(180.0 * m_turn);
+		p.translate(-box.center());
 		renderGlyph(chevronSvg, box);
 		p.restore();
 	}

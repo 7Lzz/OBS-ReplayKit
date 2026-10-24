@@ -587,6 +587,7 @@ namespace ReplayKitHelper
             if (Regex.IsMatch(path, @"^/update-prompt$|^/update-prompt\.html$")) { HttpResponse.ServeHtml(stream, "update_prompt.html"); return false; }
             if (Regex.IsMatch(path, @"^/notifications-view$|^/notifications\.html$")) { HttpResponse.ServeHtml(stream, "notifications.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/account-menu$|^/account-menu\.html$")) { HttpResponse.ServeHtml(stream, "account-menu.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/quick-actions-view$|^/quick-actions\.html$")) { HttpResponse.ServeHtml(stream, "quick-actions.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html", framed); return false; }
@@ -2127,6 +2128,23 @@ namespace ReplayKitHelper
             }
 
             // the menus of the obs menu bar, opened from the Advanced tab now that the title bar has no menu button
+            // the quick actions under the logo of the title bar: what a page offers, read back by the plugin, and a pick sent on to the plugin
+            if (path == "/quick-actions/state")
+            {
+                if (req.Method == "POST") { var set = QuickActions.Set(Q("view"), req.Body); HttpResponse.SendJson(stream, set.Value<bool>("ok") ? 200 : 400, set); return false; }
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["actions"] = QuickActions.Get(Q("view")) });
+                return false;
+            }
+            if (path == "/quick-actions/run")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                string view = Q("view"), id = Q("id");
+                bool sent = QuickActions.IsView(view) && QuickActions.IsId(id.StartsWith("page-", StringComparison.Ordinal) ? id.Substring(5) : id) && PipeClient.SendQuickAction(view, id);
+                HttpResponse.SendJson(stream, sent ? 200 : 400, new JObject { ["ok"] = sent });
+                return false;
+            }
+
             if (path == "/obs-menu")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -2524,7 +2542,12 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad screenshot time" });
                         return false;
                     }
-                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime);
+                    // the render settings of the editor, each left out to keep what the video has
+                    int.TryParse(Q("height", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderHeight);
+                    int.TryParse(Q("fps", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderFps);
+                    int.TryParse(Q("bitrate", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderKbps);
+                    var render = new Trim.RenderOptions { Height = renderHeight, Fps = renderFps, BitrateKbps = renderKbps };
+                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime, render);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)

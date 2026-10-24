@@ -29,7 +29,7 @@ QString Page(const QString &url)
 	if (parsed.scheme() != QLatin1String("http") || parsed.host() != QLatin1String("127.0.0.1") || parsed.port() != 8767 || !parsed.userInfo().isEmpty())
 		return {};
 	const QString path = parsed.path();
-	if (path == QLatin1String("/hotkey-menu") || path == QLatin1String("/notifications-view") || path == QLatin1String("/account-menu") ||
+	if (path == QLatin1String("/hotkey-menu") || path == QLatin1String("/notifications-view") || path == QLatin1String("/account-menu") || path == QLatin1String("/quick-actions-view") ||
 	    path == QLatin1String("/storage-view") || path == QLatin1String("/notification-reader-view"))
 		return path;
 	return {};

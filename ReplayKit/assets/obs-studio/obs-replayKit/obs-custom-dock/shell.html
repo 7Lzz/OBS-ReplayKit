@@ -381,7 +381,15 @@
   }
   setInterval(sweep, 5000);
 
-  window.RKShell = { show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
+  // a pick from the quick action menu under the logo goes to the page of its view, which carries it out
+  function quickAction(view, id) {
+    var f = frames[view];
+    try {
+      if (f && f.loaded && typeof f.el.contentWindow.__rkQuickAction === "function") f.el.contentWindow.__rkQuickAction(String(id));
+    } catch (_) {}
+  }
+
+  window.RKShell = { quickAction: quickAction, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
 
   // home is the landing page and clips loads right behind it, since the first click right after the window opens is usually there; settings and setup load on their first visit
   show("home");

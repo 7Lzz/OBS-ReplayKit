@@ -63,6 +63,7 @@ set(REPLAYKIT_SOURCES
     src/shell/shell_obs_nav.cpp
     src/shell/shell_obs_settings.cpp
     src/shell/shell_hotkey_menu.cpp
+    src/shell/shell_quick_menu.cpp
     src/shell/shell_page.cpp
     src/shell/shell_projector.cpp
     src/shell/shell_projector_bar.cpp

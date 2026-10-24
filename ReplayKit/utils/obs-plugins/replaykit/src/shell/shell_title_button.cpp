@@ -23,7 +23,35 @@ void ShellTitleButton::SetOpen(bool open)
 	if (open == m_open)
 		return;
 	m_open = open;
+	AnimateTurn(this, m_turnAnim, m_turn, open ? 1.0 : 0.0);
 	update();
+}
+
+QEasingCurve SmoothEase()
+{
+	QEasingCurve curve(QEasingCurve::BezierSpline);
+	curve.addCubicBezierSegment(QPointF(0.16, 1.0), QPointF(0.3, 1.0), QPointF(1.0, 1.0));
+	return curve;
+}
+
+void AnimateTurn(QWidget *widget, QVariantAnimation *&anim, qreal &value, qreal target)
+{
+	if (!anim) {
+		anim = new QVariantAnimation(widget);
+		anim->setDuration(200);
+		anim->setEasingCurve(SmoothEase());
+		qreal *slot = &value;
+		QObject::connect(anim, &QVariantAnimation::valueChanged, widget, [widget, slot](const QVariant &v) {
+			*slot = v.toReal();
+			widget->update();
+		});
+	}
+	anim->stop();
+	if (qFuzzyCompare(value + 1.0, target + 1.0))
+		return;
+	anim->setStartValue(value);
+	anim->setEndValue(target);
+	anim->start();
 }
 
 void ShellTitleButton::ClearHover()
@@ -46,7 +74,8 @@ void ShellTitleButton::enterEvent(QEnterEvent *event)
 		return;
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
-	g_notifyTip->ShowFor(m_tip, GlobalRect());
+	// kept inside the window, so the tip of a button at its edge does not hang out past it
+	g_notifyTip->ShowFor(m_tip, GlobalRect(), NotifyTip::Side::Below, window() ? window()->frameGeometry() : QRect());
 }
 
 void ShellTitleButton::leaveEvent(QEvent *event)
@@ -95,14 +124,15 @@ void ShellTitleButton::paintEvent(QPaintEvent *)
 	p.setRenderHint(QPainter::Antialiasing, true);
 	const QRectF pill(0.5, 0.5, width() - 1.0, height() - 1.0);
 	if (m_open) {
-		// the tab of its panel: the ground of the panel header with a border that has no bottom edge, so the tab and the header row under it read as one shape
+		// the tab of its panel: the ground of the panel header with a border that has no bottom edge, so the tab and the header row under it read as one shape. it runs to the very bottom of the button, where the panel starts, or its last row is only half painted and shows as a dark line between the two
+		const qreal bottom = height();
 		QPainterPath tab;
-		tab.moveTo(pill.left(), pill.bottom());
+		tab.moveTo(pill.left(), bottom);
 		tab.lineTo(pill.left(), pill.top() + kRadius);
 		tab.quadTo(pill.left(), pill.top(), pill.left() + kRadius, pill.top());
 		tab.lineTo(pill.right() - kRadius, pill.top());
 		tab.quadTo(pill.right(), pill.top(), pill.right(), pill.top() + kRadius);
-		tab.lineTo(pill.right(), pill.bottom());
+		tab.lineTo(pill.right(), bottom);
 		p.setPen(Qt::NoPen);
 		p.setBrush(g_menuPanel);
 		p.drawPath(tab);

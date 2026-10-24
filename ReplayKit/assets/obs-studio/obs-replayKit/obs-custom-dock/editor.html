@@ -7,12 +7,13 @@
   <div class="modal-veil" id="trim-veil">
     <div class="modal trim-modal" id="trim-modal">
       <header class="editor-top">
+        <!-- the name of the clip with the pencil that renames it, like the title row of a card -->
         <div class="editor-lead">
-        <button class="btn editor-cancel" type="button" id="trim-cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cancel</button>
-        <div class="editor-title">
-          <div class="trim-heading"><h2>Edit clip</h2><span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span></div>
-          <div class="clip-name" id="trim-clip-name"></div>
-        </div>
+          <div class="title-row editor-title">
+            <span class="name" id="trim-clip-name"></span>
+            <button class="icon-mini-btn edit-btn" type="button" id="trim-rename" data-tooltip="Rename" aria-label="Rename clip"><svg data-i="action/edit" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+            <span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span>
+          </div>
         </div>
         <div class="editor-frame-tools">
           <div class="combo editor-aspect" id="editor-aspect" role="combobox" aria-label="Aspect ratio" aria-expanded="false">
@@ -22,11 +23,57 @@
           <button class="icon-btn editor-screenshot" type="button" id="editor-screenshot" aria-label="Save screenshot" data-tooltip="Save a screenshot of this frame"><svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="editor-screenshot-spinner" aria-hidden="true"></span></button>
         </div>
         <div class="editor-actions">
-          <button class="btn danger-action" type="button" id="trim-overwrite">Overwrite original</button>
-          <button class="btn primary"       type="button" id="trim-save">Save copy</button>
+          <!-- leaving with edits asks what becomes of them in a menu that hangs off the button, the way the sort menu hangs off its trigger -->
+          <div class="clip-sort-wrap editor-exit" id="editor-exit">
+            <button class="btn editor-exit-btn" type="button" id="editor-exit-btn" aria-haspopup="menu" aria-expanded="false">Exit<svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></button>
+            <div class="clip-sort-menu" role="menu" aria-label="Exit the editor">
+              <div class="clip-sort-heading">Your edits</div>
+              <button class="clip-sort-item" type="button" role="menuitem" data-exit="keep" id="editor-exit-keep"><span class="clip-sort-label">Save as draft</span></button>
+              <button class="clip-sort-item" type="button" role="menuitem" data-exit="discard"><span class="clip-sort-label">Discard draft</span></button>
+            </div>
+          </div>
+          <button class="btn primary" type="button" id="trim-render">Render video</button>
         </div>
       </header>
       <div class="editor-body">
+        <div class="modal-veil render-veil" id="render-veil">
+          <div class="modal render-modal" id="render-modal" role="dialog" aria-modal="true" aria-labelledby="render-title">
+            <h2 id="render-title">Render settings</h2>
+            <div class="render-label" id="render-res-label">Resolution</div>
+            <div class="render-choices" id="render-heights" role="radiogroup" aria-labelledby="render-res-label">
+              <button type="button" class="render-choice" role="radio" data-height="0">Original</button>
+              <button type="button" class="render-choice" role="radio" data-height="720">720p</button>
+              <button type="button" class="render-choice" role="radio" data-height="1080">1080p</button>
+              <button type="button" class="render-choice" role="radio" data-height="1440">1440p</button>
+              <button type="button" class="render-choice" role="radio" data-height="2160">4K</button>
+            </div>
+            <div class="render-pair">
+              <div>
+                <div class="render-label">Frame rate</div>
+                <div class="combo" id="render-fps" role="combobox" aria-label="Frame rate" aria-expanded="false">
+                  <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+                  <div class="combo-menu" role="listbox" aria-label="Frame rate"></div>
+                </div>
+              </div>
+              <div>
+                <div class="render-label">Bitrate</div>
+                <div class="combo" id="render-bitrate" role="combobox" aria-label="Bitrate" aria-expanded="false">
+                  <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+                  <div class="combo-menu" role="listbox" aria-label="Bitrate"></div>
+                </div>
+              </div>
+            </div>
+            <div class="compress-downsample-row render-replace-row">
+              <input type="checkbox" class="rk-switch" id="render-replace" aria-label="Replace the original">
+              <span>Replace the original<span class="render-replace-note">The clip is replaced on disk, which can't be undone.</span></span>
+            </div>
+            <div class="render-meta"><span id="render-size"></span><span id="render-length"></span></div>
+            <div class="row">
+              <button class="btn" type="button" id="render-cancel">Cancel</button>
+              <button class="btn primary" type="button" id="render-go">Render</button>
+            </div>
+          </div>
+        </div>
         <div class="ed-left" id="ed-left"></div>
         <div class="editor-stage">
         <div class="trim-video-wrap preview">
@@ -243,9 +290,10 @@ window.__rkEditorApi = (function () {
   const trimTotalTime    = document.getElementById("trim-total-time");
   const trimFullscreen   = document.getElementById("trim-fullscreen");
   const trimFullscreenIcon = document.getElementById("trim-fullscreen-icon");
-  const trimCancel       = document.getElementById("trim-cancel");
-  const trimSave         = document.getElementById("trim-save");
-  const trimOverwrite    = document.getElementById("trim-overwrite");
+  const trimRender       = document.getElementById("trim-render");
+  const editorExit       = document.getElementById("editor-exit");
+  const editorExitBtn    = document.getElementById("editor-exit-btn");
+  const renderVeil       = document.getElementById("render-veil");
   const trimPrecise      = document.getElementById("trim-precise");
   const trimRemoveAudio  = document.getElementById("trim-remove-audio");
   const trimVolumeBtn    = document.getElementById("trim-volume-btn");
@@ -333,6 +381,8 @@ window.__rkEditorApi = (function () {
     onVideoSpeed: () => syncTrimReencodeLock(),
     // an edit of the pieces, the cut or the audio can change whether the saved copy has to be made frame by frame
     onEdit: () => { syncTrimReencodeLock(); scheduleTrimDraft(); },
+    // undo and redo of the quick action menu follow the history of the timeline
+    onHistory: () => { if (window.__rkPublishQuickActions) window.__rkPublishQuickActions(); },
     // the save buttons wait while audio is being added
     onBusy: () => updateTrimUi(),
     notify: (text, kind, title) => {
@@ -1098,14 +1148,13 @@ window.__rkEditorApi = (function () {
     const valid = (e - s) >= TRIM_MIN_SECONDS;
     const importing = trimLanes.busy();
     const free = !trimSaving && !importing;
-    trimSave.disabled = !valid || !free;
-    trimOverwrite.disabled = !valid || !free;
+    trimRender.disabled = !valid || !free;
     screenshotBtn.disabled = !valid || !free;
+    document.getElementById("trim-rename").disabled = !free;
     document.querySelector("#editor-aspect .combo-button").disabled = !free;
-    [trimSave, trimOverwrite].forEach((button) => {
-      if (importing) button.title = "Wait until the audio has been added";
-      else button.removeAttribute("title");
-    });
+    if (importing) trimRender.title = "Wait until the audio has been added";
+    else trimRender.removeAttribute("title");
+    if (window.__rkPublishQuickActions) window.__rkPublishQuickActions();
   }
 
   function syncTrimPlayIcon() {
@@ -1151,15 +1200,6 @@ window.__rkEditorApi = (function () {
     trimFullscreen.dataset.tooltip = isTrimFullscreen() ? "Exit fullscreen (F)" : "Fullscreen (F)";
   }
 
-  // overwrite needs two clicks within 3s to fire -- first click "arms" the button (red fill + "click again to confirm"). avoids the browser-dock confirm() dialog while still preventing one-click destructive operations.
-  let overwriteArmed = false;
-  let overwriteArmTimer = 0;
-  function disarmOverwrite() {
-    overwriteArmed = false;
-    if (overwriteArmTimer) { clearTimeout(overwriteArmTimer); overwriteArmTimer = 0; }
-    trimOverwrite.classList.remove("is-armed");
-    trimOverwrite.textContent = "Overwrite original";
-  }
 
   function openTrimModal(clip) {
     if (!clip || !clip.name || trimSaving) return;
@@ -1182,10 +1222,9 @@ window.__rkEditorApi = (function () {
     trimProcessingStage.textContent = "Reading the clip";
     resetVideoZoom(trimVideo);
     trimClipName.textContent = clip.name;
-    trimSave.disabled = true;
-    trimSave.textContent = "Save copy";
-    trimOverwrite.disabled = true;
-    disarmOverwrite();
+    trimRender.disabled = true;
+    closeExitMenu();
+    closeRenderSettings();
     trimPreviewActive = false;
     trimStallRecovering = false;
     trimLastProgressAt = Date.now();
@@ -1281,7 +1320,8 @@ window.__rkEditorApi = (function () {
     trimTimelineScrubbing = false;
     trimPlayerScrubbing = false;
     if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
-    disarmOverwrite();
+    closeExitMenu();
+    closeRenderSettings();
     try { trimVideo.pause(); } catch {}
     resetVideoZoom(trimVideo);
     // release the streaming connection back to the helper -- otherwise the /file slot stays occupied (helper caps concurrent previews).
@@ -1510,7 +1550,95 @@ window.__rkEditorApi = (function () {
     notifyVolumeSync();
   });
 
-  trimCancel.addEventListener("click", () => { if (closeTrimModal()) tellTrimDraftKept(); });
+  // leaving: the menu under the button keeps the edits as a draft or lets them go
+  function closeExitMenu() {
+    editorExit.classList.remove("is-open");
+    editorExitBtn.setAttribute("aria-expanded", "false");
+  }
+  function exitEditor(keep) {
+    closeExitMenu();
+    if (!keep && trimSourceClip) {
+      const name = trimSourceClip.name;
+      trimDraftArmed = false;
+      if (hasDraft(name)) forgetDraft(name);
+    }
+    if (closeTrimModal() && keep) tellTrimDraftKept();
+  }
+  editorExitBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (trimSaving) return;
+    if (editorExit.classList.contains("is-open")) { closeExitMenu(); return; }
+    // with nothing edited there is no draft to keep, so that row is greyed out and leaving is the other one
+    document.getElementById("editor-exit-keep").disabled = !trimEdited();
+    editorExit.classList.add("is-open");
+    editorExitBtn.setAttribute("aria-expanded", "true");
+  });
+  editorExit.querySelectorAll("[data-exit]").forEach((item) => item.addEventListener("click", (e) => {
+    e.stopPropagation();
+    exitEditor(item.dataset.exit === "keep");
+  }));
+  document.addEventListener("click", (e) => {
+    if (editorExit.classList.contains("is-open") && !editorExit.contains(e.target)) closeExitMenu();
+  }, { signal: EDITOR_SIGNAL });
+
+  // the name of the clip is changed from the bar the way a card changes it: the edit is kept as a draft first, the helper renames the clip and its draft together, and the editor opens again on the clip under its new name, so nothing in it still points at the old file
+  function startClipRename() {
+    if (trimSaving || !trimSourceClip) return;
+    const clip = trimSourceClip;
+    const nameSpan = trimClipName;
+    const dot = clip.name.lastIndexOf(".");
+    const base = dot > 0 ? clip.name.slice(0, dot) : clip.name;
+    const ext = dot > 0 ? clip.name.slice(dot) : "";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "name-edit-input";
+    input.value = base;
+    input.setAttribute("aria-label", "Clip name");
+    const extSpan = document.createElement("span");
+    extSpan.className = "name-edit-ext";
+    extSpan.textContent = ext;
+    // the pencil glides aside as the name swaps to the input, the way the rename of a card does
+    const flipTargets = [document.getElementById("trim-rename"), trimDraftNote];
+    rkFlip(flipTargets, () => {
+      nameSpan.replaceWith(input);
+      input.after(extSpan);
+    });
+    try { input.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" }); } catch (_) {}
+    input.focus();
+    input.select();
+    let settled = false;
+    const back = () => rkFlip(flipTargets, () => { input.replaceWith(nameSpan); extSpan.remove(); });
+    async function commit() {
+      if (settled) return;
+      settled = true;
+      const next = input.value.trim();
+      back();
+      if (!next || next + ext === clip.name || trimSourceClip !== clip) return;
+      keepTrimDraft();
+      try {
+        await draftWrites;
+        const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(clip.name) + "&to=" + encodeURIComponent(next + ext), { method: "POST", cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+        refreshDrafts();
+        scheduleNextPoll(0);
+        if (trimSourceClip !== clip) return;
+        closeTrimModal();
+        openEditor(Object.assign({}, clip, { name: data.name || next + ext }));
+      } catch (err) {
+        if (trimSourceClip === clip) trimDraftArmed = true;
+        showToast("The clip could not be renamed: " + escapeHtml(err.message || String(err)), "bad", "Rename");
+        scheduleToastHide(TOAST_ERROR_MS);
+      }
+    }
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      if (e.key === "Escape") { e.preventDefault(); settled = true; back(); }
+    });
+    input.addEventListener("blur", commit);
+  }
+  document.getElementById("trim-rename").addEventListener("click", startClipRename);
   trimProcessingCancel.addEventListener("click", closeTrimModal, { signal: EDITOR_SIGNAL });
   trimProcessingVeil.addEventListener("mousedown", (e) => {
     if (e.target === trimProcessingVeil) closeTrimModal();
@@ -1522,6 +1650,9 @@ window.__rkEditorApi = (function () {
     if (document.fullscreenElement || document.webkitFullscreenElement) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    // the render settings and the exit menu close first, then the editor
+    if (renderVeil.classList.contains("is-open")) { closeRenderSettings(); return; }
+    if (editorExit.classList.contains("is-open")) { closeExitMenu(); return; }
     if (closeTrimModal()) tellTrimDraftKept();
   }, { capture: true, signal: EDITOR_SIGNAL });
 
@@ -1669,10 +1800,9 @@ window.__rkEditorApi = (function () {
       if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
       else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     }
-    disarmOverwrite();
     if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch {} }
     trimVeil.inert = true;
-    saveTitle.textContent = mode === "screenshot" ? "Saving a screenshot" : mode === "overwrite" ? "Overwriting the original" : "Saving a copy";
+    saveTitle.textContent = mode === "screenshot" ? "Saving a screenshot" : mode === "overwrite" ? "Rendering over the original" : "Rendering video";
     saveClipName.textContent = clipName;
     saveClipName.title = clipName;
     paintTrimSave(save);
@@ -1753,7 +1883,7 @@ window.__rkEditorApi = (function () {
   });
 
   // single submit helper -- both buttons funnel thru here with a diffrent mode.
-  async function submitTrim(mode) {
+  async function submitTrim(mode, render) {
     if (trimSaving || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
     const sourceName = trimSourceClip.name;
     const screenshot = mode === "screenshot";
@@ -1761,7 +1891,8 @@ window.__rkEditorApi = (function () {
     // pieces of video with black between them are put together frame by frame
     const lookPlan = trimLanes.lookPlan();
     const layerPlan = trimLanes.layerPlan();
-    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original";
+    const rendered = !!render && !!(render.height || render.fps || render.bitrate);
+    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original" || rendered;
     if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
       showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
       scheduleToastHide(TOAST_ERROR_MS);
@@ -1797,6 +1928,9 @@ window.__rkEditorApi = (function () {
                   "&removeAudio=" + (removeAudio ? "1" : "0") +
                   "&aspect=" + encodeURIComponent(trimLanes.aspect()) +
                   (screenshot ? "&time=" + frameTime.toFixed(6) : "") +
+                  (render && render.height ? "&height=" + render.height : "") +
+                  (render && render.fps ? "&fps=" + render.fps : "") +
+                  (render && render.bitrate ? "&bitrate=" + render.bitrate * 1000 : "") +
                   (speed !== 1 ? "&speed=" + speed.toFixed(3) : "") +
                   "&t=" + Date.now();
       const edit = {};
@@ -1866,10 +2000,56 @@ window.__rkEditorApi = (function () {
     e.stopImmediatePropagation();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
   }, { capture: true, signal: EDITOR_SIGNAL }));
-  trimSave.addEventListener("click", () => {
-    disarmOverwrite();
-    submitTrim("copy");
+  // the render settings: the size of the picture by its short side, the frame rate and the bitrate, each Original to keep what the video has, and whether the render replaces the clip. what was picked stays for the next render while the editor is loaded
+  const renderFps = RKCombo.bind(document.getElementById("render-fps"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
+  const renderBitrate = RKCombo.bind(document.getElementById("render-bitrate"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
+  renderFps.setOptions([["0", "Original"], ["24", "24 FPS"], ["30", "30 FPS"], ["60", "60 FPS"], ["120", "120 FPS"], ["144", "144 FPS"]].map(([value, label]) => ({ value, label })));
+  renderBitrate.setOptions([["0", "Auto", "The same quality as the clip, at the size it needs"], ["5", "5 Mbps"], ["10", "10 Mbps"], ["15", "15 Mbps"], ["20", "20 Mbps"], ["30", "30 Mbps"], ["50", "50 Mbps"]].map(([value, label, description]) => ({ value, label, description:description || "" })));
+  renderFps.value = "0";
+  renderBitrate.value = "0";
+  let renderHeight = 0;
+  function renderSettings() {
+    return { height: renderHeight, fps: Number(renderFps.value) || 0, bitrate: Number(renderBitrate.value) || 0 };
+  }
+  function paintRenderSettings() {
+    const frame = editorFrameSize();
+    const short = Math.min(frame.w, frame.h);
+    const k = renderHeight > 0 ? renderHeight / short : 1;
+    const w = renderHeight > 0 ? Math.max(2, Math.round(frame.w * k / 2) * 2) : frame.w;
+    const h = renderHeight > 0 ? Math.max(2, Math.round(frame.h * k / 2) * 2) : frame.h;
+    renderVeil.querySelectorAll(".render-choice").forEach((b) => {
+      const on = Number(b.dataset.height) === renderHeight;
+      b.classList.toggle("is-selected", on);
+      b.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    document.getElementById("render-size").textContent = "Resolution: " + w + " \u00d7 " + h;
+    const plan = trimLanes.videoPlan(true);
+    const seconds = plan ? plan.window.end - plan.window.start : trimDuration() / trimLanes.videoSpeed();
+    document.getElementById("render-length").textContent = "Duration: " + (formatDuration(seconds) || "0:00");
+  }
+  function openRenderSettings() {
+    if (trimRender.disabled || trimSaving) return;
+    closeExitMenu();
+    document.getElementById("render-replace").checked = false;
+    paintRenderSettings();
+    renderVeil.classList.add("is-open");
+    document.getElementById("render-go").focus();
+  }
+  function closeRenderSettings() {
+    renderFps.close();
+    renderBitrate.close();
+    renderVeil.classList.remove("is-open");
+  }
+  renderVeil.querySelectorAll(".render-choice").forEach((b) => b.addEventListener("click", () => { renderHeight = Number(b.dataset.height) || 0; paintRenderSettings(); }));
+  renderVeil.addEventListener("mousedown", (e) => { if (e.target === renderVeil) closeRenderSettings(); });
+  document.getElementById("render-cancel").addEventListener("click", closeRenderSettings);
+  document.getElementById("render-go").addEventListener("click", () => {
+    const replace = document.getElementById("render-replace").checked;
+    const settings = renderSettings();
+    closeRenderSettings();
+    submitTrim(replace ? "overwrite" : "copy", settings);
   });
+  trimRender.addEventListener("click", openRenderSettings);
   screenshotBtn.addEventListener("click", () => submitTrim("screenshot"));
   aspectControl = RKCombo.bind(document.getElementById("editor-aspect"), (value) => trimLanes.aspect(value === sourceEditorFrame().value ? "original" : value), { menuKeys:true, signal:EDITOR_SIGNAL });
   updateEditorFrame();
@@ -1877,24 +2057,30 @@ window.__rkEditorApi = (function () {
   frameObserver.observe(trimVideoWrap);
   trimVideo.addEventListener("loadedmetadata", updateEditorFrame, { signal:EDITOR_SIGNAL });
   EDITOR_SIGNAL.addEventListener("abort", () => frameObserver.disconnect(), { once:true });
-  // first click arms (3s window), second click fires. mirrors the "double-click to confirm" pattern in githubs "delete repository" flow -- visually obvious without an os dialog.
-  trimOverwrite.addEventListener("click", () => {
-    if (trimOverwrite.disabled) return;
-    if (!overwriteArmed) {
-      overwriteArmed = true;
-      trimOverwrite.classList.add("is-armed");
-      trimOverwrite.textContent = "Click again to confirm";
-      overwriteArmTimer = setTimeout(disarmOverwrite, 3000);
-      return;
-    }
-    disarmOverwrite();
-    submitTrim("overwrite");
-  });
 
 
   return {
     open: openTrimModal,
     close: closeTrimModal,
+    // what the quick action menu under the logo offers while the editor is open, and a pick from it, which does what the button of the same name does
+    quickActions() {
+      return [
+        { id:"exit", label:"Exit editor", icon:"quick/exit", disabled:!!trimSaving },
+        { id:"undo", label:"Undo", icon:"editor/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
+        { id:"redo", label:"Redo", icon:"editor/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
+        { id:"screenshot", label:"Screenshot this frame", icon:"quick/screenshot", disabled:screenshotBtn.disabled },
+        { id:"render", label:"Render video", icon:"action/open-editor", disabled:trimRender.disabled },
+        { id:"import", label:"Import audio", icon:"editor/import-audio", disabled:!!trimSaving || trimLanes.busy() },
+      ];
+    },
+    quickAction(id) {
+      if (id === "exit") editorExitBtn.click();
+      else if (id === "screenshot") screenshotBtn.click();
+      else if (id === "render") trimRender.click();
+      else if (id === "import" && !trimSaving) trimLanes.importAudio();
+      else if (id === "undo" && !trimSaving) trimLanes.undo();
+      else if (id === "redo" && !trimSaving) trimLanes.redo();
+    },
     pause() { try { trimVideo.pause(); } catch {} },
     // the parts of the editor let go of their pictures, canvases and videos before the page drops the markup
     release() {

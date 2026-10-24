@@ -1,6 +1,7 @@
 // icon buttons of the title bar
 #pragma once
 
+#include <QEasingCurve>
 #include <QEnterEvent>
 #include <QEvent>
 #include <QMouseEvent>
@@ -10,6 +11,7 @@
 #include <QRectF>
 #include <QString>
 #include <QTimer>
+#include <QVariantAnimation>
 #include <QWidget>
 #include <functional>
 
@@ -27,6 +29,8 @@ public:
 	// the panel of this button is open, so the pill is the tab of that panel
 	void SetOpen(bool open);
 	bool IsOpen() const { return m_open; }
+	// 0 closed to 1 open, eased over the same 200ms as the chevron of the clips sort trigger
+	qreal OpenTurn() const { return m_turn; }
 	QRect GlobalRect() const { return QRect(mapToGlobal(QPoint(0, 0)), size()); }
 	// runs on the press, the way the bell opens its panel
 	std::function<void()> onPress;
@@ -51,6 +55,13 @@ private:
 	bool m_open = false;
 	qreal m_fade = 0.0;
 	QTimer *m_fadeTimer = nullptr;
+	qreal m_turn = 0.0;
+	QVariantAnimation *m_turnAnim = nullptr;
 };
+
+// the --ease_smooth curve of the pages, cubic-bezier(.16, 1, .3, 1)
+QEasingCurve SmoothEase();
+// turns value from where it stands to target over the 200ms of --anim_menu, repainting widget on every step
+void AnimateTurn(QWidget *widget, QVariantAnimation *&anim, qreal &value, qreal target);
 
 } // namespace rk

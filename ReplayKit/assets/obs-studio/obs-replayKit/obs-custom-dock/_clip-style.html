@@ -2135,6 +2135,34 @@
   .editor-screenshot.is-busy svg { display: none; }
   .editor-screenshot.is-busy .editor-screenshot-spinner { display: block; }
   .editor-screenshot.is-busy:disabled { opacity: 1; }
+  /* the name of the clip and its pencil, the title row of a card at the size of the bar */
+  .editor-title { min-width: 0; }
+  .editor-title .name { font-size: 14px; font-weight: 600; }
+  .editor-title .name-edit-input { max-width: 320px; }
+  /* exit opens its menu like the sort trigger does: the button takes the surface of the menu and loses its bottom edge so the two read as one shape */
+  .editor-exit-btn { display: inline-flex; align-items: center; gap: 4px; }
+  /* the arrow of the sort trigger, in the colour of the text */
+  .editor-exit-btn .clip-sort-chevron { margin-right: -4px; fill: currentColor; }
+  /* the button stays its size under the pointer and the press, so it never moves away from the menu that hangs off it */
+  #trim-veil .editor-top .editor-exit-btn { --hover_grow: 1; --press_shrink: 1; }
+  .editor-exit .clip-sort-item:disabled { opacity: .45; cursor: default; background: transparent; }
+  .editor-exit.is-open .editor-exit-btn { background: var(--grey5); border-color: var(--grey3); border-bottom-color: transparent; border-bottom-left-radius: 0; border-bottom-right-radius: 0; position: relative; z-index: 10001; transform: none; }
+  .editor-exit .clip-sort-menu { min-width: 170px; }
+  /* the render settings: the shape of the other modals, with the resolution as a row of choices and the frame rate and bitrate as dropdowns side by side */
+  .render-veil { z-index: 60; }
+  .render-modal { width: 420px; }
+  .render-modal h2 { margin-bottom: 14px; }
+  .render-label { margin: 0 0 6px; font-size: 12px; color: var(--text_muted); }
+  .render-choices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+  .render-choice { height: 34px; padding: 0 6px; border: 1px solid var(--grey4-solid, var(--grey4)); border-radius: 6px; background: var(--grey7); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background-color 80ms linear, border-color 80ms linear, color 80ms linear; }
+  .render-choice:hover { background: var(--grey5); border-color: var(--button_border_hover); }
+  .render-choice.is-selected, .render-choice.is-selected:hover { background: var(--selected, var(--primary)); border-color: var(--selected, var(--primary)); color: var(--on-accent); }
+  .render-choice:focus-visible { outline: 2px solid var(--primary_light); outline-offset: 2px; }
+  .render-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .render-pair .combo { width: 100%; }
+  .render-replace-row { margin: 0 0 12px; }
+  .render-replace-note { display: block; color: var(--text_muted); font-size: 11.5px; }
+  .render-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--text_muted); font-size: 12px; }
   .editor-output { position:absolute; overflow:hidden; background:#000; }
   .editor-picture { position:absolute; }
   /* the tools on the left and the panel on the right stand against the edges of the window, square, the panels a half step lighter than the page and running into the toolbar of the timeline under them, with a hairline toward the video, like the bar over them; the timeline below needs no line, its drag handle sets it apart */

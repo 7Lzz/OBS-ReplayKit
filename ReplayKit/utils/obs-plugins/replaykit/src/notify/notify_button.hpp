@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QRect>
 #include <QTimer>
+#include <QVariantAnimation>
 #include <QWidget>
 #include <QtGlobal>
 
@@ -37,6 +38,8 @@ public:
 	// each bell owns its panel: a parentless Qt::Tool is auto-hidden whenever the application deactivates, and one shared panel cannot be owned by all three windows at once, so there is one per bell kept alive after first use
 	AnchoredPanel *EnsurePanel();
 	AnchoredPanel *Panel() const { return m_panel; }
+	// turns the chevron to match the panel opening or closing
+	void SetOpen(bool open);
 
 protected:
 	void enterEvent(QEnterEvent *event) override;
@@ -59,6 +62,8 @@ private:
 	qreal m_hoverFade = 0.0;
 	QTimer *m_fadeTimer = nullptr;
 	AnchoredPanel *m_panel = nullptr;
+	qreal m_turn = 0.0;
+	QVariantAnimation *m_turnAnim = nullptr;
 };
 
 extern QList<QPointer<NotifyButton>> g_notifyButtons;

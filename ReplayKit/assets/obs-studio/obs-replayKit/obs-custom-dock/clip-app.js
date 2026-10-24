@@ -133,6 +133,7 @@ const CLIP_HOVER_PROFILES = {
     DUPLICATE: _svgInner(_RKI["action/duplicate"]),
     CLIPBOARD: _svgInner(_RKI["action/clipboard"]),
     CHECK_CIRCLE: _svgInner(_RKI["action/check-circle"]),
+    SELECT: _svgInner(_RKI["action/select"]),
     FOLDER_OPEN: _svgInner(_RKI["action/folder-open"]),
     PLAY: _svgInner(_RKI["player/play"]),
     PAUSE: _svgInner(_RKI["player/pause"]),
@@ -2710,7 +2711,7 @@ const CLIP_HOVER_PROFILES = {
                   <span class="menu-item-label">Favorite</span>
                 </div>
                 <div class="menu-item select-menu-item">
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CHECK_CIRCLE}</svg>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.SELECT}</svg>
                   <span class="menu-item-label">Select</span>
                 </div>
                 <div class="menu-item duplicate-menu-item">
@@ -5830,6 +5831,28 @@ const CLIP_HOVER_PROFILES = {
     if (editorInUse()) { editorUsedAt = Date.now(); return; }
     if (Date.now() - editorUsedAt >= EDITOR_IDLE_MS) unloadEditor();
   }, 5000);
+
+  // what the quick action menu under the logo offers for this page: the editor while it is open, else the clip folder. the helper keeps the list for the plugin, and it is only sent again when it changed
+  const QUICK_VIEW = HOME_MODE ? "home" : "clips";
+  let quickSent = "";
+  function publishQuickActions() {
+    const api = editorApi();
+    const editing = !!api && trimVeil.classList.contains("is-open");
+    const actions = editing ? api.quickActions() : [{ id:"open-folder", label:"Open clips folder", icon:"action/folder-open" }];
+    const body = JSON.stringify({ actions });
+    if (body === quickSent) return;
+    quickSent = body;
+    fetch(HELPER + "/quick-actions/state?view=" + QUICK_VIEW, { method:"POST", cache:"no-store", headers:{ "Content-Type":"application/json" }, body }).catch(() => { quickSent = ""; });
+  }
+  window.__rkPublishQuickActions = publishQuickActions;
+  window.__rkQuickAction = function (id) {
+    const api = editorApi();
+    if (api && trimVeil.classList.contains("is-open")) { api.quickAction(id); return; }
+    if (id === "open-folder") fetch(HELPER + "/open-clip-folder", { method:"POST", cache:"no-store" }).catch(() => {});
+  };
+  // the editor opening or closing changes the list
+  new MutationObserver(publishQuickActions).observe(trimVeil, { attributes:true, attributeFilter:["class"] });
+  publishQuickActions();
 
   // the ways out of the editor that this page has, whether it is loaded or still on its way
   function closeEditor() {
