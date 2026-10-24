@@ -24,6 +24,10 @@ OBS already handles recording, streaming, and replays, but finding and sharing c
 
 The goal is simple: **one app for streaming, recording, clipping, and managing videos.** ReplayKit is free, with no ads, subscriptions, or features locked behind a premium tier. Your clips stay on your PC unless you choose to upload them.
 
+### Images
+
+Images may be outdated to the current look of the GUI.
+
 ### Clip library
 
 Browse saved clips, search your library, and create share links.
