@@ -1,4 +1,4 @@
--- synchronizes ReplayKits saved clip and recording keybinds into OBSs native hotkeys when the saved keys change.
+-- synchronizes ReplayKits saved clip, recording and screenshot keybinds into OBSs native hotkeys when the saved keys change.
 
 local obs = obslua
 local ffi_ok, ffi = pcall(require, "ffi")
@@ -11,6 +11,8 @@ local RECORDING_HOTKEY_NAMES = {
     "OBSBasic.StartRecording",
     "OBSBasic.StopRecording",
 }
+-- obss own Screenshot Output; the plugin moves the picture it saves into the Screenshots folder
+local SCREENSHOT_HOTKEY_NAMES = { "OBSBasic.Screenshot" }
 
 local last_signature = nil
 local refresh_elapsed = 0
@@ -130,14 +132,15 @@ end
 
 local function load_runtime_settings()
     local text = read_text(runtime_settings_path())
-    if not text or text == "" then return { clip = {}, recording = {} } end
+    if not text or text == "" then return { clip = {}, recording = {}, screenshot = {} } end
 
     local data = obs.obs_data_create_from_json(text)
-    if data == nil then return { clip = {}, recording = {} } end
+    if data == nil then return { clip = {}, recording = {}, screenshot = {} } end
 
     local settings = {
         clip = read_combos(data, "clipKeybind"),
         recording = read_combos(data, "recordingKeybind"),
+        screenshot = read_combos(data, "screenshotKeybind"),
     }
     obs.obs_data_release(data)
     return settings
@@ -161,7 +164,8 @@ end
 
 local function settings_signature(settings)
     return "clip=" .. combos_signature(settings.clip) ..
-        "|recording=" .. combos_signature(settings.recording)
+        "|recording=" .. combos_signature(settings.recording) ..
+        "|screenshot=" .. combos_signature(settings.screenshot)
 end
 
 local function create_binding_array(combos)
@@ -252,6 +256,7 @@ local function refresh_hotkeys(force)
 
     load_native_hotkeys(CLIP_HOTKEY_NAMES, settings.clip, "clip", "Could not find OBS native clip hotkey to update.")
     load_native_hotkeys(RECORDING_HOTKEY_NAMES, settings.recording, "recording", "Could not find OBS native recording hotkeys to update.")
+    load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, settings.screenshot, "screenshot", "Could not find OBS native screenshot hotkey to update.")
     log(obs.LOG_INFO, "Loaded OBS native hotkeys: " .. signature)
 end
 
@@ -285,6 +290,7 @@ local function read_capture_signal()
     if not signal.active then
         signal.clip = read_combos(data, "clipKeybind")
         signal.recording = read_combos(data, "recordingKeybind")
+        signal.screenshot = read_combos(data, "screenshotKeybind")
     end
     obs.obs_data_release(data)
     return signal
@@ -302,12 +308,14 @@ local function apply_capture_signal()
         capture_active = true
         load_native_hotkeys(CLIP_HOTKEY_NAMES, {}, "clip", "Could not find OBS native clip hotkey to blank for capture.")
         load_native_hotkeys(RECORDING_HOTKEY_NAMES, {}, "recording", "Could not find OBS native recording hotkeys to blank for capture.")
-        log(obs.LOG_INFO, "Hotkey capture started -- blanked native clip/recording hotkeys live")
+        load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, {}, "screenshot", "Could not find OBS native screenshot hotkey to blank for capture.")
+        log(obs.LOG_INFO, "Hotkey capture started -- blanked native clip/recording/screenshot hotkeys live")
     elseif not signal.active and capture_active then
         capture_active = false
         load_native_hotkeys(CLIP_HOTKEY_NAMES, signal.clip, "clip", "Could not find OBS native clip hotkey to restore.")
         load_native_hotkeys(RECORDING_HOTKEY_NAMES, signal.recording, "recording", "Could not find OBS native recording hotkeys to restore.")
-        log(obs.LOG_INFO, "Hotkey capture ended -- restored native clip/recording hotkeys live")
+        load_native_hotkeys(SCREENSHOT_HOTKEY_NAMES, signal.screenshot, "screenshot", "Could not find OBS native screenshot hotkey to restore.")
+        log(obs.LOG_INFO, "Hotkey capture ended -- restored native clip/recording/screenshot hotkeys live")
         -- matches what the saved-settings poll above would already converge on, so it does not immediately redo the same obs_hotkey_load call a moment later.
         last_signature = settings_signature(signal)
     end

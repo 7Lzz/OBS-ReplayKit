@@ -385,6 +385,20 @@ namespace ReplayKitHelper
         }
 
         // find an already-open file explorer window thats showing targetPath. returns the windows hwnd or IntPtr.Zero if no match. used by /open-clip-folder, /open-log-folder and /open-folder to raise an existing explorer window for the clip folder instead of spawning yet another explorer.exe -- windows otherwise stacks duplicate folder windows every time the user clicks the docks open folder button. uses Shell.Applications Windows() collection (the same one explorer itself uses); LocationURL on each item is a file:// url we can convert to a local path and compare case-insensitively to the target. ie/edge browser windows show up here too -- we skip anything whose LocationURL isnt file://.
+        // shows a file in explorer: a window that already has its folder open is raised, else the folder opens with the file selected. we deliberately dont try to re-select the file in a window that is already open -- the com dance is fragile and the user is usually just trying to surface the folder. true when an open window was raised
+        private static bool RevealInExplorer(string full)
+        {
+            string parent = Path.GetDirectoryName(full);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                var existing = GetExplorerHwndForPath(parent);
+                if (existing != IntPtr.Zero) return Native.FocusHwnd(existing);
+            }
+            // explorer.exe /select,"<path>" opens the containing folder with the file already highlighted. arguments must be one string becuase explorer parses /select,<rest> as a unit.
+            Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select," + ProcessArgs.Quote(full), UseShellExecute = false })?.Dispose();
+            return false;
+        }
+
         public static IntPtr GetExplorerHwndForPath(string targetPath)
         {
             if (string.IsNullOrWhiteSpace(targetPath)) return IntPtr.Zero;
@@ -2332,13 +2346,40 @@ namespace ReplayKitHelper
 
             if (path.StartsWith("/thumb/")) { HttpResponse.ServeThumbnail(stream, Uri.UnescapeDataString(path.Substring(7))); return false; }
 
-            if (path == "/open-clip-folder")
+            if (path == "/screenshots" || path == "/screenshots/file" || path == "/screenshots/thumb")
             {
-                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string root = Path.GetFullPath(AppConfig.GetClipDir());
-                if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip folder not found" }); return false; }
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 try
                 {
+                    if (path == "/screenshots") HttpResponse.SendJson(stream, 200, new JObject { ["screenshots"] = Screenshots.List() });
+                    else
+                    {
+                        string file = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
+                        if (file == null) { HttpResponse.SendText(stream, 404, "Not Found", "Screenshot not found"); return false; }
+                        bool thumb = path == "/screenshots/thumb";
+                        // the page asks with the size and time of the file in the address, so a picture under one address never changes and the browser keeps it instead of reading it again on every paint of the grid
+                        HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["Content-Type"] = thumb ? "image/jpeg" : "image/png",
+                            ["Cache-Control"] = "private, max-age=31536000, immutable",
+                            ["X-Content-Type-Options"] = "nosniff",
+                        }, thumb ? Screenshots.Thumb(file) : file);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
+                {
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "The screenshots could not be read" });
+                }
+                return false;
+            }
+
+            if (path == "/open-clip-folder" || path == "/open-screenshot-folder")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    string root = path == "/open-screenshot-folder" ? Screenshots.Folder(create: true) : Path.GetFullPath(AppConfig.GetClipDir());
+                    if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip folder not found" }); return false; }
                     // dedupe: if explorer already has the clip folder open, raise it instead of spawning another window. falls thru to the normal launch path if the com probe fails or no match is found.
                     var existing = GetExplorerHwndForPath(root);
                     if (existing != IntPtr.Zero)
@@ -2381,25 +2422,30 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
                 if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
+                try { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = RevealInExplorer(selected.Full) }); }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // what the menu of a screenshot card does: delete it, rename it, put it on the clipboard and show it in its folder
+            if (path == "/screenshots/delete" || path == "/screenshots/rename" || path == "/screenshots/copy" || path == "/screenshots/reveal")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    // if explorer already has the containing folder open, raise that window. we deliberately dont try to re-select the file via shell.application -- the com dance is fragile and the user clicking "open file location" from a clip card is usually just trying to surface the folder, not the specific row.
-                    string parent = Path.GetDirectoryName(selected.Full);
-                    if (!string.IsNullOrEmpty(parent))
-                    {
-                        var existing = GetExplorerHwndForPath(parent);
-                        if (existing != IntPtr.Zero)
-                        {
-                            bool focused2 = Native.FocusHwnd(existing);
-                            HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = focused2 });
-                            return false;
-                        }
-                    }
-                    // explorer.exe /select,"<path>" opens the containing folder with the file already highlighted. arguments must be one string becuase explorer parses /select,<rest> as a unit.
-                    Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = "/select," + ProcessArgs.Quote(selected.Full), UseShellExecute = false })?.Dispose();
-                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = false });
+                    string shot = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
+                    if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Screenshot not found" }); return false; }
+                    var answer = new JObject { ["ok"] = true };
+                    if (path == "/screenshots/delete") Screenshots.Delete(shot);
+                    else if (path == "/screenshots/rename") answer["name"] = Screenshots.Rename(shot, query.ContainsKey("to") ? query["to"] : null);
+                    else if (path == "/screenshots/copy") Screenshots.Copy(shot);
+                    else answer["focused"] = RevealInExplorer(shot);
+                    HttpResponse.SendJson(stream, 200, answer);
                 }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
+                {
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message });
+                }
                 return false;
             }
 
@@ -2472,7 +2518,13 @@ namespace ReplayKitHelper
                         HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad speed" });
                         return false;
                     }
-                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit);
+                    double frameTime = -1;
+                    if (mode == "screenshot" && !double.TryParse(Q("time"), NumberStyles.Float, CultureInfo.InvariantCulture, out frameTime))
+                    {
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad screenshot time" });
+                        return false;
+                    }
+                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)
@@ -2597,7 +2649,7 @@ namespace ReplayKitHelper
                     ["sizeCap"] = a.SizeCap,
                     ["maxUploadBytes"] = Constants.GetEffectiveUploadCap(),
                     ["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0,
-                    ["retentionDays"] = a.RetentionDays,
+                    ["retentionDays"] = Constants.GetEffectiveRetentionDays(),
                 });
                 return false;
             }
@@ -2620,6 +2672,7 @@ namespace ReplayKitHelper
                 if (status.Value<bool?>("signedIn") == true) AppConfig.ClearClipsCache();
                 status["maxUploadBytes"] = Constants.GetEffectiveUploadCap();
                 status["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0;
+                status["retentionDays"] = Constants.GetEffectiveRetentionDays();
                 HttpResponse.SendJson(stream, status.Value<bool?>("ok") == true ? 200 : 500, status);
                 return false;
             }

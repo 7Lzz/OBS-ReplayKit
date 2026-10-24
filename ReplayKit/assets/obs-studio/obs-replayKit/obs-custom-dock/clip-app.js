@@ -304,6 +304,23 @@ const CLIP_HOVER_PROFILES = {
   // never persisted (session-only, unlike favorites) -- always starts fresh at newest so a closed-and-reopened clips window or an obs restart never comes back to whatever sort was last picked.
   let activeSort = "newest";
   let loadedClips = [];
+  const COLLAPSED_SECTIONS_KEY = "replaykit.collapsedSections.v1";
+  const SECTION_KEYS = new Set(["favorites", "screenshots", "clips", "linked", "local", "drafts"]);
+  const collapsedSections = new Set();
+  if (!HOME_MODE) {
+    try {
+      const saved = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
+      if (saved !== null) {
+        if (saved.length > 256) throw new Error("Invalid section preferences");
+        const sections = JSON.parse(saved);
+        if (!Array.isArray(sections) || sections.length > SECTION_KEYS.size || sections.some(key => !SECTION_KEYS.has(key))) throw new Error("Invalid section preferences");
+        sections.filter(key => ["favorites", "screenshots", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
+      }
+    } catch {
+      setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
+    }
+  }
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -1059,12 +1076,13 @@ const CLIP_HOVER_PROFILES = {
     // favorites are kept by name for every folder, so the count is the favorites the helper found in this folder, not the length of that list
     const favoritesKnown = !favoriteNamesList().length || favoriteResolveKey === currentFavoriteResolveKey();
     const counts = {
-      all: total,
+      all: total === undefined ? undefined : total + (screenshotGallery ? screenshotGallery.count() || 0 : 0),
       favorites: favoritesKnown ? resolvedFavoriteClips.length : undefined,
       linked: linkedTotal,
       local: known ? Math.max(0, total - linkedTotal) : undefined,
       // the same for drafts: the ones whose clip is in this folder
       drafts: draftsLoaded && draftResolveKey === currentDraftResolveKey() ? resolvedDraftClips.size : undefined,
+      screenshots: screenshotGallery ? screenshotGallery.count() : undefined,
     };
     for (const btn of tabBtns) {
       const key = btn.dataset.filter;
@@ -1103,6 +1121,13 @@ const CLIP_HOVER_PROFILES = {
   function renderLoadedClips(clips) {
     loadedClips = Array.isArray(clips) ? clips : [];
     updateTabs(loadedClips);
+    syncClipView();
+    if (activeFilter === "screenshots") {
+      screenshotGallery.update(clipSearchQuery, activeSort);
+      setClipSortLoading(false);
+      updateClipSortControl();
+      return;
+    }
     if (isClipRenameActive()) {
       pendingLoadedRenderAfterRename = true;
       return;
@@ -1126,6 +1151,48 @@ const CLIP_HOVER_PROFILES = {
     updateClipSortControl();
     render(filtered);
   }
+
+  function syncClipView() {
+    if (HOME_MODE) return;
+    if (screenshotGallery) {
+      screenshotGallery.show(activeFilter);
+      screenshotGallery.update(clipSearchQuery, activeSort);
+    }
+    document.body.classList.toggle("clips-collapsed", activeFilter === "all" && collapsedSections.has("clips"));
+    favoritesGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("favorites"));
+    document.querySelectorAll(".section-toggle").forEach(button => {
+      const expanded = activeFilter !== "all" || !collapsedSections.has(button.dataset.section);
+      button.hidden = activeFilter !== "all";
+      const label = button.parentElement.querySelector("span").textContent;
+      button.setAttribute("aria-expanded", String(expanded));
+      button.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + label);
+    });
+    if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? "Search screenshots" : "Search clips");
+    const folder = document.getElementById("clip-folder-btn");
+    if (folder) {
+      const label = activeFilter === "screenshots" ? "Open screenshots folder" : "Open clips folder";
+      folder.setAttribute("aria-label", label);
+      folder.dataset.tooltip = label;
+    }
+  }
+
+  document.querySelectorAll(".section-toggle").forEach(button => {
+    button.addEventListener("click", () => {
+      if (activeFilter !== "all") return;
+      const key = button.dataset.section;
+      const next = new Set(collapsedSections);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try { localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(Array.from(next))); }
+      catch { showToast("Could not save your section preferences.", "error", "Clips"); return; }
+      collapsedSections.clear();
+      next.forEach(section => collapsedSections.add(section));
+      stopActivePreviewForScroll();
+      if (screenshotGallery) screenshotGallery.paint();
+      renderLoadedClips(loadedClips);
+      queueVirtualRender(true);
+    });
+  });
 
   // upload caps the helper actually enforces, read from /me rather than hardcoded so they follow the signed-in plan (free/anon: 1 GB + 10 min; paid plans raise or remove both). 0 on either field means "no limit".
   let uploadLimits = { maxUploadBytes:0, maxDurationSec:0 };
@@ -1836,6 +1903,7 @@ const CLIP_HOVER_PROFILES = {
 
   function renderVirtualWindow(force) {
     virtualRenderQueued = false;
+    if (!HOME_MODE && (activeFilter === "screenshots" || (activeFilter === "all" && collapsedSections.has("clips")))) return;
     if (isClipRenameActive()) {
       pendingLoadedRenderAfterRename = true;
       return;
@@ -2039,6 +2107,7 @@ const CLIP_HOVER_PROFILES = {
 
   // the clip folder was switched: nothing read from the old one may stay, neither the loaded clips nor the favorites and drafts found in it nor the counts of the tabs, which come back from the new folder
   function forgetFolderState() {
+    if (screenshotGallery) screenshotGallery.reset();
     clipsPageVersion = "";
     clipsTotal = 0;
     clipsTotalKnown = false;
@@ -2502,8 +2571,8 @@ const CLIP_HOVER_PROFILES = {
       btn._deleteArmTimer = 0;
     }
     btn.classList.remove("is-armed");
-    btn.dataset.tooltip = "Delete clip";
-    btn.setAttribute("aria-label", "Delete clip");
+    btn.dataset.tooltip = btn.dataset.deleteLabel || "Delete clip";
+    btn.setAttribute("aria-label", btn.dataset.deleteLabel || "Delete clip");
     const label = btn.querySelector(".menu-item-label");
     if (label) label.textContent = "Delete";
   }
@@ -3294,48 +3363,9 @@ const CLIP_HOVER_PROFILES = {
       actionButton.click();
     });
 
-    // the same menu is available from the visible 3-dot button or a right-click anywhere on the clip. Its top-left corner follows the pointer, then clamps to the visible scroll area so every item stays reachable.
+    // the same menu is available from the visible 3-dot button or a right-click anywhere on the clip
     function openCardMenuAtPointer(e) {
-      if (window.RKTooltip) RKTooltip.hide();
-      resetAllArmedDeleteButtons();
-      document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
-        if (d !== menuDropdown) {
-          closeCardMenu(d);
-        }
-      });
-      const rect = card.getBoundingClientRect();
-      // the menu is painted inside .scroll-area, which clips at its own edge minus the scrollbar and starts below the toolbar -- clamping to the window instead let the menu slide under that edge, slicing off its border and rounded corners on the side it pressed against
-      const area = card.closest(".scroll-area");
-      const bounds = area && area.clientWidth > 0 ? area.getBoundingClientRect() : null;
-      const boundsLeft = Math.max(0, bounds ? bounds.left : 0);
-      const boundsTop = Math.max(0, bounds ? bounds.top : 0);
-      const boundsRight = Math.min(window.innerWidth, bounds ? bounds.left + area.clientWidth : window.innerWidth);
-      const boundsBottom = Math.min(window.innerHeight, bounds ? bounds.top + area.clientHeight : window.innerHeight);
-      const edge = 8;
-      // cleared first so a cap from an earlier open does not shrink the measurement below the natural height; a window too short for the whole menu gets a capped height with its own scrollbar instead of a hard cut
-      menuDropdown.style.maxHeight = "";
-      menuDropdown.style.overflowY = "";
-      const width = menuDropdown.offsetWidth || 190;
-      const room = boundsBottom - boundsTop - edge * 2;
-      let height = menuDropdown.offsetHeight || 280;
-      if (height > room && room > 0) {
-        height = room;
-        menuDropdown.style.maxHeight = room + "px";
-        menuDropdown.style.overflowY = "auto";
-      }
-      // the menu is positioned against the cards padding box, so the 1px card border has to come off the pointer offset
-      const originX = rect.left + card.clientLeft;
-      const originY = rect.top + card.clientTop;
-      const minLeft = boundsLeft + edge - originX;
-      const maxLeft = boundsRight - width - edge - originX;
-      const minTop = boundsTop + edge - originY;
-      const maxTop = boundsBottom - height - edge - originY;
-      const left = Math.max(minLeft, Math.min(maxLeft, e.clientX - originX));
-      const top = Math.max(minTop, Math.min(maxTop, e.clientY - originY));
-      menuDropdown.style.setProperty("--menu-left", left + "px");
-      menuDropdown.style.setProperty("--menu-top", top + "px");
-      menuDropdown.classList.add("is-open");
-      card.classList.add("menu-open");
+      openCardMenuAt(card, menuDropdown, e);
     }
     menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -3594,10 +3624,54 @@ const CLIP_HOVER_PROFILES = {
   }
 
   // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
+  // opens the menu of a card, a clip or a screenshot, with its top-left corner at the pointer, clamped to the visible scroll area so every item stays reachable
+  function openCardMenuAt(card, menuDropdown, e) {
+    if (window.RKTooltip) RKTooltip.hide();
+    resetAllArmedDeleteButtons();
+    document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
+      if (d !== menuDropdown) {
+        closeCardMenu(d);
+      }
+    });
+    const rect = card.getBoundingClientRect();
+    // the menu is painted inside .scroll-area, which clips at its own edge minus the scrollbar and starts below the toolbar -- clamping to the window instead let the menu slide under that edge, slicing off its border and rounded corners on the side it pressed against
+    const area = card.closest(".scroll-area");
+    const bounds = area && area.clientWidth > 0 ? area.getBoundingClientRect() : null;
+    const boundsLeft = Math.max(0, bounds ? bounds.left : 0);
+    const boundsTop = Math.max(0, bounds ? bounds.top : 0);
+    const boundsRight = Math.min(window.innerWidth, bounds ? bounds.left + area.clientWidth : window.innerWidth);
+    const boundsBottom = Math.min(window.innerHeight, bounds ? bounds.top + area.clientHeight : window.innerHeight);
+    const edge = 8;
+    // cleared first so a cap from an earlier open does not shrink the measurement below the natural height; a window too short for the whole menu gets a capped height with its own scrollbar instead of a hard cut
+    menuDropdown.style.maxHeight = "";
+    menuDropdown.style.overflowY = "";
+    const width = menuDropdown.offsetWidth || 190;
+    const room = boundsBottom - boundsTop - edge * 2;
+    let height = menuDropdown.offsetHeight || 280;
+    if (height > room && room > 0) {
+      height = room;
+      menuDropdown.style.maxHeight = room + "px";
+      menuDropdown.style.overflowY = "auto";
+    }
+    // the menu is positioned against the cards padding box, so the 1px card border has to come off the pointer offset
+    const originX = rect.left + card.clientLeft;
+    const originY = rect.top + card.clientTop;
+    const minLeft = boundsLeft + edge - originX;
+    const maxLeft = boundsRight - width - edge - originX;
+    const minTop = boundsTop + edge - originY;
+    const maxTop = boundsBottom - height - edge - originY;
+    const left = Math.max(minLeft, Math.min(maxLeft, e.clientX - originX));
+    const top = Math.max(minTop, Math.min(maxTop, e.clientY - originY));
+    menuDropdown.style.setProperty("--menu-left", left + "px");
+    menuDropdown.style.setProperty("--menu-top", top + "px");
+    menuDropdown.classList.add("is-open");
+    card.classList.add("menu-open");
+  }
+
   function closeCardMenu(menu) {
     if (!menu) return;
     menu.classList.remove("is-open");
-    const card = menu.closest(".card");
+    const card = menu.closest(".card, .screenshot-card");
     if (!card) return;
     if (menu._closeTimer) clearTimeout(menu._closeTimer);
     menu._closeTimer = setTimeout(() => {
@@ -4236,18 +4310,19 @@ const CLIP_HOVER_PROFILES = {
     const showFavSection = allFilterActive && favClips.length > 0;
     favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
     favoritesGridEl.classList.toggle("is-shown", showFavSection);
-    if (showFavSection) renderFavoritesGrid(favClips);
+    if (showFavSection && !collapsedSections.has("favorites")) renderFavoritesGrid(favClips);
     else favoritesGridEl.replaceChildren();
-    // all tab: only paired with the favorites split above, exactly as before. the other three tabs always get their own heading.
+    // every section keeps its heading available while its contents are collapsed.
     const restHeadingContent = allFilterActive
-      ? (showFavSection ? FILTER_SECTION_HEADING.all : null)
+      ? FILTER_SECTION_HEADING.all
       : FILTER_SECTION_HEADING[activeFilter];
     restHeadingEl.classList.toggle("is-shown", !!restHeadingContent);
-    restHeadingEl.classList.toggle("section-heading-rest", showFavSection);
+    restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showFavSection || !!(screenshotGallery && screenshotGallery.count())));
     if (restHeadingContent) {
       restHeadingIconEl.innerHTML = restHeadingContent.icon;
       restHeadingLabelEl.textContent = restHeadingContent.label;
     }
+    syncClipView();
     allClips = restClips;
     allClipsExpected = (clipsNextOffset >= clipsTotal || activeFilter !== "all" || clipSearchQuery.trim()) ? restClips.length : Math.max(restClips.length, clipsTotal - favClips.length);
     if (!restClips.length) {
@@ -4583,8 +4658,13 @@ const CLIP_HOVER_PROFILES = {
   }
 
   function selectClipFilter(next) {
-    if (next === activeFilter) return;
+    if (next === activeFilter) { renderLoadedClips(loadedClips); return; }
     activeFilter = next;
+    if (next === "screenshots") {
+      clearClipSelection();
+      stopActivePreviewForScroll();
+      if (activeSort === "longest" || activeSort === "shortest") activeSort = "newest";
+    }
     if (next === "drafts") refreshDrafts();
     scrollAreaEl.scrollTop = 0;
     resetVirtualWindow();
@@ -4685,6 +4765,11 @@ const CLIP_HOVER_PROFILES = {
         closeClipSortMenu();
         if (next === activeSort) return;
         activeSort = next;
+        if (activeFilter === "screenshots") {
+          screenshotGallery.update(clipSearchQuery, activeSort);
+          updateClipSortControl();
+          return;
+        }
         clipsPageVersion = "";
         clipsTotal = 0;
         clipsTotalKnown = false;
@@ -4796,6 +4881,8 @@ const CLIP_HOVER_PROFILES = {
     }
 
     activeFilter = "all";
+    syncClipView();
+    if (screenshotGallery) screenshotGallery.refresh();
     updateTabs(loadedClips);
 
     activeSort = "newest";
@@ -5130,7 +5217,7 @@ const CLIP_HOVER_PROFILES = {
   // compress all: bulk fast-compress of every clip that isnt already marked. client-side queue with busy-retry so the servers concurrency limiter (steady-state + cpu-gated burst) does the actual scheduling without us having to mirror its state. fast mode only -- bulk compress on smaller would take hours on a typical folder; users who want max compression on a specific clip still have the per-card 3-dot menu.
   const clipFolderBtn = document.getElementById("clip-folder-btn");
   if (clipFolderBtn) clipFolderBtn.addEventListener("click", () => {
-    fetch(HELPER + "/open-clip-folder", { method: "POST", cache: "no-store" }).catch(() => {});
+    fetch(HELPER + (activeFilter === "screenshots" ? "/open-screenshot-folder" : "/open-clip-folder"), { method: "POST", cache: "no-store" }).catch(() => {});
   });
 
   const compressAllBtn        = document.getElementById("compress-all-btn");
@@ -5693,6 +5780,8 @@ const CLIP_HOVER_PROFILES = {
       window.__rkEditorScope = { signal: editorScope.signal };
       trimVeil.replaceChildren(...Array.from(editor.childNodes));
       saveVeil.replaceChildren(...Array.from(saving.childNodes));
+      // the icons of the editor come after the ones of the page were filled, so they are filled the same way here
+      for (const el of [...trimVeil.querySelectorAll("svg[data-i]"), ...saveVeil.querySelectorAll("svg[data-i]")]) el.innerHTML = _svgInner(_RKI[el.dataset.i]);
       for (const node of doc.querySelectorAll("style, script")) {
         const copy = document.createElement(node.localName);
         copy.textContent = node.textContent;
@@ -5795,6 +5884,7 @@ const CLIP_HOVER_PROFILES = {
 
   hydrateClipUiState();
   refreshDrafts();
+  if (screenshotGallery) screenshotGallery.refresh();
   // the caps gate Create Link, so fetch them before the first paint and repaint once they land; re-fetched on re-show because signing in or out between sessions changes what Streamable will accept.
   refreshUploadLimits().then(() => queueVirtualRender(true));
   document.addEventListener("visibilitychange", () => {

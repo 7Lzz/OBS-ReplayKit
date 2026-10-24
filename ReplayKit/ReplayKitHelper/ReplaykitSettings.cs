@@ -59,10 +59,13 @@ namespace ReplayKitHelper
                 ["clipKeybind"] = new JObject { ["key"] = "OBS_KEY_F8" },
                 ["recordingKeybind"] = new JObject(),
                 ["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" },
+                // the screenshot of the obs output, saved into the Screenshots folder of the clips; unbound until a key is picked, like recording
+                ["screenshotKeybind"] = new JObject(),
                 // the one extra binding each hotkey may have (the + of the hotkeys page)
                 ["clipKeybindExtra"] = new JObject(),
                 ["recordingKeybindExtra"] = new JObject(),
                 ["openClipsKeybindExtra"] = new JObject(),
+                ["screenshotKeybindExtra"] = new JObject(),
                 ["overlayStyle"] = "off",
                 ["bongoMode"] = "standard",
                 ["overlayOpacity"] = 100,
@@ -487,6 +490,8 @@ namespace ReplayKitHelper
                 ["clipKeybindExtra"] = NormalizeExtraKeybind(data["clipKeybindExtra"], "extra clip keybind"),
                 ["recordingKeybindExtra"] = NormalizeExtraKeybind(data["recordingKeybindExtra"], "extra recording keybind"),
                 ["openClipsKeybindExtra"] = NormalizeExtraKeybind(data["openClipsKeybindExtra"], "extra open clips keybind"),
+                ["screenshotKeybind"] = NormalizeExtraKeybind(data["screenshotKeybind"], "screenshot keybind"),
+                ["screenshotKeybindExtra"] = NormalizeExtraKeybind(data["screenshotKeybindExtra"], "extra screenshot keybind"),
                 ["overlayStyle"] = GetEnumSetting(data, "overlayStyle", defaults["overlayStyle"].Value<string>(), new[] { "input_overlay", "bongo_cat", "off" }),
                 ["overlayOpacity"] = GetIntSetting(data, "overlayOpacity", defaults["overlayOpacity"].Value<int>(), 0, 100),
                 ["overlayScale"] = GetIntSetting(data, "overlayScale", defaults["overlayScale"].Value<int>(), 50, 200),
@@ -5526,7 +5531,20 @@ namespace ReplayKitHelper
         }
 
         private static string HotkeySignature(JObject settings) =>
-            new JObject { ["clip"] = settings["clipKeybind"], ["clipExtra"] = settings["clipKeybindExtra"], ["recording"] = settings["recordingKeybind"], ["recordingExtra"] = settings["recordingKeybindExtra"] }.ToString(Formatting.None);
+            new JObject { ["clip"] = settings["clipKeybind"], ["clipExtra"] = settings["clipKeybindExtra"], ["recording"] = settings["recordingKeybind"], ["recordingExtra"] = settings["recordingKeybindExtra"], ["screenshot"] = settings["screenshotKeybind"], ["screenshotExtra"] = settings["screenshotKeybindExtra"] }.ToString(Formatting.None);
+
+        // the screenshot hotkey is obss own Screenshot Output, which can be set in the hotkeys of obs as well, so a key picked there shows here too
+        private static JObject SyncScreenshotKeybindFromObs(JObject settings)
+        {
+            var shot = GetObsProfileParameterSafe("Hotkeys", "OBSBasic.Screenshot");
+            if (!shot.Ok) return settings;
+            string json = shot.Data?["parameterValue"]?.Value<string>() ?? "";
+            var combo = ConvertRecordingBasicIniToKeybind(json);
+            var extra = ConvertRecordingBasicIniToKeybind(json, 1);
+            if ((settings["screenshotKeybind"] as JObject ?? new JObject()).ToString(Formatting.None) != combo.ToString(Formatting.None)) settings["screenshotKeybind"] = combo;
+            if ((settings["screenshotKeybindExtra"] as JObject ?? new JObject()).ToString(Formatting.None) != extra.ToString(Formatting.None)) settings["screenshotKeybindExtra"] = extra;
+            return settings;
+        }
 
         private static JObject SyncHotkeysFromObs(JObject settings)
         {
@@ -5548,6 +5566,7 @@ namespace ReplayKitHelper
             }
 
             settings = SyncRecordingKeybindFromObs(settings);
+            settings = SyncScreenshotKeybindFromObs(settings);
             string after = HotkeySignature(settings);
             if (before != after) WriteSettings(settings);
             return settings;
@@ -5598,9 +5617,11 @@ namespace ReplayKitHelper
             string recordingJson = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             var r1 = SetReplayBufferHotkeyJson(clipJson);
             var r2 = SetRecordingHotkeyPairJson(recordingJson, recordingJson);
+            var r3 = SetObsProfileParameterSafe("Hotkeys", "OBSBasic.Screenshot", ConvertRecordingKeybindToBasicIni(settings["screenshotKeybind"] as JObject, settings["screenshotKeybindExtra"] as JObject));
             var errors = new List<string>();
             if (!r1.Ok) errors.Add(r1.Message);
             if (r2["ok"]?.Value<bool>() != true) errors.Add(r2["message"]?.Value<string>());
+            if (!r3.Ok) errors.Add("OBSBasic.Screenshot: " + r3.Message);
 
             // unconditional even if the ini writes above failed -- those are best-effort disk consistency, not what actually restores the live binding, so a websocket hiccup should not leave the native hotkey blanked.
             WriteHotkeyCaptureSignal(new JObject
@@ -5610,6 +5631,8 @@ namespace ReplayKitHelper
                 ["recordingKeybind"] = settings["recordingKeybind"] as JObject ?? new JObject(),
                 ["clipKeybindExtra"] = settings["clipKeybindExtra"] as JObject ?? new JObject(),
                 ["recordingKeybindExtra"] = settings["recordingKeybindExtra"] as JObject ?? new JObject(),
+                ["screenshotKeybind"] = settings["screenshotKeybind"] as JObject ?? new JObject(),
+                ["screenshotKeybindExtra"] = settings["screenshotKeybindExtra"] as JObject ?? new JObject(),
             });
             lock (Server.State.HotkeyCaptureLock)
             {
@@ -5684,6 +5707,7 @@ namespace ReplayKitHelper
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
+            profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.Screenshot", ConvertRecordingKeybindToBasicIni(settings["screenshotKeybind"] as JObject, settings["screenshotKeybindExtra"] as JObject) });
             // always pin obss recording folder to the RESOLVED clip dir (custom or the ~/Videos default) -- the helpers clip watcher/scanner uses that same resolved dir, so if obss own RecFilePath ever drifts (a reset profile, an obs update) clips land where nothing is looking for them.
             string clipDirValue = settings["clipDir"]?.Value<string>();
             string resolvedClipDir = string.IsNullOrWhiteSpace(clipDirValue) ? AppConfig.GetDefaultClipDir() : clipDirValue;

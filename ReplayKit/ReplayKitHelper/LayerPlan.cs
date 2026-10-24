@@ -96,6 +96,25 @@ namespace ReplayKitHelper
             }
         }
 
+        // the layers that show at the time t of the saved clip and nothing else, for a picture of that one frame: each is read from half a second before t rather than from its start, at the same place on the timeline, so the frame comes out the same while far less is decoded; a gif cannot be seeked into and keeps its start
+        public LayerPlan AtFrame(double t)
+        {
+            var plan = new LayerPlan();
+            foreach (var l in layers)
+            {
+                if (t < l.At || t >= l.End) continue;
+                double skip = l.Gif ? 0 : Math.Max(0, t - l.At - 0.5);
+                plan.layers.Add(new Layer
+                {
+                    Path = l.Path, Clip = l.Clip, Gif = l.Gif,
+                    At = l.At + skip, End = l.End, Src = l.Clip ? l.Src + skip : l.Src,
+                    X = l.X, Y = l.Y, W = l.W, Opacity = l.Opacity, Rotate = l.Rotate,
+                    Look = l.Look, Aspect = l.Aspect,
+                });
+            }
+            return plan;
+        }
+
         // the reads of the layers, one input each, in their order; a picture is repeated for as long as it shows, a gif loops from its first frame, and a clip is read from its own start for that long
         public List<string> Inputs()
         {

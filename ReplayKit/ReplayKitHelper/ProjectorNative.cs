@@ -74,9 +74,24 @@ namespace ReplayKitHelper
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
 
+        public static bool IsProjectorWindow(long hwndValue)
+        {
+            long main;
+            lock (Server.State.IpcLock)
+            {
+                main = Server.State.ObsMainWindowHwnd;
+                if (hwndValue == 0 || main == 0 || hwndValue == main || !Server.State.IpcClientConnected ||
+                    Server.State.ProjectorHwnds == null || !Server.State.ProjectorHwnds.Contains(hwndValue) ||
+                    (DateTime.UtcNow - Server.State.ProjectorHwndsAtUtc).TotalSeconds > 2) return false;
+            }
+            GetWindowThreadProcessId(new IntPtr(main), out uint mainProcess);
+            GetWindowThreadProcessId(new IntPtr(hwndValue), out uint projectorProcess);
+            return mainProcess != 0 && mainProcess == projectorProcess;
+        }
+
         private static bool EnsureNormalAppWindow(IntPtr hWnd)
         {
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hWnd.ToInt64())) return false;
             try { SetWindowLongPtr(hWnd, GWLP_HWNDPARENT, IntPtr.Zero); } catch (System.ComponentModel.Win32Exception) { }
             long style = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
             long next = (style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW;
@@ -87,7 +102,7 @@ namespace ReplayKitHelper
         public static bool PreParkProjectorWindow(long hwndValue, string title)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             ShowWindow(hWnd, SW_HIDE);
             if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
             EnsureNormalAppWindow(hWnd);
@@ -129,6 +144,7 @@ namespace ReplayKitHelper
             int bestScore = 0;
             EnumWindows((hWnd, lParam) =>
             {
+                if (!IsProjectorWindow(hWnd.ToInt64())) return true;
                 var sb = new StringBuilder(512);
                 GetWindowText(hWnd, sb, sb.Capacity);
                 string title = sb.ToString();
@@ -192,6 +208,7 @@ namespace ReplayKitHelper
             EnumWindows((hWnd, lParam) =>
             {
                 if (keep != IntPtr.Zero && hWnd == keep) return true;
+                if (!IsProjectorWindow(hWnd.ToInt64())) return true;
                 var sb = new StringBuilder(512);
                 GetWindowText(hWnd, sb, sb.Capacity);
                 if (!string.Equals(sb.ToString(), exactTitle, StringComparison.Ordinal)) return true;
@@ -216,7 +233,7 @@ namespace ReplayKitHelper
         public static bool SetProjectorChrome(long hwndValue, bool borderless)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             long style = GetWindowLongPtr(hWnd, GWL_STYLE).ToInt64();
             long chromeMask = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
             long next = borderless ? (style & ~chromeMask) : (style | chromeMask);
@@ -251,7 +268,7 @@ namespace ReplayKitHelper
         private static bool SetProjectorTaskbarHiddenCore(long hwndValue, bool hidden)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             if (!EnsureNormalAppWindow(hWnd)) return false;
             try
             {
@@ -267,14 +284,14 @@ namespace ReplayKitHelper
         public static bool ClearProjectorVisibleRegion(long hwndValue)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             return SetWindowRgn(hWnd, IntPtr.Zero, true) != 0;
         }
 
         public static bool SetProjectorVisibleRegion(long hwndValue, int x, int y, int width, int height)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero || width < 1 || height < 1 || x < 0 || y < 0) return false;
+            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1 || x < 0 || y < 0) return false;
             IntPtr region = CreateRectRgn(x, y, x + width, y + height);
             if (region == IntPtr.Zero) return false;
             if (SetWindowRgn(hWnd, region, true) == 0) { DeleteObject(region); return false; }
@@ -284,7 +301,7 @@ namespace ReplayKitHelper
         public static bool SetProjectorGhosted(long hwndValue, bool ghosted, byte alpha)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             long style = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
             const long ghostMask = WS_EX_LAYERED;
             long next = ghosted
@@ -305,7 +322,7 @@ namespace ReplayKitHelper
         public static bool RestoreResizeTitleAndChrome(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero || width < 1 || height < 1) return false;
+            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
             SetProjectorGhosted(hwndValue, false, 255);
             ShowWindow(hWnd, SW_RESTORE);
             ShowWindowAsync(hWnd, SW_RESTORE);
@@ -322,7 +339,7 @@ namespace ReplayKitHelper
         public static bool RestoreResizeTitleChromeAndRegion(long hwndValue, string title, int x, int y, int width, int height, bool borderless, int regionX, int regionY, int regionWidth, int regionHeight)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero || width < 1 || height < 1) return false;
+            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
             if (!SetProjectorVisibleRegion(hwndValue, regionX, regionY, regionWidth, regionHeight)) return false;
             ShowWindow(hWnd, SW_RESTORE);
             ShowWindowAsync(hWnd, SW_RESTORE);
@@ -347,7 +364,7 @@ namespace ReplayKitHelper
         private static bool RestoreResizeTitleChromeGhostedCore(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero || width < 1 || height < 1) return false;
+            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
             if (!SetProjectorGhosted(hwndValue, true, 0)) return false;
             if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
             if (!SetProjectorChrome(hwndValue, borderless)) return false;
@@ -363,7 +380,7 @@ namespace ReplayKitHelper
         public static bool IsWindowAtRectAndTitle(long hwndValue, string title, int x, int y, int width, int height)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero || width < 1 || height < 1) return false;
+            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
             if (!GetWindowRect(hWnd, out RECT rect)) return false;
             if (rect.Left != x || rect.Top != y || (rect.Right - rect.Left) != width || (rect.Bottom - rect.Top) != height) return false;
             if (!string.IsNullOrWhiteSpace(title) && !string.Equals(GetWindowTitle(hwndValue), title, StringComparison.Ordinal)) return false;
@@ -373,7 +390,7 @@ namespace ReplayKitHelper
         public static bool CloseWindow(long hwndValue)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (hWnd == IntPtr.Zero) return false;
+            if (!IsProjectorWindow(hwndValue)) return false;
             return PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
     }

@@ -126,9 +126,9 @@
   .ed-lib-veil { position: fixed; inset: 0; z-index: 75; display: grid; place-items: center; background: rgba(0, 0, 0, .55); animation: ed-lib-fade 140ms linear both; }
   .ed-lib-veil[hidden] { display: none; }
   @keyframes ed-lib-fade { from { opacity: 0; } to { opacity: 1; } }
-  .ed-lib { display: flex; flex-direction: column; width: min(940px, calc(100vw - 48px)); max-height: calc(100vh - 64px); background: var(--grey6); border: 1px solid var(--grey4); border-radius: 10px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); animation: ed-lib-in 180ms var(--ease_smooth) both; overflow: hidden; }
+  .ed-lib { display: flex; flex-direction: column; width: min(940px, calc(100vw - 48px)); height: min(720px, calc(100vh - 64px)); background: var(--grey6); border: 1px solid var(--grey4); border-radius: 10px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); animation: ed-lib-in 180ms var(--ease_smooth) both; overflow: hidden; }
   @keyframes ed-lib-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
-  .ed-lib-head { display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; border-bottom: 1px solid var(--hairline); }
+  .ed-lib-head { display: flex; flex: 0 0 auto; align-items: center; gap: 14px; padding: 12px 12px 12px 18px; border-bottom: 1px solid var(--hairline); }
   .ed-lib-title { font-size: 15px; font-weight: 700; color: var(--text); flex: 0 0 auto; }
   .ed-lib-head .ed-fx-search { flex: 0 1 160px; width: 160px; min-width: 0; }
   /* the buttons of the library sit after a divider beside its name; the sort and the search keep to the right, the sort trigger and menu being the ones of the clips page */
@@ -1158,9 +1158,6 @@
         closeLibrary();
       }, { capture: true, signal: EDITOR_SIGNAL });
       els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, sortMenu: sort, sort: "newest", clips: [], cards: [] };
-      var resize = new ResizeObserver(sizeLibrary);
-      resize.observe(card);
-      if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { resize.disconnect(); }, { once: true });
       if (window.RKHover) RKHover.apply(card, { control: ".ed-x, .clip-sort-trigger", row: ".clip-sort-item" });
     }
 
@@ -1250,19 +1247,6 @@
       lib.favHead.hidden = lib.favGrid.hidden = !split || favShown === 0;
       lib.restHead.hidden = !split || shown - favShown === 0;
       lib.empty.textContent = lib.clips.length === 0 ? "There are no clips in the clip folder yet." : shown === 0 ? "No clips match that." : "";
-      sizeLibrary();
-    }
-
-    function sizeLibrary() {
-      var lib = els.lib;
-      if (!lib || lib.veil.hidden) return;
-      var first = lib.favGrid.hidden ? lib.grid : lib.favGrid;
-      var card = Array.from(first.children).find(function (item) { return !item.hidden; });
-      if (!card) return;
-      var height = card.offsetTop - lib.body.offsetTop;
-      height += card.offsetHeight * 2 + parseFloat(getComputedStyle(first).rowGap);
-      height += parseFloat(getComputedStyle(lib.body).paddingBottom);
-      lib.body.style.height = Math.ceil(height) + "px";
     }
 
     function addClipLayer(c, title) {
@@ -2024,18 +2008,21 @@
     return { prepare: prepare, refresh: refresh, opened: opened, closed: closed, recording: function () { return rec.on || rec.starting; } };
   }
 
-  // keeps the overlay of the subtitles on the picture of the video: the element letterboxes the video, so the overlay takes the box the picture is drawn in and its height sets the size of the text
-  function trackPicture(video, overlay) {
+  // keeps the overlay of the subtitles on the picture of the video: the element letterboxes the video, so the overlay takes the box the picture is drawn in and its height sets the size of the text; a host that cuts the picture to a frame of its own says where that frame is with box
+  function trackPicture(video, overlay, box) {
     function place() {
-      var w = video.clientWidth, h = video.clientHeight;
-      var vw = video.videoWidth || 16, vh = video.videoHeight || 9;
-      var scale = Math.min(w / vw, h / vh);
-      var pw = vw * scale, ph = vh * scale;
-      overlay.style.left = (video.offsetLeft + (w - pw) / 2) + "px";
-      overlay.style.top = (video.offsetTop + (h - ph) / 2) + "px";
-      overlay.style.width = pw + "px";
-      overlay.style.height = ph + "px";
-      overlay.style.setProperty("--sub-h", ph + "px");
+      var r = box ? box() : null;
+      if (!r) {
+        var w = video.clientWidth, h = video.clientHeight;
+        var vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+        var scale = Math.min(w / vw, h / vh);
+        r = { left: video.offsetLeft + (w - vw * scale) / 2, top: video.offsetTop + (h - vh * scale) / 2, width: vw * scale, height: vh * scale };
+      }
+      overlay.style.left = r.left + "px";
+      overlay.style.top = r.top + "px";
+      overlay.style.width = r.width + "px";
+      overlay.style.height = r.height + "px";
+      overlay.style.setProperty("--sub-h", r.height + "px");
     }
     video.addEventListener("loadedmetadata", place);
     if (window.ResizeObserver) new ResizeObserver(place).observe(video);

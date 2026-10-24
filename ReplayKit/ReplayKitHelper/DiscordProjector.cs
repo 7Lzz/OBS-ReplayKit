@@ -350,12 +350,11 @@ namespace ReplayKitHelper
             }
         }
 
-        // the plugin signal above is authoritative when available -- prefer it. FindAllObsWindows (window class + no-owner heuristic) is the fallback for an older bundle without the native plugin update, or the brief window before the native plugins first publish after obs startup.
+        // Only OBS-confirmed projectors can be moved or hidden; the main window can also have "Projector" in its title.
         private static List<long> GetObsWindowCandidates()
         {
             var fromPlugin = GetProjectorHwndsFromPlugin();
-            if (fromPlugin != null) return fromPlugin;
-            return new List<long>(ProjectorNative.FindAllObsWindows());
+            return fromPlugin == null ? null : fromPlugin.Where(ProjectorNative.IsProjectorWindow).ToList();
         }
 
         // true only for a hwnd that appeared after baseline was captured -- a window already present in baseline is off limits no matter what it looks like, becuase it could be a projector the user opened themselves from OBSs own menu (same title pattern, no way to tell them apart except by "did it exist before a projector was asked for").
@@ -363,7 +362,9 @@ namespace ReplayKitHelper
 
         private static long GetFirstNewProjectorWindow(List<long> baseline)
         {
-            foreach (var candidate in GetObsWindowCandidates())
+            var candidates = GetObsWindowCandidates();
+            if (candidates == null) return 0;
+            foreach (var candidate in candidates)
             {
                 if (IsNewProjectorWindow(candidate, baseline)) return candidate;
             }
@@ -372,7 +373,9 @@ namespace ReplayKitHelper
 
         private static void CloseStrayProjectorWindows(List<long> baseline, long keepHwnd)
         {
-            foreach (var candidate in GetObsWindowCandidates())
+            var candidates = GetObsWindowCandidates();
+            if (candidates == null) return;
+            foreach (var candidate in candidates)
             {
                 if (candidate == keepHwnd) continue;
                 if (!IsNewProjectorWindow(candidate, baseline)) continue;
@@ -403,7 +406,11 @@ namespace ReplayKitHelper
 
             // an earlier attempt may still be mid-create on obss side even though this gave up waiting for it last time -- if one is already pending, reuse that same baseline instead of re-snapshotting now, or its own not-yet-appeared window would be wrongly treated as "pre-existing, not ours" the moment it finally shows up. only take a fresh baseline when nothing is pending.
             if (Server.State.ReplaykitDiscordProjectorPendingBaseline == null)
-                Server.State.ReplaykitDiscordProjectorPendingBaseline = GetObsWindowCandidates();
+            {
+                var candidates = GetObsWindowCandidates();
+                if (candidates == null) return new OpenProjectorResult { Ok = false, Message = "OBS projector window information is unavailable." };
+                Server.State.ReplaykitDiscordProjectorPendingBaseline = candidates;
+            }
             var baseline = Server.State.ReplaykitDiscordProjectorPendingBaseline;
 
             Log.Write("Opening OBS Windowed Projector for title '" + title + "'");
@@ -421,7 +428,8 @@ namespace ReplayKitHelper
                 long newHwnd = GetFirstNewProjectorWindow(baseline);
                 if (newHwnd != 0)
                 {
-                    ProjectorNative.PreParkProjectorWindow(newHwnd, title);
+                    if (!ProjectorNative.PreParkProjectorWindow(newHwnd, title))
+                        return new OpenProjectorResult { Ok = false, Message = "The OBS projector window could not be confirmed or parked." };
                     ProjectorNative.SetProjectorTaskbarHidden(newHwnd, true);
                     int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, newHwnd);
                     if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");

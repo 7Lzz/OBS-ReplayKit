@@ -759,10 +759,11 @@
   body.is-searching .page { margin-bottom:12px; }
   .nav-btn:focus:not(:focus-visible) { outline:none; }
   body.is-searching .nav-btn:not(.search-match) { opacity:.38; }
-  .account-field-value { min-width:0; padding:10px 12px; background:var(--field-dark); border:1px solid var(--line); border-radius:4px; line-height:1.4; overflow-wrap:anywhere; }
-  .account-field-value.is-off { color:var(--muted); }
-  .page .account-field .setting-description { margin-top:0; }
-  .page .account-actions { justify-content:flex-end; margin-top:2px; }
+  .account-status, .account-value { width:100%; text-align:right; font-weight:600; overflow-wrap:anywhere; }
+  .account-label { display:flex; align-items:center; gap:8px; }
+  .account-label svg { width:17px; height:17px; fill:currentColor; flex:none; }
+  .page .account-actions { justify-content:flex-end; margin:0 0 0 auto; }
+  .upload-details-note { margin:0; padding:12px 0 16px; border-top:1px solid var(--hairline); color:var(--muted); font-size:12px; line-height:1.6; }
   .account-actions:not(:has(button:not([hidden]))) { display:none; }
   #uninstallConfirmModal .modal { width:min(500px,calc(100vw - 32px)); max-height:calc(100vh - 32px); display:flex; flex-direction:column; }
   #uninstallConfirmModal .modal-body { min-height:0; overflow:auto; }
@@ -1233,6 +1234,31 @@
             </button>
           </div>
         </div>
+        <div class="hotkey-section">Screenshots</div>
+        <div class="hotkey-row" data-hotkey-name="Take Screenshot">
+          <div class="label">Take Screenshot</div>
+          <div class="hotkey-input" id="screenshotKeybind" tabindex="0" role="textbox" aria-label="Take screenshot hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" id="resetScreenshotHotkey" title="Reset to default">
+              <svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+            <button class="icon-btn" type="button" id="clearScreenshotHotkey" title="Clear hotkey">
+              <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+            <button class="icon-btn" type="button" id="addScreenshotHotkey" title="Add another hotkey">
+              <svg data-i="action/plus" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hotkey-row hotkey-extra-row" data-hotkey-name="Take Screenshot" data-extra-of="screenshotKeybind" hidden>
+          <div class="label"></div>
+          <div class="hotkey-input" id="screenshotKeybindExtra" tabindex="0" role="textbox" aria-label="Extra take screenshot hotkey"></div>
+          <div class="hotkey-actions">
+            <button class="icon-btn" type="button" data-remove-extra="screenshotKeybind" title="Remove this hotkey">
+              <svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1560,22 +1586,26 @@
 
     <section class="page" id="page-account">
       <div class="box">
-        <div class="box-title">Account settings</div>
-        <div class="form-row setting-wide account-field">
-          <div class="label">Streamable account</div>
-          <div class="account-field-value is-off" id="streamableStatus" role="status" aria-live="polite">Checking connection…</div>
-          <div class="setting-description" id="streamableHelp">Sign in to upload clips and create shareable links.</div>
+        <div class="box-title">Streamable account</div>
+        <div class="form-row" data-search="streamable account anonymous uploads connection">
+          <div class="label">Connection<span class="setting-description" id="streamableHelp">You can upload clips and create shareable links without an account.</span></div>
+          <div class="field-wrap is-stacked">
+          <div class="account-status" id="streamableStatus" role="status" aria-live="polite">Checking connection…</div>
           <div class="account-actions">
             <button class="btn is-primary" type="button" id="streamableSignIn" hidden>Sign in to Streamable</button>
             <button class="btn" type="button" id="streamableSignOut" hidden>Sign out</button>
             <button class="btn" type="button" id="streamableForce" hidden>Reset sign-in</button>
           </div>
+          </div>
         </div>
       </div>
       <div class="box" id="streamableDetails" hidden>
-        <div class="box-title">Account details</div>
-        <div class="form-row setting-wide account-field"><div class="label">Plan</div><div class="account-field-value" id="streamablePlan"></div></div>
-        <div class="form-row setting-wide account-field"><div class="label">Clip retention</div><div class="account-field-value" id="streamableRetention"></div></div>
+        <div class="box-title" id="streamableDetailsTitle">Upload details</div>
+        <div class="form-row"><div class="label">Plan<span class="setting-description">The plan used for new uploads.</span></div><div class="field-wrap"><span class="account-value" id="streamablePlan"></span></div></div>
+        <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-storage" viewBox="0 0 16 16" aria-hidden="true"></svg>Upload size</span><span class="setting-description">Maximum file size per video.</span></div><div class="field-wrap"><span class="account-value" id="streamableSize"></span></div></div>
+        <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-editor" viewBox="0 0 16 16" aria-hidden="true"></svg>Video length</span><span class="setting-description">Maximum length per video.</span></div><div class="field-wrap"><span class="account-value" id="streamableDuration"></span></div></div>
+        <div class="form-row"><div class="label"><span class="account-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l4 2 1-1.7-3-1.5V7z"/></svg>Clip retention</span><span class="setting-description">How long new uploads remain available.</span></div><div class="field-wrap"><span class="account-value" id="streamableRetention"></span></div></div>
+        <p class="upload-details-note">Limits apply to new uploads. Existing links keep the limits they were uploaded with.</p>
       </div>
     </section>
 
@@ -2033,6 +2063,7 @@
   const DEFAULT_CLIP_KEYBIND = { key:"OBS_KEY_F8" };
   const DEFAULT_RECORDING_KEYBIND = {};
   const DEFAULT_OPEN_CLIPS_KEYBIND = { alt:true, key:"OBS_KEY_Z" };
+  const DEFAULT_SCREENSHOT_KEYBIND = {};
   const DEFAULT_OVERLAY_OPACITY = 100;
   const DEFAULT_OVERLAY_SCALE = 100;
   const DEFAULT_OVERLAY_ROTATION = 0;
@@ -2051,6 +2082,7 @@
   let dirty = false;
   const settingsHistory = { past:[], future:[], current:null, group:null, time:0, restoring:false };
   let historyGesture = null;
+  let historySource = null;
   // changes that act on obs itself (clipping, the two mutes) wait here until Apply, keyed by switch with the value that was asked for, and only while it differs from what obs reports
   const pendingLive = {};
   // the recording audio list of the audio tab. all pc audio: the pc audio and the microphone. specific apps: the microphone, then a game audio section, which is the same pc audio source once it only takes the ticked programs, with a row for each program the helper found; the icons of programs are fetched once and kept as object urls
@@ -2527,16 +2559,17 @@
   }
 
   // the shell drops a view that has been out of sight for a while, and unsaved edits or an apply on its way would go with it
-  window.__rkCanUnload = () => !dirty && !applyInFlight;
+  window.__rkCanUnload = () => !dirty && !applyInFlight && !settingsHistory.past.length && !settingsHistory.future.length;
 
-  function markDirty() {
+  function markDirty(record = true) {
     dirty = JSON.stringify(state) !== JSON.stringify(originalState) || Object.keys(pendingLive).length > 0;
-    recordSettingsHistory();
+    if (record) recordSettingsHistory();
+    else if (settingsHistory.current) settingsHistory.current = settingsSnapshot();
     updateApplyButton();
   }
 
   function settingsSnapshot() {
-    return clone({ settings:state, live:pendingLive });
+    return clone({ settings:state, live:pendingLive, themeEdit:editingThemeId, themeName:els.themeName.value });
   }
 
   function updateHistoryButtons() {
@@ -2556,8 +2589,8 @@
     if (!settingsHistory.current || settingsHistory.restoring || applyInFlight) return;
     const next = settingsSnapshot();
     if (JSON.stringify(next) === JSON.stringify(settingsHistory.current)) return;
-    const focus = document.activeElement;
-    const group = historyGesture || (focus && focus.matches('input:not([type="checkbox"]):not([type="radio"]), textarea') ? focus : null);
+    const source = historySource && historySource.target;
+    const group = historyGesture || (source && source.matches('input:not([type="checkbox"]):not([type="radio"]), textarea') ? source : null);
     const now = performance.now();
     if (!group || group !== settingsHistory.group || (!historyGesture && now - settingsHistory.time > 600)) {
       settingsHistory.past.push(settingsHistory.current);
@@ -2575,6 +2608,8 @@
     if (applyInFlight || !from.length) return;
     to.push(settingsSnapshot());
     const next = from.pop();
+    const positionChanged = state.overlayStyle !== next.settings.overlayStyle ||
+      JSON.stringify(state.overlayPosition) !== JSON.stringify(next.settings.overlayPosition);
     settingsHistory.restoring = true;
     try {
       Object.keys(state).forEach((key) => { delete state[key]; });
@@ -2585,9 +2620,18 @@
       });
       closeCombos();
       endThemeEdit();
+      if (next.themeEdit) {
+        editingThemeId = next.themeEdit;
+        els.themeName.value = next.themeName;
+        els.saveThemeBtn.textContent = "Update preset";
+        els.cancelThemeEditBtn.hidden = false;
+      }
       syncUi();
       paintLiveControls();
-      if (window.RKOverlayPreview) { RKOverlayPreview.resetPosition(); RKOverlayPreview.refresh(); }
+      if (window.RKOverlayPreview) {
+        if (positionChanged) RKOverlayPreview.restorePosition();
+        else RKOverlayPreview.refresh();
+      }
       markDirty();
       settingsHistory.current = settingsSnapshot();
       settingsHistory.group = null;
@@ -2598,9 +2642,18 @@
   }
 
   window.addEventListener("pointerdown", () => { historyGesture = {}; }, true);
-  ["pointerup", "pointercancel", "blur"].forEach((name) => window.addEventListener(name, () => {
-    queueMicrotask(() => { historyGesture = null; });
+  ["input", "change", "wheel", "combochange"].forEach((name) => window.addEventListener(name, (event) => {
+    const source = { target:event.target instanceof Element ? event.target : null };
+    historySource = source;
+    setTimeout(() => { if (historySource === source) historySource = null; }, 0);
   }, true));
+  function finishHistoryGesture() {
+    const gesture = historyGesture;
+    // Native input, change and click handlers must finish before the gesture ends.
+    setTimeout(() => { if (historyGesture === gesture) historyGesture = null; }, 0);
+  }
+  ["pointerup", "pointercancel"].forEach((name) => window.addEventListener(name, finishHistoryGesture, true));
+  window.addEventListener("blur", finishHistoryGesture);
   document.getElementById("undoSettingsBtn").addEventListener("click", () => restoreSettingsHistory(false));
   document.getElementById("redoSettingsBtn").addEventListener("click", () => restoreSettingsHistory(true));
 
@@ -2667,6 +2720,7 @@
 
   function acceptSettings(nextSettings) {
     settingsHistory.restoring = true;
+    endThemeEdit();
     Object.assign(state, nextSettings || {});
     state.screenshareGameOverrides = normalizeScreenshareGameOverrides(state.screenshareGameOverrides);
     originalState = clone(state);
@@ -2833,12 +2887,14 @@
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
     recordingKeybind: { el:els.recordingKeybind, defaultValue:DEFAULT_RECORDING_KEYBIND },
     openClipsKeybind: { el:els.openClipsKeybind, defaultValue:DEFAULT_OPEN_CLIPS_KEYBIND },
+    screenshotKeybind: { el:document.getElementById("screenshotKeybind"), defaultValue:DEFAULT_SCREENSHOT_KEYBIND },
     clipKeybindExtra: { el:document.getElementById("clipKeybindExtra"), defaultValue:{} },
     recordingKeybindExtra: { el:document.getElementById("recordingKeybindExtra"), defaultValue:{} },
     openClipsKeybindExtra: { el:document.getElementById("openClipsKeybindExtra"), defaultValue:{} },
+    screenshotKeybindExtra: { el:document.getElementById("screenshotKeybindExtra"), defaultValue:{} },
   };
   // each hotkey takes one extra binding: its + opens the row under it, and the row stays while it holds a key or is being set
-  const EXTRA_HOTKEY_ADD_BUTTONS = { clipKeybind:"addHotkey", recordingKeybind:"addRecordingHotkey", openClipsKeybind:"addOpenClipsHotkey" };
+  const EXTRA_HOTKEY_ADD_BUTTONS = { clipKeybind:"addHotkey", recordingKeybind:"addRecordingHotkey", openClipsKeybind:"addOpenClipsHotkey", screenshotKeybind:"addScreenshotHotkey" };
   const extraHotkeyOpen = new Set();
   function syncExtraHotkeyRow(baseName) {
     const row = document.querySelector('[data-extra-of="' + baseName + '"]');
@@ -3458,7 +3514,7 @@
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented || activeHotkeyField || hotkeyCaptureActive) return;
     const k = (e.key || "").toLowerCase();
     if (k !== "z" && k !== "y") return;
-    if (e.target.closest('input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"], .hotkey-input') || document.querySelector(".modal-backdrop.is-visible")) return;
+    if ((e.target instanceof Element && e.target.closest('input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"], .hotkey-input')) || document.querySelector('.modal-backdrop.is-visible, #cpick:not([hidden])')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     restoreSettingsHistory(k === "y" || e.shiftKey);
@@ -3889,6 +3945,8 @@
   document.getElementById("clearHotkey").addEventListener("click", () => clearHotkey("clipKeybind"));
   document.getElementById("resetRecordingHotkey").addEventListener("click", () => resetHotkey("recordingKeybind"));
   document.getElementById("clearRecordingHotkey").addEventListener("click", () => clearHotkey("recordingKeybind"));
+  document.getElementById("resetScreenshotHotkey").addEventListener("click", () => resetHotkey("screenshotKeybind"));
+  document.getElementById("clearScreenshotHotkey").addEventListener("click", () => clearHotkey("screenshotKeybind"));
   document.getElementById("resetOpenClipsHotkey").addEventListener("click", () => resetHotkey("openClipsKeybind"));
   document.getElementById("clearOpenClipsHotkey").addEventListener("click", () => clearHotkey("openClipsKeybind"));
   Object.keys(EXTRA_HOTKEY_ADD_BUTTONS).forEach((baseName) => {
@@ -4032,6 +4090,7 @@
   // the settings window is hidden (not destroyed) on close, so a reopen re-shows this same JS -- Cancel and a plain close both have to drop every unsaved edit here in the page. state back to the last saved snapshot, repaint, clear dirty, and reset the in-page overlay preview (drag position + its undo history).
   function revertLocalEdits() {
     settingsHistory.restoring = true;
+    endThemeEdit();
     Object.keys(state).forEach((k) => { delete state[k]; });
     Object.assign(state, clone(originalState));
     overlayPreviewTouched = false;
@@ -4054,7 +4113,7 @@
 
   // true while the user is mid-interaction -- the 2s external poll must not overwrite state then.
   function externalRefreshBusy() {
-    return dirty || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending || !!document.querySelector(".combo.is-open");
+    return dirty || applyInFlight || settingsHistory.past.length > 0 || settingsHistory.future.length > 0 || activeHotkeyField || hotkeyCaptureActive || hotkeyCapturePending || !!document.querySelector(".combo.is-open");
   }
 
   let _externalRefreshInFlight = false;
@@ -5071,7 +5130,7 @@
     let caughtUp = false;
     Object.keys(pendingLive).forEach((key) => { if (pendingLive[key] === liveState[key]) { delete pendingLive[key]; caughtUp = true; } });
     paintLiveControls();
-    if (caughtUp) markDirty();
+    if (caughtUp) markDirty(false);
   }
   // sends the queue to obs. whatever obs refuses stays queued so the next Apply tries it again, and the names of those come back for the status line
   async function applyLiveChanges() {
@@ -5334,7 +5393,7 @@
 
   // streamable account: sign-in is cookie-based, the helper opens its own sign-in window and imports the session, and this box just follows /me
   const acct = { status: document.getElementById("streamableStatus"), signIn: document.getElementById("streamableSignIn"), signOut: document.getElementById("streamableSignOut"), force: document.getElementById("streamableForce") };
-  let authState = { signedIn:false, username:"", plan:"", retentionDays:2 };
+  let authState = { signedIn:false, username:"", plan:"", retentionDays:null, maxUploadBytes:null, maxDurationSec:null };
   let loginFlowActive = false;
   let loginPollTimer = null;
   let loginTimeoutTimer = null;
@@ -5342,10 +5401,21 @@
   const LOGIN_POLL_MS = 500;
 
   function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : "Free"; }
+  function formatUploadSize(bytes) {
+    if (bytes === null) return "Unavailable";
+    if (bytes === 0) return "Unlimited";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let unit = 0;
+    while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++; }
+    return bytes.toLocaleString(undefined, { maximumFractionDigits:1 }) + " " + units[unit];
+  }
   function renderAuth(busyText) {
-    document.getElementById("streamableDetails").hidden = !!busyText || !authState.signedIn;
-    document.getElementById("streamablePlan").textContent = planLabel(authState.plan);
-    document.getElementById("streamableRetention").textContent = authState.retentionDays + " days";
+    document.getElementById("streamableDetails").hidden = !!busyText;
+    document.getElementById("streamableDetailsTitle").textContent = authState.signedIn ? "Account details" : "Anonymous upload details";
+    document.getElementById("streamablePlan").textContent = authState.signedIn ? planLabel(authState.plan) : "Anonymous";
+    document.getElementById("streamableRetention").textContent = authState.retentionDays === null ? "Unavailable" : authState.retentionDays + (authState.retentionDays === 1 ? " day" : " days");
+    document.getElementById("streamableSize").textContent = formatUploadSize(authState.maxUploadBytes);
+    document.getElementById("streamableDuration").textContent = authState.maxDurationSec === null ? "Unavailable" : authState.maxDurationSec === 0 ? "Unlimited" : (authState.maxDurationSec / 60).toLocaleString(undefined, { maximumFractionDigits:1 }) + " minutes";
     if (busyText) {
       acct.status.textContent = busyText;
       acct.status.classList.remove("is-off");
@@ -5356,12 +5426,12 @@
       acct.status.textContent = authState.username || "Connected account";
       acct.status.classList.remove("is-off");
     } else {
-      acct.status.textContent = "No Streamable account connected";
+      acct.status.textContent = "Uploading anonymously";
       acct.status.classList.add("is-off");
     }
     document.getElementById("streamableHelp").textContent = authState.signedIn
       ? "Your clips are shared using this account."
-      : "Sign in to upload clips and create shareable links.";
+      : "No sign-in is needed to upload clips and create shareable links. Anonymous uploads use the limits below. Sign in to keep new uploads with your account.";
     acct.signIn.hidden = authState.signedIn;
     acct.signOut.hidden = !authState.signedIn;
     acct.force.hidden = !authState.signedIn;
@@ -5371,7 +5441,9 @@
       signedIn: !!data.signedIn,
       username: data.maskedUsername || data.displayName || data.username || "",
       plan: data.plan || "",
-      retentionDays: Number(data.retentionDays) || 2,
+      retentionDays: Number.isFinite(data.retentionDays) && data.retentionDays > 0 ? data.retentionDays : data.signedIn ? null : 1,
+      maxUploadBytes: Number.isFinite(data.maxUploadBytes) && data.maxUploadBytes >= 0 ? data.maxUploadBytes : null,
+      maxDurationSec: Number.isFinite(data.maxDurationSec) && data.maxDurationSec >= 0 ? data.maxDurationSec : null,
     };
     renderAuth();
   }
@@ -5414,10 +5486,12 @@
     loginTimeoutTimer = setTimeout(finishLoginFlow, LOGIN_TIMEOUT_MS);
   }
   acct.signIn.addEventListener("click", startLoginFlow);
-  acct.signOut.addEventListener("click", () => {
-    authState = { signedIn:false, username:"", plan:"", retentionDays:2 };
-    renderAuth();
-    fetch(HELPER + "/logout", { method:"POST", cache:"no-store" }).catch(() => {});
+  acct.signOut.addEventListener("click", async () => {
+    renderAuth("Signing out...");
+    try {
+      await helperJson("logout", { method:"POST" });
+      applyAuthData(await helperJson("me?t=" + Date.now()));
+    } catch (error) { renderAuth(); setStatus("Could not sign out: " + error.message, "bad"); }
   });
   // the plugin draws this confirm over the dimmed OBS window and runs the follow-up itself (restart obs, drop the streamable cookies, relaunch)
   acct.force.addEventListener("click", () => {

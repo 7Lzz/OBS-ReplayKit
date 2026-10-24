@@ -2,6 +2,10 @@
 #include "prelude.hpp"
 #include "app/frontend_events.hpp"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+
 #include "app/clip_buffer.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
@@ -52,6 +56,35 @@ void CloseCefWidgetsBeforeShutdown()
 		delete g_prewarmWindow.data();
 }
 
+// obs saves a screenshot where it saves recordings, which is the clip folder; it is moved into the Screenshots folder there, the one the clips page lists, keeping the name obs gave it. a file obs still holds is tried again a few times, and a Screenshots folder that is a link is left alone the way the helper leaves it alone
+void FileScreenshot(const QString &path, int tries)
+{
+	const QFileInfo shot(path);
+	if (!shot.isFile() || shot.suffix().compare(QStringLiteral("png"), Qt::CaseInsensitive) != 0)
+		return;
+	const QString folderPath = shot.dir().filePath(QStringLiteral("Screenshots"));
+	const QFileInfo folder(folderPath);
+	if (folder.isSymLink() || folder.isJunction() || (folder.exists() && !folder.isDir())) {
+		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: the Screenshots folder is not a plain folder");
+		return;
+	}
+	if (!folder.exists() && !shot.dir().mkdir(QStringLiteral("Screenshots"))) {
+		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: the Screenshots folder could not be made");
+		return;
+	}
+	QString target = QDir(folderPath).filePath(shot.fileName());
+	for (int n = 2; QFileInfo::exists(target) && n < 1000; ++n)
+		target = QDir(folderPath).filePath(QStringLiteral("%1 (%2).png").arg(shot.completeBaseName()).arg(n));
+	if (QFile::rename(path, target)) {
+		blog(LOG_INFO, "[replaykit] screenshot filed in the Screenshots folder");
+		return;
+	}
+	if (tries > 0)
+		QTimer::singleShot(250, g_callbacks, [path, tries]() { FileScreenshot(path, tries - 1); });
+	else
+		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: it could not be moved");
+}
+
 QTimer *g_projectorPublishTimer = nullptr;
 QTimer *g_notifyTimer = nullptr;
 NotifyTrackFilter *g_notifyTrackFilter = nullptr;
@@ -89,6 +122,14 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	}
 
 	ClipBufferOnFrontendEvent(event);
+	if (event == OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN) {
+		char *last = obs_frontend_get_last_screenshot();
+		const QString path = QString::fromUtf8(last ? last : "");
+		bfree(last);
+		if (!path.isEmpty())
+			FileScreenshot(path, 8);
+		return;
+	}
 	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
 	// another profile has its own hotkeys and clip length
 	if (event == OBS_FRONTEND_EVENT_PROFILE_CHANGED)

@@ -306,7 +306,7 @@ namespace ReplayKitHelper
         public string Username = "";
         public string Plan = "";
         public long SizeCap;
-        public int RetentionDays;
+        public int RetentionDays = Constants.ANON_RETENTION_DAYS;
     }
 
     // an in-flight keyframe scan; Cts is the kill switch for a hung scan (see TrimKeyframeWorkerTimeoutMs in Trim.cs)

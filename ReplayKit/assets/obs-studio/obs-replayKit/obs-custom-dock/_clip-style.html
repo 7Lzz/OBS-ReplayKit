@@ -588,6 +588,15 @@
   }
   .section-heading.is-shown { display: flex; animation: rk-fade-in 240ms var(--ease_smooth) backwards; }
   .section-heading svg { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink: 0; }
+  .section-heading .section-toggle { margin-left:2px; }
+  .section-toggle[hidden] { display:none; }
+  .section-heading .section-toggle svg { width:14px; height:14px; transition:transform var(--anim_press) var(--ease_smooth); }
+  .section-toggle[aria-expanded="false"] svg { transform:rotate(-90deg); }
+  #screenshots-area { margin-bottom:18px; }
+  #screenshots-area[hidden], #screenshots-grid[hidden], .favorites-grid.section-collapsed,
+  body.clips-collapsed #grid, body.clips-collapsed .virtual-spacer, body.clips-collapsed #empty,
+  body.is-screenshots #favorites-heading, body.is-screenshots #favorites-grid, body.is-screenshots #rest-heading,
+  body.is-screenshots #grid, body.is-screenshots .virtual-spacer, body.is-screenshots #empty { display:none !important; }
   /* divider above "all clips" so the favorites-vs-rest boundary reads clearly even with both headings now sharing the same bold white style. same border colour as every other hairline in this file (inputs, cards, toasts) for consistency. */
   .section-heading-rest {
     margin-top: 6px;
@@ -2110,6 +2119,24 @@
   .trim-modal .editor-top .trim-heading { margin: 0; justify-content: flex-start; }
   .trim-modal .editor-top .clip-name { margin: 2px 0 0; }
   .editor-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+  /* three parts: cancel and the name on the left, the frame tools in the middle of the bar, the saves on the right; the two outer parts share what is left equally, so the middle stays centred and a long name ends in an ellipsis instead of running under it */
+  .editor-top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); position: relative; z-index: 5; }
+  .editor-lead { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .editor-actions { justify-self: end; }
+  .editor-frame-tools { display: flex; align-items: center; gap: 6px; }
+  .editor-aspect { width: 196px; flex: none; }
+  /* the screenshot button is an icon button like the ones of the timeline toolbar, with the shared hover */
+  .editor-screenshot { position: relative; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
+  .editor-screenshot:hover { background: rgba(var(--text-rgb), .08); }
+  .editor-screenshot:disabled { opacity: .4; cursor: default; }
+  .editor-screenshot svg { width: 18px; height: 18px; fill: currentColor; }
+  .editor-screenshot:focus-visible { outline: 2px solid var(--primary_light); outline-offset: 2px; }
+  .editor-screenshot-spinner { display: none; width: 14px; height: 14px; border: 2px solid rgba(var(--text-rgb), .22); border-top-color: var(--text); border-radius: 50%; animation: clip-sort-spin .8s linear infinite; }
+  .editor-screenshot.is-busy svg { display: none; }
+  .editor-screenshot.is-busy .editor-screenshot-spinner { display: block; }
+  .editor-screenshot.is-busy:disabled { opacity: 1; }
+  .editor-output { position:absolute; overflow:hidden; background:#000; }
+  .editor-picture { position:absolute; }
   /* the tools on the left and the panel on the right stand against the edges of the window, square, the panels a half step lighter than the page and running into the toolbar of the timeline under them, with a hairline toward the video, like the bar over them; the timeline below needs no line, its drag handle sets it apart */
   .editor-body {
     display: grid;

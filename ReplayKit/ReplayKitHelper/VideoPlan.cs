@@ -48,6 +48,9 @@ namespace ReplayKitHelper
             return text == "-0" ? "0" : text;
         }
 
+        // a piece of another clip goes into the picture of the source with black bars where its shape differs
+        public static string Fit(SourceInfo info) => ",scale=" + info.Width + ":" + info.Height + ":force_original_aspect_ratio=decrease,pad=" + info.Width + ":" + info.Height + ":(ow-iw)/2:(oh-ih)/2:color=black";
+
         // reads what the editor sends; null and a message when anything is out of range, so a bad edit never turns into a half made clip. the pieces may not overlap, since the video is one track
         public static VideoPlan Parse(JToken json, double speed, double sourceDuration, out string error)
         {
@@ -131,7 +134,7 @@ namespace ReplayKitHelper
                 double srcB = piece.SrcStart + (b - pieceStart) * speed;
                 string label = "v" + labels.Count;
                 int input = piece.Path == null ? inputIndex : firstOther + OtherClips.FindIndex(p => string.Equals(p, piece.Path, StringComparison.OrdinalIgnoreCase));
-                string fit = piece.Path == null ? "" : ",scale=" + info.Width + ":" + info.Height + ":force_original_aspect_ratio=decrease,pad=" + info.Width + ":" + info.Height + ":(ow-iw)/2:(oh-ih)/2:color=black";
+                string fit = piece.Path == null ? "" : Fit(info);
                 chains.Add("[" + input + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + fit + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
                 cursor = b;

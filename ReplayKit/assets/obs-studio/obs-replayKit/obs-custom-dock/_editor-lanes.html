@@ -725,7 +725,7 @@
 
     function snapshot() {
       var b = opts.getBounds();
-      return { lanes: clone(st.lanes), vsegs: clone(st.vsegs), subs: clone(st.subs), subRows: clone(st.subRows), layers: clone(st.layers), fx: clone(st.fx), start: b.start, end: b.end, vspeed: st.vspeed, vpitch: st.vpitch, vlink: st.vlink };
+      return { lanes: clone(st.lanes), vsegs: clone(st.vsegs), subs: clone(st.subs), subRows: clone(st.subRows), layers: clone(st.layers), fx: clone(st.fx), aspect: st.aspect || "original", start: b.start, end: b.end, vspeed: st.vspeed, vpitch: st.vpitch, vlink: st.vlink };
     }
 
     // the state the editor opens in is where undo stops, taken once the cut has been snapped and before anything was touched
@@ -768,6 +768,8 @@
       st.layers = cleanLayers(snap.layers);
       // a snapshot or a draft from before the look had none
       st.fx = RKEditorFx.cleanFx(snap.fx);
+      st.aspect = ["9:16", "16:9", "16:10", "21:9", "4:3", "1:1"].indexOf(snap.aspect) >= 0 ? snap.aspect : "original";
+      if (opts.onFrame) opts.onFrame();
       if (opts.onFx) opts.onFx();
       st.vpitch = snap.vpitch;
       st.vlink = snap.vlink;
@@ -5014,9 +5016,9 @@
     }
 
     // what it asks for in the video: null while the saved copy is the cut of the video as it was recorded, else the pieces of the video and the part of the timeline that is the saved clip, which reaches past the video where audio does
-    function videoPlan() {
-      if (!composedSave()) return null;
-      var w = windowT();
+    function videoPlan(force) {
+      if (!force && !composedSave()) return null;
+      var w = composedSave() ? windowT() : boundsT();
       return {
         pieces: st.vsegs.map(function (v) {
           var p = { at: r3(v.at), srcStart: r3(v.srcStart), srcEnd: r3(v.srcEnd) };
@@ -5035,7 +5037,7 @@
 
     // whether the rows, the pieces, the speed or the look differ from the clip as it was recorded; the cut is for the host to judge
     function edited() {
-      return signature() !== st.initial || Math.abs(st.vspeed - 1) > 1e-6 || st.subs.length > 0 || st.layers.length > 0 || !!lookPlan();
+      return signature() !== st.initial || Math.abs(st.vspeed - 1) > 1e-6 || st.subs.length > 0 || st.layers.length > 0 || !!lookPlan() || !!st.aspect && st.aspect !== "original";
     }
 
     // the edit as it stands, for the host to keep as a draft: what the history takes, plus the files brought in from outside that a piece still uses, which a draft can only reach again by their ids
@@ -5183,6 +5185,7 @@
         var watcher = new ResizeObserver(function () { layout(); });
         watcher.observe(dom.frame);
         watcher.observe(dom.content);
+        watcher.observe(video);
       }
       document.addEventListener("keydown", onKey, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("dragenter", onDragEnter, { capture: true, signal: EDITOR_SIGNAL });
@@ -5408,6 +5411,15 @@
       unload: function () { seq += 1; unloadState(); },
       plan: plan,
       videoPlan: videoPlan,
+      aspect: function (value) {
+        if (arguments.length) {
+          if (["original", "9:16", "16:9", "16:10", "21:9", "4:3", "1:1"].indexOf(value) < 0 || value === (st.aspect || "original")) return;
+          st.aspect = value;
+          commit();
+          if (opts.onFrame) opts.onFrame();
+        }
+        return st.aspect || "original";
+      },
       // the saved clip is not the video as it was recorded, so it is put together piece by piece and the timeline plays by itself
       videoEdited: videoEdited,
       // the part of the timeline between which the preview plays, in the time of the video, while the timeline plays by itself; null otherwise

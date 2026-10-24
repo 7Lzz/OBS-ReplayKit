@@ -1,0 +1,337 @@
+<style>
+  body.is-screenshots .clip-sort-group[data-group="length"] { display:none; }
+  /* a screenshot card is built like a clip card: the picture, then the title row with the pencil, the delete button and the menu, then the size and age; the menu hangs out of the card, so only the picture clips */
+  .screenshot-card { position:relative; display:flex; flex-direction:column; min-width:0; padding:0; border:1px solid var(--grey4-solid,var(--grey4)); border-radius:6px; background:var(--bg_card); color:var(--text); text-align:left; font:inherit; cursor:pointer; overflow:visible; }
+  .screenshot-card.menu-open { z-index:20; }
+  .screenshot-card .preview { display:block; width:100%; overflow:hidden; border-radius:5px 5px 0 0; }
+  .screenshot-open { position:absolute; inset:0; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:pointer; }
+  .screenshot-card .screenshot-fullscreen { opacity:0; transition:opacity 120ms linear; }
+  .screenshot-card:hover .screenshot-fullscreen, .screenshot-card:focus-within .screenshot-fullscreen { opacity:1; }
+  .screenshot-card img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; }
+  .screenshot-card:hover, .screenshot-card:focus-visible { border-color:var(--primary_light); outline:none; }
+  .screenshot-dialog { width:min(1100px, calc(100vw - 48px)); max-height:calc(100vh - 48px); padding:0; border:1px solid var(--grey4-solid,var(--grey4)); border-radius:10px; background:var(--grey6); color:var(--text); box-shadow:0 18px 48px var(--shadow); outline:none; }
+  .screenshot-dialog::backdrop { background:rgba(0,0,0,.65); }
+  .screenshot-dialog-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--hairline); }
+  .screenshot-dialog-head h2 { flex:1; min-width:0; margin:0; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .screenshot-stage { position:relative; width:100%; height:calc(100vh - 150px); max-height:700px; background:var(--grey8); outline:none; }
+  .screenshot-stage > img { display:block; width:100%; height:100%; object-fit:contain; }
+  .screenshot-stage:fullscreen, .screenshot-stage:-webkit-full-screen { width:100vw; height:100vh; max-height:none; background:#000; }
+  .screenshot-fullscreen { position:absolute; right:12px; bottom:12px; }
+  .screenshot-fullscreen svg[hidden] { display:none; }
+  .screenshot-dialog .screenshot-meta { padding:10px 16px; margin:0; }
+</style>
+<dialog class="screenshot-dialog" id="screenshot-dialog" aria-labelledby="screenshot-title" tabindex="-1">
+  <div class="screenshot-dialog-head">
+    <h2 id="screenshot-title"></h2>
+    <button class="icon-mini-btn" type="button" id="screenshot-close" aria-label="Close screenshot" data-tooltip="Close"><svg data-i="editor/close" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+  </div>
+  <div class="screenshot-stage" id="screenshot-stage" tabindex="-1">
+    <img id="screenshot-image" alt="">
+    <button class="icon-btn fullscreen-btn screenshot-fullscreen" type="button" id="screenshot-fullscreen" aria-label="Fullscreen (F)" data-tooltip="Fullscreen (F)">
+      <svg data-i="player/fullscreen" viewBox="0 0 24 24" aria-hidden="true"></svg>
+      <svg data-i="player/fullscreen-exit" viewBox="0 0 24 24" aria-hidden="true" hidden></svg>
+    </button>
+  </div>
+  <p class="meta screenshot-meta" id="screenshot-details"></p>
+</dialog>
+<script>
+window.RKScreenshots = {
+  create: function (options) {
+    const area = document.getElementById("screenshots-area");
+    const grid = document.getElementById("screenshots-grid");
+    const empty = document.getElementById("screenshots-empty");
+    const dialog = document.getElementById("screenshot-dialog");
+    const image = document.getElementById("screenshot-image");
+    const stage = document.getElementById("screenshot-stage");
+    const fullscreen = document.getElementById("screenshot-fullscreen");
+    let fullscreenActive = false;
+    let rows = [], shown = [], mode = "", active = false, loaded = false, query = "", sort = "newest", epoch = 0, selected = "", signature = "", rowsSignature = "";
+    const url = (row, kind) => options.helper + "/screenshots/" + (kind || "file") + "?file=" + encodeURIComponent(row.name) + "&v=" + encodeURIComponent(row.size + "-" + row.mtime);
+    // the list is read every few seconds while it is on screen, and now and then otherwise for the count of its tab
+    const IDLE_REFRESH_MS = 30000;
+    let refreshedAt = 0;
+    function details(row, target) {
+      target.replaceChildren();
+      const size = document.createElement("span");
+      size.className = "size";
+      size.textContent = options.formatSize(row.size);
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      const age = document.createElement("span");
+      age.className = "age";
+      age.dataset.mtime = String(row.mtime);
+      age.textContent = options.formatTimeAgo(row.mtime);
+      target.append(size, dot, age);
+    }
+    const isFullscreen = () => (document.fullscreenElement || document.webkitFullscreenElement) === stage;
+    function toggleFullscreen() {
+      const operation = isFullscreen() ? document.exitFullscreen || document.webkitExitFullscreen : stage.requestFullscreen || stage.webkitRequestFullscreen;
+      if (!operation) { options.notify("Fullscreen is unavailable."); return; }
+      try {
+        const result = operation.call(isFullscreen() ? document : stage);
+        if (result && result.catch) result.catch(() => options.notify("Fullscreen could not be changed."));
+      } catch (error) { options.notify("Fullscreen could not be changed."); }
+    }
+    function updateFullscreen() {
+      const active = isFullscreen();
+      if (fullscreenActive && !active) requestAnimationFrame(() => {
+        if (dialog.open && !isFullscreen()) stage.focus({preventScroll:true});
+      });
+      fullscreenActive = active;
+      fullscreen.querySelector('[data-i="player/fullscreen"]').toggleAttribute("hidden", active);
+      fullscreen.querySelector('[data-i="player/fullscreen-exit"]').toggleAttribute("hidden", !active);
+      fullscreen.dataset.tooltip = active ? "Exit fullscreen (F)" : "Fullscreen (F)";
+      fullscreen.setAttribute("aria-label", fullscreen.dataset.tooltip);
+    }
+    function preview(row) {
+      selected = row.name;
+      document.getElementById("screenshot-title").textContent = row.name;
+      details(row, document.getElementById("screenshot-details"));
+      image.alt = row.name;
+      image.src = url(row);
+      if (!dialog.open) {
+        dialog.showModal();
+        dialog.focus({preventScroll:true});
+      }
+    }
+    function step(direction) {
+      const index = shown.findIndex(row => row.name === selected) + direction;
+      if (index >= 0 && index < shown.length) preview(shown[index]);
+    }
+    // the cards are kept by name and the state of their file, so a list read again only builds the cards of what changed and moves the rest, and their pictures are not loaded again
+    const cards = new Map();
+    const svg = (inner, box) => '<svg viewBox="' + (box || "0 0 24 24") + '" aria-hidden="true">' + inner + "</svg>";
+    async function act(row, kind, extra) {
+      const response = await fetch(options.helper + "/screenshots/" + kind + "?file=" + encodeURIComponent(row.name) + (extra || "") + "&t=" + Date.now(), {method:"POST", cache:"no-store"});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || "The screenshot could not be changed");
+      return data;
+    }
+    function rename(card, row) {
+      const nameSpan = card.querySelector(".name");
+      const titleRow = card.querySelector(".title-row");
+      const base = row.name.replace(/\.png$/i, "");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "name-edit-input";
+      input.value = base;
+      input.setAttribute("aria-label", "Screenshot name");
+      const ext = document.createElement("span");
+      ext.className = "name-edit-ext";
+      ext.textContent = ".png";
+      titleRow.replaceChild(input, nameSpan);
+      titleRow.insertBefore(ext, input.nextSibling);
+      input.focus();
+      input.select();
+      let settled = false;
+      const back = () => { if (input.parentNode) titleRow.replaceChild(nameSpan, input); ext.remove(); options.changed(); };
+      async function commit() {
+        if (settled) return;
+        settled = true;
+        const next = input.value.trim();
+        if (!next || next === base) { back(); return; }
+        try { await act(row, "rename", "&to=" + encodeURIComponent(next + ".png")); back(); refresh(); }
+        catch (error) { back(); options.notify(error.message); }
+      }
+      input.addEventListener("click", event => event.stopPropagation());
+      input.addEventListener("keydown", event => {
+        event.stopPropagation();
+        if (event.key === "Enter") { event.preventDefault(); commit(); }
+        if (event.key === "Escape") { event.preventDefault(); settled = true; back(); }
+      });
+      input.addEventListener("blur", commit);
+    }
+    function buildCard(row) {
+      const icons = options.icons;
+      const card = document.createElement("div");
+      card.className = "screenshot-card";
+      card.dataset.shot = row.name;
+      const picture = document.createElement("span");
+      picture.className = "preview";
+      const thumb = document.createElement("img");
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      thumb.alt = row.name;
+      thumb.src = url(row, "thumb");
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "screenshot-open";
+      open.setAttribute("aria-label", "View " + row.name);
+      open.appendChild(thumb);
+      const expand = fullscreen.cloneNode(true);
+      expand.removeAttribute("id");
+      expand.setAttribute("aria-label", "Fullscreen " + row.name);
+      expand.dataset.tooltip = "Fullscreen";
+      expand.querySelector('[data-i="player/fullscreen"]').removeAttribute("hidden");
+      expand.querySelector('[data-i="player/fullscreen-exit"]').setAttribute("hidden", "");
+      expand.addEventListener("click", event => { event.stopPropagation(); preview(row); toggleFullscreen(); });
+      picture.append(open, expand);
+      const body = document.createElement("div");
+      body.className = "body";
+      body.innerHTML =
+        '<div class="title-row"><span class="name"></span>' +
+        '<button class="icon-mini-btn edit-btn" data-tooltip="Rename" aria-label="Rename" type="button">' + svg(icons.EDIT) + "</button>" +
+        '<div class="title-actions">' +
+          '<button class="icon-mini-btn delete-btn" data-delete-label="Delete screenshot" data-tooltip="Delete screenshot" aria-label="Delete screenshot" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
+          '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
+            '<div class="menu-dropdown">' +
+              '<div class="menu-heading">Share</div>' +
+              '<div class="menu-item share-menu-item" data-act="copy">' + svg(icons.CLIPBOARD).replace("<svg", '<svg class="menu-item-icon"') + "<span>Copy to clipboard</span></div>" +
+              '<div class="menu-heading">Organize</div>' +
+              '<div class="menu-item" data-act="rename">' + svg(icons.EDIT).replace("<svg", '<svg class="menu-item-icon"') + "<span>Edit name</span></div>" +
+              '<div class="menu-item" data-act="reveal">' + svg(icons.FOLDER_OPEN).replace("<svg", '<svg class="menu-item-icon"') + "<span>Open file location</span></div>" +
+              '<div class="menu-separator"></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-label="Delete screenshot" role="button" tabindex="0" aria-label="Delete screenshot">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
+            "</div></div>" +
+        "</div></div>" +
+        '<div class="meta"></div>';
+      const name = body.querySelector(".name");
+      name.textContent = row.name.replace(/\.png$/i, "");
+      name.title = row.name;
+      details(row, body.querySelector(".meta"));
+      card.append(picture, body);
+      const menu = body.querySelector(".menu-dropdown");
+      const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
+      async function remove(trigger, inMenu) {
+        // the same two clicks as a clip: the first arms the button, the second deletes
+        options.resetDeletes(trigger);
+        if (!trigger.classList.contains("is-armed")) {
+          if (!inMenu) options.closeMenus();
+          options.armDelete(trigger);
+          if (inMenu) { menu.classList.add("is-open"); card.classList.add("menu-open"); }
+          return;
+        }
+        options.resetDeletes();
+        options.closeMenus();
+        try { await act(row, "delete"); refresh(); }
+        catch (error) { options.notify(error.message); }
+      }
+      body.addEventListener("click", async event => {
+        const button = event.target.closest("button, .menu-item");
+        if (!button) return;
+        event.stopPropagation();
+        if (button.classList.contains("menu-btn")) { options.openMenu(card, menu, event); return; }
+        if (button.classList.contains("edit-btn")) { rename(card, row); return; }
+        if (button.matches(".title-actions > .delete-btn")) { remove(button, false); return; }
+        const kind = button.dataset.act;
+        if (kind === "delete") { remove(button, true); return; }
+        closeMenu();
+        if (kind === "rename") rename(card, row);
+        else if (kind === "copy") act(row, "copy").then(() => options.toast("Screenshot copied to the clipboard"), error => options.notify(error.message));
+        else if (kind === "reveal") act(row, "reveal").catch(error => options.notify(error.message));
+      });
+      card.addEventListener("contextmenu", event => {
+        if (event.target.closest("input")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        options.openMenu(card, menu, event);
+      });
+      card.addEventListener("click", event => { if (!event.target.closest(".body")) preview(row); });
+      body.addEventListener("click", event => { if (!event.defaultPrevented && !event.target.closest("button, .menu-item, input")) preview(row); });
+      options.hovers(card);
+      return card;
+    }
+    function paint() {
+      const key = sort === "oldest" ? row => row.mtime : sort === "biggest" ? row => -row.size : sort === "smallest" ? row => row.size : row => -row.mtime;
+      shown = rows.filter(row => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b) => key(a)-key(b) || a.name.localeCompare(b.name));
+      area.hidden = !active || (mode === "all" && !shown.length);
+      const collapsed = options.collapsed();
+      grid.hidden = collapsed;
+      const current = JSON.stringify(shown);
+      // a card whose name is being typed is left as it is until the name is in
+      if (current !== signature && !grid.querySelector(".name-edit-input")) {
+        signature = current;
+        const keep = new Set();
+        shown.forEach((row, index) => {
+          const id = row.name + "\n" + row.size + "\n" + row.mtime;
+          keep.add(id);
+          let card = cards.get(id);
+          if (!card) { card = buildCard(row); cards.set(id, card); }
+          else details(row, card.querySelector(".meta"));
+          if (grid.children[index] !== card) grid.insertBefore(card, grid.children[index] || null);
+        });
+        cards.forEach((card, id) => { if (!keep.has(id)) { card.remove(); cards.delete(id); } });
+      }
+      empty.hidden = collapsed || shown.length > 0;
+      empty.textContent = !loaded ? "Loading screenshots..." : rows.length ? "No screenshots match your search." : "No screenshots yet. Save a frame with the screenshot button in the editor.";
+      if (dialog.open) {
+        const row = shown.find(item => item.name === selected);
+        if (!row) dialog.close();
+      }
+    }
+    async function refresh() {
+      if (document.hidden) return;
+      refreshedAt = Date.now();
+      const run = ++epoch;
+      try {
+        const response = await fetch(options.helper + "/screenshots?t=" + Date.now(), {cache:"no-store"});
+        if (!response.ok) throw new Error("Could not load screenshots");
+        const data = await response.json();
+        if (!Array.isArray(data.screenshots)) throw new Error("Invalid screenshot list");
+        if (run !== epoch) return;
+        const next = data.screenshots.filter(row => row && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.mtime));
+        // the clips page draws itself again only when the list or its count changed, not on every read
+        const listed = JSON.stringify(next);
+        if (loaded && listed === rowsSignature) return;
+        rowsSignature = listed;
+        rows = next;
+        loaded = true;
+        if (active) paint();
+        options.changed();
+      } catch (error) {
+        if (run !== epoch) return;
+        rows = []; loaded = false; signature = ""; rowsSignature = "";
+        grid.replaceChildren(); cards.clear();
+        if (dialog.open) dialog.close();
+        area.hidden = !active || mode === "all";
+        empty.hidden = options.collapsed();
+        empty.textContent = "The screenshots could not be loaded.";
+        options.changed();
+      }
+    }
+    document.getElementById("screenshot-close").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+    fullscreen.addEventListener("click", toggleFullscreen);
+    image.addEventListener("dblclick", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreen);
+    document.addEventListener("webkitfullscreenchange", updateFullscreen);
+    dialog.addEventListener("close", () => {
+      if (isFullscreen()) toggleFullscreen();
+      image.removeAttribute("src");
+    });
+    dialog.addEventListener("cancel", event => { if (isFullscreen()) { event.preventDefault(); toggleFullscreen(); } });
+    dialog.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); step(event.key === "ArrowLeft" ? -1 : 1); }
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        if (!event.repeat) toggleFullscreen();
+      }
+      if (event.key === "Escape" && isFullscreen()) { event.preventDefault(); toggleFullscreen(); }
+      event.stopPropagation();
+    });
+    window.addEventListener("replaykit:screenshot-saved", refresh);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    setInterval(() => { if (active || Date.now() - refreshedAt >= IDLE_REFRESH_MS) refresh(); }, 5000);
+    return {
+      refresh: refresh,
+      paint: paint,
+      count: () => loaded ? rows.length : undefined,
+      update: function (search, order) { if (search !== query || order !== sort) { query = search; sort = order; if (active) paint(); } },
+      show: function (value) {
+        document.body.classList.toggle("is-screenshots", value === "screenshots");
+        if (mode === value) return;
+        mode = value;
+        active = value === "all" || value === "screenshots";
+        if (dialog.open) dialog.close();
+        if (active) { paint(); refresh(); }
+        else area.hidden = true;
+      },
+      reset: function () {
+        ++epoch; rows = []; loaded = false; signature = ""; rowsSignature = ""; grid.replaceChildren(); cards.clear();
+        if (dialog.open) dialog.close();
+        paint(); refresh();
+      },
+    };
+  },
+};
+</script>

@@ -7,10 +7,19 @@
   <div class="modal-veil" id="trim-veil">
     <div class="modal trim-modal" id="trim-modal">
       <header class="editor-top">
+        <div class="editor-lead">
         <button class="btn editor-cancel" type="button" id="trim-cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cancel</button>
         <div class="editor-title">
           <div class="trim-heading"><h2>Edit clip</h2><span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span></div>
           <div class="clip-name" id="trim-clip-name"></div>
+        </div>
+        </div>
+        <div class="editor-frame-tools">
+          <div class="combo editor-aspect" id="editor-aspect" role="combobox" aria-label="Aspect ratio" aria-expanded="false">
+            <button class="combo-button" type="button" aria-label="Aspect ratio" aria-haspopup="listbox"><span class="combo-label">Landscape</span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+            <div class="combo-menu" role="listbox" aria-label="Aspect ratio"></div>
+          </div>
+          <button class="icon-btn editor-screenshot" type="button" id="editor-screenshot" aria-label="Save screenshot" data-tooltip="Save a screenshot of this frame"><svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="editor-screenshot-spinner" aria-hidden="true"></span></button>
         </div>
         <div class="editor-actions">
           <button class="btn danger-action" type="button" id="trim-overwrite">Overwrite original</button>
@@ -21,11 +30,15 @@
         <div class="ed-left" id="ed-left"></div>
         <div class="editor-stage">
         <div class="trim-video-wrap preview">
+          <!-- the frame that is saved: the picture inside it is cut to the aspect, and the layers and subtitles are laid out on the frame itself, the way the saved copy lays them out -->
+          <div class="editor-output"><div class="editor-picture">
           <video id="trim-video" preload="metadata" playsinline
                  controlsList="nodownload noplaybackrate noremoteplayback"
                  disablePictureInPicture></video>
+          </div>
           <div class="lay-overlay" id="trim-layer-overlay" hidden aria-hidden="true"></div>
           <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true"></div>
+          </div>
           <div class="player-shade"></div>
           <div class="preview-controls trim-preview-controls">
             <div class="controls-left">
@@ -136,6 +149,76 @@ window.__rkEditorApi = (function () {
   const trimProcessingCancel = document.getElementById("trim-processing-cancel");
   const trimClipName     = document.getElementById("trim-clip-name");
   const trimVideoWrap    = document.querySelector(".trim-video-wrap");
+  const screenshotBtn = document.getElementById("editor-screenshot");
+  let aspectControl = null;
+  let aspectOptions = "";
+  const editorFrames = [
+    { value:"9:16", name:"Portrait", w:9, h:16 },
+    { value:"16:9", name:"Landscape", w:16, h:9 },
+    { value:"16:10", name:"Widescreen", w:8, h:5 },
+    { value:"21:9", name:"Ultrawide", w:7, h:3 },
+    { value:"4:3", name:"Standard", w:4, h:3 },
+    { value:"1:1", name:"Square", w:1, h:1 },
+  ];
+
+  function sourceEditorFrame() {
+    const width = trimVideo.videoWidth || 1920, height = trimVideo.videoHeight || 1080;
+    const ratio = width / height;
+    const known = editorFrames.find((item) => Math.abs(item.w / item.h - ratio) / ratio < 0.005);
+    if (known) return known;
+    let a = width, b = height;
+    while (b) { const remainder = a % b; a = b; b = remainder; }
+    return { value:"source", name:(width / a) + ":" + (height / a), w:0, h:0 };
+  }
+
+  // the size of the frame that is saved, in pixels of the video: the video itself, or the part of it the aspect keeps, worked out the way the helper works it out
+  function editorFrameSize() {
+    const sourceW = trimVideo.videoWidth || 1920, sourceH = trimVideo.videoHeight || 1080;
+    const choice = trimLanes.aspect() === "original" ? null : editorFrames.find((item) => item.value === trimLanes.aspect());
+    const unit = choice ? Math.floor(Math.min(sourceW / choice.w, sourceH / choice.h) / 2) * 2 : 0;
+    return unit > 0 ? { w:unit * choice.w, h:unit * choice.h } : { w:sourceW, h:sourceH };
+  }
+  let frameKey = "";
+
+  function updateEditorFrame() {
+    const source = sourceEditorFrame();
+    const native = trimLanes.aspect() === "original";
+    const choice = native ? source : editorFrames.find((item) => item.value === trimLanes.aspect()) || source;
+    if (aspectControl) {
+      const options = source.value === "source" ? [source].concat(editorFrames) : editorFrames;
+      const signature = options.map((item) => item.name).join("|");
+      if (signature !== aspectOptions) {
+        aspectOptions = signature;
+        aspectControl.setOptions(options.map((item) => ({ value:item.value, label:item.name + (item.w ? " (" + item.value + ")" : "") })));
+      }
+      aspectControl.value = choice.value;
+      document.querySelector("#editor-aspect .combo-label").textContent = choice.name;
+    }
+    const sourceW = trimVideo.videoWidth || 1920, sourceH = trimVideo.videoHeight || 1080;
+    const frame = editorFrameSize();
+    const cropW = frame.w, cropH = frame.h;
+    const scale = Math.min(trimVideoWrap.clientWidth / cropW, trimVideoWrap.clientHeight / cropH);
+    if (!(scale > 0)) return;
+    const output = trimVideoWrap.querySelector(".editor-output");
+    const picture = trimVideoWrap.querySelector(".editor-picture");
+    output.style.width = cropW * scale + "px";
+    output.style.height = cropH * scale + "px";
+    output.style.left = (trimVideoWrap.clientWidth - cropW * scale) / 2 + "px";
+    output.style.top = (trimVideoWrap.clientHeight - cropH * scale) / 2 + "px";
+    picture.style.width = sourceW * scale + "px";
+    picture.style.height = sourceH * scale + "px";
+    picture.style.left = (cropW - sourceW) * scale / 2 + "px";
+    picture.style.top = (cropH - sourceH) * scale / 2 + "px";
+    placeSubtitles();
+    placeLayers();
+    // a frame of another shape breaks the subtitles into lines again, so the editor draws them again once
+    const key = cropW + "x" + cropH;
+    if (key !== frameKey) {
+      frameKey = key;
+      if (trimSourceClip) trimLanes.refresh();
+    }
+    trimVideo.dispatchEvent(new Event("rkframe"));
+  }
   const trimVideo        = document.getElementById("trim-video");
   const trimPlayPauseBtn = document.getElementById("trim-playpause");
   const trimPlayPauseIcn = document.getElementById("trim-playpause-icon");
@@ -237,9 +320,10 @@ window.__rkEditorApi = (function () {
     onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
     onPanel: () => { if (editorFx) editorFx.refresh(); },
     onFx: () => { if (editorFx) editorFx.changed(); syncTrimReencodeLock(); },
+    onFrame: () => updateEditorFrame(),
     // where a subtitle breaks into lines, shared by the preview and the saved copy so both break it the same way
-    layoutSubtitle: (text, style) => RKEditorTools.layoutText(text, style, (trimVideo.videoWidth || 16) / (trimVideo.videoHeight || 9)),
-    subtitleAspect: () => (trimVideo.videoWidth || 16) + "x" + (trimVideo.videoHeight || 9),
+    layoutSubtitle: (text, style) => { const frame = editorFrameSize(); return RKEditorTools.layoutText(text, style, frame.w / frame.h); },
+    subtitleAspect: () => { const frame = editorFrameSize(); return frame.w + "x" + frame.h; },
     restore: () => applyVolume(trimVideo),
     // the default rate is set too, so the preview keeps its speed when the source is loaded again after a stall
     setVideoRate: (rate) => {
@@ -323,8 +407,11 @@ window.__rkEditorApi = (function () {
       timer = setTimeout(end, 140);
     }).observe(side, { subtree: true, attributes: true, attributeFilter: ["hidden"], attributeOldValue: true });
   })();
-  const placeSubtitles = RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-sub-overlay"));
-  RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-layer-overlay"));
+  // both overlays cover the frame that is saved, which is the whole of the output box
+  const editorOutput = trimVideoWrap.querySelector(".editor-output");
+  const outputBox = () => ({ left:0, top:0, width:editorOutput.clientWidth, height:editorOutput.clientHeight });
+  const placeSubtitles = RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-sub-overlay"), outputBox);
+  const placeLayers = RKEditorTools.trackPicture(trimVideo, document.getElementById("trim-layer-overlay"), outputBox);
 
   // a file dropped on this page while no clip is open would make the window open the file itself, so the drag is turned away here; with a clip open the editor takes it
   ["dragenter", "dragover", "drop"].forEach((name) => document.addEventListener(name, (e) => {
@@ -1013,6 +1100,8 @@ window.__rkEditorApi = (function () {
     const free = !trimSaving && !importing;
     trimSave.disabled = !valid || !free;
     trimOverwrite.disabled = !valid || !free;
+    screenshotBtn.disabled = !valid || !free;
+    document.querySelector("#editor-aspect .combo-button").disabled = !free;
     [trimSave, trimOverwrite].forEach((button) => {
       if (importing) button.title = "Wait until the audio has been added";
       else button.removeAttribute("title");
@@ -1563,7 +1652,7 @@ window.__rkEditorApi = (function () {
     saveFill.style.width = known ? percent + "%" : "";
     saveTrack.setAttribute("aria-valuenow", known ? String(percent) : "0");
     savePercent.textContent = known ? percent + "%" : "";
-    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.precise ? "Re-encoding the video" : "Cutting the clip";
+    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.mode === "screenshot" ? "Rendering screenshot" : save.precise ? "Re-encoding the video" : "Cutting the clip";
     // once the file is being put in place there is nothing left to take back
     saveCancel.hidden = finishing;
     saveCancel.disabled = save.stopping;
@@ -1583,12 +1672,14 @@ window.__rkEditorApi = (function () {
     disarmOverwrite();
     if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch {} }
     trimVeil.inert = true;
-    saveTitle.textContent = mode === "overwrite" ? "Overwriting the original" : "Saving a copy";
+    saveTitle.textContent = mode === "screenshot" ? "Saving a screenshot" : mode === "overwrite" ? "Overwriting the original" : "Saving a copy";
     saveClipName.textContent = clipName;
     saveClipName.title = clipName;
     paintTrimSave(save);
     saveVeil.classList.add("is-open", "is-quiet");
-    save.quietTimer = setTimeout(() => {
+    // a screenshot is one frame and done in well under a second, so the popup of a save would only flash; the button says it is busy instead, while the editor is still held still under it
+    if (mode === "screenshot") screenshotBtn.classList.add("is-busy");
+    else save.quietTimer = setTimeout(() => {
       save.quietTimer = 0;
       if (trimSaving === save) saveVeil.classList.remove("is-quiet");
     }, SAVE_QUIET_MS);
@@ -1601,6 +1692,7 @@ window.__rkEditorApi = (function () {
     if (!save || trimSaving !== save) return;
     trimSaving = null;
     if (save.quietTimer) clearTimeout(save.quietTimer);
+    screenshotBtn.classList.remove("is-busy");
     saveVeil.classList.remove("is-open", "is-quiet");
     trimVeil.inert = false;
     updateTrimUi();
@@ -1664,11 +1756,12 @@ window.__rkEditorApi = (function () {
   async function submitTrim(mode) {
     if (trimSaving || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
     const sourceName = trimSourceClip.name;
-    const videoPlan = trimLanes.videoPlan();
+    const screenshot = mode === "screenshot";
+    const videoPlan = trimLanes.videoPlan(screenshot);
     // pieces of video with black between them are put together frame by frame
     const lookPlan = trimLanes.lookPlan();
     const layerPlan = trimLanes.layerPlan();
-    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan;
+    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original";
     if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
       showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
       scheduleToastHide(TOAST_ERROR_MS);
@@ -1688,10 +1781,11 @@ window.__rkEditorApi = (function () {
     }
     const startSec = Number(trimStart.value);
     const endSec   = Number(trimEnd.value);
-    const removeAudio = trimRemoveAudio.checked;
+    const removeAudio = screenshot || trimRemoveAudio.checked;
     const audioPlan = removeAudio ? null : trimLanes.plan();
     const subtitlePlan = trimLanes.subtitlePlan();
     const speed = trimLanes.videoSpeed();
+    const frameTime = Math.max(videoPlan ? videoPlan.window.start : startSec / speed, Math.min((videoPlan ? videoPlan.window.end : endSec / speed) - 0.001, trimVideo.currentTime / speed));
     let save = null;
     try {
       save = beginTrimSave(sourceName, mode, precise);
@@ -1701,6 +1795,8 @@ window.__rkEditorApi = (function () {
                   "&mode="  + encodeURIComponent(mode) +
                   "&precise=" + (precise ? "1" : "0") +
                   "&removeAudio=" + (removeAudio ? "1" : "0") +
+                  "&aspect=" + encodeURIComponent(trimLanes.aspect()) +
+                  (screenshot ? "&time=" + frameTime.toFixed(6) : "") +
                   (speed !== 1 ? "&speed=" + speed.toFixed(3) : "") +
                   "&t=" + Date.now();
       const edit = {};
@@ -1728,6 +1824,12 @@ window.__rkEditorApi = (function () {
         throw new Error(data.message || ("HTTP " + res.status));
       }
       endTrimSave(save);
+      if (screenshot) {
+        showToast("Screenshot saved in Screenshots as " + escapeHtml(data.name), "info");
+        window.dispatchEvent(new Event("replaykit:screenshot-saved"));
+        scheduleToastHide(3500);
+        return;
+      }
       // the edit is written, so what was kept for it is spent
       trimDraftArmed = false;
       if (trimDraftTimer) {
@@ -1768,6 +1870,13 @@ window.__rkEditorApi = (function () {
     disarmOverwrite();
     submitTrim("copy");
   });
+  screenshotBtn.addEventListener("click", () => submitTrim("screenshot"));
+  aspectControl = RKCombo.bind(document.getElementById("editor-aspect"), (value) => trimLanes.aspect(value === sourceEditorFrame().value ? "original" : value), { menuKeys:true, signal:EDITOR_SIGNAL });
+  updateEditorFrame();
+  const frameObserver = new ResizeObserver(updateEditorFrame);
+  frameObserver.observe(trimVideoWrap);
+  trimVideo.addEventListener("loadedmetadata", updateEditorFrame, { signal:EDITOR_SIGNAL });
+  EDITOR_SIGNAL.addEventListener("abort", () => frameObserver.disconnect(), { once:true });
   // first click arms (3s window), second click fires. mirrors the "double-click to confirm" pattern in githubs "delete repository" flow -- visually obvious without an os dialog.
   trimOverwrite.addEventListener("click", () => {
     if (trimOverwrite.disabled) return;

@@ -101,6 +101,7 @@
   var posOverride = null, stageRect = null, posTimer = 0, posRun = 0, posDirty = false;
   // the items real rect on the canvas as reported by obs, so the preview draws the same box the projector does
   var liveRect = null;
+  var liveRects = Object.create(null);
   var running = false, wired = false;
   var mode = "input_overlay";
   var wasdBuilt = false, mouseBuilt = false, bongoBuilt = false;
@@ -552,6 +553,7 @@
               Math.abs(liveRect.w - d.w) > 0.0005 || Math.abs(liveRect.h - d.h) > 0.0005 ||
               liveRect.scalePct !== d.scalePct) {
             liveRect = { x: d.x, y: d.y, w: d.w, h: d.h, scalePct: d.scalePct || 100 };
+            liveRects[mode] = liveRect;
             posOverride = null;
             changed = true;
           }
@@ -618,6 +620,16 @@
     // exposed so settings.html can also drive undo/redo -- its keyboard handling is the reliable one in the CEF host
     undo: function () { undoMove(); },
     redo: function () { redoMove(); },
+    restorePosition: function () {
+      var s = getStyle() || {};
+      var changed = setMode(s.overlayStyle || "input_overlay");
+      if (changed) liveRect = liveRects[mode] || null;
+      posOverride = savedPosition();
+      posDirty = true;
+      clearMoveHistory();
+      if (changed) applyMode();
+      else layout();
+    },
     // selecting an overlay clears its saved drag override. Keep the preview on the hard-coded transform until Apply updates OBS; otherwise the first poll can briefly replace it with the old live scene-item rectangle.
     resetPosition: function () {
       liveRect = null;

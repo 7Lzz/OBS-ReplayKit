@@ -18,11 +18,21 @@
     <div class="section-heading" id="favorites-heading">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
       <span>Favorites</span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="favorites-grid"></div>
+    <section id="screenshots-area" hidden>
+      <div class="section-heading is-shown" id="screenshots-heading">
+        <svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Screenshots</span>
+        <button class="icon-mini-btn section-toggle" type="button" data-section="screenshots" aria-label="Collapse Screenshots" aria-expanded="true" aria-controls="screenshots-grid screenshots-empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      </div>
+      <div class="grid" id="screenshots-grid"></div>
+      <div class="empty" id="screenshots-empty" role="status">Loading screenshots...</div>
+    </section>
     <div class="section-heading" id="rest-heading">
       <svg viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>
       <span id="rest-heading-label">All clips</span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="clips" aria-label="Collapse All clips" aria-expanded="true" aria-controls="grid top-spacer bottom-spacer empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="virtual-spacer" id="top-spacer"></div>
     <div class="grid" id="grid" style="display:none"></div>

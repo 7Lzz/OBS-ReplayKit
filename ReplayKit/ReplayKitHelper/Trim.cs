@@ -251,11 +251,11 @@ namespace ReplayKitHelper
         }
 
         // picks a non-colliding "<base> (<suffix>).<ext>" or "<base> (<suffix> n).<ext>" filename inside the clip folder. returns null if 99 candidates are taken.
-        public static string GetSuffixedOutputName(string sourceName, string suffix)
+        public static string GetSuffixedOutputName(string sourceName, string suffix, string folder = null)
         {
             string baseName = Path.GetFileNameWithoutExtension(sourceName);
             string ext = Path.GetExtension(sourceName);
-            string clipDir = AppConfig.GetClipDir();
+            string clipDir = folder ?? AppConfig.GetClipDir();
             string candidate = baseName + " (" + suffix + ")" + ext;
             if (!File.Exists(Path.Combine(clipDir, candidate))) return candidate;
             for (int i = 2; i <= 99; i++)
@@ -414,14 +414,55 @@ namespace ReplayKitHelper
 
         // the parts of a trim command that has video pieces: the video and the audio are both put together by the filter graph from one read of the source, so a piece may start anywhere on the timeline, and nothing is written for a clip without audio
         // what follows the video as it was put together, in this order: the look, the layers over it, then the subtitles over everything; null with [vout] as the label when there is nothing
-        private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, VideoPlan.SourceInfo info, string subtitles, out string label)
+        // the picture is cut to its aspect first, so the look, the layers and the subtitles are all laid out on the frame that is saved, the way the editor shows them; width and height are that frame
+        private static string FinishGraph(string look, LayerPlan layers, int firstLayerInput, int width, int height, string subtitles, string frame, out string label)
         {
             var steps = new List<string>();
             label = "[vout]";
+            if (frame != null) { steps.Add(label + frame + "[vframe]"); label = "[vframe]"; }
             if (look != null) { steps.Add(label + look + "[vlook]"); label = "[vlook]"; }
-            if (layers != null) { steps.Add(layers.Graph(firstLayerInput, label, "[vlayers]", info.Width, info.Height)); label = "[vlayers]"; }
+            if (layers != null) { steps.Add(layers.Graph(firstLayerInput, label, "[vlayers]", width, height)); label = "[vlayers]"; }
             if (subtitles != null) { steps.Add(label + subtitles + "[vfinal]"); label = "[vfinal]"; }
             return steps.Count > 0 ? string.Join(";", steps) : null;
+        }
+
+        // the one frame at frameTime of the saved clip, put together the way the full render puts it but without the rest of the clip: the piece under it is read from half a second before it, on the same grid of frames, sped up and fitted the same way and placed at its time on the timeline, so the look, the layers that show then and the subtitles land on it as they do in a saved copy. a frame no piece covers is black. the whole edit up to the frame used to be decoded and filtered for this, which grew with how far into the clip the frame was
+        private static List<string> ScreenshotArgs(VideoPlan plan, VideoPlan.SourceInfo info, double speed, double frameTime, string sourcePath, string look, LayerPlan layers, string subtitles, string frame, string aspect)
+        {
+            string N(double x) => x.ToString("0.######", CultureInfo.InvariantCulture);
+            string[] ratio = info.Fps.Split('/');
+            double rate = double.Parse(ratio[0], CultureInfo.InvariantCulture) / double.Parse(ratio[1], CultureInfo.InvariantCulture);
+            double t = frameTime - plan.Start;
+            var argv = new List<string> { "-hide_banner", "-loglevel", "error" };
+            var piece = plan.Pieces.FirstOrDefault(p => frameTime >= Math.Max(p.At, plan.Start) - 1e-6 && frameTime < p.At + p.Length(speed));
+            string video;
+            int inputs = 0;
+            if (piece != null)
+            {
+                double a = Math.Max(piece.At, plan.Start);
+                double srcA = piece.SrcStart + (a - piece.At) * speed;
+                // a whole number of frames after the start of the piece, so the frames fall where the full render puts them
+                double k = Math.Max(0, Math.Floor((frameTime - a) * rate + 1e-6) - Math.Ceiling(0.5 * rate));
+                double seekAt = a + k / rate;
+                double seekSrc = srcA + (seekAt - a) * speed;
+                argv.AddRange(new[] { "-ss", N(seekSrc), "-i", piece.Path ?? sourcePath });
+                inputs = 1;
+                string stretch = Math.Abs(speed - 1) > 1e-6 ? "setpts=(PTS-STARTPTS)/" + N(speed) : "setpts=PTS-STARTPTS";
+                video = "[0:v:0]" + stretch + (piece.Path == null ? "" : VideoPlan.Fit(info)) + ",fps=" + info.Fps + ",setsar=1,format=yuv420p,setpts=PTS+" + N(seekAt - plan.Start) + "/TB[vout]";
+            }
+            else
+            {
+                video = "color=c=black:s=" + info.Width + "x" + info.Height + ":r=" + info.Fps + ":d=" + N(2 / rate) + ",setsar=1,format=yuv420p,setpts=PTS+" + N(t) + "/TB[vout]";
+            }
+            LayerPlan shown = layers?.AtFrame(t);
+            if (shown != null && shown.Count > 0) argv.AddRange(shown.Inputs());
+            else shown = null;
+            var size = frame != null ? EditorFrame.Size(aspect, info.Width, info.Height) : (info.Width, info.Height);
+            string finish = FinishGraph(look, shown, inputs, size.Item1, size.Item2, subtitles, frame, out string label);
+            // the frames that lead up to it only settle the decoder and the filters; the first one from the frame on is the picture
+            string graph = video + (finish != null ? ";" + finish : "") + ";" + label + "trim=start=" + N(Math.Max(0, t - 0.5 / rate)) + "[shot]";
+            argv.AddRange(new[] { "-filter_complex", graph, "-map", "[shot]", "-an" });
+            return argv;
         }
 
         private static void AddComposedArgs(List<string> argv, string videoGraph, AudioPlan.Rendering rendering, string finish, string finalLabel)
@@ -440,8 +481,18 @@ namespace ReplayKitHelper
         }
 
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
-        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null)
+        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1)
         {
+            if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = "Unknown aspect ratio" };
+            bool screenshot = string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase);
+            bool framed = aspect != "original";
+            if (screenshot)
+            {
+                if (double.IsNaN(frameTime) || double.IsInfinity(frameTime) || frameTime < 0 || videoEdit == null)
+                    return new TrimResult { Ok = false, Message = "Bad screenshot time or video edit" };
+                removeAudio = true;
+                audioEdit = null;
+            }
             // the editor offers a tenth of normal speed to five times normal
             if (double.IsNaN(videoSpeed) || double.IsInfinity(videoSpeed) || videoSpeed < 0.1 || videoSpeed > 5)
                 return new TrimResult { Ok = false, Message = "Bad speed" };
@@ -456,7 +507,7 @@ namespace ReplayKitHelper
             // and so are layers, which only the graph that puts the video together lays on
             bool layered = layerEdit != null;
             if (layered && !composed) return new TrimResult { Ok = false, Message = "Layers need the video of the edit to be put together" };
-            if (retimed || composed || subtitled || looked || layered) precise = true;
+            if (retimed || composed || subtitled || looked || layered || framed || screenshot) precise = true;
             if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
                 return new TrimResult { Ok = false, Message = "Bad start/end" };
             if (startSec < 0) return new TrimResult { Ok = false, Message = "Start must be >= 0" };
@@ -465,7 +516,7 @@ namespace ReplayKitHelper
             if (duration < 0.5) return new TrimResult { Ok = false, Message = "Trim must be at least 0.5s long" };
 
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "copy";
-            if (mode != "copy" && mode != "overwrite") return new TrimResult { Ok = false, Message = "Unknown trim mode '" + mode + "'" };
+            if (mode != "copy" && mode != "overwrite" && mode != "screenshot") return new TrimResult { Ok = false, Message = "Unknown trim mode '" + mode + "'" };
             bool overwrite = mode == "overwrite";
 
             var source = Clips.GetSafeClipPath(sourceName);
@@ -479,7 +530,7 @@ namespace ReplayKitHelper
             string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "FFmpeg is missing or unavailable. Use Settings > Check for Updates or run the ReplayKit installer again to repair the video tools." };
 
-            string ext = Path.GetExtension(source.Name);
+            string ext = screenshot ? ".png" : Path.GetExtension(source.Name);
             // for overwrite mode, snapshot the sources filesystem timestamps now (before the atomic replace destroys them) so they can be restored after the encode -- same rationale as the compress-overwrite path: keeps the clip in its original sort position rather than jumping to the top of the dock list every time its trimmed.
             long originalSize = 0;
             DateTime? origLastWriteUtc = null;
@@ -510,15 +561,17 @@ namespace ReplayKitHelper
             }
             else
             {
-                string suffix = precise ? "trimmed" : "trimmed (fast)";
-                outName = GetSuffixedOutputName(source.Name, suffix);
+                string outputFolder = screenshot ? Screenshots.Folder(Path.GetDirectoryName(source.Full), create: true) : Path.GetDirectoryName(source.Full);
+                string suffix = screenshot ? "screenshot" : precise ? "trimmed" : "trimmed (fast)";
+                outName = GetSuffixedOutputName(screenshot ? Path.ChangeExtension(source.Name, ".png") : source.Name, suffix, outputFolder);
                 if (outName == null) return new TrimResult { Ok = false, Message = "Too many existing trim outputs" };
-                finalPath = Path.Combine(AppConfig.GetClipDir(), outName);
-                tempPath = Path.Combine(AppConfig.GetClipDir(), "_replaykit_trim_copy_" + Guid.NewGuid().ToString("N") + ext);
+                finalPath = Path.Combine(outputFolder, outName);
+                tempPath = Path.Combine(outputFolder, "_replaykit_trim_copy_" + Guid.NewGuid().ToString("N") + ext);
                 outPath = tempPath;
             }
 
-            int audioCount = Mp4Tracks.CountAudio(source.Full);
+            // a screenshot has no audio, so the audio of the clip is never read for one
+            int audioCount = screenshot ? 0 : Mp4Tracks.CountAudio(source.Full);
             // the audio edits of the editor: a plan that leaves nothing audible writes no audio at all, and a plan that is out of range stops the trim before anything is made
             AudioPlan.Rendering planned = null;
             // a plan can also bring in audio files from outside the clip, which a clip without audio takes as well
@@ -542,6 +595,29 @@ namespace ReplayKitHelper
                 if (videoPlan == null) return new TrimResult { Ok = false, Message = videoError };
                 windowStart = videoPlan.Start;
                 windowEnd = videoPlan.End;
+            }
+            if (screenshot && (frameTime < windowStart || frameTime >= windowEnd))
+                return new TrimResult { Ok = false, Message = "The screenshot time is outside the saved part of the video" };
+            if (screenshot)
+            {
+                string[] rate = sourceInfo.Fps.Split('/');
+                double fps = double.Parse(rate[0], CultureInfo.InvariantCulture) / double.Parse(rate[1], CultureInfo.InvariantCulture);
+                double last = Math.Max(0, Math.Ceiling((windowEnd - windowStart) * fps) - 1);
+                frameTime = windowStart + Math.Min(last, Math.Floor((frameTime - windowStart) * fps)) / fps;
+            }
+            string frameFilter = null;
+            // the frame that is saved, which everything drawn over the picture is laid out on; the size of the video until it is cut to an aspect
+            int frameW = sourceInfo?.Width ?? 0, frameH = sourceInfo?.Height ?? 0;
+            if (framed)
+            {
+                sourceInfo ??= ProbeVideo(source.Full);
+                if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                try
+                {
+                    frameFilter = EditorFrame.Filter(aspect, sourceInfo.Width, sourceInfo.Height);
+                    (frameW, frameH) = EditorFrame.Size(aspect, sourceInfo.Width, sourceInfo.Height);
+                }
+                catch (ArgumentException ex) { return new TrimResult { Ok = false, Message = ex.Message }; }
             }
             if (hasPlan)
             {
@@ -578,7 +654,8 @@ namespace ReplayKitHelper
                 if (lookPlan == null) return new TrimResult { Ok = false, Message = lookError };
                 sourceInfo ??= ProbeVideo(source.Full);
                 if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
-                lookFilter = lookPlan.Filter(sourceInfo.Width, sourceInfo.Height);
+                if (!framed) (frameW, frameH) = (sourceInfo.Width, sourceInfo.Height);
+                lookFilter = lookPlan.Filter(frameW, frameH);
             }
             if (subtitled)
             {
@@ -587,11 +664,12 @@ namespace ReplayKitHelper
                 if (burn.Count > 0)
                 {
                     var size = sourceInfo ?? ProbeVideo(source.Full);
+                    if (!framed && size != null) (frameW, frameH) = (size.Width, size.Height);
                     subtitleDir = Path.Combine(Constants.SCRATCH_DIR, "subs-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(subtitleDir);
                     double sourceTimed = !composed && !hasPlan && !retimed ? startSec : 0;
                     // the folder is only cleaned by the finally further down, which a failed write never reaches
-                    try { burn.Write(subtitleDir, size?.Width ?? 0, size?.Height ?? 0, sourceTimed); }
+                    try { burn.Write(subtitleDir, frameW, frameH, sourceTimed); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException)
                     {
                         try { Directory.Delete(subtitleDir, true); } catch (Exception cleanup) when (cleanup is IOException || cleanup is UnauthorizedAccessException) { Log.Write("Trim subtitles cleanup: " + cleanup.Message); }
@@ -602,6 +680,8 @@ namespace ReplayKitHelper
                 }
             }
             if (lookFilter != null) videoTail = videoTail != null ? lookFilter + "," + videoTail : lookFilter;
+            // the cut to the aspect comes first, the same as in the graph of a put together video
+            if (!composed && frameFilter != null) videoTail = videoTail != null ? frameFilter + "," + videoTail : frameFilter;
             try
             {
             // invariant-culture decimal formatting -- ffmpeg only accepts . as the decimal separator, never ,, regardless of system locale.
@@ -614,7 +694,14 @@ namespace ReplayKitHelper
             int firstLayerInput = 0;
             int firstOtherInput = 0;
 
-            if (precise)
+            if (screenshot)
+            {
+                argv = ScreenshotArgs(videoPlan, sourceInfo, videoSpeed, frameTime, source.Full, lookFilter, layerPlan, subtitleFilter, frameFilter, aspect);
+                encoder = new EditEncoder { Name = "png", Args = new List<string> { "-c:v", "png" } };
+                argv.AddRange(encoder.Args);
+                argv.AddRange(new[] { "-frames:v", "1", "-update", "1", "-y", outPath });
+            }
+            else if (precise)
             {
                 // ss after -i is output-side / decode-then-seek: ffmpeg decodes frames from the start of the file but discards everything before startSec, then emits exactly the picked window -- the only way to land the cut on the exact frame chosen, at the cost of a full re-encode. on the processor crf 14 is the perceptual quality target -- visually indistinguishable from the source; the graphics card encoder works to a constant quality of its own, picked by measuring against it. on a fresh obs clip (30-60 mbps) crf 14 lands around 70-85% of source size; on a heavily compressed source it would happily exceed the source bitrate trying to preserve compression artifacts, so the sources video bitrate is probed and passed as -maxrate / -bufsize -- x264 in "capped crf" mode still targets crf, but rate-control caps the output when reaching it would spend more bits than the source had. trims of original clips look the same as before; trims of compressed clips no longer inflate. audio is stream-copied so the source aac bytes are preserved exactly, no second-generation transcoding loss. preset is "fast" rather than "veryfast" -- veryfast at low bitrates throws away bit-allocation efficiency the cap depends on, and the wall-clock difference for a typical trim is small enough to be invisible. with video pieces nothing is seeked, since the graph cuts every piece out of the source by its own times; with a plan the video is read seeked and the audio graph reads the file again from its start, so the plan keeps working on the timeline of the source, and decoding a seeked input to a re-encode is exact to the frame as well; a video at another speed is read seeked as well, since the output side seek of ffmpeg counts the time after the filters have stretched it
                 if (composed)
@@ -658,7 +745,7 @@ namespace ReplayKitHelper
                 }
                 if (composed)
                 {
-                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, sourceInfo, subtitleFilter, out string finalLabel), finalLabel);
+                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, frameW > 0 ? frameW : sourceInfo.Width, frameH > 0 ? frameH : sourceInfo.Height, subtitleFilter, frameFilter, out string finalLabel), finalLabel);
                 }
                 else if (hasPlan)
                 {
@@ -683,7 +770,7 @@ namespace ReplayKitHelper
             }
 
             // ffmpeg writes how far it has come as out_time_us; against the length of the saved clip that is the percent the editor shows while it waits
-            double outputUs = Math.Max(1.0, (composed ? windowEnd - windowStart : duration / videoSpeed) * 1000000.0);
+            double outputUs = Math.Max(1.0, (screenshot ? 0 : composed ? windowEnd - windowStart : duration / videoSpeed) * 1000000.0);
             int lastPercent = 0;
             argv.InsertRange(3, new[] { "-progress", "pipe:1", "-nostats" });
             UploadState.SetUploadState(requestId: requestId, phase: "encoding");
@@ -735,7 +822,11 @@ namespace ReplayKitHelper
                         return new TrimResult { Ok = false, Message = "A clip with that output name already exists" };
                     }
                     // plain File.Move, not an atomic replace -- a new output name colliding with an existing file is a genuine error above, not a case to silently overwrite.
-                    JobCoordinator.Commit(requestId, () => File.Move(tempPath, finalPath));
+                    JobCoordinator.Commit(requestId, () =>
+                    {
+                        if (screenshot) Screenshots.Folder(Path.GetDirectoryName(source.Full));
+                        File.Move(tempPath, finalPath);
+                    });
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
