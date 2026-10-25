@@ -14,6 +14,25 @@ constexpr int kOpenClipsHotkeyIds[2] = {0x524B, 0x524C};
 bool g_openClipsHotkeyRegistered[2] = {false, false};
 QAbstractNativeEventFilter *g_openClipsHotkeyFilter = nullptr;
 std::string g_openClipsHotkeyBinding;
+// the key of a press that is still held: its auto-repeats are taken as hotkeys and dropped, since with no-repeat they went to the window in front, where an alt combo with no menu behind it sounds the windows default beep
+UINT g_openClipsHeldKey = 0;
+QPointer<QTimer> g_openClipsReleaseTimer;
+
+void WatchOpenClipsRelease(UINT key)
+{
+	g_openClipsHeldKey = key;
+	if (!g_openClipsReleaseTimer) {
+		g_openClipsReleaseTimer = new QTimer(qApp);
+		g_openClipsReleaseTimer->setInterval(30);
+		QObject::connect(g_openClipsReleaseTimer, &QTimer::timeout, []() {
+			if (GetAsyncKeyState((int)g_openClipsHeldKey) & 0x8000)
+				return;
+			g_openClipsHeldKey = 0;
+			g_openClipsReleaseTimer->stop();
+		});
+	}
+	g_openClipsReleaseTimer->start();
+}
 
 UINT OpenClipsVirtualKey(const std::string &obsKey)
 {
@@ -48,7 +67,10 @@ public:
 		MSG *msg = static_cast<MSG *>(message);
 		if (!msg || msg->message != WM_HOTKEY || (msg->wParam != (WPARAM)kOpenClipsHotkeyIds[0] && msg->wParam != (WPARAM)kOpenClipsHotkeyIds[1]))
 			return false;
+		if (g_openClipsHeldKey)
+			return true;
 		ToggleClips();
+		WatchOpenClipsRelease(HIWORD(msg->lParam));
 		return true;
 	}
 };
@@ -63,7 +85,7 @@ void RegisterOneOpenClipsHotkey(int slot, const std::string &binding)
 		blog(LOG_WARNING, "[replaykit] Open Clips hotkey uses an unsupported key");
 		return;
 	}
-	UINT modifiers = MOD_NOREPEAT;
+	UINT modifiers = 0;
 	if (JsonBoolField(binding, "control", false)) modifiers |= MOD_CONTROL;
 	if (JsonBoolField(binding, "alt", false)) modifiers |= MOD_ALT;
 	if (JsonBoolField(binding, "shift", false)) modifiers |= MOD_SHIFT;
@@ -119,6 +141,8 @@ void RemoveOpenClipsHotkey()
 {
 	if (g_openClipsHotkeyTimer)
 		g_openClipsHotkeyTimer->stop();
+	delete g_openClipsReleaseTimer;
+	g_openClipsHeldKey = 0;
 	UnregisterOpenClipsHotkeys();
 	if (g_openClipsHotkeyFilter) {
 		qApp->removeNativeEventFilter(g_openClipsHotkeyFilter);

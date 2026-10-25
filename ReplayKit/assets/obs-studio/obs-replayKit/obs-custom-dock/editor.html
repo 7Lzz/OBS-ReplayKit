@@ -1815,19 +1815,61 @@ window.__rkEditorApi = (function () {
 
   // the save: the editor is locked and a popup follows the encode until the helper answers, so nothing can change under the copy or the new original that is being written
   const SAVE_QUIET_MS = 300;
-  const SAVE_POLL_MS = 400;
+  const SAVE_POLL_MS = 200;
   const SAVE_POLL_TIMEOUT_MS = 5000;
   // a helper that has said nothing for this long is given up on, so the editor never stays locked for good behind a save nobody is answering
   const SAVE_LOST_MS = 30000;
 
+  // the fill follows the reported percent the way the upload meter of the clip cards does (critically damped, carrying a velocity), so the steps of the encode glide into each other instead of jumping
+  const saveMotion = { shown: 0, target: 0, vel: 0, raf: 0, lastT: 0 };
+  const SAVE_SMOOTH_S = 0.45;
+
+  function resetSaveFill() {
+    if (saveMotion.raf) cancelAnimationFrame(saveMotion.raf);
+    Object.assign(saveMotion, { shown: 0, target: 0, vel: 0, raf: 0, lastT: 0 });
+    saveFill.style.width = "";
+  }
+
+  function followSaveFill(percent) {
+    const m = saveMotion;
+    // the fill only ever moves forward, toward the newest percent
+    if (percent > m.target) m.target = percent;
+    saveFill.style.width = m.shown.toFixed(3) + "%";
+    if (m.raf) return;
+    m.lastT = 0;
+    const step = (now) => {
+      const dt = m.lastT ? Math.min(0.05, (now - m.lastT) / 1000) : 0.016;
+      m.lastT = now;
+      const omega = 2 / SAVE_SMOOTH_S;
+      const x = omega * dt;
+      const expf = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+      const change = m.shown - m.target;
+      const temp = (m.vel + omega * change) * dt;
+      m.vel = (m.vel - omega * temp) * expf;
+      let out = m.target + (change + temp) * expf;
+      if (out > m.target) { out = m.target; m.vel = 0; }
+      m.shown = out;
+      saveFill.style.width = m.shown.toFixed(3) + "%";
+      if (m.target - m.shown > 0.08 || m.vel > 0.4) {
+        m.raf = requestAnimationFrame(step);
+      } else {
+        m.shown = m.target;
+        saveFill.style.width = m.shown.toFixed(3) + "%";
+        m.raf = 0;
+      }
+    };
+    m.raf = requestAnimationFrame(step);
+  }
+
   function paintTrimSave(save) {
     const finishing = save.phase === "finishing";
     const percent = finishing ? Math.max(save.percent, 98) : save.percent;
-    const known = percent > 1;
+    // once ffmpeg runs the bar is a real one from zero
+    const known = finishing || save.phase === "encoding" || percent > 1;
     saveTrack.classList.toggle("is-waiting", !known);
-    saveFill.style.width = known ? percent + "%" : "";
+    if (known) followSaveFill(percent);
     saveTrack.setAttribute("aria-valuenow", known ? String(percent) : "0");
-    savePercent.textContent = known ? percent + "%" : "";
+    savePercent.textContent = known ? Math.round(percent) + "%" : "";
     saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.mode === "screenshot" ? "Rendering screenshot" : save.precise ? "Re-encoding the video" : "Cutting the clip";
     // once the file is being put in place there is nothing left to take back
     saveCancel.hidden = finishing;
@@ -1838,6 +1880,7 @@ window.__rkEditorApi = (function () {
   function beginTrimSave(clipName, mode, precise) {
     const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "", stopping: false, quietTimer: 0 };
     trimSaving = save;
+    resetSaveFill();
     // nothing keeps playing under the save, and a view in fullscreen would hide the popup
     trimPreviewActive = false;
     try { trimVideo.pause(); } catch {}

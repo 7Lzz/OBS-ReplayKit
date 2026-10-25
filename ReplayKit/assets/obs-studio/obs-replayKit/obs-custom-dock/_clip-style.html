@@ -1831,6 +1831,12 @@
     border-radius: 50%;
     animation: clip-sort-spin .8s linear infinite;
   }
+  /* the card that stands in for a clip being saved until the clip takes its place: the box of a card with only the processing look in it, out of reach of the pointer */
+  .save-ghost { position: relative; display: flex; flex-direction: column; background: var(--bg_card); border: 1px solid var(--grey4-solid,var(--grey4)); border-radius: 6px; pointer-events: none; animation: save-ghost-in 220ms linear; }
+  #grid .save-ghost { position: absolute; left: 0; top: 0; min-width: 0; max-width: 100%; width: var(--virtual-card-width, 260px); transform: translate3d(var(--virtual-card-x, 0px), var(--virtual-card-y, 0px), 0); }
+  .save-ghost .preview { cursor: default; }
+  .save-ghost .processing-overlay { opacity: 1; visibility: visible; transition: none; }
+  @keyframes save-ghost-in { from { opacity: 0; } to { opacity: 1; } }
   .card.is-processing .preview { cursor: default; }
   .card.is-processing .play-overlay, .card.is-processing .player-shade, .card.is-processing .preview-controls, .card.is-processing .progress-bar, .card.is-processing .center-pulse, .card.is-processing .duration-badge { display: none !important; }
   .card-resize svg { width: 14px; height: 14px; fill: currentColor; display: block; pointer-events: none; }
@@ -2023,9 +2029,9 @@
   .save-modal [hidden] { display: none; }
   .save-modal .clip-name { margin: 2px 0 14px; font-size: 12px; color: var(--text_muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .save-track { position: relative; height: 6px; border-radius: 3px; background: var(--grey3); overflow: hidden; }
-  .save-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: var(--link_accent); transition: width 300ms linear; }
-  /* until the helper reports a position the bar slides instead of sitting empty */
-  .save-track.is-waiting .save-fill { width: 34%; transition: none; animation: save-slide 1.15s ease-in-out infinite; }
+  .save-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: var(--link_accent); }
+  /* until the encode has started the bar slides instead of sitting empty */
+  .save-track.is-waiting .save-fill { width: 34%; animation: save-slide 1.15s ease-in-out infinite; }
   @keyframes save-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
   .save-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
   .save-percent { color: var(--text_muted); }

@@ -47,5 +47,7 @@ void ShellCloseView(ShellView view);
 // the settings page answered the unsaved-changes prompt with save or leave, and the view it held back goes ahead
 void ShellLeaveSettings(const std::string &target);
 void ShellSetClipsFullscreen(bool active);
+// tells the clips view a clip save started or ended, args being the json array of the state and the saved file name
+void ShellClipSaving(const std::string &args);
 
 } // namespace rk

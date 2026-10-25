@@ -602,6 +602,23 @@ namespace ReplayKitHelper
             }
 
             // the plugin hands over the pieces of the disk buffer that cover the clip, and they are joined into the clip itself
+            // the plugin says a clip press started a save, or that one ended before it reached the helper
+            if (path == "/clip-buffer/saving")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    var body = JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body);
+                    long id = body["id"]?.Value<long?>() ?? -1;
+                    string state = body["state"]?.Value<string>() ?? "";
+                    if (id < 0 || (state != "start" && state != "failed")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save notice was not valid." }); return false; }
+                    if (state == "start") ClipBuffer.MarkSaveStarted(id); else ClipBuffer.MarkSaveEnded(id, "");
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                }
+                catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is FormatException || ex is OverflowException || ex is ArgumentException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save notice was not valid." }); }
+                return false;
+            }
+
             if (path == "/clip-buffer/save")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -1754,7 +1771,13 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/status") { HttpResponse.SendJson(stream, 200, UploadState.GetUploadStatusSnapshot()); return false; }
+            if (path == "/status")
+            {
+                var status = UploadState.GetUploadStatusSnapshot();
+                status["clipSave"] = ClipBuffer.SaveStatus();
+                HttpResponse.SendJson(stream, 200, status);
+                return false;
+            }
 
             if (path == "/clips/state")
             {

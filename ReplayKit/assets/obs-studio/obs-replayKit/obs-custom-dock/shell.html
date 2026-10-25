@@ -389,7 +389,15 @@
     } catch (_) {}
   }
 
-  window.RKShell = { quickAction: quickAction, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
+  // a clip is being saved: the clips view puts a card in for it until the clip is written
+  function clipSaving(state, name) {
+    var f = frames.clips;
+    try {
+      if (f && f.loaded && typeof f.el.contentWindow.__rkClipSaving === "function") f.el.contentWindow.__rkClipSaving(String(state), String(name || ""));
+    } catch (_) {}
+  }
+
+  window.RKShell = { quickAction: quickAction, clipSaving: clipSaving, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, timing: function () { return JSON.stringify(marks); } };
 
   // home is the landing page and clips loads right behind it, since the first click right after the window opens is usually there; settings and setup load on their first visit
   show("home");

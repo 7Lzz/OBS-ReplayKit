@@ -22,6 +22,7 @@
 #include "core/state.hpp"
 #include "core/win32.hpp"
 #include "shell/shell_views.hpp"
+#include "windows/clips_window.hpp"
 
 namespace rk {
 
@@ -52,6 +53,8 @@ int g_clipSeconds = 20;
 bool g_saving = false;
 bool g_awaitingSplit = false;
 int g_saveGen = 0;
+// when the running save was pressed, the number the helper knows it by; a time and not the count above, which starts over with obs while the helper may not
+qint64 g_saveStamp = 0;
 // the encoders came from the recording output of obs, so a recording and the buffer share one encode
 bool g_sharedEncoders = false;
 // a stop that is only the first half of moving onto those encoders, which keeps the pieces already recorded
@@ -386,6 +389,22 @@ void StopDisk()
 		obs_output_stop(g_out);
 }
 
+// the clips pages put a card in for a clip that is being saved, and the clip takes its place once it is written
+void TellPagesClipSaving(const char *state, const std::string &path = std::string())
+{
+	const QString name = path.empty() ? QString() : QFileInfo(QString::fromStdString(path)).fileName();
+	const std::string args = QJsonDocument(QJsonArray{QString::fromUtf8(state), name}).toJson(QJsonDocument::Compact).toStdString();
+	ShellClipSaving(args);
+	ClipsWindowClipSaving(args);
+}
+
+// the helper keeps the save too, for a clips page that opens or comes back while it runs; the number lets it drop a notice that arrives after its save already ended
+void TellHelperClipSaving(qint64 stamp, const char *state)
+{
+	const std::string json = QJsonDocument(QJsonObject{{"id", stamp}, {"state", QString::fromUtf8(state)}}).toJson(QJsonDocument::Compact).toStdString();
+	RunAsync([json]() { HttpRequest("POST", "/clip-buffer/saving", 8767, json.c_str(), 3000); });
+}
+
 // the newest finished pieces that cover the clip, plus one more, so the helper can always cut the full length from them
 void SendSave()
 {
@@ -400,6 +419,8 @@ void SendSave()
 	}
 	if (paths.empty()) {
 		g_saving = false;
+		TellPagesClipSaving("failed");
+		TellHelperClipSaving(g_saveStamp, "failed");
 		blog(LOG_WARNING, "[replaykit] disk clip buffer has nothing to save yet");
 		return;
 	}
@@ -419,7 +440,7 @@ void SendSave()
 	QJsonArray segments;
 	for (const std::string &path : paths)
 		segments.append(QString::fromStdString(path));
-	const QByteArray body = QJsonDocument(QJsonObject{{"segments", segments}, {"seconds", g_clipSeconds}, {"name", QString::fromUtf8(name ? name : "")}})
+	const QByteArray body = QJsonDocument(QJsonObject{{"id", g_saveStamp}, {"segments", segments}, {"seconds", g_clipSeconds}, {"name", QString::fromUtf8(name ? name : "")}})
 					.toJson(QJsonDocument::Compact);
 	bfree(name);
 	blog(LOG_INFO, "[replaykit] disk clip buffer saving %d s from %zu piece(s)", g_clipSeconds, paths.size());
@@ -433,11 +454,12 @@ void SendSave()
 				if (!JsonBoolField(answer, "ok", false)) {
 					const std::string message = ExtractJsonStringField(answer, "message");
 					blog(LOG_WARNING, "[replaykit] disk clip buffer save failed: %s", message.empty() ? "no answer from the helper" : message.c_str());
+					TellPagesClipSaving("failed");
 					return;
 				}
 				const std::string path = ExtractJsonStringField(answer, "path");
+				TellPagesClipSaving("done", path);
 				blog(LOG_INFO, "[replaykit] disk clip buffer saved a clip");
-				// the scripts that beep and show the clip toast hear this in place of the replay saved event of obs
 				calldata_t cd = {};
 				calldata_set_string(&cd, "path", path.c_str());
 				signal_handler_signal(obs_get_signal_handler(), "replaykit_clip_saved", &cd);
@@ -458,6 +480,13 @@ void SaveDisk()
 	g_saving = true;
 	g_awaitingSplit = true;
 	const int gen = ++g_saveGen;
+	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
+	// the scripts that beep and show the clip toast hear this on the press, since joining the pieces takes long enough to notice
+	calldata_t saving = {};
+	signal_handler_signal(obs_get_signal_handler(), "replaykit_clip_saving", &saving);
+	calldata_free(&saving);
+	TellPagesClipSaving("start");
+	TellHelperClipSaving(g_saveStamp, "start");
 	// the piece being written is closed first, so the clip runs right up to the press
 	calldata_t cd = {};
 	proc_handler_call(obs_output_get_proc_handler(g_out), "split_file", &cd);
@@ -586,6 +615,7 @@ void SwitchMode(Mode next)
 void ClipBufferInit()
 {
 	g_mode = ModeFromSettingsFile();
+	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saving()");
 	signal_handler_add(obs_get_signal_handler(), "void replaykit_clip_saved(string path)");
 	proc_handler_add(obs_get_proc_handler(), "void replaykit_clip_start(out bool handled)", ClipStartProc, nullptr);
 	signal_handler_connect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);

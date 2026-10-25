@@ -841,10 +841,10 @@ namespace ReplayKitHelper
                 argv.AddRange(new[] { "-avoid_negative_ts", "make_zero", "-y", outPath });
             }
 
-            // ffmpeg writes how far it has come as out_time_us; against the length of the saved clip that is the percent the editor shows while it waits
+            // ffmpeg writes how far it has come as out_time_us four times a second; against the length of the saved clip that is the percent the editor shows while it waits
             double outputUs = Math.Max(1.0, (screenshot ? 0 : composed ? windowEnd - windowStart : duration / videoSpeed) * 1000000.0);
             int lastPercent = 0;
-            argv.InsertRange(3, new[] { "-progress", "pipe:1", "-nostats" });
+            argv.InsertRange(3, new[] { "-progress", "pipe:1", "-nostats", "-stats_period", "0.25" });
             UploadState.SetUploadState(requestId: requestId, phase: "encoding");
             Log.Write("Trim (" + mode + ", precise=" + precise + ", removeAudio=" + removeAudio + "): " + ffmpeg + " " + string.Join(" ", argv));
             try

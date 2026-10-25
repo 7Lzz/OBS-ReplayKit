@@ -293,6 +293,12 @@ void ShellCreateHost(QMainWindow *mw)
 
 } // namespace
 
+void ShellClipSaving(const std::string &args)
+{
+	if (g_shellHost && g_shellHost->browser)
+		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.clipSaving && RKShell.clipSaving.apply(null, " + args + ");");
+}
+
 void ShellUpdateTitle()
 {
 	if (!g_shellOn || !g_shellTitle)

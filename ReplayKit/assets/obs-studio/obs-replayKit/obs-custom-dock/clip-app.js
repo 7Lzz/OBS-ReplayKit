@@ -386,6 +386,8 @@ const CLIP_HOVER_PROFILES = {
   let virtualRangeStart = -1;
   let virtualRangeEnd = -1;
   let virtualColumns = 1;
+  // the slots in front of the first clip, one while a clip is being saved
+  let virtualLead = 0;
   // how many clips the grid holds once every page has arrived; the height of the scroll bar is made for all of them from the start, so it does not change size when a page comes in
   let allClipsExpected = 0;
   let virtualCardWidth = 330;
@@ -1119,8 +1121,83 @@ const CLIP_HOVER_PROFILES = {
     return "No clips found.";
   }
 
+  // a clip that is being saved gets a card of its own at the front of the newest-first list, in the look of a card whose clip is still being processed, and the clip takes that very spot once it is written; the plugin says at once when the save starts and how it ended, and the helper keeps the save as well for a page that opened, came back or was not there when the plugin spoke
+  const SAVE_GHOST_LOST_MS = 135000;
+  const SAVE_GHOST_ARRIVE_MS = 10000;
+  const SAVE_GHOST_POLL_MS = 300;
+  let pendingClipSave = null;
+  let saveGhostEl = null;
+  // the save of the helper whose card has already come and gone, so a poll does not put it up again
+  let finishedClipSaveStart = 0;
+  function saveGhostSlots() {
+    return pendingClipSave && !HOME_MODE && (activeFilter === "all" || activeFilter === "local") && activeSort === "newest" && !clipSearchQuery.trim() ? 1 : 0;
+  }
+  function endClipSave(save) {
+    if (!save || pendingClipSave !== save) return;
+    clearTimeout(save.timer);
+    if (save.startedAt) finishedClipSaveStart = save.startedAt;
+    pendingClipSave = null;
+    queueVirtualRender(true);
+  }
+  function beginClipSave(startedAt) {
+    if (pendingClipSave) clearTimeout(pendingClipSave.timer);
+    const save = { name: "", startedAt: startedAt || 0, since: Date.now(), timer: 0 };
+    // a save that never reports back does not leave the card up for good
+    save.timer = setTimeout(() => endClipSave(save), SAVE_GHOST_LOST_MS);
+    pendingClipSave = save;
+    queueVirtualRender(true);
+  }
+  function clipSaveWritten(save, name) {
+    if (!name) { endClipSave(save); return; }
+    if (save.name) return;
+    save.name = name;
+    clearTimeout(save.timer);
+    // the list can be a moment behind the file, so the card waits a little for the clip to show up in it
+    save.timer = setTimeout(() => endClipSave(save), SAVE_GHOST_ARRIVE_MS);
+  }
+  // runs on every poll before the list is drawn, so a page that loads in the middle of a save has the card in place on its first frame
+  function syncClipSave(info) {
+    if (HOME_MODE || !info) return;
+    const started = Number(info.startedAt) || 0;
+    const ended = Number(info.endedAt) || 0;
+    const save = pendingClipSave;
+    if (info.active) {
+      if (save) { if (!save.startedAt) save.startedAt = started; }
+      else if (started && started !== finishedClipSaveStart) beginClipSave(started);
+      return;
+    }
+    if (!save || !ended) return;
+    // the save the helper ended last is this card when the helper started it, or when it ended after the card went up on the word of the plugin
+    if (save.startedAt ? save.startedAt === started : ended >= save.since) clipSaveWritten(save, String(info.name || ""));
+  }
+  function buildSaveGhost() {
+    const ghost = document.createElement("div");
+    ghost.className = "save-ghost";
+    ghost.setAttribute("aria-label", "Saving clip");
+    ghost.innerHTML = `
+      <div class="preview"><div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div></div>
+      <div class="body">
+        <div class="title-row"><span class="name">Saving clip&hellip;</span></div>
+        <div class="meta"><span class="age">Just now</span></div>
+      </div>`;
+    return ghost;
+  }
+  window.__rkClipSaving = function (state, name) {
+    if (HOME_MODE) return;
+    if (state === "start") {
+      beginClipSave(0);
+      scheduleNextPoll(SAVE_GHOST_POLL_MS);
+      return;
+    }
+    const save = pendingClipSave;
+    if (!save) return;
+    clipSaveWritten(save, state === "done" ? String(name || "") : "");
+    scheduleNextPoll(0);
+  };
+
   function renderLoadedClips(clips) {
     loadedClips = Array.isArray(clips) ? clips : [];
+    if (pendingClipSave && pendingClipSave.name && loadedClips.some((c) => c && c.name === pendingClipSave.name)) endClipSave(pendingClipSave);
     updateTabs(loadedClips);
     syncClipView();
     if (activeFilter === "screenshots") {
@@ -1598,7 +1675,7 @@ const CLIP_HOVER_PROFILES = {
     const layout = computeVirtualLayout();
     // a row is as high as a card, and a card is as much higher as its picture is: 16 to 9 of the width
     virtualRowStride = Math.ceil(drag.height + (layout.cardWidth - drag.width) * 9 / 16) + GRID_GAP;
-    gridEl.style.height = Math.ceil(Math.max(allClips.length, allClipsExpected) / layout.columns) * virtualRowStride + "px";
+    gridEl.style.height = Math.ceil((Math.max(allClips.length, allClipsExpected) + saveGhostSlots()) / layout.columns) * virtualRowStride + "px";
     scrollAreaEl.scrollTop = scrolled + cardResizeTop(drag, layout.columns) - before;
     renderVirtualWindow(true);
   }
@@ -1928,7 +2005,8 @@ const CLIP_HOVER_PROFILES = {
     const layout = computeVirtualLayout();
     const columns = layout.columns;
     const cardWidth = layout.cardWidth;
-    const totalRows = Math.ceil(Math.max(allClips.length, allClipsExpected) / columns);
+    const lead = saveGhostSlots();
+    const totalRows = Math.ceil((Math.max(allClips.length, allClipsExpected) + lead) / columns);
     // the virtualized grid sits below an optional favorites sub-section, so subtract that section height from scrollTop before computing visible rows.
     const virtScrollTop = Math.max(0,
       scrollAreaEl.scrollTop - (gridEl.offsetTop - scrollAreaEl.offsetTop));
@@ -1937,10 +2015,11 @@ const CLIP_HOVER_PROFILES = {
       totalRows,
       Math.ceil((virtScrollTop + scrollAreaEl.clientHeight) / virtualRowStride) + VIRTUAL_OVERSCAN_ROWS
     );
-    const start = Math.min(allClips.length, startRow * columns);
-    const end = Math.min(allClips.length, endRow * columns);
+    const start = Math.max(0, Math.min(allClips.length, startRow * columns - lead));
+    const end = Math.max(0, Math.min(allClips.length, endRow * columns - lead));
 
     if (!force &&
+        lead === virtualLead &&
         columns === virtualColumns &&
         cardWidth === virtualCardWidth &&
         start === virtualRangeStart &&
@@ -1949,6 +2028,7 @@ const CLIP_HOVER_PROFILES = {
     }
 
     virtualColumns = columns;
+    virtualLead = lead;
     virtualCardWidth = cardWidth;
     virtualRangeStart = start;
     virtualRangeEnd = end;
@@ -1986,8 +2066,20 @@ const CLIP_HOVER_PROFILES = {
         card = acquireCard(clip);
         gridEl.appendChild(card);
       }
-      positionVirtualCard(card, i, columns, cardWidth);
+      positionVirtualCard(card, i + lead, columns, cardWidth);
       observeThumb(card.querySelector(".thumb"));
+    }
+
+    if (lead && startRow === 0) {
+      if (!saveGhostEl) saveGhostEl = buildSaveGhost();
+      if (saveGhostEl.parentNode !== gridEl) gridEl.appendChild(saveGhostEl);
+      positionVirtualCard(saveGhostEl, 0, columns, cardWidth);
+      // as tall as the cards beside it, whose action row it does not have
+      const sample = gridEl.querySelector(".card");
+      saveGhostEl.style.height = sample ? sample.offsetHeight + "px" : "";
+    } else if (saveGhostEl) {
+      saveGhostEl.remove();
+      saveGhostEl = null;
     }
 
     // the active preview belongs to the users current hover or a fullscreened card; abort only when it is no longer in the virtual window or favorites.
@@ -4517,6 +4609,7 @@ const CLIP_HOVER_PROFILES = {
       let uploadStatus = null;
       try { uploadStatus = await fetchUploadStatus(); } catch {}
       lastUploadStatus = uploadStatus;
+      syncClipSave(uploadStatus && uploadStatus.clipSave);
       const jobSync = syncUploadJobState(uploadStatus);
       if (jobSync.completed.length) {
         clips = applyCompletedUploadLinks(clips, jobSync.completed);
@@ -4595,7 +4688,7 @@ const CLIP_HOVER_PROFILES = {
       pollInFlight = false;
       const hasActiveStreamableUpload = Array.from(lastUploadJobsByName.values()).some((job) =>
         job && job.active && job.state === "uploading");
-      scheduleNextPoll(hasActiveStreamableUpload ? POLL_UPLOAD_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
+      scheduleNextPoll(hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
     }
   }
 
@@ -4717,7 +4810,7 @@ const CLIP_HOVER_PROFILES = {
       } else {
         const index = allClips.findIndex((c) => c && c.name === name);
         if (index >= 0) {
-          const row = Math.floor(index / Math.max(1, virtualColumns));
+          const row = Math.floor((index + saveGhostSlots()) / Math.max(1, virtualColumns));
           const top = (gridEl.offsetTop - scrollAreaEl.offsetTop) + row * virtualRowStride;
           scrollAreaEl.scrollTo({ top: Math.max(0, top - Math.max(0, (scrollAreaEl.clientHeight - virtualRowStride) / 2)), behavior: "smooth" });
           queueVirtualRender(false);

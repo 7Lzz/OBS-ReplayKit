@@ -28,6 +28,14 @@ namespace ReplayKitHelper
         private static readonly object StateGate = new object();
         private static readonly object SaveGate = new object();
         private static bool _diskActive;
+        // the save that runs or the last one that ended, so a clips page that opens or comes back while a clip is saved still shows its card, and learns the name of the clip it waits for; the plugin numbers its saves, so a start that arrives after its save already ended cannot open it again
+        private static long _saveId = -1;
+        private static long _endedSaveId = -1;
+        private static long _saveStartedAt;
+        private static long _saveEndedAt;
+        private static string _savedName = "";
+        // a save nobody ever ends stops counting as running, the longest a join may take and then some
+        private const long SaveForgetMs = 150000;
 
         public static string DiskDir => Path.Combine(Constants.SCRATCH_DIR, "clip-buffer");
 
@@ -93,8 +101,49 @@ namespace ReplayKitHelper
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
-        // joins the newest pieces the plugin recorded into one clip of the asked length, in the clip folder under the name obs would have given it; the pieces stay where they are, since they are still the buffer
+        public static JObject SaveStatus()
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            lock (StateGate)
+                return new JObject { ["active"] = _saveStartedAt > 0 && _saveEndedAt == 0 && now - _saveStartedAt < SaveForgetMs, ["startedAt"] = _saveStartedAt, ["endedAt"] = _saveEndedAt, ["name"] = _savedName };
+        }
+
+        // the plugin says so on the clip press, before it has the pieces together
+        public static void MarkSaveStarted(long id)
+        {
+            lock (StateGate)
+            {
+                if (id == _endedSaveId || (id == _saveId && _saveEndedAt == 0)) return;
+                _saveId = id;
+                _saveStartedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                _saveEndedAt = 0;
+                _savedName = "";
+            }
+        }
+
+        public static void MarkSaveEnded(long id, string name)
+        {
+            lock (StateGate)
+            {
+                if (id == _endedSaveId || id != _saveId) return;
+                _endedSaveId = id;
+                _saveEndedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                _savedName = name ?? "";
+            }
+        }
+
         public static JObject SaveSegments(JObject body)
+        {
+            long id = body?["id"]?.Value<long?>() ?? 0;
+            MarkSaveStarted(id);
+            var result = SaveSegmentsCore(body, id);
+            // a save that failed ends here; one that worked already ended the moment its file was in place
+            MarkSaveEnded(id, "");
+            return result;
+        }
+
+        // joins the newest pieces the plugin recorded into one clip of the asked length, in the clip folder under the name obs would have given it; the pieces stay where they are, since they are still the buffer
+        private static JObject SaveSegmentsCore(JObject body, long id)
         {
             var segments = body?["segments"] as JArray;
             int seconds = body?["seconds"]?.Value<int?>() ?? 0;
@@ -172,6 +221,8 @@ namespace ReplayKitHelper
                 }
                 File.Move(part, target);
                 part = null;
+                // said as soon as the file is in the folder, so a page that already lists the clip also reads that its save ended
+                MarkSaveEnded(id, Path.GetFileName(target));
                 Log.Write("clip buffer save: " + (files.Count - first) + " of " + files.Count + " piece(s), " + lengths.Sum().ToString("0.0", CultureInfo.InvariantCulture) + " s buffered -> " + target);
                 return new JObject { ["ok"] = true, ["path"] = target };
             }

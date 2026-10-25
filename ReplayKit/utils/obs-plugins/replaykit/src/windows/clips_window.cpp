@@ -197,4 +197,10 @@ void ToggleClips()
 	ShowClips();
 }
 
+void ClipsWindowClipSaving(const std::string &args)
+{
+	if (g_clipsBrowser)
+		RunBrowserScript(g_clipsBrowser, "window.__rkClipSaving && window.__rkClipSaving.apply(null, " + args + ");");
+}
+
 } // namespace rk
