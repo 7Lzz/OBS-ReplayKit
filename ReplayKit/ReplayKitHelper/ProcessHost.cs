@@ -41,6 +41,9 @@ namespace ReplayKitHelper
                     Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName), StringComparison.OrdinalIgnoreCase))
                     throw new ArgumentException("Invalid helper host.");
                 ProcessHost.Hosted = true;
+                // a runtime started by a native host has no entry assembly to read the target framework from, so .net 4.8 keeps its legacy tls defaults (ssl3 and tls 1.0) that github and streamable refuse; these must be set before anything touches the network
+                AppContext.SetSwitch("Switch.System.Net.DontEnableSystemDefaultTlsVersions", false);
+                AppContext.SetSwitch("Switch.System.Net.DontEnableSchUseStrongCrypto", false);
                 return Program.Main(args.Skip(2).ToArray());
             }
             catch (Exception ex)
