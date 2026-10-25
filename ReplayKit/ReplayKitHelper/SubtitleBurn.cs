@@ -47,6 +47,8 @@ namespace ReplayKitHelper
             public int Rotate;
             public bool Shadow;
             public bool WordOn = true;
+            // word lights one word at a time; fill sweeps the colour through each word as it is said and keeps it on the words already said
+            public string WordFx = "word";
             public string Word = "#ffe500";
             // a row dragged on the preview: the centre of its block as fractions of the picture, NaN when it stacks at its position
             public double X = double.NaN;
@@ -62,8 +64,9 @@ namespace ReplayKitHelper
             public List<string> Lines;
             // widths of the lines in ems of the font, as the page measured them
             public double MaxWidth;
-            // start of every word of the lines, in order; null when the cue has no word times or they do not line up with its words
+            // start and end of every word of the lines, in order; null when the cue has no word times or they do not line up with its words
             public List<double> Words;
+            public List<double> Ends;
         }
 
         private sealed class Row
@@ -118,28 +121,30 @@ namespace ReplayKitHelper
                         kept.Add(line);
                         maxWidth = Math.Max(maxWidth, width);
                     }
-                    List<double> words = null;
+                    List<double> words = null, ends = null;
                     if (c["words"] != null && c["words"].Type != JTokenType.Null)
                     {
                         if (!(c["words"] is JArray list) || list.Count > MaxTextLength) { error = "Bad subtitles"; return null; }
                         wordCount += list.Count;
                         if (wordCount > MaxWords) { error = "Too many subtitles"; return null; }
                         words = new List<double>(list.Count);
+                        ends = new List<double>(list.Count);
                         foreach (var w in list)
                         {
                             var pair = w as JArray;
                             double at = pair != null && pair.Count == 2 ? Number(pair[0]) : double.NaN;
                             double to = pair != null && pair.Count == 2 ? Number(pair[1]) : double.NaN;
-                            if (double.IsNaN(at) || double.IsNaN(to)) { error = "Bad subtitles"; return null; }
+                            if (double.IsNaN(at) || double.IsNaN(to) || to < at) { error = "Bad subtitles"; return null; }
                             words.Add(at);
+                            ends.Add(to);
                         }
                     }
                     start = Math.Max(0, start);
                     end = Math.Min(outDuration, end);
                     if (kept.Count == 0 || end - start < 0.05) continue;
                     // the times only mean something while there is one per word of the lines
-                    if (words != null && words.Count != CountWords(kept)) words = null;
-                    row.Cues.Add(new Cue { Start = start, End = end, Lines = kept, MaxWidth = maxWidth, Words = words });
+                    if (words != null && words.Count != CountWords(kept)) words = ends = null;
+                    row.Cues.Add(new Cue { Start = start, End = end, Lines = kept, MaxWidth = maxWidth, Words = words, Ends = ends });
                 }
                 if (row.Cues.Count > 0) burn._rows.Add(row);
             }
@@ -167,6 +172,7 @@ namespace ReplayKitHelper
             style.Italic = Flag(s["italic"], style.Italic);
             style.Shadow = Flag(s["shadow"], style.Shadow);
             style.WordOn = Flag(s["wordOn"], style.WordOn);
+            style.WordFx = Pick(s["wordFx"]?.Type == JTokenType.String ? s["wordFx"].Value<string>() : null, "word", "word", "fill");
             style.Align = Pick(s["align"]?.Value<string>(), "center", "left", "center", "right");
             style.Position = Pick(s["position"]?.Value<string>(), "bottom", "bottom", "middle", "top");
             double x = Number(s["x"]), y = Number(s["y"]);
@@ -272,6 +278,32 @@ namespace ReplayKitHelper
             return sb.ToString();
         }
 
+        // the lines of a cue as ass karaoke from the time a on: the words already said are in the word colour, and each word after that sweeps from the text colour to the word colour while it is said; a slice starting partway into a word sweeps what is left of it
+        private static string FillText(Cue cue, Style style, double a)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\\1c").Append(Bgr(style.Word)).Append("\\1a").Append(AssAlpha(style.Word)).Append("\\2c").Append(Bgr(style.Color)).Append("\\2a").Append(AssAlpha(style.Color)).Append('}');
+            // karaoke times are whole centiseconds counted from the start of the line, so each one is rounded against the running total to keep the words from drifting
+            long spent = 0;
+            int word = 0;
+            for (int i = 0; i < cue.Lines.Count; i++)
+            {
+                var parts = cue.Lines[i].Split(' ');
+                for (int j = 0; j < parts.Length; j++, word++)
+                {
+                    string gap = i > 0 && j == 0 ? "\\N" : j > 0 ? " " : "";
+                    double from = cue.Words[word], to = cue.Ends[word];
+                    if (to <= a + 1e-6) { sb.Append(gap).Append(parts[j]); continue; }
+                    long wait = Math.Max(spent, (long)Math.Round((Math.Max(from, a) - a) * 100));
+                    long done = Math.Max(wait, (long)Math.Round((to - a) * 100));
+                    sb.Append("{\\k").Append(wait - spent).Append('}').Append(gap);
+                    sb.Append("{\\kf").Append(done - wait).Append('}').Append(parts[j]);
+                    spent = done;
+                }
+            }
+            return sb.ToString();
+        }
+
         // the look follows the size of the video, so a 720p and a 1440p save show the same subtitles
         // offset is added to every time, for a filter that sees the frames in the time of the source rather than of the saved clip
         public void Write(string dir, int width, int height, double offset)
@@ -299,7 +331,8 @@ namespace ReplayKitHelper
                 {
                     cuts.Add(Math.Round(cue.Start, 3));
                     cuts.Add(Math.Round(cue.End, 3));
-                    if (cue.Words != null && row.Style.WordOn)
+                    // a fill animates within one stretch by itself, so only the word that lights up needs a cut of its own
+                    if (cue.Words != null && row.Style.WordOn && row.Style.WordFx == "word")
                         foreach (var w in cue.Words) if (w > cue.Start && w < cue.End) cuts.Add(Math.Round(w, 3));
                 }
             var times = new List<double>(cuts);
@@ -402,8 +435,9 @@ namespace ReplayKitHelper
                     .Append(N(textX + ShadowOffset * k)).Append(',').Append(N(top + padY + ShadowOffset * k)).Append(")\\1c&H000000&\\3c&H000000&\\1a").Append(ShadowAlpha)
                     .Append("\\3a").Append(ShadowAlpha).Append("\\blur").Append(N(ShadowBlur * k)).Append('}').Append(Text(cue, s, -1)).Append('\n');
             }
+            bool fill = s.WordOn && s.WordFx == "fill" && cue.Words != null && cue.Ends != null;
             sb.Append("Dialogue: 2,").Append(start).Append(',').Append(end).Append(",R").Append(row.Index).Append(",,0,0,0,,{").Append(turn).Append("\\an").Append(an).Append("\\pos(")
-                .Append(N(textX)).Append(',').Append(N(top + padY)).Append(")}").Append(Text(cue, s, lit)).Append('\n');
+                .Append(N(textX)).Append(',').Append(N(top + padY)).Append(")}").Append(fill ? FillText(cue, s, a) : Text(cue, s, lit)).Append('\n');
         }
 
         // the filter reads the file by its name from the folder ffmpeg runs in, so no path has to be escaped into the filter graph; the bundled fonts sit in a folder beside it

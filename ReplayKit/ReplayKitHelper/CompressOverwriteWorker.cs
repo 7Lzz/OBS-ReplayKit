@@ -218,6 +218,8 @@ namespace ReplayKitHelper
                 }
             }
 
+            if (origLastWrite.HasValue) EditDrafts.Follow(sourcePath, preBytes, origLastWrite.Value.Ticks);
+
             // persist the compress marker so the clips listings cache check (cmp_mtime == file mtime) sees the new mode immediately -- without this the preserved mtime keeps the cache key matching, but the cached cmp_mode is stale (empty for a first-time compress), so the dock would keep showing the clip as compressable until something else invalidates the entry.
             string clipName = Path.GetFileName(sourcePath);
             long newMtimeTicks;

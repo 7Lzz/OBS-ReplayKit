@@ -245,6 +245,21 @@ namespace ReplayKitHelper
             }, sourcePath == null ? null : Path.GetDirectoryName(sourcePath));
         }
 
+        // a clip replaced by a fresh encode of an edit is no longer the compressed file, though its restored mtime would still match the cached marker
+        public static void ClearCompressed(string name, string sourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            UpdateDb(db =>
+            {
+                if (!(db[name] is JObject entry)) return false;
+                bool changed = false;
+                foreach (var k in new[] { "cmp_mode", "cmp_mtime", "cmp_ts", "cmp_pre", "cmp_ver" })
+                    changed |= entry.Remove(k);
+                if (entry.Count == 0) db.Remove(name);
+                return changed;
+            }, Path.GetDirectoryName(sourcePath));
+        }
+
         // drop the streamable link + its transcode state from a clips_db entry (the "remove link" action on a failed / unwanted upload). keeps the cmp_* compress-history fields; removes the whole entry if nothing else was on it. returns false when there was no entry to touch.
         public static bool RemoveLink(string name)
         {

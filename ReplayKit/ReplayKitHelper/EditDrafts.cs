@@ -196,6 +196,37 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException) { Log.Write("EditDrafts.Rename: " + ex.Message); }
         }
 
+        // a clip compressed in place is the same edit on a smaller file, so the draft of the version it replaced moves to the new one; a draft saved for the new file in the meantime is left as it is
+        public static void Follow(string path, long oldSize, long oldMtimeTicks)
+        {
+            try
+            {
+                ClipStore.Update(StorePath(), db =>
+                {
+                    var file = new FileInfo(path);
+                    if (!file.Exists) return false;
+                    long oldSeconds = new DateTimeOffset(new DateTime(oldMtimeTicks, DateTimeKind.Utc)).ToUnixTimeSeconds();
+                    bool changed = false;
+                    foreach (string key in new[] { Key(path), Path.GetFileName(path) })
+                    {
+                        if (!(db[key] is JObject entry)) continue;
+                        if (key != Key(path) && entry["source"] != null) continue;
+                        if (entry["size"]?.Value<long>() != oldSize) continue;
+                        if (entry["mtimeTicks"] != null ? entry["mtimeTicks"].Value<long>() != oldMtimeTicks : entry["mtime"]?.Value<long>() != oldSeconds) continue;
+                        entry["size"] = file.Length;
+                        entry["mtime"] = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds();
+                        entry["mtimeTicks"] = file.LastWriteTimeUtc.Ticks;
+                        changed = true;
+                    }
+                    return changed;
+                });
+            }
+            catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is FormatException || ex is InvalidCastException)
+            {
+                Log.Write("EditDrafts.Follow: " + ex.Message);
+            }
+        }
+
         public static void Forget(string name)
         {
             try { ClipStore.Update(StorePath(), db => Remove(db, FullPath(name))); }

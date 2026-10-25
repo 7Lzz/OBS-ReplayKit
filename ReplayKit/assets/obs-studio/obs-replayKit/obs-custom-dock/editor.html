@@ -218,6 +218,32 @@ window.__rkEditorApi = (function () {
     return { value:"source", name:(width / a) + ":" + (height / a), w:0, h:0 };
   }
 
+  // under the aspects, whether the stage around the frame is drawn black; a preference of this viewer, off unless turned on
+  const BLACK_BARS_KEY = "rk-editor-black-bars";
+  function blackBarsOn() { try { return localStorage.getItem(BLACK_BARS_KEY) === "1"; } catch (_) { return false; } }
+  function paintBlackBars() { trimVideoWrap.classList.toggle("is-barless", !blackBarsOn()); }
+  function blackBarsRow() {
+    const footer = document.createElement("div");
+    footer.className = "combo-footer";
+    const row = document.createElement("label");
+    row.className = "combo-toggle";
+    const text = document.createElement("span");
+    text.textContent = "Black bars";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "rk-switch";
+    box.checked = blackBarsOn();
+    box.setAttribute("aria-label", "Show black bars around the frame");
+    box.addEventListener("change", () => {
+      try { localStorage.setItem(BLACK_BARS_KEY, box.checked ? "1" : "0"); } catch (_) {}
+      paintBlackBars();
+    });
+    row.append(text, box);
+    footer.appendChild(row);
+    paintBlackBars();
+    return footer;
+  }
+
   // the size of the frame that is saved, in pixels of the video: the video itself, or the part of it the aspect keeps, worked out the way the helper works it out
   function editorFrameSize() {
     const sourceW = trimVideo.videoWidth || 1920, sourceH = trimVideo.videoHeight || 1080;
@@ -226,6 +252,13 @@ window.__rkEditorApi = (function () {
     return unit > 0 ? { w:unit * choice.w, h:unit * choice.h } : { w:sourceW, h:sourceH };
   }
   let frameKey = "";
+
+  // the outline of a frame of that shape, its longer side 13 of the 16 pixels of the icon box
+  function aspectIcon(w, h) {
+    const long = 13, side = Math.max(w, h);
+    const iw = Math.max(4, long * w / side), ih = Math.max(4, long * h / side);
+    return '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="' + ((16 - iw) / 2 + 0.75).toFixed(2) + '" y="' + ((16 - ih) / 2 + 0.75).toFixed(2) + '" width="' + (iw - 1.5).toFixed(2) + '" height="' + (ih - 1.5).toFixed(2) + '" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+  }
 
   function updateEditorFrame() {
     const source = sourceEditorFrame();
@@ -236,7 +269,7 @@ window.__rkEditorApi = (function () {
       const signature = options.map((item) => item.name).join("|");
       if (signature !== aspectOptions) {
         aspectOptions = signature;
-        aspectControl.setOptions(options.map((item) => ({ value:item.value, label:item.name + (item.w ? " (" + item.value + ")" : "") })));
+        aspectControl.setOptions(options.map((item) => ({ value:item.value, label:item.name, detail:item.w ? "(" + item.value + ")" : "", icon:aspectIcon(item.w || trimVideo.videoWidth || 16, item.h || trimVideo.videoHeight || 9) })));
       }
       aspectControl.value = choice.value;
       document.querySelector("#editor-aspect .combo-label").textContent = choice.name;
@@ -362,7 +395,8 @@ window.__rkEditorApi = (function () {
     },
     isOpen: () => trimVeil.classList.contains("is-open"),
     master: () => (recordingQuiet || VolumeState.muted ? 0 : VolumeState.volume),
-    onSubtitles: () => { if (editorTools) editorTools.refresh(); },
+    // the presets of subtitles light the one in use, so a change of style is drawn there too
+    onSubtitles: () => { if (editorTools) editorTools.refresh(); if (editorFx) editorFx.refresh(); },
     // the tabs on the right: which one of the video is open, and what is selected
     videoPane: () => (editorFx ? editorFx.pane() : "general"),
     onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
@@ -398,6 +432,7 @@ window.__rkEditorApi = (function () {
 
   editorTools = RKEditorTools.create({
     lanes: trimLanes,
+    subtitlePane: () => (editorFx ? editorFx.subtitlePane() : "edit"),
     helper: HELPER,
     root: document.getElementById("ed-left"),
     // the clips starred on the clips page, which the library of the editor lists first
@@ -427,6 +462,14 @@ window.__rkEditorApi = (function () {
     side: document.querySelector(".editor-side"),
     rail: document.getElementById("ed-right-rail"),
     video: trimVideo,
+    helper: HELPER,
+    // the card of a subtitle steps aside while its presets show
+    onSubtitlePane: () => { if (editorTools) editorTools.refresh(); },
+    notify: (text, kind, title) => {
+      if (kind === "bad") { showToast(escapeHtml(text), "bad", title); return; }
+      showToast(escapeHtml(text), "info");
+      scheduleToastHide(3500);
+    },
   });
   // the slide of the right panel when its last card goes. the cards are hidden by the modules that own them, so the card that went is copied as it was and stands in for it until the slide is over; a card that comes back meanwhile ends it at once
   (() => {
@@ -1646,6 +1689,8 @@ window.__rkEditorApi = (function () {
   // escape backs out of the editor (or its loading screen) from anywhere on the page, not only when focus sits inside it -- capture phase so the theater view behind it does not also close on the same key; a press that already left fullscreen (the embedded stand-in clears its element and prevents default first) is not a second press for the editor
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || e.defaultPrevented) return;
+    // a rename in progress, of a preset or of the clip, puts the old name back on escape instead
+    if (e.target && e.target.classList && e.target.classList.contains("name-edit-input")) return;
     if (!trimVeil.classList.contains("is-open") && !trimProcessingVeil.classList.contains("is-open")) return;
     if (document.fullscreenElement || document.webkitFullscreenElement) return;
     e.preventDefault();
@@ -2051,7 +2096,7 @@ window.__rkEditorApi = (function () {
   });
   trimRender.addEventListener("click", openRenderSettings);
   screenshotBtn.addEventListener("click", () => submitTrim("screenshot"));
-  aspectControl = RKCombo.bind(document.getElementById("editor-aspect"), (value) => trimLanes.aspect(value === sourceEditorFrame().value ? "original" : value), { menuKeys:true, signal:EDITOR_SIGNAL });
+  aspectControl = RKCombo.bind(document.getElementById("editor-aspect"), (value) => trimLanes.aspect(value === sourceEditorFrame().value ? "original" : value), { menuKeys:true, signal:EDITOR_SIGNAL, footer:blackBarsRow() });
   updateEditorFrame();
   const frameObserver = new ResizeObserver(updateEditorFrame);
   frameObserver.observe(trimVideoWrap);
@@ -2066,11 +2111,11 @@ window.__rkEditorApi = (function () {
     quickActions() {
       return [
         { id:"exit", label:"Exit editor", icon:"quick/exit", disabled:!!trimSaving },
-        { id:"undo", label:"Undo", icon:"editor/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
-        { id:"redo", label:"Redo", icon:"editor/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
+        { id:"undo", label:"Undo", icon:"quick/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
+        { id:"redo", label:"Redo", icon:"quick/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
         { id:"screenshot", label:"Screenshot this frame", icon:"quick/screenshot", disabled:screenshotBtn.disabled },
-        { id:"render", label:"Render video", icon:"action/open-editor", disabled:trimRender.disabled },
-        { id:"import", label:"Import audio", icon:"editor/import-audio", disabled:!!trimSaving || trimLanes.busy() },
+        { id:"render", label:"Render video", icon:"quick/render", disabled:trimRender.disabled },
+        { id:"import", label:"Import audio", icon:"quick/import-audio", disabled:!!trimSaving || trimLanes.busy() },
       ];
     },
     quickAction(id) {

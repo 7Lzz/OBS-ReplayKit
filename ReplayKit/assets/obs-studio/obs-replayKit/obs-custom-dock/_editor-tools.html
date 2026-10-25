@@ -52,7 +52,7 @@
   .ed-status { font-size: 12px; color: var(--text_muted); margin: 8px 0 0; }
   .ed-status:empty { display: none; }
   .ed-tools .btn, .ed-sub-edit .btn { width: 100%; height: 32px; gap: 6px; }
-  .ed-tools .btn svg, .ed-sub-edit .btn svg { width: 15px; height: 15px; fill: currentColor; }
+  .ed-tools .btn svg, .ed-sub-edit .btn svg { width: 14px; height: 14px; fill: currentColor; }
   .ed-progress { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 12px; color: var(--text); }
   .ed-progress[hidden] { display: none; }
   .ed-progress > span { flex: 0 0 auto; }
@@ -86,6 +86,8 @@
   .ed-gen { position: relative; overflow: hidden; }
   .ed-gen-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--primary); opacity: 0; transition: width 400ms linear, opacity 120ms linear; pointer-events: none; }
   .ed-gen-label { position: relative; z-index: 1; font-variant-numeric: tabular-nums; }
+  .ed-gen-icon { position: relative; z-index: 1; display: inline-flex; }
+  .ed-gen.is-working .ed-gen-icon { display: none; }
   .ed-gen-cancel { position: absolute; z-index: 2; right: 6px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 4px; display: none; place-items: center; color: var(--on-accent); }
   .ed-gen-cancel:hover { background: rgba(0, 0, 0, .25); }
   .ed-gen-cancel svg { width: 12px; height: 12px; fill: currentColor; }
@@ -219,7 +221,10 @@
   .sub-rot::after { content: ""; position: absolute; left: 50%; top: 10px; width: 1px; height: 14px; margin-left: -.5px; background: rgba(255, 255, 255, .7); pointer-events: none; }
   .sub-cue:hover .sub-rot, .sub-overlay.is-dragging .sub-rot { opacity: 1; }
   .sub-line { display: inline-block; white-space: pre; max-width: 100%; box-sizing: border-box; }
-  .sub-line .sub-word.is-on { color: var(--sub-word); }
+  .sub-line .sub-word.is-on, .sub-line .sub-word.is-done { color: var(--sub-word); }
+  /* the fill: the word drawn again in the word colour on top, cut off where the sweep has reached */
+  .sub-line.is-fill .sub-word { display: inline-block; position: relative; }
+  .sub-line .sub-word.is-filling::after { content: attr(data-text); position: absolute; left: 0; top: 0; color: var(--sub-word); text-shadow: none; white-space: pre; pointer-events: none; clip-path: inset(0 calc(100% - var(--fill, 0%)) 0 0); }
 </style>
 <script>
 (function () {
@@ -386,7 +391,7 @@
   function icon(name) { return (window.RK_ICONS && window.RK_ICONS[name]) || ""; }
   function hovers(root) { if (window.RKHover) RKHover.apply(root, HOVERS); }
   function loadPrefs() {
-    var d = { tab: "subtitles", open: false, language: "auto", length: "normal", hear: false, mic: "", shapeColor: "#ffffff" };
+    var d = { tab: "subtitles", open: false, language: "auto", length: "normal", accuracy: "accurate", hear: false, mic: "", shapeColor: "#ffffff" };
     // every edit starts with no panel open and white shapes, so the panel open last and the shape colour are not read back
     try { var p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); Object.keys(d).forEach(function (k) { if (k !== "tab" && k !== "open" && k !== "shapeColor" && typeof p[k] === typeof d[k]) d[k] = p[k]; }); } catch (_) {}
     return d;
@@ -411,32 +416,53 @@
   }
 
   // words of the speech engine to cues: a cue ends at a pause, at the end of a sentence, or once it would be too long to read; what the engine writes for sounds that are not words ([music], (laughs)) is left out. every cue keeps the times of its words, one per word of its text, for the word that lights up as it is spoken
-  function groupWords(words, mapTime, length) {
+  function groupWords(words, mapTime, length, alternatives) {
     var lim = LENGTHS[length] || LENGTHS.normal;
     var cues = [];
     var cur = null;
-    words.forEach(function (w) {
+    var timed = [];
+    (Array.isArray(words) ? words : []).forEach(function (w) {
+      if (!Array.isArray(w) || w.length < 3 || !Number.isFinite(w[0]) || !Number.isFinite(w[1]) || w[1] < w[0]) return;
       var text = String(w[2] || "").trim();
-      if (!text || /^[\[(].*[\])]$/.test(text) || /\s/.test(text)) return;
-      var a = mapTime(w[0]);
-      var b = mapTime(w[1]);
-      if (a == null || b == null) return;
-      if (b < a) b = a;
-      if (cur && (a - cur.end > 0.7 || cur.text.length + 1 + text.length > lim.chars || b - cur.at > lim.dur || /[.?!]$/.test(cur.text))) {
+      if (!text || /^[\[(].*[\])]$/.test(text)) return;
+      var parts = text.match(/\S+/g) || [];
+      var total = parts.reduce(function (sum, part) { return sum + part.length; }, 0);
+      var offset = 0;
+      parts.forEach(function (part) {
+        var a = mapTime(w[0] + (w[1] - w[0]) * offset / total);
+        offset += part.length;
+        var b = mapTime(w[0] + (w[1] - w[0]) * offset / total);
+        if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return;
+        timed.push([a, Math.min(b, a + Math.max(3, lim.dur)), part, typeof w[3] === "number" && w[3] > 0 ? w[3] : 0]);
+      });
+    });
+    timed.sort(function (a, b) { return a[0] - b[0]; });
+    timed.forEach(function (w) {
+      var a = w[0], b = w[1], text = w[2];
+      // the words of a stretch the engine was unsure of make cues of their own, so one guess does not mark a whole sentence for checking
+      if (cur && (a - cur.end > 0.7 || cur.text.length + 1 + text.length > lim.chars || b - cur.at > lim.dur || /[.?!]$/.test(cur.text) || cur.stretch !== w[3])) {
         cues.push(cur);
         cur = null;
       }
-      if (!cur) cur = { at: a, end: b, text: text, words: [[a, b]] };
+      if (!cur) cur = { at: a, end: b, text: text, words: [[a, b]], stretch: w[3], unsure: w[3] > 0 };
       else { cur.text += " " + text; cur.end = b; cur.words.push([a, b]); }
     });
     if (cur) cues.push(cur);
+    // what else an unsure stretch might have been is offered on its cue, when one cue holds the whole stretch
+    cues.forEach(function (c) {
+      if (!c.unsure) return;
+      var whole = cues.filter(function (o) { return o.stretch === c.stretch; }).length === 1;
+      var offers = alternatives && Array.isArray(alternatives[String(c.stretch)]) ? alternatives[String(c.stretch)] : [];
+      c.alts = whole ? offers.filter(function (s) { return typeof s === "string" && s.trim(); }).slice(0, 3) : [];
+    });
     // a cue stays up long enough to be read, without running into the next one
     cues.forEach(function (c, i) {
       var next = cues[i + 1];
       var want = c.at + Math.max(0.6, Math.min(lim.dur, c.text.length * 0.06));
       var limit = next ? next.at - 0.02 : Infinity;
-      c.end = Math.max(c.end, Math.min(want, limit));
-      if (c.end - c.at < 0.2) c.end = c.at + 0.2;
+      var duration = Math.max(lim.dur, Math.max.apply(null, c.words.map(function (w) { return w[1] - w[0]; })));
+      c.end = Math.max(c.at, Math.min(c.at + duration, limit, Math.max(c.end, want)));
+      c.words = c.words.map(function (w) { return [Math.max(c.at, Math.min(c.end, w[0])), Math.max(c.at, Math.min(c.end, w[1]))]; });
     });
     return cues;
   }
@@ -477,7 +503,7 @@
     return out;
   }
 
-  function makeCombo(onPick, onPreview) {
+  function makeCombo(onPick, onPreview, extra) {
     var wrap = el("div", "combo");
     wrap.setAttribute("role", "combobox");
     wrap.setAttribute("aria-expanded", "false");
@@ -491,7 +517,7 @@
     var menu = el("div", "combo-menu");
     menu.setAttribute("role", "listbox");
     wrap.append(button, menu);
-    var control = RKCombo.bind(wrap, onPick, { menuKeys:true, preview:onPreview, signal:EDITOR_SIGNAL });
+    var control = RKCombo.bind(wrap, onPick, Object.assign({ menuKeys:true, preview:onPreview, signal:EDITOR_SIGNAL }, extra));
     wrap.setOptions = function (list, value) {
       control.setOptions(list.map(function (entry) {
         return { value:entry[0], label:entry[1], font:entry[2] || "", description:entry[3] || "" };
@@ -659,21 +685,38 @@
       els.lang = makeCombo(function (v) { prefs.language = v; savePrefs(); });
       els.lang.setOptions(LANGUAGES, prefs.language);
       auto.appendChild(row("Language", els.lang));
-      els.listen = makeCombo(function () {});
-      els.listenRow = row("Listen to", els.listen, "Pick one audio track when the voice is hard to hear over the game. Clicking a track on the timeline picks it here too.");
+      // several tracks can be listened to together, such as discord and the microphone without the game; all audio stands alone
+      els.listen = makeCombo(function () {}, null, { multi: true, only: ["0"] });
+      els.listenRow = row("Listen to", els.listen, "Pick the tracks with the voices, so the game is left out when it drowns them. Selecting an audio track picks it here; selecting the video uses all audio.");
       auto.appendChild(els.listenRow);
       els.length = picker([["short", "Short"], ["normal", "Normal"], ["long", "Long"]], prefs.length, function (v) { prefs.length = v; savePrefs(); els.length.paint(v); });
       auto.appendChild(row("Length", els.length, "How many words show at once."));
+      if (prefs.accuracy !== "fast") prefs.accuracy = "accurate";
+      // the note says what the picked one does, the way the choices of settings explain themselves
+      var ACCURACY_NOTES = { fast: "Finishes sooner, which helps on slower PCs, but mishears more words.", accurate: "Hears speech best and times the words most closely. Takes longer on slower PCs." };
+      els.accuracy = picker([["fast", "Fast"], ["accurate", "Accurate"]], prefs.accuracy, function (v) {
+        prefs.accuracy = v;
+        savePrefs();
+        els.accuracy.paint(v);
+        els.accuracyNote.textContent = ACCURACY_NOTES[v];
+      });
+      var accuracyRow = row("Accuracy", els.accuracy, ACCURACY_NOTES[prefs.accuracy]);
+      els.accuracyNote = accuracyRow.querySelector(".control-note");
+      auto.appendChild(accuracyRow);
       els.generate = el("button", "btn primary ed-gen");
       els.generate.type = "button";
       els.genFill = el("span", "ed-gen-fill");
       els.genLabel = el("span", "ed-gen-label", "Generate subtitles");
+      // the button carries the icon of the choice that led to it, like the add buttons of the other tools
+      var genIcon = el("span", "ed-gen-icon");
+      genIcon.innerHTML = SPARKLE_ICON;
       els.genCancel = el("span", "ed-gen-cancel");
       els.genCancel.setAttribute("role", "button");
       els.genCancel.setAttribute("aria-label", "Stop generating");
       els.genCancel.dataset.tooltip = "Stop";
       els.genCancel.innerHTML = icon("editor/close");
       els.generate.appendChild(els.genFill);
+      els.generate.appendChild(genIcon);
       els.generate.appendChild(els.genLabel);
       els.generate.appendChild(els.genCancel);
       els.generate.addEventListener("click", function (e) {
@@ -685,8 +728,10 @@
       auto.appendChild(els.autoStatus);
 
       var manual = els.views.manual;
-      els.add = el("button", "btn primary", "Add subtitle");
+      els.add = el("button", "btn primary");
       els.add.type = "button";
+      els.add.innerHTML = icon("action/edit");
+      els.add.appendChild(document.createTextNode("Add subtitle"));
       els.add.addEventListener("click", addManual);
       manual.appendChild(els.add);
       manual.appendChild(el("p", "ed-status", "Each one is added at the playhead in a row of its own. Click it on the timeline to edit it on the right."));
@@ -868,6 +913,7 @@
       pickRow.appendChild(els.subPickRow);
       card.appendChild(pickRow);
 
+
       var text = section("Text");
       els.textSec = text;
       els.subText = el("textarea", "ed-sub-text");
@@ -926,12 +972,15 @@
       });
       typo.appendChild(row("Alignment", aligns));
       els.position = picker([["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]], "bottom", function (v) { writeStyle({ position: v, x: null, y: null }); });
-      typo.appendChild(row("Position", els.position, "Drag a subtitle on the video to place it anywhere. It snaps to the edges and the middle, hold Shift to place it freely. Picking a position here puts it back."));
+      typo.appendChild(row("Position", els.position));
       card.appendChild(typo);
 
-      var word = section("Spoken word", "Colours each word while it is said. Works on subtitles made with Auto subtitles, and stays as long as a subtitle keeps the same number of words.");
+      var word = section("Spoken word", "Colours each word while it is said.");
       els.wordOn = switchRow("Highlight the word being said", function (on) { writeStyle({ wordOn: on }); });
       word.appendChild(els.wordOn);
+      els.wordFx = picker([["word", "Word"], ["fill", "Fill"]], "word", function (v) { writeStyle({ wordFx: v }); });
+      els.wordFxRow = row("Animation", els.wordFx, "Word lights up one word at a time. Fill sweeps the colour through the words as they are said.");
+      word.appendChild(els.wordFxRow);
       els.word = colorField("word", "Word color");
       els.wordRow = row("Color", els.word);
       word.appendChild(els.wordRow);
@@ -1699,6 +1748,8 @@
       var id = subs.selected();
       var i = list.findIndex(function (c) { return c.id === id; });
       var cue = list[i];
+      // the presets of subtitles, or the list of words to check, take the place of this card while their tab is picked
+      if (cue && o.subtitlePane && o.subtitlePane() !== "edit") cue = null;
       if (editing && editing !== id) { clearTimeout(textTimer); subs.checkpoint(); }
       editing = cue ? cue.id : "";
       editRow = cue ? cue.row : "";
@@ -1741,11 +1792,11 @@
       els.italic.classList.toggle("is-active", s.italic);
       els.aligns.forEach(function (b) { b.classList.toggle("is-active", b.dataset.value === s.align); });
       els.position.paint(s.x != null ? "" : s.position);
-      // only a row the speech engine made knows when each word is said
-      els.wordSec.hidden = !r.auto;
       els.wordOn.input.checked = s.wordOn;
       els.word.show(s.word);
       els.wordRow.classList.toggle("is-off", !s.wordOn);
+      els.wordFx.paint(s.wordFx);
+      els.wordFxRow.classList.toggle("is-off", !s.wordOn);
       els.borderColor.show(s.borderColor);
       els.borderWidth.show(s.borderWidth);
       els.bg.show(s.bg);
@@ -1804,11 +1855,12 @@
       job.busy = true;
       refresh();
       setProgress("Getting ready", 0);
-      helperJson("/speech/status").then(function (st) {
+      var model = prefs.accuracy;
+      helperJson("/speech/status?model=" + model).then(function (st) {
         if (run !== job.run) return null;
-        if (st.installed) return transcribe(run);
-        // the first time the engine and its model are fetched, which the progress says
-        return helperJson("/speech/install", "POST").then(function () { return waitInstall(run); });
+        if (st.installed) return transcribe(run, model);
+        // the first time the engine and the model of the chosen accuracy are fetched, which the progress says
+        return helperJson("/speech/install?model=" + model, "POST").then(function () { return waitInstall(run, model); });
       }).catch(function (err) {
         if (run !== job.run) return;
         endJob();
@@ -1816,26 +1868,26 @@
       });
     }
 
-    function waitInstall(run) {
-      return helperJson("/speech/status").then(function (st) {
+    function waitInstall(run, model) {
+      return helperJson("/speech/status?model=" + model).then(function (st) {
         if (run !== job.run) return null;
-        if (st.installed) return transcribe(run);
+        if (st.installed) return transcribe(run, model);
         if (!st.installing) throw new Error(st.error || "The speech engine could not be downloaded.");
         setProgress("Downloading " + st.downloadMb + " MB", st.percent);
-        return new Promise(function (resolve, reject) { poll(function () { waitInstall(run).then(resolve, reject); }, 500); });
+        return new Promise(function (resolve, reject) { poll(function () { waitInstall(run, model).then(resolve, reject); }, 500); });
       });
     }
 
-    function transcribe(run) {
+    function transcribe(run, model) {
       var range = subs.sourceRange();
-      var track = els.listenRow.hidden ? "0" : els.listen.value() || "0";
-      var opt = (clip.tracks || []).find(function (t) { return String(t.index) === track; });
-      var title = track === "0" || !opt ? "Subtitles" : opt.label;
-      // about a tenth of a second for every second of audio on a usual processor, never under four
+      var tracks = els.listenRow.hidden ? "0" : els.listen.value() || "0";
+      var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? t.label : ""; });
+      var title = tracks === "0" || names.indexOf("") >= 0 ? "Subtitles" : names.join(" + ");
+      // a guess at how long listening takes until the engine reports, from a two minute clip taking about 5 seconds on fast and 19 on accurate
       job.listenAt = performance.now();
-      job.listenTau = Math.max(4, (range.end - range.start) * 0.08);
+      job.listenTau = Math.max(4, (range.end - range.start) * (model === "fast" ? 0.05 : 0.17));
       setProgress("Listening", 0);
-      return helperJson("/speech/transcribe?file=" + encodeURIComponent(clip.name) + "&start=" + range.start.toFixed(3) + "&end=" + range.end.toFixed(3) + "&track=" + encodeURIComponent(track) + "&language=" + encodeURIComponent(els.lang.value()), "POST")
+      return helperJson("/speech/transcribe?file=" + encodeURIComponent(clip.name) + "&start=" + range.start.toFixed(3) + "&end=" + range.end.toFixed(3) + "&tracks=" + encodeURIComponent(tracks) + "&language=" + encodeURIComponent(els.lang.value()) + "&model=" + model, "POST")
         .then(function (started) {
           if (run !== job.run) { helperJson("/speech/cancel?id=" + encodeURIComponent(started.id), "POST").catch(function () {}); return null; }
           job.id = started.id;
@@ -1848,16 +1900,22 @@
         if (run !== job.run) return null;
         if (j.state === "error") throw new Error(j.message || "The clip could not be listened to.");
         if (j.state !== "done") {
-          setProgress(j.state === "preparing" || j.state === "queued" ? "Getting the audio" : "Listening", j.percent);
+          setProgress(j.state === "preparing" || j.state === "queued" ? "Getting the audio" : j.state === "checking" ? "Checking unclear words" : "Listening", j.percent);
           return new Promise(function (resolve, reject) { poll(function () { waitJob(run, title).then(resolve, reject); }, 400); });
         }
-        var cues = groupWords(j.words || [], function (t) { return subs.sourceToTimeline(t); }, prefs.length);
+        var cues = groupWords(j.words || [], function (t) { return subs.sourceToTimeline(t); }, prefs.length, j.alternatives);
         endJob();
-        if (!cues.length || !subs.addRow(title, cues)) {
+        var rowId = cues.length ? subs.addRow(title, cues) : "";
+        if (!rowId) {
           o.notify("No speech was found in this part of the clip.", "info");
           return null;
         }
-        o.notify(cues.length + " subtitles added in a new row. Undo takes them back.", "info");
+        // the new subtitles come in selected, the first one shown, so their style can be set for all of them at once
+        var made = subs.list().filter(function (c) { return c.row === rowId; });
+        if (made.length) { subs.select(made[0].id); subs.pickRow(rowId); }
+        var unsure = cues.filter(function (c) { return c.unsure; }).length;
+        var check = unsure === 1 ? " One might be misheard. It is marked in orange; select it and open Check on the right." : unsure > 1 ? " " + unsure + " might be misheard. They are marked in orange; select them and open Check on the right." : "";
+        o.notify(cues.length + " subtitles added in a new row. Undo takes them back." + check + (j.warning ? " " + j.warning : ""), "info");
         return null;
       });
     }

@@ -11,6 +11,8 @@
     transform: scale(max(var(--press_shrink, .97), var(--rk-press-limit, .97)));
   }
   .rk-hover-control:focus-visible { outline: 2px solid var(--primary_light, var(--primary)); outline-offset: 2px; }
+  /* a control clicked with the mouse never shows the ring of keyboard focus, even once a key like space is pressed on it; the ring is for moving through the page with tab */
+  html[data-rk-input="pointer"] :focus-visible { outline: none !important; }
 
   .rk-hover-row { transition: background-color 90ms linear, color 90ms linear, padding-left var(--anim_press, 120ms) var(--ease_pop, ease); }
   .rk-hover-row:not(.is-disabled):hover { background: var(--button_bg_hover); padding-left: calc(var(--rk-row-padding, 14px) + 2px); }
@@ -36,6 +38,13 @@
   }
 </style>
 <script>
+  // the last way the page was moved through: a press of the mouse, or tab
+  (function () {
+    var root = document.documentElement;
+    root.dataset.rkInput = "pointer";
+    document.addEventListener("pointerdown", function () { root.dataset.rkInput = "pointer"; }, true);
+    document.addEventListener("keydown", function (e) { if (e.key === "Tab") root.dataset.rkInput = "keyboard"; }, true);
+  })();
 (function () {
   var profiles = ["control", "overlay", "row", "accent", "danger", "nav", "card", "surface"];
   var observed = new WeakSet();

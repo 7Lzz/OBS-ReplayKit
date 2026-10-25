@@ -284,7 +284,7 @@
       </div>
       <div id="recordingAdvanced" hidden>
         <div class="form-row">
-          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on.</span></div>
+          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Disk uses very little RAM and writes to your drive while clipping is on. Memory saves clips fastest but uses more RAM, and can help if Disk causes problems.</span></div>
           <div class="field-wrap">
             <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false" aria-label="Recording buffer"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
           </div>
@@ -451,7 +451,7 @@
     clipDir: "",
     recordingPreset: "balanced",
     captureDisplay: "primary",
-    recordingBuffer: "recommended",
+    recordingBuffer: "disk",
     replaySeconds: 90,
     clipKeybind: clone(DEFAULT_CLIP_KEYBIND),
     recordingKeybind: {},
@@ -546,7 +546,7 @@
   document.addEventListener("click", () => closeCombos());
   els.recordingPreset.addEventListener("combochange", () => { state.recordingPreset = comboValue(els.recordingPreset); });
   els.captureDisplay.addEventListener("combochange", () => { state.captureDisplay = comboValue(els.captureDisplay) || "primary"; });
-  els.recordingBuffer.addEventListener("combochange", () => { state.recordingBuffer = comboValue(els.recordingBuffer) || "recommended"; });
+  els.recordingBuffer.addEventListener("combochange", () => { state.recordingBuffer = comboValue(els.recordingBuffer) || "disk"; });
   els.toggleAdvanced.addEventListener("click", () => {
     const open = els.recordingAdvanced.hidden;
     els.recordingAdvanced.hidden = !open;
@@ -850,7 +850,7 @@
     setComboValue(els.recordingPreset, state.recordingPreset, false);
     fillCombo(els.captureDisplay, opts.captureDisplays || [{ value:"primary", label:"Primary display" }]);
     setComboValue(els.captureDisplay, state.captureDisplay, false);
-    fillCombo(els.recordingBuffer, opts.recordingBuffers || [{ value:"recommended", label:"Recommended" }, { value:"disk", label:"Disk" }, { value:"memory", label:"Memory" }]);
+    fillCombo(els.recordingBuffer, opts.recordingBuffers || [{ value:"disk", label:"Disk" }, { value:"memory", label:"Memory" }]);
     setComboValue(els.recordingBuffer, state.recordingBuffer, false);
 
     els.clipDir.value = state.clipDir;

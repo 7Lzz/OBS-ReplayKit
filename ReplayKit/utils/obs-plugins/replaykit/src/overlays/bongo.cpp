@@ -90,7 +90,23 @@ struct Settings {
 	double x = 0, y = 0.02, scale = 1.83, delay = 1;
 	int width = 1280, height = 768;
 	bool breath = true, eyeBlink = true, track = true, live2d = true, relative = false, horizontalFlip = true, verticalFlip = true, mask = false;
+	// the virtual key of each key slot of the mode, 0 where the mode keeps its own; ReplayKit writes them as a comma list in keys
+	std::vector<int> keys;
 };
+
+std::vector<int> ParseKeys(const char *text)
+{
+	std::vector<int> out;
+	for (const QString &part : QString::fromUtf8(text ? text : "").split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+		bool ok = false;
+		const int vk = part.trimmed().toInt(&ok);
+		// a key past what windows numbers, or any slot past what a mode could have, is left at the default of the mode
+		out.push_back(ok && vk > 0 && vk < 256 ? vk : 0);
+		if (out.size() >= 32)
+			break;
+	}
+	return out;
+}
 
 QString BangoCatFolder()
 {
@@ -210,6 +226,9 @@ struct Bongo {
 	size_t current = 0;
 	size_t currentFace = 0;
 	std::array<bool, KeyDefine.size()> pressed{};
+	// whether each key slot of the current mode is held, for the slots bound to a key of their own; their order is the order of KeyDefine, the virtual key after it for keys it does not name
+	std::vector<bool> slotDown;
+	std::vector<int> slotOrder;
 	// relative mouse is the plugins window of one screen around the accumulated raw motion, which is the same as a position clamped to the screen that starts in the middle
 	float mouseX = 0.5f, mouseY = 0.5f;
 	bool relativeBefore = false;
@@ -275,6 +294,7 @@ struct Bongo {
 		next.horizontalFlip = obs_data_get_bool(data, "mouse_horizontal_flip");
 		next.verticalFlip = obs_data_get_bool(data, "mouse_vertical_flip");
 		next.mask = obs_data_get_bool(data, "mask");
+		next.keys = ParseKeys(obs_data_get_string(data, "keys"));
 		std::lock_guard<std::mutex> guard(settingsLock);
 		settings = next;
 	}
@@ -285,14 +305,47 @@ struct Bongo {
 		return settings;
 	}
 
-	// View::TranslateKey: where a KeyDefine key sits in the KeyUse list of the mode
-	int TranslateKey(const Mode &mode, size_t key) const
+	// the key slots that are held, in the order View::Render visits them: KeyDefine order, which is View::TranslateKey run over every KeyDefine key when no slot has a key of its own
+	std::vector<int> HeldSlots() const
 	{
-		for (size_t j = 0; j < mode.keyUse.size(); ++j) {
-			if (mode.keyUse[j] == int(key))
-				return int(j);
+		std::vector<int> held;
+		for (int slot : slotOrder) {
+			if (slot < int(slotDown.size()) && slotDown[slot])
+				held.push_back(slot);
 		}
-		return -1;
+		return held;
+	}
+
+	// the virtual key of each slot and where it falls in KeyDefine order; a slot bound to a key KeyDefine does not name sorts after all of them by its virtual key
+	void ReadSlots(const Mode &mode, const Settings &now)
+	{
+		const size_t count = mode.keyUse.size();
+		std::vector<std::pair<int, int>> order;
+		slotDown.assign(count, false);
+		for (size_t j = 0; j < count; ++j) {
+			const int custom = j < now.keys.size() ? now.keys[j] : 0;
+			int vk = 0, rank = -1;
+			if (custom > 0) {
+				vk = custom;
+				for (size_t i = 0; i < KeyDefine.size() && rank < 0; ++i) {
+					if (KeyDefine[i].vk == custom)
+						rank = int(i);
+				}
+				if (rank < 0)
+					rank = int(KeyDefine.size()) + custom;
+			} else if (mode.keyUse[j] >= 0) {
+				vk = KeyDefine[size_t(mode.keyUse[j])].vk;
+				rank = mode.keyUse[j];
+			}
+			if (vk == 0)
+				continue;
+			slotDown[j] = (GetAsyncKeyState(vk) & 0x8000) != 0;
+			order.emplace_back(rank, int(j));
+		}
+		std::stable_sort(order.begin(), order.end());
+		slotOrder.clear();
+		for (const auto &entry : order)
+			slotOrder.push_back(entry.second);
 	}
 
 	void Tick(float seconds)
@@ -353,6 +406,7 @@ struct Bongo {
 
 		// Model::Update runs its clocks at delta * speed and only for the models that are drawn
 		Mode &mode = *modes[current];
+		ReadSlots(mode, now);
 		const double delta = double(seconds) * now.delay;
 		if (now.live2d && mode.hasModel && mode.cat)
 			mode.cat->animation.Tick(delta);
@@ -414,19 +468,16 @@ struct Bongo {
 		gs_matrix_translate3f(0.0f, float(now.height) - FrameHeight, 0.0f);
 
 		Draw(image, opacity, now.live2d && mode.hasModel ? mode.back.get() : mode.catBack.get());
-		for (size_t i = 0; i < KeyDefine.size(); ++i) {
-			const int key = pressed[i] ? TranslateKey(mode, i) : -1;
-			if (key >= 0)
-				Draw(image, opacity, mode.keys[key].get());
-		}
+		const std::vector<int> held = HeldSlots();
+		for (int key : held)
+			Draw(image, opacity, mode.keys[size_t(key)].get());
 		if (now.live2d && mode.hasModel)
 			DrawModel(mode.cat.get(), now);
 
 		bool leftUp = true, rightUp = true;
 		if (!mode.leftHands.empty()) {
-			for (size_t i = 0; i < KeyDefine.size(); ++i) {
-				const int key = pressed[i] ? TranslateKey(mode, i) : -1;
-				if (key >= 0 && key < int(mode.leftHands.size())) {
+			for (int key : held) {
+				if (key < int(mode.leftHands.size())) {
 					Draw(image, opacity, mode.leftHands[key].get());
 					leftUp = false;
 					break;
@@ -440,8 +491,8 @@ struct Bongo {
 			leftUp = false;
 		}
 		if (!mode.rightHands.empty()) {
-			for (size_t i = 0; i < KeyDefine.size(); ++i) {
-				const int key = pressed[i] ? TranslateKey(mode, i) - int(mode.leftHands.size()) : -1;
+			for (int slot : held) {
+				const int key = slot - int(mode.leftHands.size());
 				if (key >= 0 && key < int(mode.rightHands.size())) {
 					Draw(image, opacity, mode.rightHands[key].get());
 					rightUp = false;

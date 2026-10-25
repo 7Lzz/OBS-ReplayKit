@@ -1,4 +1,4 @@
-<!-- shared partial (helper #include target: live2d-bongo). RKBongo draws the bongo cat source of replaykit.dll into one canvas for the overlay preview: the Bango Cat folder of obs as /bongo-cat/manifest describes it (modes, pictures, models), the baked models of overlay-preview/bongo-models, and the layers and parameters of the obs source with the settings ReplayKit gives it (Live2D on, no mask, scale 1.83 at x 0, y 0.02). webgl, or canvas2d when webgl is missing. host: RKBongo.mount(canvas) -> promise, then .setMode(name) / .setKey(code, down) / .clearKeys() / .setInput(x, y, left, right) / .start() / .stop(). -->
+<!-- shared partial (helper #include target: live2d-bongo). RKBongo draws the bongo cat source of replaykit.dll into one canvas for the overlay preview: the Bango Cat folder of obs as /bongo-cat/manifest describes it (modes, pictures, models), the baked models of overlay-preview/bongo-models, and the layers and parameters of the obs source with the settings ReplayKit gives it (Live2D, head tracking, breathing and blinking as the settings pick, no mask, scale 1.83 at x 0, y 0.02). webgl, or canvas2d when webgl is missing. host: RKBongo.mount(canvas) -> promise, then .setMode(name) / .setKey(code, down) / .setKeys(map) / .setLook(settings) / .clearKeys() / .setInput(x, y, left, right) / .start() / .stop(). -->
 <script>
 (function () {
   var HELPER = location.protocol === "http:" ? location.origin : "http://127.0.0.1:8767";
@@ -17,6 +17,10 @@
   var canvas = null, gl = null, ctx = null, program = null, loc = {}, quad = null;
   var manifest = null, modes = {}, current = null, wanted = "standard";
   var pressed = new Set(), mouse = { x: 0.5, y: 0.5, left: false, right: false };
+  // the keys each mode was given in place of its own, KeyboardEvent.code per key of the mode ("" keeps its own), and the codes that are held
+  var custom = {}, heldCodes = new Set();
+  // the bongo cat settings the source is given: the animated cat or the flat drawing, the head following the mouse, breathing, blinking and the speed of its clocks
+  var look = { live2d: true, track: true, breath: true, blink: true, speed: 1 };
   var running = false, frame = 0, lastFrame = 0, mounted = null;
 
   function fetchJson(url) {
@@ -79,13 +83,16 @@
       rightFolder ? loadImage(at(rightFolder, c.RightHandUpImageName)) : null,
       rightFolder ? many(rightFolder, c.RightHandImageName) : [],
       loadModel(entry.cat),
+      loadModel(entry.left),
+      loadModel(entry.right),
     ]).then(function (got) {
       return {
         name: entry.name, hasModel: !!c.HasModel,
         back: texture(got[0]), catBack: texture(got[1]), keys: got[2].map(texture),
         keyUse: (c.KeyUse || []).slice(0, keyCount).map(function (name) { return KEY_DEFINE.indexOf(name); }),
         leftUp: texture(got[3]), leftHands: got[4].map(texture), rightUp: texture(got[5]), rightHands: got[6].map(texture),
-        cat: got[7],
+        cat: got[7], leftModel: got[8], rightModel: got[9],
+        hasLeftHandModel: !!c.ModelHasLeftHandModel, hasRightHandModel: !!c.ModelHasRightHandModel,
       };
     });
   }
@@ -107,13 +114,17 @@
     function set(i, value) { if (i >= 0) v[i] = Math.max(params[i].min, Math.min(params[i].max, value)); }
     function add(id, value) { var i = index(id); if (i >= 0) set(i, v[i] + value); }
     var x = mouse.x, y = mouse.y, t = model.time * 2 * 3.14159;
-    model.blinkIds.forEach(function (id) { set(index(id), model.eye); });
-    add("ParamAngleX", (1 - x) * 30); add("ParamAngleY", (1 - y) * 30); add("ParamAngleZ", (1 - x) * (1 - y) * -30);
-    add("ParamEyeBallX", (1 - x) * 30); add("ParamEyeBallY", (1 - y) * 30);
+    if (look.blink) model.blinkIds.forEach(function (id) { set(index(id), model.eye); });
+    if (look.track) {
+      add("ParamAngleX", (1 - x) * 30); add("ParamAngleY", (1 - y) * 30); add("ParamAngleZ", (1 - x) * (1 - y) * -30);
+      add("ParamEyeBallX", (1 - x) * 30); add("ParamEyeBallY", (1 - y) * 30);
+    }
     add("ParamMouseX", x * 60 - 30); add("ParamMouseY", (1 - y) * 60 - 30);
     add("ParamMouseRightDown", mouse.right ? 1 : 0); add("ParamMouseLeftDown", mouse.left ? 1 : 0);
-    add("ParamAngleX", 0.5 * 15 * Math.sin(t / 6.5345)); add("ParamAngleY", 0.5 * 8 * Math.sin(t / 3.5345)); add("ParamAngleZ", 0.5 * 10 * Math.sin(t / 5.5345));
-    add("ParamBodyAngleX", 0.5 * 4 * Math.sin(t / 15.5345)); add("ParamBreath", 0.5 * (0.5 + 0.5 * Math.sin(t / 3.2345)));
+    if (look.breath) {
+      add("ParamAngleX", 0.5 * 15 * Math.sin(t / 6.5345)); add("ParamAngleY", 0.5 * 8 * Math.sin(t / 3.5345)); add("ParamAngleZ", 0.5 * 10 * Math.sin(t / 5.5345));
+      add("ParamBodyAngleX", 0.5 * 4 * Math.sin(t / 15.5345)); add("ParamBreath", 0.5 * (0.5 + 0.5 * Math.sin(t / 3.2345)));
+    }
     return v;
   }
   // CubismEyeBlink with its defaults
@@ -238,7 +249,11 @@
     if (!running || !current) return;
     var seconds = lastFrame ? (now - lastFrame) / 1000 : 0; lastFrame = now;
     var mode = current;
-    if (mode.hasModel) tickModel(mode.cat, seconds);
+    seconds *= look.speed;
+    var animated = look.live2d && mode.hasModel;
+    if (animated) tickModel(mode.cat, seconds);
+    if (!look.live2d && !mode.leftHands.length && mode.hasLeftHandModel) tickModel(mode.leftModel, seconds);
+    if (!look.live2d && !mode.rightHands.length && mode.hasRightHandModel) tickModel(mode.rightModel, seconds);
     var r = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     var width = Math.max(1, Math.round(r.width * dpr)), height = Math.max(1, Math.round(r.height * dpr));
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
@@ -248,17 +263,31 @@
     } else {
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
     }
-    var held = [];
-    for (var i = 0; i < KEY_DEFINE.length; i++) if (pressed.has(i)) held.push(mode.keyUse.indexOf(i));
-    drawPicture(mode.hasModel ? mode.back : mode.catBack);
+    // the held keys of the mode in KeyDefine order, the way the source visits them; a key of its own that KeyDefine does not name comes after
+    var codes = custom[mode.name] || [], order = [];
+    for (var j = 0; j < mode.keyUse.length; j++) {
+      var code = codes[j] || "";
+      var rank = code ? (CODE_TO_KEY[code] ? KEY_DEFINE.indexOf(CODE_TO_KEY[code]) : KEY_DEFINE.length + j) : mode.keyUse[j];
+      var down = code ? heldCodes.has(code) : rank >= 0 && pressed.has(rank);
+      if (down) order.push([rank, j]);
+    }
+    order.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var held = order.map(function (entry) { return entry[1]; });
+    drawPicture(animated ? mode.back : mode.catBack);
     held.forEach(function (k) { if (k >= 0) drawPicture(mode.keys[k]); });
-    if (mode.hasModel) drawModel(mode.cat);
+    if (animated) drawModel(mode.cat);
     var left = held.find(function (k) { return k >= 0 && k < mode.leftHands.length; });
     var right = held.map(function (k) { return k - mode.leftHands.length; }).find(function (k) { return k >= 0 && k < mode.rightHands.length; });
-    if (left !== undefined) drawPicture(mode.leftHands[left]);
-    if (right !== undefined) drawPicture(mode.rightHands[right]);
-    if (mode.leftHands.length && left === undefined) drawPicture(mode.leftUp);
-    if (mode.rightHands.length && right === undefined) drawPicture(mode.rightUp);
+    // a side with hand pictures shows the held one; one with a hand model draws it only without Live2D, which otherwise draws that paw as part of the cat; the raised hand is drawn where neither is
+    var leftUp = true, rightUp = true;
+    if (mode.leftHands.length) { if (left !== undefined) { drawPicture(mode.leftHands[left]); leftUp = false; } }
+    else if (mode.hasLeftHandModel) { if (!look.live2d) drawModel(mode.leftModel); leftUp = false; }
+    else if (look.live2d) leftUp = false;
+    if (mode.rightHands.length) { if (right !== undefined) { drawPicture(mode.rightHands[right]); rightUp = false; } }
+    else if (mode.hasRightHandModel) { if (!look.live2d) drawModel(mode.rightModel); rightUp = false; }
+    else if (look.live2d) rightUp = false;
+    if (leftUp) drawPicture(mode.leftUp);
+    if (rightUp) drawPicture(mode.rightUp);
     schedule();
   }
   function schedule() { if (running && !frame) frame = requestAnimationFrame(draw); }
@@ -281,12 +310,22 @@
     // KeyboardEvent.code; false when the plugin has no key for it
     setKey: function (code, down) {
       var key = KEY_DEFINE.indexOf(CODE_TO_KEY[code]);
-      if (key < 0) return false;
-      if (down) pressed.add(key); else pressed.delete(key);
+      var bound = Object.keys(custom).some(function (name) { return custom[name].indexOf(code) >= 0; });
+      if (key < 0 && !bound) return false;
+      if (key >= 0) { if (down) pressed.add(key); else pressed.delete(key); }
+      if (down) heldCodes.add(code); else heldCodes.delete(code);
       schedule();
       return true;
     },
-    clearKeys: function () { pressed.clear(); schedule(); },
+    // { mode: [KeyboardEvent.code per key of the mode] }, the bongoKeys setting
+    setKeys: function (map) { custom = map && typeof map === "object" ? map : {}; schedule(); },
+    // the bongoLive2d, bongoTrack, bongoBreath, bongoBlink and bongoSpeed settings
+    setLook: function (next) {
+      next = next || {};
+      look = { live2d: next.live2d !== false, track: next.track !== false, breath: next.breath !== false, blink: next.blink !== false, speed: Math.max(0.1, Math.min(3, Number(next.speed) || 1)) };
+      schedule();
+    },
+    clearKeys: function () { pressed.clear(); heldCodes.clear(); schedule(); },
     setInput: function (x, y, left, right) {
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
       mouse.x = Math.max(0, Math.min(1, x)); mouse.y = Math.max(0, Math.min(1, y)); mouse.left = !!left; mouse.right = !!right; schedule();

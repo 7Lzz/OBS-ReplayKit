@@ -231,6 +231,11 @@
   }
   .tl-cue:hover { border-color: rgba(224, 165, 55, 1); }
   .tl-cue.is-selected { z-index: 3; border-color: rgba(var(--text-rgb), .95); box-shadow: 0 1px 6px rgba(0, 0, 0, .38); }
+  /* a cue the speech engine was unsure of, until its text is edited or kept: orange, with a mark at its start */
+  .tl-cue.is-unsure { border-color: rgba(255, 159, 67, .9); background: rgba(255, 159, 67, .28); padding-left: 22px; }
+  .tl-cue.is-unsure:hover { border-color: rgb(255, 159, 67); }
+  .tl-cue.is-unsure::before { content: "!"; position: absolute; left: 4px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: rgb(255, 159, 67); color: #1a1a1a; font-size: 10px; font-weight: 800; line-height: 14px; text-align: center; pointer-events: none; }
+  .tl-cue.is-unsure.is-selected { border-color: rgba(var(--text-rgb), .95); }
   /* a layer is a block like a subtitle, in a cool colour of its own, alone in its row */
   .tl-layers[hidden] { display: none; }
   .tl-cue.tl-layer { border-color: rgba(120, 140, 255, .75); background: rgba(120, 140, 255, .22); }
@@ -867,7 +872,7 @@
     var SUB_WORD_NAMES = { white: "#ffffff", yellow: "#ffe500", green: "#3ee07a", cyan: "#36d6ff", pink: "#ff4fa3" };
 
     function defaultRowStyle() {
-      return { font: "Arial", size: 64, color: "#ffffff", bold: true, italic: false, align: "center", position: "bottom", borderColor: "#000000", borderWidth: 4, bg: "#00000000", radius: 8, padX: 14, padY: 6, shadow: false, wordOn: true, word: "#ffe500", x: null, y: null, rotate: 0 };
+      return { font: "Arial", size: 64, color: "#ffffff", bold: true, italic: false, align: "center", position: "bottom", borderColor: "#000000", borderWidth: 4, bg: "#00000000", radius: 8, padX: 14, padY: 6, shadow: false, wordOn: true, wordFx: "word", word: "#ffe500", x: null, y: null, rotate: 0 };
     }
     // a row dragged on the preview has its own place, the centre of its block as fractions of the picture; null keeps it in the stack of its position
     function cleanPlace(v) { var n = Number(v); return v != null && isFinite(n) && n >= 0 && n <= 1 ? Math.round(n * 10000) / 10000 : null; }
@@ -880,6 +885,19 @@
       var ok = c.words.every(function (w) { return Array.isArray(w) && w.length === 2 && isFinite(w[0]) && isFinite(w[1]) && w[1] >= w[0]; });
       if (!ok || c.words.length !== subTokens(c.text).length) return null;
       return c.words.map(function (w) { return [r3(w[0]), r3(w[1])]; });
+    }
+    // the times of the words of a cue: the ones the speech engine heard, or for a subtitle typed by hand or given another number of words, its length shared out by the length of each word
+    function cueWords(c) {
+      if (wordsFit(c)) return c.words;
+      var parts = subTokens(c.text);
+      var total = parts.reduce(function (sum, p) { return sum + p.length; }, 0) || 1;
+      var span = c.end - c.at;
+      var done = 0;
+      return parts.map(function (p) {
+        var a = c.at + span * done / total;
+        done += p.length;
+        return [r3(a), r3(c.at + span * done / total)];
+      });
     }
     function shiftWords(words, dt) { return words.map(function (w) { return [r3(w[0] + dt), r3(w[1] + dt)]; }); }
     function cleanColor(v, fallback) {
@@ -929,6 +947,7 @@
         rotate: num("rotate"),
         shadow: typeof s.shadow === "boolean" ? s.shadow : d.shadow,
         wordOn: typeof s.wordOn === "boolean" ? s.wordOn : d.wordOn,
+        wordFx: ["word", "fill"].indexOf(s.wordFx) >= 0 ? s.wordFx : d.wordFx,
         word: cleanColor(s.word, d.word),
         x: cleanPlace(s.x) != null && cleanPlace(s.y) != null ? cleanPlace(s.x) : null,
         y: cleanPlace(s.x) != null && cleanPlace(s.y) != null ? cleanPlace(s.y) : null,
@@ -962,6 +981,10 @@
           var cue = { id: c.id, row: typeof c.row === "string" ? c.row : "", at: r3(Math.max(0, c.at)), end: r3(c.end), text: c.text.slice(0, SUB_TEXT_MAX) };
           var words = cleanWords({ words: c.words, text: cue.text });
           if (words) cue.words = words;
+          if (c.unsure === true) {
+            cue.unsure = true;
+            if (Array.isArray(c.alts)) cue.alts = c.alts.filter(function (s) { return typeof s === "string" && s.trim(); }).slice(0, 3).map(function (s) { return s.slice(0, SUB_TEXT_MAX); });
+          }
           return cue;
         })
         .filter(function (c) { return rows.some(function (r) { return r.id === c.row; }); })
@@ -1022,7 +1045,7 @@
         block.style.alignSelf = s.align === "left" ? "flex-start" : s.align === "right" ? "flex-end" : "center";
         if (turn) block.style.transform = turn.trim();
       }
-      var line = el("span", "sub-line");
+      var line = el("span", "sub-line" + (byWord && s.wordFx === "fill" ? " is-fill" : ""));
       var css = line.style;
       css.fontFamily = '"' + s.font + '", sans-serif';
       css.fontWeight = s.bold ? "700" : "400";
@@ -1047,6 +1070,7 @@
           if (j) line.appendChild(document.createTextNode(" "));
           var w = el("span", "sub-word");
           w.textContent = part;
+          w.dataset.text = part;
           words.push(w);
           line.appendChild(w);
         });
@@ -1067,10 +1091,10 @@
       var t = nowT();
       var shown = st.ready || st.Dsrc ? subsAt(t) : [];
       var parts = shown.map(function (h) {
-        var byWord = h.row.style.wordOn && wordsFit(h.cue);
+        var byWord = h.row.style.wordOn && subTokens(h.cue.text).length > 0;
         return { row: h.row, cue: h.cue, byWord: byWord };
       });
-      var key = JSON.stringify(parts.map(function (p) { return [p.row.id, p.cue.id, p.cue.text, p.byWord, p.row.style]; })) + (opts.subtitleAspect ? opts.subtitleAspect() : "");
+      var key = JSON.stringify(parts.map(function (p) { return [p.row.id, p.cue.id, p.cue.text, p.cue.at, p.cue.end, p.byWord, p.row.style]; })) + (opts.subtitleAspect ? opts.subtitleAspect() : "");
       if (box._key !== key) {
         box._key = key;
         box._lit = [];
@@ -1085,14 +1109,26 @@
         parts.forEach(function (p) {
           var made = makeOverlayCue(p.row, p.cue, layoutOf(p.cue.text.trim(), p.row.style), p.byWord);
           (p.row.style.x != null ? box : groups[p.row.style.position]).appendChild(made.node);
-          box._lit.push({ cue: p.cue, byWord: p.byWord, words: made.words, on: -1 });
+          box._lit.push({ cue: p.cue, byWord: p.byWord, words: made.words, times: cueWords(p.cue), fill: p.row.style.wordFx === "fill", on: -1 });
         });
       }
-      // a word lights up from its start until the next one starts, the way the saved copy draws it
       box._lit.forEach(function (l) {
         if (!l.byWord) return;
+        // fill: the colour sweeps through each word while it is said and stays on the words already said, the way the saved copy draws it
+        if (l.fill) {
+          l.words.forEach(function (w, i) {
+            var span = l.times[i];
+            if (!span) return;
+            var part = t >= span[1] ? 1 : t <= span[0] ? 0 : (t - span[0]) / Math.max(0.001, span[1] - span[0]);
+            w.classList.toggle("is-done", part >= 1);
+            w.classList.toggle("is-filling", part > 0 && part < 1);
+            if (part > 0 && part < 1) w.style.setProperty("--fill", (part * 100).toFixed(1) + "%");
+          });
+          return;
+        }
+        // a word lights up from its start until the next one starts, the way the saved copy draws it
         var on = -1;
-        for (var i = 0; i < l.cue.words.length; i++) if (t >= l.cue.words[i][0] - 0.0005) on = i;
+        for (var i = 0; i < l.times.length; i++) if (t >= l.times[i][0] - 0.0005) on = i;
         if (l.on === on) return;
         if (l.words[l.on]) l.words[l.on].classList.remove("is-on");
         if (l.words[on]) l.words[on].classList.add("is-on");
@@ -1146,9 +1182,13 @@
         node.style.left = (c.at / d * 100) + "%";
         node.style.width = ((c.end - c.at) / d * 100) + "%";
         node.classList.toggle("is-selected", isPicked(c.id));
+        node.classList.toggle("is-unsure", !!c.unsure);
         var label = node.firstChild;
         if (label.textContent !== c.text) label.textContent = c.text;
-        node.title = c.text;
+        // an unsure cue says what to do with it in the app tooltip; a plain one shows its text on the block itself
+        if (c.unsure) node.dataset.tooltip = "Might be misheard. Select it and open Check on the right.";
+        else delete node.dataset.tooltip;
+        node.removeAttribute("title");
       });
       Object.keys(subEls).forEach(function (id) { if (!live[id]) { subEls[id].remove(); delete subEls[id]; } });
       Object.keys(subRowEls).forEach(function (id) { if (!liveRows[id]) { subRowEls[id].remove(); delete subRowEls[id]; } });
@@ -1400,6 +1440,9 @@
       cue.end = r3(Math.max(cue.end, next.end));
       if (words && words.length === subTokens(cue.text).length) cue.words = words;
       else delete cue.words;
+      // what else the halves might have been no longer fits the joined text
+      if (next.unsure) cue.unsure = true;
+      delete cue.alts;
       st.subs.splice(st.subs.indexOf(next), 1);
       commit();
       subsChanged();
@@ -1486,7 +1529,7 @@
           var lay = layoutOf(text, row.style);
           cell = lay.cell;
           var cue = { start: r3(a - start), end: r3(b - start), lines: lay.lines, widths: lay.widths.map(function (w) { return Math.round(w * 10000) / 10000; }) };
-          if (row.style.wordOn && wordsFit(c)) cue.words = c.words.map(function (w) { return [r3(clamp(w[0], a, b) - start), r3(clamp(w[1], a, b) - start)]; });
+          if (row.style.wordOn) cue.words = cueWords(c).map(function (w) { return [r3(clamp(w[0], a, b) - start), r3(clamp(w[1], a, b) - start)]; });
           cues.push(cue);
         });
         if (cues.length) rows.push({ style: clone(row.style), cell: Math.round(cell * 10000) / 10000, cues: cues });
@@ -3453,6 +3496,52 @@
     }
 
     // a change to the selected piece: what is on screen and what is heard follow it at once, the history waits for the change to end
+    // what is selected put back the way it starts, as one step of undo: the video its speed, pitch, link and look; a clip row its look; a piece of audio its volume, fades, speed, pitch and sound; the subtitles the style of their rows, where they were dragged to included. returns the kind that was reset, or ""
+    function resetSelected() {
+      var hit = selected();
+      var row = fxRow();
+      var cues = pickedSubs();
+      if (videoSelected()) {
+        if (st.vspeed !== 1) setVideoSpeed(1);
+        // at speed 1 the link and the pitch move no piece, so they are just set
+        st.vlink = true;
+        st.vpitch = true;
+        st.fx = RKEditorFx.defaultFx();
+        if (opts.onFx) opts.onFx();
+        commit();
+        renderProps();
+        return "video";
+      }
+      if (row) {
+        row.fx = RKEditorFx.defaultFx();
+        paintLayers();
+        if (opts.onFx) opts.onFx();
+        commit();
+        return "video";
+      }
+      if (hit) {
+        editPiece(function (s) {
+          s.volume = 1;
+          s.fadeIn = 0;
+          s.fadeOut = 0;
+          setSpeed(s, 1);
+          s.pitch = true;
+          s.muted = false;
+        });
+        done();
+        return "audio";
+      }
+      if (cues.length) {
+        var rows = [];
+        cues.forEach(function (id) { var c = findSub(id); if (c && rows.indexOf(c.row) < 0) rows.push(c.row); });
+        rows.forEach(function (id) { var r = findRow(id); if (r) r.style = defaultRowStyle(); });
+        commit();
+        subsChanged();
+        return "subtitle";
+      }
+      return "";
+    }
+
     function editPiece(fn) {
       var hit = selected();
       if (!hit) return;
@@ -4181,6 +4270,8 @@
     function onKey(e) {
       if (!opts.isOpen()) return;
       if (e.key === "Escape") {
+        // a name being typed (a preset, the title of the clip) takes escape back itself
+        if (e.target && e.target.classList && e.target.classList.contains("name-edit-input")) return;
         if (menu) { e.preventDefault(); e.stopImmediatePropagation(); closeMenu(); return; }
         if (st.selected && !document.fullscreenElement && !document.webkitFullscreenElement) { e.preventDefault(); e.stopImmediatePropagation(); select(""); }
         return;
@@ -4205,10 +4296,24 @@
       else if (key === " " && !interactive(e.target)) { e.preventDefault(); opts.togglePlay(); }
     }
 
-    // a press that is not on the selected track, its handles, the side panels (blank space in them included), the colour picker, the toolbar or a scrollbar lets go of the selection. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
-    function isOutside(target) {
+    // a press that is not on the selected track, its handles, the video, the colour picker, the toolbar or a scrollbar lets go of the selection, and so does one on the blank space of the side panels, while one on a card, a tab or any control in them keeps it. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
+    // the controls of the bar over the editor (rename, aspect, screenshot, exit, render) and what they open act on the clip, not on what is selected in it
+    var KEEPS_SELECTION = ".tl-seg, .tl-vseg, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .editor-stage, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer, " +
+      ".editor-top button, .editor-top .combo, .editor-top input, .editor-title, .clip-sort-menu, .render-veil, .name-edit-input";
+    var SIDE_PANELS = ".ed-left, .editor-side, .ed-rail-r";
+    var SIDE_CONTROLS = ".editor-card, .ed-tab, .ed-big, button, input, textarea, select, label, a, [role], [tabindex]";
+    function isOutside(target, e) {
       if (!target || !target.closest) return false;
-      return !target.closest(".tl-seg, .tl-vseg, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .ed-left, .editor-side, .ed-rail-r, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer");
+      if (target.closest(KEEPS_SELECTION)) return false;
+      // in a bar of tabs only the empty part under the last tab lets go, so a press that just misses a tab keeps the selection
+      var rail = target.closest(".ed-rail");
+      if (rail && !target.closest(".ed-tab")) {
+        var tabs = Array.prototype.filter.call(rail.querySelectorAll(".ed-tab"), function (t) { return !t.hidden && t.offsetParent !== null; });
+        var last = tabs.length ? tabs[tabs.length - 1].getBoundingClientRect().bottom : -Infinity;
+        return !!e && e.clientY > last + 12;
+      }
+      if (target.closest(SIDE_PANELS)) return !target.closest(SIDE_CONTROLS);
+      return true;
     }
 
     // the sound of the pieces. every part of a piece that is playing has an element of its own, taken from a pool per track
@@ -4949,6 +5054,12 @@
       Object.keys(layerRowEls).forEach(function (id) { layerRowEls[id].remove(); });
       layerRowEls = {};
       layerEls = {};
+      // the subtitle rows are only drawn again when subtitles change, so a next clip without any would keep showing these
+      Object.keys(subEls).forEach(function (id) { subEls[id].remove(); });
+      Object.keys(subRowEls).forEach(function (id) { subRowEls[id].remove(); });
+      subEls = {};
+      subRowEls = {};
+      if (dom.subs) { dom.subs.hidden = true; dom.subs._rows = 0; }
       if (dom.layerOverlay) dom.layerOverlay.hidden = true;
       if (dom.layers) { dom.layers.hidden = true; dom.layers._rows = 0; }
       if (pv) { hidePiece(); pv.ref = ""; pv.video.removeAttribute("src"); pv.video.load(); }
@@ -5195,12 +5306,12 @@
       document.addEventListener("drop", onDrop, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("pointerdown", function (e) {
         if (menu && !menu.contains(e.target)) closeMenu();
-        pressOutside = !!st.selected && opts.isOpen() && isOutside(e.target);
+        pressOutside = !!st.selected && opts.isOpen() && isOutside(e.target, e);
       }, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("click", function (e) {
         var was = pressOutside;
         pressOutside = false;
-        if (was && st.selected && isOutside(e.target)) select("");
+        if (was && st.selected && isOutside(e.target, e)) select("");
       }, { capture: true, signal: EDITOR_SIGNAL });
       window.addEventListener("blur", closeMenu, { signal: EDITOR_SIGNAL });
       // the height of the timeline is set by dragging the bar above it, which trades space with the video
@@ -5277,6 +5388,9 @@
         cue.text = String(text || "").slice(0, SUB_TEXT_MAX);
         // fixing a word keeps the timing, adding or taking one away leaves nothing to line the words up with
         if (cue.words && !wordsFit(cue)) delete cue.words;
+        // the text has been looked at and set by hand
+        delete cue.unsure;
+        delete cue.alts;
         subsChanged();
       },
       setTimes: function (id, at, end) {
@@ -5304,7 +5418,7 @@
       // cues made from the words of the speech engine, in seconds of the timeline, as a new row named after what was listened to; the rows already there stay, and undo takes the new one back in one step
       addRow: function (title, cues) {
         var row = { id: newId("R"), auto: true, title: String(title || "Subtitles").slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
-        var made = cleanSubs(cues.map(function (c) { return { id: newId("C"), row: row.id, at: c.at, end: c.end, text: c.text, words: c.words }; }), [row]);
+        var made = cleanSubs(cues.map(function (c) { return { id: newId("C"), row: row.id, at: c.at, end: c.end, text: c.text, words: c.words, unsure: c.unsure === true, alts: c.alts }; }), [row]);
         if (!made.length) return "";
         st.subRows.push(row);
         st.subs = st.subs.concat(made);
@@ -5335,11 +5449,30 @@
         pickSubs(rowCues(rowId).map(function (c) { return c.id; }), st.selected);
       },
       mergeNext: function (id) { var cue = findSub(id); if (cue) mergeNext(cue); },
+      // an unsure subtitle replaced by what else the speech engine heard there, as one step of undo
+      pickAlternative: function (id, text) {
+        var cue = findSub(id);
+        if (!cue || !cue.unsure) return;
+        subsApi.setText(id, text);
+        commit();
+      },
+      // unsure subtitles the user has checked and kept as they are
+      markChecked: function (ids) {
+        var changed = false;
+        (ids || []).forEach(function (id) {
+          var cue = findSub(id);
+          if (cue && cue.unsure) { delete cue.unsure; delete cue.alts; changed = true; }
+        });
+        if (!changed) return;
+        commit();
+        subsChanged();
+      },
       hasNext: function (id) { var cue = findSub(id); return !!(cue && nextInRow(cue)); },
       mergeRows: function (fromId, intoId) { mergeRows(fromId, intoId); },
       removeRow: function (rowId) { removeRow(rowId); },
-      // the clip track of the audio piece that is selected, which the speech engine can be pointed at; null when nothing of the clip itself is selected
+      // the selected source audio track, 0 for all audio when video is selected, or null for other selections
       selectedTrack: function () {
+        if (videoSelected()) return 0;
         var hit = selected();
         if (!hit || !hit.seg.parts.length) return null;
         var src = hit.seg.parts[0].src;
@@ -5382,6 +5515,8 @@
         picture: function () { var row = fxRow(); return row && layerViews[row.id] ? layerViews[row.id].media : null; },
         checkpoint: function () { commit(); },
       },
+      // whatever is selected back to how it starts, for the reset tab of the right bar
+      resetSelected: function () { return resetSelected(); },
       lookPlan: lookPlan,
       layerPlan: layerPlan,
       // a layer put at the playhead and selected: { kind: "clip" | "media", ref, name, len, dur, aspect, w, gif }; the id, or empty when there is no room for it

@@ -431,6 +431,20 @@
     background:var(--field-dark);
   }
   .hotkey-input.is-empty { color:var(--muted); }
+  /* the keys of a bongo cat mode: a hotkey field each that takes the next key pressed, quieter while it keeps the key of the mode */
+  .bongo-keys { flex:1; display:grid; grid-template-columns:repeat(auto-fill, 66px); justify-content:end; gap:6px; min-width:0; }
+  .bongo-keys .hotkey-input { justify-content:center; cursor:pointer; }
+  .bongo-keys .hotkey-input.is-default { color:var(--muted); }
+  .bongo-keys .hotkey-input.is-listening { border-color:var(--selected2); background:var(--field-dark); color:var(--text); }
+  /* the keys of the custom wasd keyboard where they sit on a keyboard; a picked key is filled with the accent the way a picked option is */
+  /* the keys row is a wide row: its label in the top left and the keyboard under it across the page, the reset beside the keyboard */
+  .page .box .form-row.ovk-row { grid-template-columns:minmax(0,1fr); }
+  .page .form-row.ovk-row > .field-wrap { align-items:flex-start; justify-content:space-between; }
+  .ovk-board { position:relative; flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden; }
+  .ovk-key { position:absolute; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:0; overflow:hidden; white-space:nowrap; border:1px solid var(--line2); border-radius:4px; background:var(--button); color:var(--text); font:inherit; cursor:pointer; transition:background-color 90ms linear, border-color 90ms linear, color 90ms linear; }
+  .ovk-key:hover { background:var(--button-hover); }
+  .ovk-key.is-on { background:var(--selected, var(--primary)); border-color:transparent; color:var(--on-accent); }
+  .ovk-key:focus-visible { outline:2px solid var(--selected2); outline-offset:1px; }
   .hotkey-actions { display:flex; gap:3px; }
   .hotkey-row[hidden] { display:none; }
   /* as wide as the three buttons of the row above, so both fields line up */
@@ -1284,6 +1298,80 @@
           <div class="label">Bongo Cat mode</div>
           <div class="field-wrap"><div class="combo" id="bongoMode" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
+        <div class="form-row bongo-row" id="bongoKeysRow" hidden>
+          <div class="label">Keys <span class="control-note">Click a key, then press the key to use for it. Backspace puts back the key of the mode.</span></div>
+          <div class="field-wrap">
+            <div class="bongo-keys" id="bongoKeys"></div>
+            <button class="icon-btn field-reset" type="button" id="resetBongoKeys" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+        <div class="form-row bongo-row" hidden>
+          <div class="label">Speed <span class="control-note">How fast the cat breathes, blinks and moves.</span></div>
+          <div class="field-wrap">
+            <div class="volume-control">
+              <input class="text-input volume-value" id="bongoSpeedValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Bongo Cat speed">
+              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="bongoSpeed" type="range" min="0.1" max="3" step="0.1" aria-label="Bongo Cat speed slider"></div>
+            </div>
+            <button class="icon-btn field-reset" type="button" id="resetBongoSpeed" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoLive2d" aria-label="Animated cat">
+            <span>Animated cat<span class="control-note">The Live2D cat whose paw follows the mouse. Off shows the flat drawing of the mode.</span></span>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoTrack" aria-label="Head follows the mouse">
+            <span>Head follows the mouse<span class="control-note">The cat turns its head toward the mouse.</span></span>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoBreath" aria-label="Breathing">
+            <span>Breathing<span class="control-note">The cat breathes while it waits.</span></span>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoBlink" aria-label="Blinking">
+            <span>Blinking<span class="control-note">The cat blinks now and then.</span></span>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoFaces" aria-label="Faces on F1 to F4">
+            <span>Faces on F1 to F4<span class="control-note">F1 to F4 give the cat another face, which stays until another one is picked.</span></span>
+          </div>
+        </div>
+        <div class="form-row tight bongo-row" hidden>
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="bongoRelativeMouse" aria-label="Raw mouse movement">
+            <span>Raw mouse movement<span class="control-note">Follows how the mouse itself moves, so the paw still moves in games that keep the cursor still.</span></span>
+          </div>
+        </div>
+        <div class="form-row" id="inputOverlayMouseRow" hidden>
+          <div class="label">Mouse</div>
+          <div class="field-wrap"><div class="combo" id="inputOverlayMouse" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row" id="inputOverlayKeyboardRow" hidden>
+          <div class="label">Keyboard</div>
+          <div class="field-wrap"><div class="combo" id="inputOverlayKeyboard" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row setting-wide ovk-row" id="inputOverlayKeysRow" hidden>
+          <div class="label">Keys <span class="control-note">Pick the keys to show. They keep their place on the keyboard, and empty rows and wide gaps close up.</span></div>
+          <div class="field-wrap">
+            <div class="ovk-board" id="inputOverlayKeys" role="group" aria-label="Keys of the custom keyboard"></div>
+            <button class="icon-btn field-reset" type="button" id="resetInputOverlayKeys" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+          </div>
+        </div>
         <div class="form-row">
           <div class="label">Opacity</div>
           <div class="field-wrap">
@@ -1613,7 +1701,7 @@
       <div class="box">
         <div class="box-title">Recording</div>
         <div class="form-row">
-          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Memory (RAM) saves clips fastest but uses more RAM. Disk uses much less RAM but writes to your drive while clipping is on.</span></div>
+          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Disk uses very little RAM and writes to your drive while clipping is on. Memory saves clips fastest but uses more RAM, and can help if Disk causes problems.</span></div>
           <div class="field-wrap">
             <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
           </div>
@@ -2143,6 +2231,21 @@
     overlayFlipH: document.getElementById("overlayFlipH"),
     bongoMode: document.getElementById("bongoMode"),
     bongoModeRow: document.getElementById("bongoModeRow"),
+    bongoKeys: document.getElementById("bongoKeys"),
+    bongoSpeed: document.getElementById("bongoSpeed"),
+    bongoSpeedValue: document.getElementById("bongoSpeedValue"),
+    bongoLive2d: document.getElementById("bongoLive2d"),
+    bongoTrack: document.getElementById("bongoTrack"),
+    bongoBreath: document.getElementById("bongoBreath"),
+    bongoBlink: document.getElementById("bongoBlink"),
+    bongoFaces: document.getElementById("bongoFaces"),
+    bongoRelativeMouse: document.getElementById("bongoRelativeMouse"),
+    inputOverlayKeyboard: document.getElementById("inputOverlayKeyboard"),
+    inputOverlayKeyboardRow: document.getElementById("inputOverlayKeyboardRow"),
+    inputOverlayKeys: document.getElementById("inputOverlayKeys"),
+    inputOverlayKeysRow: document.getElementById("inputOverlayKeysRow"),
+    inputOverlayMouse: document.getElementById("inputOverlayMouse"),
+    inputOverlayMouseRow: document.getElementById("inputOverlayMouseRow"),
     overlayHueShift: document.getElementById("overlayHueShift"),
     overlayHueShiftValue: document.getElementById("overlayHueShiftValue"),
     overlayColorMultiply: document.getElementById("overlayColorMultiply"),
@@ -2543,8 +2646,8 @@
     const actions = [
       { id:"save", label:"Save", icon:"action/save", disabled:els.applyBtn.disabled },
       { id:"cancel", label:"Cancel", icon:"editor/close" },
-      { id:"undo", label:"Undo", icon:"editor/undo", disabled:document.getElementById("undoSettingsBtn").disabled },
-      { id:"redo", label:"Redo", icon:"editor/redo", disabled:document.getElementById("redoSettingsBtn").disabled },
+      { id:"undo", label:"Undo", icon:"quick/undo", disabled:document.getElementById("undoSettingsBtn").disabled },
+      { id:"redo", label:"Redo", icon:"quick/redo", disabled:document.getElementById("redoSettingsBtn").disabled },
     ];
     const body = JSON.stringify({ actions });
     if (body === quickSent) return;
@@ -3309,6 +3412,198 @@
     els.fpsWarning.hidden = fps <= 60;
   }
 
+  // -- the keys and layouts of the overlays --
+  // the keyboards and mice the helper offers, with the keys of the custom keyboard and where they sit (options.inputOverlay)
+  let overlayLayouts = null;
+  // the modes of the bongo cat folder with the keys each listens to, read once from the helper
+  let bongoManifest = null, bongoManifestLoading = null;
+  // the bongo key field waiting for a key, as { mode, slot }, and whether the fields are being drawn again, which takes the focused one away without the user leaving it
+  let bongoListening = null, bongoRepainting = false;
+  const DEFAULT_CUSTOM_KEYS = ["q", "w", "e", "shift", "a", "s", "d", "ctrl", "space"];
+  const DEFAULT_BONGO_SPEED = 1;
+  // the KeyboardEvent.code a bongo key can be bound to, the same list the helper takes; each with how it is shown
+  const BONGO_KEY_LABELS = (() => {
+    const labels = {
+      Space:"Space", Tab:"Tab", Enter:"Enter", Backspace:"Backspace", CapsLock:"Caps", Escape:"Esc",
+      ShiftLeft:"L Shift", ShiftRight:"R Shift", ControlLeft:"L Ctrl", ControlRight:"R Ctrl", AltLeft:"L Alt", AltRight:"R Alt",
+      ArrowLeft:"Left", ArrowUp:"Up", ArrowRight:"Right", ArrowDown:"Down", Insert:"Insert", Delete:"Delete", Home:"Home", End:"End", PageUp:"Page Up", PageDown:"Page Down",
+      Semicolon:";", Equal:"=", Comma:",", Minus:"-", Period:".", Slash:"/", Backquote:"`", BracketLeft:"[", Backslash:"\\", BracketRight:"]", Quote:"'",
+      NumpadAdd:"Num +", NumpadSubtract:"Num -", NumpadMultiply:"Num *", NumpadDivide:"Num /", NumpadDecimal:"Num .", NumpadEnter:"Num Enter",
+    };
+    for (let c = 65; c <= 90; c++) labels["Key" + String.fromCharCode(c)] = String.fromCharCode(c);
+    for (let d = 0; d <= 9; d++) { labels["Digit" + d] = String(d); labels["Numpad" + d] = "Num " + d; }
+    for (let f = 1; f <= 12; f++) labels["F" + f] = "F" + f;
+    return labels;
+  })();
+  // how a key name of a mode config reads, by the key that really sets it off: the plugin hears the right arrow as left and the left arrow as right
+  const BONGO_NAME_LABELS = { space:"Space", lshift:"L Shift", lctrl:"L Ctrl", rshift:"R Shift", rctrl:"R Ctrl", up:"Up", down:"Down", left:"Right", right:"Left", "<":",", ">":"." };
+  function bongoNameLabel(name) { return BONGO_NAME_LABELS[name] || String(name || "").toUpperCase(); }
+
+  // the rows of the picked overlay: the bongo cat settings, or the keyboard, its keys when custom, and the mouse of the wasd overlay
+  function syncOverlayRows() {
+    const bongo = state.overlayStyle === "bongo_cat", wasd = state.overlayStyle === "input_overlay";
+    els.bongoModeRow.hidden = !bongo;
+    document.querySelectorAll("#page-overlay .bongo-row").forEach((row) => { row.hidden = !bongo; });
+    els.inputOverlayKeyboardRow.hidden = !wasd;
+    els.inputOverlayMouseRow.hidden = !wasd;
+    els.inputOverlayKeysRow.hidden = !wasd || state.inputOverlayKeyboard !== "custom";
+    if (bongo) paintBongoKeys();
+    if (wasd && state.inputOverlayKeyboard === "custom") paintCustomKeys();
+  }
+
+  function syncBongoSpeed() {
+    const speed = Math.max(0.1, Math.min(3, Number(state.bongoSpeed ?? DEFAULT_BONGO_SPEED) || DEFAULT_BONGO_SPEED));
+    els.bongoSpeed.value = String(speed);
+    els.bongoSpeedValue.value = speed.toFixed(1) + "x";
+    setSliderFill(els.bongoSpeed, speed, 0.1, 3);
+    refreshFieldResetState("bongoSpeed", DEFAULT_BONGO_SPEED);
+  }
+
+  function loadBongoManifest() {
+    if (bongoManifest || bongoManifestLoading) return bongoManifestLoading;
+    bongoManifestLoading = fetch(HELPER + "/bongo-cat/manifest", { cache:"no-store" }).then((r) => r.ok ? r.json() : null).then((data) => {
+      bongoManifest = data && Array.isArray(data.modes) ? data : { modes: [] };
+      if (state.overlayStyle === "bongo_cat") paintBongoKeys();
+    }).catch(() => { bongoManifestLoading = null; });
+    return bongoManifestLoading;
+  }
+
+  // the keys of the picked mode: one field per key the mode has, showing the key it was given or, quieter, its own
+  function paintBongoKeys() {
+    if (!bongoManifest) { loadBongoManifest(); return; }
+    const mode = state.bongoMode || "standard";
+    const entry = bongoManifest.modes.find((m) => m.name === mode);
+    const config = entry && entry.config || {};
+    const own = (config.KeyUse || []).slice(0, Math.min((config.KeyUse || []).length, (config.KeysImageName || []).length));
+    const given = (state.bongoKeys && state.bongoKeys[mode]) || [];
+    bongoRepainting = true;
+    els.bongoKeys.replaceChildren();
+    bongoRepainting = false;
+    own.forEach((name, slot) => {
+      const code = given[slot] || "";
+      const field = document.createElement("div");
+      field.className = "hotkey-input" + (code ? "" : " is-default") + (bongoListening && bongoListening.mode === mode && bongoListening.slot === slot ? " is-listening" : "");
+      field.tabIndex = 0;
+      field.setAttribute("role", "button");
+      field.setAttribute("aria-label", "Key " + (slot + 1) + " of " + mode + ": " + (code ? BONGO_KEY_LABELS[code] || code : bongoNameLabel(name)));
+      field.textContent = field.classList.contains("is-listening") ? "Press a key" : code ? BONGO_KEY_LABELS[code] || code : bongoNameLabel(name);
+      field.addEventListener("click", () => { bongoListening = { mode, slot }; paintBongoKeys(); els.bongoKeys.children[slot]?.focus(); });
+      field.addEventListener("blur", () => { if (!bongoRepainting && bongoListening && bongoListening.slot === slot) { bongoListening = null; paintBongoKeys(); } });
+      els.bongoKeys.appendChild(field);
+    });
+    document.getElementById("resetBongoKeys").classList.toggle("is-default", !given.some(Boolean));
+  }
+
+  function setBongoKey(mode, slot, code) {
+    const keys = { ...(state.bongoKeys || {}) };
+    const list = (keys[mode] || []).slice();
+    while (list.length <= slot) list.push("");
+    list[slot] = code;
+    while (list.length && !list[list.length - 1]) list.pop();
+    if (list.length) keys[mode] = list; else delete keys[mode];
+    state.bongoKeys = keys;
+    markDirty();
+    if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+  }
+
+  // repaints the board when the window resizes it, since the keys are placed in pixels
+  let customKeysWidth = 0;
+  new ResizeObserver(() => {
+    if (!els.inputOverlayKeysRow.hidden && els.inputOverlayKeys.clientWidth && els.inputOverlayKeys.clientWidth !== customKeysWidth) paintCustomKeys();
+  }).observe(els.inputOverlayKeys);
+
+  // the keys of the custom wasd keyboard, picked by clicking them where they sit on the keyboard
+  function paintCustomKeys() {
+    const table = (overlayLayouts && overlayLayouts.customKeys) || [];
+    const picked = new Set(Array.isArray(state.inputOverlayCustomKeys) ? state.inputOverlayCustomKeys : DEFAULT_CUSTOM_KEYS);
+    // keys sit on one square pitch so the gap is the same across and down -- the table numbers include the lean of the drawn keys, so a 1u key is 157 wide on a 137 column; below the smallest pitch the board scrolls instead of shrinking further
+    const span = (key) => 1 + Math.round((key.w - 157) / 137);
+    const cols = Math.max(1, ...table.map((key) => Math.round(key.x / 137) + span(key)));
+    const rows = Math.max(1, ...table.map((key) => Math.round(key.y / 133) + 1));
+    const edge = 3, gap = 3;
+    const room = (els.inputOverlayKeys.clientWidth || 600) - edge * 2;
+    const pitch = Math.max(20, Math.min(40, Math.floor((room + gap) / cols)));
+    els.inputOverlayKeys.style.fontSize = Math.max(9, Math.min(11, Math.round(pitch * 0.3))) + "px";
+    customKeysWidth = els.inputOverlayKeys.clientWidth;
+    els.inputOverlayKeys.replaceChildren();
+    table.forEach((key) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ovk-key" + (picked.has(key.id) ? " is-on" : "");
+      button.textContent = key.label;
+      button.setAttribute("aria-pressed", picked.has(key.id) ? "true" : "false");
+      button.style.left = (edge + Math.round(key.x / 137) * pitch) + "px";
+      button.style.top = (edge + Math.round(key.y / 133) * pitch) + "px";
+      button.style.width = (span(key) * pitch - gap) + "px";
+      button.style.height = (pitch - gap) + "px";
+      button.addEventListener("click", () => {
+        const next = new Set(picked);
+        if (next.has(key.id)) next.delete(key.id); else next.add(key.id);
+        // the keyboard keeps at least one key
+        if (!next.size) return;
+        state.inputOverlayCustomKeys = table.map((k) => k.id).filter((id) => next.has(id));
+        markDirty();
+        paintCustomKeys();
+        els.inputOverlayKeys.querySelector('.ovk-key:nth-child(' + (table.indexOf(key) + 1) + ')')?.focus();
+        if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+      });
+      els.inputOverlayKeys.appendChild(button);
+    });
+    els.inputOverlayKeys.style.height = (rows * pitch - gap + edge * 2) + "px";
+    // a scrolling board also needs the height of its scrollbar
+    const bar = els.inputOverlayKeys.offsetHeight - els.inputOverlayKeys.clientHeight;
+    if (bar > 0) els.inputOverlayKeys.style.height = (rows * pitch - gap + edge * 2 + bar) + "px";
+    const same = picked.size === DEFAULT_CUSTOM_KEYS.length && DEFAULT_CUSTOM_KEYS.every((id) => picked.has(id));
+    document.getElementById("resetInputOverlayKeys").classList.toggle("is-default", same);
+  }
+
+  function wireOverlayLayouts() {
+    // a bongo key field that waits takes the next key: escape stops waiting, backspace puts back the key of the mode
+    document.addEventListener("keydown", (e) => {
+      if (!bongoListening) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const { mode, slot } = bongoListening;
+      if (e.code === "Escape") { bongoListening = null; paintBongoKeys(); return; }
+      if (e.code === "Backspace" || e.code === "Delete") { bongoListening = null; setBongoKey(mode, slot, ""); paintBongoKeys(); return; }
+      if (!BONGO_KEY_LABELS[e.code]) return;
+      bongoListening = null;
+      setBongoKey(mode, slot, e.code);
+      paintBongoKeys();
+    }, true);
+    document.getElementById("resetBongoKeys").addEventListener("click", () => {
+      const mode = state.bongoMode || "standard";
+      if (!state.bongoKeys || !state.bongoKeys[mode]) return;
+      const keys = { ...state.bongoKeys };
+      delete keys[mode];
+      state.bongoKeys = keys;
+      markDirty();
+      paintBongoKeys();
+      if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+    });
+    document.getElementById("resetInputOverlayKeys").addEventListener("click", () => {
+      state.inputOverlayCustomKeys = DEFAULT_CUSTOM_KEYS.slice();
+      markDirty();
+      paintCustomKeys();
+      if (window.RKOverlayPreview) RKOverlayPreview.refresh();
+    });
+    fieldResetBtns.bongoSpeed = document.getElementById("resetBongoSpeed");
+    els.bongoSpeed.addEventListener("input", () => { state.bongoSpeed = Math.round(Number(els.bongoSpeed.value) * 10) / 10; syncBongoSpeed(); markDirty(); if (window.RKOverlayPreview) RKOverlayPreview.refresh(); });
+    els.bongoSpeedValue.addEventListener("change", () => {
+      const v = parseFloat(els.bongoSpeedValue.value);
+      if (Number.isFinite(v)) state.bongoSpeed = Math.round(Math.max(0.1, Math.min(3, v)) * 10) / 10;
+      syncBongoSpeed();
+      markDirty();
+    });
+    els.bongoSpeedValue.addEventListener("keydown", (e) => { if (e.key === "Enter") els.bongoSpeedValue.blur(); });
+    fieldResetBtns.bongoSpeed.addEventListener("click", () => {
+      if (fieldAtDefault("bongoSpeed", DEFAULT_BONGO_SPEED)) return;
+      state.bongoSpeed = DEFAULT_BONGO_SPEED;
+      syncBongoSpeed();
+      markDirty();
+    });
+  }
+
   function syncUi() {
     state.shareMode = "projector";
     state.discord_output_mode = "projector";
@@ -3318,7 +3613,7 @@
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
     setComboValue(els.codecPreference, state.codecPreference || "auto", false);
     setComboValue(els.recordingScaleMode, state.recordingScaleMode || "native", false);
-    setComboValue(els.recordingBuffer, state.recordingBuffer || "recommended", false);
+    setComboValue(els.recordingBuffer, state.recordingBuffer || "disk", false);
     setComboValue(els.captureDisplay, state.captureDisplay || "primary", false);
     setComboValue(els.downscaleFilter, state.downscaleFilter || "lanczos", false);
     {
@@ -3347,7 +3642,11 @@
     syncIntegerRangeControl(els.overlayRotation, els.overlayRotationValue, state.overlayRotation ?? 0, clampHueShift, -180, 180);
     els.overlayFlipH.checked = !!state.overlayFlipH;
     setComboValue(els.bongoMode, state.bongoMode || "standard", false);
-    els.bongoModeRow.hidden = state.overlayStyle !== "bongo_cat";
+    setComboValue(els.inputOverlayKeyboard, state.inputOverlayKeyboard || "wasd-minimal", false);
+    setComboValue(els.inputOverlayMouse, state.inputOverlayMouse || "buttons", false);
+    [["bongoLive2d", true], ["bongoTrack", true], ["bongoBreath", true], ["bongoBlink", true], ["bongoFaces", false], ["bongoRelativeMouse", true]].forEach(([key, def]) => { els[key].checked = state[key] ?? def; });
+    syncBongoSpeed();
+    syncOverlayRows();
     syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, state.overlayHueShift ?? 0, clampHueShift, -180, 180);
     refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
     refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
@@ -3428,7 +3727,7 @@
     state.compressionMode = comboValue(els.compressionMode);
     state.codecPreference = comboValue(els.codecPreference);
     state.recordingScaleMode = comboValue(els.recordingScaleMode) || "native";
-    state.recordingBuffer = comboValue(els.recordingBuffer) || "recommended";
+    state.recordingBuffer = comboValue(els.recordingBuffer) || "disk";
     state.captureDisplay = comboValue(els.captureDisplay) || "primary";
     state.downscaleFilter = comboValue(els.downscaleFilter) || "lanczos";
     {
@@ -3448,6 +3747,9 @@
     state.overlayRotation = clampHueShift(els.overlayRotation.value);
     state.overlayFlipH = els.overlayFlipH.checked;
     state.bongoMode = comboValue(els.bongoMode);
+    state.inputOverlayKeyboard = comboValue(els.inputOverlayKeyboard) || "wasd-minimal";
+    state.inputOverlayMouse = comboValue(els.inputOverlayMouse) || "buttons";
+    ["bongoLive2d", "bongoTrack", "bongoBreath", "bongoBlink", "bongoFaces", "bongoRelativeMouse"].forEach((key) => { state[key] = els[key].checked; });
     state.overlayHueShift = clampHueShift(els.overlayHueShift.value);
     state.overlayColorMultiply = cleanHexColor(els.overlayColorMultiplyValue.value, "#ffffff");
     state.overlayColorAdd = cleanHexColor(els.overlayColorAddValue.value, "#000000");
@@ -3602,7 +3904,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -3616,9 +3918,10 @@
         syncScreenshareCaptureFields();
         refreshFieldResetState("screenshareCaptureMode", DEFAULT_SCREENSHARE_CAPTURE_MODE);
       }
-      if (combo === els.bongoMode && window.RKOverlayPreview) RKOverlayPreview.refresh();
+      if ((combo === els.bongoMode || combo === els.inputOverlayKeyboard || combo === els.inputOverlayMouse) && window.RKOverlayPreview) RKOverlayPreview.refresh();
+      if (combo === els.bongoMode || combo === els.inputOverlayKeyboard) syncOverlayRows();
       if (combo === els.overlayStyle) {
-        els.bongoModeRow.hidden = state.overlayStyle !== "bongo_cat";
+        syncOverlayRows();
         resetOverlayPosition(state.overlayStyle);
         if (window.RKOverlayPreview) RKOverlayPreview.resetPosition();
       }
@@ -3893,12 +4196,14 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
     });
   });
+  wireOverlayLayouts();
+  [els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink].forEach((input) => input.addEventListener("change", () => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); }));
   els.debugLoggingEnabled.addEventListener("change", syncDebugLoggingFields);
   els.developmentMode.addEventListener("change", syncDevelopmentFields);
   els.openStorageCard.addEventListener("click", () => { fetch(HELPER + "/storage/open", { method:"POST", cache:"no-store" }).catch(() => {}); });
@@ -4007,6 +4312,10 @@
       fillCombo(els.screenshareGameOverridePicker, data.options.screenshareGameWindows || []);
       fillCombo(els.overlayStyle, data.options.overlays || []);
       fillCombo(els.bongoMode, data.options.bongoModes || []);
+      overlayLayouts = data.options.inputOverlay || null;
+      fillCombo(els.inputOverlayKeyboard, (overlayLayouts && overlayLayouts.keyboards) || []);
+      fillCombo(els.inputOverlayMouse, (overlayLayouts && overlayLayouts.mice) || []);
+      if (window.RKOverlayPreview && RKOverlayPreview.setLayouts) RKOverlayPreview.setLayouts(overlayLayouts);
       if (data.defaultClipDir) els.clipDir.placeholder = data.defaultClipDir;
       clearLivePending();
       acceptSettings(data.settings || {});

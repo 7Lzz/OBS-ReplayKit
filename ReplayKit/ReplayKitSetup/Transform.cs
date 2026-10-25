@@ -1231,11 +1231,24 @@ namespace ReplayKitSetup
             if (filters.Count == 0) src.Remove("filters");
         }
 
+        // the size the group was saved at: the helper sizes it to the keyboard and mouse picked in the settings, the first one was 628x292
+        private static double inputOverlayGroupW = InputOverlayGroupW, inputOverlayGroupH = InputOverlayGroupH;
+
+        private static void ReadInputOverlayGroupSize(JArray groups, HashSet<string> names)
+        {
+            inputOverlayGroupW = InputOverlayGroupW;
+            inputOverlayGroupH = InputOverlayGroupH;
+            var group = groups.OfType<JObject>().FirstOrDefault(g => names.Contains(g.Value<string>("name") ?? "\0"));
+            double w = group?["settings"]?["cx"]?.Type == JTokenType.Integer || group?["settings"]?["cx"]?.Type == JTokenType.Float ? group["settings"]["cx"].Value<double>() : 0;
+            double h = group?["settings"]?["cy"]?.Type == JTokenType.Integer || group?["settings"]?["cy"]?.Type == JTokenType.Float ? group["settings"]["cy"].Value<double>() : 0;
+            if (w > 0 && w <= InputOverlayGroupW && h > 0 && h <= InputOverlayGroupH) { inputOverlayGroupW = w; inputOverlayGroupH = h; }
+        }
+
         private static (double X, double Y, double Scale) InputOverlayGroupGeometry(double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
         {
             var c = content ?? OverlayContentRect(canvasW, canvasH);
             double scale = (c.H / 1440.0) * OverlayScaleFactor(prefs);
-            var (x, y) = InputOverlayPos(c, InputOverlayGroupW, InputOverlayGroupH, scale, scale);
+            var (x, y) = InputOverlayPos(c, inputOverlayGroupW, inputOverlayGroupH, scale, scale);
             return (x, y, scale);
         }
 
@@ -1286,7 +1299,7 @@ namespace ReplayKitSetup
             item["bounds_rel"] = new JObject { ["x"] = 0.0, ["y"] = 0.0 };
             item["bounds_type"] = 0;
             item["bounds_align"] = 0;
-            ApplyOverlayTransform(item, canvasW, canvasH, prefs, "input_overlay", 628, 292);
+            ApplyOverlayTransform(item, canvasW, canvasH, prefs, "input_overlay", inputOverlayGroupW, inputOverlayGroupH);
         }
 
         private static void ApplyOverlayTransform(JObject item, double canvasW, double canvasH, Preferences prefs, string style, double width, double height)
@@ -1434,6 +1447,7 @@ namespace ReplayKitSetup
             double motionBlurStrength = prefs.MotionBlurStrength;
             var overlayUuids = CollectOverlayUuids(sources);
             var overlayGroupNames = CollectOverlayGroupNames(sources, groups);
+            ReadInputOverlayGroupSize(groups, overlayGroupNames);
 
             if (!useInputOverlay)
             {

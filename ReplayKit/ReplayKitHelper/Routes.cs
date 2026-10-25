@@ -902,17 +902,24 @@ namespace ReplayKitHelper
             {
                 bool post = path != "/speech/status" && path != "/speech/job";
                 if (req.Method != (post ? "POST" : "GET")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", (post ? "POST" : "GET") + " required"); return false; }
-                if (path == "/speech/status") HttpResponse.SendJson(stream, 200, Speech.Status());
-                else if (path == "/speech/install") HttpResponse.SendJson(stream, 200, Speech.StartInstall());
+                if (path == "/speech/status") HttpResponse.SendJson(stream, 200, Speech.Status(Q("model")));
+                else if (path == "/speech/install") HttpResponse.SendJson(stream, 200, Speech.StartInstall(Q("model")));
                 else if (path == "/speech/job") HttpResponse.SendJson(stream, 200, Speech.JobStatus(Q("id")));
                 else if (path == "/speech/cancel") HttpResponse.SendJson(stream, 200, Speech.Cancel(Q("id")));
                 else
                 {
+                    // tracks is a comma list of the audio streams to listen to together
+                    var trackParts = (Q("tracks") ?? "").Split(',');
+                    var tracks = new List<int>();
                     bool parsed = double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double from) &
-                        double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double to) &
-                        int.TryParse(Q("track"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int track);
+                        double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double to);
+                    foreach (string part in trackParts)
+                    {
+                        if (int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int one)) tracks.Add(one);
+                        else parsed = false;
+                    }
                     if (!parsed) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad request" }); return false; }
-                    var started = Speech.StartTranscribe(Q("file"), from, to, track, Q("language"));
+                    var started = Speech.StartTranscribe(Q("file"), from, to, tracks, Q("language"), Q("model"));
                     HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 400, started);
                 }
                 return false;
@@ -1129,6 +1136,28 @@ namespace ReplayKitHelper
                 if (picture == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
                 var hb = HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" });
                 HttpResponse.SendBytes(stream, 200, "OK", hb, File.ReadAllBytes(picture));
+                return false;
+            }
+
+            // the wasd overlay preview draws the layouts obs gets: a file of the input-overlay presets, or the layout of the keys picked for the custom keyboard
+            if (path == "/input-overlay/file")
+            {
+                string file = InputOverlayLayouts.ServedFile(Q("path", ""));
+                if (file == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
+                string ctype = file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? "application/json" : "image/png";
+                HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = ctype }), File.ReadAllBytes(file));
+                return false;
+            }
+            if (path == "/input-overlay/custom-sheet")
+            {
+                string sheet = InputOverlayLayouts.CustomSheet();
+                if (sheet == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false }); return false; }
+                HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" }), File.ReadAllBytes(sheet));
+                return false;
+            }
+            if (path == "/input-overlay/custom")
+            {
+                HttpResponse.SendJson(stream, 200, InputOverlayLayouts.CustomLayout(new JArray((Q("keys", "") ?? "").Split(',').Where(k => k.Length > 0 && k.Length <= 8).Take(64))));
                 return false;
             }
 
@@ -1736,6 +1765,19 @@ namespace ReplayKitHelper
                     HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
                 }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
+            // the presets of the clip editor: the lists of subtitle styles and video looks, and one list saved back whole
+            if (path == "/editor-presets" || path == "/editor-presets/save")
+            {
+                try
+                {
+                    if (path == "/editor-presets" && req.Method == "GET") { var listed = EditorPresets.List(); HttpResponse.SendJson(stream, listed.Value<bool>("ok") ? 200 : 500, listed); return false; }
+                    if (path == "/editor-presets/save" && req.Method == "POST") { var saved = EditorPresets.Save(Q("kind"), req.Body); HttpResponse.SendJson(stream, saved.Value<bool>("ok") ? 200 : 400, saved); return false; }
+                    HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required");
+                }
+                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
 

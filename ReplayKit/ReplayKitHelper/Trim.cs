@@ -828,7 +828,8 @@ namespace ReplayKitHelper
                     if (chain != null) argv.AddRange(new[] { "-vf", chain });
                     AddAudioArgs(argv, audioCount, removeAudio, videoSpeed);
                 }
-                argv.AddRange(new[] { "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", "-y", outPath });
+                // a new encode is not the compressed file any more, so the hidden compress marker that ffmpeg would copy over from the source is left out
+                argv.AddRange(new[] { "-metadata", "comment=", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart", "-y", outPath });
             }
             else
             {
@@ -946,6 +947,7 @@ namespace ReplayKitHelper
 
             // the clip under this name is another file now, so an edit that was kept for the old one fits nothing any more
             if (overwrite) EditDrafts.Forget(source.Full);
+            if (overwrite && precise) Clips.ClearCompressed(source.Name, source.Full);
             AppConfig.ClearClipsCache();
             return new TrimResult
             {

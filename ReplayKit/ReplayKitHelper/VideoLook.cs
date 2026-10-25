@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -12,10 +13,12 @@ namespace ReplayKitHelper
         private double[] hue, sat, gain;
         private double vib, gamma, bright, contrast;
         private bool looked;
-        private double[] lookM, lookOff;
+        private double[] lookM, lookMo, lookOff;
         private double lookGamma, lookContrast;
-        private double zoom, lens, blur, pixel, shift, sharp, sepia, invert, vignette, scanP, scanA;
-        private bool flip, emboss, sketch, thermal;
+        private double zoom, lens, blur, motion, zblur, tilt, glow, glowS, bloomT, bloomS, pixel, shift, sharp, sepia, invert, solar, vignette, scanP, scanA;
+        private bool flip, reflect, emboss, sketch, edges, thermal;
+        // the labels of the branches of one look, told apart from those of the other looks of the same graph
+        private static int lastTag;
         private int poster, noise;
 
         private static readonly double[] Luma = { 0.2126, 0.7152, 0.0722 };
@@ -78,22 +81,33 @@ namespace ReplayKitHelper
                 {
                     l.looked = true;
                     l.lookM = List(lk, "m", 9, -2, 2);
+                    l.lookMo = List(lk, "mo", 3, -1, 1);
                     l.lookOff = List(lk, "off", 3, -1, 1);
                     l.lookGamma = Num(lk, "gamma", 0.2, 3);
                     l.lookContrast = Num(lk, "contrast", 0, 3);
                 }
                 var s = o["steps"] as JObject ?? throw new BadLook("steps are missing");
                 l.zoom = Num(s, "zoom", 1, 2);
-                l.lens = Num(s, "lens", 0, 1);
+                l.lens = Num(s, "lens", -1, 1);
                 l.flip = Flag(s, "flip");
+                l.reflect = Flag(s, "reflect");
                 l.blur = Num(s, "blur", 0, 20);
+                l.motion = Num(s, "motion", 0, 40);
+                l.zblur = Num(s, "zblur", 0, 0.3);
+                l.tilt = Num(s, "tilt", 0, 20);
+                l.glow = Num(s, "glow", 0, 1);
+                l.glowS = Num(s, "glowS", 0, 30);
+                l.bloomT = Num(s, "bloomT", 0, 0.95);
+                l.bloomS = Num(s, "bloomS", 0, 30);
                 l.pixel = Num(s, "pixel", 0, 64);
                 l.shift = Num(s, "shift", 0, 20);
                 l.sharp = Num(s, "sharp", 0, 3);
                 l.emboss = Flag(s, "emboss");
                 l.sketch = Flag(s, "sketch");
+                l.edges = Flag(s, "edges");
                 l.sepia = Num(s, "sepia", 0, 1);
                 l.invert = Num(s, "invert", 0, 1);
+                l.solar = Num(s, "solar", 0, 1);
                 double poster = Num(s, "poster", 0, 16);
                 if (poster != Math.Floor(poster) || poster == 1) throw new BadLook("poster is out of range");
                 l.poster = (int)poster;
@@ -128,21 +142,89 @@ namespace ReplayKitHelper
         // the expressions below are written in v, which no function name they use contains
         private static string V(string expr) => expr.Replace("v", "(val/255)");
 
+        // the copies of the picture blurred and laid over it, each taken from the picture as it arrives the way the preview draws them: tilt shift merged through a mask of rows, glow as a screen, bloom added. the result is a graph whose last chain carries on with the filters after it, so it fits wherever a chain of filters does
+        private string Overlays(int width, int height, double k, string tag)
+        {
+            bool tilted = tilt > 0, glowing = glow > 0 && glowS > 0, blooming = bloomS > 0;
+            if (!tilted && !glowing && !blooming) return null;
+            var heads = new List<string> { "[" + tag + "s]" };
+            var chains = new List<string>();
+            // what each merge lays over the picture so far, and the filter that does it
+            var merges = new List<(string over, string filter)>();
+            if (tilted)
+            {
+                heads.Add("[" + tag + "t]");
+                heads.Add("[" + tag + "m]");
+                chains.Add("[" + tag + "t]gblur=sigma=" + N(tilt * k / zoom) + ":steps=3,format=gbrp[" + tag + "tb]");
+                // the mask is worked out on a strip two pixels wide and stretched, so the expression runs once a row; sharp in the middle quarter and fully blurred a fifth of the height past it, eased like smoothstep
+                string d = "clip((abs((Y+0.5)/H-0.5)-0.12)/0.2,0,1)";
+                string m = "'round(255*" + d + "*" + d + "*(3-2*" + d + "))'";
+                chains.Add("[" + tag + "m]scale=2:" + height + ":flags=neighbor,format=gbrp,geq=r=" + m + ":g=" + m + ":b=" + m + ",scale=" + width + ":" + height + ":flags=neighbor,format=gbrp[" + tag + "tm]");
+                merges.Add(("[" + tag + "tb][" + tag + "tm]", "maskedmerge"));
+            }
+            if (glowing)
+            {
+                heads.Add("[" + tag + "g]");
+                chains.Add("[" + tag + "g]gblur=sigma=" + N(glowS * k / zoom) + ":steps=3,format=gbrp[" + tag + "gb]");
+                merges.Add(("[" + tag + "gb]", "blend=all_mode=screen:all_opacity=" + N(glow)));
+            }
+            if (blooming)
+            {
+                heads.Add("[" + tag + "b]");
+                string e = V("(v-" + N(bloomT) + ")/" + N(1 - bloomT));
+                chains.Add("[" + tag + "b]" + Lut(e, e, e) + ",format=gbrp,gblur=sigma=" + N(bloomS * k / zoom) + ":steps=3,format=gbrp[" + tag + "bb]");
+                merges.Add(("[" + tag + "bb]", "blend=all_mode=addition"));
+            }
+            // each merge takes the one before it as its first input, and the last is left open for the chain to go on from
+            for (int i = 0; i < merges.Count; i++)
+            {
+                string input = i == 0 ? "[" + tag + "s]" : "[" + tag + "c" + (i - 1) + "]";
+                chains.Add(input + merges[i].over + merges[i].filter + ",format=gbrp" + (i == merges.Count - 1 ? "" : "[" + tag + "c" + i + "]"));
+            }
+            return "split=" + heads.Count + string.Concat(heads) + ";" + string.Join(";", chains);
+        }
+
+        // the picture averaged with four copies of itself cut to its middle and stretched back, each zoomed a quarter further toward the most
+        private string ZoomBlur(int width, int height, string tag)
+        {
+            var parts = new List<string> { "split=5" + string.Concat(Enumerable.Range(0, 5).Select(i => "[" + tag + "z" + i + "]")) };
+            for (int i = 1; i < 5; i++)
+            {
+                double z = 1 + zblur * i / 4;
+                int cw = Math.Max(2, (int)Math.Floor(width / z + 0.5)), ch = Math.Max(2, (int)Math.Floor(height / z + 0.5));
+                parts.Add("[" + tag + "z" + i + "]crop=" + cw + ":" + ch + ":" + (width - cw) / 2 + ":" + (height - ch) / 2 + ",scale=" + width + ":" + height + ":flags=bilinear,format=gbrp[" + tag + "y" + i + "]");
+            }
+            parts.Add("[" + tag + "z0]" + string.Concat(Enumerable.Range(1, 4).Select(i => "[" + tag + "y" + i + "]")) + "mix=inputs=5");
+            return string.Join(";", parts);
+        }
+
         // the filters for a picture of width x height, from whatever the frames are to 8 bit planar rgb for the filters after them
         public string Filter(int width, int height)
         {
             if (width <= 0 || height <= 0) throw new InvalidOperationException("the size of the video is not known");
             double k = height / 1080.0;
+            string tag = "fx" + Interlocked.Increment(ref lastTag) + "_";
             var f = new List<string>();
-            if (blur > 0) f.Add("gblur=sigma=" + N(blur * k / zoom) + ":steps=3");
+            string overlays = Overlays(width, height, k, tag);
+            if (overlays != null) f.Add(overlays);
+            // one of the three blurs, the way the preview draws them
+            if (zblur > 0) f.Add(ZoomBlur(width, height, tag));
+            else if (motion > 0) f.Add("gblur=sigma=" + N(motion * k / zoom) + ":sigmaV=0:steps=3");
+            else if (blur > 0) f.Add("gblur=sigma=" + N(blur * k / zoom) + ":steps=3");
             if (zoom > 1)
             {
                 int cw = Math.Max(2, (int)Math.Floor(width / zoom + 0.5)), ch = Math.Max(2, (int)Math.Floor(height / zoom + 0.5));
                 f.Add("crop=" + cw + ":" + ch + ":" + (width - cw) / 2 + ":" + (height - ch) / 2);
                 f.Add("scale=" + width + ":" + height + ":flags=bicubic");
             }
-            if (lens > 0) f.Add("lenscorrection=k1=" + N(lens) + ":k2=0:i=bilinear");
+            if (lens != 0) f.Add("lenscorrection=k1=" + N(lens) + ":k2=0:i=bilinear");
             if (flip) f.Add("hflip");
+            if (reflect)
+            {
+                // the top half, and below it the rows above the middle upside down; an odd middle row stays in the top half
+                int top = (height + 1) / 2;
+                f.Add("split[" + tag + "ra][" + tag + "rb];[" + tag + "ra]crop=iw:" + top + ":0:0[" + tag + "rt];[" + tag + "rb]crop=iw:" + (height - top) + ":0:0,vflip[" + tag + "ru];[" + tag + "rt][" + tag + "ru]vstack");
+            }
             if (pixel > 0)
             {
                 int b = Math.Max(1, Px(pixel, k));
@@ -153,7 +235,7 @@ namespace ReplayKitHelper
                 int d = Px(shift, k);
                 if (d > 0) f.Add("rgbashift=rh=" + (-d) + ":bh=" + d + ":edge=smear");
             }
-            // one of the three, the way the preview draws them
+            // one of the four, the way the preview draws them
             if (emboss)
             {
                 const string m = "'-2 -1 0 -1 1 1 0 1 2'";
@@ -163,6 +245,12 @@ namespace ReplayKitHelper
             {
                 f.Add("sobel=planes=7");
                 string e = V("1-clip((v-0.1)/0.2,0,1)");
+                f.Add(Lut(e, e, e));
+            }
+            else if (edges)
+            {
+                f.Add("sobel=planes=7");
+                string e = V("(v-0.04)/0.3");
                 f.Add(Lut(e, e, e));
             }
             else if (sharp > 0)
@@ -186,7 +274,9 @@ namespace ReplayKitHelper
             }
             if (looked)
             {
-                if (!Plain(lookM)) f.Add(Mixer(lookM));
+                // the offset inside the matrix is added to the alpha column, which is full on frames that gain an alpha plane
+                if (lookMo.Any(v => v != 0)) f.Add("format=gbrap," + Mixer(lookM) + ":ra=" + N(lookMo[0]) + ":ga=" + N(lookMo[1]) + ":ba=" + N(lookMo[2]));
+                else if (!Plain(lookM)) f.Add(Mixer(lookM));
                 string[] ch = new string[3];
                 for (int i = 0; i < 3; i++) ch[i] = V("(pow(clip(v+" + N(lookOff[i]) + ",0,1)," + N(1 / lookGamma) + ")-0.5)*" + N(lookContrast) + "+0.5");
                 f.Add(Lut(ch[0], ch[1], ch[2]));
@@ -195,6 +285,11 @@ namespace ReplayKitHelper
             if (invert > 0)
             {
                 string e = V("v*" + N(1 - 2 * invert) + "+" + N(invert));
+                f.Add(Lut(e, e, e));
+            }
+            if (solar > 0)
+            {
+                string e = V("if(gt(v," + N(solar) + "),1-v,v)");
                 f.Add(Lut(e, e, e));
             }
             if (poster > 0)

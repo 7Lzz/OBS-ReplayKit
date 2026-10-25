@@ -45,8 +45,8 @@ namespace ReplayKitHelper
                 ["recordingScaleMode"] = DefaultRecordingScaleMode(),
                 ["downscaleHeight"] = 1080,
                 ["downscaleFilter"] = "lanczos",
-                // where the clip buffer is kept: recommended picks disk or memory from the installed memory, see ClipBuffer
-                ["recordingBuffer"] = ClipBuffer.Recommended,
+                // where the clip buffer is kept: disk unless memory is picked, see ClipBuffer
+                ["recordingBuffer"] = ClipBuffer.Disk,
                 // which kinds of capture show the mouse cursor in recordings and clips
                 ["showCursorDisplayCapture"] = true,
                 ["showCursorGameCapture"] = true,
@@ -68,6 +68,20 @@ namespace ReplayKitHelper
                 ["screenshotKeybindExtra"] = new JObject(),
                 ["overlayStyle"] = "off",
                 ["bongoMode"] = "standard",
+                // the keys each bongo cat mode listens to in place of its own: { mode: [KeyboardEvent.code or "" per key of the mode] }
+                ["bongoKeys"] = new JObject(),
+                // the settings of the bongo cat source: the animated cat, its head following the mouse, breathing and blinking, the faces of F1 to F4, the mouse read as raw movement for games that hold the cursor still, and how fast it animates
+                ["bongoLive2d"] = true,
+                ["bongoTrack"] = true,
+                ["bongoBreath"] = true,
+                ["bongoBlink"] = true,
+                ["bongoFaces"] = false,
+                ["bongoRelativeMouse"] = true,
+                ["bongoSpeed"] = 1.0,
+                // the keyboard and mouse of the wasd overlay, see InputOverlayLayouts
+                ["inputOverlayKeyboard"] = InputOverlayLayouts.DefaultKeyboard,
+                ["inputOverlayCustomKeys"] = new JArray(InputOverlayLayouts.DefaultCustomKeys),
+                ["inputOverlayMouse"] = InputOverlayLayouts.DefaultMouse,
                 ["overlayOpacity"] = 100,
                 ["overlayScale"] = 100,
                 ["overlayRotation"] = 0,
@@ -477,7 +491,7 @@ namespace ReplayKitHelper
                 ["recordingScaleMode"] = GetEnumSetting(data, "recordingScaleMode", defaults["recordingScaleMode"].Value<string>(), new[] { "native", "downscale" }),
                 ["downscaleHeight"] = GetIntSetting(data, "downscaleHeight", defaults["downscaleHeight"].Value<int>(), 240, 4320),
                 ["downscaleFilter"] = GetEnumSetting(data, "downscaleFilter", defaults["downscaleFilter"].Value<string>(), new[] { "bilinear", "area", "bicubic", "lanczos" }),
-                ["recordingBuffer"] = GetEnumSetting(data, "recordingBuffer", defaults["recordingBuffer"].Value<string>(), new[] { ClipBuffer.Recommended, ClipBuffer.Disk, ClipBuffer.Memory }),
+                ["recordingBuffer"] = GetEnumSetting(data, "recordingBuffer", defaults["recordingBuffer"].Value<string>(), new[] { ClipBuffer.Disk, ClipBuffer.Memory }),
                 ["showCursorDisplayCapture"] = GetBoolSetting(data, "showCursorDisplayCapture", defaults["showCursorDisplayCapture"].Value<bool>()),
                 ["showCursorGameCapture"] = GetBoolSetting(data, "showCursorGameCapture", defaults["showCursorGameCapture"].Value<bool>()),
                 ["showCursorWindowCapture"] = GetBoolSetting(data, "showCursorWindowCapture", defaults["showCursorWindowCapture"].Value<bool>()),
@@ -498,6 +512,17 @@ namespace ReplayKitHelper
                 ["overlayRotation"] = GetIntSetting(data, "overlayRotation", 0, -180, 180),
                 ["overlayFlipH"] = GetBoolSetting(data, "overlayFlipH", defaults["overlayFlipH"].Value<bool>()),
                 ["bongoMode"] = GetEnumSetting(data, "bongoMode", defaults["bongoMode"].Value<string>(), BongoModes),
+                ["bongoKeys"] = NormalizeBongoKeys(data["bongoKeys"]),
+                ["bongoLive2d"] = GetBoolSetting(data, "bongoLive2d", defaults["bongoLive2d"].Value<bool>()),
+                ["bongoTrack"] = GetBoolSetting(data, "bongoTrack", defaults["bongoTrack"].Value<bool>()),
+                ["bongoBreath"] = GetBoolSetting(data, "bongoBreath", defaults["bongoBreath"].Value<bool>()),
+                ["bongoBlink"] = GetBoolSetting(data, "bongoBlink", defaults["bongoBlink"].Value<bool>()),
+                ["bongoFaces"] = GetBoolSetting(data, "bongoFaces", defaults["bongoFaces"].Value<bool>()),
+                ["bongoRelativeMouse"] = GetBoolSetting(data, "bongoRelativeMouse", defaults["bongoRelativeMouse"].Value<bool>()),
+                ["bongoSpeed"] = GetFloatSetting(data, "bongoSpeed", defaults["bongoSpeed"].Value<double>(), 0.1, 3.0),
+                ["inputOverlayKeyboard"] = GetEnumSetting(data, "inputOverlayKeyboard", defaults["inputOverlayKeyboard"].Value<string>(), InputOverlayLayouts.Keyboards.Select(l => l.Id).ToArray()),
+                ["inputOverlayCustomKeys"] = InputOverlayLayouts.NormalizeCustomKeys(data["inputOverlayCustomKeys"]),
+                ["inputOverlayMouse"] = GetEnumSetting(data, "inputOverlayMouse", defaults["inputOverlayMouse"].Value<string>(), InputOverlayLayouts.Mice.Select(l => l.Id).ToArray()),
                 ["overlayHueShift"] = GetFloatSetting(data, "overlayHueShift", defaults["overlayHueShift"].Value<double>(), -180.0, 180.0),
                 ["overlayColorMultiply"] = GetHexColorSetting(data, "overlayColorMultiply", defaults["overlayColorMultiply"].Value<string>()),
                 ["overlayColorAdd"] = GetHexColorSetting(data, "overlayColorAdd", defaults["overlayColorAdd"].Value<string>()),
@@ -1028,26 +1053,6 @@ namespace ReplayKitHelper
             return ObsWebSocket.InvokeRequest("SetOutputSettings", new JObject { ["outputName"] = "Replay Buffer", ["outputSettings"] = outputSettings }, 5000);
         }
 
-        // resolves a bundled input-overlay preset path; falls back to a recursive filename search under the presets root for older settings that stored just "<folder>/<file>" without the full relative path.
-        private static string FindOverlayAsset(string relativePath)
-        {
-            string root = Path.Combine(Directory.GetParent(GetScriptsDir().TrimEnd('\\', '/')).FullName, "input-overlay-presets");
-            if (!Directory.Exists(root)) return "";
-            string candidate = Path.Combine(root, relativePath);
-            if (File.Exists(candidate)) return candidate;
-
-            var parts = relativePath.Split('\\', '/');
-            if (parts.Length < 2) return "";
-            string folder = parts[parts.Length - 2];
-            string leaf = parts[parts.Length - 1];
-            string suffix = "\\" + folder + "\\" + leaf;
-            foreach (var file in Directory.EnumerateFiles(root, leaf, SearchOption.AllDirectories))
-            {
-                if (file.Replace('/', '\\').EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return file;
-            }
-            return "";
-        }
-
         private static JObject GetSceneName()
         {
             var scenes = ObsWebSocket.InvokeRequest("GetSceneList", null, 3000);
@@ -1477,16 +1482,34 @@ namespace ReplayKitHelper
         {
             var content = OverlayContentRect(preset);
             double scale = content["height"].Value<double>() / 1440.0 * OverlayScaleFactor(settings);
-            var pos = InputOverlayPos(preset, 628.0, 292.0, scale, scale);
+            InputOverlayLayouts.GroupSize(settings, out double groupW, out double groupH);
+            var pos = InputOverlayPos(preset, groupW, groupH, scale, scale);
             var transform = new JObject
             {
                 ["positionX"] = pos["x"].Value<double>(), ["positionY"] = pos["y"].Value<double>(), ["scaleX"] = scale, ["scaleY"] = scale,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
             ApplyOverlayPositionOverride(transform, preset, settings, "input_overlay");
-            ApplyOverlayFlipH(transform, 628.0, settings);
-            transform.Merge(OverlayRotation.Rotate(transform, settings?["overlayRotation"]?.Value<int>() ?? 0, 628, 292));
+            ApplyOverlayFlipH(transform, groupW, settings);
+            transform.Merge(OverlayRotation.Rotate(transform, settings?["overlayRotation"]?.Value<int>() ?? 0, groupW, groupH));
             return transform;
+        }
+
+        // where the picked keyboard or mouse sits inside Group; a mouse that is off stays in the group hidden, shrunk to a point in its corner, since obs counts hidden members in the box it gives a group
+        private static InputOverlayLayouts.Fit InputOverlayMemberFit(string name, JObject settings)
+        {
+            InputOverlayLayouts.Place(InputOverlayLayouts.Keyboard(settings), InputOverlayLayouts.Mouse(settings), out var keys, out var pointer, out _, out _);
+            if (name != "Mouse Overlay") return keys;
+            return pointer ?? new InputOverlayLayouts.Fit { X = 0.0, Y = 0.0, Scale = 0.001 };
+        }
+
+        private static bool InputOverlayMouseShown(JObject settings) => InputOverlayLayouts.FindMouse(settings?["inputOverlayMouse"]?.Value<string>()).Json != null;
+
+        // the files of a member: the picked keyboard or mouse, and the default mouse for one that is off, since its source stays in the group hidden
+        private static InputOverlayLayouts.Picked InputOverlayMemberFiles(string name, JObject settings)
+        {
+            if (name != "Mouse Overlay") return InputOverlayLayouts.Keyboard(settings);
+            return InputOverlayLayouts.Mouse(settings) ?? InputOverlayLayouts.Mouse(new JObject { ["inputOverlayMouse"] = InputOverlayLayouts.DefaultMouse });
         }
 
         private static JObject InputOverlayTransform(string name, JObject preset, JObject settings = null)
@@ -1494,22 +1517,13 @@ namespace ReplayKitHelper
             var content = OverlayContentRect(preset);
             double scale = content["height"].Value<double>() / 1440.0 * OverlayScaleFactor(settings);
             // un-flipped group base -- these transforms feed the WASD/Mouse group_item_backup items, which dont render; the visible mirror comes from InputOverlayGroupTransform on the Group scene item.
-            var pos = InputOverlayPos(preset, 628.0, 292.0, scale, scale);
-            double groupX = pos["x"].Value<double>(), groupY = pos["y"].Value<double>();
-            if (name == "Mouse Overlay")
-            {
-                return new JObject
-                {
-                    ["positionX"] = groupX + 431.0 * scale,
-                    ["positionY"] = groupY,
-                    ["scaleX"] = 0.6909722089767456 * scale, ["scaleY"] = 0.6909722089767456 * scale,
-                    ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
-                };
-            }
+            InputOverlayLayouts.GroupSize(settings, out double groupW, out double groupH);
+            var pos = InputOverlayPos(preset, groupW, groupH, scale, scale);
+            var fit = InputOverlayMemberFit(name, settings);
             return new JObject
             {
-                ["positionX"] = groupX, ["positionY"] = groupY,
-                ["scaleX"] = 0.7395833134651184 * scale, ["scaleY"] = 0.7388888597488403 * scale,
+                ["positionX"] = pos["x"].Value<double>() + fit.X * scale, ["positionY"] = pos["y"].Value<double>() + fit.Y * scale,
+                ["scaleX"] = fit.Scale * scale, ["scaleY"] = fit.Scale * scale,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
         }
@@ -1594,6 +1608,58 @@ namespace ReplayKitHelper
         // the modes of the Bango Cat folder, by their folder names
         private static readonly string[] BongoModes = { "standard", "keyboard", "feixue", "mania" };
 
+        // the keys a bongo cat key can be bound to, as KeyboardEvent.code with the windows virtual key the source reads
+        private static readonly Dictionary<string, int> BongoKeyCodes = BuildBongoKeyCodes();
+
+        private static Dictionary<string, int> BuildBongoKeyCodes()
+        {
+            var map = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (char c = 'A'; c <= 'Z'; c++) map["Key" + c] = c;
+            for (char c = '0'; c <= '9'; c++) { map["Digit" + c] = c; map["Numpad" + c] = 0x60 + (c - '0'); }
+            for (int i = 1; i <= 12; i++) map["F" + i] = 0x6F + i;
+            var named = new Dictionary<string, int>
+            {
+                ["Space"] = 0x20, ["Tab"] = 0x09, ["Enter"] = 0x0D, ["Backspace"] = 0x08, ["CapsLock"] = 0x14, ["Escape"] = 0x1B,
+                ["ShiftLeft"] = 0xA0, ["ShiftRight"] = 0xA1, ["ControlLeft"] = 0xA2, ["ControlRight"] = 0xA3, ["AltLeft"] = 0xA4, ["AltRight"] = 0xA5,
+                ["ArrowLeft"] = 0x25, ["ArrowUp"] = 0x26, ["ArrowRight"] = 0x27, ["ArrowDown"] = 0x28,
+                ["Insert"] = 0x2D, ["Delete"] = 0x2E, ["Home"] = 0x24, ["End"] = 0x23, ["PageUp"] = 0x21, ["PageDown"] = 0x22,
+                ["Semicolon"] = 0xBA, ["Equal"] = 0xBB, ["Comma"] = 0xBC, ["Minus"] = 0xBD, ["Period"] = 0xBE, ["Slash"] = 0xBF, ["Backquote"] = 0xC0,
+                ["BracketLeft"] = 0xDB, ["Backslash"] = 0xDC, ["BracketRight"] = 0xDD, ["Quote"] = 0xDE,
+                ["NumpadAdd"] = 0x6B, ["NumpadSubtract"] = 0x6D, ["NumpadMultiply"] = 0x6A, ["NumpadDivide"] = 0x6F, ["NumpadDecimal"] = 0x6E, ["NumpadEnter"] = 0x0D,
+            };
+            foreach (var pair in named) map[pair.Key] = pair.Value;
+            return map;
+        }
+
+        // { mode: [code per key of the mode] }; an unknown code keeps the key of the mode ("") and a mode with nothing of its own is left out
+        private static JObject NormalizeBongoKeys(JToken token)
+        {
+            var result = new JObject();
+            if (!(token is JObject map)) return result;
+            foreach (var mode in BongoModes)
+            {
+                if (!(map[mode] is JArray list)) continue;
+                var keys = list.Take(32).Select(k => k.Type == JTokenType.String && BongoKeyCodes.ContainsKey(k.Value<string>()) ? k.Value<string>() : "").ToList();
+                while (keys.Count > 0 && keys[keys.Count - 1] == "") keys.RemoveAt(keys.Count - 1);
+                if (keys.Count > 0) result[mode] = new JArray(keys);
+            }
+            return result;
+        }
+
+        // the keys of the mode as the source reads them: one virtual key per key of the mode, 0 where it keeps its own
+        private static string BongoSourceKeys(JObject settings, string mode)
+        {
+            if (!(settings?["bongoKeys"]?[mode] is JArray list)) return "";
+            return string.Join(",", list.Select(k => k.Type == JTokenType.String && BongoKeyCodes.TryGetValue(k.Value<string>(), out int vk) ? vk : 0));
+        }
+
+        private static bool BongoSettingsChanged(JObject previous, JObject settings) =>
+            new[] { "bongoMode", "bongoKeys", "bongoLive2d", "bongoTrack", "bongoBreath", "bongoBlink", "bongoFaces", "bongoRelativeMouse", "bongoSpeed" }
+                .Any(key => !JToken.DeepEquals(previous?[key], settings?[key]));
+
+        private static bool InputOverlayLayoutChanged(JObject previous, JObject settings) =>
+            new[] { "inputOverlayKeyboard", "inputOverlayMouse", "inputOverlayCustomKeys" }.Any(key => !JToken.DeepEquals(previous?[key], settings?[key]));
+
         private static bool IsBongoInputKind(string id) => id == BongoInputKind || id == LegacyBongoInputKind;
 
         private static void SetBongoSourceJson(JObject source, string uuid, JObject settings)
@@ -1614,10 +1680,17 @@ namespace ReplayKitHelper
             sourceSettings["mode"] = mode;
             sourceSettings["Mode"] = mode; sourceSettings["width"] = 1280; sourceSettings["height"] = 768;
             sourceSettings["x"] = 0.0; sourceSettings["y"] = 0.02; sourceSettings["scale"] = 1.83;
-            sourceSettings["delay"] = 1.0; sourceSettings["delaytime"] = 1.0;
-            sourceSettings["random_motion"] = true; sourceSettings["breath"] = true; sourceSettings["eyeblink"] = true; sourceSettings["track"] = true;
-            sourceSettings["live2d"] = true; sourceSettings["relative_mouse"] = true;
-            sourceSettings["mouse_horizontal_flip"] = true; sourceSettings["mouse_vertical_flip"] = true; sourceSettings["mask"] = false;
+            double speed = settings?["bongoSpeed"]?.Value<double>() ?? 1.0;
+            sourceSettings["delay"] = speed; sourceSettings["delaytime"] = speed;
+            sourceSettings["random_motion"] = true;
+            sourceSettings["breath"] = settings?["bongoBreath"]?.Value<bool>() ?? true;
+            sourceSettings["eyeblink"] = settings?["bongoBlink"]?.Value<bool>() ?? true;
+            sourceSettings["track"] = settings?["bongoTrack"]?.Value<bool>() ?? true;
+            sourceSettings["live2d"] = settings?["bongoLive2d"]?.Value<bool>() ?? true;
+            sourceSettings["relative_mouse"] = settings?["bongoRelativeMouse"]?.Value<bool>() ?? true;
+            sourceSettings["mouse_horizontal_flip"] = true; sourceSettings["mouse_vertical_flip"] = true;
+            sourceSettings["mask"] = settings?["bongoFaces"]?.Value<bool>() ?? false;
+            sourceSettings["keys"] = BongoSourceKeys(settings, mode);
         }
 
         private static JObject NewBongoSourceJson(string uuid, JObject settings)
@@ -1761,8 +1834,9 @@ namespace ReplayKitHelper
             double canvasW = preset["video"]?["baseWidth"]?.Value<double>() ?? 0.0;
             double canvasH = preset["video"]?["baseHeight"]?.Value<double>() ?? 0.0;
             var transform = InputOverlayTransform(name, preset, settings);
-            double sourceW = name == "Mouse Overlay" ? 285.0 : 568.0;
-            double sourceH = name == "Mouse Overlay" ? 421.0 : 394.0;
+            var files = InputOverlayMemberFiles(name, settings);
+            double sourceW = files?.Width ?? (name == "Mouse Overlay" ? 285.0 : 568.0);
+            double sourceH = files?.Height ?? (name == "Mouse Overlay" ? 421.0 : 394.0);
             SetSceneItemBaseJson(item, name, visible);
             if (!string.IsNullOrWhiteSpace(sourceUuid)) item["source_uuid"] = sourceUuid;
             item["scale_ref"] = new JObject { ["x"] = sourceW, ["y"] = sourceH };
@@ -1775,13 +1849,12 @@ namespace ReplayKitHelper
             item["group_item_backup"] = groupBackup;
         }
 
-        private static void SetInputOverlayGroupMemberJson(JObject item, string name, string sourceUuid, JObject preset, int id)
+        private static void SetInputOverlayGroupMemberJson(JObject item, string name, string sourceUuid, JObject preset, int id, JObject overlaySettings)
         {
             const double canvasW = 2560.0, canvasH = 1440.0;
-            double x, y, scaleX, scaleY;
-            if (name == "Mouse Overlay") { x = 431.0; y = 0.0; scaleX = scaleY = 0.6909722089767456; }
-            else { x = 0.0; y = 0.0; scaleX = 0.7395833134651184; scaleY = 0.7388888597488403; }
-            SetSceneItemBaseJson(item, name, true);
+            var fit = InputOverlayMemberFit(name, overlaySettings);
+            double x = fit.X, y = fit.Y, scaleX = fit.Scale, scaleY = fit.Scale;
+            SetSceneItemBaseJson(item, name, name != "Mouse Overlay" || InputOverlayMouseShown(overlaySettings));
             item["source_uuid"] = sourceUuid;
             item["scale_ref"] = new JObject { ["x"] = canvasW, ["y"] = canvasH };
             item["id"] = id;
@@ -1802,18 +1875,19 @@ namespace ReplayKitHelper
         }
 
         // builds the group-kind source that wraps WASD+Mouse together, with its own nested items array using canvas-relative 2560x1440 reference geometry independent of the real canvas size. inputSources maps "WASD Overlay"/"Mouse Overlay" -> {uuid, id} for whichever of the two are actually present.
-        private static void SetInputOverlayGroupSourceJson(JObject group, string groupUuid, Dictionary<string, InputOverlaySourceRef> inputSources, JObject preset)
+        private static void SetInputOverlayGroupSourceJson(JObject group, string groupUuid, Dictionary<string, InputOverlaySourceRef> inputSources, JObject preset, JObject overlaySettings)
         {
             group["prev_ver"] = 536936450; group["name"] = "Group"; group["uuid"] = groupUuid;
             group["id"] = "group"; group["versioned_id"] = "group";
 
-            var settings = new JObject { ["id_counter"] = 0, ["custom_size"] = true, ["cx"] = 628, ["cy"] = 292 };
+            InputOverlayLayouts.GroupSize(overlaySettings, out double groupW, out double groupH);
+            var settings = new JObject { ["id_counter"] = 0, ["custom_size"] = true, ["cx"] = (int)Math.Round(groupW), ["cy"] = (int)Math.Round(groupH) };
             var items = new JArray();
             foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
             {
                 if (!inputSources.TryGetValue(name, out var src)) continue;
                 var member = new JObject();
-                SetInputOverlayGroupMemberJson(member, name, src.Uuid, preset, src.Id);
+                SetInputOverlayGroupMemberJson(member, name, src.Uuid, preset, src.Id, overlaySettings);
                 items.Add(member);
             }
             settings["items"] = items;
@@ -2631,10 +2705,12 @@ namespace ReplayKitHelper
 
                 if (useInputOverlay)
                 {
+                    var keyboardFiles = InputOverlayMemberFiles("WASD Overlay", settings);
+                    var mouseFiles = InputOverlayMemberFiles("Mouse Overlay", settings);
                     var inputSpecs = new[]
                     {
-                        new { name = "WASD Overlay", image = FindOverlayAsset("wasd\\wasd.png"), layout = FindOverlayAsset("wasd\\wasd-minimal.json") },
-                        new { name = "Mouse Overlay", image = FindOverlayAsset("mouse\\mouse.png"), layout = FindOverlayAsset("mouse\\mouse-no-movement.json") },
+                        new { name = "WASD Overlay", image = keyboardFiles?.Sheet ?? "", layout = keyboardFiles?.Json ?? "" },
+                        new { name = "Mouse Overlay", image = mouseFiles?.Sheet ?? "", layout = mouseFiles?.Json ?? "" },
                     };
                     foreach (var spec in inputSpecs)
                     {
@@ -2810,7 +2886,7 @@ namespace ReplayKitHelper
                             inputGroup = new JObject();
                             groups.Add(inputGroup);
                         }
-                        SetInputOverlayGroupSourceJson(inputGroup, inputGroupUuid, inputSources, preset);
+                        SetInputOverlayGroupSourceJson(inputGroup, inputGroupUuid, inputSources, preset, settings);
                         if (!foundInputGroupItem)
                         {
                             var groupItem = new JObject { ["id"] = GetNextJsonSceneItemId(items) };
@@ -2999,11 +3075,35 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["mode"] = mode };
         }
 
+        // powercfg only takes a request override from an administrator, so when windows refuses it the same command is run again through the administrator prompt, which the user can allow or decline
         private static JObject ApplySleepOverrideSetting(bool allowSleep)
         {
             var result = SetSleepOverrideSetting(allowSleep);
+            if (result["ok"]?.Value<bool>() != true) result = SetSleepOverrideElevated(allowSleep);
             if (result["ok"]?.Value<bool>() == true) return new JObject { ["applied"] = new JArray("Windows sleep"), ["warnings"] = new JArray() };
-            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray("Windows sleep setting was saved, but Windows rejected the change: " + result["message"]) };
+            return new JObject { ["applied"] = new JArray(), ["warnings"] = new JArray("Windows sleep setting was saved, but it was not applied: " + result["message"]) };
+        }
+
+        private static JObject SetSleepOverrideElevated(bool allowSleep)
+        {
+            var args = new List<string> { "/requestsoverride", "PROCESS", "obs64.exe" };
+            if (allowSleep) args.AddRange(new[] { "DISPLAY", "SYSTEM", "AWAYMODE" });
+            try
+            {
+                var psi = new ProcessStartInfo { FileName = "powercfg.exe", Arguments = string.Join(" ", args), UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
+                using var process = Process.Start(psi);
+                if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
+                if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = "powercfg did not finish." };
+                return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = "powercfg exited " + process.ExitCode + "." };
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                return new JObject { ["ok"] = false, ["message"] = "the administrator prompt was declined." };
+            }
+            catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException)
+            {
+                return new JObject { ["ok"] = false, ["message"] = ex.Message };
+            }
         }
 
         private static string GetStartupShortcutPath()
@@ -3514,15 +3614,28 @@ namespace ReplayKitHelper
         }
 
         // where WASD Overlay and Mouse Overlay sit inside Group, the member transforms SetInputOverlayGroupMemberJson writes
-        private static JObject InputOverlayMemberTransform(string name)
+        private static JObject InputOverlayMemberTransform(string name, JObject settings)
         {
-            bool mouse = name == "Mouse Overlay";
+            var fit = InputOverlayMemberFit(name, settings);
             return new JObject
             {
-                ["positionX"] = mouse ? 431.0 : 0.0, ["positionY"] = 0.0,
-                ["scaleX"] = mouse ? 0.6909722089767456 : 0.7395833134651184, ["scaleY"] = mouse ? 0.6909722089767456 : 0.7388888597488403,
+                ["positionX"] = fit.X, ["positionY"] = fit.Y, ["scaleX"] = fit.Scale, ["scaleY"] = fit.Scale,
                 ["rotation"] = 0.0, ["alignment"] = 5, ["boundsType"] = "OBS_BOUNDS_NONE", ["boundsAlignment"] = 0, ["cropToBounds"] = false,
             };
+        }
+
+        // a member already in Group is moved to where the picked layouts put it, and the mouse hidden while it is off; obs-websocket takes the group by its name like a scene
+        private static void PlaceInputOverlayMember(string name, JObject settings, List<string> warnings)
+        {
+            var list = ObsWebSocket.InvokeRequest("GetGroupSceneItemList", new JObject { ["sceneName"] = "Group" }, 3000);
+            if (!list.Ok) { warnings.Add("Could not read the overlay group: " + list.Message); return; }
+            var member = (list.Data?["sceneItems"] as JArray ?? new JArray()).OfType<JObject>().FirstOrDefault(i => i["sourceName"]?.Value<string>() == name);
+            if (member == null) return;
+            var moved = SetSceneItemTransform("Group", member, InputOverlayMemberTransform(name, settings));
+            if (moved["ok"]?.Value<bool>() != true) warnings.Add("Could not place " + name + ": " + moved["message"]);
+            if (name != "Mouse Overlay") return;
+            var shown = SetSceneItemEnabled("Group", member, InputOverlayMouseShown(settings));
+            if (shown["ok"]?.Value<bool>() != true) warnings.Add("Could not show or hide " + name + ": " + shown["message"]);
         }
 
         // removing the inputs takes their items inside Group with them, and the empty Group item goes after
@@ -3565,7 +3678,7 @@ namespace ReplayKitHelper
         }
 
         // the parallel live-websocket version of Set-OverlaySceneFile, used when obs must not be restarted: toggle visibility, refresh the bongo settings and reposition.
-        private static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true)
+        private static JObject ApplyOverlayLive(JObject settings, JObject preset, bool recreateBongo = true, bool rebuildInputOverlay = false)
         {
             var warnings = new List<string>();
             var scene = GetSceneName();
@@ -3582,7 +3695,12 @@ namespace ReplayKitHelper
 
             // only the picked overlay lives in obs: the others are removed rather than hidden, so they do not sit in the sources list, and get built again when picked
             bool removed = false;
-            if (overlayStyle != "input_overlay") removed |= RemoveInputOverlayLive(sceneName, items, warnings);
+            // input-overlay reads its layout and picture only when the source is made, so other layouts take new sources, built below the way a freshly picked overlay is
+            if (overlayStyle != "input_overlay" || rebuildInputOverlay) removed |= RemoveInputOverlayLive(sceneName, items, warnings);
+            // a removed source keeps its name until obs has let go of it, and a new source of that name is refused until then
+            if (rebuildInputOverlay)
+                for (int i = 0; i < 30 && new[] { "WASD Overlay", "Mouse Overlay" }.Any(n => ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = n }, 3000).Ok); i++)
+                    Thread.Sleep(100);
             if (overlayStyle != "bongo_cat") removed |= RemoveBongoLive(warnings);
             if (removed)
             {
@@ -3639,10 +3757,9 @@ namespace ReplayKitHelper
                     var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
                     if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position input overlay group: " + rGroupTransform["message"]);
                 }
-                string wasdPng = FindOverlayAsset("wasd\\wasd.png");
-                string wasdJson = FindOverlayAsset("wasd\\wasd-minimal.json");
-                string mousePng = FindOverlayAsset("mouse\\mouse.png");
-                string mouseJson = FindOverlayAsset("mouse\\mouse-no-movement.json");
+                var keyboardFiles = InputOverlayMemberFiles("WASD Overlay", settings);
+                var mouseFiles = InputOverlayMemberFiles("Mouse Overlay", settings);
+                string wasdPng = keyboardFiles?.Sheet, wasdJson = keyboardFiles?.Json, mousePng = mouseFiles?.Sheet, mouseJson = mouseFiles?.Json;
                 if (string.IsNullOrWhiteSpace(wasdPng) || string.IsNullOrWhiteSpace(wasdJson) || string.IsNullOrWhiteSpace(mousePng) || string.IsNullOrWhiteSpace(mouseJson))
                 {
                     warnings.Add("Input overlay assets are missing from the ReplayKit install, so OBS could not switch that overlay live.");
@@ -3665,11 +3782,12 @@ namespace ReplayKitHelper
                         {
                             var s = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
                             if (!s.Ok) warnings.Add("Could not update " + entry.name + ": " + s.Message);
+                            PlaceInputOverlayMember(entry.name, settings, warnings);
                             continue;
                         }
                         var created = EnsureInputSceneItem(sceneName, entry.name, "input-overlay", io, true);
                         if (created["ok"]?.Value<bool>() != true) { warnings.Add("Could not create " + entry.name + ": " + created["message"]); continue; }
-                        var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, InputOverlayMemberTransform(entry.name));
+                        var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, InputOverlayMemberTransform(entry.name, settings));
                         if (rTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position " + entry.name + ": " + rTransform["message"]);
                     }
                     if (group == null)
@@ -3684,6 +3802,7 @@ namespace ReplayKitHelper
                         if (group == null) warnings.Add("Could not group the WASD and mouse overlays. Restart OBS to rebuild them.");
                         else
                         {
+                            if (!InputOverlayMouseShown(settings)) PlaceInputOverlayMember("Mouse Overlay", settings, warnings);
                             var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
                             if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add("Could not position input overlay group: " + rGroupTransform["message"]);
                         }
@@ -3881,9 +4000,17 @@ namespace ReplayKitHelper
         }
 
         // Mirror along the rotated local axis while keeping the same center.
-        private static JObject MirrorTransformInPlace(JObject current, string overlayStyle)
+        private static JObject MirrorTransformInPlace(JObject current, string overlayStyle, JObject settings)
         {
-            return OverlayRotation.Mirror(current, overlayStyle == "bongo_cat" ? 1280 : 628, overlayStyle == "bongo_cat" ? 768 : 292);
+            OverlayBoxSize(overlayStyle, settings, out double w, out double h);
+            return OverlayRotation.Mirror(current, w, h);
+        }
+
+        // the unscaled box of the item of an overlay style: the 1280x768 bongo frame, or the group the picked wasd layouts make
+        private static void OverlayBoxSize(string overlayStyle, JObject settings, out double width, out double height)
+        {
+            if (overlayStyle == "bongo_cat") { width = 1280; height = 768; return; }
+            InputOverlayLayouts.GroupSize(settings, out width, out height);
         }
 
         private static JObject ApplyOverlayRotationLive(JObject settings)
@@ -3930,7 +4057,7 @@ namespace ReplayKitHelper
             var cur = GetSceneItemTransformLive(sceneName, item);
             if (cur["ok"]?.Value<bool>() != true || cur["transform"] == null || cur["transform"].Type == JTokenType.Null)
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but " + itemName + "'s current position could not be read: " + cur["message"]) };
-            var r = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style));
+            var r = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style, settings));
             if (r["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
             else warnings.Add("Could not flip " + itemName + ": " + r["message"]);
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
@@ -4134,14 +4261,15 @@ namespace ReplayKitHelper
                     var scaled = GetScaledTransformFromCurrent(entry["transform"], scaleRatio, preset);
                     if (mirrorApplied) // keep the current mirror while resizing; the flip step below toggles it if needed
                     {
+                        OverlayBoxSize(style, settings, out double boxW, out double boxH);
                         double sw = GetDoubleValue(entry["transform"], "sourceWidth", 0.0);
-                        if (sw <= 0.0) sw = style == "bongo_cat" ? 1280.0 : 628.0;
+                        if (sw <= 0.0) sw = boxW;
                         var basis = (JObject)entry["transform"].DeepClone();
                         basis.Merge(scaled);
                         var size = OverlayRotation.Rectangle((JObject)entry["transform"]);
                         basis["width"] = size["w"].Value<double>() * scaleRatio;
                         basis["height"] = size["h"].Value<double>() * scaleRatio;
-                        scaled = OverlayRotation.Mirror(basis, sw, style == "bongo_cat" ? 768 : 292);
+                        scaled = OverlayRotation.Mirror(basis, sw, boxH);
                     }
                     var rs = SetSceneItemTransform(sceneName, entry["item"] as JObject, scaled);
                     if (rs["ok"]?.Value<bool>() == true) { if (!flipTransition) applied.Add(prop.Name + " size"); }
@@ -4165,7 +4293,7 @@ namespace ReplayKitHelper
                             if (transforms[itemName] is JObject snapEntry) snapEntry["transform"] = cur["transform"];
                             else transforms[itemName] = new JObject { ["item"] = item, ["transform"] = cur["transform"] };
                         }
-                        var rf = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style));
+                        var rf = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style, settings));
                         if (rf["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
                         else warnings.Add("Could not preview " + itemName + " flip: " + rf["message"]);
                     }
@@ -5656,7 +5784,7 @@ namespace ReplayKitHelper
         // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
         // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
         // preserve that asymmetry, it is not an oversight to fix.
-        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool applyRecordingAudio = false)
+        private static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool applyRecordingAudio = false, bool rebuildInputOverlay = false, bool applySleep = false)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -5687,9 +5815,13 @@ namespace ReplayKitHelper
             if (closeWarning["ok"]?.Value<bool>() == true) applied.Add("OBS close warning");
             else warnings.Add("OBS close warning was saved, but OBS config could not be updated: " + closeWarning["message"]);
 
-            var sleepOverride = ApplySleepOverrideSetting(settings["allowSleepWhileActive"]?.Value<bool>() ?? false);
-            applied.AddRange((sleepOverride["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            warnings.AddRange((sleepOverride["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            // only a change of the setting is applied, since applying it can take the administrator prompt
+            if (applySleep)
+            {
+                var sleepOverride = ApplySleepOverrideSetting(settings["allowSleepWhileActive"]?.Value<bool>() ?? false);
+                applied.AddRange((sleepOverride["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+                warnings.AddRange((sleepOverride["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            }
 
             var profileUpdates = new List<string[]>();
             foreach (var u in preset["profile"] as JArray ?? new JArray())
@@ -5760,7 +5892,7 @@ namespace ReplayKitHelper
                 {
                     if (applyOverlay)
                     {
-                        var overlay = ApplyOverlayLive(settings, preset, recreateBongo);
+                        var overlay = ApplyOverlayLive(settings, preset, recreateBongo, rebuildInputOverlay);
                         if (overlay["ok"]?.Value<bool>() == true) applied.Add("OBS overlay");
                         else warnings.AddRange((overlay["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                     }
@@ -5937,6 +6069,7 @@ namespace ReplayKitHelper
                             new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
                             new JObject { ["value"] = "off", ["label"] = "Off", ["blurb"] = "No input overlay in the OBS scene." }
                         ),
+                        ["inputOverlay"] = InputOverlayLayouts.Options(),
                         ["bongoModes"] = new JArray(
                             new JObject { ["value"] = "standard", ["label"] = "Standard", ["blurb"] = "Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space." },
                             new JObject { ["value"] = "keyboard", ["label"] = "Keyboard", ["blurb"] = "Two paws on the arrow keys, R, Left Ctrl and Left Shift." },
@@ -6671,9 +6804,10 @@ namespace ReplayKitHelper
                     previous["overlayColorAdd"]?.Value<string>() != settings["overlayColorAdd"]?.Value<string>();
                 bool motionBlurChanged = previous["motionBlurEnabled"]?.Value<bool>() != settings["motionBlurEnabled"]?.Value<bool>() ||
                     previous["motionBlurStrength"]?.Value<double>() != settings["motionBlurStrength"]?.Value<double>();
-                // the mode is a setting of the bongo source, so a change reaches obs live
-                bool bongoModeChanged = previous["bongoMode"]?.Value<string>() != settings["bongoMode"]?.Value<string>();
-                bool applyOverlay = overlayStyleChanged || overlayGeometryChanged || bongoModeChanged;
+                // the mode, its keys and the rest of the bongo settings are settings of its source, and the layouts of the wasd overlay are files of its sources, so a change of either reaches obs live
+                bool bongoModeChanged = BongoSettingsChanged(previous, settings);
+                bool inputOverlayLayoutChanged = InputOverlayLayoutChanged(previous, settings);
+                bool applyOverlay = overlayStyleChanged || overlayGeometryChanged || bongoModeChanged || inputOverlayLayoutChanged;
                 bool recreateBongo = (overlayStyleChanged || bongoModeChanged) && settings["overlayStyle"]?.Value<string>() == "bongo_cat";
                 bool restartObs = TestRestartRequired(previous, settings);
                 bool applyVideoSettings = TestRuntimeVideoSettingsChanged(previous, settings);
@@ -6686,7 +6820,8 @@ namespace ReplayKitHelper
                     hotkeyRelease["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, display["applied"] as JArray);
                     hotkeyRelease["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, display["warnings"] as JArray);
                 }
-                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), RecordingAudioKeysChanged(previous, settings));
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), RecordingAudioKeysChanged(previous, settings), inputOverlayLayoutChanged && settings["overlayStyle"]?.Value<string>() == "input_overlay",
+                    previous["allowSleepWhileActive"]?.Value<bool>() != settings["allowSleepWhileActive"]?.Value<bool>());
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||
                     previous["appIconRecordingDot"]?.Value<bool>() != settings["appIconRecordingDot"]?.Value<bool>())

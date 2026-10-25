@@ -104,23 +104,46 @@
   var liveRects = Object.create(null);
   var running = false, wired = false;
   var mode = "input_overlay";
-  var wasdBuilt = false, mouseBuilt = false, bongoBuilt = false;
+  var bongoBuilt = false;
   var wasdSize = { w: 568, h: 394 }, mouseSize = { w: 285, h: 421 };
+  // the keyboard and mouse layouts the settings offer (options.inputOverlay of the helper), what the stage was last built for, and whether the mouse is shown
+  var layouts = null, builtFor = "", buildRun = 0, mouseOn = true;
+  var DEFAULT_KEYBOARD = { value: "wasd-minimal", json: "wasd/wasd-minimal.json", sheet: "wasd/wasd.png" };
+  var DEFAULT_MOUSE = { value: "buttons", json: "mouse/mouse-no-movement.json", sheet: "mouse/mouse.png" };
+  var GROUP = { width: 628, height: 292, gap: 11 };
 
   // gap between an elements released sprite and the pressed one directly below it, measured on both preset sheets
   var SPRITE_GUTTER = 3;
 
-  // KeyboardEvent.code -> element id in wasd-minimal.json (it only carries these 9)
-  var CODE_TO_ID = {
-    KeyQ:"q", KeyW:"w", KeyE:"e", KeyA:"a", KeyS:"s", KeyD:"d",
-    ControlLeft:"ctrl", ControlRight:"ctrl", ShiftLeft:"shift", ShiftRight:"shift", Space:"space",
+  // KeyboardEvent.code -> the key code input-overlay gives an element (the codes of libuiohook), which every layout uses whatever it names its keys
+  var CODE_TO_KEYCODE = {
+    Escape:1, Backquote:41, Minus:12, Equal:13, Backspace:14, Tab:15, BracketLeft:26, BracketRight:27, Backslash:43, CapsLock:58, Semicolon:39, Quote:40, Enter:28,
+    ShiftLeft:42, ShiftRight:54, Comma:51, Period:52, Slash:53, ControlLeft:29, ControlRight:3613, AltLeft:56, AltRight:3640, MetaLeft:3675, MetaRight:3676, ContextMenu:3677, Space:57,
+    Insert:3666, Home:3655, PageUp:3657, Delete:3667, End:3663, PageDown:3665, ArrowUp:57416, ArrowLeft:57419, ArrowRight:57421, ArrowDown:57424,
+    PrintScreen:3639, ScrollLock:70, Pause:3653, NumLock:69, NumpadDivide:3637, NumpadMultiply:55, NumpadSubtract:3658, NumpadAdd:3662, NumpadEnter:3612, NumpadDecimal:83,
+    Numpad0:82, Numpad1:79, Numpad2:80, Numpad3:81, Numpad4:75, Numpad5:76, Numpad6:77, Numpad7:71, Numpad8:72, Numpad9:73,
+    F11:87, F12:88,
   };
+  "QWERTYUIOP".split("").forEach(function (c, i) { CODE_TO_KEYCODE["Key" + c] = 16 + i; });
+  "ASDFGHJKL".split("").forEach(function (c, i) { CODE_TO_KEYCODE["Key" + c] = 30 + i; });
+  "ZXCVBNM".split("").forEach(function (c, i) { CODE_TO_KEYCODE["Key" + c] = 44 + i; });
+  for (var digit = 1; digit <= 10; digit++) CODE_TO_KEYCODE["Digit" + (digit % 10)] = digit + 1;
+  for (var fn = 1; fn <= 10; fn++) CODE_TO_KEYCODE["F" + fn] = 58 + fn;
   // MouseEvent.button -> element id in mouse-no-movement.json
   var BTN_TO_ID = { 0:"lmb", 2:"rmb", 3:"smb2", 4:"smb1" };
 
   // starting guess only (basic.ini BaseCX/BaseCY) -- the position poll replaces both with the projectors real resolution as soon as obs answers.
   var CANVAS_W = 2560, CANVAS_H = 1440;
   var REF = CANVAS_H / 1080;
+
+  // the keyboard and the mouse at one height side by side, as tall as the box lets both fit -- twin of InputOverlayLayouts.Place, which sizes the group obs draws
+  function placeMembers() {
+    var kw = wasdSize.w, kh = wasdSize.h;
+    var across = kw / kh + (mouseOn ? mouseSize.w / mouseSize.h : 0);
+    var height = Math.min(GROUP.height, (GROUP.width - (mouseOn ? GROUP.gap : 0)) / across);
+    var keysW = kw * height / kh, mouseW = mouseOn ? mouseSize.w * height / mouseSize.h : 0;
+    return { height: height, keysW: keysW, mouseX: keysW + GROUP.gap, mouseW: mouseW, width: keysW + (mouseOn ? GROUP.gap + mouseW : 0) };
+  }
 
   // real overlay rects in canvas px -- mirrors ReplaykitSettings.InputOverlayTransform / BongoTransform
   function overlayRects(style, scalePct) {
@@ -132,11 +155,12 @@
       return { bongo: { x: 0, y: Math.max(0, CANVAS_H - h), w: w, h: h } };
     }
     var sc = CANVAS_H / 1440 * f;
+    var m = placeMembers();
     var gx = Math.max(0, 15 * REF);
-    var gy = Math.max(0, CANVAS_H - 292 * sc - 16 * REF);
+    var gy = Math.max(0, CANVAS_H - m.height * sc - 16 * REF);
     return {
-      wasd:  { x: gx,               y: gy, w: 568 * 0.73958331 * sc, h: 394 * 0.73888886 * sc },
-      mouse: { x: gx + 431 * sc,    y: gy, w: 285 * 0.69097221 * sc, h: 421 * 0.69097221 * sc },
+      wasd:  { x: gx,                 y: gy, w: m.keysW * sc, h: m.height * sc },
+      mouse: { x: gx + m.mouseX * sc, y: gy, w: (mouseOn ? m.mouseW : m.keysW) * sc, h: m.height * sc },
     };
   }
 
@@ -151,6 +175,7 @@
       var d = document.createElement("div");
       d.className = "ovp-key";
       d.dataset.id = e.id;
+      if (e.code !== undefined && e.code !== null) d.dataset.code = e.code;
       d.dataset.u = u; d.dataset.v = v;
       if (e.code !== undefined && e.code !== null) d.dataset.press = v + h + SPRITE_GUTTER;
       // a scroll wheel carries no code -- its states are four frames to the right: idle, middle-down, scroll up, scroll down
@@ -160,15 +185,22 @@
       container.appendChild(d);
       maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
     });
-    container.style.width = maxX + "px";
-    container.style.height = maxY + "px";
-    return { w: maxX || layout.overlay_width || 1, h: maxY || layout.overlay_height || 1 };
+    // input-overlay sizes the source by the overlay size the layout names, which is what the group is fitted from
+    var w = layout.overlay_width || maxX || 1, h = layout.overlay_height || maxY || 1;
+    container.style.width = w + "px";
+    container.style.height = h + "px";
+    return { w: w, h: h };
   }
 
   function setPressed(container, id, down) {
     var el = container.querySelector('.ovp-key[data-id="' + id + '"]');
     if (!el || !el.dataset.press) return;
     el.style.backgroundPosition = (-el.dataset.u) + "px " + (down ? -el.dataset.press : -el.dataset.v) + "px";
+  }
+  function setPressedCode(container, code, down) {
+    container.querySelectorAll('.ovp-key[data-code="' + code + '"]').forEach(function (el) {
+      if (el.dataset.press) el.style.backgroundPosition = (-el.dataset.u) + "px " + (down ? -el.dataset.press : -el.dataset.v) + "px";
+    });
   }
 
   var wheelTimer = 0;
@@ -183,25 +215,53 @@
     wheelTimer = setTimeout(function () { setWheel(0); }, 160);
   }
 
+  function pickLayout(list, value, fallback) {
+    return (list || []).find(function (entry) { return entry.value === value; }) || fallback;
+  }
+
+  // the keyboard and mouse picked in the settings, drawn from the same files obs gets; the custom keyboard is the layout the helper writes for the picked keys
   async function ensureInputOverlay() {
-    if (wasdBuilt && mouseBuilt) return;
-    var base = HELPER + "/overlay-preview/";
-    if (!wasdBuilt) {
-      wasdBuilt = true;
-      try { wasdSize = await buildLayout(wasdInner, base + "wasd/wasd-minimal.json", base + "wasd/wasd.png"); }
-      catch (_) { wasdBuilt = false; }
+    var s = getStyle() || {};
+    var keyboard = pickLayout(layouts && layouts.keyboards, s.inputOverlayKeyboard, DEFAULT_KEYBOARD);
+    var mouse = pickLayout(layouts && layouts.mice, s.inputOverlayMouse, DEFAULT_MOUSE);
+    var keys = Array.isArray(s.inputOverlayCustomKeys) ? s.inputOverlayCustomKeys.join(",") : "";
+    var want = keyboard.value + "|" + mouse.value + "|" + (keyboard.json ? "" : keys);
+    if (want === builtFor) return;
+    builtFor = want;
+    var run = ++buildRun;
+    function file(path) { return HELPER + "/input-overlay/file?path=" + encodeURIComponent(path); }
+    try {
+      var keysJson = keyboard.json ? file(keyboard.json) : HELPER + "/input-overlay/custom?keys=" + encodeURIComponent(keys);
+      var keyboardBox = document.createElement("div");
+      var size = await buildLayout(keyboardBox, keysJson, keyboard.json ? file(keyboard.sheet) : HELPER + "/input-overlay/custom-sheet");
+      var mouseBox = document.createElement("div"), sizeMouse = null;
+      if (mouse.json) sizeMouse = await buildLayout(mouseBox, file(mouse.json), file(mouse.sheet));
+      if (run !== buildRun) return;
+      wasdInner.replaceChildren.apply(wasdInner, Array.prototype.slice.call(keyboardBox.childNodes));
+      wasdInner.style.width = keyboardBox.style.width; wasdInner.style.height = keyboardBox.style.height;
+      wasdSize = size;
+      mouseOn = !!sizeMouse;
+      if (sizeMouse) {
+        mouseInner.replaceChildren.apply(mouseInner, Array.prototype.slice.call(mouseBox.childNodes));
+        mouseInner.style.width = mouseBox.style.width; mouseInner.style.height = mouseBox.style.height;
+        mouseSize = sizeMouse;
+      }
+    } catch (_) {
+      if (run === buildRun) builtFor = "";
     }
-    if (!mouseBuilt) {
-      mouseBuilt = true;
-      try { mouseSize = await buildLayout(mouseInner, base + "mouse/mouse-no-movement.json", base + "mouse/mouse.png"); }
-      catch (_) { mouseBuilt = false; }
-    }
-    layout();
+    if (run === buildRun) layout();
+  }
+
+  function pushBongoLook() {
+    var s = getStyle() || {};
+    if (window.RKBongo && window.RKBongo.setLook) window.RKBongo.setLook({ live2d: s.bongoLive2d, track: s.bongoTrack, breath: s.bongoBreath, blink: s.bongoBlink, speed: s.bongoSpeed });
   }
 
   function ensureBongo() {
     if (!window.RKBongo) return;
     window.RKBongo.setMode((getStyle() || {}).bongoMode || "standard");
+    if (window.RKBongo.setKeys) window.RKBongo.setKeys((getStyle() || {}).bongoKeys);
+    pushBongoLook();
     if (bongoBuilt) return;
     bongoBuilt = true;
     window.RKBongo.mount(bongoCanvas)
@@ -234,12 +294,15 @@
       bh = Math.max(r.wasd.y + r.wasd.h, r.mouse.y + r.mouse.h) - by;
     } else { applyStyle(); return; }
     var localW = bw, localH = bh, localX0 = bx, localY0 = by;
+    // a wasd group of another shape than the picked layouts make is the one obs has until apply, so it is not drawn into
+    var live = liveRect;
+    if (live && mode === "input_overlay" && Math.abs((live.w * CANVAS_W) / Math.max(1e-6, live.h * CANVAS_H) - bw / bh) > 0.02) live = null;
     // obs is authoritative for the items real box -- take its size too, not just its corner, or the drawn box is the right shape in the wrong place (the overlay reads as floating above the canvas bottom when obs has it flush)
-    if (liveRect) {
-      bx = liveRect.x * CANVAS_W; by = liveRect.y * CANVAS_H;
-      bw = liveRect.w * CANVAS_W; bh = liveRect.h * CANVAS_H;
+    if (live) {
+      bx = live.x * CANVAS_W; by = live.y * CANVAS_H;
+      bw = live.w * CANVAS_W; bh = live.h * CANVAS_H;
       // an unapplied size edit grows the real box, anchored the way the helper ScaleAnchor does at Apply: an edge on the canvas edge stays there, else an item in an outer third keeps to that side, else the center holds
-      var f = clampNum(curScalePct(), 50, 200, 100) / (liveRect.scalePct || 100);
+      var f = clampNum(curScalePct(), 50, 200, 100) / (live.scalePct || 100);
       if (Math.abs(f - 1) > 0.0005) {
         var nw = bw * f, nh = bh * f;
         bx = scaledStart(bx, bw, nw, CANVAS_W);
@@ -248,7 +311,7 @@
       }
     }
     // no live rect means obs is still showing the other overlay, so honour whatever this style was last dragged to before falling back to the canonical corner
-    if (!liveRect) {
+    if (!live) {
       var saved = savedPosition();
       if (saved) { bx = saved.x * CANVAS_W; by = saved.y * CANVAS_H; }
     }
@@ -275,6 +338,7 @@
       var fx = localW > 0 ? bw / localW : 1, fy = localH > 0 ? bh / localH : 1;
       setBox(wasdEl, (r.wasd.x - localX0) * k * fx, (r.wasd.y - localY0) * k * fy, r.wasd.w * k * fx, r.wasd.h * k * fy);
       setBox(mouseEl, (r.mouse.x - localX0) * k * fx, (r.mouse.y - localY0) * k * fy, r.mouse.w * k * fx, r.mouse.h * k * fy);
+      mouseEl.hidden = !mouseOn;
       if (wasdSize.w > 0) wasdInner.style.transform = "scale(" + (r.wasd.w * k * fx / wasdSize.w) + ")";
       if (mouseSize.w > 0) mouseInner.style.transform = "scale(" + (r.mouse.w * k * fx / mouseSize.w) + ")";
     }
@@ -444,7 +508,7 @@
     var bongo = mode === "bongo_cat";
     bongoEl.hidden = !bongo;
     wasdEl.hidden = bongo;
-    mouseEl.hidden = bongo;
+    mouseEl.hidden = bongo || !mouseOn;
     if (bongo) ensureBongo(); else ensureInputOverlay();
     if (window.RKBongo) { if (bongo && running) window.RKBongo.start(); else window.RKBongo.stop(); }
     layout();
@@ -476,8 +540,8 @@
         if (window.RKBongo) window.RKBongo.setKey(code, down);
         return;
       }
-      var id = CODE_TO_ID[code];
-      if (id) setPressed(wasdInner, id, down);
+      var keyCode = CODE_TO_KEYCODE[code];
+      if (keyCode) setPressedCode(wasdInner, keyCode, down);
     };
   }
   var onDown = onKey(true), onUp = onKey(false);
@@ -660,8 +724,18 @@
     },
     refresh: function () {
       var s = getStyle() || {};
+      if (window.RKBongo && window.RKBongo.setKeys) window.RKBongo.setKeys(s.bongoKeys);
+      pushBongoLook();
       if (setMode(s.overlayStyle || "input_overlay")) applyMode();
+      else if (mode === "input_overlay") ensureInputOverlay().then(layout);
       else layout();
+    },
+    // the keyboards and mice the helper offers and how it fits them, options.inputOverlay of the settings
+    setLayouts: function (options) {
+      layouts = options || null;
+      if (options && options.group) GROUP = { width: options.group.width, height: options.group.height, gap: options.group.gap };
+      builtFor = "";
+      if (running && mode === "input_overlay") ensureInputOverlay();
     },
   };
 })();

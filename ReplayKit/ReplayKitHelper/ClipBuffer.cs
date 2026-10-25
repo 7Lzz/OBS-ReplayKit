@@ -13,11 +13,8 @@ namespace ReplayKitHelper
     // where the last stretch of gameplay a clip is cut from is kept: obs holds it in memory as its replay buffer, or the plugin records it to disk in short pieces and this joins the newest of them into the clip
     internal static class ClipBuffer
     {
-        public const string Recommended = "recommended";
         public const string Disk = "disk";
         public const string Memory = "memory";
-        // with this much installed memory or less, recommended keeps the buffer on disk
-        private const int DiskUpToGb = 16;
         private const int MaxSegments = 500;
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -48,22 +45,14 @@ namespace ReplayKitHelper
         // 0 when windows does not say
         public static int SystemMemoryGb => InstalledGb.Value;
 
-        // a machine whose memory could not be read keeps what obs does on its own
-        public static string RecommendedMode() => SystemMemoryGb > 0 && SystemMemoryGb <= DiskUpToGb ? Disk : Memory;
-
-        public static string EffectiveMode(JObject settings)
-        {
-            string chosen = settings?["recordingBuffer"]?.Value<string>();
-            return chosen == Disk || chosen == Memory ? chosen : RecommendedMode();
-        }
+        // disk unless memory was picked; the recommended choice of older builds now reads as disk
+        public static string EffectiveMode(JObject settings) => settings?["recordingBuffer"]?.Value<string>() == Memory ? Memory : Disk;
 
         public static JArray Options()
         {
-            string recommended = RecommendedMode() == Disk ? "Disk" : "Memory";
             return new JArray(
-                new JObject { ["value"] = Recommended, ["label"] = "Recommended (" + recommended + ")", ["blurb"] = $"Automatically uses Disk with {DiskUpToGb} GB of RAM or less, or Memory with more than {DiskUpToGb} GB of RAM." },
-                new JObject { ["value"] = Disk, ["label"] = "Disk", ["blurb"] = "Keeps the buffer on your drive. Uses far less memory, but writes to the drive the whole time." },
-                new JObject { ["value"] = Memory, ["label"] = "Memory", ["blurb"] = "Keeps the buffer in memory. Fastest saves, but uses the most RAM." });
+                new JObject { ["value"] = Disk, ["label"] = "Disk", ["blurb"] = "Keeps the buffer on your drive. Uses very little RAM, but writes to the drive while clipping is on." },
+                new JObject { ["value"] = Memory, ["label"] = "Memory", ["blurb"] = "Keeps the buffer in RAM. Saves clips fastest but uses the most RAM. If Disk causes stutters, slow saves or clips that fail to save, Memory can help." });
         }
 
         // the plugin says whenever its disk buffer starts or stops, and again on every settings poll

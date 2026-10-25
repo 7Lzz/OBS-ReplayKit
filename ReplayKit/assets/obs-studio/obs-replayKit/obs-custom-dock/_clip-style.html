@@ -2164,6 +2164,8 @@
   .render-replace-note { display: block; color: var(--text_muted); font-size: 11.5px; }
   .render-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--text_muted); font-size: 12px; }
   .editor-output { position:absolute; overflow:hidden; background:#000; }
+  /* without black bars only the frame that is saved is black, and the stage around it shows the page */
+  .editor-stage .trim-video-wrap.is-barless { background:transparent; }
   .editor-picture { position:absolute; }
   /* the tools on the left and the panel on the right stand against the edges of the window, square, the panels a half step lighter than the page and running into the toolbar of the timeline under them, with a hairline toward the video, like the bar over them; the timeline below needs no line, its drag handle sets it apart */
   .editor-body {

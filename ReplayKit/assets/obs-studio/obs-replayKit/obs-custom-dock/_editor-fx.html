@@ -72,6 +72,44 @@
   .ed-fx-head .ed-back[hidden] { display: none; }
   .ed-fx-box { display: flex; flex-direction: column; padding: 12px; border-radius: 8px; background: rgba(var(--text-rgb), .05); }
   .ed-fx-box-title { font-size: 12px; color: var(--text_muted); }
+  /* the presets of a tab, drawn the way settings draws its lists and its theme presets: a bordered table of rows, the picked one filled with the accent like a picked theme, a name field with the button that saves beside it */
+  .ed-preset-table { margin-top: 10px; border: 1px solid var(--grey4-solid, var(--grey4)); border-radius: 4px; background: rgba(var(--text-rgb), .035); overflow: hidden; }
+  .ed-preset-table:empty { display: none; }
+  .ed-preset { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; column-gap: 4px; min-height: 38px; padding: 0 6px 0 12px; color: var(--text); font-size: 13px; cursor: pointer; transition: background 120ms linear; }
+  .ed-preset + .ed-preset { border-top: 1px solid var(--grey4-solid, var(--grey4)); }
+  .ed-preset:hover { background: rgba(var(--text-rgb), .06); }
+  .ed-preset.is-selected { background: var(--primary); color: var(--on-accent); }
+  .ed-preset:focus-visible { outline: 2px solid var(--primary_light); outline-offset: -2px; }
+  .ed-preset-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ed-preset-use { font-size: 11px; color: var(--text_muted); white-space: nowrap; }
+  .ed-preset-use:empty { display: none; }
+  .ed-preset.is-selected .ed-preset-use { color: rgba(var(--on-accent-rgb), .8); }
+  .ed-preset .icon-mini-btn { opacity: 0; }
+  .ed-preset:hover .icon-mini-btn, .ed-preset:focus-within .icon-mini-btn, .ed-preset.is-selected .icon-mini-btn, .ed-preset .icon-mini-btn.is-armed { opacity: 1; }
+  .ed-preset.is-selected .icon-mini-btn:not(.is-armed) { color: var(--on-accent); }
+  .ed-preset-name-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; margin-top: 8px; }
+  .ed-preset .name-edit-input { width: 100%; box-sizing: border-box; }
+  .ed-text-input { height: 32px; min-width: 0; box-sizing: border-box; padding: 0 9px; border: 1px solid var(--grey4-solid, var(--grey4)); border-radius: 4px; background: var(--grey4); color: var(--text); font: inherit; font-size: 13px; outline: none; }
+  .ed-text-input:focus { border-color: var(--primary_light); }
+  .ed-text-input::placeholder { color: var(--text_muted); opacity: 1; }
+  /* the tab of words to check carries the orange of the mark on the timeline */
+  .ed-rail-r .ed-tab[data-kind="check"] svg { color: rgb(255, 159, 67); }
+  /* each subtitle to check is a row of the same table as the presets: its text and time, what else it might have been as small buttons, and keeping it */
+  .ed-check-item { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+  .ed-check-item + .ed-check-item { border-top: 1px solid var(--grey4-solid, var(--grey4)); }
+  .ed-check-head { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+  .ed-check-text { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 600; color: var(--text); }
+  .ed-check-time { flex: none; font-size: 11px; color: var(--text_muted); font-variant-numeric: tabular-nums; }
+  .ed-check-label { font-size: 11px; color: var(--text_muted); }
+  .ed-check-item .tl-speeds { flex-wrap: wrap; }
+  .ed-check-item .tl-speeds .btn { flex: 0 1 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ed-check-item .ed-btns { margin: 0; }
+  .ed-check-item .ed-btns .btn { flex: 1 1 0; height: 32px; gap: 6px; }
+  /* the icon of a button with a label is drawn at the size settings uses beside its 12px text, the same in every card of the editor */
+  .ed-fx-card .btn svg { width: 14px; height: 14px; fill: currentColor; flex: none; }
+  .ed-check-head .delete-btn { flex: none; margin: -4px -4px -4px 0; }
+  .ed-check-type { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+  .ed-check-type .btn { height: 32px; gap: 6px; }
 </style>
 <script>
 (function () {
@@ -110,8 +148,8 @@
   }
   function gainM(r, g, b) { return [r, 0, 0, 0, g, 0, 0, 0, b]; }
 
-  // the filters: a look is a matrix, an offset per channel, a gamma and a contrast, taken toward no change by its intensity
-  function look(m, off, gamma, contrast) { return { m: m, off: off || [0, 0, 0], gamma: gamma || 1, contrast: contrast || 1 }; }
+  // the filters: a look is a matrix with an offset added before the result is cut to range (mo), an offset per channel after it, a gamma and a contrast, taken toward no change by its intensity
+  function look(m, off, gamma, contrast, mo) { return { m: m, off: off || [0, 0, 0], gamma: gamma || 1, contrast: contrast || 1, mo: mo || [0, 0, 0] }; }
   var LOOKS = [
     ["vivid", "Vivid", look(satM(1.45), [0, 0, 0], 1, 1.12)],
     ["warm", "Warm", look(gainM(1.12, 1.02, 0.86), [0.02, 0.01, 0], 1, 1.04)],
@@ -133,6 +171,19 @@
     ["matrix", "Retro Green", look([0.8, 0.1, 0, 0.15, 1.1, 0.05, 0, 0.1, 0.75], [0, 0.02, 0], 1, 1.1)],
     ["rose", "Rose", look(mul(gainM(1.1, 0.94, 1.02), satM(0.9)), [0.04, 0.01, 0.03], 1.04, 0.95)],
     ["punch", "Punch", look(satM(1.25), [-0.02, -0.02, -0.02], 0.95, 1.3)],
+    ["dramatic", "Dramatic", look(satM(0.85), [-0.02, -0.02, -0.02], 0.92, 1.35)],
+    ["bright", "Bright", look(identity(), [0.05, 0.05, 0.05], 1.15, 1)],
+    ["bluehour", "Blue Hour", look(mul(gainM(0.86, 0.95, 1.18), satM(0.9)), [0, 0.01, 0.05], 1.02, 1.06)],
+    ["lush", "Lush Green", look(mul([1, 0, 0, -0.06, 1.16, -0.06, 0, 0, 1], satM(1.2)), [0, 0.01, 0], 1.02, 1.06)],
+    ["natural", "Natural", look(mul(gainM(1.03, 1, 0.97), satM(1.08)), [0, 0, 0], 1, 1.06)],
+    ["orange", "Orange", look(gainM(1.18, 1, 0.75), [0.03, 0.01, 0], 1, 1.05)],
+    ["magic", "Magic", look(mul(gainM(1.08, 0.9, 1.15), satM(1.15)), [0.02, 0, 0.04], 1, 1.08)],
+    ["shadow", "Shadow", look(satM(0.35), [-0.03, -0.03, -0.03], 0.82, 1.2)],
+    // the photo film looks of the colour matrix filter of pixi.js, the matrices and offsets as it publishes them
+    ["polaroid", "Polaroid", look([1.438, -0.062, -0.062, -0.122, 1.378, -0.122, -0.016, -0.016, 1.483])],
+    ["kodachrome", "Kodachrome", look([1.1285582, -0.3967382, -0.0399256, -0.1640434, 1.0835252, -0.0549881, -0.1678601, -0.5603416, 1.6014851], null, 1, 1, [0.24992, 0.09699, 0.139725])],
+    ["technicolor", "Technicolor", look([1.9125278, -0.8545345, -0.0915551, -0.3087833, 1.7658909, -0.1060174, -0.2311034, -0.7501899, 1.8475978], null, 1, 1, [0.046249, -0.27589, 0.121376])],
+    ["brownie", "Brownie", look([0.5997023, 0.3455324, -0.2708299, -0.0377032, 0.8609578, 0.1505955, 0.2411364, -0.0744104, 0.4497218], null, 1, 1, [0.186008, -0.144974, -0.029655])],
   ];
 
   // the effects: each sets some of the steps from its strength (0 to 1), and effects that share a step take the stronger value. lengths are pixels of a 1080p picture
@@ -154,10 +205,28 @@
     ["zoom", "Zoom", true, function (s, a) { s.zoom = Math.max(s.zoom, 1 + a); }],
     ["fisheye", "Fisheye", true, function (s, a) { s.lens = Math.max(s.lens, 0.1 + 0.5 * a); }],
     ["mirror", "Mirror", false, function (s) { s.flip = 1; }],
+    // the bloom filter of pixi.js: a blurred copy laid over the picture as a screen
+    ["glow", "Glow", true, function (s, a) { s.glow = Math.max(s.glow, 0.3 + 0.6 * a); s.glowS = Math.max(s.glowS, 6 + 10 * a); }],
+    // the advanced bloom of pixi.js: the part of each colour over a threshold, blurred and added to the picture
+    ["bloom", "Bloom", true, function (s, a) { var t = 0.75 - 0.35 * a; s.bloomT = s.bloomS ? Math.min(s.bloomT, t) : t; s.bloomS = Math.max(s.bloomS, 8 + 12 * a); }],
+    // a band across the middle stays sharp and the rows above and below it blur, the way a tilted lens fakes a model
+    ["tiltshift", "Tilt Shift", true, function (s, a) { s.tilt = Math.max(s.tilt, 3 + 9 * a); }],
+    ["motionblur", "Motion Blur", true, function (s, a) { s.motion = Math.max(s.motion, 3 + 22 * a); }],
+    // the picture averaged with copies of itself zoomed toward its centre
+    ["zoomblur", "Zoom Blur", true, function (s, a) { s.zblur = Math.max(s.zblur, 0.03 + 0.12 * a); }],
+    // every colour over the threshold is turned to its negative, the sabattier effect of the darkroom
+    ["solarize", "Solarize", true, function (s, a) { var t = 0.9 - 0.4 * a; s.solar = s.solar ? Math.min(s.solar, t) : t; }],
+    ["edges", "Neon Edges", false, function (s) { s.edges = 1; }],
+    // the top half again, upside down, in the bottom half
+    ["reflection", "Reflection", false, function (s) { s.reflect = 1; }],
+    // the fisheye turned the other way; a fisheye that is also on wins
+    ["pinch", "Pinch", true, function (s, a) { if (s.lens <= 0) s.lens = Math.min(s.lens, -(0.1 + 0.4 * a)); }],
+    // a tube screen: a curved glass, lines between the rows, a dark edge and the colours a little apart
+    ["crt", "CRT", true, function (s, a) { s.lens = Math.max(s.lens, 0.06 + 0.1 * a); s.scanP = s.scanP || 3; s.scanA = Math.max(s.scanA, 0.2 + 0.35 * a); s.vignette = Math.max(s.vignette, 0.5 + 0.4 * a); s.shift = Math.max(s.shift, Math.round(1 + 2 * a)); }],
   ];
   var EFFECT_START = 50;
 
-  function noSteps() { return { zoom: 1, lens: 0, flip: 0, blur: 0, pixel: 0, shift: 0, sharp: 0, emboss: 0, sketch: 0, sepia: 0, invert: 0, poster: 0, thermal: 0, vignette: 0, noise: 0, scanP: 0, scanA: 0 }; }
+  function noSteps() { return { zoom: 1, lens: 0, flip: 0, reflect: 0, blur: 0, motion: 0, zblur: 0, tilt: 0, glow: 0, glowS: 0, bloomT: 0, bloomS: 0, pixel: 0, shift: 0, sharp: 0, emboss: 0, sketch: 0, edges: 0, sepia: 0, invert: 0, solar: 0, poster: 0, thermal: 0, vignette: 0, noise: 0, scanP: 0, scanA: 0 }; }
 
   function lookById(id) { for (var i = 0; i < LOOKS.length; i++) if (LOOKS[i][0] === id) return LOOKS[i]; return null; }
   function effectById(id) { for (var i = 0; i < EFFECTS.length; i++) if (EFFECTS[i][0] === id) return EFFECTS[i]; return null; }
@@ -197,7 +266,7 @@
     var lk = fx.look && lookById(fx.look.id);
     if (lk && fx.look.amount > 0) {
       var t = fx.look.amount / 100, L = lk[2];
-      out.look = { m: lerpM(identity(), L.m, t).map(r4), off: L.off.map(function (v) { return r4(v * t); }), gamma: r4(1 + (L.gamma - 1) * t), contrast: r4(1 + (L.contrast - 1) * t) };
+      out.look = { m: lerpM(identity(), L.m, t).map(r4), mo: L.mo.map(function (v) { return r4(v * t); }), off: L.off.map(function (v) { return r4(v * t); }), gamma: r4(1 + (L.gamma - 1) * t), contrast: r4(1 + (L.contrast - 1) * t) };
     }
     fx.effects.forEach(function (e) { effectById(e.id)[3](out.steps, e.amount / 100); });
     var s = out.steps;
@@ -210,8 +279,8 @@
   function isIdentity(r) {
     var s = r.steps;
     return plainM(r.hue) && plainM(r.sat) && r.gain.every(function (v) { return v === 1; }) && !r.vib && r.gamma === 1 && r.bright === 1 && r.contrast === 1 && !r.look &&
-      s.zoom === 1 && !s.lens && !s.flip && !s.blur && !s.pixel && !s.shift && !s.sharp && !s.emboss && !s.sketch &&
-      !s.sepia && !s.invert && !s.poster && !s.thermal && !s.vignette && !s.noise && !s.scanA;
+      s.zoom === 1 && !s.lens && !s.flip && !s.reflect && !s.blur && !s.motion && !s.zblur && !s.tilt && !(s.glow && s.glowS) && !s.bloomS && !s.pixel && !s.shift && !s.sharp && !s.emboss && !s.sketch && !s.edges &&
+      !s.sepia && !s.invert && !s.solar && !s.poster && !s.thermal && !s.vignette && !s.noise && !s.scanA;
   }
 
   var VERTEX = [
@@ -224,7 +293,7 @@
     "}",
   ].join("\n");
 
-  // the steps in the order the helper writes them: blur, zoom, lens, mirror, pixelate, rgb split, one of emboss / sketch / sharpen, the colour stage, the look, then the finishing steps. positions are pixels of the video, y down
+  // the steps in the order the helper writes them: the blurred copies laid over the picture (tilt shift, glow, bloom), one of zoom blur / motion blur / blur, zoom, lens, mirror, reflection, pixelate, rgb split, one of emboss / sketch / neon edges / sharpen, the colour stage, the look, then the finishing steps. positions are pixels of the video, y down
   var FRAGMENT = [
     "#version 300 es",
     "precision highp float;",
@@ -232,57 +301,101 @@
     "uniform vec4 uRect;",
     "uniform vec2 uVid;",
     "uniform float uLod, uPix, uTime;",
-    "uniform float uZoom, uLens, uFlip, uBlurS, uBlock, uShift, uSharp, uEmboss, uSketch;",
+    "uniform vec4 uZb[4];",
+    // where the cut of the zoom starts and how much of the picture it keeps, in whole pixels as the helper cuts it
+    "uniform vec4 uZoomCut;",
+    "uniform float uZoom, uLens, uFlip, uReflect, uBlurS, uMotion, uZBlur, uTiltS, uGlow, uGlowS, uBloomT, uBloomS, uBlock, uShift, uSharp, uEmboss, uSketch, uEdges;",
     "uniform mat3 uHueM, uSatM;",
     "uniform vec3 uGain;",
     "uniform float uVib, uGamma, uBright, uContrast;",
     "uniform float uLookOn;",
     "uniform mat3 uLookM;",
-    "uniform vec3 uLookOff;",
+    "uniform vec3 uLookOff, uLookMo;",
     "uniform float uLookGamma, uLookContrast;",
-    "uniform float uSepia, uInvert, uPoster, uThermal, uVignette, uNoise, uScanPer, uScanTh, uScanA;",
+    "uniform float uSepia, uInvert, uSolar, uPoster, uThermal, uVignette, uNoise, uScanPer, uScanTh, uScanA;",
     "in vec2 vUv;",
     "out vec4 o;",
     "const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);",
-    "vec3 at(vec2 p, float lod) { p = clamp(p, vec2(0.5), uVid - 0.5); return textureLod(uTex, vec2(p.x / uVid.x, 1.0 - p.y / uVid.y), lod).rgb; }",
-    // the pixel of the source an output pixel shows, undoing the mirror, then the lens, then the zoom
+    "vec3 raw(vec2 p, float lod) { p = clamp(p, vec2(0.5), uVid - 0.5); return textureLod(uTex, vec2(p.x / uVid.x, 1.0 - p.y / uVid.y), lod).rgb; }",
+    // every function that samples is called from one place inside a loop: the compiler behind webgl inlines each call, so a function called from several places, inside functions that are themselves called from several, multiplies until the shader no longer compiles
+    // the source with the blurred copies laid over it, each copy taken from the source as it was: tilt shift through a mask of rows in 8 bit steps, glow as a screen, bloom as the part of each colour over the threshold added. a copy is a gaussian of nine samples of the mipmap level that already averages blocks of about its size; the bloom cuts every sample before averaging, so it reads 25 samples of a finer level
+    "vec3 at(vec2 p, float lod) {",
+    "  vec3 c = raw(p, lod);",
+    "  float m = 0.0;",
+    "  if (uTiltS > 0.0) { float d = clamp((abs(p.y / uVid.y - 0.5) - 0.12) / 0.2, 0.0, 1.0); m = floor(d * d * (3.0 - 2.0 * d) * 255.0 + 0.5) / 255.0; }",
+    "  for (int k = 0; k < 3; k++) {",
+    "    float sigma = k == 0 ? (m > 0.0 ? uTiltS : 0.0) : k == 1 ? (uGlow > 0.0 ? uGlowS : 0.0) : uBloomS;",
+    "    if (sigma <= 0.0) continue;",
+    "    int r = k == 2 ? 2 : 1;",
+    "    float gap = sigma * (k == 2 ? 0.56 : 1.12);",
+    "    float fall = k == 2 ? 0.157 : 0.5;",
+    "    float l = max(lod, log2(max(1.0, sigma)) - (k == 2 ? 1.0 : 0.0));",
+    "    vec3 acc = vec3(0.0); float sum = 0.0;",
+    "    for (int j = -r; j <= r; j++) for (int i = -r; i <= r; i++) {",
+    "      vec3 s = raw(p + vec2(float(i), float(j)) * gap, l);",
+    "      if (k == 2) s = clamp((s - uBloomT) / (1.0 - uBloomT), 0.0, 1.0);",
+    "      float w = exp(-fall * float(i * i + j * j));",
+    "      acc += w * s; sum += w;",
+    "    }",
+    "    vec3 b = acc / sum;",
+    "    if (k == 0) c = mix(c, b, m);",
+    "    else if (k == 1) c += (1.0 - (1.0 - c) * (1.0 - b) - c) * uGlow;",
+    "    else c = min(c + b, 1.0);",
+    "  }",
+    "  return c;",
+    "}",
+    // the pixel of the source an output pixel shows, undoing the reflection, the mirror, then the lens, then the zoom
     "vec2 source(vec2 p) {",
     "  vec2 c = uVid * 0.5;",
+    "  if (uReflect > 0.5 && p.y > c.y) p.y = uVid.y - p.y;",
     "  if (uFlip > 0.5) p.x = uVid.x - p.x;",
-    "  if (uLens > 0.0) { vec2 d = p - c; float r2 = dot(d, d) / dot(c, c); p = c + d * (1.0 + uLens * r2); }",
-    "  if (uZoom > 1.0) p = c + (p - c) / uZoom;",
+    // the lenscorrection of ffmpeg measures from the pixel in the middle and its bilinear reads half a pixel further on, so its centre sits half a pixel in and the picture moves half a pixel
+    "  if (uLens != 0.0) { vec2 lc = floor(c) + 0.5; vec2 d = p - lc; float r2 = dot(d, d) / dot(c, c); p = lc + 0.5 + d * (1.0 + uLens * r2); }",
+    "  if (uZoom > 1.0) p = uZoomCut.xy + p * uZoomCut.zw;",
     "  return p;",
     "}",
-    // a picture shrunk on screen is read as four samples spread over the screen pixel from the next finer level, the way the msaa of the clip player does, which keeps edges and text as crisp as the video shows them without its look; one sample from a coarser level would blur them
-    "vec3 fine(vec2 sp, float lod) {",
-    "  vec2 d = vec2(uPix);",
-    "  float l = max(0.0, lod - 2.0);",
-    "  return 0.25 * (at(sp + d * vec2(-0.375, -0.125), l) + at(sp + d * vec2(0.125, -0.375), l) + at(sp + d * vec2(0.375, 0.125), l) + at(sp + d * vec2(-0.125, 0.375), l));",
-    "}",
-    // the blurred source where an output pixel lands; the lens leaves black where it reaches past the picture
+    // the source where an output pixel lands, through one of the three blurs: the zoom blur averages the picture with four copies cut to its middle and stretched back (uZb holds where each cut starts and how much of the picture it keeps, in whole pixels as the helper cuts them), the motion blur is a gaussian along the row with a sample at least every pixel of the level read, the blur nine samples of a coarser level. without one, a picture shrunk on screen is read as four samples spread over the screen pixel from a finer level, the way the msaa of the clip player does, which keeps edges and text as crisp as the video shows them without its look; one sample from a coarser level would blur them. the lens leaves black where it reaches past the picture
     "vec3 picture(vec2 p, float lod) {",
     "  vec2 sp = source(p);",
     "  if (sp.x < 0.0 || sp.y < 0.0 || sp.x > uVid.x || sp.y > uVid.y) return vec3(0.0);",
-    "  if (uBlurS <= 0.0) return uPix > 1.0 && lod <= uLod + 0.001 ? fine(sp, lod) : at(sp, lod);",
-    "  float l = max(lod, log2(max(1.0, uBlurS)));",
+    "  int mode = uZBlur > 0.0 ? 1 : uMotion > 0.0 ? 2 : uBlurS > 0.0 ? 3 : uPix > 1.0 && lod <= uLod + 0.001 ? 4 : 0;",
+    "  int reach = mode == 2 ? int(clamp(ceil(3.0 * uMotion / max(1.0, exp2(lod))), 1.0, 30.0)) : 0;",
+    "  int n = mode == 1 ? 5 : mode == 2 ? 2 * reach + 1 : mode == 3 ? 9 : mode == 4 ? 4 : 1;",
+    "  float l = mode == 3 ? max(lod, log2(max(1.0, uBlurS))) : mode == 4 ? max(0.0, lod - 2.0) : lod;",
+    "  vec2 c = uVid * 0.5;",
+    "  vec2 spread[4] = vec2[4](vec2(-0.375, -0.125), vec2(0.125, -0.375), vec2(0.375, 0.125), vec2(-0.125, 0.375));",
     "  vec3 acc = vec3(0.0); float sum = 0.0;",
-    "  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) { float w = exp(-0.5 * float(i * i + j * j)); acc += w * at(sp + vec2(float(i), float(j)) * uBlurS * 1.12, l); sum += w; }",
+    "  for (int i = 0; i < n; i++) {",
+    "    vec2 q = sp; float w = 1.0;",
+    "    if (mode == 1) { if (i > 0) q = uZb[i - 1].xy + sp * uZb[i - 1].zw; }",
+    "    else if (mode == 2) { float t = float(i - reach) * 3.0 / float(reach); q = sp + vec2(t * uMotion, 0.0); w = exp(-0.5 * t * t); }",
+    "    else if (mode == 3) { vec2 d = vec2(float(i % 3 - 1), float(i / 3 - 1)); q = sp + d * uBlurS * 1.12; w = exp(-0.5 * dot(d, d)); }",
+    "    else if (mode == 4) q = sp + vec2(uPix) * spread[i];",
+    "    acc += w * at(q, l); sum += w;",
+    "  }",
     "  return acc / sum;",
     "}",
     // blocks of the pixelate effect start at the top left and the last ones are cut by the edge; a block is the mean of 16 samples spread over it
     "vec3 blocked(vec2 p) {",
-    "  if (uBlock <= 1.0) return picture(p, uLod);",
-    "  vec2 a = floor(p / uBlock) * uBlock;",
-    "  vec2 size = min(a + uBlock, uVid) - a;",
-    "  float l = max(uLod, log2(max(1.0, uBlock * 0.25 / max(1.0, uZoom))));",
+    "  bool on = uBlock > 1.0;",
+    "  vec2 a = on ? floor(p / uBlock) * uBlock : p;",
+    "  vec2 size = on ? min(a + uBlock, uVid) - a : vec2(0.0);",
+    "  float l = on ? max(uLod, log2(max(1.0, uBlock * 0.25 / max(1.0, uZoom)))) : uLod;",
+    "  int n = on ? 16 : 1;",
     "  vec3 acc = vec3(0.0);",
-    "  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) acc += picture(a + size * (vec2(float(i), float(j)) + 0.5) * 0.25, l);",
-    "  return acc * 0.0625;",
+    "  for (int i = 0; i < n; i++) acc += picture(on ? a + size * (vec2(float(i % 4), float(i / 4)) + 0.5) * 0.25 : p, l);",
+    "  return acc / float(n);",
     "}",
+    // the rgb split takes red from the right and blue from the left
     "vec3 shifted(vec2 p) {",
     "  p = clamp(p, vec2(0.5), uVid - 0.5);",
-    "  vec3 c = blocked(p);",
-    "  if (uShift > 0.0) { c.r = blocked(clamp(p + vec2(uShift, 0.0), vec2(0.5), uVid - 0.5)).r; c.b = blocked(clamp(p - vec2(uShift, 0.0), vec2(0.5), uVid - 0.5)).b; }",
+    "  int n = uShift > 0.0 ? 3 : 1;",
+    "  vec3 c = vec3(0.0);",
+    "  for (int i = 0; i < n; i++) {",
+    "    float dx = n == 1 ? 0.0 : float(1 - i) * uShift;",
+    "    vec3 v = blocked(clamp(p + vec2(dx, 0.0), vec2(0.5), uVid - 0.5));",
+    "    if (n == 1) c = v; else if (i == 0) c.r = v.r; else if (i == 1) c.g = v.g; else c.b = v.b;",
+    "  }",
     "  return c;",
     "}",
     "float hash(vec2 p, float k) { return fract(sin(dot(p, vec2(12.9898 + k, 78.233 - k)) + uTime * 43.21 + k * 7.13) * 43758.5453); }",
@@ -292,24 +405,28 @@
     "  vec2 p = vec2(s.x, 1.0 - s.y) * uVid;",
     "  vec2 q = floor(p) + 0.5;",
     "  vec3 col;",
-    "  if (uEmboss > 0.5) {",
-    "    float k[9] = float[9](-2.0, -1.0, 0.0, -1.0, 1.0, 1.0, 0.0, 1.0, 2.0);",
-    "    col = vec3(0.0);",
-    "    for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++) col += k[j * 3 + i] * shifted(q + vec2(float(i - 1), float(j - 1)));",
-    "    col = clamp(col, 0.0, 1.0);",
-    "  } else if (uSketch > 0.5) {",
-    "    vec3 n[9];",
-    "    for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++) n[j * 3 + i] = shifted(q + vec2(float(i - 1), float(j - 1)));",
-    "    vec3 gx = -n[0] + n[2] - 2.0 * n[3] + 2.0 * n[5] - n[6] + n[8];",
-    "    vec3 gy = -n[0] - 2.0 * n[1] - n[2] + n[6] + 2.0 * n[7] + n[8];",
-    "    vec3 mag = min(sqrt(gx * gx + gy * gy), 1.0);",
-    "    col = 1.0 - clamp((mag - 0.1) / 0.2, 0.0, 1.0);",
-    "  } else if (uSharp > 0.0) {",
-    "    vec3 c0 = shifted(q);",
-    "    vec3 nb = shifted(q + vec2(2.0, 0.0)) + shifted(q - vec2(2.0, 0.0)) + shifted(q + vec2(0.0, 2.0)) + shifted(q - vec2(0.0, 2.0));",
-    "    col = clamp(c0 * (1.0 + uSharp) - nb * (uSharp * 0.25), 0.0, 1.0);",
-    "  } else {",
+    // emboss, sketch and neon edges read the 3x3 pixels around, sharpen the four two pixels away, which are the middles of the sides of the same grid twice as wide
+    "  bool around = uEmboss > 0.5 || uSketch > 0.5 || uEdges > 0.5;",
+    "  if (!around && uSharp <= 0.0) {",
     "    col = shifted(p);",
+    "  } else {",
+    "    float gap = around ? 1.0 : 2.0;",
+    "    vec3 n[9];",
+    "    for (int i = 0; i < 9; i++) {",
+    "      if (!around && i % 2 == 0 && i != 4) { n[i] = vec3(0.0); continue; }",
+    "      n[i] = shifted(q + vec2(float(i % 3 - 1), float(i / 3 - 1)) * gap);",
+    "    }",
+    "    if (uEmboss > 0.5) {",
+    "      col = clamp(-2.0 * n[0] - n[1] - n[3] + n[4] + n[5] + n[7] + 2.0 * n[8], 0.0, 1.0);",
+    "    } else if (around) {",
+    // the size of the change per channel, the way the sobel filter of ffmpeg measures it
+    "      vec3 gx = -n[0] + n[2] - 2.0 * n[3] + 2.0 * n[5] - n[6] + n[8];",
+    "      vec3 gy = -n[0] - 2.0 * n[1] - n[2] + n[6] + 2.0 * n[7] + n[8];",
+    "      vec3 mag = min(sqrt(gx * gx + gy * gy), 1.0);",
+    "      col = uSketch > 0.5 ? 1.0 - clamp((mag - 0.1) / 0.2, 0.0, 1.0) : clamp((mag - 0.04) / 0.3, 0.0, 1.0);",
+    "    } else {",
+    "      col = clamp(n[4] * (1.0 + uSharp) - (n[1] + n[3] + n[5] + n[7]) * (uSharp * 0.25), 0.0, 1.0);",
+    "    }",
     "  }",
     // the colour stage: hue, saturation and gain, each kept in range the way 8 bit frames are, the vibrance of ffmpeg, then gamma, brightness and contrast
     "  col = clamp(uHueM * col, 0.0, 1.0);",
@@ -323,7 +440,7 @@
     "  }",
     "  col = clamp((pow(col, vec3(1.0 / uGamma)) * uBright - 0.5) * uContrast + 0.5, 0.0, 1.0);",
     "  if (uLookOn > 0.5) {",
-    "    col = clamp(uLookM * col, 0.0, 1.0);",
+    "    col = clamp(uLookM * col + uLookMo, 0.0, 1.0);",
     "    col = clamp((pow(clamp(col + uLookOff, 0.0, 1.0), vec3(1.0 / uLookGamma)) - 0.5) * uLookContrast + 0.5, 0.0, 1.0);",
     "  }",
     "  if (uSepia > 0.0) {",
@@ -331,6 +448,7 @@
     "    col = clamp(mix(col, sep * col, uSepia), 0.0, 1.0);",
     "  }",
     "  if (uInvert > 0.0) col = col * (1.0 - 2.0 * uInvert) + uInvert;",
+    "  if (uSolar > 0.0) col = mix(col, 1.0 - col, vec3(greaterThan(col, vec3(uSolar))));",
     "  if (uPoster > 0.0) col = floor(floor(col * 255.0 + 0.5) * uPoster / 256.0) / (uPoster - 1.0);",
     "  if (uThermal > 0.5) { float t = dot(col, LUMA); col = clamp(vec3(3.0 * t - 1.0, 3.0 * t - 2.0, 1.0 - abs(3.0 * t - 1.0)), 0.0, 1.0); }",
     "  if (uVignette > 0.0) { float d = length(p - uVid * 0.5) / length(uVid * 0.5); float c = d > 1.0 ? 0.0 : cos(uVignette * d); col *= c * c * c * c; }",
@@ -355,8 +473,8 @@
     return shader;
   }
 
-  var UNIFORMS = ["uTex", "uRect", "uVid", "uLod", "uPix", "uTime", "uZoom", "uLens", "uFlip", "uBlurS", "uBlock", "uShift", "uSharp", "uEmboss", "uSketch", "uHueM", "uSatM", "uGain", "uVib", "uGamma", "uBright", "uContrast",
-    "uLookOn", "uLookM", "uLookOff", "uLookGamma", "uLookContrast", "uSepia", "uInvert", "uPoster", "uThermal", "uVignette", "uNoise", "uScanPer", "uScanTh", "uScanA"];
+  var UNIFORMS = ["uTex", "uRect", "uVid", "uLod", "uPix", "uTime", "uZb", "uZoomCut", "uZoom", "uLens", "uFlip", "uReflect", "uBlurS", "uMotion", "uZBlur", "uTiltS", "uGlow", "uGlowS", "uBloomT", "uBloomS", "uBlock", "uShift", "uSharp", "uEmboss", "uSketch", "uEdges", "uHueM", "uSatM", "uGain", "uVib", "uGamma", "uBright", "uContrast",
+    "uLookOn", "uLookM", "uLookOff", "uLookMo", "uLookGamma", "uLookContrast", "uSepia", "uInvert", "uSolar", "uPoster", "uThermal", "uVignette", "uNoise", "uScanPer", "uScanTh", "uScanA"];
 
   // a drawing context for the shader on a canvas; null where webgl2 is missing or only drawn by the processor, which could not keep up with it
   function build(canvas) {
@@ -430,14 +548,33 @@
     gl.uniform1f(u.uPix, 1 / fit);
     gl.uniform1f(u.uTime, (time || 0) % 1000);
     gl.uniform1f(u.uZoom, st.zoom);
+    var zw = Math.max(2, Math.floor(vw / st.zoom + 0.5)), zh = Math.max(2, Math.floor(vh / st.zoom + 0.5));
+    gl.uniform4f(u.uZoomCut, Math.floor((vw - zw) / 2), Math.floor((vh - zh) / 2), zw / vw, zh / vh);
     gl.uniform1f(u.uLens, st.lens);
     gl.uniform1f(u.uFlip, st.flip);
+    gl.uniform1f(u.uReflect, st.reflect);
+    // the blurs and the blurred copies come before the zoom, so their lengths shrink by it the way the helper writes them
     gl.uniform1f(u.uBlurS, st.blur > 0 ? st.blur * k / st.zoom : 0);
+    gl.uniform1f(u.uMotion, st.motion > 0 ? st.motion * k / st.zoom : 0);
+    gl.uniform1f(u.uZBlur, st.zblur);
+    var cuts = new Float32Array(16);
+    for (var i = 1; i <= 4 && st.zblur > 0; i++) {
+      var z = 1 + st.zblur * i / 4;
+      var cw = Math.max(2, Math.floor(vw / z + 0.5)), ch = Math.max(2, Math.floor(vh / z + 0.5));
+      cuts.set([Math.floor((vw - cw) / 2), Math.floor((vh - ch) / 2), cw / vw, ch / vh], (i - 1) * 4);
+    }
+    gl.uniform4fv(u.uZb, cuts);
+    gl.uniform1f(u.uTiltS, st.tilt > 0 ? st.tilt * k / st.zoom : 0);
+    gl.uniform1f(u.uGlow, st.glow);
+    gl.uniform1f(u.uGlowS, st.glowS > 0 ? st.glowS * k / st.zoom : 0);
+    gl.uniform1f(u.uBloomT, st.bloomT);
+    gl.uniform1f(u.uBloomS, st.bloomS > 0 ? st.bloomS * k / st.zoom : 0);
     gl.uniform1f(u.uBlock, st.pixel > 0 ? Math.max(1, px(st.pixel, k)) : 0);
     gl.uniform1f(u.uShift, st.shift > 0 ? px(st.shift, k) : 0);
     gl.uniform1f(u.uSharp, st.sharp);
     gl.uniform1f(u.uEmboss, st.emboss);
     gl.uniform1f(u.uSketch, st.sketch);
+    gl.uniform1f(u.uEdges, st.edges);
     gl.uniformMatrix3fv(u.uHueM, false, cols(r.hue));
     gl.uniformMatrix3fv(u.uSatM, false, cols(r.sat));
     gl.uniform3f(u.uGain, r.gain[0], r.gain[1], r.gain[2]);
@@ -446,13 +583,15 @@
     gl.uniform1f(u.uBright, r.bright);
     gl.uniform1f(u.uContrast, r.contrast);
     gl.uniform1f(u.uLookOn, r.look ? 1 : 0);
-    var L = r.look || { m: identity(), off: [0, 0, 0], gamma: 1, contrast: 1 };
+    var L = r.look || { m: identity(), mo: [0, 0, 0], off: [0, 0, 0], gamma: 1, contrast: 1 };
     gl.uniformMatrix3fv(u.uLookM, false, cols(L.m));
+    gl.uniform3f(u.uLookMo, L.mo[0], L.mo[1], L.mo[2]);
     gl.uniform3f(u.uLookOff, L.off[0], L.off[1], L.off[2]);
     gl.uniform1f(u.uLookGamma, L.gamma);
     gl.uniform1f(u.uLookContrast, L.contrast);
     gl.uniform1f(u.uSepia, st.sepia);
     gl.uniform1f(u.uInvert, st.invert);
+    gl.uniform1f(u.uSolar, st.solar);
     gl.uniform1f(u.uPoster, st.poster);
     gl.uniform1f(u.uThermal, st.thermal);
     gl.uniform1f(u.uVignette, st.vignette);
@@ -601,7 +740,9 @@
     filters: '<svg viewBox="0 0 24 24" class="is-line" aria-hidden="true"><circle cx="9" cy="9.5" r="5.2"/><circle cx="15" cy="9.5" r="5.2"/><circle cx="12" cy="14.8" r="5.2"/></svg>',
     effects: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2.5l1.9 5.6 5.6 1.9-5.6 1.9L10 17.5l-1.9-5.6L2.5 10l5.6-1.9zM18 13l1 2.9 3 1.1-3 1.1-1 2.9-1-2.9-3-1.1 3-1.1z"/></svg>',
   };
-  var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"]];
+  TAB_ICONS.presets = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15-5-2.18L7 18V5h10v13z"/></svg>';
+  var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"], ["presets", "Presets"]];
+  var PRESET_KINDS = { video: "the look of this video", subtitle: "the style of these subtitles" };
   var COLOR_GROUPS = [
     ["Channels", [["r", "Red"], ["g", "Green"], ["b", "Blue"], ["a", "Opacity"]]],
     ["Color", [["sat", "Saturation"], ["hue", "Hue"], ["vib", "Vibrance"]]],
@@ -631,6 +772,14 @@
     var els = { tabs: {}, panes: {}, color: {}, lookTiles: {}, effectTiles: {}, kindTabs: {}, editing: null, lastPane: "" };
     var thumbQueued = 0;
     var fxTimer = 0;
+    // a selected subtitle shows its own card ("edit") or the presets of subtitles here ("presets")
+    var subPane = "edit";
+    // the saved presets of each kind, the one picked last of each that overwrite writes over, and the one whose name is being typed
+    var presets = { subtitle: [], video: [] };
+    var chosen = { subtitle: "", video: "" };
+    var renaming = null;
+    var presetsKey = "";
+    var presetsSaving = Promise.resolve();
 
     function fx() { return lanes.fx.get(); }
     // a change that keeps coming (a slider being dragged) shows at once and is one step of the history once it rests
@@ -977,12 +1126,54 @@
         var b = el("button", "ed-tab is-active");
         b.type = "button";
         b.dataset.kind = t[0];
-        b.addEventListener("click", function () { if (lanes.panelClosed()) lanes.openPanel(); });
+        b.addEventListener("click", function () {
+          if (t[0] === "subtitle") setSubPane("edit");
+          if (lanes.panelClosed()) lanes.openPanel();
+        });
         b.innerHTML = icon(t[2]);
         b.appendChild(el("span", "", t[1]));
         els.kindTabs[t[0]] = b;
         o.rail.appendChild(b);
       });
+      // a selected subtitle has a second tab, its presets, drawn like the presets tab of the video
+      els.subPresetsTab = el("button", "ed-tab");
+      els.subPresetsTab.type = "button";
+      els.subPresetsTab.dataset.kind = "subtitle-presets";
+      els.subPresetsTab.innerHTML = TAB_ICONS.presets;
+      els.subPresetsTab.appendChild(el("span", "", "Presets"));
+      els.subPresetsTab.addEventListener("click", function () {
+        setSubPane("presets");
+        if (lanes.panelClosed()) lanes.openPanel();
+      });
+      o.rail.appendChild(els.subPresetsTab);
+      // the last tab of the bar sets whatever is selected back to how it starts, every tab of it at once, as one step of undo
+      els.resetTab = el("button", "ed-tab");
+      els.resetTab.type = "button";
+      els.resetTab.dataset.kind = "reset";
+      els.resetTab.innerHTML = icon("action/reset");
+      els.resetTab.appendChild(el("span", "", "Reset"));
+      els.resetTab.addEventListener("click", function () {
+        var done = lanes.resetSelected();
+        if (!done) return;
+        // the preset picked last is no longer what is on screen
+        if (done === "video" || done === "subtitle") chosen[done] = "";
+        presetsKey = "";
+        paint();
+        if (o.notify) o.notify({ video: "The video", audio: "The audio", subtitle: "The subtitles" }[done] + " went back to default. Undo brings it back.", "info");
+      });
+      o.rail.appendChild(els.resetTab);
+      // below reset, while a selected subtitle may be misheard: the list of them, with what else each might have been
+      els.checkTab = el("button", "ed-tab");
+      els.checkTab.type = "button";
+      els.checkTab.dataset.kind = "check";
+      els.checkTab.dataset.tooltip = "Subtitles that might be misheard";
+      els.checkTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2zm0-4h-2V7h2z"/></svg>';
+      els.checkTab.appendChild(el("span", "", "Check"));
+      els.checkTab.addEventListener("click", function () {
+        setSubPane("check");
+        if (lanes.panelClosed()) lanes.openPanel();
+      });
+      o.rail.appendChild(els.checkTab);
       var card = el("section", "editor-card ed-fx-card");
       card.hidden = true;
       var head = el("div", "ed-fx-head");
@@ -1005,11 +1196,13 @@
       card.appendChild(head);
       els.support = el("p", "ed-fx-note", "");
       card.appendChild(els.support);
-      ["color", "filters", "effects"].forEach(function (k) {
+      ["color", "filters", "effects", "presets", "check"].forEach(function (k) {
         var p = el("div", "ed-fx-pane");
         els.panes[k] = p;
         card.appendChild(p);
       });
+      buildPresets(els.panes.presets);
+      buildCheck(els.panes.check);
       els.editView = el("div", "ed-fx-pane");
       els.editView.hidden = true;
       card.appendChild(els.editView);
@@ -1037,17 +1230,59 @@
       lanes.refreshProps();
     }
 
+    function setSubPane(name) {
+      if (name === subPane) return;
+      subPane = name;
+      paint();
+      if (o.onSubtitlePane) o.onSubtitlePane();
+    }
+
     function paint() {
       // a panel closed with its x leaves its tabs in the bar with none of them lit
       var closed = lanes.panelClosed();
       Object.keys(els.tabs).forEach(function (k) { els.tabs[k].classList.toggle("is-active", !closed && k === pane); els.tabs[k].hidden = !shown; });
-      Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; els.kindTabs[k].classList.toggle("is-active", !closed); });
+      Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; els.kindTabs[k].classList.toggle("is-active", !closed && (k !== "subtitle" || subPane === "edit")); });
+      els.subPresetsTab.hidden = kind !== "subtitle";
+      els.resetTab.hidden = ["video", "audio", "subtitle"].indexOf(kind) < 0;
+      els.resetTab.dataset.tooltip = { video: "Reset the video to default", audio: "Reset this audio to default", subtitle: "Reset these subtitles to default" }[kind] || "";
+      els.subPresetsTab.classList.toggle("is-active", !closed && subPane === "presets");
+      var toCheck = kind === "subtitle" ? unsureCues() : [];
+      els.checkTab.hidden = !toCheck.length;
+      // once nothing is left to check its card gives way to the subtitle
+      if (subPane === "check" && !toCheck.length) { subPane = "edit"; if (o.onSubtitlePane) o.onSubtitlePane(); }
+      els.checkTab.classList.toggle("is-active", !closed && subPane === "check");
       // the bar stays while nothing is selected, empty, so the editor keeps its shape
       o.rail.hidden = false;
-      var open = shown && pane !== "general" && !closed;
+      var subPresets = kind === "subtitle" && subPane === "presets" && !closed;
+      var subCheck = kind === "subtitle" && subPane === "check" && !closed;
+      var open = (shown && pane !== "general" && !closed) || subPresets || subCheck;
       var wasOpen = !els.card.hidden;
       els.card.hidden = !open;
       if (!open) { els.editing = null; els.lastPane = ""; return; }
+      if (subCheck) {
+        els.editing = null;
+        els.back.hidden = true;
+        els.title.textContent = "Might be misheard";
+        els.support.textContent = "";
+        Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = k !== "check"; });
+        els.editView.hidden = true;
+        if (wasOpen && els.lastPane && els.lastPane !== "subtitle-check") slideIn(els.panes.check);
+        els.lastPane = "subtitle-check";
+        paintCheck(toCheck);
+        return;
+      }
+      if (subPresets) {
+        els.editing = null;
+        els.back.hidden = true;
+        els.title.textContent = "Subtitle presets";
+        els.support.textContent = "";
+        Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = k !== "presets"; });
+        els.editView.hidden = true;
+        if (wasOpen && els.lastPane && els.lastPane !== "subtitle-presets") slideIn(els.panes.presets);
+        els.lastPane = "subtitle-presets";
+        paintPresets("subtitle");
+        return;
+      }
       var state = fx();
       // the page of a filter or effect closes once it is turned off, by undo or anything else
       var ed = els.editing;
@@ -1055,7 +1290,7 @@
       var view = ed ? "edit:" + ed.kind + ":" + ed.id : pane;
       var def = ed ? (ed.kind === "filter" ? lookById(ed.id) : effectById(ed.id)) : null;
       els.back.hidden = !ed;
-      els.title.textContent = ed ? def[1] : { color: "Color", filters: "Filters", effects: "Effects" }[pane];
+      els.title.textContent = ed ? def[1] : { color: "Color", filters: "Filters", effects: "Effects", presets: "Video presets" }[pane];
       Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = !!ed || k !== pane; });
       els.editView.hidden = !ed;
       // the card comes in by itself when it was not showing; a switch inside it, to another tab or a page and back, brings the new view in the same way
@@ -1073,11 +1308,384 @@
         els.editField.show(amountOf(state));
         return;
       }
+      if (pane === "presets") { paintPresets("video"); return; }
       Object.keys(els.color).forEach(function (k) { els.color[k].show(state.color[k]); });
       var lookId = state.look ? state.look.id : "";
       Object.keys(els.lookTiles).forEach(function (k) { els.lookTiles[k].classList.toggle("is-active", k === lookId); });
       Object.keys(els.effectTiles).forEach(function (k) { els.effectTiles[k].classList.toggle("is-active", state.effects.some(function (e) { return e.id === k; })); });
       queueThumbs();
+    }
+
+    // presets. a preset of the video is its whole look; a preset of subtitles is the style of a row without where it was dragged to, since that belongs to the clip. the helper keeps the lists, the page sends a whole list back after every change
+    function canon(v) {
+      if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+      if (v && typeof v === "object") return "{" + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ":" + canon(v[k]); }).join(",") + "}";
+      return JSON.stringify(v);
+    }
+    function subRow() {
+      var subs = lanes.subtitles;
+      var id = subs.selected();
+      var rowId = id ? subs.rowOf(id) : "";
+      return subs.rows().find(function (r) { return r.id === rowId; }) || null;
+    }
+    function withoutPlace(style) {
+      var s = JSON.parse(JSON.stringify(style || {}));
+      delete s.x;
+      delete s.y;
+      return s;
+    }
+    // what a preset of the kind would hold right now, or null when there is nothing to take it from
+    function current(k) {
+      if (k === "video") return fx();
+      var row = subRow();
+      return row ? withoutPlace(row.style) : null;
+    }
+    function matches(k, p) {
+      var now = current(k);
+      if (!now) return false;
+      return k === "video" ? canon(cleanFx(p.data)) === canon(now) : canon(withoutPlace(Object.assign(lanes.subtitles.defaultStyle(), p.data))) === canon(now);
+    }
+    function findPreset(k, id) { return presets[k].find(function (p) { return p.id === id; }) || null; }
+
+    function loadPresets() {
+      if (!o.helper) return;
+      fetch(o.helper + "/editor-presets", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.message) || "The presets could not be read");
+        presets.subtitle = Array.isArray(j.subtitle) ? j.subtitle : [];
+        presets.video = Array.isArray(j.video) ? j.video : [];
+        presetsKey = "";
+        paint();
+      }).catch(function (err) { if (o.notify) o.notify(err.message || "The presets could not be read", "bad", "Presets"); });
+    }
+
+    // the list shows the change at once; one the helper refuses is taken back
+    function storePresets(k, list) {
+      var before = presets[k];
+      presets[k] = list;
+      presetsKey = "";
+      paint();
+      presetsSaving = presetsSaving.then(function () {
+        return fetch(o.helper + "/editor-presets/save?kind=" + k, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: list }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { if (!j || !j.ok) throw new Error((j && j.message) || "The presets could not be saved"); });
+      }).catch(function (err) {
+        if (presets[k] === list) { presets[k] = before; presetsKey = ""; paint(); }
+        if (o.notify) o.notify(err.message || "The presets could not be saved", "bad", "Presets");
+      });
+    }
+
+    function applyPreset(k, p) {
+      chosen[k] = p.id;
+      if (k === "video") {
+        lanes.fx.set(cleanFx(p.data), true);
+      } else {
+        var subs = lanes.subtitles;
+        var rows = [];
+        subs.picked().forEach(function (id) { var r = subs.rowOf(id); if (r && rows.indexOf(r) < 0) rows.push(r); });
+        var patch = withoutPlace(p.data);
+        rows.forEach(function (r, i) { subs.setRowStyle(r, patch, i === rows.length - 1); });
+      }
+      presetsKey = "";
+      paint();
+    }
+
+    // a click picks a preset without using it, so the look on screen can still be written over it with overwrite; apply or a double click uses it
+    function selectPreset(k, id) {
+      if (chosen[k] === id) return;
+      chosen[k] = id;
+      presetsKey = "";
+      paint();
+    }
+
+    // save as new takes the name typed beside it, or the next free preset number when the field is empty, the way settings names an unnamed theme
+    function saveNewPreset(k) {
+      var data = current(k);
+      if (!data) return;
+      var name = els.presetName.value.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40);
+      if (!name) {
+        var names = presets[k].map(function (p) { return p.name; });
+        var n = presets[k].length + 1;
+        while (names.indexOf("Preset " + n) >= 0) n++;
+        name = "Preset " + n;
+      }
+      var p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: name, data: data };
+      chosen[k] = p.id;
+      els.presetName.value = "";
+      storePresets(k, presets[k].concat([p]));
+    }
+
+    function overwritePreset(k) {
+      var target = findPreset(k, chosen[k]);
+      var data = current(k);
+      if (!target || !data) return;
+      storePresets(k, presets[k].map(function (p) { return p.id === target.id ? { id: p.id, name: p.name, data: data } : p; }));
+    }
+
+    function renamePreset(k, id, typed) {
+      var target = findPreset(k, id);
+      var name = String(typed || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40);
+      if (!target || !name || name === target.name) return false;
+      storePresets(k, presets[k].map(function (p) { return p.id === target.id ? { id: p.id, name: name, data: p.data } : p; }));
+      return true;
+    }
+
+    // the name of a row turns into a field in place, the way a clip card, a screenshot and the title of the editor are renamed: the buttons beside it glide aside and the field fades in. enter or leaving it keeps the name, escape puts the old one back
+    function startRename(k, p, row) {
+      var name = row.querySelector(".ed-preset-name");
+      if (!name || row.querySelector(".name-edit-input")) return;
+      renaming = { kind: k, id: p.id };
+      var flipTargets = [row.querySelector(".ed-preset-use"), row.querySelector(".edit-btn"), row.querySelector(".delete-btn")];
+      var input = el("input", "name-edit-input");
+      input.type = "text";
+      input.maxLength = 40;
+      input.spellcheck = false;
+      input.value = p.name;
+      input.setAttribute("aria-label", "Preset name");
+      var swap = function (from, to) { if (typeof rkFlip === "function") rkFlip(flipTargets, function () { from.replaceWith(to); }); else from.replaceWith(to); };
+      swap(name, input);
+      try { input.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" }); } catch (_) {}
+      input.focus();
+      input.select();
+      var settled = false;
+      var finish = function (keep) {
+        if (settled) return;
+        settled = true;
+        renaming = null;
+        if (keep && renamePreset(k, p.id, input.value)) return;
+        swap(input, name);
+        presetsKey = "";
+        paint();
+      };
+      input.addEventListener("keydown", function (e) {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      });
+      input.addEventListener("blur", function () { finish(true); });
+      input.addEventListener("click", function (e) { e.stopPropagation(); });
+      input.addEventListener("dblclick", function (e) { e.stopPropagation(); });
+    }
+
+    function deletePreset(k, id) {
+      if (chosen[k] === id) chosen[k] = "";
+      if (renaming && renaming.id === id) renaming = null;
+      storePresets(k, presets[k].filter(function (p) { return p.id !== id; }));
+    }
+
+    function presetButton(text, cls) {
+      var b = el("button", "btn" + (cls ? " " + cls : ""), text);
+      b.type = "button";
+      return b;
+    }
+
+    function buildPresets(box) {
+      var sec = section("Saved presets");
+      els.presetNote = el("p", "ed-fx-note", "");
+      sec.appendChild(els.presetNote);
+      els.presetList = el("div", "ed-preset-table");
+      sec.appendChild(els.presetList);
+      var use = el("div", "ed-btns");
+      els.presetApply = presetButton("Apply", "primary");
+      els.presetOverwrite = presetButton("Overwrite");
+      use.appendChild(els.presetApply);
+      use.appendChild(els.presetOverwrite);
+      sec.appendChild(use);
+      var named = el("div", "ed-preset-name-row");
+      els.presetName = el("input", "ed-text-input");
+      els.presetName.type = "text";
+      els.presetName.maxLength = 40;
+      els.presetName.spellcheck = false;
+      els.presetName.placeholder = "Name this preset";
+      els.presetName.setAttribute("aria-label", "Preset name");
+      els.presetSave = presetButton("Save as new");
+      named.appendChild(els.presetName);
+      named.appendChild(els.presetSave);
+      sec.appendChild(named);
+      box.appendChild(sec);
+      els.presetApply.addEventListener("click", function () { var p = findPreset(els.presetKind, chosen[els.presetKind]); if (p) applyPreset(els.presetKind, p); });
+      els.presetOverwrite.addEventListener("click", function () { overwritePreset(els.presetKind); });
+      els.presetSave.addEventListener("click", function () { saveNewPreset(els.presetKind); });
+      els.presetName.addEventListener("keydown", function (e) {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); els.presetSave.click(); }
+      });
+      if (window.RKHover) RKHover.apply(sec, { control: ".btn" });
+    }
+
+    // the buttons follow every paint; the table is drawn again only when what it shows changed
+    function paintPresets(k) {
+      els.presetKind = k;
+      var list = presets[k];
+      var data = current(k);
+      if (chosen[k] && !findPreset(k, chosen[k])) chosen[k] = "";
+      var target = findPreset(k, chosen[k]);
+      var inUse = list.filter(function (p) { return matches(k, p); }).map(function (p) { return p.id; });
+      els.presetApply.disabled = !target;
+      els.presetOverwrite.disabled = !target || !data;
+      els.presetOverwrite.dataset.tooltip = target ? "Replace " + target.name + " with " + PRESET_KINDS[k] : "Pick a preset to overwrite";
+      els.presetSave.disabled = !data;
+      // a name being typed into a row is never drawn over; the list catches up once it is done
+      if (renaming && renaming.kind === k && findPreset(k, renaming.id)) return;
+      renaming = null;
+      var key = canon([k, list.map(function (p) { return [p.id, p.name]; }), inUse, chosen[k]]);
+      if (key === presetsKey) return;
+      presetsKey = key;
+      els.presetNote.textContent = list.length ? "Pick a preset, then apply it, or overwrite it with " + PRESET_KINDS[k] + "." : "No presets yet. Name " + PRESET_KINDS[k] + " below and save it to use it on any clip.";
+      els.presetList.textContent = "";
+      list.forEach(function (p) {
+        var row = el("div", "ed-preset" + (p.id === chosen[k] ? " is-selected" : ""));
+        row.tabIndex = 0;
+        row.setAttribute("role", "option");
+        row.setAttribute("aria-selected", p.id === chosen[k] ? "true" : "false");
+        row.appendChild(el("span", "ed-preset-name", p.name));
+        // the preset that matches what is on screen says so, picked or not
+        row.appendChild(el("span", "ed-preset-use", inUse.indexOf(p.id) >= 0 ? "In use" : ""));
+        var edit = el("button", "icon-mini-btn edit-btn");
+        edit.type = "button";
+        edit.dataset.tooltip = "Rename";
+        edit.setAttribute("aria-label", "Rename " + p.name);
+        edit.innerHTML = icon("action/edit");
+        edit.addEventListener("click", function (e) { e.stopPropagation(); startRename(k, p, row); });
+        row.appendChild(edit);
+        // the bin of a clip card: the first click turns it into a delete? button, the second deletes
+        var bin = el("button", "icon-mini-btn delete-btn");
+        bin.type = "button";
+        bin.dataset.deleteLabel = "Delete preset";
+        bin.dataset.tooltip = "Delete preset";
+        bin.setAttribute("aria-label", "Delete " + p.name);
+        bin.innerHTML = icon("action/trash");
+        bin.appendChild(el("span", "delete-confirm-text", "Delete?"));
+        bin.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (bin.classList.contains("is-armed")) { deletePreset(k, p.id); return; }
+          if (typeof armDeleteButton === "function") armDeleteButton(bin);
+          else bin.classList.add("is-armed");
+        });
+        row.appendChild(bin);
+        row.addEventListener("click", function () { selectPreset(k, p.id); });
+        row.addEventListener("dblclick", function () { applyPreset(k, p); });
+        row.addEventListener("keydown", function (e) {
+          if (e.key === " ") { e.preventDefault(); selectPreset(k, p.id); }
+          if (e.key === "Enter") { e.preventDefault(); applyPreset(k, p); }
+        });
+        els.presetList.appendChild(row);
+      });
+      if (window.RKHover) RKHover.apply(els.presetList, { control: ".icon-mini-btn" });
+    }
+
+
+    // the selected subtitles the speech engine was unsure of, in the order of the clip
+    function unsureCues() {
+      var subs = lanes.subtitles;
+      var picked = subs.picked();
+      return subs.list().filter(function (c) { return c.unsure && picked.indexOf(c.id) >= 0; });
+    }
+
+    function clockOf(t) {
+      t = Math.max(0, t || 0);
+      var m = Math.floor(t / 60), s = t - m * 60;
+      return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
+    }
+
+    function buildCheck(box) {
+      var sec = section("Check these subtitles");
+      els.checkNote = el("p", "ed-fx-note", "");
+      sec.appendChild(els.checkNote);
+      els.checkList = el("div", "ed-preset-table");
+      sec.appendChild(els.checkList);
+      var all = el("div", "ed-btns");
+      els.checkKeepAll = iconButton("action/select", "Keep all as they are");
+      els.checkKeepAll.addEventListener("click", function () { lanes.subtitles.markChecked(unsureCues().map(function (c) { return c.id; })); });
+      all.appendChild(els.checkKeepAll);
+      sec.appendChild(all);
+      box.appendChild(sec);
+      if (window.RKHover) RKHover.apply(sec, { control: ".btn" });
+    }
+
+    var checkKey = "";
+    // a button with the icon of the action in front of its text, the way every button of this card is drawn
+    function iconButton(name, text) {
+      var b = el("button", "btn");
+      b.type = "button";
+      b.innerHTML = icon(name);
+      b.appendChild(document.createTextNode(text));
+      return b;
+    }
+    function paintCheck(cues) {
+      els.checkKeepAll.parentNode.hidden = cues.length < 2;
+      var key = canon(cues.map(function (c) { return [c.id, c.text, c.at, c.alts || []]; }));
+      if (key === checkKey) return;
+      checkKey = key;
+      els.checkNote.textContent = (cues.length === 1 ? "This subtitle was" : "These " + cues.length + " subtitles were") + " hard to make out. Pick or type what was said, keep it, or delete it.";
+      els.checkList.textContent = "";
+      var subs = lanes.subtitles;
+      cues.forEach(function (c) {
+        var item = el("div", "ed-check-item");
+        var head = el("div", "ed-check-head");
+        // the app tooltip sits on the text alone, so the bin beside it keeps its own
+        var said = el("span", "ed-check-text", c.text);
+        said.dataset.tooltip = "Go to this subtitle";
+        head.appendChild(said);
+        head.appendChild(el("span", "ed-check-time", clockOf(c.at)));
+        head.addEventListener("click", function () { subs.seek(c.at + 0.01); });
+        // the bin of a clip card: a click turns it into delete?, a second one deletes, and undo brings the subtitle back
+        var del = el("button", "icon-mini-btn delete-btn");
+        del.type = "button";
+        del.dataset.deleteLabel = "Delete subtitle";
+        del.dataset.tooltip = "Delete subtitle";
+        del.setAttribute("aria-label", "Delete subtitle");
+        del.innerHTML = icon("action/trash");
+        del.appendChild(el("span", "delete-confirm-text", "Delete?"));
+        del.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (del.classList.contains("is-armed")) { subs.remove(c.id); return; }
+          if (typeof armDeleteButton === "function") armDeleteButton(del);
+          else del.classList.add("is-armed");
+        });
+        head.appendChild(del);
+        item.appendChild(head);
+        var alts = Array.isArray(c.alts) ? c.alts : [];
+        if (alts.length) {
+          item.appendChild(el("div", "ed-check-label", "Might have been"));
+          var row = el("div", "tl-speeds");
+          alts.forEach(function (text) {
+            var b = el("button", "btn tl-mini", text);
+            b.type = "button";
+            b.addEventListener("click", function () { subs.pickAlternative(c.id, text); });
+            row.appendChild(b);
+          });
+          item.appendChild(row);
+        }
+        // what was said, typed by hand: it replaces the text and the subtitle counts as checked
+        var typed = el("div", "ed-check-type");
+        var field = el("input", "ed-text-input");
+        field.type = "text";
+        field.maxLength = 300;
+        field.spellcheck = false;
+        field.placeholder = "What was said";
+        field.setAttribute("aria-label", "What was said");
+        var use = iconButton("action/edit", "Use text");
+        use.disabled = true;
+        var apply = function () {
+          var text = field.value.trim();
+          if (!text) return;
+          subs.setText(c.id, text);
+          subs.checkpoint();
+        };
+        field.addEventListener("input", function () { use.disabled = !field.value.trim(); });
+        field.addEventListener("keydown", function (e) { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); apply(); } });
+        use.addEventListener("click", apply);
+        typed.appendChild(field);
+        typed.appendChild(use);
+        item.appendChild(typed);
+        var keep = el("div", "ed-btns");
+        var k = iconButton("action/select", "Keep as it is");
+        k.addEventListener("click", function () { subs.markChecked([c.id]); });
+        keep.appendChild(k);
+        item.appendChild(keep);
+        els.checkList.appendChild(item);
+      });
+      if (window.RKHover) RKHover.apply(els.checkList, { control: ".btn" });
     }
 
     // the tiles show the frame under the playhead with the colour settings as they are, the filters each with their own look, the effects on top of the filter that is set
@@ -1123,16 +1731,22 @@
 
     build();
     paint();
+    loadPresets();
     preview.set(resolve(lanes.fx.main()));
     return {
       reset: function () {
         shown = false; kind = ""; pane = "general"; els.editing = null;
+        subPane = "edit"; renaming = null; chosen = { subtitle: "", video: "" }; presetsKey = "";
+        if (els.presetName) els.presetName.value = "";
+        presetsKey = "";
         clearTimeout(fxTimer);
         preview.set(null); clearThumbs();
         paint();
       },
       // the tab the right panel shows while the video is selected
       pane: function () { return pane; },
+      // what the right panel shows while a subtitle is selected: its own card ("edit") or the presets of subtitles ("presets")
+      subtitlePane: function () { return kind === "subtitle" && !lanes.panelClosed() ? subPane : "edit"; },
       // the lanes say when the panel of what is selected was closed or opened again
       refresh: function () { paint(); },
       // the lanes say whenever the panel on the right is drawn what is selected: "video", "audio", "subtitle", "layer" or ""

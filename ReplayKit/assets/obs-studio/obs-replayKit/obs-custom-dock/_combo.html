@@ -124,6 +124,11 @@
   }
   .combo-option + .combo-option { margin-top:2px; }
   .combo-option-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* an option may lead with a small icon and trail a quieter detail, such as the shape and the ratio of an aspect */
+  .combo-option-icon { flex:none; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-right:9px; }
+  .combo-option-icon svg { display:block; overflow:visible; }
+  .combo-option-detail { flex:none; margin-left:6px; color:var(--text_muted); }
+  .combo-option.is-selected .combo-option-detail { color:inherit; opacity:.75; }
   /* Selected options use the normal theme highlight and its contrasting text. */
   .combo-option:hover, .combo-option:focus-visible { background:var(--button_bg_hover); outline:none; }
   .combo-option.is-selected { position:relative; padding-right:30px; background:var(--selected,var(--primary)); color:var(--on-accent); }
@@ -141,6 +146,18 @@
     text-overflow:ellipsis;
   }
   .combo-option.is-selected .option-blurb { color:inherit; }
+  /* a menu that takes several: each row leads with the select icon, its corners always there and its tick drawn in once the row is picked, and stays open while rows are picked */
+  .combo.is-multi .combo-option.is-selected { padding-right:10px; }
+  .combo.is-multi .combo-option.is-selected::after { display:none; }
+  .combo-option-pick { flex:none; display:inline-flex; width:14px; height:14px; margin-right:9px; color:var(--text_muted); }
+  .combo-option.is-selected .combo-option-pick { color:inherit; }
+  .combo-option-pick svg { width:14px; height:14px; fill:currentColor; overflow:visible; }
+  .combo-option-pick svg path + path { transform-box:fill-box; transform-origin:center; opacity:0; transform:scale(.4); transition:opacity 120ms ease, transform 160ms var(--ease_pop, ease-out); }
+  .combo-option.is-selected .combo-option-pick svg path + path { opacity:1; transform:none; }
+  /* a setting under the choices, set apart by a divider: a label and a switch on one row */
+  .combo-footer { margin:3px 0 0; padding:3px 0 0; border-top:1px solid var(--line2, var(--line)); }
+  .combo-toggle { min-height:28px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 10px; border-radius:3px; color:var(--text); cursor:pointer; white-space:nowrap; }
+  .combo-toggle:hover { background:var(--button_bg_hover); }
 </style>
 <script>
 (function () {
@@ -152,6 +169,11 @@
     const label = combo.querySelector(".combo-label");
     const menu = combo.querySelector(".combo-menu");
     let options = [], value = "";
+    // config.multi lets several rows be picked at once; value is then their values joined with commas in the order of the menu, and a row named in config.only stands alone, so picking it lets the others go and it comes back when nothing else is left
+    const multi = !!config.multi;
+    const only = (config.only || []).map(String);
+    let picked = [];
+    if (multi) { combo.classList.add("is-multi"); menu.setAttribute("aria-multiselectable", "true"); }
     function close() {
       combo.classList.remove("is-open");
       combo.setAttribute("aria-expanded", "false");
@@ -203,6 +225,7 @@
       }
     }
     function select(next, notify) {
+      if (multi) { pick(String(next).split(","), notify); return; }
       const option = options.find((entry) => entry.value === String(next)) || options[0];
       value = option ? option.value : "";
       label.textContent = option ? option.label : "";
@@ -215,6 +238,27 @@
       preview(option);
       if (notify && changed) changed(value);
     }
+    function pick(list, notify) {
+      let chosen = options.filter((entry) => list.includes(entry.value));
+      const alone = chosen.find((entry) => only.includes(entry.value));
+      if (alone) chosen = [alone];
+      if (!chosen.length) chosen = options.slice(0, 1);
+      picked = chosen.map((entry) => entry.value);
+      value = picked.join(",");
+      label.textContent = chosen.map((entry) => entry.label).join(", ");
+      menu.querySelectorAll(".combo-option").forEach((row) => {
+        const selected = picked.includes(row.dataset.value);
+        row.classList.toggle("is-selected", selected);
+        row.setAttribute("aria-selected", String(selected));
+      });
+      if (notify && changed) changed(value);
+    }
+    // a row picked in a menu that takes several turns on or off, and a row that stands alone replaces the rest
+    function toggle(rowValue) {
+      if (only.includes(rowValue)) { pick([rowValue], true); return; }
+      const rest = picked.filter((v) => !only.includes(v));
+      pick(rest.includes(rowValue) ? rest.filter((v) => v !== rowValue) : rest.concat([rowValue]), true);
+    }
     function menuKey(event) {
       if (!combo.classList.contains("is-open")) return;
       const key = event.key;
@@ -225,7 +269,9 @@
         event.preventDefault(); event.stopPropagation(); close(); button.focus(); return;
       }
       if ((key === "Enter" || key === " ") && focused >= 0) {
-        event.preventDefault(); event.stopPropagation(); select(rows[focused].dataset.value, true); close(); button.focus(); return;
+        event.preventDefault(); event.stopPropagation();
+        if (multi) { toggle(rows[focused].dataset.value); return; }
+        select(rows[focused].dataset.value, true); close(); button.focus(); return;
       }
       const current = focused >= 0 ? focused : options.findIndex((entry) => entry.value === value);
       if (key === "ArrowDown") next = Math.min(rows.length - 1, current + 1);
@@ -254,6 +300,7 @@
       const row = event.target.closest(".combo-option");
       if (!row || !menu.contains(row)) return;
       event.stopPropagation();
+      if (multi) { toggle(row.dataset.value); return; }
       select(row.dataset.value, true);
       close();
       button.focus();
@@ -274,7 +321,7 @@
       } else if (key === "Enter" || key === " ") {
         event.preventDefault(); event.stopPropagation();
         if (combo.classList.contains("is-open")) close(); else open();
-      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(key) && options.length) {
+      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(key) && options.length && !multi) {
         event.preventDefault(); event.stopPropagation();
         const current = Math.max(0, options.findIndex((entry) => entry.value === value));
         const next = key === "Home" ? 0 : key === "End" ? options.length - 1
@@ -293,7 +340,7 @@
       get options() { return options.slice(); },
       setOptions(next) {
         close();
-        options = next.map((entry) => ({ value:String(entry.value), label:String(entry.label), font:entry.font || "", description:entry.description || "" }));
+        options = next.map((entry) => ({ value:String(entry.value), label:String(entry.label), font:entry.font || "", description:entry.description || "", icon:entry.icon || "", detail:entry.detail || "" }));
         menu.replaceChildren();
         options.forEach((entry) => {
           const row = document.createElement("div");
@@ -301,13 +348,33 @@
           row.tabIndex = -1;
           row.setAttribute("role", "option");
           row.dataset.value = entry.value;
+          if (multi) {
+            const mark = document.createElement("span");
+            mark.className = "combo-option-pick";
+            mark.innerHTML = (window.RK_ICONS || {})["action/select"] || "";
+            row.appendChild(mark);
+          }
+          // the icon is markup the page itself builds, never text that came from outside
+          if (entry.icon) {
+            const icon = document.createElement("span");
+            icon.className = "combo-option-icon";
+            icon.innerHTML = entry.icon;
+            row.appendChild(icon);
+          }
           const text = document.createElement("span");
           text.className = "combo-option-label";
           text.textContent = entry.label;
           row.appendChild(text);
+          if (entry.detail) {
+            const detail = document.createElement("span");
+            detail.className = "combo-option-detail";
+            detail.textContent = entry.detail;
+            row.appendChild(detail);
+          }
           if (entry.font) row.style.fontFamily = '"' + entry.font + '", sans-serif';
           menu.appendChild(row);
         });
+        if (config.footer) menu.appendChild(config.footer);
         select(value, false);
       },
       close,

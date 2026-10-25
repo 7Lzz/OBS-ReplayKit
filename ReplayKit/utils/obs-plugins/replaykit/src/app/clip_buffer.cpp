@@ -33,8 +33,6 @@ enum class Mode { Memory, Disk };
 constexpr int kPieceSeconds = 10;
 // a split lands on the next keyframe and the next audio packet after it
 constexpr int kSplitWaitMs = 6000;
-// with this much installed memory or less, recommended keeps the buffer on disk; the helper decides the same way, see ClipBuffer.cs
-constexpr unsigned long long kDiskUpToGb = 16;
 
 struct Piece {
 	std::string path;
@@ -76,16 +74,7 @@ const char *ModeName(Mode mode)
 	return mode == Mode::Disk ? "disk" : "memory";
 }
 
-Mode RecommendedMode()
-{
-	ULONGLONG kb = 0;
-	if (!GetPhysicallyInstalledSystemMemory(&kb) || kb == 0)
-		return Mode::Memory;
-	const unsigned long long gb = (kb + 512 * 1024) / (1024 * 1024);
-	return gb <= kDiskUpToGb ? Mode::Disk : Mode::Memory;
-}
-
-// the mode is known before the helper is up, since obs starts the buffer while it loads: the setting is read straight from the settings file and recommended is worked out the way the helper does it
+// the mode is known before the helper is up, since obs starts the buffer while it loads: the setting is read straight from the settings file, and anything but memory is disk the way the helper reads it
 Mode ModeFromSettingsFile()
 {
 	const QString folder = qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit/");
@@ -95,11 +84,7 @@ Mode ModeFromSettingsFile()
 	QString chosen;
 	if (file.open(QIODevice::ReadOnly) && file.size() < 4 * 1024 * 1024)
 		chosen = QJsonDocument::fromJson(file.readAll()).object().value(QStringLiteral("recordingBuffer")).toString();
-	if (chosen == QLatin1String("disk"))
-		return Mode::Disk;
-	if (chosen == QLatin1String("memory"))
-		return Mode::Memory;
-	return RecommendedMode();
+	return chosen == QLatin1String("memory") ? Mode::Memory : Mode::Disk;
 }
 
 bool DiskActive()

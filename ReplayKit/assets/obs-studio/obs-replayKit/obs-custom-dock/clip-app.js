@@ -3114,6 +3114,11 @@ const CLIP_HOVER_PROFILES = {
           e.target.closest("button, input, a, .settings-menu, .progress-bar, .volume-slider-wrap")) {
         return;
       }
+      // a card of the drafts tab opens its draft in the editor instead, unless it is the big player of theater or full screen
+      if (card.classList.contains("is-draft-card") && !card.classList.contains("is-theater-card") && !card.closest(".rk-fs") && !document.fullscreenElement) {
+        requestOpenEditor(loadedClips.find((c) => c.name === card.dataset.name));
+        return;
+      }
       toggleVideoPlayback();
     });
 
