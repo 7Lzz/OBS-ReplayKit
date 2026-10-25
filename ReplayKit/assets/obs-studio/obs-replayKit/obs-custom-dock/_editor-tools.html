@@ -1207,7 +1207,8 @@
         closeLibrary();
       }, { capture: true, signal: EDITOR_SIGNAL });
       els.lib = { veil: veil, body: body, grid: grid, favGrid: favGrid, favHead: favHead, restHead: restHead, empty: empty, input: input, sortMenu: sort, sort: "newest", clips: [], cards: [] };
-      if (window.RKHover) RKHover.apply(card, { control: ".ed-x, .clip-sort-trigger", row: ".clip-sort-item" });
+      // the sort and folder buttons keep the plain hover they have on the clips page, with no grow or shrink
+      if (window.RKHover) RKHover.apply(card, { control: ".ed-x", row: ".clip-sort-item" });
     }
 
     function openLibrary() {

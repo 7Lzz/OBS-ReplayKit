@@ -164,9 +164,18 @@
     height: var(--tl-track-h, 40px);
     margin-top: 3px;
     border-radius: 5px;
-    background: rgba(var(--text-rgb), .035);
   }
-  .tl-lane.is-drop { background: rgba(var(--accent-rgb), .16); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .8); }
+  .tl-lane.is-drop { --tl-holder: rgba(var(--accent-rgb), .16); }
+  .tl-lane.is-drop::before { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .8); }
+  /* every row is a holder that runs the whole width of the timeline, past both ends of the clip, and its pieces lie on it; one strip per row, so no seam shows where the clip used to end and the video row is not darker where its video was trimmed away */
+  .tl-lane::before, .tl-subrow::before, .trim-timeline::before { content: ""; position: absolute; top: 0; left: calc(-1 * var(--tl-ext-l, 0px)); right: calc(-1 * var(--tl-ext-r, 0px)); border-radius: 5px; background: var(--tl-holder, rgba(var(--text-rgb), .035)); pointer-events: none; }
+  .tl-lane::before, .tl-subrow::before { bottom: 0; }
+  .trim-timeline::before { height: var(--trim-strip-h, 40px); }
+  .tl-lane.is-floating::before { display: none; }
+  /* the video row takes the presses past the ends of the clip with these, where the bar of the cut does not reach, so a piece lying out there can still be picked */
+  .tl-vext { position: absolute; top: 0; z-index: 0; height: var(--trim-strip-h, 40px); cursor: pointer; }
+  .tl-vext.l { right: 100%; width: var(--tl-ext-l, 0px); }
+  .tl-vext.r { left: 100%; width: var(--tl-ext-r, 0px); }
   /* a piece that is carried to another row leaves its row for one of its own that is out of the flow and floats over the rest; the rows glide aside to make room where it asks to be put, or hold still while it asks to go into one of them */
   .tl-lane.is-floating { position: absolute; left: 0; right: 0; margin: 0; z-index: 4; background: transparent; pointer-events: none; }
   .tl-lane.is-floating .tl-seg { box-shadow: 0 8px 18px rgba(0, 0, 0, .45); }
@@ -185,11 +194,11 @@
     z-index: 2;
     box-sizing: border-box;
     border-radius: 5px;
-    border: 1px solid rgba(var(--accent-rgb), .5);
+    border: 1px solid rgba(var(--seg-rgb, var(--accent-rgb)), .5);
     cursor: grab;
     touch-action: none;
   }
-  .tl-seg:hover { border-color: rgba(var(--accent-rgb), .85); }
+  .tl-seg:hover { border-color: rgba(var(--seg-rgb, var(--accent-rgb)), .85); }
   .tl-seg.is-muted { border-color: rgba(var(--text-rgb), .16); }
   .tl-seg.is-muted:hover { border-color: rgba(var(--text-rgb), .32); }
   .tl-seg.is-selected { z-index: 3; border-color: rgba(var(--text-rgb), .95); box-shadow: 0 1px 6px rgba(0, 0, 0, .38); }
@@ -197,13 +206,9 @@
   .tl-seg.is-merge-target { z-index: 3; border-color: var(--selected2); box-shadow: inset 0 0 0 2px var(--selected2); background: rgba(var(--accent-rgb), .18); }
   .tl-seg.is-muted .tl-chip { opacity: .55; }
   .tl-chip {
-    position: sticky;
-    left: 6px;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    max-width: calc(100% - 20px);
-    margin: 6px 0 0 6px;
     padding: 2px 7px 2px 5px;
     border-radius: 4px;
     background: rgba(0, 0, 0, .5);
@@ -217,13 +222,15 @@
     user-select: none;
     vertical-align: top;
   }
-  .tl-chip.tl-vchip { position: absolute; z-index: 5; left: 8px; top: 6px; margin: 0; }
+  /* every piece wears its tag at its own start, the same spot on audio, video and layers, and the tag scrolls away with the piece instead of staying in view */
+  .tl-seg > .tl-chip, .tl-vseg > .tl-chip, .tl-cue.tl-layer > .tl-chip { position: absolute; z-index: 1; left: 16px; top: 50%; transform: translateY(-50%); margin: 0; max-width: calc(100% - 24px); }
+  .tl-vseg.is-linked > .tl-chip, .tl-seg.is-linked > .tl-chip { background: rgba(var(--link-rgb), .85); }
   /* the subtitles row sits above the video row; a cue is a block like a piece, in a warm colour of its own */
   .tl-subs[hidden] { display: none; }
   .tl-marquee { position: absolute; top: 2px; bottom: 2px; z-index: 6; border: 1px solid var(--selected2); border-radius: 4px; background: rgba(var(--accent-rgb), .18); pointer-events: none; }
   .tl-chip.tl-subchip { cursor: pointer; pointer-events: auto; }
-  .tl-subrow { position: relative; height: var(--tl-track-h); margin: 0 0 6px; border-radius: 6px; background: rgba(var(--text-rgb), .035); }
-  .tl-chip.tl-subchip { position: absolute; z-index: 5; left: 8px; top: 6px; margin: 0; }
+  .tl-subrow { position: relative; height: var(--tl-track-h); margin: 0 0 3px; border-radius: 6px; }
+  .tl-chip.tl-subchip { position: absolute; z-index: 5; left: 8px; top: 6px; margin: 0; max-width: calc(100% - 32px); }
   .tl-cue {
     position: absolute; top: 3px; bottom: 3px; z-index: 2; box-sizing: border-box; min-width: 4px; padding: 0 8px;
     border-radius: 4px; border: 1px solid rgba(224, 165, 55, .7); background: rgba(224, 165, 55, .2);
@@ -242,17 +249,24 @@
   .tl-cue.tl-layer:hover { border-color: rgba(120, 140, 255, 1); }
   .tl-cue.tl-layer.is-selected { border-color: rgba(var(--text-rgb), .95); }
   .tl-chip.tl-layerchip { max-width: 40%; }
+  /* a layer carries its own tag, so the tag goes where the layer goes instead of standing at the start of its row */
+  .tl-layerrow > .tl-layerchip { display: none; }
+  .tl-cue.tl-layer .tl-cue-text { display: none; }
+  .tl-cue.tl-layer.is-linked > .tl-chip { background: rgba(var(--link-rgb), .85); }
   /* a layer shows what it is along its block, its picture (a clip its thumbnail) repeated at the height of the block like the strip of the video row, under a faint wash of its colour */
   .tl-cue.tl-layer.has-thumb { background-repeat: no-repeat, repeat-x; background-size: 100% 100%, auto 100%; background-position: 0 0, left center; }
   .tl-cue.tl-layer.has-thumb .tl-cue-text { visibility: hidden; }
   /* a sticker, a shape or a gif sits a little smaller with room between its copies, so they read as separate pictures */
   .tl-cue.tl-layer.has-thumb.is-pic { background-repeat: no-repeat, space; background-size: 100% 100%, auto 78%; background-position: 0 0, center; }
   /* a row of another clip is a video row: the same height, ground and outline as the video row, its pieces its frames edge to edge with no wash */
-  .tl-subrow.tl-layerrow.is-video { background: var(--grey8); border-radius: 5px; }
+  .tl-subrow.tl-layerrow.is-video { border-radius: 5px; }
+  /* an added clip lights up in its own colour while it is selected, and so does the other half of it, its picture or its sound, so the two read as one */
+  :is(.tl-seg, .tl-vseg, .tl-layer).is-linked.is-selected { border-color: rgb(var(--link-rgb)) !important; box-shadow: 0 0 0 1px rgb(var(--link-rgb)), 0 1px 6px rgba(0, 0, 0, .38); }
+  :is(.tl-seg, .tl-vseg, .tl-layer).is-linked.is-grouped { border-color: rgb(var(--link-rgb)) !important; box-shadow: 0 0 0 1px rgba(var(--link-rgb), .55); }
   .tl-cue.tl-layer.is-clip { top: 0; bottom: 0; padding: 0; border-radius: 5px; border-color: var(--tl-video-line, rgba(var(--text-rgb), .3)); background-color: transparent; }
   .tl-cue.tl-layer.is-clip:hover { border-color: rgba(var(--text-rgb), .55); }
   .tl-cue.tl-layer.is-clip.is-selected { border-color: rgba(var(--text-rgb), .95); }
-  .tl-subrow.tl-layerrow.is-drop-target { outline: 2px dashed var(--selected2); outline-offset: -2px; }
+  .tl-subrow.tl-layerrow.is-drop-target::before { outline: 2px dashed var(--selected2); outline-offset: -2px; }
   .tl-box .btn.tl-wide { width: 100%; height: 32px; margin-top: 12px; --hover_grow: 1.01; --press_shrink: .99; }
   .tl-box .btn.tl-wide + .btn.tl-wide { margin-top: 8px; }
   /* the layers on the preview sit over the picture, under the subtitles, each placed by its centre */
@@ -327,7 +341,7 @@
   .trim-time-ruler .trim-time-mark.is-end { transform: translateX(-100%); }
   .trim-time-ruler .trim-time-mark.is-end::after { left: 100%; }
 
-  /* the video row is a row of pieces like the audio rows are. the script draws the frames over the whole room the timeline has, black where the saved clip has no piece, and every piece wears a faint outline in a tint of the clip, the bright one while it is selected. the two handles of the cut show while the video or one of its pieces is selected */
+  /* the video row is a row of pieces like the audio rows are. the script draws the frames of the pieces, leaving the row empty where the saved clip has none, and every piece wears a faint outline in a tint of the clip, the bright one while it is selected. the two handles of the cut show while the video or one of its pieces is selected */
   .trim-timeline .trim-filmstrip { background: transparent !important; overflow: visible; }
   .tl-vseg {
     position: absolute;
@@ -345,9 +359,8 @@
   .tl-vseg.is-selected { z-index: 6; border-color: rgba(var(--text-rgb), .95); box-shadow: 0 1px 6px rgba(0, 0, 0, .38); }
   .tl-vseg.is-dragging { cursor: grabbing; }
   /* a video row carried over the video lights it, and a piece of another clip carried up out of the video fades, since either one changes rows when it is let go */
-  .trim-timeline.is-drop-target .trim-filmstrip { outline: 2px dashed var(--selected2); outline-offset: -2px; }
+  .trim-timeline.is-drop-target::before { outline: 2px dashed var(--selected2); outline-offset: -2px; }
   .tl-vseg.is-leaving { opacity: .45; border-style: dashed; }
-  .tl-vname { position: absolute; left: 6px; top: 3px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 14px; padding: 0 5px; border-radius: 3px; background: rgba(0, 0, 0, .6); color: #fff; pointer-events: none; }
   /* a press on the video row lands on the bar over it and the piece under the pointer is found by time, so a piece takes no press itself, except at the grips it carries while it is selected: the same bright cap the cut wears, at the edges where the script asks for one */
   .tl-vseg .tl-h { display: none; }
   .tl-vseg.is-capped-l .tl-h.l, .tl-vseg.is-capped-r .tl-h.r {
@@ -442,6 +455,10 @@
   var EDGE = 0.0101;
   var BAR_PX = 3;
   var CANVAS_MARGIN = 320;
+  // the empty room past the end of everything, as a share of the width of the view, so a piece can be carried out there and worked on the way medal lets it
+  var BLANK_ROOM = 0.3;
+  // the colours an added clip and its sound share, so it reads which sound belongs to which video; the clip itself keeps the accent
+  var LINK_RGB = ["88, 166, 255", "76, 201, 140", "190, 120, 255", "255, 166, 64", "64, 200, 210", "255, 110, 170"];
   var MAX_PX_PER_SEC = 400;
   var MAX_HISTORY = 100;
   var ZOOM_STEP = 1.5;
@@ -500,13 +517,14 @@
   }
 
   function loadPrefs() {
-    var p = { height: DEFAULT_HEIGHT, waves: true, snap: true };
+    var p = { height: DEFAULT_HEIGHT, waves: true, snap: true, trimAll: false };
     try {
       var raw = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
       if (raw && typeof raw === "object") {
         if (typeof raw.height === "number" && raw.height >= 190) p.height = raw.height;
         if (typeof raw.waves === "boolean") p.waves = raw.waves;
         if (typeof raw.snap === "boolean") p.snap = raw.snap;
+        if (typeof raw.trimAll === "boolean") p.trimAll = raw.trimAll;
       }
     } catch (e) { /* no stored choices, the defaults stand */ }
     return p;
@@ -614,6 +632,7 @@
     function sameSource(from, to) { if (from.ref) { to.ref = from.ref; to.name = from.name; to.dur = from.dur; } return to; }
     function vLen(v) { return (v.srcEnd - v.srcStart) / st.vspeed; }
     function vEnd(v) { return v.at + vLen(v); }
+    function videoLabel() { return st.vspeed === 1 ? "Video" : "Video " + r3(st.vspeed) + "x"; }
     function findV(id) {
       if (!id) return null;
       for (var i = 0; i < st.vsegs.length; i++) if (st.vsegs[i].id === id) return { seg: st.vsegs[i], index: i };
@@ -735,6 +754,7 @@
 
     // the state the editor opens in is where undo stops, taken once the cut has been snapped and before anything was touched
     function initHistory() {
+      if (releaseCut()) changed();
       st.history = [snapshot()];
       st.future = [];
       refreshToolbar();
@@ -745,6 +765,7 @@
     function commit() {
       // a change that ends here also ends the run of speed changes it belonged to
       st.vsess = null;
+      if (releaseCut()) changed();
       var snap = snapshot();
       var last = st.history[st.history.length - 1];
       if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
@@ -790,6 +811,8 @@
       if (st.history.length < 2) return;
       st.future.push(st.history.pop());
       restoreSnap(st.history[st.history.length - 1]);
+      // a step from before the switch was turned off can hold a cut that was drawn in, which is handed to the video alone again
+      if (releaseCut()) changed();
     }
 
     function redo() {
@@ -797,6 +820,7 @@
       var snap = st.future.pop();
       st.history.push(snap);
       restoreSnap(snap);
+      if (releaseCut()) changed();
     }
 
     // everything the screen and the sound show follows the model from here
@@ -851,10 +875,22 @@
 
     function paintSelection() {
       reportKind();
-      Object.keys(segEls).forEach(function (sid) { segEls[sid].classList.toggle("is-selected", sid === st.selected); });
+      var group = linkGroup(st.selected);
+      var links = {};
+      allSegs().forEach(function (h) { links[h.seg.id] = h.seg.link || ""; });
+      Object.keys(segEls).forEach(function (sid) {
+        segEls[sid].classList.toggle("is-selected", sid === st.selected);
+        segEls[sid].classList.toggle("is-grouped", !!group && sid !== st.selected && links[sid] === group);
+      });
       Object.keys(subEls).forEach(function (cid) { subEls[cid].classList.toggle("is-selected", isPicked(cid)); });
-      Object.keys(vsegEls).forEach(function (vid) { vsegEls[vid].classList.toggle("is-selected", vid === st.selected); });
-      Object.keys(layerEls).forEach(function (lid) { layerEls[lid].classList.toggle("is-selected", lid === st.selected); });
+      Object.keys(vsegEls).forEach(function (vid) {
+        vsegEls[vid].classList.toggle("is-selected", vid === st.selected);
+        vsegEls[vid].classList.toggle("is-grouped", !!group && vid !== st.selected && vid === group);
+      });
+      Object.keys(layerEls).forEach(function (lid) {
+        layerEls[lid].classList.toggle("is-selected", lid === st.selected);
+        layerEls[lid].classList.toggle("is-grouped", !!group && lid !== st.selected && lid === group);
+      });
       Object.keys(layerViews).forEach(function (lid) { layerViews[lid].box.classList.toggle("is-selected", lid === st.selected); });
       if (!dom.timeline) return;
       dom.timeline.classList.toggle("is-selected", videoSelected());
@@ -1598,6 +1634,10 @@
       var node = el("div", "tl-cue tl-layer");
       node.dataset.layer = l.id;
       node.appendChild(el("span", "tl-cue-text"));
+      var chip = el("span", "tl-chip");
+      chip.innerHTML = icon(l.kind === "clip" ? "editor/video" : "editor/image");
+      chip.appendChild(el("span", "tl-chip-label"));
+      node.appendChild(chip);
       node.appendChild(el("i", "tl-h l"));
       node.appendChild(el("i", "tl-h r"));
       layerEls[l.id] = node;
@@ -1630,7 +1670,12 @@
           node.style.width = ((l.end - l.at) / d * 100) + "%";
           node.classList.toggle("is-selected", l.id === st.selected);
           node.classList.toggle("is-clip", l.kind === "clip");
+          // a clip layer wears the colour its sound is drawn in
+          if (l.kind === "clip") { node.style.setProperty("--tl-video-line", "rgba(" + linkRgb(l.id) + ", .9)"); node.style.setProperty("--link-rgb", linkRgb(l.id)); } else { node.style.removeProperty("--tl-video-line"); node.style.removeProperty("--link-rgb"); }
+          node.classList.toggle("is-linked", l.kind === "clip");
           if (node.firstChild.textContent !== l.name) node.firstChild.textContent = l.name;
+          var tag = node.querySelector(".tl-chip-label");
+          if (tag && tag.textContent !== l.name) tag.textContent = l.name;
           var pic = l.kind === "clip" ? opts.helper + "/thumb/" + encodeURIComponent(l.ref) : layerSrc(l);
           if (node._pic !== pic) {
             node._pic = pic;
@@ -1783,7 +1828,8 @@
         if (!on) { if (!m.paused) m.pause(); return; }
         var local = l.src + (t - l.at);
         // a playing layer is left to run and only pulled back when it drifts; a still one is put on the exact frame
-        if (Math.abs((m.currentTime || 0) - local) > (playing ? 0.3 : 0.03)) { try { m.currentTime = local; } catch (e) { /* the file is still opening */ } }
+        if (playing) v.sought = null;
+        if (Math.abs((m.currentTime || 0) - local) > (playing ? 0.3 : 0.03) && v.sought !== local) { try { m.currentTime = local; if (!playing) v.sought = local; } catch (e) { /* the file is still opening */ } }
         if (playing && m.paused) { var p = m.play(); if (p && p.catch) p.catch(function () {}); }
         if (!playing && !m.paused) m.pause();
       });
@@ -1982,7 +2028,9 @@
 
     function addLayer(l) {
       if (st.layers.length >= LAYER_MAX) return "";
-      var at = clamp(nowT(), 0, Math.max(0, D() - LAYER_MIN));
+      // a clip goes in at the playhead even past the end of the video, where the saved clip may already reach; a picture has to start inside the video, since it stops at its end
+      var last = l.kind === "clip" ? Math.max(D(), windowT().end) : D();
+      var at = clamp(nowT(), 0, Math.max(0, last - LAYER_MIN));
       var len = l.len > 0 ? l.len : 5;
       // a clip runs its whole length, past the end of the video if it has to; a picture stops at the end
       var end = l.kind === "clip" ? at + len : Math.min(D(), at + len);
@@ -2061,7 +2109,14 @@
       var capL = false;
       var capR = false;
       var pick = selectedV();
-      if (st.Dsrc > 0 && opts.getBounds && videoSelected()) {
+      if (st.Dsrc > 0 && opts.getBounds && videoSelected() && !prefs.trimAll) {
+        // the cut is the whole clip while the audio is left alone, so only the piece that is selected carries grips, at both of its edges
+        capL = !!pick;
+        capR = !!pick;
+        var dragging = pick && drag && drag.id === pick.seg.id ? drag.mode : "";
+        if (dragging === "vtrimL") capR = true;
+        if (dragging === "vtrimR") capL = true;
+      } else if (st.Dsrc > 0 && opts.getBounds && videoSelected()) {
         var b = boundsT();
         var w = windowT();
         var edge = EDGE / st.vspeed;
@@ -2140,8 +2195,8 @@
       right.id = newId("S");
       right.at = r3(t);
       // the two halves of a linked sound would each follow the whole piece
-      delete seg.link;
-      delete right.link;
+      unlink(seg);
+      unlink(right);
       right.fadeIn = 0;
       seg.fadeOut = 0;
       var leftParts = [];
@@ -2245,7 +2300,12 @@
     }
 
     // the sound linked to a clip goes with it when the clip changes rows
-    function moveLinks(from, to) { allSegs().forEach(function (h) { if (h.seg.link === from) h.seg.link = to; }); }
+    function moveLinks(from, to) {
+      allSegs().forEach(function (h) {
+        if (h.seg.link === from) h.seg.link = to;
+        if (h.seg.origin === from) h.seg.origin = to;
+      });
+    }
 
     // a video row let go over the video goes into it where it starts, the same part of its clip
     function rowToPiece(l) {
@@ -2378,7 +2438,7 @@
       var hit = selected();
       var c = clone(st.clipboard);
       c.id = newId("S");
-      delete c.link;
+      unlink(c);
       var t = at != null ? at : nowT();
       c.at = r3(clamp(t, 0, Math.max(0, D() - segLen(c))));
       var lane = laneIndex != null ? st.lanes[laneIndex] : hit ? hit.lane : st.lanes[0];
@@ -2455,6 +2515,41 @@
       if ((t - b.start) * st.vspeed < 0.5) return;
       setBoundsT(b.start, t);
       commit();
+    }
+
+    // while the audio is left alone when the video is trimmed (the switch of the toolbar off), the cut of the clip only ever trims the video: a cut drawn in by the keys of the cut, by a draft or before the switch was turned off becomes a trim of the pieces of the video, and the cut opens up to the whole clip, so the audio, the layers and the subtitles past it stay in the saved clip
+    function releaseCut() {
+      if (prefs.trimAll || !(st.Dsrc > 0) || !opts.getBounds || !opts.setBounds) return false;
+      var b = boundsT();
+      var d = D();
+      var edge = EDGE / st.vspeed;
+      var lo = b.start > edge ? b.start : -Infinity;
+      var hi = b.end < d - edge ? b.end : Infinity;
+      if (lo === -Infinity && hi === Infinity) return false;
+      var kept = [];
+      st.vsegs.forEach(function (v) {
+        var end = vEnd(v);
+        var a = Math.max(v.at, lo);
+        var e = Math.min(end, hi);
+        if (e - a < MIN_LEN) { if (st.selected === v.id) st.selected = ""; return; }
+        v.srcStart = r3(v.srcStart + (a - v.at) * st.vspeed);
+        v.srcEnd = r3(v.srcEnd - (end - e) * st.vspeed);
+        v.at = r3(a);
+        kept.push(v);
+      });
+      st.vsegs = kept;
+      setBoundsT(0, d);
+      return true;
+    }
+
+    function toggleTrimAll() {
+      prefs.trimAll = !prefs.trimAll;
+      savePrefs();
+      // turning it off hands a cut that was drawn in over to the video alone
+      if (!prefs.trimAll && releaseCut()) { changed(); commit(); }
+      paintHandles();
+      refreshToolbar();
+      setBoundsUi(opts.getBounds().start, opts.getBounds().end);
     }
 
     function clampFades(s) {
@@ -2562,7 +2657,7 @@
     }
 
     function combineInto(target, other) {
-      delete target.link;
+      unlink(target);
       var at = Math.min(target.at, other.at);
       var parts = [];
       [target, other].forEach(function (s) {
@@ -2648,7 +2743,9 @@
         });
       }
       var left = before > 0.001 ? Math.ceil(before * pps) : 0;
-      var right = after > 0.001 ? Math.ceil(after * pps) : 0;
+      var reach = after > 0.001 ? Math.ceil(after * pps) : 0;
+      var right = reach + (fw > 0 ? Math.round(fw * BLANK_ROOM) : 0);
+      dom.content.style.setProperty("--tl-reach-r", reach + "px");
       var grew = left - st.extL;
       st.extL = left;
       st.extR = right;
@@ -2742,6 +2839,9 @@
       node.style.width = (segLen(seg) / d * 100) + "%";
       node.classList.toggle("is-selected", seg.id === st.selected);
       node.classList.toggle("is-muted", !!seg.muted);
+      var rgb = segRgb(seg);
+      if (rgb) { node.style.setProperty("--seg-rgb", rgb); node.style.setProperty("--link-rgb", rgb); } else { node.style.removeProperty("--seg-rgb"); node.style.removeProperty("--link-rgb"); }
+      node.classList.toggle("is-linked", !!rgb);
       var label = pieceLabel(seg);
       var chipLabel = node.firstChild.lastChild;
       if (chipLabel.textContent !== label) {
@@ -2795,10 +2895,18 @@
           dom.timeline.appendChild(node);
         }
         positionV(v, node);
-        var name = node.querySelector(".tl-vname");
-        if (v.ref && !name) { name = el("span", "tl-vname"); node.appendChild(name); }
-        if (name && !v.ref) name.remove();
-        else if (name && name.textContent !== v.name) name.textContent = v.name || "";
+        // a piece of another clip wears the colour its sound is drawn in
+        if (v.ref) { node.style.setProperty("--tl-video-line", "rgba(" + linkRgb(v.id) + ", .9)"); node.style.setProperty("--link-rgb", linkRgb(v.id)); } else { node.style.removeProperty("--tl-video-line"); node.style.removeProperty("--link-rgb"); }
+        node.classList.toggle("is-linked", !!v.ref);
+        var chip = node.querySelector(".tl-chip");
+        if (!chip) {
+          chip = el("span", "tl-chip");
+          chip.innerHTML = icon("editor/video");
+          chip.appendChild(el("span", "tl-chip-label"));
+          node.insertBefore(chip, node.firstChild);
+        }
+        var label = v.ref ? v.name || "" : videoLabel();
+        if (chip.lastChild.textContent !== label) chip.lastChild.textContent = label;
         live[v.id] = true;
       });
       Object.keys(vsegEls).forEach(function (id) { if (!live[id]) { vsegEls[id].remove(); delete vsegEls[id]; } });
@@ -2851,12 +2959,39 @@
       return Math.min(1, amp * Math.min(1.6, seg.volume));
     }
 
+    // the same colour for every id, from the numbers in it, so consecutive clips take different ones
+    function linkRgb(id) {
+      var n = 0;
+      String(id).replace(/\d+/g, function (m) { n += Number(m); return m; });
+      return LINK_RGB[n % LINK_RGB.length];
+    }
+    // the sound of an added clip is drawn in the colour of that clip, and keeps it after it was moved or cut on its own and no longer follows the clip
+    function segRgb(seg) {
+      var from = seg.link || seg.origin;
+      return from && linkedItem(from) ? linkRgb(from) : "";
+    }
+    // a sound that stops following its clip remembers which clip it came from
+    function unlink(seg) {
+      if (!seg.link) return;
+      seg.origin = seg.link;
+      delete seg.link;
+    }
+    function linkedItem(id) { return st.vsegs.some(function (v) { return v.id === id; }) || st.layers.some(function (l) { return l.id === id; }); }
+    // the added clip a selection belongs to: the clip itself (a piece of another clip or a clip layer) or the clip a sound is linked to
+    function linkGroup(id) {
+      if (!id) return "";
+      if (st.vsegs.some(function (v) { return v.id === id && v.ref; }) || st.layers.some(function (l) { return l.id === id && l.kind === "clip"; })) return id;
+      var hit = find(id);
+      return hit && hit.seg.link && linkedItem(hit.seg.link) ? hit.seg.link : "";
+    }
+
     function drawSeg(ctx, seg, from, w, h, pal) {
       var pps = pxPerSec();
       var x0 = seg.at * pps - from;
       var x1 = segEnd(seg) * pps - from;
       if (x1 < -2 || x0 > w + 2) return;
-      ctx.fillStyle = seg.muted ? pal.fillMuted : pal.fill;
+      var rgb = segRgb(seg);
+      ctx.fillStyle = seg.muted ? pal.fillMuted : rgb ? "rgba(" + rgb + ", .38)" : pal.fill;
       roundRect(ctx, x0, 1, Math.max(2, x1 - x0), h - 2, 5);
       ctx.fill();
       if (prefs.waves) {
@@ -2937,7 +3072,7 @@
       var aw = axisW();
       var vw = dom.frame.clientWidth;
       var seen = dom.frame.scrollLeft - axisLeft();
-      // the room past the ends of the video is drawn too, for the pieces and the black that lie there
+      // the room past the ends of the video is drawn too, for the pieces that lie there
       var from = Math.max(-st.extL, seen - CANVAS_MARGIN);
       var to = Math.min(aw + st.extR, seen + vw + CANVAS_MARGIN);
       var w = Math.max(1, Math.ceil(to - from));
@@ -2957,10 +3092,7 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       var pps = pxPerSec();
-      // the saved clip is black wherever no piece of the video is
-      var win = windowT();
-      ctx.fillStyle = "#000";
-      ctx.fillRect(win.start * pps - from, 0, (win.end - win.start) * pps, h);
+      // the saved clip is black where no piece of the video is, but the row stays empty there like the audio rows do, so a clip added past the end does not paint a black block over it
       var cell = Math.max(24, h * film.aspect);
       st.vsegs.forEach(function (v) {
         var x0 = v.at * pps - from;
@@ -3108,8 +3240,9 @@
       // a cut that is drawn in from a side also leaves out what lies in the room past that end of the video
       els.dimStart.style.left = a > 0 ? "calc(-1 * var(--tl-ext-l, 0px))" : "0";
       els.dimStart.style.width = a > 0 ? "calc(" + a * 100 + "% + var(--tl-ext-l, 0px))" : "0%";
-      els.dimEnd.style.right = b > 0 ? "calc(-1 * var(--tl-ext-r, 0px))" : "0";
-      els.dimEnd.style.width = b > 0 ? "calc(" + b * 100 + "% + var(--tl-ext-r, 0px))" : "0%";
+      // the blank room past everything is not part of the clip, so the dimming stops where the last piece does
+      els.dimEnd.style.right = b > 0 ? "calc(-1 * var(--tl-reach-r, 0px))" : "0";
+      els.dimEnd.style.width = b > 0 ? "calc(" + b * 100 + "% + var(--tl-reach-r, 0px))" : "0%";
       // the cut decides how far the saved clip reaches past the video, so it decides whether the timeline plays by itself
       syncVmode();
       paintHandles();
@@ -3229,6 +3362,7 @@
       right.appendChild(el("span", "tl-sep"));
       right.appendChild(group(
         button("snap", "editor/magnet", "Snap to edges and the playhead", function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
+        button("trimAll", "action/link", "Trim the audio with the video", toggleTrimAll),
         button("fit", "editor/fit-timeline", "Fit to zoom (0)", fitView),
         button("zoomOut", "editor/zoom-out", "Zoom out (-)", function () { setZoom(st.zoom / ZOOM_STEP); }),
         button("zoomIn", "editor/zoom-in", "Zoom in (+)", function () { setZoom(st.zoom * ZOOM_STEP); })
@@ -3265,6 +3399,8 @@
       if (opts.onSubtitles) opts.onSubtitles();
       els.waves.classList.toggle("is-active", prefs.waves);
       els.snap.classList.toggle("is-active", prefs.snap);
+      els.trimAll.classList.toggle("is-active", prefs.trimAll);
+      els.trimAll.setAttribute("aria-pressed", prefs.trimAll ? "true" : "false");
       els.undo.disabled = st.history.length < 2;
       els.redo.disabled = st.future.length === 0;
       if (opts.onHistory) opts.onHistory();
@@ -3279,7 +3415,10 @@
       }
       // the total is where the saved clip ends on the ruler, which is past the end of the video where pieces reach past it
       if (els.total) els.total.textContent = "/ " + fmt(vt.on ? windowT().end : D(), 1);
-      if (els.vchip) els.vchip.textContent = st.vspeed === 1 ? "Video" : "Video " + r3(st.vspeed) + "x";
+      st.vsegs.forEach(function (v) {
+        var chip = !v.ref && vsegEls[v.id] && vsegEls[v.id].querySelector(".tl-chip-label");
+        if (chip && chip.textContent !== videoLabel()) chip.textContent = videoLabel();
+      });
     }
 
     // properties panel
@@ -3666,6 +3805,8 @@
       afterSpeed(run.pps, playX);
       syncDom();
       subsChanged();
+      // the layers keep their seconds while the length of the video changes under them, so their rows are placed again
+      layersChanged();
       paintSelection();
       layout();
       renderProps();
@@ -4191,7 +4332,7 @@
       if (was.leave && findV(was.id)) { pieceToRow(findV(was.id).seg); return; }
       // a linked sound that was moved or drawn out by hand is a sound of its own from now on
       var heard = find(was.id);
-      if (heard) delete heard.seg.link;
+      if (heard) unlink(heard.seg);
       done();
     }
 
@@ -4200,7 +4341,7 @@
       if (e.button !== 0 || !(st.Dsrc > 0)) return;
       var target = e.target;
       // the handles of the cut are inputs of their own
-      if (!target || !target.closest || target.tagName === "INPUT" || !target.closest(".trim-bar, .tl-vseg")) return;
+      if (!target || !target.closest || target.tagName === "INPUT" || !target.closest(".trim-bar, .tl-vseg, .tl-vext")) return;
       closeMenu();
       // a grip of the selected piece takes hold of that edge of the piece
       var grip = target.closest(".tl-vseg .tl-h");
@@ -4226,7 +4367,7 @@
 
     function onVideoContext(e) {
       var target = e.target;
-      if (!(st.Dsrc > 0) || !target || !target.closest || !target.closest(".trim-bar, .tl-vseg")) return;
+      if (!(st.Dsrc > 0) || !target || !target.closest || !target.closest(".trim-bar, .tl-vseg, .tl-vext")) return;
       e.preventDefault();
       var v = vAt(rawTimeAtClient(e.clientX));
       if (!v) { select("video"); return; }
@@ -4298,7 +4439,7 @@
 
     // a press that is not on the selected track, its handles, the video, the colour picker, the toolbar or a scrollbar lets go of the selection, and so does one on the blank space of the side panels, while one on a card, a tab or any control in them keeps it. it is judged at the click, once whatever was pressed has done its work, and only when the press and the click both landed outside, so a slider dragged past the edge of its panel keeps the selection
     // the controls of the bar over the editor (rename, aspect, screenshot, exit, render) and what they open act on the clip, not on what is selected in it
-    var KEEPS_SELECTION = ".tl-seg, .tl-vseg, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .editor-stage, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer, " +
+    var KEEPS_SELECTION = ".tl-seg, .tl-vseg, .tl-vext, .tl-cue, .tl-subs, .tl-frame, .lay-item, .ed-lib-veil, .editor-stage, .cpick, .trim-bar, .tl-lanes, .tl-toolbar, .tl-menu, .tl-bar, .tl-resizer, " +
       ".editor-top button, .editor-top .combo, .editor-top input, .editor-title, .clip-sort-menu, .render-veil, .name-edit-input";
     var SIDE_PANELS = ".ed-left, .editor-side, .ed-rail-r";
     var SIDE_CONTROLS = ".editor-card, .ed-tab, .ed-big, button, input, textarea, select, label, a, [role], [tabindex]";
@@ -4484,12 +4625,14 @@
       vt.piece = piece.id;
       vt.dirty = false;
       if (vt.playing) {
+        vt.sought = null;
         var limit = entering ? 0.12 : 0.25 * Math.max(1, st.vspeed);
         if (Math.abs(current - src) > limit) native.currentTime.set.call(video, src);
         if (native.paused.get.call(video)) elementPlay();
       } else {
         if (!native.paused.get.call(video)) native.pause.call(video);
-        if (entering || Math.abs(current - src) > 0.02) native.currentTime.set.call(video, src);
+        // a seek lands on the nearest frame, which can sit past the time asked for (a clip whose first frame is not at 0), so the same time is never asked for twice or the element seeks every step
+        if (entering || (Math.abs(current - src) > 0.02 && vt.sought !== src)) { vt.sought = src; native.currentTime.set.call(video, src); }
       }
     }
 
@@ -4551,12 +4694,13 @@
       vt.dirty = false;
       var current = fv.currentTime || 0;
       if (vt.playing) {
+        p.sought = null;
         var limit = entering ? 0.12 : 0.25 * Math.max(1, st.vspeed);
         if (Math.abs(current - src) > limit) { try { fv.currentTime = src; } catch (e) { /* the file is still opening */ } }
         if (fv.paused) { var pr = fv.play(); if (pr && pr.catch) pr.catch(function () {}); }
       } else {
         if (!fv.paused) fv.pause();
-        if (entering || Math.abs(current - src) > 0.02) { try { fv.currentTime = src; } catch (e) { /* the file is still opening */ } }
+        if (entering || (Math.abs(current - src) > 0.02 && p.sought !== src)) { try { fv.currentTime = src; p.sought = src; } catch (e) { /* the file is still opening */ } }
       }
     }
     function hidePiece() {
@@ -4619,9 +4763,10 @@
         }
       }
       vFollow();
-      // the page follows the clock through the time updates of the element, which a clock of its own has to give
-      if (now - vt.fired >= 40) {
+      // the page follows the clock through the time updates of the element, which a clock of its own has to give -- only while the time moves, since every update repaints the editor and its look from the video frame
+      if (now - vt.fired >= 40 && vt.T !== vt.firedT) {
         vt.fired = now;
+        vt.firedT = vt.T;
         vFire("timeupdate");
       }
     }
@@ -4661,6 +4806,11 @@
       var want = st.Dsrc > 0 && videoEdited();
       if (want && !vt.on) enterVmode();
       else if (!want && vt.on) leaveVmode();
+      // an edit that made the saved clip shorter, a piece carried in from past its end, takes the playhead back inside it
+      if (vt.on) {
+        var w = windowT();
+        if (vt.T > w.end + 1e-6 || vt.T < w.start - 1e-6) vSeek(vt.T);
+      }
       // the end of the saved clip that the toolbar tells moves with the pieces
       refreshToolbar();
     }
@@ -5244,14 +5394,10 @@
       els.drop.appendChild(els.dropLabel);
       document.body.appendChild(els.drop);
       [els.playline, els.snapline].forEach(function (n) { (dom.tracks || dom.lanes).appendChild(n); });
-      // the video row is named like the audio rows are, and a press on it selects the video or the piece of it that was pressed
+      // a press on the video row selects the video or the piece of it that was pressed; every piece carries its own tag
       if (dom.timeline) {
-        var vchip = el("span", "tl-chip tl-vchip");
-        vchip.innerHTML = icon("editor/video");
-        els.vchip = el("span", "tl-chip-label");
-        els.vchip.textContent = "Video";
-        vchip.appendChild(els.vchip);
-        dom.timeline.appendChild(vchip);
+        dom.timeline.insertBefore(el("div", "tl-vext l"), dom.timeline.firstChild);
+        dom.timeline.insertBefore(el("div", "tl-vext r"), dom.timeline.firstChild);
         dom.timeline.addEventListener("pointerdown", onVideoDown);
         dom.timeline.addEventListener("contextmenu", onVideoContext);
       }
@@ -5278,6 +5424,8 @@
       dom.lanes.hidden = true;
       dom.lanes.addEventListener("pointerdown", onDown);
       dom.lanes.addEventListener("contextmenu", onContext);
+      // the presses on pieces hold back the focus the browser would move, so a press on the timeline puts the keys on this page itself while it sits in a frame of a page that had them; without it delete and the other keys went nowhere
+      dom.frame.addEventListener("pointerdown", function () { if (!document.hasFocus()) { try { window.focus(); } catch (_) {} } }, true);
       buildToolbar();
       buildProps();
       // the shared hover and press profile of the dock, which only reaches the buttons that exist when the page starts

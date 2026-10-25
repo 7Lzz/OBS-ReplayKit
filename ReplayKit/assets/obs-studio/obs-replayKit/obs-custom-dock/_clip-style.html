@@ -1829,8 +1829,9 @@
     border: 3px solid rgba(var(--text-rgb), .16);
     border-top-color: var(--text);
     border-radius: 50%;
-    animation: clip-sort-spin .8s linear infinite;
   }
+  /* only a card that shows the overlay spins it, since every card carries one and a hidden spin still keeps the page drawing frames */
+  .card.is-processing .processing-spinner, .save-ghost .processing-spinner { animation: clip-sort-spin .8s linear infinite; }
   /* the card that stands in for a clip being saved until the clip takes its place: the box of a card with only the processing look in it, out of reach of the pointer */
   .save-ghost { position: relative; display: flex; flex-direction: column; background: var(--bg_card); border: 1px solid var(--grey4-solid,var(--grey4)); border-radius: 6px; pointer-events: none; animation: save-ghost-in 220ms linear; }
   #grid .save-ghost { position: absolute; left: 0; top: 0; min-width: 0; max-width: 100%; width: var(--virtual-card-width, 260px); transform: translate3d(var(--virtual-card-x, 0px), var(--virtual-card-y, 0px), 0); }

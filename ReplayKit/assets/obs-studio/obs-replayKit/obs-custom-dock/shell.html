@@ -35,7 +35,9 @@
   .veil { position:fixed; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; background:rgba(0, 0, 0, .45); opacity:0; pointer-events:none; transition:opacity 160ms ease; }
   .veil.on { opacity:1; pointer-events:auto; }
   .veil-box { display:flex; align-items:center; gap:12px; padding:12px 18px 12px 14px; border-radius:10px; background:var(--panel); box-shadow:0 8px 28px rgba(0, 0, 0, .4); font:14px "Segoe UI", system-ui, sans-serif; color:var(--text); }
-  .veil-spin { width:18px; height:18px; border-radius:50%; border:2px solid rgba(var(--text-rgb), .22); border-top-color:var(--text); animation:veil-spin .8s linear infinite; }
+  .veil-spin { width:18px; height:18px; border-radius:50%; border:2px solid rgba(var(--text-rgb), .22); border-top-color:var(--text); }
+  /* the veil is always in the page, so the spinner only turns while it shows or the page draws a frame every frame for nothing */
+  .veil.on .veil-spin { animation:veil-spin .8s linear infinite; }
   @keyframes veil-spin { to { transform:rotate(360deg); } }
 
 </style>
