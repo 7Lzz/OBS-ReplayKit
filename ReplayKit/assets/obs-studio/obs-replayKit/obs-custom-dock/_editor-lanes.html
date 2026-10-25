@@ -148,11 +148,12 @@
   .tl-bar:hover .tl-thumb, .tl-thumb.is-dragging { background: rgba(var(--text-rgb), .46); }
 
   /* the tracks stand inside the frame with room on both sides, and only the ruler stays put while the tracks scroll under it, the video row among them. the script widens the content and the margins of the axis by the room a piece needs that was moved past an end of the clip, and tells the room in --tl-ext-l and --tl-ext-r */
-  .tl-content { --tl-pad: 14px; position: relative; min-width: 100%; box-sizing: border-box; padding: 6px var(--tl-pad) 0; }
+  /* the room on the right is the blank room the script adds past the end, so the tracks reach the right edge of the frame when the timeline fits */
+  .tl-content { --tl-pad: 14px; position: relative; min-width: 100%; box-sizing: border-box; padding: 6px 0 0 var(--tl-pad); }
   .tl-axis { position: relative; }
   .tl-ruler { position: sticky; top: 0; z-index: 9; height: 33px; background: var(--grey7); }
   /* the ruler is only as wide as the axis, so its colour is carried over the room beside it, or a piece out there would show above the tracks that scroll under the ruler */
-  .tl-ruler::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: calc(-1 * (var(--tl-pad) + var(--tl-ext-l, 0px))); right: calc(-1 * (var(--tl-pad) + var(--tl-ext-r, 0px))); background: var(--grey7); }
+  .tl-ruler::before { content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; left: calc(-1 * (var(--tl-pad) + var(--tl-ext-l, 0px))); right: calc(-1 * var(--tl-ext-r, 0px)); background: var(--grey7); }
   /* the ruler can be pressed over the room made for pieces past the ends of the clip too, which is where the playhead goes to hear and see them */
   .tl-ruler .trim-scrubber { left: calc(-1 * var(--tl-ext-l, 0px)); right: calc(-1 * var(--tl-ext-r, 0px)); }
   /* the strip of room between the ruler and the video row is a part of the ruler as far as the mouse goes, so a press and a drag right above the first track scrub the timeline too */
@@ -656,8 +657,9 @@
         if (!s.link) return;
         var p = s.parts[0];
         var row = findLayer(s.link);
+        // the sound always spans its clip even where the audio of the file stops a few frames before its picture, so the two rows end together and that bit is silent
         if (row && row.kind === "clip") {
-          var e = Math.min(row.src + (row.end - row.at), srcDuration(p.src));
+          var e = row.src + (row.end - row.at);
           if (e - row.src < MIN_LEN) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
           s.parts = [newPart(p.src, row.src, e, 0, p.gain)];
           s.at = row.at;
@@ -669,7 +671,7 @@
         var pick = findV(s.link);
         if (!pick || !pick.seg.ref) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
         var v = pick.seg;
-        var b = Math.min(v.srcEnd, srcDuration(p.src));
+        var b = v.srcEnd;
         if (b - v.srcStart < MIN_LEN) { h.lane.segments.splice(h.lane.segments.indexOf(s), 1); return; }
         s.parts = [newPart(p.src, v.srcStart, b, 0, p.gain)];
         s.at = v.at;
@@ -736,7 +738,8 @@
     function buildModel() {
       st.lanes = st.tracks.map(function (t) {
         var p = st.peaks[t.index];
-        var len = Math.max(MIN_LEN, Math.min(p ? p.duration : D(), D()));
+        // a recording usually stops its audio a few frames before its picture, so a track that close to the end reaches it and every row ends with the video; a track that really stops early keeps its length
+        var len = Math.max(MIN_LEN, p && p.duration < D() - 0.5 ? p.duration : D());
         return { id: newId("L"), label: t.label, segments: [newSeg(t.index, 0, len, 0)] };
       });
       st.initial = signature();
@@ -2686,11 +2689,11 @@
     function pxPerSec() { return D() > 0 ? axisW() / D() : 0; }
     // the tracks stand a little inside the frame, so the timeline starts this far from its left edge; further when pieces lie before the start of the clip
     function axisLeft() { return dom.axis.offsetLeft; }
-    // the room the content keeps on either side of the timeline, as the style sheet has it
+    // the room the content keeps on the left of the timeline, as the style sheet has it; the right has none of its own
     function padX() { return parseFloat(getComputedStyle(dom.content).paddingLeft) || 0; }
     function zoomFor(pps) {
       var fw = dom.frame.clientWidth;
-      return fw > 0 ? (pps * D() + 2 * padX()) / fw : 1;
+      return fw > 0 ? (pps * D() + padX()) / fw : 1;
     }
     function maxZoom() {
       return clamp(zoomFor(MAX_PX_PER_SEC), 1, 400);
@@ -2718,14 +2721,14 @@
       if (past <= 0) return 1;
       var j = past / d;
       var pad = padX();
-      // the content is zoom * fw + past * pps wide with pps = (zoom * fw - 2 * pad) / d, and it is fw wide at this zoom; a few pixels are left for the rounding up of the room at each end
-      return clamp((fw + 2 * pad * j) / (fw * (1 + j)) - 3 / fw, 0.02, 1);
+      // the content is zoom * fw + past * pps wide with pps = (zoom * fw - pad) / d, and it is fw wide at this zoom; a couple of pixels are left for the rounding up of the room at each end -- taken off the whole width, which moves (1 + j) times as fast as the zoom, or a long piece past the end leaves a wide gap
+      return clamp((fw + pad * j - 2) / (fw * (1 + j)), 0.02, 1);
     }
     // the width of the content follows the zoom and the pieces: the timeline reaches out to every piece that lies past an end of the clip, so it can be scrolled to and taken hold of. the axis keeps its size, and what grows in front of it is taken off the scroll, so nothing in view moves under the pointer while a piece is carried out
     function applyZoomWidth() {
       var d = D();
       var fw = dom.frame.clientWidth;
-      var pps = d > 0 && fw > 0 ? (st.zoom * fw - 2 * padX()) / d : 0;
+      var pps = d > 0 && fw > 0 ? (st.zoom * fw - padX()) / d : 0;
       var before = 0;
       var after = 0;
       if (pps > 0) {
@@ -3362,7 +3365,7 @@
       right.appendChild(el("span", "tl-sep"));
       right.appendChild(group(
         button("snap", "editor/magnet", "Snap to edges and the playhead", function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
-        button("trimAll", "action/link", "Trim the audio with the video", toggleTrimAll),
+        button("trimAll", "editor/trim-audio", "Trim the audio with the video", toggleTrimAll),
         button("fit", "editor/fit-timeline", "Fit to zoom (0)", fitView),
         button("zoomOut", "editor/zoom-out", "Zoom out (-)", function () { setZoom(st.zoom / ZOOM_STEP); }),
         button("zoomIn", "editor/zoom-in", "Zoom in (+)", function () { setZoom(st.zoom * ZOOM_STEP); })
@@ -4520,9 +4523,10 @@
             var key = s.id + "#" + pi;
             live[key] = true;
             var item = eng.busy[key];
-            var active = playing && !s.muted && inside && tau >= part.off - 0.001 && tau < part.off + partLen(part);
-            if (!active) { if (item) release(key); return; }
             var expected = part.srcStart + (tau - part.off);
+            // a piece can run past the end of its file (a sound drawn to the end of its picture), where it stays silent -- an element told to play after its end would start over from the top
+            var active = playing && !s.muted && inside && tau >= part.off - 0.001 && tau < part.off + partLen(part) && expected < srcDuration(part.src) - 0.01;
+            if (!active) { if (item) release(key); return; }
             if (!item) {
               item = ensureItem(part.src);
               item.busy = key;
