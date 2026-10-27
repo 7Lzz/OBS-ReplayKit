@@ -313,6 +313,7 @@
     background: rgba(5, 6, 9, .55);
     pointer-events: none;
   }
+  .tl-tracks.is-trimming-audio .tl-dim, .tl-tracks.is-trimming-audio .trim-outside { display: none; }
   .tl-playline {
     position: absolute;
     top: 0;
@@ -518,14 +519,14 @@
   }
 
   function loadPrefs() {
-    var p = { height: DEFAULT_HEIGHT, waves: true, snap: true, trimAll: false };
+    var p = { height: DEFAULT_HEIGHT, waves: true, snap: true, trimAudioWithVideo: true };
     try {
       var raw = JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
       if (raw && typeof raw === "object") {
         if (typeof raw.height === "number" && raw.height >= 190) p.height = raw.height;
         if (typeof raw.waves === "boolean") p.waves = raw.waves;
         if (typeof raw.snap === "boolean") p.snap = raw.snap;
-        if (typeof raw.trimAll === "boolean") p.trimAll = raw.trimAll;
+        if (typeof raw.trimAudioWithVideo === "boolean") p.trimAudioWithVideo = raw.trimAudioWithVideo;
       }
     } catch (e) { /* no stored choices, the defaults stand */ }
     return p;
@@ -570,6 +571,10 @@
     }
     function setBoundsT(start, end) { opts.setBounds(start * st.vspeed, end * st.vspeed); }
     function seekT(t) { opts.seek(t * st.vspeed); }
+    function previewEdge(start, end, left) {
+      video.pause();
+      seekT(left ? start : Math.max(start, end - 0.001));
+    }
 
     // model. a piece is made of parts, one cut of a source track each starting off seconds into the piece, so a piece that combines several tracks is still one piece
 
@@ -1922,6 +1927,7 @@
           l.end = r3(clamp(sr.t, o.at + LAYER_MIN, Math.max(o.at + LAYER_MIN, hi)));
         }
         setSnapGuide(guide);
+        if (mode !== "move" && (l.kind === "clip" || l.gif)) previewEdge(l.at, l.end, mode === "l");
         layersChanged();
         followLinked(l.id);
         applyZoomWidth();
@@ -2112,7 +2118,7 @@
       var capL = false;
       var capR = false;
       var pick = selectedV();
-      if (st.Dsrc > 0 && opts.getBounds && videoSelected() && !prefs.trimAll) {
+      if (st.Dsrc > 0 && opts.getBounds && videoSelected() && !prefs.trimAudioWithVideo) {
         // the cut is the whole clip while the audio is left alone, so only the piece that is selected carries grips, at both of its edges
         capL = !!pick;
         capR = !!pick;
@@ -2141,8 +2147,8 @@
           var right = vEnd(pick.seg);
           var atL = Math.abs(left - b.start) <= near;
           var atR = Math.abs(right - b.end) <= near;
-          cutL = atL || drawnL;
-          cutR = atR || drawnR;
+          cutL = atL || (drawnL && b.start >= left - near && b.start <= right + near);
+          cutR = atR || (drawnR && b.end >= left - near && b.end <= right + near);
           capL = !atL && left >= w.start - near && left <= w.end + near;
           capR = !atR && right >= w.start - near && right <= w.end + near;
           // the edge that is being dragged keeps its own grip, even where it passes the place of the cut
@@ -2522,7 +2528,7 @@
 
     // while the audio is left alone when the video is trimmed (the switch of the toolbar off), the cut of the clip only ever trims the video: a cut drawn in by the keys of the cut, by a draft or before the switch was turned off becomes a trim of the pieces of the video, and the cut opens up to the whole clip, so the audio, the layers and the subtitles past it stay in the saved clip
     function releaseCut() {
-      if (prefs.trimAll || !(st.Dsrc > 0) || !opts.getBounds || !opts.setBounds) return false;
+      if (prefs.trimAudioWithVideo || !(st.Dsrc > 0) || !opts.getBounds || !opts.setBounds) return false;
       var b = boundsT();
       var d = D();
       var edge = EDGE / st.vspeed;
@@ -2545,14 +2551,53 @@
       return true;
     }
 
-    function toggleTrimAll() {
-      prefs.trimAll = !prefs.trimAll;
+    function toggleTrimAudioWithVideo() {
+      prefs.trimAudioWithVideo = !prefs.trimAudioWithVideo;
       savePrefs();
       // turning it off hands a cut that was drawn in over to the video alone
-      if (!prefs.trimAll && releaseCut()) { changed(); commit(); }
+      if (prefs.trimAudioWithVideo ? applyVideoCut() : releaseCut()) { changed(); commit(); }
       paintHandles();
       refreshToolbar();
       setBoundsUi(opts.getBounds().start, opts.getBounds().end);
+    }
+
+    function applyVideoCut() {
+      if (!(st.Dsrc > 0) || !st.vsegs.length) return false;
+      var b = boundsT();
+      var start = Infinity, end = -Infinity;
+      st.vsegs.forEach(function (v) { start = Math.min(start, v.at); end = Math.max(end, vEnd(v)); });
+      start = clamp(start, b.start, b.end);
+      end = clamp(end, start, b.end);
+      if ((end - start) * st.vspeed < 0.5 || (Math.abs(start - b.start) < 0.0005 && Math.abs(end - b.end) < 0.0005)) return false;
+      setBoundsT(start, end);
+      return true;
+    }
+
+    function trimCutEdge(edge) {
+      if (!prefs.trimAudioWithVideo || st.vsegs.length !== 1) return;
+      var v = st.vsegs[0];
+      var b = boundsT();
+      if (edge === "start") {
+        var first = Math.max(0, v.at - v.srcStart / st.vspeed);
+        var lastStart = Math.min(vEnd(v) - MIN_LEN, b.end - 0.5 / st.vspeed);
+        if (lastStart < first) return;
+        var start = clamp(b.start, first, lastStart);
+        v.srcStart = r3(Math.max(0, v.srcStart + (start - v.at) * st.vspeed));
+        v.at = r3(start);
+        if (Math.abs(start - b.start) > 0.0005) setBoundsT(start, b.end);
+      } else if (edge === "end") {
+        var last = Math.min(D(), v.at + (srcMax(v) - v.srcStart) / st.vspeed);
+        var firstEnd = Math.max(v.at + MIN_LEN, b.start + 0.5 / st.vspeed);
+        if (last < firstEnd) return;
+        var end = clamp(b.end, firstEnd, last);
+        v.srcEnd = r3(Math.min(srcMax(v), v.srcStart + (end - v.at) * st.vspeed));
+        if (Math.abs(end - b.end) > 0.0005) setBoundsT(b.start, end);
+      } else return;
+      if (vsegEls[v.id]) positionV(v, vsegEls[v.id]);
+      followLinked(v.id);
+      syncVmode();
+      drawSoon();
+      paintHandles();
     }
 
     function clampFades(s) {
@@ -2836,10 +2881,22 @@
       return node;
     }
 
-    function positionSeg(seg, node) {
+    function audioRange(seg, cut) {
+      var range = { start: seg.at, end: segEnd(seg) };
+      if (prefs.trimAudioWithVideo) {
+        cut = cut || windowT();
+        range.start = Math.max(range.start, cut.start);
+        range.end = Math.min(range.end, cut.end);
+      }
+      return range;
+    }
+
+    function positionSeg(seg, node, cut) {
       var d = D() || 1;
-      node.style.left = (seg.at / d * 100) + "%";
-      node.style.width = (segLen(seg) / d * 100) + "%";
+      var range = audioRange(seg, cut);
+      node.hidden = range.end - range.start < 0.0005;
+      node.style.left = (range.start / d * 100) + "%";
+      node.style.width = (Math.max(0, range.end - range.start) / d * 100) + "%";
       node.classList.toggle("is-selected", seg.id === st.selected);
       node.classList.toggle("is-muted", !!seg.muted);
       var rgb = segRgb(seg);
@@ -2857,6 +2914,7 @@
       var host = dom.lanes;
       var liveLanes = {};
       var liveSegs = {};
+      var cut = prefs.trimAudioWithVideo ? windowT() : null;
       st.lanes.forEach(function (lane) {
         var rec = laneRecs[lane.id];
         if (!rec) rec = laneRecs[lane.id] = makeLaneRec(lane);
@@ -2867,7 +2925,7 @@
           var node = segEls[seg.id];
           if (!node) { node = segEls[seg.id] = makeSegEl(); node.dataset.seg = seg.id; }
           if (node.parentNode !== rec.el) rec.el.appendChild(node);
-          positionSeg(seg, node);
+          positionSeg(seg, node, cut);
           liveSegs[seg.id] = true;
         });
       });
@@ -3046,8 +3104,15 @@
       var ctx = cv.getContext("2d");
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      if (prefs.trimAudioWithVideo) {
+        var cut = windowT();
+        roundRect(ctx, cut.start * pxPerSec() - from, 0, (cut.end - cut.start) * pxPerSec(), h, 5);
+        ctx.clip();
+      }
       var pal = palette();
       lane.segments.forEach(function (seg) { drawSeg(ctx, seg, from, w, h, pal); });
+      ctx.restore();
       rec.from = from;
       rec.to = to;
     }
@@ -3246,6 +3311,8 @@
       // the blank room past everything is not part of the clip, so the dimming stops where the last piece does
       els.dimEnd.style.right = b > 0 ? "calc(-1 * var(--tl-reach-r, 0px))" : "0";
       els.dimEnd.style.width = b > 0 ? "calc(" + b * 100 + "% + var(--tl-reach-r, 0px))" : "0%";
+      var cut = prefs.trimAudioWithVideo ? windowT() : null;
+      allSegs().forEach(function (h) { if (segEls[h.seg.id]) positionSeg(h.seg, segEls[h.seg.id], cut); });
       // the cut decides how far the saved clip reaches past the video, so it decides whether the timeline plays by itself
       syncVmode();
       paintHandles();
@@ -3365,7 +3432,7 @@
       right.appendChild(el("span", "tl-sep"));
       right.appendChild(group(
         button("snap", "editor/magnet", "Snap to edges and the playhead", function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
-        button("trimAll", "editor/trim-audio", "Trim the audio with the video", toggleTrimAll),
+        button("trimAudioWithVideo", "editor/trim-audio", "Trim the audio with the video", toggleTrimAudioWithVideo),
         button("fit", "editor/fit-timeline", "Fit to zoom (0)", fitView),
         button("zoomOut", "editor/zoom-out", "Zoom out (-)", function () { setZoom(st.zoom / ZOOM_STEP); }),
         button("zoomIn", "editor/zoom-in", "Zoom in (+)", function () { setZoom(st.zoom * ZOOM_STEP); })
@@ -3402,8 +3469,9 @@
       if (opts.onSubtitles) opts.onSubtitles();
       els.waves.classList.toggle("is-active", prefs.waves);
       els.snap.classList.toggle("is-active", prefs.snap);
-      els.trimAll.classList.toggle("is-active", prefs.trimAll);
-      els.trimAll.setAttribute("aria-pressed", prefs.trimAll ? "true" : "false");
+      els.trimAudioWithVideo.classList.toggle("is-active", prefs.trimAudioWithVideo);
+      els.trimAudioWithVideo.setAttribute("aria-pressed", prefs.trimAudioWithVideo ? "true" : "false");
+      if (dom.tracks) dom.tracks.classList.toggle("is-trimming-audio", prefs.trimAudioWithVideo);
       els.undo.disabled = st.history.length < 2;
       els.redo.disabled = st.future.length === 0;
       if (opts.onHistory) opts.onHistory();
@@ -4151,12 +4219,15 @@
       e.preventDefault();
       select(hit.seg.id);
       var edge = e.target.closest(".tl-h");
+      var cut = prefs.trimAudioWithVideo ? windowT() : null;
       drag = {
         id: hit.seg.id,
         mode: edge ? (edge.classList.contains("l") ? "trimL" : "trimR") : "move",
         x: e.clientX,
         y: e.clientY,
         orig: clone(hit.seg),
+        range: audioRange(hit.seg, cut),
+        cut: cut,
         moved: false,
         lift: null,
       };
@@ -4200,18 +4271,18 @@
         if (!drag.lift && Math.abs(dy) > LIFT_PX && (st.lanes.length > 1 || hit.lane.segments.length > 1)) liftPiece(hit);
         if (drag.lift) steer(e.clientY);
       } else if (drag.mode === "trimL") {
-        var hi = o.at + segLen(o) - MIN_LEN;
-        var lo = Math.min(leftLimit(o), hi);
-        var s1 = snapTo(clamp(o.at + dt, lo, hi), seg.id);
+        var hi = drag.range.end - MIN_LEN;
+        var lo = Math.min(Math.max(leftLimit(o), drag.cut ? drag.cut.start : -Infinity), hi);
+        var s1 = snapTo(clamp(drag.range.start + dt, lo, hi), seg.id);
         guide = s1.hit;
         trimLeftTo(seg, o, clamp(s1.t, lo, hi));
         clampFades(seg);
       } else {
-        var oEnd = o.at + segLen(o);
-        var top = Math.max(o.at + MIN_LEN, rightLimit(o));
-        var s2 = snapTo(clamp(oEnd + dt, o.at + MIN_LEN, top), seg.id);
+        var bottom = Math.max(o.at, drag.cut ? drag.cut.start : -Infinity) + MIN_LEN;
+        var top = Math.max(bottom, Math.min(rightLimit(o), drag.cut ? drag.cut.end : Infinity));
+        var s2 = snapTo(clamp(drag.range.end + dt, bottom, top), seg.id);
         guide = s2.hit;
-        trimRightTo(seg, o, clamp(s2.t, o.at + MIN_LEN, top));
+        trimRightTo(seg, o, clamp(s2.t, bottom, top));
         clampFades(seg);
       }
       setSnapGuide(guide);
@@ -4292,6 +4363,7 @@
       var guide = -1;
       if (drag.mode === "vtrimL") {
         var hiL = vEnd(o) - MIN_LEN;
+        if (prefs.trimAudioWithVideo && !prev) hiL = Math.min(hiL, boundsT().end - 0.5 / st.vspeed);
         var loL = Math.min(Math.max(prev ? vEnd(prev) : -Infinity, o.at - o.srcStart / st.vspeed), hiL);
         var sl = snapTo(clamp(o.at + dt, loL, hiL), v.id);
         guide = sl.hit;
@@ -4300,6 +4372,7 @@
         v.srcStart = r3(Math.max(0, o.srcStart + (at - o.at) * st.vspeed));
       } else {
         var loR = o.at + MIN_LEN;
+        if (prefs.trimAudioWithVideo && !next) loR = Math.max(loR, boundsT().start + 0.5 / st.vspeed);
         var hiR = Math.max(loR, Math.min(next ? next.at : Infinity, vEnd(o) + (srcMax(o) - o.srcEnd) / st.vspeed));
         var sr = snapTo(clamp(vEnd(o) + dt, loR, hiR), v.id);
         guide = sr.hit;
@@ -4310,8 +4383,14 @@
       setSnapGuide(guide);
       positionV(v, vsegEls[v.id]);
       followLinked(v.id);
+      if (prefs.trimAudioWithVideo) {
+        var cut = boundsT();
+        if (drag.mode === "vtrimL" && !prev) setBoundsT(v.at, cut.end);
+        else if (drag.mode === "vtrimR" && !next) setBoundsT(cut.start, vEnd(v));
+      }
       applyZoomWidth();
       syncVmode();
+      previewEdge(v.at, vEnd(v), drag.mode === "vtrimL");
       drawSoon();
       renderProps();
       paintHandles();
@@ -5367,13 +5446,21 @@
         var seen = JSON.stringify(clean).match(/"id":"[A-Z](\d+)"/g) || [];
         seen.forEach(function (m) { top = Math.max(top, parseInt(m.replace(/\D+/g, ""), 10) || 0); });
         st.nextId = Math.max(st.nextId, top + 1);
+        var corrected = false;
         try {
           restoreSnap(clean);
+          var v = st.vsegs.length === 1 ? st.vsegs[0] : null;
+          var simple = v && !v.ref && !st.layers.length && !st.subs.length && !st.tracks.some(function (t) { return !!t.importId; });
+          // Older simple drafts could keep the audio window behind a video trim.
+          if (prefs.trimAudioWithVideo && simple && Math.abs(v.at - v.srcStart / st.vspeed) < 0.002) {
+            corrected = applyVideoCut();
+            if (corrected) changed();
+          }
           commit();
         } catch (e) {
           return { ok: false, dropped: dropped };
         }
-        return { ok: true, dropped: dropped };
+        return { ok: true, dropped: dropped, corrected: corrected };
       });
     }
 
@@ -5739,6 +5826,7 @@
       },
       setPlayhead: function (t) { setPlayhead(t); if (els.split) refreshToolbar(); },
       showBounds: setBoundsUi,
+      trimCutEdge: trimCutEdge,
       refresh: function () {
         var d = Number(opts.duration()) || st.Dsrc;
         if (Math.abs(d - st.Dsrc) > 1e-6) {

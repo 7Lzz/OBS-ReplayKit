@@ -1326,10 +1326,13 @@ window.__rkEditorApi = (function () {
       placeSubtitles();
       // an edit that was kept for this clip goes back before the editor shows, as one step that undo can take back
       let restored = false;
+      let corrected = false;
       const draft = await draftPromise;
       if (draft) {
         trimProcessingStage.textContent = "Putting your edits back";
-        restored = await restoreTrimDraft(clip, draft, dur);
+        const result = await restoreTrimDraft(clip, draft, dur);
+        restored = !!result;
+        corrected = !!(result && result.corrected);
         if (trimSourceClip !== clip) return;
       }
       trimProcessingVeil.classList.remove("is-open");
@@ -1337,8 +1340,9 @@ window.__rkEditorApi = (function () {
       trimVeil.classList.add("is-open");
       // the snap marks were already computed above while the trim bar was still display:none (0 width, so pickVisibleTrimSnapMarks drew nothing even though snapping is active) -- now that the bar actually has real layout, redraw them for real.
       renderTrimSnapMarks();
-      trimDraftSent = restored ? JSON.stringify(buildTrimDraft()) : "";
+      trimDraftSent = restored && !corrected ? JSON.stringify(buildTrimDraft()) : "";
       trimDraftArmed = true;
+      if (corrected) scheduleTrimDraft();
       if (restored) {
         showToast("Your unsaved edits are back", "info");
         scheduleToastHide(3200);
@@ -1395,6 +1399,7 @@ window.__rkEditorApi = (function () {
   // moving a trim handle seeks the preview to that cut point without changing the free video playhead behavior.
   trimStart.addEventListener("input", () => {
     snapTrimSelection("start");
+    trimLanes.trimCutEdge("start");
     trimPreviewActive = false;
     try { trimVideo.pause(); } catch {}
     previewSeek(Number(trimStart.value));
@@ -1408,6 +1413,7 @@ window.__rkEditorApi = (function () {
   });
   trimEnd.addEventListener("input", () => {
     snapTrimSelection("end");
+    trimLanes.trimCutEdge("end");
     trimPreviewActive = false;
     try { trimVideo.pause(); } catch {}
     previewSeek(Number(trimEnd.value));
@@ -1810,7 +1816,7 @@ window.__rkEditorApi = (function () {
     if (result.dropped.length) {
       showToast("Audio that was added to this edit is no longer there, so it was left out:<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", "Some audio is missing");
     }
-    return true;
+    return result;
   }
 
   // the save: the editor is locked and a popup follows the encode until the helper answers, so nothing can change under the copy or the new original that is being written
