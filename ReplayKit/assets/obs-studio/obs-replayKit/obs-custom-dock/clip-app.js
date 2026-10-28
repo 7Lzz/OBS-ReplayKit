@@ -321,7 +321,7 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -1628,7 +1628,7 @@ const CLIP_HOVER_PROFILES = {
 
   // the columns of the list are the ones the css grid works out (.grid, with the chosen card size when there is one): the used track sizes are read back from the list itself or, when it is hidden, from the favorites above it, so every card of every tab stands on the same columns
   function computeVirtualLayout() {
-    const source = gridEl.style.display === "none" ? favoritesGridEl : gridEl;
+    const source = activeFilter === "screenshots" ? document.getElementById("screenshots-grid") : gridEl.style.display === "none" ? favoritesGridEl : gridEl;
     const tracks = getComputedStyle(source).gridTemplateColumns.split(" ").map(parseFloat).filter((px) => px > 0);
     return tracks.length ? { columns: tracks.length, cardWidth: tracks[0] } : { columns: virtualColumns, cardWidth: virtualCardWidth };
   }
@@ -1639,12 +1639,12 @@ const CLIP_HOVER_PROFILES = {
 
   function cardResizeFrom(card) {
     const rect = card.getBoundingClientRect();
-    const name = card.dataset.name;
+    const name = card.dataset.shot || card.dataset.name;
     return {
       width: rect.width,
       height: rect.height,
       name,
-      favorite: favoritesGridEl.contains(card),
+      row: favoritesGridEl.contains(card) || card.dataset.shot ? card.parentElement : null,
       index: allClips.findIndex((clip) => clip && clip.name === name),
       x: 0,
       y: 0,
@@ -1653,11 +1653,12 @@ const CLIP_HOVER_PROFILES = {
     };
   }
 
-  // where the top of the card the drag began on is in the scrolled content: the main grid keeps only the cards near the screen, so its card is placed from its number in the list and the height of a row, and a favorite is read from the page
+  // The virtual list places its cards by index; Favorites and Screenshots use their actual row positions.
   function cardResizeTop(drag, columns) {
     const origin = scrollAreaEl.getBoundingClientRect().top - scrollAreaEl.scrollTop;
-    if (drag.favorite) {
-      const card = favoritesGridEl.querySelector('.card[data-name="' + CSS.escape(drag.name) + '"]');
+    if (drag.row) {
+      const name = CSS.escape(drag.name);
+      const card = drag.row.querySelector('[data-name="' + name + '"], [data-shot="' + name + '"]');
       return card ? card.getBoundingClientRect().top - origin : 0;
     }
     if (drag.index < 0) return 0;
@@ -1746,6 +1747,19 @@ const CLIP_HOVER_PROFILES = {
   function resetCardWidth(card) {
     setCardWidth(null, cardResizeFrom(card));
     saveCardWidth();
+  }
+
+  function bindCardResize(card) {
+    let grip = card.querySelector(".card-resize");
+    if (!grip) {
+      grip = document.createElement("div");
+      grip.className = "card-resize";
+      grip.innerHTML = CARD_GRIP_SVG;
+      card.appendChild(grip);
+    }
+    grip.dataset.tooltip = "Drag to resize cards, double-click to reset";
+    grip.addEventListener("pointerdown", (event) => startCardResize(event, card));
+    grip.addEventListener("click", (event) => event.stopPropagation());
   }
 
   function clearTransientCardState(card) {
@@ -3364,9 +3378,7 @@ const CLIP_HOVER_PROFILES = {
     });
 
     // the dotted corner resizes every card, and a double click on it takes the choice back
-    const resizeGrip = card.querySelector(".card-resize");
-    resizeGrip.addEventListener("pointerdown", (e) => startCardResize(e, card));
-    resizeGrip.addEventListener("click", (e) => e.stopPropagation());
+    bindCardResize(card);
 
     syncTheaterButton(preview);
     theaterBtn.addEventListener("click", (e) => {
@@ -3813,6 +3825,8 @@ const CLIP_HOVER_PROFILES = {
   });
 
   function previewToFullscreen() {
+    const screenshot = document.querySelector(".screenshot-card:hover");
+    if (screenshot && screenshotGallery) return screenshotGallery.fullscreen(screenshot.dataset.shot);
     let preview = null;
     if (activePreview) {
       preview = activePreview.closest && activePreview.closest(".preview");
@@ -4722,7 +4736,7 @@ const CLIP_HOVER_PROFILES = {
       try {
         const area = scrollAreaEl.getBoundingClientRect();
         const shown = [];
-        for (const el of scrollAreaEl.querySelectorAll(".card, .section-heading.is-shown, #empty")) {
+        for (const el of scrollAreaEl.querySelectorAll(".card, .screenshot-card, .section-heading.is-shown, #empty, #screenshots-empty")) {
           if (el.offsetParent === null) continue;
           const r = el.getBoundingClientRect();
           if (r.bottom < area.top || r.top > area.bottom) continue;

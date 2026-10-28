@@ -1,14 +1,14 @@
 <style>
   body.is-screenshots .clip-sort-group[data-group="length"] { display:none; }
   /* a screenshot card is built like a clip card: the picture, then the title row with the pencil, the delete button and the menu, then the size and age; the menu hangs out of the card, so only the picture clips */
-  .screenshot-card { position:relative; display:flex; flex-direction:column; min-width:0; padding:0; border:1px solid var(--grey4-solid,var(--grey4)); border-radius:6px; background:var(--bg_card); color:var(--text); text-align:left; font:inherit; cursor:pointer; overflow:visible; }
+  .screenshot-card { min-width:0; padding:0; color:var(--text); text-align:left; font:inherit; cursor:pointer; }
   .screenshot-card.menu-open { z-index:20; }
   .screenshot-card .preview { display:block; width:100%; overflow:hidden; border-radius:5px 5px 0 0; }
   .screenshot-open { position:absolute; inset:0; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:pointer; }
   .screenshot-card .screenshot-fullscreen { opacity:0; transition:opacity 120ms linear; }
   .screenshot-card:hover .screenshot-fullscreen, .screenshot-card:focus-within .screenshot-fullscreen { opacity:1; }
   .screenshot-card img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; }
-  .screenshot-card:hover, .screenshot-card:focus-visible { border-color:var(--primary_light); outline:none; }
+  .screenshot-open:focus-visible { outline:2px solid var(--selected-solid,var(--primary-solid,var(--primary_light))); outline-offset:-2px; }
   .screenshot-dialog { width:min(1100px, calc(100vw - 48px)); max-height:calc(100vh - 48px); padding:0; border:1px solid var(--grey4-solid,var(--grey4)); border-radius:10px; background:var(--grey6); color:var(--text); box-shadow:0 18px 48px var(--shadow); outline:none; }
   .screenshot-dialog::backdrop { background:rgba(0,0,0,.65); }
   .screenshot-dialog-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--hairline); }
@@ -107,6 +107,12 @@ window.RKScreenshots = {
       if (!response.ok || !data.ok) throw new Error(data.message || "The screenshot could not be changed");
       return data;
     }
+    async function copy(row, button) {
+      if (button) button.disabled = true;
+      try { await act(row, "copy"); options.toast("Screenshot copied to the clipboard"); }
+      catch (error) { options.notify(error.message); }
+      finally { if (button) button.disabled = false; }
+    }
     function rename(card, row) {
       const nameSpan = card.querySelector(".name");
       const titleRow = card.querySelector(".title-row");
@@ -144,7 +150,7 @@ window.RKScreenshots = {
     function buildCard(row) {
       const icons = options.icons;
       const card = document.createElement("div");
-      card.className = "screenshot-card";
+      card.className = "screenshot-card rk-hover-card";
       card.dataset.shot = row.name;
       const picture = document.createElement("span");
       picture.className = "preview";
@@ -189,7 +195,16 @@ window.RKScreenshots = {
       name.textContent = row.name.replace(/\.png$/i, "");
       name.title = row.name;
       details(row, body.querySelector(".meta"));
-      card.append(picture, body);
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const copyButton = document.createElement("button");
+      copyButton.type = "button";
+      copyButton.className = "btn action-link-btn";
+      copyButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.CLIPBOARD + '</svg><span class="btn-label">Copy image</span>';
+      copyButton.addEventListener("click", event => { event.stopPropagation(); copy(row, copyButton); });
+      actions.appendChild(copyButton);
+      card.append(picture, body, actions);
+      options.resize(card);
       const menu = body.querySelector(".menu-dropdown");
       const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
       async function remove(trigger, inMenu) {
@@ -217,7 +232,7 @@ window.RKScreenshots = {
         if (kind === "delete") { remove(button, true); return; }
         closeMenu();
         if (kind === "rename") rename(card, row);
-        else if (kind === "copy") act(row, "copy").then(() => options.toast("Screenshot copied to the clipboard"), error => options.notify(error.message));
+        else if (kind === "copy") copy(row);
         else if (kind === "reveal") act(row, "reveal").catch(error => options.notify(error.message));
       });
       card.addEventListener("contextmenu", event => {
@@ -226,7 +241,7 @@ window.RKScreenshots = {
         event.stopPropagation();
         options.openMenu(card, menu, event);
       });
-      card.addEventListener("click", event => { if (!event.target.closest(".body")) preview(row); });
+      card.addEventListener("click", event => { if (event.target.closest(".preview")) preview(row); });
       body.addEventListener("click", event => { if (!event.defaultPrevented && !event.target.closest("button, .menu-item, input")) preview(row); });
       options.hovers(card);
       return card;
@@ -315,6 +330,13 @@ window.RKScreenshots = {
     return {
       refresh: refresh,
       paint: paint,
+      fullscreen: function (name) {
+        const row = shown.find(item => item.name === name);
+        if (!row) return false;
+        preview(row);
+        if (!isFullscreen()) toggleFullscreen();
+        return true;
+      },
       count: () => loaded ? rows.length : undefined,
       update: function (search, order) { if (search !== query || order !== sort) { query = search; sort = order; if (active) paint(); } },
       show: function (value) {

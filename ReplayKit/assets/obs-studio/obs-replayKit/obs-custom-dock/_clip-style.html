@@ -627,7 +627,7 @@
     border-radius: 3px;
     font-size: 11.5px;
   }
-  .card {
+  .card, .screenshot-card {
     position: relative;
     background: var(--bg_card);
     border: 1px solid var(--grey4-solid,var(--grey4));
@@ -1800,8 +1800,8 @@
     /* only the lower right half of its box, where the dots are, answers the pointer: the X of an upload bar or of a failed link sits right beside it and keeps its whole box */
     clip-path: polygon(100% 0, 100% 100%, 0 100%);
   }
-  .card:hover .card-resize { opacity: .65; }
-  .card .card-resize:hover { opacity: 1; }
+  .card:hover .card-resize, .screenshot-card:hover .card-resize { opacity: .65; }
+  .card .card-resize:hover, .screenshot-card .card-resize:hover { opacity: 1; }
   /* a clip that was only just saved has no picture yet: its card says it is being processed in place of the grey tile, and the player stays out of reach until the picture is there */
   .processing-overlay {
     position: absolute;
@@ -1844,7 +1844,7 @@
   .rk-home .card-resize, .card.is-theater-card .card-resize { display: none; }
   /* while a drag of the corner runs the cursor stays the corner cursor wherever the pointer is, nothing under it reacts, and the cards do not play their hover motion as the rows move */
   html.is-card-resizing, html.is-card-resizing * { cursor: nwse-resize !important; user-select: none !important; }
-  html.is-card-resizing .card { pointer-events: none; transition: none !important; translate: 0 0 !important; }
+  html.is-card-resizing .card, html.is-card-resizing .screenshot-card { pointer-events: none; transition: none !important; translate: 0 0 !important; }
   /* a chosen size is the same for every list: columns of that width, left aligned, and the room that is left stays empty */
   html.rk-card-sized .grid { grid-template-columns: repeat(auto-fill, min(var(--rk-card-w), 100%)); justify-content: start; }
   .btn {
