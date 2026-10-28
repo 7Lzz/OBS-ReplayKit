@@ -30,10 +30,21 @@ namespace ReplayKitHelper
                     (expectedWriteTime.HasValue && sourceWriteTime != expectedWriteTime.Value))
                     return new JObject { ["ok"] = false, ["message"] = "The selected clip changed; select it again." };
 
+                try { CompressionHistory.Prepare(); }
+                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+                {
+                    Log.Write("Compression history: " + ex.Message);
+                    return new JObject { ["ok"] = false, ["message"] = "Compression history could not be opened or saved. Check ReplayKit's saved state folder before compressing." };
+                }
+
                 var caps = Compression.GetHelperCapabilities();
+                string fastEncoder = caps["fastEncoder"]?.Value<string>();
+                string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
                 string ffmpeg = caps["ffmpeg"]?.Value<string>();
                 if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
                     return new JObject { ["ok"] = false, ["message"] = "ffmpeg.exe not found in clip folder" };
+                if (string.IsNullOrEmpty(mode == "fast" ? fastEncoder : smallerEncoder))
+                    return new JObject { ["ok"] = false, ["message"] = "No compatible compression encoder is available on this PC." };
                 string ffprobe = caps["ffprobe"]?.Value<string>();
 
                 var metadata = Compression.GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
@@ -53,8 +64,6 @@ namespace ReplayKitHelper
 
                 Log.Write("Start-CompressOverwriteFile clip=" + selected.Name + " mode=" + mode + " duration=" + duration + " scaleHeight=" + scaleHeight, "compress", requestId);
 
-                string fastEncoder = caps["fastEncoder"]?.Value<string>();
-                string smallerEncoder = caps["smallerEncoder"]?.Value<string>();
                 string sourceFull = selected.Full;
                 string selectedName = selected.Name;
                 int scale = scaleHeight;
@@ -91,7 +100,7 @@ namespace ReplayKitHelper
             if (success)
             {
                 // no url to set -- the clip card just goes back to its normal state once /clips picks up the new mtime/size.
-                UploadState.SetUploadState(requestId: requestId, state: "idle", active: false, error: "", phase: "", percent: 0, url: "");
+                UploadState.SetUploadState(requestId: requestId, state: "idle", active: false, error: "", phase: "", percent: 0, url: "", message: task.Result.Message ?? "");
             }
             else
             {

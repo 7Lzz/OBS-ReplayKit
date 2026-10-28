@@ -215,6 +215,11 @@
   .form-row:has(> .field-wrap.is-stacked) { align-items:start; }
   .form-row:has(> .field-wrap.is-stacked) > .label { line-height:32px; }
   .hint { color:var(--muted); font-size:12px; margin-left:4px; }
+  #storageCompressionType .combo-option[data-value="smaller"],
+  #storageCompressionType.is-smaller .combo-label,
+  .storage-compression-warning { color:var(--danger); }
+  #storageCompressionType .combo-option[data-value="smaller"].is-selected { background:var(--danger); color:var(--on-accent); }
+  .storage-compression-warning { line-height:1.5; }
   .form-row.is-disabled .label,
   .form-row.is-disabled .hint {
     color:var(--disabled);
@@ -1539,6 +1544,13 @@
     <section class="page" id="page-storage">
       <div class="box">
         <div class="box-title">Storage</div>
+        <div class="form-row">
+          <div class="label">Compression type<span class="setting-description">Used by Compress Clips in Free-up Space.</span></div>
+          <div class="field-wrap is-stacked">
+            <div class="combo" id="storageCompressionType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Storage compression type" aria-describedby="storageCompressionWarning"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+            <div class="hint storage-compression-warning" id="storageCompressionWarning" role="note" hidden><strong>Much slower.</strong> Smaller can take much longer with large clips or libraries and uses more CPU while it runs.</div>
+          </div>
+        </div>
         <div class="form-row tight">
           <div></div>
           <div class="check-row">
@@ -2299,6 +2311,8 @@
     autoCopyLink: document.getElementById("autoCopyLink"),
     linkNotificationEnabled: document.getElementById("linkNotificationEnabled"),
     compressSkipFavorites: document.getElementById("compressSkipFavorites"),
+    storageCompressionType: document.getElementById("storageCompressionType"),
+    storageCompressionWarning: document.getElementById("storageCompressionWarning"),
     storageLimit: document.getElementById("storageLimit"),
     storageLimitCustomRow: document.getElementById("storageLimitCustomRow"),
     storageLimitGb: document.getElementById("storageLimitGb"),
@@ -2382,6 +2396,7 @@
   // the limits of the storage card, in GB; anything else is typed in through Custom
   const STORAGE_LIMITS = [{ value:"0", label:"No limit" }, { value:"25", label:"25 GB" }, { value:"50", label:"50 GB" }, { value:"100", label:"100 GB" }, { value:"250", label:"250 GB" }, { value:"500", label:"500 GB" }, { value:"1024", label:"1 TB" }, { value:"custom", label:"Custom..." }];
   fillCombo(els.storageLimit, STORAGE_LIMITS);
+  fillCombo(els.storageCompressionType, [{ value:"fast", label:"Fast" }, { value:"smaller", label:"Smaller" }]);
   fillCombo(els.editorSeekStep, [{ value:"1", label:"1 second" }, { value:"2", label:"2 seconds" }, { value:"5", label:"5 seconds" }, { value:"10", label:"10 seconds" }, { value:"15", label:"15 seconds" }, { value:"30", label:"30 seconds" }]);
   fillCombo(els.editorZoomScaling, [
     { value:"smooth", label:"Smooth", blurb:"Blend pixels for smoother zoomed-in video." },
@@ -3361,6 +3376,12 @@
   }
 
   // the limit is one of the steps of the list, or typed in when it is none of them
+  function syncStorageCompression() {
+    const smaller = comboValue(els.storageCompressionType) === "smaller";
+    els.storageCompressionType.classList.toggle("is-smaller", smaller);
+    els.storageCompressionWarning.hidden = !smaller;
+  }
+
   function syncStorageLimit() {
     const limit = Math.max(0, Number(state.storageLimitGb) || 0);
     const step = STORAGE_LIMITS.some((o) => o.value === String(limit));
@@ -3712,6 +3733,8 @@
     els.autoCopyLink.checked = state.autoCopyLink !== false;
     els.linkNotificationEnabled.checked = state.linkNotificationEnabled !== false;
     els.compressSkipFavorites.checked = state.compressSkipFavorites !== false;
+    setComboValue(els.storageCompressionType, state.storageCompressionType || "fast", false);
+    syncStorageCompression();
     els.developmentMode.checked = !!state.developmentMode;
     els.sdkMode.checked = !!state.sdkMode;
     els.logInterfaceEvents.checked = !!state.logInterfaceEvents;
@@ -3803,6 +3826,8 @@
     state.autoCopyLink = els.autoCopyLink.checked;
     state.linkNotificationEnabled = els.linkNotificationEnabled.checked;
     state.compressSkipFavorites = els.compressSkipFavorites.checked;
+    state.storageCompressionType = comboValue(els.storageCompressionType);
+    syncStorageCompression();
     state.developmentMode = els.developmentMode.checked;
     state.sdkMode = els.sdkMode.checked;
     state.logInterfaceEvents = els.logInterfaceEvents.checked;
@@ -3904,7 +3929,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {

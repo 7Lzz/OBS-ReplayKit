@@ -4043,6 +4043,7 @@ const CLIP_HOVER_PROFILES = {
     const processing = clip.ready === false && !failed && !timedOut;
     const transPct   = Number(clip.transcode_percent) || 0;
     const stillTicking = (state === "compressing" || state === "uploading");
+    const queuedCompression = state === "compressing" && status && status.phase === "queued";
     const finalizing = stillTicking && uploadPhaseIsFinalizing(status);
     // amber transcode bar while streamable processes; the link is only offered once it is playable (ready, or our poll timed out and we give it the benefit of the doubt). a failed transcode offers no link.
     const showTranscodeBar = !!clip.streamable_url && processing && !stillTicking;
@@ -4069,6 +4070,9 @@ const CLIP_HOVER_PROFILES = {
       if (bar) {
         card.dataset.actionSig = actionSig;
         bar.classList.toggle("is-finalizing", finalizing);
+        bar.classList.toggle("is-queued", !!queuedCompression);
+        const phaseLabel = bar.querySelector(".progress-phase");
+        if (phaseLabel) phaseLabel.textContent = queuedCompression ? "Queued" : "";
         updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), uploadPct);
         return;
       }
@@ -4187,7 +4191,7 @@ const CLIP_HOVER_PROFILES = {
         btn = document.createElement("div");
         btn.className = "btn is-progress";
         btn.innerHTML =
-          '<span class="progress-track"><span class="progress-fill"></span></span>' +
+          '<span class="progress-track"><span class="progress-fill"></span></span><span class="progress-phase"></span>' +
           '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel">' +
           '<svg viewBox="0 0 320.591 320.591" aria-hidden="true">' + CANCEL_ICON + '</svg></button>';
         // resolve the clip + its live job at click time from the card -- a recycled card node can outlive the clip this listener was built for.
@@ -4204,6 +4208,8 @@ const CLIP_HOVER_PROFILES = {
         actions.appendChild(btn);
       }
       btn.classList.toggle("is-finalizing", finalizing);
+      btn.classList.toggle("is-queued", !!queuedCompression);
+      btn.querySelector(".progress-phase").textContent = queuedCompression ? "Queued" : "";
       updateDisplayProgress(clip.name, btn.querySelector(".progress-fill"), uploadPct);
     } else {
       const btn = document.createElement("button");
@@ -5141,7 +5147,7 @@ const CLIP_HOVER_PROFILES = {
     }
   });
 
-  // compress-overwrite mode picker. the clip cards 3-dot menu has a single "compress..." entry that opens this modal. the user picks fast (veryfast preset, smaller than source) or smaller (slower preset, ~30-50% smaller still), and the click fires post /compress-overwritemode=... which replaces the source clip in place.
+  // The mode picker starts a compression that replaces the clip only when the output is smaller.
   const compressModeVeil     = document.getElementById("compress-mode-veil");
   const compressModeModal    = document.getElementById("compress-mode-modal");
   const compressModeCancel   = document.getElementById("compress-mode-cancel");
@@ -5859,6 +5865,37 @@ const CLIP_HOVER_PROFILES = {
   let trimSaving = null;
   let editorLoad = null;
   let editorRequest = 0;
+  const editorSessionId = crypto.randomUUID();
+  let editorSessionRegistered = false, editorSessionRevision = 0;
+  let editorSessionWrites = Promise.resolve();
+  function editorSessionBody(action, names) {
+    return { view:HOME_MODE ? "home" : "clips", id:editorSessionId, revision:++editorSessionRevision, action, names };
+  }
+  async function sendEditorSession(body, keepalive) {
+    const res = await fetch(HELPER + "/editor/session", { method:"POST", cache:"no-store", keepalive:!!keepalive,
+      headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || "The editor clip could not be protected.");
+  }
+  function protectEditorSources(names) {
+    const body = editorSessionBody("add", names);
+    editorSessionWrites = editorSessionWrites.catch(() => {}).then(async () => {
+      if (!editorSessionRegistered) {
+        await sendEditorSession({ view:body.view, id:editorSessionId, action:"register" });
+        editorSessionRegistered = true;
+      }
+      await sendEditorSession(body);
+    });
+    return editorSessionWrites;
+  }
+  function releaseEditorSources() {
+    const body = editorSessionBody("clear");
+    editorSessionWrites = editorSessionWrites.catch(() => {}).then(() => editorSessionRegistered ? sendEditorSession(body, true) : undefined);
+    editorSessionWrites.catch((err) => showToast(escapeHtml(err.message), "bad", "Editor"));
+  }
+  window.addEventListener("pagehide", () => {
+    if (editorSessionRegistered) navigator.sendBeacon(HELPER + "/editor/session", new Blob([JSON.stringify(editorSessionBody("clear"))], { type:"application/json" }));
+  });
   // the signal every listener and timer of the editor hangs off, and the style and script tags the loader put in the head
   let editorScope = null;
   let editorNodes = [];
@@ -5961,7 +5998,10 @@ const CLIP_HOVER_PROFILES = {
 
   function cancelEditorLoading() {
     ++editorRequest;
-    if (!window.__replaykitEditorReady) trimProcessingVeil.classList.remove("is-open");
+    if (!window.__replaykitEditorReady) {
+      trimProcessingVeil.classList.remove("is-open");
+      releaseEditorSources();
+    }
   }
 
   async function openEditor(clip) {
@@ -5969,15 +6009,18 @@ const CLIP_HOVER_PROFILES = {
     trimProcessingVeil.classList.add("is-open");
     document.getElementById("trim-processing-stage").textContent = "Preparing the editor";
     try {
+      await protectEditorSources([clip.name]);
+      if (request !== editorRequest) return;
       await loadEditor();
       if (request !== editorRequest) return;
       const blocked = clipBusyWith(clip.name);
-      if (blocked) { trimProcessingVeil.classList.remove("is-open"); showToast(blocked, "bad", "Editor"); return; }
+      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(blocked, "bad", "Editor"); return; }
       editorApi().open(clip);
     } catch (err) {
       if (request !== editorRequest) return;
       trimProcessingVeil.classList.remove("is-open");
-      showToast("The editor could not be loaded. Reopen ReplayKit and try again.", "bad", "Editor");
+      releaseEditorSources();
+      showToast(escapeHtml(err.message || "The editor could not be loaded. Reopen ReplayKit and try again."), "bad", "Editor");
     }
   }
 
@@ -5994,12 +6037,12 @@ const CLIP_HOVER_PROFILES = {
     cancelEditorLoading();
   }, true);
 
-  // the shell drops a view that has been out of sight for a while; anything only this page holds would go with it -- the editor (open, loading, held for return or saving), an open dialog, and the bulk upload, compress all and per-clip work that run from here
+  // Keep client-owned work. Accepted helper jobs continue without this page and restore their status when it opens again.
   window.__rkCanUnload = function () {
     if (trimSaving || editorHeldAway) return false;
     if (trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") || document.querySelector(".modal-veil.is-open")) return false;
-    if (compressAllRunning || bulkUploadRunning || bulkUploadInFlight.size > 0) return false;
-    for (const state of localState.values()) if (state === "compressing" || state === "uploading") return false;
+    if (compressAllRunning || bulkUploadRunning || bulkUploadQueued.size > 0) return false;
+    if (linkTransitionBusy.size > 0 || inFlightCancels.size > 0) return false;
     return true;
   };
 

@@ -28,6 +28,10 @@ namespace ReplayKitHelper
             public int Height;
             public string Fps;
             public double Duration;
+            public string PixelFormat;
+            public string SampleAspect;
+            public bool ConstantFrameRate;
+            public long Bitrate;
         }
 
         private const int MaxPieces = 64;
@@ -39,6 +43,17 @@ namespace ReplayKitHelper
         // the part of the timeline that is the saved clip
         public double Start;
         public double End;
+
+        public bool TryDirectRange(out double start, out double end)
+        {
+            start = end = 0;
+            if (Pieces.Count != 1) return false;
+            var piece = Pieces[0];
+            if (piece.Path != null || piece.At > Start || piece.At + piece.Length(1) < End) return false;
+            start = piece.SrcStart + Start - piece.At;
+            end = piece.SrcStart + End - piece.At;
+            return true;
+        }
 
         private static bool Finite(double x) => !double.IsNaN(x) && !double.IsInfinity(x);
 

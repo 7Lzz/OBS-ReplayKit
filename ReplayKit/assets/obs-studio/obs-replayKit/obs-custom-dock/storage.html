@@ -26,6 +26,7 @@
     --ease_smooth:cubic-bezier(.16, 1, .3, 1);
     --ease_pop:cubic-bezier(.2, .7, .3, 1);
     --anim_press:130ms;
+    --anim_menu:200ms;
     --sb-outline:var(--grey5);
   }
   * { box-sizing:border-box; }
@@ -41,9 +42,9 @@
   /* the card fades in with the dim the plugin lays under it */
   .card.is-opening { animation:rk-open 280ms var(--ease_smooth, ease-out) both; }
   @keyframes rk-open { from { opacity:0; } to { opacity:1; } }
-  .scroll { flex:1; min-height:0; overflow-y:auto; padding:0 24px 12px; display:flex; flex-direction:column; }
-  /* the limit row is the foot of the card, so what is left over sits between it and the compress list instead of under everything */
-  .scroll > .sec:last-of-type { margin-top:auto; }
+  .scroll { flex:1; min-height:0; overflow-y:auto; margin-right:6px; padding:0 18px 12px 24px; display:flex; flex-direction:column; }
+  #cmpSec { flex:1; min-height:300px; display:flex; flex-direction:column; }
+  #cmpPick { flex:1; min-height:0; display:flex; flex-direction:column; }
 
   .top { position:relative; padding:16px 0 12px; text-align:center; }
   .top h1 { margin:0 0 4px; font-size:18px; font-weight:700; }
@@ -124,6 +125,10 @@
   .status.is-error { color:var(--red); }
 
   /* compress clips: the biggest clips, the ones to keep out of it, and the run itself */
+  .cmp-mode { margin-left:8px; font-size:12px; font-weight:500; color:var(--text_muted); }
+  .cmp-mode.is-slow { color:var(--red); }
+  .callout.is-slow { border-color:var(--red); background:color-mix(in srgb, var(--red) 9%, transparent); }
+  .callout.is-slow .bang { background:var(--red); color:var(--on-accent); }
   .switch { display:flex; align-items:center; gap:8px; font-size:12.5px; }
   .switch .sw-hit { position:relative; display:flex; flex:none; cursor:pointer; }
   .switch input { position:absolute; opacity:0; pointer-events:none; }
@@ -137,30 +142,35 @@
   .switch .sw-hit:active .sw::after { width:18px; }
   .switch .sw-hit:active input:checked + .sw::after { transform:translateX(10px); }
   .switch input:focus-visible + .sw { outline:2px solid var(--selected2,var(--primary_light)); outline-offset:2px; }
-  .cmp-list { border:1px solid var(--grey3); border-radius:6px; background:var(--window); overflow-x:hidden; overflow-y:auto; max-height:172px; --sb-outline:transparent; --sb-start:4px; --sb-end:4px; }
+  .cmp-list { flex:1; min-height:102px; border:1px solid var(--grey3); border-radius:6px; background:var(--window); overflow:hidden; padding-right:4px; }
+  .cmp-items { height:100%; overflow-x:hidden; overflow-y:auto; --sb-outline:transparent; --sb-start:4px; --sb-end:4px; }
   /* the list is a card inside the card, so its scrollbar is only a slim thumb in the edge of it, with no outline drawn around the track like the one the pages have */
-  .cmp-list::-webkit-scrollbar { width:10px; }
-  .cmp-list::-webkit-scrollbar-thumb { background-color:rgba(var(--text-rgb,255,255,255),.16); border:2px solid transparent; border-radius:6px; }
-  .cmp-list::-webkit-scrollbar-thumb:hover { background-color:rgba(var(--text-rgb,255,255,255),.28); }
-  .cmp-list::-webkit-scrollbar-thumb:active { background-color:rgba(var(--text-rgb,255,255,255),.38); }
-  .cmp-tools { display:flex; align-items:center; gap:16px; margin:6px 0 0; }
+  .cmp-items::-webkit-scrollbar { width:10px; }
+  .cmp-items::-webkit-scrollbar-thumb { background-color:rgba(var(--text-rgb,255,255,255),.16); border:2px solid transparent; border-radius:6px; }
+  .cmp-items::-webkit-scrollbar-thumb:hover { background-color:rgba(var(--text-rgb,255,255,255),.28); }
+  .cmp-items::-webkit-scrollbar-thumb:active { background-color:rgba(var(--text-rgb,255,255,255),.38); }
+  .cmp-tools { flex:none; display:flex; align-items:center; gap:16px; margin:6px 0 0; }
   .cmp-more { margin-left:auto; }
   .cmp-row { position:relative; display:flex; align-items:center; gap:10px; height:34px; padding:0 12px; cursor:pointer; transition:background-color 90ms linear; }
   .cmp-row + .cmp-row { border-top:1px solid var(--grey3); }
-  .cmp-row:hover { background:rgba(255, 255, 255, .04); }
+  .cmp-row:hover, .cmp-row:has(input:focus-visible) { background:var(--button_bg_hover); }
+  .cmp-row:has(input:focus-visible) { box-shadow:inset 3px 0 0 var(--selected-solid,var(--primary-solid,rgb(var(--accent-rgb,40,76,184)))); }
   .cmp-row input { position:absolute; opacity:0; pointer-events:none; }
-  .cmp-row .cb { flex:none; width:16px; height:16px; border:1px solid var(--line2); border-radius:4px; display:flex; align-items:center; justify-content:center; transition:background-color 90ms linear, border-color 90ms linear; }
-  .cmp-row .cb::after { content:""; width:8px; height:4px; margin-top:-2px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg) scale(0); transition:transform 110ms var(--ease_pop); }
-  .cmp-row input:checked + .cb { background:var(--primary_light); border-color:var(--primary_light); }
-  .cmp-row input:checked + .cb::after { transform:rotate(-45deg) scale(1); }
-  .cmp-row input:focus-visible + .cb { box-shadow:0 0 0 2px var(--primary_light); }
+  .cmp-row .cb { flex:none; width:16px; height:16px; display:flex; align-items:center; justify-content:center; color:var(--text_muted); }
+  .cmp-row .cb svg { width:16px; height:16px; fill:currentColor; overflow:visible; }
+  .cmp-row .cb svg path + path { transform-box:fill-box; transform-origin:center; opacity:0; transform:scale(.4); transition:opacity 120ms ease, transform 160ms var(--ease_pop); }
+  .cmp-row input:checked + .cb { color:var(--selected-solid,var(--primary-solid,rgb(var(--accent-rgb,40,76,184)))); }
+  .cmp-row input:checked + .cb svg path + path { opacity:1; transform:none; }
   .cmp-row .nm { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12.5px; }
   .cmp-row .sz { flex:none; font-size:12px; color:var(--text_muted); font-variant-numeric:tabular-nums; }
   .cmp-empty { padding:14px 12px; font-size:12.5px; color:var(--text_muted); border:1px solid var(--grey3); border-radius:6px; background:var(--window); }
-  .cmp-foot { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
-  .cmp-summary { min-width:0; display:flex; flex-direction:column; gap:4px; line-height:1.45; }
+  .cmp-foot { flex:none; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
+  .cmp-summary { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; line-height:1.45; }
+  .cmp-details { display:flex; align-items:center; gap:12px; min-height:18px; }
   .cmp-estimate { color:var(--text_muted); font-size:12px; }
   .cmp-estimate b { color:var(--text); font-weight:600; }
+  #cmpEstInfo { flex:none; }
+  #cmpStatus { flex:1; min-width:0; margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .cmp-foot > .btn { flex:none; }
   .callout { display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--warning); border-radius:6px; background:rgba(226, 163, 59, .09); font-size:12.5px; line-height:1.5; }
   .callout .bang { flex:none; width:18px; height:18px; margin-top:1px; border-radius:50%; background:var(--warning); color:#1b1b1f; font-weight:800; font-size:12px; line-height:18px; text-align:center; }
@@ -205,7 +215,7 @@
 
     <section class="sec" id="cmpSec">
       <div class="sec-head">
-        <h2>Compress Clips</h2>
+        <h2>Compress Clips<span class="cmp-mode" id="cmpMode">Fast</span></h2>
         <div class="switch" id="cmpFavSwitch">
           <label class="sw-hit"><input type="checkbox" id="cmpSkipFav" checked aria-label="Skip favorites"><span class="sw"></span></label>
           <span>Skip favorites</span>
@@ -220,10 +230,13 @@
           <button class="link" type="button" id="cmpNone">Clear</button>
           <button class="link cmp-more" type="button" id="cmpMore" hidden>Show more clips</button>
         </div>
-        <div class="cmp-foot" id="cmpFoot" hidden>
+        <div class="cmp-foot" id="cmpFoot">
           <div class="cmp-summary">
             <span class="hint" id="cmpPicked"></span>
-            <span class="cmp-estimate" id="cmpEstInfo" hidden>Estimated savings: <b id="cmpEstimateValue"></b></span>
+            <div class="cmp-details">
+              <span class="cmp-estimate" id="cmpEstInfo" hidden>Estimated savings: <b id="cmpEstimateValue"></b></span>
+              <span class="status" id="cmpStatus" role="status" aria-live="polite"></span>
+            </div>
           </div>
           <button class="btn is-primary" type="button" id="cmpGo" aria-describedby="cmpEstInfo">Compress</button>
         </div>
@@ -231,9 +244,9 @@
 
       <div id="cmpConfirm" hidden>
         <p class="hint" id="cmpConfirmSum" style="margin:0 0 10px"></p>
-        <div class="callout">
+        <div class="callout" id="cmpWarning">
           <span class="bang" aria-hidden="true">!</span>
-          <p>Compressing works your PC hard. Avoid gaming or other demanding tasks until it finishes, and expect everything to feel a little slower. It keeps going if you close this window, and each clip is replaced by its smaller version.</p>
+          <p id="cmpWarningText"></p>
         </div>
         <div class="cmp-actions">
           <button class="btn is-primary" type="button" id="cmpStart">Start compressing</button>
@@ -264,7 +277,6 @@
         <p class="run-title" id="cmpDoneText"></p>
         <div class="cmp-actions"><button class="btn" type="button" id="cmpOk">Done</button></div>
       </div>
-      <p class="status" id="cmpStatus"></p>
     </section>
 
     <section class="sec">
@@ -308,7 +320,7 @@
     over:$("over"), overText:$("overText"), overActions:$("overActions"), limitStatus:$("limitStatus"),
     skipFav:$("cmpSkipFav"), pick:$("cmpPick"), empty:$("cmpEmpty"), list:$("cmpList"), foot:$("cmpFoot"), picked:$("cmpPicked"), go:$("cmpGo"),
     tools:$("cmpTools"), all:$("cmpAll"), none:$("cmpNone"), more:$("cmpMore"), estInfo:$("cmpEstInfo"), estimateValue:$("cmpEstimateValue"), confirmSum:$("cmpConfirmSum"),
-    confirm:$("cmpConfirm"), start:$("cmpStart"), back:$("cmpBack"),
+    confirm:$("cmpConfirm"), start:$("cmpStart"), back:$("cmpBack"), mode:$("cmpMode"), warning:$("cmpWarning"), warningText:$("cmpWarningText"),
     run:$("cmpRun"), arc:$("cmpArc"), pct:$("cmpPct"), runTitle:$("cmpTitle"), runCurrent:$("cmpCurrent"), runSaved:$("cmpSaved"), stop:$("cmpStop"),
     done:$("cmpDone"), doneText:$("cmpDoneText"), ok:$("cmpOk"), cmpStatus:$("cmpStatus"),
   };
@@ -337,6 +349,7 @@
 
   function setStatus(el, text, isError) {
     el.textContent = text || "";
+    el.title = text || "";
     el.classList.toggle("is-error", !!isError);
   }
 
@@ -484,11 +497,23 @@
     }
   }
 
-  // compress clips. phase is what the section shows: the list to pick from, the note before it starts, the run, or its result limit is how many of the biggest clips are listed, more come a page at a time; a clip that shows up after the first page starts unticked, so a long list is never picked by accident
-  const CMP_PAGE = 8;
+  // The biggest verified clips are offered first, with more added a page at a time.
+  const CMP_PAGE = 10;
   const CMP_MAX = 50;
-  const cmp = { phase:"pick", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, eligible:0, loadedOnce:false };
+  const cmp = { phase:"pick", mode:"fast", clips:[], picked:new Set(), timer:0, lastId:0, ackedId:0, starting:false, limit:CMP_PAGE, hasMore:false, loadedOnce:false, loading:false, loadGeneration:0 };
   const RING = 219.9;
+
+  function showCompressionType(mode) {
+    cmp.mode = mode === "smaller" ? "smaller" : "fast";
+    const smaller = cmp.mode === "smaller";
+    els.mode.textContent = smaller ? "Smaller" : "Fast";
+    els.mode.classList.toggle("is-slow", smaller);
+    els.warning.classList.toggle("is-slow", smaller);
+    els.warningText.textContent = smaller
+      ? "Smaller can take much longer and uses more CPU. Large libraries may take hours. Avoid gaming or other demanding tasks while it runs. It continues if you close this window and replaces each clip only when the result is smaller."
+      : "Fast uses your GPU when supported to finish sooner. It continues if you close this window and replaces each clip only when the result is smaller.";
+    els.empty.textContent = smaller ? "No large clips are eligible for Smaller compression." : "No large uncompressed clips are available for Fast compression.";
+  }
 
   function showPhase(phase) {
     cmp.phase = phase;
@@ -518,12 +543,15 @@
     const has = cmp.clips.length > 0;
     els.empty.hidden = has;
     els.list.hidden = !has;
-    els.foot.hidden = !has;
+    els.go.hidden = !has;
+    els.picked.hidden = !has;
     els.tools.hidden = !has;
-    const left = Math.min(cmp.eligible, CMP_MAX) - cmp.clips.length;
-    els.more.hidden = !has || left <= 0;
-    els.more.textContent = left > 0 ? "Show " + Math.min(CMP_PAGE, left) + " more clip" + (Math.min(CMP_PAGE, left) === 1 ? "" : "s") + (cmp.eligible <= CMP_MAX ? " (" + left + " left)" : "") : "";
+    els.more.hidden = !has || !cmp.hasMore || cmp.limit >= CMP_MAX;
+    els.more.textContent = "Show " + Math.min(CMP_PAGE, CMP_MAX - cmp.limit) + " more clips";
     els.list.textContent = "";
+    const items = document.createElement("div");
+    items.className = "cmp-items";
+    els.list.appendChild(items);
     cmp.clips.forEach((clip) => {
       const row = document.createElement("label");
       row.className = "cmp-row";
@@ -536,6 +564,8 @@
       });
       const mark = document.createElement("span");
       mark.className = "cb";
+      mark.setAttribute("aria-hidden", "true");
+      mark.innerHTML = (window.RK_ICONS || {})["action/select"] || "";
       const name = document.createElement("span");
       name.className = "nm";
       name.textContent = clip.name;
@@ -544,7 +574,7 @@
       size.className = "sz";
       size.textContent = clip.sizeText;
       row.append(box, mark, name, size);
-      els.list.appendChild(row);
+      items.appendChild(row);
     });
     renderPickedFoot();
   }
@@ -560,25 +590,46 @@
     els.picked.innerHTML = count ? "<b>" + count + "</b> selected · " + formatBytes(pickedBytes()) : "Pick the clips to compress";
     els.estInfo.hidden = !count || !estimate;
     els.estimateValue.textContent = count && estimate ? formatBytes(estimate) : "";
-    els.go.disabled = count === 0 || !!(summary && summary.busy);
+    els.go.disabled = cmp.loading || count === 0 || !!(summary && summary.busy);
     els.go.textContent = count ? "Compress " + count + " clip" + (count === 1 ? "" : "s") : "Compress";
   }
 
   async function loadCandidates() {
-    if (cmp.phase !== "pick") return;
+    if (cmp.phase !== "pick" || !shown) return;
+    const generation = ++cmp.loadGeneration;
+    cmp.loading = true;
+    els.go.disabled = true;
+    els.more.disabled = true;
+    setStatus(els.cmpStatus, "Checking clip eligibility...");
     try {
       const data = await helperJson("/storage/compress-candidates?favorites=" + (els.skipFav.checked ? "0" : "1") + "&limit=" + cmp.limit + "&t=" + Date.now());
+      if (generation !== cmp.loadGeneration) return;
+      showCompressionType(data.mode);
       const previous = new Set(cmp.clips.map((c) => c.name));
       const firstPage = !cmp.loadedOnce;
       cmp.loadedOnce = true;
       cmp.clips = Array.isArray(data.clips) ? data.clips : [];
-      cmp.eligible = data.eligible || 0;
-      // the first page starts ticked; a clip that was listed before keeps its tick, and one that only shows up now (more clips, favorites let back in) starts unticked
+      cmp.hasMore = !!data.hasMore;
+      // New verified clips start selected; clips already shown keep the user's choice.
       const kept = new Set();
-      cmp.clips.forEach((c) => { if (firstPage || (previous.has(c.name) && cmp.picked.has(c.name))) kept.add(c.name); });
+      cmp.clips.forEach((c) => { if (firstPage || !previous.has(c.name) || cmp.picked.has(c.name)) kept.add(c.name); });
       cmp.picked = kept;
+      setStatus(els.cmpStatus, data.unchecked ? data.unchecked + " clips could not be checked and were left out." : "");
       renderPick();
-    } catch (_) {}
+    } catch (err) {
+      if (generation !== cmp.loadGeneration) return;
+      cmp.clips = [];
+      cmp.picked.clear();
+      cmp.hasMore = false;
+      renderPick();
+      setStatus(els.cmpStatus, err.message || "Could not check clip eligibility.", true);
+    } finally {
+      if (generation === cmp.loadGeneration) {
+        cmp.loading = false;
+        els.more.disabled = false;
+        renderPickedFoot();
+      }
+    }
   }
   els.skipFav.addEventListener("change", () => { setStatus(els.cmpStatus, ""); loadCandidates(); });
   els.more.addEventListener("click", () => { cmp.limit = Math.min(CMP_MAX, cmp.limit + CMP_PAGE); loadCandidates(); });
@@ -586,7 +637,7 @@
   els.none.addEventListener("click", () => { cmp.picked = new Set(); renderPick(); });
 
   els.go.addEventListener("click", () => {
-    if (!cmp.picked.size) return;
+    if (cmp.loading || !cmp.picked.size) return;
     setStatus(els.cmpStatus, "");
     const estimate = pickedEstimate();
     els.confirmSum.innerHTML = "Compressing <b>" + cmp.picked.size + "</b> clip" + (cmp.picked.size === 1 ? "" : "s") + " (" + formatBytes(pickedBytes()) + ")" + (estimate ? " should free about <b>" + formatBytes(estimate) + "</b>." : ".");
@@ -600,13 +651,14 @@
     els.start.disabled = true;
     setStatus(els.cmpStatus, "");
     try {
-      await helperJson("/storage/compress-start", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ names:Array.from(cmp.picked) }) });
+      const started = await helperJson("/storage/compress-start", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ names:Array.from(cmp.picked), mode:cmp.mode }) });
       showPhase("run");
-      paintRun({ running:true, percent:0, done:0, failed:0, total:cmp.picked.size, current:"", savedText:"0 B" });
+      paintRun({ running:true, percent:0, done:0, failed:0, total:started.count, mode:started.mode, current:"", savedText:"0 B" });
       pollCompress(true);
     } catch (err) {
       showPhase("pick");
       setStatus(els.cmpStatus, err.message || "Could not start compressing.", true);
+      if (err.body && err.body.changed) await loadCandidates();
     } finally {
       cmp.starting = false;
       els.start.disabled = false;
@@ -631,6 +683,7 @@
   });
 
   function paintRun(st) {
+    if (st.mode) showCompressionType(st.mode);
     const percent = Math.max(0, Math.min(100, st.percent || 0));
     els.arc.style.strokeDashoffset = String(RING * (1 - percent / 100));
     els.pct.textContent = percent + "%";
@@ -642,6 +695,7 @@
   }
 
   function paintDone(st) {
+    if (st.mode) showCompressionType(st.mode);
     const clips = (st.done || 0) + " clip" + (st.done === 1 ? "" : "s");
     let text = st.cancelled ? "Stopped after " + clips + ", freed " + st.savedText + "." : "Compressed " + clips + " and freed " + st.savedText + ".";
     if (st.failed) text += " " + st.failed + " could not be compressed" + (st.error ? " (" + st.error + ")" : "") + ".";

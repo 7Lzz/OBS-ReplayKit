@@ -1726,8 +1726,13 @@ namespace ReplayKitHelper
                     if (path == "/storage/compress-cancel") HttpResponse.SendJson(stream, 200, Storage.CancelCompress());
                     else
                     {
-                        JArray names = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body)["names"] as JArray;
-                        var started = Storage.StartCompress(names);
+                        var body = string.IsNullOrWhiteSpace(req.Body) ? new JObject() : JObject.Parse(req.Body);
+                        if (body["mode"] != null && body["mode"].Type != JTokenType.String)
+                        {
+                            HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Compression mode must be a string." });
+                            return false;
+                        }
+                        var started = Storage.StartCompress(body["names"] as JArray, body["mode"]?.Value<string>());
                         HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 409, started);
                     }
                 }
@@ -2194,6 +2199,43 @@ namespace ReplayKitHelper
 
             // the menus of the obs menu bar, opened from the Advanced tab now that the title bar has no menu button
             // the quick actions under the logo of the title bar: what a page offers, read back by the plugin, and a pick sent on to the plugin
+            if (path == "/editor/session")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                JObject body;
+                try { body = JObject.Parse(req.Body ?? ""); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                string view = body["view"]?.Type == JTokenType.String ? body.Value<string>("view") : null;
+                string id = body["id"]?.Type == JTokenType.String ? body.Value<string>("id") : null;
+                string action = body["action"]?.Type == JTokenType.String ? body.Value<string>("action") : null;
+                if ((view != "clips" && view != "home") || !Guid.TryParseExact(id, "D", out _))
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                if (action == "register")
+                {
+                    JobCoordinator.RegisterEditor(view, id);
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                    return false;
+                }
+                if (body["revision"]?.Type != JTokenType.Integer || !long.TryParse(body["revision"].ToString(), out long revision) || revision <= 0 ||
+                    (action != "add" && action != "clear"))
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                var paths = new List<string>();
+                if (action == "add")
+                {
+                    if (!(body["names"] is JArray names) || names.Count == 0 || names.Count > 128)
+                    { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor sources." }); return false; }
+                    foreach (var name in names)
+                    {
+                        var selected = name.Type == JTokenType.String ? Clips.GetEditorSource(name.Value<string>()) : null;
+                        if (selected == null || !File.Exists(selected.Full))
+                        { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "An editor source is unavailable." }); return false; }
+                        paths.Add(selected.Full);
+                    }
+                }
+                bool ok = JobCoordinator.UpdateEditor(view, id, revision, action == "clear" ? null : paths.ToArray(), out string error);
+                HttpResponse.SendJson(stream, ok ? 200 : 409, new JObject { ["ok"] = ok, ["message"] = error });
+                return false;
+            }
             if (path == "/quick-actions/state")
             {
                 if (req.Method == "POST") { var set = QuickActions.Set(Q("view"), req.Body); HttpResponse.SendJson(stream, set.Value<bool>("ok") ? 200 : 400, set); return false; }

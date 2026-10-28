@@ -1299,7 +1299,11 @@
       lib.empty.textContent = lib.clips.length === 0 ? "There are no clips in the clip folder yet." : shown === 0 ? "No clips match that." : "";
     }
 
-    function addClipLayer(c, title) {
+    async function addClipLayer(c, title) {
+      var source = clip;
+      try { await o.protect([c.name]); }
+      catch (err) { o.notify((err && err.message) || "The clip is processing.", "bad", "Library"); return; }
+      if (!clip || clip !== source) return;
       var id = lanes.addLayer({ kind: "clip", ref: c.name, name: title, len: c.duration, dur: c.duration, aspect: c.width > 0 && c.height > 0 ? c.height / c.width : 0.5625, w: 1 });
       closeLibrary();
       if (!id) { o.notify("There is no room for another layer.", "bad", "Library"); return; }

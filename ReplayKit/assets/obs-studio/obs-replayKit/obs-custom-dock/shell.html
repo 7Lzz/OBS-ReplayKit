@@ -368,7 +368,7 @@
     Object.keys(frames).forEach(function (k) {
       var f = frames[k];
       var onDisplay = k === active || k === wanted || f.el.classList.contains("on");
-      if (k === entering || (windowUp && onDisplay) || f.seen === undefined) { f.seen = now; return; }
+      if ((windowUp && (k === entering || onDisplay)) || f.seen === undefined) { f.seen = now; return; }
       if (!f.loaded || now - f.seen < IDLE_UNLOAD_MS) return;
       try {
         var w = f.el.contentWindow;

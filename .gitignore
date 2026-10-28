@@ -19,6 +19,7 @@ ReplayKit/publish_tmp/
 helper_config.json
 clips_db.json
 clips_index.json
+compression_history.json
 edit_drafts.json
 notifications.json
 window_state.ini

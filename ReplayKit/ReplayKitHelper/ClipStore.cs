@@ -30,20 +30,35 @@ namespace ReplayKitHelper
             }
         }
 
-        public static T Read<T>(string path, Func<JObject, T> read)
+        private static JObject Load(string path, int maxBytes)
+        {
+            if (maxBytes == 0) return File.Exists(path) ? JObject.Parse(File.ReadAllText(path)) : new JObject();
+            try
+            {
+                using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (file.Length > maxBytes) throw new InvalidDataException("The saved state file is too large.");
+                    using (var reader = new StreamReader(file, Encoding.UTF8, true)) return JObject.Parse(reader.ReadToEnd());
+                }
+            }
+            catch (FileNotFoundException) { return new JObject(); }
+            catch (DirectoryNotFoundException) { return new JObject(); }
+        }
+
+        public static T Read<T>(string path, Func<JObject, T> read, int maxBytes = 0)
         {
             return WithLock(path, full =>
             {
-                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                var db = Load(full, maxBytes);
                 return read(db);
             });
         }
 
-        public static bool Update(string path, Func<JObject, bool> change)
+        public static bool Update(string path, Func<JObject, bool> change, int maxBytes = 0)
         {
             return WithLock(path, full =>
             {
-                var db = File.Exists(full) ? JObject.Parse(File.ReadAllText(full)) : new JObject();
+                var db = Load(full, maxBytes);
                 if (!change(db)) return false;
                 Write(full, db);
                 return true;

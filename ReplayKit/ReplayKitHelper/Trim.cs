@@ -387,7 +387,7 @@ namespace ReplayKitHelper
             {
                 var r = Compression.InvokeNativeCapture(ffprobe, new[]
                 {
-                    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate:format=duration",
+                    "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate,pix_fmt,sample_aspect_ratio,bit_rate:format=duration",
                     "-of", "json", path,
                 });
                 if (r.ExitCode != 0) return null;
@@ -399,7 +399,14 @@ namespace ReplayKitHelper
                 string fps = ValidFrameRate(stream.Value<string>("avg_frame_rate")) ?? ValidFrameRate(stream.Value<string>("r_frame_rate"));
                 double.TryParse(json["format"]?.Value<string>("duration"), NumberStyles.Float, CultureInfo.InvariantCulture, out double duration);
                 if (width < 16 || height < 16 || fps == null || !(duration > 0)) return null;
-                return new VideoPlan.SourceInfo { Width = width, Height = height, Fps = fps, Duration = duration };
+                long.TryParse(stream.Value<string>("bit_rate"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long bitrate);
+                return new VideoPlan.SourceInfo
+                {
+                    Width = width, Height = height, Fps = fps, Duration = duration,
+                    PixelFormat = stream.Value<string>("pix_fmt"), SampleAspect = stream.Value<string>("sample_aspect_ratio"),
+                    ConstantFrameRate = ValidFrameRate(stream.Value<string>("avg_frame_rate")) == ValidFrameRate(stream.Value<string>("r_frame_rate")),
+                    Bitrate = bitrate,
+                };
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException || ex is Newtonsoft.Json.JsonException)
             {
@@ -637,6 +644,9 @@ namespace ReplayKitHelper
             double windowEnd = endSec / videoSpeed;
             VideoPlan videoPlan = null;
             VideoPlan.SourceInfo sourceInfo = null;
+            bool directVideo = false;
+            double directReadStart = 0;
+            double directStart = 0, directEnd = 0;
             if (composed)
             {
                 // the audio of a clip that has some is part of the same graph, so an edit that leaves it out would drop it without a word
@@ -647,6 +657,15 @@ namespace ReplayKitHelper
                 if (videoPlan == null) return new TrimResult { Ok = false, Message = videoError };
                 windowStart = videoPlan.Start;
                 windowEnd = videoPlan.End;
+                // A single unchanged CFR video range can use the existing accurate input seek; the audio keeps its original timeline on its own input.
+                if (!layered && !screenshot && videoSpeed == 1 && sourceInfo.PixelFormat == "yuv420p" &&
+                    sourceInfo.SampleAspect == "1:1" && sourceInfo.ConstantFrameRate && videoPlan.TryDirectRange(out directStart, out directEnd) &&
+                    Math.Abs(directStart - startSec) <= 0.000501 && Math.Abs(directEnd - endSec) <= 0.000501)
+                {
+                    composed = false;
+                    directVideo = true;
+                    directReadStart = Math.Max(0, directStart - 1);
+                }
             }
             if (screenshot && (frameTime < windowStart || frameTime >= windowEnd))
                 return new TrimResult { Ok = false, Message = "The screenshot time is outside the saved part of the video" };
@@ -711,7 +730,7 @@ namespace ReplayKitHelper
             }
             if (subtitled)
             {
-                var burn = SubtitleBurn.Parse(subtitleEdit, composed ? windowEnd - windowStart : duration / videoSpeed, out string subtitleError);
+                var burn = SubtitleBurn.Parse(subtitleEdit, videoPlan != null ? windowEnd - windowStart : duration / videoSpeed, out string subtitleError);
                 if (burn == null) return new TrimResult { Ok = false, Message = subtitleError };
                 if (burn.Count > 0)
                 {
@@ -719,7 +738,7 @@ namespace ReplayKitHelper
                     if (!framed && size != null) (frameW, frameH) = (size.Width, size.Height);
                     subtitleDir = Path.Combine(Constants.SCRATCH_DIR, "subs-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(subtitleDir);
-                    double sourceTimed = !composed && !hasPlan && !retimed ? startSec : 0;
+                    double sourceTimed = !composed && !directVideo && !hasPlan && !retimed ? startSec : 0;
                     // the folder is only cleaned by the finally further down, which a failed write never reaches
                     try { burn.Write(subtitleDir, frameW, frameH, sourceTimed); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException)
@@ -747,13 +766,20 @@ namespace ReplayKitHelper
                 renderFilter = render.Filter(frameW, frameH);
                 if (!composed && renderFilter != null) videoTail = videoTail != null ? videoTail + "," + renderFilter : renderFilter;
             }
+            if (directVideo)
+            {
+                string normalize = "trim=start=" + (directStart - directReadStart).ToString("0.######", CultureInfo.InvariantCulture) +
+                    ":end=" + (directEnd - directReadStart).ToString("0.######", CultureInfo.InvariantCulture) +
+                    ",setpts=PTS-STARTPTS,fps=" + sourceInfo.Fps + ",setsar=1,format=yuv420p";
+                videoTail = normalize + (videoTail != null ? "," + videoTail : "");
+            }
             try
             {
             // invariant-culture decimal formatting -- ffmpeg only accepts . as the decimal separator, never ,, regardless of system locale.
             string startStr = startSec.ToString("F3", CultureInfo.InvariantCulture);
             string durStr = duration.ToString("F3", CultureInfo.InvariantCulture);
             // how long the saved copy runs: the kept part of the source, stretched by the speed
-            string outDurStr = (composed ? windowEnd - windowStart : duration / videoSpeed).ToString("F3", CultureInfo.InvariantCulture);
+            string outDurStr = (videoPlan != null ? windowEnd - windowStart : duration / videoSpeed).ToString("F3", CultureInfo.InvariantCulture);
             List<string> argv;
             EditEncoder encoder = null;
             int firstLayerInput = 0;
@@ -768,7 +794,7 @@ namespace ReplayKitHelper
             }
             else if (precise)
             {
-                // ss after -i is output-side / decode-then-seek: ffmpeg decodes frames from the start of the file but discards everything before startSec, then emits exactly the picked window -- the only way to land the cut on the exact frame chosen, at the cost of a full re-encode. on the processor crf 14 is the perceptual quality target -- visually indistinguishable from the source; the graphics card encoder works to a constant quality of its own, picked by measuring against it. on a fresh obs clip (30-60 mbps) crf 14 lands around 70-85% of source size; on a heavily compressed source it would happily exceed the source bitrate trying to preserve compression artifacts, so the sources video bitrate is probed and passed as -maxrate / -bufsize -- x264 in "capped crf" mode still targets crf, but rate-control caps the output when reaching it would spend more bits than the source had. trims of original clips look the same as before; trims of compressed clips no longer inflate. audio is stream-copied so the source aac bytes are preserved exactly, no second-generation transcoding loss. preset is "fast" rather than "veryfast" -- veryfast at low bitrates throws away bit-allocation efficiency the cap depends on, and the wall-clock difference for a typical trim is small enough to be invisible. with video pieces nothing is seeked, since the graph cuts every piece out of the source by its own times; with a plan the video is read seeked and the audio graph reads the file again from its start, so the plan keeps working on the timeline of the source, and decoding a seeked input to a re-encode is exact to the frame as well; a video at another speed is read seeked as well, since the output side seek of ffmpeg counts the time after the filters have stretched it
+                // Multi-piece edits retain source timestamps; simple ranges seek before decoding, with audio plans on a separate unseeked input.
                 if (composed)
                 {
                     argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full };
@@ -783,10 +809,11 @@ namespace ReplayKitHelper
                     foreach (string other in videoPlan.OtherClips) argv.AddRange(new[] { "-i", other });
                     argv.AddRange(new[] { "-t", outDurStr });
                 }
-                else if (hasPlan)
+                else if (hasPlan || directVideo)
                 {
-                    argv = new List<string> { "-hide_banner", "-loglevel", "error", "-ss", startStr, "-i", source.Full };
-                    argv.AddRange(PlanReads(composed, audioCount, source.Full, importArgs));
+                    string readStart = directVideo ? directReadStart.ToString("0.######", CultureInfo.InvariantCulture) : startStr;
+                    argv = new List<string> { "-hide_banner", "-loglevel", "error", "-ss", readStart, "-i", source.Full };
+                    if (hasPlan) argv.AddRange(PlanReads(composed, audioCount, source.Full, importArgs));
                     argv.AddRange(new[] { "-t", outDurStr });
                 }
                 else if (retimed)
@@ -797,7 +824,7 @@ namespace ReplayKitHelper
                 if (render.BitrateKbps > 0) encoder.SetBitrate(render.BitrateKbps);
                 argv.AddRange(encoder.Args);
                 // a bitrate picked in the render settings is the rate, so the cap that keeps a quality encode under the source is not added to it
-                long srcBps = render.BitrateKbps > 0 ? 0 : GetVideoBitratePerSec(source.Full);
+                long srcBps = render.BitrateKbps > 0 ? 0 : sourceInfo?.Bitrate > 0 ? sourceInfo.Bitrate : GetVideoBitratePerSec(source.Full);
                 if (render.BitrateKbps > 0)
                 {
                     Log.Write("Trim rate: " + render.BitrateKbps + "k from the render settings");
@@ -842,10 +869,10 @@ namespace ReplayKitHelper
             }
 
             // ffmpeg writes how far it has come as out_time_us four times a second; against the length of the saved clip that is the percent the editor shows while it waits
-            double outputUs = Math.Max(1.0, (screenshot ? 0 : composed ? windowEnd - windowStart : duration / videoSpeed) * 1000000.0);
+            double outputUs = Math.Max(1.0, (screenshot ? 0 : videoPlan != null ? windowEnd - windowStart : duration / videoSpeed) * 1000000.0);
             int lastPercent = 0;
             argv.InsertRange(3, new[] { "-progress", "pipe:1", "-nostats", "-stats_period", "0.25" });
-            UploadState.SetUploadState(requestId: requestId, phase: "encoding");
+            UploadState.SetUploadState(requestId: requestId, phase: "starting");
             Log.Write("Trim (" + mode + ", precise=" + precise + ", removeAudio=" + removeAudio + "): " + ffmpeg + " " + string.Join(" ", argv));
             try
             {
@@ -959,7 +986,7 @@ namespace ReplayKitHelper
                 RemoveAudio = removeAudio,
                 StartSec = startSec,
                 EndSec = endSec,
-                DurationSec = composed ? windowEnd - windowStart : duration,
+                DurationSec = videoPlan != null ? windowEnd - windowStart : duration,
             };
             }
             finally

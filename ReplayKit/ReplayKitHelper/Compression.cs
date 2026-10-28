@@ -152,12 +152,12 @@ namespace ReplayKitHelper
                     ["libx264"] = TestSwEncoderLinked(ffmpeg, "libx264"),
                 };
                 // pick the best fast and smaller encoders for this machine. fast is gpu-first (hevc > h264, nvidia > amd > intel) so games keep the cpu free; falls thru to libx264 veryfast if no hw encoder works at all. smaller is cpu-first by design -- sw encoders are ~2-3x more bit-efficient than hw at the same perceived quality, and the user trades wall time for file size when they pick this mode. libx265 wins when present; libx264 is the last resort if the build was stripped down.
-                string fast = "libx264";
+                string fast = "";
                 foreach (var cand in new[] { "hevc_nvenc", "hevc_amf", "hevc_qsv", "h264_nvenc", "h264_amf", "h264_qsv", "libx264" })
                 {
                     if (encoders[cand].Value<bool>()) { fast = cand; break; }
                 }
-                string smaller = "libx264";
+                string smaller = "";
                 foreach (var cand in new[] { "libx265", "libx264" })
                 {
                     if (encoders[cand].Value<bool>()) { smaller = cand; break; }
@@ -187,16 +187,19 @@ namespace ReplayKitHelper
             }
         }
 
-        // probe whether the bundled ffmpeg can actualy drive a given hardware encoder. stricter than parsing -encoders output: nvenc/amf/qsv can be compiled in but still fail at runtime (no driver, no gpu, mismatched silicon, wrong permissions). encodes a tiny synthetic clip to a null sink and checks the exit code. bounded by a 5s wait so a frozen driver cant stall helper startup. returns false on any failure -- callers fall thru to the next encoder in the priority list.
+        // Exercise the same options as Fast, including enough frames to initialize B-frames and lookahead.
         public static bool TestHwEncoderAvailable(string ffmpegPath, string encoder)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return false;
             try
             {
+                var arguments = new List<string> { "-nostdin", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256:r=30:d=1", "-pix_fmt", "yuv420p" };
+                arguments.AddRange(CompressionProfile.Arguments(encoder, "fast"));
+                arguments.AddRange(new[] { "-frames:v", "30", "-f", "null", "-" });
                 var psi = new ProcessStartInfo
                 {
                     FileName = ffmpegPath,
-                    Arguments = "-hide_banner -loglevel error -f lavfi -i color=black:s=256x256:r=1:d=0.1 -pix_fmt yuv420p -c:v " + encoder + " -frames:v 1 -f null -",
+                    Arguments = ProcessArgs.Join(arguments.ToArray()),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardError = true,
@@ -204,20 +207,26 @@ namespace ReplayKitHelper
                 };
                 using (var proc = Process.Start(psi))
                 {
-                    var stdout = proc.StandardOutput.ReadToEndAsync();
-                    var stderr = proc.StandardError.ReadToEndAsync();
+                    try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; }
+                    catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
+                    var stdout = CompressionOutput.Read(proc.StandardOutput, proc);
+                    var stderr = CompressionOutput.Read(proc.StandardError, proc);
                     if (!proc.WaitForExit(5000))
                     {
                         try { proc.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+                        Log.Write("Compression encoder probe timed out: " + encoder);
                         return false;
                     }
-                    stdout.GetAwaiter().GetResult();
-                    stderr.GetAwaiter().GetResult();
-                    return proc.ExitCode == 0;
+                    var output = stdout.GetAwaiter().GetResult();
+                    var error = stderr.GetAwaiter().GetResult();
+                    bool available = proc.ExitCode == 0 && !output.Exceeded && !error.Exceeded;
+                    if (!available) Log.Write("Compression encoder unavailable: " + encoder + " exit=" + proc.ExitCode + " " + error.Text);
+                    return available;
                 }
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
             {
+                Log.Write("Compression encoder probe failed: " + encoder + " " + ex.Message);
                 return false;
             }
         }
@@ -409,9 +418,38 @@ namespace ReplayKitHelper
 
         public sealed class CompressMarker
         {
+            public bool Ok;
             public string Mode = "";
             public long Ts;
             public long Pre;
+        }
+
+        private static string ReadCompressComment(string ffprobe, string path)
+        {
+            var info = new ProcessStartInfo
+            {
+                FileName = ffprobe,
+                Arguments = ProcessArgs.Join(new[] { "-v", "error", "-show_entries", "format_tags=comment", "-of", "default=nokey=1:noprint_wrappers=1", path }),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using var process = Process.Start(info);
+            using var deadline = new System.Threading.CancellationTokenSource(30000);
+            using var registration = deadline.Token.Register(() =>
+            {
+                try { if (!process.HasExited) process.Kill(); }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            });
+            var stdout = CompressionOutput.Read(process.StandardOutput, process);
+            var stderr = CompressionOutput.Read(process.StandardError, process);
+            process.WaitForExit();
+            var output = stdout.GetAwaiter().GetResult();
+            var error = stderr.GetAwaiter().GetResult();
+            if (deadline.IsCancellationRequested || process.ExitCode != 0 || output.Exceeded || output.Truncated || error.Exceeded) return null;
+            return output.Text.Trim();
         }
 
         // reads the hidden compress-history marker that CompressOverwrite writes into the mp4s comment metadata atom. empty Mode = no marker found / not one of ours. cheap: ffprobe with -show_entries format_tags=comment touches only the header atoms, no decode -- about 30-60ms per file on a local ssd. the marker prefix is "obs-replaykit_compress_v2_" -- the v2 bump invalidates every clip processed by the old (broken) pipeline so it becomes eligible for re-compression under the dynamic/av1-aware pipeline; v1 markers are intentionally treated as "no marker" so those clips show as compressable again.
@@ -423,9 +461,9 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return result;
             try
             {
-                var probe = InvokeNativeCapture(ffprobe, new[] { "-v", "error", "-show_entries", "format_tags=comment", "-of", "default=nokey=1:noprint_wrappers=1", path });
-                if (probe.ExitCode != 0 || probe.Output.Count == 0) return result;
-                string raw = string.Join("", probe.Output).Trim();
+                string raw = ReadCompressComment(ffprobe, path);
+                if (raw == null) return result;
+                result.Ok = true;
                 const string prefix = "obs-replaykit_compress_v2_";
                 if (!raw.StartsWith(prefix)) return result;
                 var parts = raw.Substring(prefix.Length).Split(new[] { ':' }, 3);

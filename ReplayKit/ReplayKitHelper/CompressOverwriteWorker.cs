@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -16,6 +17,8 @@ namespace ReplayKitHelper
     // compresses a clip locally with the best encoder the machine has and atomically replaces the original, reporting progress through UploadState and writing the compress marker through Clips.MarkCompressed
     internal static class CompressOverwriteWorker
     {
+        private static readonly SemaphoreSlim SoftwareSlot = new SemaphoreSlim(1, 1);
+        private static readonly SemaphoreSlim HardwareSlot = new SemaphoreSlim(1, 1);
         private static List<string> Combine(List<string> head, string[] mid, List<string> tail)
         {
             var result = new List<string>(head);
@@ -31,12 +34,28 @@ namespace ReplayKitHelper
         {
             var token = JobCoordinator.Token(requestId);
             token.ThrowIfCancellationRequested();
-            int cpuCount = caps?["cpuCount"]?.Value<int>() ?? Environment.ProcessorCount;
-            // half-cores per encode for sw codecs. two parallel libx265 jobs split the cpu cleanly with this -- one job grabbing every core context-switches itself silly when a second job lands.
-            int swPools = Math.Max(2, cpuCount / 2);
             string pickedEncoder = mode == "fast"
-                ? (!string.IsNullOrEmpty(fastEncoder) ? fastEncoder : "libx264")
-                : (!string.IsNullOrEmpty(smallerEncoder) ? smallerEncoder : "libx264");
+                ? fastEncoder : smallerEncoder;
+            CompressionProfile.Arguments(pickedEncoder, mode);
+            var slot = CompressionProfile.Software(pickedEncoder) ? SoftwareSlot : HardwareSlot;
+            if (!slot.Wait(0))
+            {
+                UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "queued", percent: 0, message: "Waiting for another compression to finish");
+                slot.Wait(token);
+            }
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                return Encode(requestId, ffmpeg, sourcePath, tempPath, durationSec, mode, preBytes, caps, pickedEncoder, scaleHeight, expectedWriteTime);
+            }
+            finally { slot.Release(); }
+        }
+
+        private static CompressOverwriteResult Encode(string requestId, string ffmpeg, string sourcePath, string tempPath,
+            double durationSec, string mode, long preBytes, JObject caps, string pickedEncoder, int scaleHeight, DateTime? expectedWriteTime)
+        {
+            var token = JobCoordinator.Token(requestId);
+            var resources = CompressionProfile.Limits(pickedEncoder == "libx265");
 
             // capture the source clips filesystem timestamps before the atomic replace. restoring them after the encode keeps the clip in its original sort position in the dock instead of jumping to the top of the list every time its compressed.
             DateTime? origLastWrite = null;
@@ -52,7 +71,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             Log.Write("start mode=" + mode + " input=" + sourcePath + " temp=" + tempPath + " duration=" + durationSec, "compress", requestId);
-            UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "compressing", percent: 1);
+            UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: "compressing", percent: 1, message: "");
 
             // hidden marker embedded in the mp4s udta:comment atom so a later listing can identify files already compressed without a sidecar db. format obs-replaykit_compress_v2_<fast|slow>:<unix_ms>:<pre_compress_bytes>.
             string tagMode = mode == "fast" ? "fast" : "slow";
@@ -61,49 +80,18 @@ namespace ReplayKitHelper
             try { preSize = new FileInfo(sourcePath).Length; } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             string comment = "obs-replaykit_compress_v2_" + tagMode + ":" + tagTs + ":" + preSize;
 
-            // build encoder-specific argv. goals: fast mode -> shortest wall time, ok quality. gpu encoders win here becuase they barely touch the cpu (so games keep running fine) and ffmpeg sustains 5-10x realtime on them. smaller mode -> smallest file at watch-anywhere quality. cpu sw encoders win here -- libx265 is ~2-3x more bit-efficient than nvenc/amf/qsv at matched perceptual quality. qp / crf targets are picked one or two notches below the obs source, so the output is guaranteed to be a step worse perceptually and a noticeable step smaller in size -- the size guard further down verifies that and reverts the replace if the output is somehow not smaller. the first video stream and every audio stream, so a clip recorded with separate audio tracks keeps all of them; ffmpeg alone would pick one
-            var commonHead = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-i", sourcePath, "-map", "0:v:0", "-map", "0:a?" };
+            var commonHead = new List<string> { "-y", "-nostdin", "-xerror", "-hide_banner", "-loglevel", "error" };
+            if (CompressionProfile.Software(pickedEncoder))
+                commonHead.AddRange(new[] { "-threads", resources.DecoderThreads.ToString(CultureInfo.InvariantCulture), "-filter_threads", "2" });
+            commonHead.AddRange(new[] { "-i", sourcePath, "-map", "0:v:0", "-map", "0:a?" });
             // optional resolution reduction folded into the same encode. -2 keeps aspect + even width; min(ih,H) never upscales, so this is a no-op if the source is already at/below the target.
             if (scaleHeight > 0)
                 commonHead.AddRange(new[] { "-vf", "scale=-2:min(ih\\," + scaleHeight + ")" });
             var commonTail = new List<string> { "-c:a", "aac", "-b:a", "96k", "-metadata", "comment=" + comment, "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", tempPath };
-            List<string> argv;
-            switch (pickedEncoder)
-            {
-                case "hevc_nvenc":
-                    // nvidia hevc. constqp + spatial-aq + lookahead is the safe combo: spatial-aq redistributes the fixed qp across the frame without raising the bitrate ceiling, becuase there is no bitrate ceiling to raise in constqp mode. qp 28 -> ~50% of source at quality close to the hevc qp24 input.
-                    argv = Combine(commonHead, new[] { "-c:v", "hevc_nvenc", "-preset", "p4", "-tune", "hq", "-rc", "constqp", "-qp", "28", "-bf", "2", "-spatial-aq", "1", "-rc-lookahead", "16", "-multipass", "disabled", "-profile:v", "main", "-tag:v", "hvc1", "-pix_fmt", "yuv420p" }, commonTail);
-                    break;
-                case "h264_nvenc":
-                    // h264 needs ~30% more bits than hevc for the same quality, so the qp target sits a couple notches above hevc.
-                    argv = Combine(commonHead, new[] { "-c:v", "h264_nvenc", "-preset", "p4", "-tune", "hq", "-rc", "constqp", "-qp", "28", "-bf", "2", "-spatial-aq", "1", "-rc-lookahead", "16", "-multipass", "disabled", "-profile:v", "high", "-pix_fmt", "yuv420p" }, commonTail);
-                    break;
-                case "hevc_amf":
-                    // amd amf hevc. cqp mode + matching qp_i/qp_p/qp_b is the rate-control combination that honours the qp target without padding with filler bits. qp 28 mirrors the hevc_nvenc target for comparable compression on amd silicon.
-                    argv = Combine(commonHead, new[] { "-c:v", "hevc_amf", "-usage", "transcoding", "-quality", "quality", "-rc", "cqp", "-qp_i", "28", "-qp_p", "28", "-qp_b", "28", "-profile:v", "main", "-tag:v", "hvc1" }, commonTail);
-                    break;
-                case "h264_amf":
-                    argv = Combine(commonHead, new[] { "-c:v", "h264_amf", "-usage", "transcoding", "-quality", "quality", "-rc", "cqp", "-qp_i", "28", "-qp_p", "28", "-qp_b", "28", "-profile:v", "high" }, commonTail);
-                    break;
-                case "hevc_qsv":
-                    // intel quick sync hevc. global_quality maps to icq on qsv -- the closest analogue to nvencs constqp. icq 26 puts us at roughly the same quality target as hevc_nvenc qp. look_ahead 0 keeps file size from creeping up on already-compressed sources.
-                    argv = Combine(commonHead, new[] { "-c:v", "hevc_qsv", "-preset", "medium", "-global_quality", "26", "-look_ahead", "0", "-profile:v", "main", "-tag:v", "hvc1" }, commonTail);
-                    break;
-                case "h264_qsv":
-                    argv = Combine(commonHead, new[] { "-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "25", "-look_ahead", "0", "-profile:v", "high" }, commonTail);
-                    break;
-                case "libx265":
-                    // libx265 medium crf 25 -- the textbook "compress with good quality" config, tuned a notch tighter than the original crf 28 defualt. pools=swPools + frame-threads=2 lets two encodes share one cpu cleanly; without the cap, each libx265 process grabs every core and contends.
-                    argv = Combine(commonHead, new[] { "-c:v", "libx265", "-preset", "medium", "-crf", "25", "-tag:v", "hvc1", "-x265-params", "pools=" + swPools + ":frame-threads=2:log-level=error" }, commonTail);
-                    break;
-                default:
-                    // libx264 -- universal fallback when nothing else linked. preset varies by mode so fast feels fast even on machines with no hw encoder at all.
-                    string preset = mode == "fast" ? "veryfast" : "medium";
-                    string crf = mode == "fast" ? "23" : "21";
-                    argv = Combine(commonHead, new[] { "-c:v", "libx264", "-preset", preset, "-crf", crf, "-threads", swPools.ToString() }, commonTail);
-                    break;
-            }
-            Log.Write("encoder=" + pickedEncoder + " mode=" + mode + " cpu=" + cpuCount + " swPools=" + swPools, "compress", requestId);
+            var argv = Combine(commonHead, CompressionProfile.Arguments(pickedEncoder, mode, resources.Workers, resources.FrameThreads), commonTail);
+            string resourceLog = CompressionProfile.Software(pickedEncoder)
+                ? " workers=" + resources.Workers + " frameThreads=" + resources.FrameThreads : " hardware";
+            Log.Write("encoder=" + pickedEncoder + " mode=" + mode + resourceLog, "compress", requestId);
 
             var psi = new ProcessStartInfo
             {
@@ -123,8 +111,7 @@ namespace ReplayKitHelper
             // drop to belownormal so a running encode never starves the users foreground apps (game, browser, obs itself). best-effort: if PriorityClass fails (rare race / weird security context), the encode just runs at normal.
             try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception || ex is NotSupportedException) { }
 
-            // stderr is collected once at end for diagnostics only.
-            var stderrTask = proc.StandardError.ReadToEndAsync();
+            var stderrTask = CompressionOutput.Read(proc.StandardError, proc);
 
             // pull progress from stdout line-by-line. -progress pipe:1 makes ffmpeg flush each progress block to stdout immediately, so each readline returns within ~1s of the actual encode position -- the alternative (-progress <file>) goes thru the os page cache and can lag arbitrarily on windows. strictly matches out_time_us= (microseconds); out_time_ms= was changed from milliseconds to microseconds in ffmpeg 5.x and is inconsistent across builds, so its never trusted.
             double durationUs = Math.Max(1.0, durationSec * 1000000.0);
@@ -157,16 +144,17 @@ namespace ReplayKitHelper
             }
 
             proc.WaitForExit();
-            string stderr = stderrTask.Result;
+            var diagnostics = stderrTask.GetAwaiter().GetResult();
+            string stderr = diagnostics.Text;
             token.ThrowIfCancellationRequested();
             if (deadline.IsCancellationRequested) throw new TimeoutException("Compression exceeded its time limit.");
             if (!string.IsNullOrEmpty(stderr)) Log.Write("stderr: " + stderr, "compress", requestId);
             Log.Write("progress lines=" + linesSeen + " lastPct=" + lastReportedPct, "compress", requestId);
 
-            if (proc.ExitCode != 0)
+            if (proc.ExitCode != 0 || diagnostics.Exceeded)
             {
                 try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                string msg = "ffmpeg failed (exit=" + proc.ExitCode + ")";
+                string msg = diagnostics.Exceeded ? "Compression stopped because the encoder produced too many errors." : "ffmpeg failed (exit=" + proc.ExitCode + ")";
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: msg);
                 return new CompressOverwriteResult { Ok = false, Message = msg };
             }
@@ -232,9 +220,19 @@ namespace ReplayKitHelper
             Clips.MarkCompressed(clipName, tagMode, newMtimeTicks, preBytes, sourcePath);
             Log.Write("marker written: name=" + clipName + " mode=" + tagMode + " mtime=" + newMtimeTicks, "compress", requestId);
 
+            string historyWarning = null;
+            try { CompressionHistory.Record(requestId, mode, preBytes, outBytes, scaleHeight); }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+            {
+                historyWarning = "The clip was compressed, but its result could not be saved to compression history.";
+                Log.Write("Compression history: " + ex.Message, "compress", requestId);
+                try { Notifications.Add("warning", "compression-history", "Compression history was not saved", historyWarning); }
+                catch (Exception notice) when (notice is IOException || notice is UnauthorizedAccessException || notice is Newtonsoft.Json.JsonException)
+                { Log.Write("Compression history notification: " + notice.Message, "compress", requestId); }
+            }
             Log.Write("done", "compress", requestId);
             UploadState.SetUploadState(requestId: requestId, state: "done", phase: "done", percent: 100);
-            return new CompressOverwriteResult { Ok = true };
+            return new CompressOverwriteResult { Ok = true, Message = historyWarning };
         }
     }
 }

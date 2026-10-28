@@ -11,12 +11,92 @@ namespace ReplayKitHelper
     {
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, Reservation> Jobs = new Dictionary<string, Reservation>();
+        private sealed class Editor
+        {
+            public string Id;
+            public long Revision;
+            public readonly HashSet<string> Paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+        private static readonly Dictionary<string, Editor> Editors = new Dictionary<string, Editor>();
+        private static readonly HashSet<string> CompressionQueue = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public static void RegisterEditor(string view, string id)
+        {
+            lock (Gate) Editors[view] = new Editor { Id = id };
+        }
+
+        public static bool UpdateEditor(string view, string id, long revision, string[] paths, out string message)
+        {
+            lock (Gate)
+            {
+                if (!Editors.TryGetValue(view, out var editor) || editor.Id != id || revision <= editor.Revision)
+                {
+                    message = "The editor session changed. Reopen the editor.";
+                    return false;
+                }
+                // A cancelled load or page unload must win over an older request arriving late.
+                editor.Revision = revision;
+                if (paths == null) editor.Paths.Clear();
+                else
+                {
+                    if (editor.Paths.Concat(paths).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 128)
+                    {
+                        message = "Too many editor sources. Save your edits and reopen the editor.";
+                        return false;
+                    }
+                    if (paths.Any(p => CompressionQueue.Contains(p) || Jobs.Values.Any(j => j.Paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
+                    {
+                        message = "A clip is processing or queued for compression. Open it after that finishes.";
+                        return false;
+                    }
+                    foreach (string path in paths) editor.Paths.Add(path);
+                }
+                message = "";
+                return true;
+            }
+        }
+
+        public static bool IsEditorSource(string path)
+        {
+            lock (Gate) return Editors.Values.Any(e => e.Paths.Contains(path));
+        }
+
+        public static bool QueueCompression(IEnumerable<string> paths, out string message)
+        {
+            lock (Gate)
+            {
+                var selected = paths.ToArray();
+                if (selected.Any(p => Editors.Values.Any(e => e.Paths.Contains(p))))
+                {
+                    message = "A selected clip is open in the editor. Close the editor and review the clips again.";
+                    return false;
+                }
+                if (selected.Any(p => Jobs.Values.Any(j => j.Paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
+                {
+                    message = "A selected clip is processing. Review the clips again after it finishes.";
+                    return false;
+                }
+                CompressionQueue.UnionWith(selected);
+                message = "";
+                return true;
+            }
+        }
+
+        public static void ClearCompressionQueue()
+        {
+            lock (Gate) CompressionQueue.Clear();
+        }
 
         public static Reservation TryReserve(string requestId, string name, string path, string kind, out string message, string destination = null)
         {
             var paths = new[] { path, destination }.Where(p => p != null).Select(Path.GetFullPath).ToArray();
             lock (Gate)
             {
+                if (kind.StartsWith("compress", StringComparison.Ordinal) && paths.Any(p => Editors.Values.Any(e => e.Paths.Contains(p))))
+                {
+                    message = "That clip is open in the editor. Close the editor before compressing it.";
+                    return null;
+                }
                 if (Jobs.Values.Any(j => j.Paths.Any(p => paths.Contains(p, StringComparer.OrdinalIgnoreCase))))
                 {
                     message = "That clip already has an operation running";

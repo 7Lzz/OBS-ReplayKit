@@ -435,6 +435,7 @@ window.__rkEditorApi = (function () {
     subtitlePane: () => (editorFx ? editorFx.subtitlePane() : "edit"),
     helper: HELPER,
     root: document.getElementById("ed-left"),
+    protect: protectEditorSources,
     // the clips starred on the clips page, which the library of the editor lists first
     favorites: () => favoriteNamesList(),
     side: document.querySelector(".editor-side"),
@@ -1330,6 +1331,11 @@ window.__rkEditorApi = (function () {
       const draft = await draftPromise;
       if (draft) {
         trimProcessingStage.textContent = "Putting your edits back";
+        const snap = draft.edit?.snap;
+        const refs = [...(snap?.vsegs || []), ...(snap?.layers || []).filter((v) => v.kind === "clip")].map((v) => v.ref).filter(Boolean);
+        try { if (refs.length) await protectEditorSources([...new Set(refs)]); }
+        catch (err) { closeTrimModal(); showToast(escapeHtml(err.message), "bad", "Editor"); return; }
+        if (trimSourceClip !== clip) return;
         const result = await restoreTrimDraft(clip, draft, dur);
         restored = !!result;
         corrected = !!(result && result.corrected);
@@ -1375,6 +1381,7 @@ window.__rkEditorApi = (function () {
     trimVideo.removeAttribute("src");
     try { trimVideo.load(); } catch {}
     trimSourceClip = null;
+    releaseEditorSources();
     trimSnapRequestSeq++;
     trimThumbnailRequestSeq++;
     resetTrimSnapPoints();
@@ -1870,13 +1877,15 @@ window.__rkEditorApi = (function () {
   function paintTrimSave(save) {
     const finishing = save.phase === "finishing";
     const percent = finishing ? Math.max(save.percent, 98) : save.percent;
-    // once ffmpeg runs the bar is a real one from zero
-    const known = finishing || save.phase === "encoding" || percent > 1;
+    // Preparation and encoder startup have no measured percentage yet.
+    const known = finishing || percent > 0;
     saveTrack.classList.toggle("is-waiting", !known);
     if (known) followSaveFill(percent);
-    saveTrack.setAttribute("aria-valuenow", known ? String(percent) : "0");
+    if (known) saveTrack.setAttribute("aria-valuenow", String(percent));
+    else saveTrack.removeAttribute("aria-valuenow");
     savePercent.textContent = known ? Math.round(percent) + "%" : "";
-    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.mode === "screenshot" ? "Rendering screenshot" : save.precise ? "Re-encoding the video" : "Cutting the clip";
+    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.mode === "screenshot" ? "Rendering screenshot"
+      : save.phase === "preparing" ? "Preparing video" : !known ? "Starting render" : save.precise ? "Rendering video" : "Cutting the clip";
     // once the file is being put in place there is nothing left to take back
     saveCancel.hidden = finishing;
     saveCancel.disabled = save.stopping;
@@ -1884,7 +1893,7 @@ window.__rkEditorApi = (function () {
   }
 
   function beginTrimSave(clipName, mode, precise) {
-    const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "", stopping: false, quietTimer: 0 };
+    const save = { clipName, mode, precise, requestId: "", percent: 0, phase: "preparing", stopping: false, quietTimer: 0 };
     trimSaving = save;
     resetSaveFill();
     // nothing keeps playing under the save, and a view in fullscreen would hide the popup
@@ -2181,6 +2190,7 @@ window.__rkEditorApi = (function () {
       try { editorTools.closed(); } catch {}
       try { trimLanes.unload(); } catch {}
       try { if (editorFx) editorFx.reset(); } catch {}
+      releaseEditorSources();
     },
   };
 })();

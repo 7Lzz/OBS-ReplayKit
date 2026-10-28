@@ -1922,6 +1922,17 @@
     background: var(--grey3);
     overflow: hidden;
   }
+  .btn.is-progress .progress-phase {
+    position: absolute;
+    inset: 0 34px 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .btn.is-progress .progress-phase:empty { display: none; }
+  .btn.is-progress.is-queued .progress-track { visibility: hidden; }
   /* width is driven frame-by-frame from updateDisplayProgress -- no css width transition, it only fought the raf and added ~600ms of lag. */
   .btn.is-progress .progress-fill {
     position: absolute;

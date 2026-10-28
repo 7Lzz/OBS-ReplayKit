@@ -56,6 +56,7 @@ namespace ReplayKitHelper
                 ["clipDir"] = "",
                 // the most the clips may take, in GB (1024-based, the way the storage card shows sizes); 0 = no limit. going over it only warns and offers to delete the oldest clips after a review, nothing is removed on its own
                 ["storageLimitGb"] = 0,
+                ["storageCompressionType"] = "fast",
                 ["clipKeybind"] = new JObject { ["key"] = "OBS_KEY_F8" },
                 ["recordingKeybind"] = new JObject(),
                 ["openClipsKeybind"] = new JObject { ["alt"] = true, ["key"] = "OBS_KEY_Z" },
@@ -498,6 +499,7 @@ namespace ReplayKitHelper
                 ["captureDisplay"] = NormalizeCaptureDisplay(data["captureDisplay"]),
                 ["clipDir"] = clipDir,
                 ["storageLimitGb"] = GetIntSetting(data, "storageLimitGb", defaults["storageLimitGb"].Value<int>(), 0, 1000000),
+                ["storageCompressionType"] = GetEnumSetting(data, "storageCompressionType", defaults["storageCompressionType"].Value<string>(), new[] { "fast", "smaller" }),
                 ["clipKeybind"] = NormalizeClipKeybind(data["clipKeybind"]),
                 ["recordingKeybind"] = NormalizeRecordingKeybind(data["recordingKeybind"]),
                 ["openClipsKeybind"] = NormalizeOpenClipsKeybind(data["openClipsKeybind"]),
@@ -848,6 +850,8 @@ namespace ReplayKitHelper
             try { return ReadSettings()["compressSkipFavorites"]?.Value<bool>() ?? true; }
             catch (InvalidOperationException) { return true; }
         }
+
+        public static string GetStorageCompressionType() => ReadSettings()["storageCompressionType"].Value<string>();
 
         // whether the saves that make the video again may use the graphics card encoder
         public static bool GetTrimGpuEncode()
@@ -6518,7 +6522,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         private static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
+            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
 
         private static readonly string[] StartupKeys = { "obsStartupEnabled" };
 

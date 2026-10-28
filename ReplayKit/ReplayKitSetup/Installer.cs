@@ -180,6 +180,7 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", StateLayout.SettingsFile),
             Path.Combine("obs-replayKit", StateLayout.ClipsDbFile),
             Path.Combine("obs-replayKit", StateLayout.ClipsIndexFile),
+            Path.Combine("obs-replayKit", StateLayout.CompressionHistoryFile),
         };
 
         private static readonly string[] RuntimeDeleteRels =
@@ -191,7 +192,7 @@ namespace ReplayKitSetup
         };
 
         // the clip state that is kept across an uninstall and put back by a reinstall
-        private static readonly string[] RuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile };
+        private static readonly string[] RuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile, StateLayout.CompressionHistoryFile };
 
         // installs made before the streamable/ -> helper/ rename: source name (in the old directory) -> new relative path.
         private static readonly string LegacyStreamableDirRel = Path.Combine("obs-replayKit", "scripts", "streamable");
