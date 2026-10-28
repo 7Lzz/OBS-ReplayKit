@@ -133,6 +133,7 @@ namespace ReplayKitHelper
                 case "MAINWIN":
                     if (long.TryParse(payload.Trim(), out long hwnd))
                         lock (Server.State.IpcLock) Server.State.ObsMainWindowHwnd = hwnd;
+                    DiscordProjector.StartAtStartup();
                     break;
                 case "PROJECTORS":
                     var list = new List<long>();
@@ -143,6 +144,7 @@ namespace ReplayKitHelper
                         Server.State.ProjectorHwnds = list;
                         Server.State.ProjectorHwndsAtUtc = DateTime.UtcNow;
                     }
+                    DiscordProjector.StartAtStartup();
                     break;
                 case "ALLOWCLOSE_ACK":
                     AllowCloseAck.Set();

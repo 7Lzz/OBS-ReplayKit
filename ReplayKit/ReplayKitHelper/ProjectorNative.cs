@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ReplayKitHelper
@@ -26,6 +27,11 @@ namespace ReplayKitHelper
         [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+        [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+        [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool GetLayeredWindowAttributes(IntPtr hWnd, out uint key, out byte alpha, out uint flags);
+        [DllImport("user32.dll")] private static extern int GetWindowRgn(IntPtr hWnd, IntPtr region);
         [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
         [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
         [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr hObject);
@@ -48,7 +54,6 @@ namespace ReplayKitHelper
         private const int GWL_EXSTYLE = -20;
         private const int GWLP_HWNDPARENT = -8;
         private const uint GW_OWNER = 4;
-        private const int SW_HIDE = 0;
         private const int SW_SHOWNOACTIVATE = 4;
         private const int SW_RESTORE = 9;
         private const uint WM_CLOSE = 0x0010;
@@ -60,6 +65,7 @@ namespace ReplayKitHelper
         private const long WS_EX_TOOLWINDOW = 0x00000080L;
         private const long WS_EX_APPWINDOW = 0x00040000L;
         private const long WS_EX_LAYERED = 0x00080000L;
+        private const long WS_EX_TOPMOST = 0x00000008L;
         private const uint SWP_NOSIZE = 0x0001;
         private const uint SWP_NOMOVE = 0x0002;
         private const uint SWP_NOZORDER = 0x0004;
@@ -101,14 +107,16 @@ namespace ReplayKitHelper
 
         public static bool PreParkProjectorWindow(long hwndValue, string title)
         {
-            IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue)) return false;
-            ShowWindow(hWnd, SW_HIDE);
-            if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
-            EnsureNormalAppWindow(hWnd);
-            bool positioned = SetWindowPos(hWnd, IntPtr.Zero, -32000, -32000, 16, 16, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-            ShowWindow(hWnd, SW_SHOWNOACTIVATE);
-            return positioned;
+            return RunWithTimeout(cancel =>
+            {
+                IntPtr hWnd = new IntPtr(hwndValue);
+                if (cancel.IsCancellationRequested || !IsProjectorWindow(hwndValue)) return false;
+                if (!SetProjectorGhosted(hwndValue, true, 0)) return false;
+                if (cancel.IsCancellationRequested) return false;
+                if (!string.IsNullOrWhiteSpace(title) && !SetWindowText(hWnd, title)) return false;
+                if (cancel.IsCancellationRequested) return false;
+                return EnsureNormalAppWindow(hWnd);
+            }, 1500);
         }
 
         private static bool IsObsFamilyProcess(uint pid, out string processName)
@@ -202,7 +210,7 @@ namespace ReplayKitHelper
         // self-healing sweep for the accumulating-hidden-projectors bug: the keep-alive tick opens a replacement whenever it cant find the parked projector, but never closed the original if it was still alive elsewhere -- only matches windows carrying the exact branded title (set by this classs own SetWindowText calls), so it can never touch a projector the user opened themselves from OBSs own menu. keepHwndValue=0 closes every match (used when disabling share preview); nonzero keeps that hwnd and closes the rest (used right after find/open, so at most one of these is ever alive between keep-alive ticks).
         public static int CloseDuplicateProjectorWindows(string exactTitle, long keepHwndValue)
         {
-            if (string.IsNullOrWhiteSpace(exactTitle)) return 0;
+            if (OperationPending() || string.IsNullOrWhiteSpace(exactTitle)) return 0;
             IntPtr keep = new IntPtr(keepHwndValue);
             int closed = 0;
             EnumWindows((hWnd, lParam) =>
@@ -243,42 +251,70 @@ namespace ReplayKitHelper
             return SetWindowPos(hWnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         }
 
-        // SetWindowPos/SetWindowLong/the shell taskbar-list com calls below all synchronously message the target windows owning thread (obss ui thread) and block until it services them, so a busy/slow obs ui thread could freeze every dock over http, not just the projector. running the real work on a background task and giving up after timeoutMs bounds how long the caller waits -- but Task.Wait timing out does not cancel the task, so a win32 call blocked on a window that never answers keeps running forever, and every timed-out firing abandons one more permanently-stuck threadpool thread. this fires at startup and every keep-alive tick for as long as discord projector mode is on, so left unguarded that leak is unbounded -- the inFlight guards below are what stop that.
-        private static bool RunWithTimeout(Func<bool> action, int timeoutMs)
+        private static readonly object OperationGate = new object();
+        private static Task<bool> pendingOperation;
+
+        public static bool OperationPending()
         {
-            var task = Task.Run(action);
-            return task.Wait(timeoutMs) && task.Result;
+            lock (OperationGate) return pendingOperation != null && !pendingOperation.IsCompleted;
         }
 
-        private static volatile bool s_reparkInFlight;
-        private static volatile bool s_taskbarInFlight;
+        // A timed-out Win32 call can still be running. Keep its slot until it finishes, and stop the remaining steps when it returns.
+        private static bool RunWithTimeout(Func<CancellationToken, bool> action, int timeoutMs)
+        {
+            var cancellation = new CancellationTokenSource();
+            Task<bool> task;
+            lock (OperationGate)
+            {
+                if (pendingOperation != null && !pendingOperation.IsCompleted)
+                {
+                    cancellation.Dispose();
+                    return false;
+                }
+                task = Task.Run(() => action(cancellation.Token));
+                pendingOperation = task;
+            }
+            try
+            {
+                if (task.Wait(timeoutMs)) return task.Result;
+                cancellation.Cancel();
+                return false;
+            }
+            finally
+            {
+                task.ContinueWith(done =>
+                {
+                    if (done.IsFaulted) Log.Write("warn: Projector window operation failed: " + done.Exception.GetBaseException().Message);
+                    cancellation.Dispose();
+                }, TaskScheduler.Default);
+            }
+        }
 
         public static bool SetProjectorTaskbarHidden(long hwndValue, bool hidden)
         {
-            // an earlier call that timed out from the callers side may still be stuck on the real win32 work -- skip this tick rather than abandoning a second thread on top of it.
-            if (s_taskbarInFlight) return false;
-            s_taskbarInFlight = true;
-            return RunWithTimeout(() =>
+            return RunWithTimeout(cancel =>
             {
-                try { return SetProjectorTaskbarHiddenCore(hwndValue, hidden); }
-                finally { s_taskbarInFlight = false; }
+                if (cancel.IsCancellationRequested) return false;
+                return SetProjectorTaskbarHiddenCore(hwndValue, hidden, cancel);
             }, 1500);
         }
 
-        private static bool SetProjectorTaskbarHiddenCore(long hwndValue, bool hidden)
+        private static bool SetProjectorTaskbarHiddenCore(long hwndValue, bool hidden, CancellationToken cancel)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
             if (!IsProjectorWindow(hwndValue)) return false;
             if (!EnsureNormalAppWindow(hWnd)) return false;
+            if (cancel.IsCancellationRequested) return false;
             try
             {
                 var taskbarList = (IProjectorTaskbarList)new CProjectorTaskbarList();
                 taskbarList.HrInit();
+                if (cancel.IsCancellationRequested) return false;
                 if (hidden) taskbarList.DeleteTab(hWnd);
                 else { taskbarList.AddTab(hWnd); taskbarList.SetActiveAlt(hWnd); }
-                return true;
+                return !cancel.IsCancellationRequested;
             }
-            catch (COMException) { return hidden; }
+            catch (COMException) { return false; }
         }
 
         public static bool ClearProjectorVisibleRegion(long hwndValue)
@@ -321,19 +357,27 @@ namespace ReplayKitHelper
 
         public static bool RestoreResizeTitleAndChrome(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
         {
+            return RunWithTimeout(cancel => RestoreResizeTitleAndChromeCore(hwndValue, title, x, y, width, height, borderless, cancel), 1500);
+        }
+
+        private static bool RestoreResizeTitleAndChromeCore(long hwndValue, string title, int x, int y, int width, int height, bool borderless, CancellationToken cancel)
+        {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
-            SetProjectorGhosted(hwndValue, false, 255);
+            if (cancel.IsCancellationRequested || !IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
+            if (!SetProjectorGhosted(hwndValue, false, 255) || cancel.IsCancellationRequested) return false;
             ShowWindow(hWnd, SW_RESTORE);
-            ShowWindowAsync(hWnd, SW_RESTORE);
+            if (cancel.IsCancellationRequested) return false;
             if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
-            if (!SetProjectorChrome(hwndValue, borderless)) return false;
-            ClearProjectorVisibleRegion(hwndValue);
+            if (cancel.IsCancellationRequested || !SetProjectorChrome(hwndValue, borderless)) return false;
+            if (cancel.IsCancellationRequested || !ClearProjectorVisibleRegion(hwndValue)) return false;
+            if (cancel.IsCancellationRequested) return false;
             if (!SetWindowPos(hWnd, HWND_NOTOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
+            if (cancel.IsCancellationRequested) return false;
             if (!SetWindowPos(hWnd, HWND_TOP, x, y, width, height, SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
+            if (cancel.IsCancellationRequested) return false;
             BringWindowToTop(hWnd);
             SetForegroundWindow(hWnd);
-            return true;
+            return IsWindowVisible(hWnd) && !IsIconic(hWnd) && IsWindowAtRectAndTitle(hwndValue, title, x, y, width, height);
         }
 
         public static bool RestoreResizeTitleChromeAndRegion(long hwndValue, string title, int x, int y, int width, int height, bool borderless, int regionX, int regionY, int regionWidth, int regionHeight)
@@ -352,29 +396,43 @@ namespace ReplayKitHelper
 
         public static bool RestoreResizeTitleChromeGhosted(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
         {
-            if (s_reparkInFlight) return false;
-            s_reparkInFlight = true;
-            return RunWithTimeout(() =>
-            {
-                try { return RestoreResizeTitleChromeGhostedCore(hwndValue, title, x, y, width, height, borderless); }
-                finally { s_reparkInFlight = false; }
-            }, 1500);
+            return RunWithTimeout(cancel => RestoreResizeTitleChromeGhostedCore(hwndValue, title, x, y, width, height, borderless, cancel), 1500);
         }
 
-        private static bool RestoreResizeTitleChromeGhostedCore(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
+        private static bool RestoreResizeTitleChromeGhostedCore(long hwndValue, string title, int x, int y, int width, int height, bool borderless, CancellationToken cancel)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
-            if (!SetProjectorGhosted(hwndValue, true, 0)) return false;
+            if (cancel.IsCancellationRequested || !IsProjectorWindow(hwndValue) || width < 1 || height < 1) return false;
+            if (IsProjectorParked(hwndValue, title, x, y, width, height, borderless)) return true;
+            if (!SetProjectorGhosted(hwndValue, true, 0) || cancel.IsCancellationRequested) return false;
             if (!string.IsNullOrWhiteSpace(title)) SetWindowText(hWnd, title);
-            if (!SetProjectorChrome(hwndValue, borderless)) return false;
-            // park topmost so discord lists the projector near the top of its picker -- safe becuase the window is alpha 0 layered, which is click-thru and invisible.
-            if (!SetWindowPos(hWnd, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED)) return false;
-            ClearProjectorVisibleRegion(hwndValue);
+            if (cancel.IsCancellationRequested || !SetProjectorChrome(hwndValue, borderless)) return false;
+            if (cancel.IsCancellationRequested || !ClearProjectorVisibleRegion(hwndValue)) return false;
+            if (cancel.IsCancellationRequested) return false;
             ShowWindow(hWnd, SW_SHOWNOACTIVATE);
-            ShowWindowAsync(hWnd, SW_SHOWNOACTIVATE);
+            if (cancel.IsCancellationRequested) return false;
+            // park topmost so discord lists the projector near the top of its picker -- safe becuase the window is alpha 0 layered, which is click-thru and invisible.
             if (!SetWindowPos(hWnd, HWND_TOPMOST, x, y, width, height, SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) return false;
-            return SetProjectorGhosted(hwndValue, true, 0);
+            if (cancel.IsCancellationRequested || !SetProjectorGhosted(hwndValue, true, 0)) return false;
+            return !cancel.IsCancellationRequested && IsProjectorParked(hwndValue, title, x, y, width, height, borderless);
+        }
+
+        public static bool IsProjectorParked(long hwndValue, string title, int x, int y, int width, int height, bool borderless)
+        {
+            IntPtr hWnd = new IntPtr(hwndValue);
+            if (!IsWindowAtRectAndTitle(hwndValue, title, x, y, width, height) || !IsWindowVisible(hWnd) || IsIconic(hWnd)) return false;
+            if (!GetClientRect(hWnd, out RECT client) || client.Right < 1 || client.Bottom < 1) return false;
+            long style = GetWindowLongPtr(hWnd, GWL_STYLE).ToInt64();
+            long chrome = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+            if (borderless && ((style & chrome) != 0 || client.Right != width || client.Bottom != height)) return false;
+            long extended = GetWindowLongPtr(hWnd, GWL_EXSTYLE).ToInt64();
+            long required = WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_TOPMOST;
+            if ((extended & required) != required || (extended & WS_EX_TOOLWINDOW) != 0 || GetWindow(hWnd, GW_OWNER) != IntPtr.Zero) return false;
+            if (!GetLayeredWindowAttributes(hWnd, out _, out byte alpha, out uint flags) || alpha != 0 || (flags & LWA_ALPHA) == 0) return false;
+            IntPtr region = CreateRectRgn(0, 0, 0, 0);
+            if (region == IntPtr.Zero) return false;
+            try { return GetWindowRgn(hWnd, region) == 0; }
+            finally { DeleteObject(region); }
         }
 
         public static bool IsWindowAtRectAndTitle(long hwndValue, string title, int x, int y, int width, int height)
@@ -390,7 +448,7 @@ namespace ReplayKitHelper
         public static bool CloseWindow(long hwndValue)
         {
             IntPtr hWnd = new IntPtr(hwndValue);
-            if (!IsProjectorWindow(hwndValue)) return false;
+            if (OperationPending() || !IsProjectorWindow(hwndValue)) return false;
             return PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
     }
