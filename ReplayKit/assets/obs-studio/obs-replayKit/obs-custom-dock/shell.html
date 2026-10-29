@@ -139,7 +139,12 @@
   // two frames later whatever was just put on screen has been presented, which is the moment the plugin may put this browser above the preview; the timer only covers a browser that is not producing frames while it sits under the preview
   function ackSoon(name) {
     var sent = false;
-    var send = function () { if (!sent) { sent = true; ack(name); } };
+    var send = function () {
+      if (sent || wanted !== name) return;
+      if (active !== name && !document.getElementById("skel").classList.contains("on")) return;
+      sent = true;
+      ack(name);
+    };
     requestAnimationFrame(function () { requestAnimationFrame(send); });
     setTimeout(send, 150);
   }

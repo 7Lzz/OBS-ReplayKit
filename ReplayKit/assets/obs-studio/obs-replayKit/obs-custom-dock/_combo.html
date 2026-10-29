@@ -262,6 +262,7 @@
     function menuKey(event) {
       if (!combo.classList.contains("is-open")) return;
       const key = event.key;
+      if (key !== "Escape" && config.footer && config.footer.contains(event.target)) return;
       const rows = Array.from(menu.querySelectorAll(".combo-option"));
       const focused = rows.indexOf(document.activeElement);
       let next = -1;
@@ -296,6 +297,13 @@
       event.stopPropagation();
       if (combo.classList.contains("is-open")) close(); else open();
     }, events);
+    menu.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 || !config.footer || !config.footer.contains(event.target)) return;
+      const control = event.target.closest("input, button, select, textarea, a, [tabindex], [contenteditable='true']");
+      if (control && config.footer.contains(control)) return;
+      // keep focus until the label or shared row handler activates its control
+      event.preventDefault();
+    }, events);
     menu.addEventListener("click", (event) => {
       const row = event.target.closest(".combo-option");
       if (!row || !menu.contains(row)) return;
@@ -312,6 +320,7 @@
     menu.addEventListener("mouseleave", () => preview(), events);
     combo.addEventListener("keydown", (event) => {
       const key = event.key;
+      if (key !== "Escape" && config.footer && config.footer.contains(event.target)) return;
       if (config.menuKeys && ["ArrowDown", "ArrowUp", "Home", "End"].includes(key)) {
         event.preventDefault(); event.stopPropagation(); open(); menuKey(event); return;
       }

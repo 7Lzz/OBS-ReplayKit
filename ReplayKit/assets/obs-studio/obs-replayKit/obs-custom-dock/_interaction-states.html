@@ -14,6 +14,8 @@
   /* a control clicked with the mouse never shows the ring of keyboard focus, even once a key like space is pressed on it; the ring is for moving through the page with tab */
   html[data-rk-input="pointer"] :focus-visible { outline: none !important; }
 
+  :is(.check-row, .action-row, .combo-toggle, .trim-mode-row, .compress-downsample-row, .switch, .ed-switchrow, .ed-check, [data-control-row]):not(.is-disabled):not([aria-disabled="true"]):has(:is(input[type="checkbox"], button, a.btn, [role="button"]):not(:disabled):not([aria-disabled="true"])) { cursor:pointer; }
+
   .rk-hover-row { transition: background-color 90ms linear, color 90ms linear, padding-left var(--anim_press, 120ms) var(--ease_pop, ease); }
   .rk-hover-row:not(.is-disabled):hover { background: var(--button_bg_hover); padding-left: calc(var(--rk-row-padding, 14px) + 2px); }
   .rk-hover-accent:hover { background: rgba(var(--accent-rgb), .13); }
@@ -45,6 +47,26 @@
     document.addEventListener("pointerdown", function () { root.dataset.rkInput = "pointer"; }, true);
     document.addEventListener("keydown", function (e) { if (e.key === "Tab") root.dataset.rkInput = "keyboard"; }, true);
   })();
+(function () {
+  var rows = ".check-row, .action-row, .combo-toggle, .trim-mode-row, .compress-downsample-row, .switch, .ed-switchrow, .ed-check, [data-control-row]";
+  // native labels already activate their input; other single-control rows forward the click once
+  document.addEventListener("click", function (event) {
+    if (event.defaultPrevented || event.button !== 0 || !(event.target instanceof Element)) return;
+    var row = event.target.closest(rows);
+    if (!row || row.closest(".is-disabled, [aria-disabled='true'], [inert]")) return;
+    var interactive = event.target.closest("input, button, select, textarea, a, [role='button'], [role='combobox'], [contenteditable]:not([contenteditable='false'])");
+    if (interactive && row.contains(interactive)) return;
+    var controls = row.querySelectorAll("input:not([type='hidden']), button, select, textarea, a.btn, [role='button']");
+    if (controls.length !== 1) return;
+    var control = controls[0];
+    if (!control.matches("input[type='checkbox'], button, a.btn, [role='button']") || control.matches(":disabled, [aria-disabled='true']") || !control.getClientRects().length) return;
+    var label = event.target.closest("label");
+    if (label && label.control === control) return;
+    event.preventDefault();
+    control.focus({ preventScroll:true });
+    control.click();
+  });
+})();
 (function () {
   var profiles = ["control", "overlay", "row", "accent", "danger", "nav", "card", "surface"];
   var observed = new WeakSet();

@@ -46,6 +46,9 @@ constexpr int kHostMissLimit = 4;
 bool g_setupForeground = false;
 bool g_homeEditor = false;
 bool g_clipsEditor = false;
+int probePending = 0;
+int probeGeneration = 0;
+QElapsedTimer resumeTimer;
 
 bool ShellMainWindowIsForeground();
 
@@ -218,7 +221,7 @@ void ShellSurfacePage()
 		blog(LOG_WARNING, "[replaykit] shell browser did not confirm '%s' in time; showing it anyway", ShellViewName(view));
 		ShellRaiseHost();
 		// a page that says nothing at all may have lost its renderer, which leaves the browser white
-		ShellProbeHost(true);
+		ShellProbeHost();
 	});
 }
 
@@ -374,6 +377,7 @@ namespace {
 // a renderer that stopped answering is reloaded behind the stage cover
 void ShellRestartHost()
 {
+	ShellResetHostProbe();
 	g_homeEditor = false;
 	g_clipsEditor = false;
 	ShellUpdateTitle();
@@ -406,34 +410,54 @@ void ShellReloadHost()
 	ShellRestartHost();
 }
 
-// a page whose renderer died stays blank until the browser is reloaded and nothing tells the plugin, so the page is asked for a sign of life: it answers through the helper (RKShell.ping, /shell/ping, SHELLPONG on the pipe). silence only counts against the page once an answer has come back at least once, since a helper that does not know the route never answers, and only while the helper itself is up
-void ShellProbeHost(bool suspicious)
+void ShellResetHostProbe()
+{
+	probePending = 0;
+	++probeGeneration;
+	g_hostPingMisses = 0;
+	resumeTimer.restart();
+}
+
+// one probe at a time; a restored renderer needs time to page its idle memory back in
+void ShellProbeHost()
 {
 	if (!CefOpen())
 		return;
 	QMainWindow *mw = ObsMainWindowQt();
 	if (!g_shellOn || !g_shellHost || !g_hostReady || !mw || !mw->isVisible() || mw->isMinimized()) {
-		g_hostPingMisses = 0;
+		ShellResetHostProbe();
 		return;
 	}
-	if (suspicious)
-		g_hostPingMisses = qMax(g_hostPingMisses, kHostMissLimit - 2);
+	if (probePending || (resumeTimer.isValid() && resumeTimer.elapsed() < 5000))
+		return;
 	const int n = ++g_hostPingSent;
+	const int generation = probeGeneration;
+	probePending = n;
 	ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.ping && RKShell.ping(" + std::to_string(n) + ");");
 	QPointer<ShellPage> host = g_shellHost;
-	QTimer::singleShot(2000, g_callbacks, [n, host]() {
+	QTimer::singleShot(2000, g_callbacks, [n, host, generation]() {
+		if (generation != probeGeneration || probePending != n)
+			return;
+		probePending = 0;
+		QMainWindow *mw = ObsMainWindowQt();
+		if (!mw || !mw->isVisible() || mw->isMinimized()) {
+			ShellResetHostProbe();
+			return;
+		}
 		if (n <= g_hostPingAcked || !g_hostPingProven || !host || host != g_shellHost || !g_hostReady)
 			return;
 		if (++g_hostPingMisses < kHostMissLimit)
 			return;
 		g_hostPingMisses = 0;
 		// a reload is no use while the helper is down, and a page that only waits on the helper is not the one to throw away
-		RunAsync([n]() {
+		RunAsync([n, host, generation]() {
 			const bool helperUp = !HttpRequest("GET", "/version", 8767, nullptr, 800).empty();
 			QMetaObject::invokeMethod(
 				g_callbacks,
-				[n, helperUp]() {
-					if (helperUp && n > g_hostPingAcked && g_hostReady)
+				[n, host, generation, helperUp]() {
+					QMainWindow *mw = ObsMainWindowQt();
+					if (generation == probeGeneration && host && host == g_shellHost && helperUp && n > g_hostPingAcked && g_hostReady &&
+					    mw && mw->isVisible() && !mw->isMinimized())
 						ShellReloadHost();
 				},
 				Qt::QueuedConnection);
@@ -444,13 +468,15 @@ void ShellProbeHost(bool suspicious)
 void ShellHostPong(int n)
 {
 	// an answer to a number that was never sent says nothing about the page
-	if (n < 1 || n > g_hostPingSent)
+	if (n <= g_hostPingAcked || n < 1 || n > g_hostPingSent)
 		return;
 	if (!g_hostPingProven)
 		blog(LOG_INFO, "[replaykit] shell page answers pings, the watchdog is armed");
 	g_hostPingAcked = qMax(g_hostPingAcked, n);
 	g_hostPingProven = true;
 	g_hostPingMisses = 0;
+	if (probePending && n >= probePending)
+		probePending = 0;
 }
 
 // the native side of a clip fullscreen ends without the page having asked, so the page is told to leave its own as well. safe to call when nothing is fullscreen
@@ -657,9 +683,11 @@ bool ShellActivate(ShellView view)
 	return true;
 }
 
-// the shell page reporting which view it now shows (the VIEWSHOWN message of the helper). only the current wish counts: an answer for a page the user has already left is just recorded
+// page confirmations can arrive after a switch or reload; always restore the selected view
 void ShellHostShown(const std::string &name)
 {
+	if (name != "home" && name != "clips" && name != "settings" && name != "setup")
+		return;
 	const ShellView view = name == "clips" ? ShellView::Clips : name == "settings" ? ShellView::Settings : name == "setup" ? ShellView::Setup : ShellView::Home;
 	g_hostShown = view;
 	const bool first = !g_hostReady;
@@ -671,18 +699,18 @@ void ShellHostShown(const std::string &name)
 		if (g_shellView == view) {
 			if (!g_hostOnTop && first) {
 				QTimer::singleShot(kFirstRaiseSettleMs, g_callbacks, [view]() {
-					if (g_shellView == view && !g_hostOnTop && g_hostReady)
+					if (g_shellView == view && g_hostShown == view && g_hostRequested == view && !g_hostOnTop && g_hostReady)
 						ShellRaiseHost();
 				});
 			} else if (!g_hostOnTop) {
 				ShellRaiseHost();
 			}
-		} else if (first) {
-			// the browser came up on home while the user had already asked for another page
+		} else {
+			// a reload or a late reply must converge on the selected view
 			ShellSurfacePage();
 		}
-	} else if (first && g_shellHost) {
-		// the preview or the obs settings are showing, so the page that just came up is told it is not
+	} else if (g_shellHost) {
+		// native views cover the browser, including after an unexpected reload
 		ShellRunJs(g_shellHost->browser, "RKShell.park();");
 	}
 	if (name == "setup" && g_setupForeground) {

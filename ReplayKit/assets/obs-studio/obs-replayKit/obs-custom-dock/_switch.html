@@ -45,7 +45,7 @@
   .check-row input[type=checkbox]:disabled, input[type=checkbox].rk-switch:disabled { opacity:.45; cursor:default; }
   .check-row input[type=checkbox]:focus-visible, input[type=checkbox].rk-switch:focus-visible { outline:2px solid var(--selected2,#476BD7); outline-offset:2px; }
 
-  /* a setting that is a switch, or a line with a button at its end, sits in a row in the column of the fields, level with the dropdowns above and below it: the name and its note on the left and the switch or the button at the end of a row that stops at a width where the two still read as one thing. nothing is drawn behind the row and the switch or the button is the only thing in it that takes a click. a hairline goes above such a row wherever another row comes before it, and under the last of a run where an ordinary row follows */
+  /* a setting that is a switch, or a line with a button at its end, sits in a row in the column of the fields, level with the dropdowns above and below it: the name and its note on the left and the switch or the button at the end of a row that stops at a width where the two still read as one thing. nothing is drawn behind the row; its text and empty space activate its single control through the shared interaction module. a hairline goes above such a row wherever another row comes before it, and under the last of a run where an ordinary row follows */
   .action-row { display:flex; align-items:center; gap:8px; color:var(--text); }
   .form-row:has(> :is(.check-row, .action-row)) { min-height:0; padding-top:0; padding-bottom:0; }
   .form-row > :is(.check-row, .action-row) {

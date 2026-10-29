@@ -82,7 +82,7 @@ void ShellTick()
 	ShellWarmStep();
 	if (tick % 12 == 0) {
 		PollSharePreview();
-		ShellProbeHost(false);
+		ShellProbeHost();
 	}
 	if (tick % 40 == 0 || (tick % 4 == 0 && g_shellRail && g_shellRail->StorageCompressing()))
 		ShellStoragePoll();

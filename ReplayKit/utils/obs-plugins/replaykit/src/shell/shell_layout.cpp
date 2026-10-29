@@ -356,22 +356,27 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 			ShellBindHwnd();
 			break;
 		case QEvent::Show:
+			ShellResetHostProbe();
 			ShellBindHwnd();
 			ShellLayout();
 			ShellTintPreview();
 			QTimer::singleShot(0, g_callbacks, []() { ShellMakeMaximizeReal(); });
 			if (g_shellHost && !g_hostReady && !g_hostVisibleTimer.isValid())
 				g_hostVisibleTimer.start();
-			// a window that was hidden or minimized may have lost its page meanwhile, so it is asked right after the window is back
-			QTimer::singleShot(1500, g_callbacks, []() { ShellProbeHost(true); });
+			// let the restored renderer resume before checking whether it still answers
+			QTimer::singleShot(5000, g_callbacks, []() { ShellProbeHost(); });
 			if (g_shellPendingSetup) {
 				g_shellPendingSetup = false;
 				QTimer::singleShot(0, g_callbacks, []() { ShellOpenView(ShellView::Setup, true); });
 			}
 			break;
+		case QEvent::Hide:
+			ShellResetHostProbe();
+			break;
 		case QEvent::Resize:
 		case QEvent::WindowStateChange:
 			if (event->type() == QEvent::WindowStateChange) {
+				ShellResetHostProbe();
 				if (g_shellHost) {
 					const bool minimizedEditor = m_mw->isMinimized() && ShellEditorActive();
 					const bool showing = m_mw->isVisible() && !m_mw->isMinimized();
@@ -382,7 +387,7 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 				QTimer::singleShot(0, g_callbacks, []() { ShellMakeMaximizeReal(); });
 				// a window that was minimized may have lost its page meanwhile
 				if (!m_mw->isMinimized())
-					QTimer::singleShot(1500, g_callbacks, []() { ShellProbeHost(true); });
+					QTimer::singleShot(5000, g_callbacks, []() { ShellProbeHost(); });
 			}
 			ShellLayout();
 			break;

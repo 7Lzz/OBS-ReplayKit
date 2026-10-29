@@ -27,8 +27,10 @@ void ShellUpdateTitle();
 void ShellSetEditor(ShellView view, bool active);
 void ShellOpenSettingsPage(const QString &page);
 void ShellEnsureHost();
-// asks the shell page for a sign of life and reloads it when none comes for several tries in a row. suspicious starts the count part way, for a moment when the page should answer at once
-void ShellProbeHost(bool suspicious);
+// forgets pending deadlines when the window or browser restarts
+void ShellResetHostProbe();
+// asks the shell page for a sign of life and reloads it after consecutive missed replies
+void ShellProbeHost();
 // the sign of life of the page came back through the helper
 void ShellHostPong(int n);
 // brings the shell page back from the start, the way it is after a launch
