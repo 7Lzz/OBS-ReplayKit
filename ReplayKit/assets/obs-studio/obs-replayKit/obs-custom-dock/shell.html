@@ -59,6 +59,7 @@
   // the view whose page is told it is on screen; none while the preview or the obs settings cover this browser
   var active = "";
   var windowUp = true;
+  var windowVisible = true;
   var settingsPage = "";
   var skelTimer = 0;
   var dipTimer = 0;
@@ -74,7 +75,7 @@
 
   function dispatch(f) {
     if (!f.loaded) return;
-    var shown = windowUp && f.name === active;
+    var shown = windowVisible && f.name === active;
     try {
       var w = f.el.contentWindow;
       // windowUp tells a page that only lost the stage to another view apart from one whose window went away
@@ -306,8 +307,9 @@
     try { window.focus(); } catch (_) {}
   }
 
-  function windowShown(up) {
-    windowUp = !!up;
+  function windowShown(up, minimized) {
+    windowVisible = !!up;
+    windowUp = windowVisible || !!minimized;
     dispatchAll();
   }
 

@@ -2,6 +2,8 @@
 #include "prelude.hpp"
 #include "windows/clips_window.hpp"
 
+#include <QLineEdit>
+
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
@@ -23,7 +25,26 @@ bool g_clipsCheckInFlight = false;
 
 // CEF treats a parent QWidgets close event as a browser-close request even when Qt leaves the parent allocated. Ignore that event after hiding the window so the browser stays usable when a hotkey reopens Clips immediately afterward.
 class ClipsWindow : public QWidget {
+private:
+	void PublishState(bool shown)
+	{
+		if (!g_clipsBrowser || !CefOpen())
+			return;
+		const bool keepEditor = isMinimized() && property("replaykitEditorActive").toBool();
+		RunBrowserScript(g_clipsBrowser, shown ? "window.dispatchEvent(new CustomEvent('replaykit-window',{detail:{shown:true,windowUp:true}}));" : keepEditor ? "window.dispatchEvent(new CustomEvent('replaykit-window',{detail:{shown:false,windowUp:true}}));" : "window.dispatchEvent(new CustomEvent('replaykit-window',{detail:{shown:false,windowUp:false}}));");
+	}
+
 protected:
+	void showEvent(QShowEvent *event) override
+	{
+		QWidget::showEvent(event);
+		PublishState(true);
+	}
+	void hideEvent(QHideEvent *event) override
+	{
+		QWidget::hideEvent(event);
+		PublishState(false);
+	}
 	void closeEvent(QCloseEvent *event) override
 	{
 		SaveClipsWindowGeometry(this);
@@ -36,11 +57,18 @@ protected:
 	{
 		QWidget::changeEvent(event);
 		if (event->type() == QEvent::WindowStateChange && isMinimized()) {
+			if (property("replaykitEditorActive").toBool()) {
+				AnchoredPanel::HideOwnedBy(this);
+				PublishState(false);
+				return;
+			}
 			QTimer::singleShot(0, this, [this]() {
 				hide();
 				AnchoredPanel::HideOwnedBy(this);
 				setWindowState(windowState() & ~Qt::WindowMinimized);
 			});
+		} else if (event->type() == QEvent::WindowStateChange) {
+			PublishState(isVisible());
 		}
 	}
 	void moveEvent(QMoveEvent *event) override
@@ -84,6 +112,10 @@ void CreateClipsWindow()
 	layout->addWidget(browser);
 	g_clipsBrowser = browser;
 	g_clipsWindow = win;
+	auto *status = new QLineEdit(win);
+	status->hide();
+	QObject::connect(browser, SIGNAL(titleChanged(QString)), status, SLOT(setText(QString)));
+	QObject::connect(status, &QLineEdit::textChanged, win, [win](const QString &title) { win->setProperty("replaykitEditorActive", title == QLatin1String("Clips - Editor")); });
 
 	// restore the remembered position/size before the first show so it doesnt flash at the default spot.
 	RestoreWindowGeometry("clipsWindow", win);
@@ -182,7 +214,10 @@ void ToggleClips()
 				return;
 			}
 			SaveClipsWindowGeometry();
-			g_clipsWindow->hide();
+			if (g_clipsWindow->property("replaykitEditorActive").toBool())
+				g_clipsWindow->showMinimized();
+			else
+				g_clipsWindow->hide();
 			AnchoredPanel::HideOwnedBy(g_clipsWindow);
 			return;
 		}

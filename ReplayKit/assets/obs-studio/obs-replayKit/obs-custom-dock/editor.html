@@ -520,7 +520,7 @@ window.__rkEditorApi = (function () {
     const retimed = Math.abs(trimLanes.videoSpeed() - 1) > 1e-6;
     const subtitled = !!trimLanes.subtitlePlan();
     const looked = !!trimLanes.lookPlan() || !!trimLanes.layerPlan();
-    const needed = retimed || trimLanes.videoEdited() || subtitled || looked;
+    const needed = retimed || !!trimLanes.videoPlan() || subtitled || looked;
     const row = trimPrecise.closest(".trim-mode-row");
     if (needed && trimPreciseBeforeSpeed === null) {
       trimPreciseBeforeSpeed = trimPrecise.checked;
@@ -1234,6 +1234,7 @@ window.__rkEditorApi = (function () {
     } else {
       if (volume.parentNode !== middle) middle.appendChild(volume);
       if (trimFullscreen.parentNode !== middle) middle.appendChild(trimFullscreen);
+      if (window.RKHover) RKHover.apply(document.getElementById("tl-toolbar"), { control: "button" });
     }
   }
 

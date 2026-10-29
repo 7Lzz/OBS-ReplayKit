@@ -495,6 +495,7 @@ namespace ReplayKitHelper
             int inputs = 0;
             if (piece != null)
             {
+                speed = piece.Rate(speed);
                 double a = Math.Max(piece.At, plan.Start);
                 double srcA = piece.SrcStart + (a - piece.At) * speed;
                 // a whole number of frames after the start of the piece, so the frames fall where the full render puts them
@@ -504,7 +505,8 @@ namespace ReplayKitHelper
                 argv.AddRange(new[] { "-ss", N(seekSrc), "-i", piece.Path ?? sourcePath });
                 inputs = 1;
                 string stretch = Math.Abs(speed - 1) > 1e-6 ? "setpts=(PTS-STARTPTS)/" + N(speed) : "setpts=PTS-STARTPTS";
-                video = "[0:v:0]" + stretch + (piece.Path == null ? "" : VideoPlan.Fit(info)) + ",fps=" + info.Fps + ",setsar=1,format=yuv420p,setpts=PTS+" + N(seekAt - plan.Start) + "/TB[vout]";
+                string pieceLook = piece.Look != null ? "," + piece.Look.Filter(info.Width, info.Height) : "";
+                video = "[0:v:0]" + stretch + (piece.Path == null ? "" : VideoPlan.Fit(info)) + pieceLook + ",fps=" + info.Fps + ",setsar=1,format=yuv420p,setpts=PTS+" + N(seekAt - plan.Start) + "/TB[vout]";
             }
             else
             {

@@ -5062,10 +5062,12 @@ const CLIP_HOVER_PROFILES = {
         activePreview = null;
       }
       // embedded in the obs window this page sits behind another view now, so the reset is done while nobody looks and the next show finds a clean grid instead of watching it reset; an open editor is kept for when the user comes back, unless the window itself went away
-      if (window.RKEmbedded) {
+      if (editorKeptForReturn()) {
         wasHiddenSinceShown = false;
-        if (editorKeptForReturn()) holdEditorWhileAway();
-        else resetClipsWindowState();
+        holdEditorWhileAway();
+      } else if (window.RKEmbedded) {
+        wasHiddenSinceShown = false;
+        resetClipsWindowState();
       }
     } else {
       if (wasHiddenSinceShown) {
@@ -5987,6 +5989,7 @@ const CLIP_HOVER_PROFILES = {
   function publishQuickActions() {
     const api = editorApi();
     const editing = !!api && trimVeil.classList.contains("is-open");
+    if (!window.RKEmbedded) document.title = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") ? "Clips - Editor" : "Clips";
     const actions = editing ? api.quickActions() : [{ id:"open-folder", label:"Open clips folder", icon:"action/folder-open" }];
     const body = JSON.stringify({ actions });
     if (body === quickSent) return;
@@ -6000,7 +6003,9 @@ const CLIP_HOVER_PROFILES = {
     if (id === "open-folder") fetch(HELPER + "/open-clip-folder", { method:"POST", cache:"no-store" }).catch(() => {});
   };
   // the editor opening or closing changes the list
-  new MutationObserver(publishQuickActions).observe(trimVeil, { attributes:true, attributeFilter:["class"] });
+  const editorStatusObserver = new MutationObserver(publishQuickActions);
+  editorStatusObserver.observe(trimVeil, { attributes:true, attributeFilter:["class"] });
+  editorStatusObserver.observe(trimProcessingVeil, { attributes:true, attributeFilter:["class"] });
   publishQuickActions();
 
   // the ways out of the editor that this page has, whether it is loaded or still on its way

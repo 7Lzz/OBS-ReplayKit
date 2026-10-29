@@ -16,9 +16,12 @@ namespace ReplayKitHelper
             public double SrcEnd;
             // the file of another clip the piece is cut from; null for the source
             public string Path;
+            public double? Speed;
+            public VideoLook Look;
 
             // how long the piece is on the timeline, which the speed changes
-            public double Length(double speed) => (SrcEnd - SrcStart) / speed;
+            public double Rate(double speed) => Speed ?? speed;
+            public double Length(double speed) => (SrcEnd - SrcStart) / Rate(speed);
         }
 
         // what ffprobe says about the video of the source, which the black parts have to match
@@ -49,7 +52,7 @@ namespace ReplayKitHelper
             start = end = 0;
             if (Pieces.Count != 1) return false;
             var piece = Pieces[0];
-            if (piece.Path != null || piece.At > Start || piece.At + piece.Length(1) < End) return false;
+            if (piece.Path != null || piece.Look != null || Math.Abs(piece.Rate(1) - 1) > 1e-6 || piece.At > Start || piece.At + piece.Length(1) < End) return false;
             start = piece.SrcStart + Start - piece.At;
             end = piece.SrcStart + End - piece.At;
             return true;
@@ -111,6 +114,20 @@ namespace ReplayKitHelper
                     && piece.At >= -86400 && piece.At <= 86400
                     && piece.SrcStart >= 0 && piece.SrcEnd - piece.SrcStart >= 0.01 && piece.SrcEnd <= length + 0.1;
                 if (!valid) { error = "Bad video edit"; return null; }
+                var rate = po["speed"];
+                if (rate != null)
+                {
+                    if (rate.Type != JTokenType.Float && rate.Type != JTokenType.Integer) { error = "Bad video speed"; return null; }
+                    double value = rate.Value<double>();
+                    if (!Finite(value) || value < 0.1 || value > 5) { error = "Bad video speed"; return null; }
+                    piece.Speed = value;
+                }
+                var look = po["look"];
+                if (look != null)
+                {
+                    piece.Look = VideoLook.Parse(look, out error);
+                    if (piece.Look == null) return null;
+                }
                 plan.Pieces.Add(piece);
             }
             plan.Pieces.Sort((a, b) => a.At.CompareTo(b.At));
@@ -128,7 +145,6 @@ namespace ReplayKitHelper
             var chains = new List<string>();
             var labels = new List<string>();
             double cursor = Start;
-            string speedFilter = Math.Abs(speed - 1) > 1e-6 ? ",setpts=(PTS-STARTPTS)/" + Num(speed) : ",setpts=PTS-STARTPTS";
             Action<double, double> black = (a, b) =>
             {
                 string label = "v" + labels.Count;
@@ -145,12 +161,15 @@ namespace ReplayKitHelper
                 if (b - a < 0.001) continue;
                 if (a > cursor + 0.004) black(cursor, a);
                 // the part of the piece that lies inside the saved clip, in seconds of the source
-                double srcA = piece.SrcStart + (a - pieceStart) * speed;
-                double srcB = piece.SrcStart + (b - pieceStart) * speed;
+                double rate = piece.Rate(speed);
+                double srcA = piece.SrcStart + (a - pieceStart) * rate;
+                double srcB = piece.SrcStart + (b - pieceStart) * rate;
+                string speedFilter = Math.Abs(rate - 1) > 1e-6 ? ",setpts=(PTS-STARTPTS)/" + Num(rate) : ",setpts=PTS-STARTPTS";
                 string label = "v" + labels.Count;
                 int input = piece.Path == null ? inputIndex : firstOther + OtherClips.FindIndex(p => string.Equals(p, piece.Path, StringComparison.OrdinalIgnoreCase));
                 string fit = piece.Path == null ? "" : Fit(info);
-                chains.Add("[" + input + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + fit + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
+                string look = piece.Look != null ? "," + piece.Look.Filter(info.Width, info.Height) : "";
+                chains.Add("[" + input + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + fit + look + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
                 cursor = b;
             }

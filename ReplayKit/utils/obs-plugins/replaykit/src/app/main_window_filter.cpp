@@ -2,6 +2,11 @@
 #include "prelude.hpp"
 #include "app/main_window_filter.hpp"
 
+#include <QScopedValueRollback>
+#include <QScopeGuard>
+#include <QWindowStateChangeEvent>
+#include <util/config-file.h>
+
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/idle_memory.hpp"
@@ -46,6 +51,24 @@ protected:
 			return false;
 
 		const QEvent::Type type = event->type();
+		if (type == QEvent::WindowStateChange && !forwardingMinimize && g_shellOn && ShellEditorActive() && m_mw->isMinimized()) {
+			config_t *config = obs_frontend_get_user_config();
+			if (config && config_get_bool(config, "BasicWindow", "SysTrayMinimizeToTray")) {
+				const bool hadUserValue = config_has_user_value(config, "BasicWindow", "SysTrayMinimizeToTray");
+				config_set_bool(config, "BasicWindow", "SysTrayMinimizeToTray", false);
+				const auto restore = qScopeGuard([config, hadUserValue]() {
+					if (hadUserValue)
+						config_set_bool(config, "BasicWindow", "SysTrayMinimizeToTray", true);
+					else
+						config_remove_value(config, "BasicWindow", "SysTrayMinimizeToTray");
+				});
+				QScopedValueRollback<bool> forwarding(forwardingMinimize, true);
+				// let obs suspend its preview without routing this minimize through the tray
+				QWindowStateChangeEvent forwarded(static_cast<QWindowStateChangeEvent *>(event)->oldState());
+				QCoreApplication::sendEvent(m_mw, &forwarded);
+				return true;
+			}
+		}
 		if (type == QEvent::Show || type == QEvent::Hide || type == QEvent::WindowStateChange)
 			IdleMemory::WindowChanged(m_mw);
 		if (type == QEvent::Move || type == QEvent::Resize) {
@@ -100,6 +123,7 @@ private:
 	}
 	const UINT m_taskbarCreated = RegisterWindowMessageW(L"TaskbarButtonCreated");
 	bool m_iconRefreshQueued = false;
+	bool forwardingMinimize = false;
 	QWidget *m_mw;
 };
 

@@ -2199,13 +2199,13 @@
   #trim-veil .trim-video-wrap:not(:fullscreen) .trim-seek-overlay { display: none; }
   .tl-toolbar .trim-volume-control { position: static; opacity: 1; }
   /* the volume in the toolbar is always open, its slider showing */
-  .tl-toolbar .volume-control { width: 124px; background: transparent; }
+  .tl-toolbar .volume-control { flex: 0 0 124px; width: 124px; height: 28px; background: transparent; transition: background-color 90ms linear; }
   .tl-toolbar .volume-control:hover { width: 124px; background: rgba(var(--text-rgb), .08); }
   .tl-toolbar .volume-slider-wrap { opacity: 1; }
-  .tl-toolbar .volume-btn { color: var(--text); }
-  .tl-toolbar .icon-btn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
+  .tl-toolbar .volume-btn { flex: 0 0 32px; width: 32px; height: 28px; color: var(--text); }
+  .tl-toolbar .icon-btn { flex: 0 0 32px; width: 32px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
   .tl-toolbar .icon-btn:hover { background: rgba(var(--text-rgb), .08); }
-  .tl-toolbar .icon-btn svg { width: 16px; height: 16px; fill: currentColor; }
+  .tl-toolbar .icon-btn svg, .tl-toolbar .volume-btn svg { width: 17px; height: 17px; fill: currentColor; }
   .editor-side {
     min-width: 0;
     min-height: 0;

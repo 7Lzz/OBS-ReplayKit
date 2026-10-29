@@ -151,7 +151,7 @@ void ShellHideMainWindowToTray()
 		return;
 	SaveWindowGeometry("obsMainWindow", mw);
 	QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
-	if (!(tray && tray->isVisible() && ToggleMainWindowShowing()))
+	if (ShellEditorActive() || !(tray && tray->isVisible() && ToggleMainWindowShowing()))
 		mw->showMinimized();
 	AnchoredPanel::HideOwnedBy(mw);
 }

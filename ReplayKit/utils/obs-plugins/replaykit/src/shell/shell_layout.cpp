@@ -372,6 +372,11 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 		case QEvent::Resize:
 		case QEvent::WindowStateChange:
 			if (event->type() == QEvent::WindowStateChange) {
+				if (g_shellHost) {
+					const bool minimizedEditor = m_mw->isMinimized() && ShellEditorActive();
+					const bool showing = m_mw->isVisible() && !m_mw->isMinimized();
+					ShellRunJs(g_shellHost->browser, showing ? "window.RKShell && RKShell.windowShown(true);" : minimizedEditor ? "window.RKShell && RKShell.windowShown(false, true);" : "window.RKShell && RKShell.windowShown(false);");
+				}
 				ShellSyncFrameMargins(g_shellHwnd);
 				// whoever asked for the maximize (obs restoring its saved state, a shortcut) went through qt, which only resizes
 				QTimer::singleShot(0, g_callbacks, []() { ShellMakeMaximizeReal(); });

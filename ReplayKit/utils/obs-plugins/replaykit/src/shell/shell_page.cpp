@@ -3,6 +3,7 @@
 #include "shell/shell_page.hpp"
 
 #include "core/cef_host.hpp"
+#include "core/main_window.hpp"
 #include "core/theme.hpp"
 #include "shell/shell_views.hpp"
 
@@ -33,7 +34,9 @@ void ShellPage::showEvent(QShowEvent *event)
 void ShellPage::hideEvent(QHideEvent *event)
 {
 	QWidget::hideEvent(event);
-	ShellRunJs(browser, "window.RKShell && RKShell.windowShown(false);");
+	QMainWindow *window = ObsMainWindowQt();
+	const bool minimizedEditor = window && window->isMinimized() && ShellEditorActive();
+	ShellRunJs(browser, minimizedEditor ? "window.RKShell && RKShell.windowShown(false, true);" : "window.RKShell && RKShell.windowShown(false);");
 }
 
 } // namespace rk
