@@ -11,6 +11,5 @@ bool ShellEnableFrame(QMainWindow *mw);
 void ShellBuild();
 void ShellStart();
 void ShellStop();
-void ShellWarmAgain();
 
 } // namespace rk

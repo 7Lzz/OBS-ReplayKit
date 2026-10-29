@@ -20,6 +20,21 @@ bool ToggleMainWindowShowing()
 	return mw && QMetaObject::invokeMethod(mw, "ToggleShowHide", Qt::DirectConnection);
 }
 
+bool ShowMainWindow()
+{
+	QMainWindow *mw = ObsMainWindowQt();
+	if (!mw)
+		return false;
+	if (!mw->isVisible()) {
+		ToggleMainWindowShowing();
+		if (!mw->isVisible())
+			mw->show();
+	}
+	if (mw->isMinimized())
+		ShowWindow((HWND)mw->winId(), SW_RESTORE);
+	return mw->isVisible() && !mw->isMinimized();
+}
+
 // obs_frontend_get_main_window() is the only language-neutral way to identify obss real main window -- its title is a localized template ("<version> - profile: ... - scenes: ...") with no fixed substring a non-english build still renders, which is what broke the helpers old title-matching close. captured once, not on the projector timer, since the handle never changes for the life of the process; the pipe thread sends it to the helper on each (re)connect.
 void PublishMainWindow()
 {

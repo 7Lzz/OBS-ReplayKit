@@ -8,6 +8,7 @@
 #include "core/async.hpp"
 #include "core/crash_reporter.hpp"
 #include "core/ipc_pipe.hpp"
+#include "core/idle_memory.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
 #include "core/state.hpp"
@@ -52,6 +53,7 @@ void obs_module_unload(void)
 	obs_frontend_remove_event_callback(OnFrontendEvent, nullptr);
 	SdkStopFocusTrace();
 	StopPipeServer();
+	IdleMemory::Stop();
 	StopWorkers();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;

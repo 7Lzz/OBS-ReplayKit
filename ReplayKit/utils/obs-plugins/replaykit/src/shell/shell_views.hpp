@@ -33,9 +33,7 @@ void ShellProbeHost(bool suspicious);
 void ShellHostPong(int n);
 // brings the shell page back from the start, the way it is after a launch
 void ShellReloadHost();
-// the window went to the tray or came back: after a while hidden the shell and popup browsers are parked, and showing the window brings them back
-void ShellHostWindowShown(bool shown);
-bool ShellHostParked();
+bool ShellBringMainWindowForward();
 void ShellOpenView(ShellView view, bool quiet);
 // puts the keyboard on the browser of the shell when the window of obs is the one in front, so a page gets its keys without a click on it first; true when the browser has the keyboard afterwards
 bool ShellFocusBrowser();
@@ -47,6 +45,7 @@ void ShellCloseView(ShellView view);
 // the settings page answered the unsaved-changes prompt with save or leave, and the view it held back goes ahead
 void ShellLeaveSettings(const std::string &target);
 void ShellSetClipsFullscreen(bool active);
+bool ShellEditorActive();
 // tells the clips view a clip save started or ended, args being the json array of the state and the saved file name
 void ShellClipSaving(const std::string &args);
 

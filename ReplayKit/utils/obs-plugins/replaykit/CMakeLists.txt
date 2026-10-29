@@ -35,6 +35,7 @@ set(REPLAYKIT_SOURCES
     src/core/dev_log.cpp
     src/core/draw_util.cpp
     src/core/helper_client.cpp
+    src/core/idle_memory.cpp
     src/core/ipc_pipe.cpp
     src/core/json_lite.cpp
     src/core/keybind_label.cpp
@@ -112,6 +113,8 @@ target_link_libraries(replaykit PRIVATE
     ole32
     shell32
     dwmapi
+    iphlpapi
+    psapi
     "${OBS_IMPLIB_DIR}/obs.lib"
     "${OBS_IMPLIB_DIR}/obs-frontend-api.lib"
 )

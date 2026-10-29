@@ -4,6 +4,7 @@
 
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
+#include "core/idle_memory.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
@@ -45,6 +46,8 @@ protected:
 			return false;
 
 		const QEvent::Type type = event->type();
+		if (type == QEvent::Show || type == QEvent::Hide || type == QEvent::WindowStateChange)
+			IdleMemory::WindowChanged(m_mw);
 		if (type == QEvent::Move || type == QEvent::Resize) {
 			ScheduleObsMainGeometrySave();
 			return false; // observe only, never consume
@@ -115,6 +118,7 @@ void InstallMainWindowCloseFilter()
 	auto *filter = new MainWindowCloseFilter(mw);
 	mw->installEventFilter(filter);
 	g_mainWindowCloseFilter = filter;
+	IdleMemory::WindowChanged(mw);
 
 	// grab obss own icons now, while the main window is up and untouched, so a restore/aux-window path never finds them null.
 	CaptureAppIconDefaults();

@@ -19,6 +19,7 @@
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
+#include "core/idle_memory.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "notify/notify_tip.hpp"
@@ -94,7 +95,7 @@ QJsonObject UiState(const QJsonObject &)
 	out["warmUp"] = QJsonObject{{"panels", AnchoredPanel::WarmReport()}, {"storageCard", StorageModalWarmReport()}};
 	out["popupHost"] = PopupHost::Probe();
 	out["clipBuffer"] = ClipBufferProbe();
-	out["hostParked"] = ShellHostParked();
+	out["hostParked"] = false;
 	out["pageHostReady"] = g_hostReady;
 	out["setupPending"] = g_setupPending;
 	out["setupLocked"] = ShellSetupLocked();
@@ -155,8 +156,8 @@ QJsonObject UiWindow(const QJsonObject &args)
 	if (!mw)
 		return Fail(QStringLiteral("The window of obs is not there."));
 	if (mode == "show") {
-		if (!mw->isVisible())
-			ToggleMainWindowShowing();
+		if (!ShellBringMainWindowForward())
+			return Fail(QStringLiteral("OBS could not be brought forward."));
 	} else if (mode == "hide") {
 		if (mw->isVisible())
 			ToggleMainWindowShowing();
@@ -164,6 +165,14 @@ QJsonObject UiWindow(const QJsonObject &args)
 		return Fail(QStringLiteral("args.mode is show or hide."));
 	}
 	return UiState(QJsonObject());
+}
+
+QJsonObject UiBringForward(const QJsonObject &)
+{
+	const bool broughtForward = ShellBringMainWindowForward();
+	QJsonObject result = UiState(QJsonObject());
+	result["broughtForward"] = broughtForward;
+	return result;
 }
 
 // the reload the watchdog does when the page stops answering, run on request so it can be tried without a crash
@@ -444,9 +453,11 @@ void RegisterBuiltins()
 {
 	SdkRegister("commands", "the commands of the native plugin", Commands);
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
+	SdkRegister("memory.state", "committed and resident memory before and after the last hidden-window cleanup", [](const QJsonObject &) { return IdleMemory::Probe(); });
 	SdkRegister("ui.view", "shows a view: args.view is home, projector, clips, settings, setup or obs-settings", UiView);
 	SdkRegister("ui.popup", "opens a shell popup using args.name: account, notifications, clip, record, storage, reader (args.id) or close; reports the shared surface", UiPopup);
 	SdkRegister("ui.window", "shows the window of obs or sends it to the tray: args.mode is show or hide", UiWindow);
+	SdkRegister("ui.bring-forward", "restores and raises the obs window, and reports whether it became visible", UiBringForward);
 	SdkRegister("ui.reload-page", "reloads the page of the shell browser the way the watchdog does when it stops answering", UiReloadPage);
 	SdkRegister("ui.preview", "turns the preview on or off: args.on", UiPreview);
 	SdkRegister("ui.lock", "locks or unlocks the scene in the preview: args.on", UiLock);

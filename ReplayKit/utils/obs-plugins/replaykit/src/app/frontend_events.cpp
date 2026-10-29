@@ -1,6 +1,7 @@
 // reacts to obs frontend events and wires the plugin together
 #include "prelude.hpp"
 #include "app/frontend_events.hpp"
+#include "core/idle_memory.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -38,6 +39,7 @@ namespace {
 // synchronously deletes our cef widgets before obs_module_unload, mirroring how OBSBasic.cpp deletes extraBrowsers early, to dodge upstream race obsproject/obs-browser#353 where cef can still be mid-teardown when the browser-manager thread is joined -- direct delete not deleteLater becuase a deferred one wouldnt run before applicationShutdown anyway
 void CloseCefWidgetsBeforeShutdown()
 {
+	IdleMemory::Stop();
 	AnchoredPanel::DestroyAll();
 	StorageModalDestroy();
 	NotifyReaderDestroy();

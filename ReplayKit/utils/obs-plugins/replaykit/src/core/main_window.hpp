@@ -8,6 +8,7 @@ namespace rk {
 QMainWindow *ObsMainWindowQt();
 // hides or shows the window through the toggle slot of obs, false when this obs build has none
 bool ToggleMainWindowShowing();
+bool ShowMainWindow();
 void PublishMainWindow();
 
 } // namespace rk

@@ -309,8 +309,6 @@
   function windowShown(up) {
     windowUp = !!up;
     dispatchAll();
-    // the page on display was unloaded while the window sat in the tray, so it comes back behind the placeholder
-    if (windowUp && active && !frames[active]) show(active);
   }
 
   // a veil with a spinner over whatever page is showing, for as long as the plugin builds a native window; false takes it away
@@ -361,14 +359,14 @@
     fetch(HELPER + "/shell/leave-settings?to=" + encodeURIComponent(target), { method: "POST", cache: "no-store" }).catch(function () {});
   }
 
-  // a view out of sight for this long is dropped, and show() loads it again behind the placeholder the next time it is asked for. the page on display stays while the window is up, also under the preview, and goes too once the window has sat in the tray that long; a page that says it holds work of its own (__rkCanUnload) always stays
+  // keep the last displayed page warm in the tray; inactive views can go unless they still hold work
   var IDLE_UNLOAD_MS = 30000;
   function sweep() {
     var now = performance.now();
     Object.keys(frames).forEach(function (k) {
       var f = frames[k];
       var onDisplay = k === active || k === wanted || f.el.classList.contains("on");
-      if ((windowUp && (k === entering || onDisplay)) || f.seen === undefined) { f.seen = now; return; }
+      if (k === entering || onDisplay || f.seen === undefined) { f.seen = now; return; }
       if (!f.loaded || now - f.seen < IDLE_UNLOAD_MS) return;
       try {
         var w = f.el.contentWindow;
@@ -378,8 +376,6 @@
       delete frames[k];
       f.el.remove();
     });
-    // with no view left the plugin may park this whole browser while the window sits in the tray
-    if (!Object.keys(frames).length && document.title !== "rk-status:empty") document.title = "rk-status:empty";
   }
   setInterval(sweep, 5000);
 

@@ -93,13 +93,6 @@ void ShellTick()
 
 } // namespace
 
-// the popup browser was parked and loads its pages again, so the menus are warmed the way they are after a launch
-void ShellWarmAgain()
-{
-	g_warmDone = false;
-	g_warmSince.invalidate();
-}
-
 // keybind chips, clip length and theme colours arrive on the 1s settings poll
 void ShellApplySettings(const std::string &settingsBody)
 {

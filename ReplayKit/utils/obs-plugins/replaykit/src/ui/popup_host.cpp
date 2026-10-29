@@ -21,7 +21,6 @@ QSet<QString> ready;
 const void *active = nullptr;
 QString activeUrl;
 std::function<void()> suspend;
-bool parked = false;
 
 QString Page(const QString &url)
 {
@@ -37,7 +36,7 @@ QString Page(const QString &url)
 
 void Call(const char *method, const QJsonArray &args)
 {
-	if (!browser || parked)
+	if (!browser)
 		return;
 	QByteArray values = QJsonDocument(args).toJson(QJsonDocument::Compact);
 	values = values.mid(1, values.size() - 2);
@@ -166,29 +165,14 @@ void PopupHost::Destroy()
 	activeUrl.clear();
 	suspend = nullptr;
 	ready.clear();
-	parked = false;
 	if (window)
 		delete window.data();
 	browser.clear();
 }
 
-void PopupHost::Park()
-{
-	if (!browser || active || parked)
-		return;
-	parked = true;
-	ready.clear();
-	browser->closeBrowser();
-}
-
-void PopupHost::Unpark()
-{
-	parked = false;
-}
-
 QJsonObject PopupHost::Probe()
 {
-	return {{"built", !window.isNull()}, {"visible", window && window->isVisible()}, {"parked", parked}, {"page", Page(activeUrl)},
+	return {{"built", !window.isNull()}, {"visible", window && window->isVisible()}, {"parked", false}, {"page", Page(activeUrl)},
 		{"readyPages", ready.size()}, {"surface", window ? QString::number(quintptr(window->internalWinId()), 16) : QString()}};
 }
 

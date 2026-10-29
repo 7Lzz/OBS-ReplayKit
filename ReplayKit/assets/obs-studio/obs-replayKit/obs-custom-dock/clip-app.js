@@ -321,7 +321,7 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -5861,7 +5861,7 @@ const CLIP_HOVER_PROFILES = {
 
   // tooltips come from the shared _tooltip partial; the page-specific rule is that a trigger goes quiet while its own menu is open, since the panel already says what it is -- the 3-dot tip used to sit on top of the menus first row and hide it
   if (window.RKTooltip) {
-    RKTooltip.suppressWhen((btn) => (btn === sortButton && sortWrap && sortWrap.classList.contains("is-open")) || (btn.classList.contains("menu-btn") && !!btn.closest(".card.menu-open")));
+  RKTooltip.suppressWhen((btn) => (btn === sortButton && sortWrap && sortWrap.classList.contains("is-open")) || (btn.classList.contains("menu-btn") && !!btn.closest(".card.menu-open, .screenshot-card.menu-open")));
   }
 
   // keep the buttons enabled/disabled state in sync with the current clip list every render.

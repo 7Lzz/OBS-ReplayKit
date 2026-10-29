@@ -465,11 +465,6 @@
     var shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      var message = gl.getShaderInfoLog(shader) || "shader";
-      gl.deleteShader(shader);
-      throw new Error(message);
-    }
     return shader;
   }
 
@@ -477,20 +472,18 @@
     "uLookOn", "uLookM", "uLookOff", "uLookMo", "uLookGamma", "uLookContrast", "uSepia", "uInvert", "uSolar", "uPoster", "uThermal", "uVignette", "uNoise", "uScanPer", "uScanTh", "uScanA"];
 
   // a drawing context for the shader on a canvas; null where webgl2 is missing or only drawn by the processor, which could not keep up with it
-  function build(canvas) {
+  function build(canvas, ready) {
     var gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true });
     if (!gl) return null;
     var info = gl.getExtension("WEBGL_debug_renderer_info");
     var renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "") : "";
     if (/swiftshader|llvmpipe|software/i.test(renderer)) return null;
+    var parallel = gl.getExtension("KHR_parallel_shader_compile");
     var p = gl.createProgram();
     var v = compile(gl, gl.VERTEX_SHADER, VERTEX), f = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT);
     gl.attachShader(p, v);
     gl.attachShader(p, f);
     gl.linkProgram(p);
-    gl.deleteShader(v);
-    gl.deleteShader(f);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || "program");
     var t = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -498,13 +491,43 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    var u = {};
-    UNIFORMS.forEach(function (n) { u[n] = gl.getUniformLocation(p, n); });
-    return { gl: gl, program: p, texture: t, vao: gl.createVertexArray(), u: u, uploaded: null };
+    var g = { gl: gl, program: p, texture: t, vao: gl.createVertexArray(), u: null, uploaded: null, shaders: [v, f], ready: false, poll: 0, disposed: false };
+    function fail(message) {
+      dispose(g);
+      if (ready) ready(null, message);
+    }
+    function finish() {
+      g.poll = 0;
+      if (g.disposed) return;
+      if (parallel && !gl.getProgramParameter(p, parallel.COMPLETION_STATUS_KHR)) {
+        g.poll = setTimeout(finish, 16);
+        return;
+      }
+      var shaderError = g.shaders.map(function (shader) {
+        return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? "" : gl.getShaderInfoLog(shader) || "shader";
+      }).filter(Boolean).join("\n");
+      if (shaderError || !gl.getProgramParameter(p, gl.LINK_STATUS)) {
+        fail(shaderError || gl.getProgramInfoLog(p) || "program");
+        return;
+      }
+      g.shaders.forEach(function (shader) { gl.deleteShader(shader); });
+      g.shaders = null;
+      g.u = {};
+      UNIFORMS.forEach(function (n) { g.u[n] = gl.getUniformLocation(p, n); });
+      g.ready = true;
+      if (ready) ready(g);
+    }
+    g.poll = setTimeout(finish, 16);
+    return g;
   }
 
   function dispose(g) {
-    if (!g) return;
+    if (!g || g.disposed) return;
+    g.disposed = true;
+    if (g.poll) clearTimeout(g.poll);
+    g.poll = 0;
+    if (g.shaders) g.shaders.forEach(function (shader) { g.gl.deleteShader(shader); });
+    g.shaders = null;
     // A current program remains alive after deletion until it is unbound.
     g.gl.useProgram(null);
     g.gl.bindVertexArray(null);
@@ -521,6 +544,7 @@
 
   // draws the picture of source (a video or an image) through the numbers of resolve into the canvas of g, letterboxed the way object-fit contain shows it. upload false reuses the frame already sent; blank draws a black frame of the same size, which is what a gap between the pieces of the video is
   function render(g, source, r, width, height, upload, time, blank) {
+    if (!g || !g.ready) return false;
     var gl = g.gl;
     var vw = source.videoWidth || source.naturalWidth || source.width, vh = source.videoHeight || source.naturalHeight || source.height;
     if (!vw || !vh) return false;
@@ -612,14 +636,36 @@
     video.insertAdjacentElement("afterend", canvas);
     var g = null;
     var capable = null, destroyed = false, context = null;
-    function supported() {
-      if (destroyed) return false;
-      if (capable === null) {
-        try { g = build(canvas); } catch (e) { g = null; }
+    function built(candidate, result) {
+      if (destroyed || g !== candidate) return;
+      if (!result) {
+        g = null; capable = false; context = null; current = null;
+        canvas.hidden = true; delete video.dataset.rkFxOwned;
+        if (els.support) els.support.textContent = "This computer cannot show the look on the preview. The saved copy still gets it.";
+        return;
+      }
+      context = result.gl;
+      if (!current || document.hidden) return;
+      canvas.hidden = false;
+      video.dataset.rkFxOwned = "1";
+      if (!handle && typeof video.requestVideoFrameCallback === "function") handle = video.requestVideoFrameCallback(loop);
+      redraw();
+    }
+    function ensure() {
+      if (destroyed || capable === false) return false;
+      if (!g) {
+        var candidate;
+        try { candidate = build(canvas, function (result) { built(candidate, result); }); }
+        catch (e) { candidate = null; }
+        g = candidate;
         capable = !!g;
         context = g && g.gl;
       }
-      return capable;
+      return !!g;
+    }
+    function supported() {
+      if (destroyed) return false;
+      return ensure();
     }
     var current = null;
     var handle = 0;
@@ -665,14 +711,13 @@
     }
     function set(resolved) {
       if (destroyed) return;
-      current = resolved && !isIdentity(resolved) && supported() ? resolved : null;
+      current = resolved && !isIdentity(resolved) && ensure() ? resolved : null;
       if (!current || document.hidden) {
         release(); canvas.hidden = true; delete video.dataset.rkFxOwned;
         return;
       }
-      if (!g) { try { g = build(canvas); } catch (e) { g = null; } }
-      canvas.hidden = !g;
-      if (!g) { delete video.dataset.rkFxOwned; return; }
+      if (!g || !g.ready) { canvas.hidden = true; return; }
+      canvas.hidden = false;
       context = g.gl;
       video.dataset.rkFxOwned = "1";
       if (!handle && typeof video.requestVideoFrameCallback === "function") handle = video.requestVideoFrameCallback(loop);
@@ -707,27 +752,46 @@
     var canvas = document.createElement("canvas");
     var g = null;
     var capable = null;
-    function supported() {
-      if (capable === null) {
-        try { g = build(canvas); } catch (e) { g = null; }
+    var pending = null;
+    function ensure() {
+      if (capable === false) return null;
+      if (!g) {
+        var candidate;
+        try {
+          candidate = build(canvas, function (result) {
+            if (g !== candidate) return;
+            if (!result) { g = null; capable = false; pending = null; return; }
+            var next = pending;
+            pending = null;
+            if (next) draw(next.video, next.list);
+          });
+        } catch (e) { candidate = null; }
+        g = candidate;
         capable = !!g;
       }
-      return capable;
+      return g;
+    }
+    function supported() {
+      return !!ensure();
+    }
+    function draw(video, list) {
+      if (document.hidden || !video.videoWidth || video.readyState < 2) return false;
+      var active = ensure();
+      if (!active) return false;
+      if (!active.ready) { pending = { video: video, list: list }; return false; }
+      list.forEach(function (item, i) {
+        var w = item.canvas.width, h = item.canvas.height;
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        render(active, video, item.resolved, w, h, i === 0, 0, false);
+        item.canvas.getContext("2d").drawImage(canvas, 0, 0, w, h);
+      });
+      return true;
     }
     return {
       supported: supported,
-      clear: function () { dispose(g); g = null; canvas.width = canvas.height = 1; },
+      clear: function () { pending = null; dispose(g); g = null; capable = null; canvas.width = canvas.height = 1; },
       draw: function (video, list) {
-        if (document.hidden || !video.videoWidth || video.readyState < 2 || !supported()) return false;
-        if (!g) { try { g = build(canvas); } catch (e) { g = null; } }
-        if (!g) return false;
-        list.forEach(function (item, i) {
-          var w = item.canvas.width, h = item.canvas.height;
-          if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-          render(g, video, item.resolved, w, h, i === 0, 0, false);
-          item.canvas.getContext("2d").drawImage(canvas, 0, 0, w, h);
-        });
-        return true;
+        return draw(video, list);
       },
     };
   }
@@ -1301,7 +1365,7 @@
       });
       if (wasOpen && els.lastPane && els.lastPane !== view) slideIn(shownNode);
       els.lastPane = view;
-      els.support.textContent = preview.supported() ? "" : "This computer cannot show the look on the preview. The saved copy still gets it.";
+      els.support.textContent = !isIdentity(resolve(lanes.fx.main())) && !preview.supported() ? "This computer cannot show the look on the preview. The saved copy still gets it." : "";
       if (ed) {
         els.editName.textContent = def[1];
         els.editLabel.textContent = ed.kind === "filter" ? "Intensity" : "Strength";

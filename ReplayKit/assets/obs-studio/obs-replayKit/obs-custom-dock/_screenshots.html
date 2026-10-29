@@ -115,7 +115,9 @@ window.RKScreenshots = {
     }
     function rename(card, row) {
       const nameSpan = card.querySelector(".name");
+      if (!nameSpan) return;
       const titleRow = card.querySelector(".title-row");
+      const moving = [card.querySelector(".edit-btn"), card.querySelector(".title-actions")];
       const base = row.name.replace(/\.png$/i, "");
       const input = document.createElement("input");
       input.type = "text";
@@ -125,12 +127,19 @@ window.RKScreenshots = {
       const ext = document.createElement("span");
       ext.className = "name-edit-ext";
       ext.textContent = ".png";
-      titleRow.replaceChild(input, nameSpan);
-      titleRow.insertBefore(ext, input.nextSibling);
+      options.flip(moving, () => {
+        titleRow.replaceChild(input, nameSpan);
+        titleRow.insertBefore(ext, input.nextSibling);
+      });
+      input.animate([{ opacity:0 }, { opacity:1 }], { duration:150, easing:"ease-out" });
       input.focus();
       input.select();
       let settled = false;
-      const back = () => { if (input.parentNode) titleRow.replaceChild(nameSpan, input); ext.remove(); options.changed(); };
+      const back = () => {
+        options.flip(moving, () => { if (input.parentNode) titleRow.replaceChild(nameSpan, input); ext.remove(); });
+        paint();
+        options.changed();
+      };
       async function commit() {
         if (settled) return;
         settled = true;

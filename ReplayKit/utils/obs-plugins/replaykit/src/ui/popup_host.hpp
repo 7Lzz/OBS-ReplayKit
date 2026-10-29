@@ -25,9 +25,6 @@ public:
 	static void Release(const void *owner);
 	static void Reload(const QString &url);
 	static void Destroy();
-	// the browser is closed while nothing uses it, the way obs closes the browser of a hidden dock; the widget stays, and builds a new browser at its pages the next time the warm-up shows it
-	static void Park();
-	static void Unpark();
 	static QJsonObject Probe();
 };
 
