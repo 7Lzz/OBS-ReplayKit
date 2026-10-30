@@ -538,7 +538,7 @@ namespace ReplayKitHelper
             for (int k = 0; k < rendering.Names.Count; k++) argv.AddRange(new[] { "-metadata:s:a:" + k, "handler_name=" + rendering.Names[k] });
         }
 
-        // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
+        // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i, read from a keyframe near the cut when TrimSeek finds one that decodes the same frames) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
         public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1, RenderOptions render = null)
         {
             JObject sourceCapture = null;
@@ -589,7 +589,9 @@ namespace ReplayKitHelper
             var token = JobCoordinator.Token(requestId);
 
 
-            string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
+            var tools = Compression.GetToolPaths();
+            string ffmpeg = tools["ffmpeg"]?.Value<string>();
+            string ffprobePath = tools["ffprobe"]?.Value<string>();
             if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "FFmpeg is missing or unavailable. Use Settings > Check for Updates or run the ReplayKit installer again to repair the video tools." };
 
             string ext = screenshot ? ".png" : Path.GetExtension(source.Name);
@@ -671,6 +673,11 @@ namespace ReplayKitHelper
                     directReadStart = Math.Max(0, directStart - 1);
                 }
             }
+            // a put together video reads the source from a keyframe near its first piece when that decodes the same frames, and its audio then comes from a read of its own from the start, the way a plain cut with an audio plan reads it
+            decimal? composedSeek = null;
+            if (composed && !screenshot && videoPlan.SourceSpan(videoSpeed, out double spanFirst, out double spanLast))
+                composedSeek = TrimSeek.Find(ffprobePath, source.Full, (decimal)spanFirst, (decimal)spanLast, token);
+            bool audioApart = !composed || composedSeek != null;
             if (screenshot && (frameTime < windowStart || frameTime >= windowEnd))
                 return new TrimResult { Ok = false, Message = "The screenshot time is outside the saved part of the video" };
             if (screenshot)
@@ -700,7 +707,7 @@ namespace ReplayKitHelper
                 if (plan == null) return new TrimResult { Ok = false, Message = planError };
                 // each file brought in is a read of its own after the reads of the source, and a file that left the cache since it was added stops the trim before anything is made
                 var importInputs = new Dictionary<int, int>();
-                int nextInput = composed ? 1 : audioCount > 0 ? 2 : 1;
+                int nextInput = !audioApart ? 1 : audioCount > 0 ? 2 : 1;
                 foreach (var import in plan.Imports)
                 {
                     string importFile = AudioImports.PathFor(import.Id);
@@ -709,7 +716,7 @@ namespace ReplayKitHelper
                     importInputs[import.Src] = nextInput++;
                 }
                 // the plan lives on the timeline of the saved clip, which is the source divided by the speed of the video
-                planned = plan.Build(windowStart, windowEnd, composed ? 0 : 1, Mp4Tracks.AudioSampleRates(source.Full), importInputs);
+                planned = plan.Build(windowStart, windowEnd, audioApart ? 1 : 0, Mp4Tracks.AudioSampleRates(source.Full), importInputs);
             }
             // the subtitles live in seconds of the saved clip, and the filter sees the frames in the time of the path that made them: from 0 when the video is put together, retimed or read seeked, and in the time of the source on the plain cut, which seeks after reading (an input seek there would start the video a moment after the copied audio), so those cues move by the start of the cut; measured on rendered frames. an edit whose subtitles all fall outside the clip burns nothing
             string subtitleDir = null;
@@ -723,10 +730,12 @@ namespace ReplayKitHelper
             }
             // the look goes on before the subtitles, which are drawn over the picture as it ends up
             string lookFilter = null;
+            bool lookTemporal = false;
             if (looked)
             {
                 var lookPlan = VideoLook.Parse(lookEdit, out string lookError);
                 if (lookPlan == null) return new TrimResult { Ok = false, Message = lookError };
+                lookTemporal = lookPlan.Temporal;
                 sourceInfo ??= ProbeVideo(source.Full);
                 if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
                 if (!framed) (frameW, frameH) = (sourceInfo.Width, sourceInfo.Height);
@@ -798,11 +807,13 @@ namespace ReplayKitHelper
             }
             else if (precise)
             {
-                // Multi-piece edits retain source timestamps; simple ranges seek before decoding, with audio plans on a separate unseeked input.
+                // put together videos cut their pieces by source time, read from the start or from a keyframe TrimSeek found; simple ranges seek before decoding, with audio plans on a separate read from the start
                 if (composed)
                 {
-                    argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full };
-                    argv.AddRange(PlanReads(composed, audioCount, source.Full, importArgs));
+                    argv = new List<string> { "-hide_banner", "-loglevel", "error" };
+                    if (composedSeek != null) argv.AddRange(new[] { "-ss", composedSeek.Value.ToString("0.######", CultureInfo.InvariantCulture) });
+                    argv.AddRange(new[] { "-i", source.Full });
+                    argv.AddRange(PlanReads(!(audioApart && hasPlan), audioCount, source.Full, importArgs));
                     if (layerPlan != null)
                     {
                         firstLayerInput = argv.Count(a => a == "-i");
@@ -823,7 +834,15 @@ namespace ReplayKitHelper
                 else if (retimed)
                     argv = new List<string> { "-hide_banner", "-loglevel", "error", "-ss", startStr, "-i", source.Full, "-t", outDurStr };
                 else
-                    argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full, "-ss", startStr, "-t", durStr };
+                {
+                    // the plain cut seeks after reading so the copied audio is cut where the video is; it starts reading at a keyframe near the cut when TrimSeek finds one that decodes the same frames, but not under a filter that carries state from frame to frame or subtitles timed from the start of the source
+                    decimal cutAt = decimal.Parse(startStr, CultureInfo.InvariantCulture);
+                    decimal? seek = subtitleFilter == null && render.Fps == 0 && !lookTemporal ? TrimSeek.Find(ffprobePath, source.Full, cutAt, cutAt + decimal.Parse(durStr, CultureInfo.InvariantCulture), token) : null;
+                    if (seek == null)
+                        argv = new List<string> { "-hide_banner", "-loglevel", "error", "-i", source.Full, "-ss", startStr, "-t", durStr };
+                    else
+                        argv = new List<string> { "-hide_banner", "-loglevel", "error", "-ss", seek.Value.ToString("0.######", CultureInfo.InvariantCulture), "-i", source.Full, "-ss", (cutAt - seek.Value).ToString("0.######", CultureInfo.InvariantCulture), "-t", durStr };
+                }
                 encoder = PickEditEncoder(ext);
                 if (render.BitrateKbps > 0) encoder.SetBitrate(render.BitrateKbps);
                 argv.AddRange(encoder.Args);
@@ -847,7 +866,7 @@ namespace ReplayKitHelper
                 }
                 if (composed)
                 {
-                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, frameW > 0 ? frameW : sourceInfo.Width, frameH > 0 ? frameH : sourceInfo.Height, subtitleFilter, frameFilter, out string finalLabel, renderFilter), finalLabel);
+                    AddComposedArgs(argv, videoPlan.BuildGraph(0, firstOtherInput, videoSpeed, sourceInfo, composedSeek ?? 0), planned, FinishGraph(lookFilter, layerPlan, firstLayerInput, frameW > 0 ? frameW : sourceInfo.Width, frameH > 0 ? frameH : sourceInfo.Height, subtitleFilter, frameFilter, out string finalLabel, renderFilter), finalLabel);
                 }
                 else if (hasPlan)
                 {

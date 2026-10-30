@@ -139,8 +139,53 @@ namespace ReplayKitHelper
             return plan;
         }
 
+        // a piece as far as it lies inside the saved clip: from A to B on the timeline, showing SrcA to SrcB of its clip
+        private struct Part
+        {
+            public Piece Piece;
+            public double A, B, SrcA, SrcB;
+        }
+
+        private IEnumerable<Part> Parts(double speed)
+        {
+            foreach (var piece in Pieces)
+            {
+                double pieceStart = piece.At;
+                double pieceEnd = piece.At + piece.Length(speed);
+                if (pieceEnd <= Start + 0.001 || pieceStart >= End - 0.001) continue;
+                double a = Math.Max(pieceStart, Start);
+                double b = Math.Min(pieceEnd, End);
+                if (b - a < 0.001) continue;
+                double rate = piece.Rate(speed);
+                yield return new Part { Piece = piece, A = a, B = b, SrcA = piece.SrcStart + (a - pieceStart) * rate, SrcB = piece.SrcStart + (b - pieceStart) * rate };
+            }
+        }
+
+        // the first and last second of the source that the saved clip shows; false when it shows none of the source
+        public bool SourceSpan(double speed, out double first, out double last)
+        {
+            first = double.MaxValue;
+            last = double.MinValue;
+            foreach (var part in Parts(speed))
+            {
+                if (part.Piece.Path != null) continue;
+                first = Math.Min(first, part.SrcA);
+                last = Math.Max(last, part.SrcB);
+            }
+            return first <= last;
+        }
+
+        // a cut written the way Num writes it, moved back by the read start in exact decimal steps so ffmpeg reads the same microsecond it would have without the move
+        private static string Shifted(double x, decimal shift)
+        {
+            if (shift == 0) return Num(x);
+            string text = (decimal.Parse(Num(x), NumberStyles.Float, CultureInfo.InvariantCulture) - shift).ToString("0.######", CultureInfo.InvariantCulture);
+            return text == "-0" ? "0" : text;
+        }
+
         // the filter graph that puts the saved clip together: every piece is cut out of its clip and the places no piece covers are black frames of the same size and rate, all joined one after the other. the pieces of the source keep the order of the source, which is what keeps the decoder from having to hold frames back. a piece of another clip is fitted into the picture of the source with black bars where its shape differs, the way the editor shows it. reads the source from input inputIndex and the other clips from firstOther on, in the order of OtherClips, and ends in the label vout
-        public string BuildGraph(int inputIndex, int firstOther, double speed, SourceInfo info)
+        // the source is read from readStart seconds on, so the cuts of its pieces move back by that much; the other clips are read from their start
+        public string BuildGraph(int inputIndex, int firstOther, double speed, SourceInfo info, decimal readStart = 0)
         {
             var chains = new List<string>();
             var labels = new List<string>();
@@ -151,27 +196,20 @@ namespace ReplayKitHelper
                 chains.Add("color=c=black:s=" + info.Width + "x" + info.Height + ":r=" + info.Fps + ":d=" + Num(b - a) + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
             };
-            foreach (var piece in Pieces)
+            foreach (var part in Parts(speed))
             {
-                double pieceStart = piece.At;
-                double pieceEnd = piece.At + piece.Length(speed);
-                if (pieceEnd <= Start + 0.001 || pieceStart >= End - 0.001) continue;
-                double a = Math.Max(pieceStart, Start);
-                double b = Math.Min(pieceEnd, End);
-                if (b - a < 0.001) continue;
-                if (a > cursor + 0.004) black(cursor, a);
-                // the part of the piece that lies inside the saved clip, in seconds of the source
+                var piece = part.Piece;
+                if (part.A > cursor + 0.004) black(cursor, part.A);
                 double rate = piece.Rate(speed);
-                double srcA = piece.SrcStart + (a - pieceStart) * rate;
-                double srcB = piece.SrcStart + (b - pieceStart) * rate;
                 string speedFilter = Math.Abs(rate - 1) > 1e-6 ? ",setpts=(PTS-STARTPTS)/" + Num(rate) : ",setpts=PTS-STARTPTS";
                 string label = "v" + labels.Count;
                 int input = piece.Path == null ? inputIndex : firstOther + OtherClips.FindIndex(p => string.Equals(p, piece.Path, StringComparison.OrdinalIgnoreCase));
                 string fit = piece.Path == null ? "" : Fit(info);
                 string look = piece.Look != null ? "," + piece.Look.Filter(info.Width, info.Height) : "";
-                chains.Add("[" + input + ":v:0]trim=start=" + Num(srcA) + ":end=" + Num(srcB) + speedFilter + fit + look + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
+                decimal shift = piece.Path == null ? readStart : 0;
+                chains.Add("[" + input + ":v:0]trim=start=" + Shifted(part.SrcA, shift) + ":end=" + Shifted(part.SrcB, shift) + speedFilter + fit + look + ",fps=" + info.Fps + ",setsar=1,format=yuv420p[" + label + "]");
                 labels.Add(label);
-                cursor = b;
+                cursor = part.B;
             }
             if (End > cursor + 0.001) black(cursor, End);
             if (labels.Count == 1)

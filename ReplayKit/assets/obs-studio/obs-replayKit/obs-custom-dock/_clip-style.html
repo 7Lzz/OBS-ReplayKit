@@ -2650,6 +2650,9 @@
     appearance: none;
     pointer-events: none;
   }
+  /* a range thumb only travels the input width less its own 12px while the frame sits at the plain time percent, so each input is one thumb wider (the end one shifted left) to put the cap just inside the frame edge at every value */
+  #trim-start { width: calc(100% + 12px); }
+  #trim-end { left: -12px; width: calc(100% + 12px); }
   .trim-bar input[type=range]::-webkit-slider-runnable-track {
     background: transparent;
     height: var(--trim-strip-h, 38px);

@@ -21,6 +21,9 @@ namespace ReplayKitHelper
         private static int lastTag;
         private int poster, noise;
 
+        // the grain draws new noise for each frame from where the frames before left it, so what it adds depends on how many frames went through first; every other step works on one frame alone
+        internal bool Temporal => noise > 0;
+
         private static readonly double[] Luma = { 0.2126, 0.7152, 0.0722 };
         private static readonly double[] Sepia = { 0.393, 0.769, 0.189, 0.349, 0.686, 0.168, 0.272, 0.534, 0.131 };
 
