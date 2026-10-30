@@ -34,11 +34,181 @@ namespace ReplayKitHelper
             string name = GetSafeFilename(raw);
             if (name == null) return null;
             string root = Path.GetFullPath(folder ?? AppConfig.GetClipDir());
-            string full = Path.GetFullPath(Path.Combine(root, name));
+            string full = Path.GetFullPath(LocateClip(name, root));
             string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString()) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
             if (File.Exists(full) && (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0) return null;
             return new SafeClipPath { Name = name, Full = full };
+        }
+
+        // every clip is filed in a folder of the clip folder named after its game (Unassigned, Desktop and Mixed for the others) and keeps its plain file name as its id; the folders that hold clips are listed in the clips db, so a folder the user made in the clip folder for something else never joins the library
+        private const string GameFoldersKey = "@folders";
+        private static readonly object GameFolderGate = new object();
+        private static string gameFolderSig = "";
+        private static List<string> gameFolderNames = new List<string>();
+        // the folders that exist, kept for a moment since every thumbnail and cache key asks
+        private static string gameFolderDirsSig = "";
+        private static long gameFolderDirsAt;
+        private static List<string> gameFolderDirs = new List<string>();
+
+        public static bool IsGameFolderName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.Length > 80 || name.Trim() != name || name.EndsWith(".") || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name.IndexOf('%') >= 0) return false;
+            string lower = name.ToLowerInvariant();
+            if (lower == "screenshots" || lower == "con" || lower == "prn" || lower == "aux" || lower == "nul") return false;
+            return !(lower.Length == 4 && (lower.StartsWith("com") || lower.StartsWith("lpt")) && lower[3] >= '1' && lower[3] <= '9');
+        }
+
+        // the folder name a game gets, the same one the plugin names the saved file after; empty when the name cannot be a folder
+        public static string GameFolderFor(string game)
+        {
+            if (string.IsNullOrEmpty(game) || game.Length > 160 || game.Any(char.IsControl)) return "";
+            const string unsafeLetters = "<>:\"/\\|?*%";
+            var clean = new System.Text.StringBuilder();
+            foreach (char letter in game) clean.Append(unsafeLetters.IndexOf(letter) >= 0 ? '-' : letter);
+            string name = System.Text.RegularExpressions.Regex.Replace(clean.ToString().Trim(), @"\s+", " ");
+            if (name.Length > 80) name = name.Substring(0, 80);
+            if (name.Length > 0 && char.IsHighSurrogate(name[name.Length - 1])) name = name.Substring(0, name.Length - 1);
+            name = name.TrimEnd('.', ' ');
+            return IsGameFolderName(name) ? name : "";
+        }
+
+        private static List<string> GameFolderNames(string root)
+        {
+            string db = AppConfig.GetDbPath();
+            string sig;
+            try
+            {
+                var fi = new FileInfo(db);
+                sig = root.ToUpperInvariant() + "|" + (fi.Exists ? fi.Length + ":" + fi.LastWriteTimeUtc.Ticks : "missing");
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException) { return new List<string>(); }
+            lock (GameFolderGate) if (sig == gameFolderSig) return gameFolderNames;
+            List<string> names;
+            try { names = ClipStore.ReadFolder(db, root, data => (data[GameFoldersKey] as JObject)?.Properties().Select(p => p.Name).Where(IsGameFolderName).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>()); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException) { return new List<string>(); }
+            lock (GameFolderGate) { gameFolderSig = sig; gameFolderNames = names; }
+            return names;
+        }
+
+        // the game folders of a clip folder that exist right now, in name order
+        public static List<string> GameFolders(string root = null)
+        {
+            root = Path.GetFullPath(root ?? AppConfig.GetClipDir()).TrimEnd(Path.DirectorySeparatorChar);
+            var names = GameFolderNames(root);
+            string key = root.ToUpperInvariant() + "|" + string.Join("|", names);
+            long now = Environment.TickCount;
+            lock (GameFolderGate) if (key == gameFolderDirsSig && now - gameFolderDirsAt < 2000) return new List<string>(gameFolderDirs);
+            var folders = new List<string>();
+            foreach (string name in names)
+            {
+                string dir = Path.Combine(root, name);
+                try { if (Directory.Exists(dir) && (File.GetAttributes(dir) & FileAttributes.ReparsePoint) == 0) folders.Add(dir); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+            lock (GameFolderGate) { gameFolderDirsSig = key; gameFolderDirsAt = now; gameFolderDirs = folders; }
+            return new List<string>(folders);
+        }
+
+        // forgets the folders that were seen, after a move made or emptied one
+        public static void ForgetFolderCache()
+        {
+            lock (GameFolderGate) gameFolderDirsSig = "";
+        }
+
+        public static bool IsGameFolder(string dir)
+        {
+            if (string.IsNullOrEmpty(dir)) return false;
+            string full = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar);
+            return GameFolders().Any(d => string.Equals(d, full, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // the folder whose clips db scope and screenshots folder a clip folder or game folder uses
+        public static string LibraryRoot(string dir) => IsGameFolder(dir) ? Path.GetDirectoryName(Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar)) : dir;
+
+        // what the caches know a clip by: its name in the clip folder, so a clip filed into another folder keeps its thumbnail, filmstrip, peaks and keyframes; a file outside the library is known by its own path
+        public static string CacheIdentity(string full)
+        {
+            string dir = Path.GetDirectoryName(full);
+            return string.IsNullOrEmpty(dir) ? full : Path.Combine(LibraryRoot(dir), Path.GetFileName(full));
+        }
+
+        // a clip replaykit saved into a game folder makes that folder part of the library; only a direct folder of the clip folder whose name starts the file name counts, so a recording format with folders of its own never does
+        public static void RegisterGameFolder(string file)
+        {
+            string root = Path.GetFullPath(AppConfig.GetClipDir()).TrimEnd(Path.DirectorySeparatorChar);
+            string dir = Path.GetDirectoryName(Path.GetFullPath(file));
+            string name = Path.GetFileName(dir);
+            if (!string.Equals(Path.GetDirectoryName(dir), root, StringComparison.OrdinalIgnoreCase) || !NamedAfterFolder(Path.GetFileName(file), name)) return;
+            RegisterFolder(root, name);
+        }
+
+        // the plugin names a saved clip after the folder it saves it in; obs writes both with underscores for spaces when its file names may hold no spaces
+        public static bool NamedAfterFolder(string file, string folder) =>
+            folder.Length > 0 && (file.StartsWith(folder + " ", StringComparison.OrdinalIgnoreCase) || file.StartsWith(folder + "_", StringComparison.OrdinalIgnoreCase));
+
+        public static void RegisterFolder(string root, string name)
+        {
+            if (!IsGameFolderName(name) || GameFolderNames(root).Contains(name, StringComparer.OrdinalIgnoreCase)) return;
+            UpdateDb(db =>
+            {
+                var folders = db[GameFoldersKey] as JObject ?? new JObject();
+                if (folders.Properties().Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))) return false;
+                folders[name] = true;
+                db[GameFoldersKey] = folders;
+                return true;
+            }, root);
+            ForgetFolderCache();
+            Log.Write("Folder added to the library: " + name);
+        }
+
+        // a folder that is gone, deleted or renamed in explorer, leaves the list; a renamed one comes back through ClipFolderWorker, which finds the clips it knows in it
+        public static void PruneFolders(string root)
+        {
+            var gone = GameFolderNames(root).Where(n => !Directory.Exists(Path.Combine(root, n))).ToList();
+            if (gone.Count == 0) return;
+            UpdateDb(db =>
+            {
+                if (!(db[GameFoldersKey] is JObject folders)) return false;
+                bool changed = false;
+                foreach (string name in gone) changed |= folders.Remove(name);
+                return changed;
+            }, root);
+            ForgetFolderCache();
+            Log.Write("Folders left the library: " + string.Join(", ", gone));
+        }
+
+        // the file a clip name stands for: the clip folder itself first, then its game folders; a name found in none of them is placed in the clip folder
+        public static string LocateClip(string name, string root = null)
+        {
+            root = root ?? AppConfig.GetClipDir();
+            string full = Path.Combine(root, name);
+            if (File.Exists(full) || IsGameFolder(root)) return full;
+            foreach (string dir in GameFolders(root))
+            {
+                string inFolder = Path.Combine(dir, name);
+                if (File.Exists(inFolder)) return inFolder;
+            }
+            return full;
+        }
+
+        public static bool NameTaken(string name) => File.Exists(LocateClip(name));
+
+        // the files of the clip folder and its game folders; a name already seen in the clip folder or an earlier game folder hides a later one, so every name stands for one file
+        public static List<FileInfo> LibraryFiles(string root)
+        {
+            var files = new List<FileInfo>(new DirectoryInfo(root).EnumerateFiles());
+            var seen = new HashSet<string>(files.Select(f => f.Name), StringComparer.OrdinalIgnoreCase);
+            foreach (string dir in GameFolders(root))
+            {
+                try
+                {
+                    foreach (var file in new DirectoryInfo(dir).EnumerateFiles())
+                        if (seen.Add(file.Name)) files.Add(file);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+            return files;
         }
 
         // what the editor reads a clip by: a clip of the folder, or a video picked from outside it; only routes that read go through this, never the ones that delete or rename
@@ -169,6 +339,12 @@ namespace ReplayKitHelper
                             // compress-only entry: clip has never been uploaded but its compress history is known. keep it.
                             db[prop.Name] = cmpEntry;
                         }
+                        if (v["capture"] is JObject capture)
+                        {
+                            var entry = db[prop.Name] as JObject ?? new JObject();
+                            entry["capture"] = capture.DeepClone();
+                            db[prop.Name] = entry;
+                        }
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
@@ -185,7 +361,7 @@ namespace ReplayKitHelper
         {
             lock (Server.State.ClipsMetaLock)
             {
-                bool result = ClipStore.UpdateFolder(AppConfig.GetDbPath(), folder ?? AppConfig.GetClipDir(), change);
+                bool result = ClipStore.UpdateFolder(AppConfig.GetDbPath(), LibraryRoot(folder ?? AppConfig.GetClipDir()), change);
                 Server.State.ClipsDbCache = null;
                 Server.State.ClipsDbCacheSig = "";
                 AppConfig.ClearClipsCache();
@@ -213,11 +389,13 @@ namespace ReplayKitHelper
                 // preserve the compress-history cache fields if they were already there. otherwise an upload would wipe the fact that this file had already been ffprobed for its compress marker.
                 if (db[name] is JObject prev)
                 {
+                    if (prev["capture"] is JObject capture) entry["capture"] = capture.DeepClone();
                     if (prev["cmp_mode"] != null) entry["cmp_mode"] = prev["cmp_mode"].Value<string>();
                     if (prev["cmp_mtime"] != null) entry["cmp_mtime"] = prev["cmp_mtime"].Value<long>();
                     if (prev["cmp_ts"] != null) entry["cmp_ts"] = prev["cmp_ts"].Value<long>();
                     if (prev["cmp_pre"] != null) entry["cmp_pre"] = prev["cmp_pre"].Value<long>();
                     if (prev["cmp_ver"] != null) entry["cmp_ver"] = prev["cmp_ver"].Value<int>();
+                    if (prev["filed"] is JObject filed) entry["filed"] = filed.DeepClone();
                 }
                 db[name] = entry;
 
@@ -239,6 +417,12 @@ namespace ReplayKitHelper
                 entry["cmp_pre"] = preBytes;
                 // cmp_ver = 2 -- written by the v2 (dynamic encoder / size-guarded) compress pipeline. a cache hit is refused without this field, which forces v1-era entries to re-probe their mp4 atom.
                 entry["cmp_ver"] = 2;
+                if (entry["capture"] is JObject capture)
+                {
+                    string file = sourcePath ?? LocateClip(name);
+                    if (ClipGames.PriorIdentity(capture, preBytes, mtimeTicks, File.GetCreationTimeUtc(file).Ticks)) ClipGames.Stamp(capture, file);
+                    else entry.Remove("capture");
+                }
                 db[name] = entry;
 
                 return true;
@@ -287,13 +471,14 @@ namespace ReplayKitHelper
                 string baseName = Path.GetFileNameWithoutExtension(src.Full);
                 string ext = Path.GetExtension(src.Full);
                 string dest = Path.Combine(dir, baseName + " (copy)" + ext);
-                for (int i = 2; File.Exists(dest); i++) dest = Path.Combine(dir, baseName + " (copy " + i + ")" + ext);
+                for (int i = 2; File.Exists(dest) || NameTaken(Path.GetFileName(dest)); i++) dest = Path.Combine(dir, baseName + " (copy " + i + ")" + ext);
                 string requestId = UploadState.NewRequestId();
                 using var reservation = JobCoordinator.TryReserve(requestId, src.Name, src.Full, "duplicate", out string busy, dest);
                 if (reservation == null) return new JObject { ["ok"] = false, ["busy"] = true, ["message"] = busy };
                 JobCoordinator.Commit(requestId, () => File.Copy(src.Full, dest));
                 try { File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(src.Full)); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+                ClipGames.Copy(src.Full, dest);
                 AppConfig.ClearClipsCache();
                 return new JObject { ["ok"] = true, ["name"] = Path.GetFileName(dest) };
             }
@@ -707,6 +892,7 @@ namespace ReplayKitHelper
             {
                 var dir = new DirectoryInfo(root);
                 parts.Add(dir.Exists ? "dir:" + dir.LastWriteTimeUtc.Ticks : "dir:missing");
+                if (dir.Exists) foreach (string folder in GameFolders(root)) parts.Add(Path.GetFileName(folder) + ":" + Directory.GetLastWriteTimeUtc(folder).Ticks);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is SecurityException)
             {
@@ -744,7 +930,7 @@ namespace ReplayKitHelper
                 eligibleFiles = new List<FileInfo>();
 
                 IEnumerable<FileInfo> files;
-                try { files = new DirectoryInfo(root).EnumerateFiles(); }
+                try { files = LibraryFiles(root); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return new List<JObject>(); }
 
                 foreach (var fi in files)
@@ -771,6 +957,7 @@ namespace ReplayKitHelper
                     string cmpMode = "";
                     long cmpTs = 0, cmpPre = 0;
                     var entry = db[fi.Name] as JObject;
+                    item["capture"] = ClipGames.Public(entry?["capture"] as JObject, fi);
                     // cache hit requires both the mtime match and a cmp_ver=2 stamp. without the version check, clips compressed by the v1 pipeline would still report "already compressed" forever.
                     int entryVer = entry?["cmp_ver"]?.Value<int>() ?? 0;
                     if (entry != null && entry["cmp_mtime"] != null && entry["cmp_mtime"].Value<long>() == fileMtimeTicks && entryVer == 2)
@@ -879,11 +1066,12 @@ namespace ReplayKitHelper
         public static List<JObject> GetClipsList() => GetSnapshot().Body;
         public static string GetClipsListJson() => GetSnapshot().Json;
 
-        public static string GetClipsPageJson(int offset, int limit, string sort = "newest")
+        public static string GetClipsPageJson(int offset, int limit, string sort = "newest", string game = "all", bool linkedOnly = false)
         {
             string safeSort = NormalizeClipSort(sort);
             var snapshot = GetSnapshot();
             var items = snapshot.Sorted(safeSort);
+            if (game != "all" || linkedOnly) items = items.Where(c => ClipGames.Matches(c, game) && (!linkedOnly || !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()))).ToList();
             int total = items.Count;
             int safeOffset = Math.Max(0, Math.Min(offset, total));
             int safeLimit = limit > 0 ? Math.Min(limit, Constants.CLIPS_PAGE_LIMIT_MAX) : Math.Min(Math.Max(total, 1), Constants.CLIPS_PAGE_LIMIT_MAX);
@@ -893,10 +1081,10 @@ namespace ReplayKitHelper
                 int end = Math.Min(total - 1, safeOffset + safeLimit - 1);
                 page = items.GetRange(safeOffset, end - safeOffset + 1);
             }
-            int linked = snapshot.Linked;
+            int linked = items.Count(c => !string.IsNullOrEmpty(c["streamable_url"]?.Value<string>()));
             var payload = new JObject
             {
-                ["version"] = snapshot.Version + "|sort:" + safeSort,
+                ["version"] = snapshot.Version + "|sort:" + safeSort + "|game:" + game + "|linked:" + linkedOnly,
                 ["folder"] = snapshot.Folder,
                 ["total"] = total,
                 ["linked"] = linked,

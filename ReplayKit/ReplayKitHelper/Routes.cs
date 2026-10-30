@@ -572,6 +572,35 @@ namespace ReplayKitHelper
             string Q(string key, string def = "") => query.TryGetValue(key, out string v) ? v : def;
             bool QFlag(string key) => query.TryGetValue(key, out string v) && v == "1";
 
+            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set")
+            {
+                try
+                {
+                    if (path == "/games/set")
+                    {
+                        if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                        string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file")) : Clips.GetSafeClipPath(Q("file"))?.Full;
+                        if (file == null || !File.Exists(file)) throw new ArgumentException("Clip not found.");
+                        ClipGames.Correct(file, Q("id"), Q("name"), 0);
+                        // a clip given another game is filed in the folder of that game
+                        if (!QFlag("screenshot")) ClipFolderWorker.Poke();
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                    }
+                    else if (req.Method != "GET") HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required");
+                    else if (path == "/games/library") HttpResponse.SendJson(stream, 200, ClipGames.Library());
+                    else if (path == "/games/search") HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["games"] = GameCatalog.Search(Q("q")) });
+                    else
+                    {
+                        byte[] icon = GameCatalog.IconBytes(Q("id"));
+                        if (icon == null) HttpResponse.SendText(stream, 404, "Not Found", "Game icon unavailable.");
+                        else HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" }), icon);
+                    }
+                }
+                catch (Exception ex) when (ex is ArgumentException || ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Game details could not be read or updated." }); }
+                return false;
+            }
+
             if (Regex.IsMatch(path, @"^/(?:controls\.html)?$")) { HttpResponse.ServeHtml(stream, "controls.html"); return false; }
             if (Regex.IsMatch(path, @"^/controls_app\.html$")) { HttpResponse.ServeHtml(stream, "controls_app.html"); return false; }
             // the clean layout frames these inside its shell page and popup.html frames the menus and cards (?embedded=1), which needs same-origin framing; a page loaded on its own keeps the DENY
@@ -1780,6 +1809,7 @@ namespace ReplayKitHelper
             {
                 var status = UploadState.GetUploadStatusSnapshot();
                 status["clipSave"] = ClipBuffer.SaveStatus();
+                status["clipFolders"] = ClipFolderWorker.Status();
                 HttpResponse.SendJson(stream, 200, status);
                 return false;
             }
@@ -1873,7 +1903,9 @@ namespace ReplayKitHelper
                         string sort = Q("sort", "newest");
                         if (query.ContainsKey("offset")) int.TryParse(Q("offset"), out offset);
                         if (query.ContainsKey("limit")) int.TryParse(Q("limit"), out limit);
-                        HttpResponse.SendText(stream, 200, "OK", Clips.GetClipsPageJson(offset, limit, sort), "application/json; charset=utf-8");
+                        string game = Q("game", "all");
+                        if (game != "all" && game != "desktop" && game != "mixed" && game != "unknown" && !GameCatalog.ValidId(game)) throw new ArgumentException("Invalid game filter.");
+                        HttpResponse.SendText(stream, 200, "OK", Clips.GetClipsPageJson(offset, limit, sort, game, QFlag("linked")), "application/json; charset=utf-8");
                     }
                     else
                     {
@@ -2744,8 +2776,9 @@ namespace ReplayKitHelper
                 string newName = Clips.GetSafeFilename(query.ContainsKey("to") ? query["to"] : null);
                 if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad new filename" }); return false; }
                 if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
-                string newPath = Path.Combine(AppConfig.GetClipDir(), newName);
-                if (File.Exists(newPath)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
+                // a renamed clip stays in its own folder, and the name stays unique across the clip folder and its game folders
+                string newPath = Path.Combine(Path.GetDirectoryName(selected.Full), newName);
+                if (File.Exists(newPath) || Clips.NameTaken(newName)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
                 string requestId = UploadState.NewRequestId();
                 using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath);
                 if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }

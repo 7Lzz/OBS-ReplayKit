@@ -1,8 +1,11 @@
 // what each line the helper sends over the pipe does
 #include "prelude.hpp"
 #include "app/ipc_commands.hpp"
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "app/clip_buffer.hpp"
+#include "app/capture_context.hpp"
 #include "app/obs_actions.hpp"
 #include "app/obs_menu.hpp"
 #include "app/sdk_commands.hpp"
@@ -86,6 +89,9 @@ void PipeDispatchLine(const std::string &line)
 		}
 	} else if (line == "CLIPSAVE") {
 		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
+	} else if (line.rfind("CAPTURENAME ", 0) == 0 && line.size() < 40000) {
+		const QJsonObject data = QJsonDocument::fromJson(QByteArray::fromStdString(line.substr(12))).object();
+		QMetaObject::invokeMethod(g_callbacks, [data]() { CaptureContextName(data); }, Qt::QueuedConnection);
 	} else if (line == "OPENSETUP") {
 		QMetaObject::invokeMethod(g_callbacks, []() { ShowSetup(false); }, Qt::QueuedConnection);
 	} else if (line == "OPENSETUPQUIET") {

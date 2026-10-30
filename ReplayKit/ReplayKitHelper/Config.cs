@@ -209,8 +209,9 @@ namespace ReplayKitHelper
                     {
                         Path = root,
                         Filter = "*.*",
-                        IncludeSubdirectories = false,
-                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime
+                        // game folders sit inside the clip folder, so the watcher looks below it and the events are sorted out in InLibrary
+                        IncludeSubdirectories = true,
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.CreationTime
                     };
                     watcher.Created += OnClipFolderChanged;
                     watcher.Changed += OnClipFolderChanged;
@@ -229,8 +230,41 @@ namespace ReplayKitHelper
         }
 
         // runs on a .net threadpool thread, a real 3rd execution context beyond the accept loop and the connection pool -- needs the lock same as everything else.
-        private static void OnClipFolderChanged(object sender, FileSystemEventArgs e) => InvalidateClipsCacheFromWatcher();
-        private static void OnClipFolderRenamed(object sender, RenamedEventArgs e) => InvalidateClipsCacheFromWatcher();
+        private static void OnClipFolderChanged(object sender, FileSystemEventArgs e)
+        {
+            if (InLibrary(e.FullPath)) InvalidateClipsCacheFromWatcher();
+            // a file or folder that came in may be a clip to file or a folder renamed in explorer
+            if (e.ChangeType == WatcherChangeTypes.Created && InClipFolder(e.FullPath)) ClipFolderWorker.Poke();
+        }
+
+        private static void OnClipFolderRenamed(object sender, RenamedEventArgs e)
+        {
+            if (InLibrary(e.FullPath) || InLibrary(e.OldFullPath)) InvalidateClipsCacheFromWatcher();
+            if (InClipFolder(e.FullPath)) ClipFolderWorker.Poke();
+        }
+
+        // the clip folder itself or a folder straight inside it
+        private static bool InClipFolder(string path)
+        {
+            try
+            {
+                string root = Server.State.ClipWatcherPath.TrimEnd(Path.DirectorySeparatorChar);
+                string dir = Path.GetDirectoryName(Path.GetFullPath(path));
+                return string.Equals(dir, root, StringComparison.OrdinalIgnoreCase) || string.Equals(Path.GetDirectoryName(dir), root, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return false; }
+        }
+
+        // only the clip folder itself and its game folders hold clips; the other folders below it are none of the librarys business
+        private static bool InLibrary(string path)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(Path.GetFullPath(path));
+                return string.Equals(dir, Server.State.ClipWatcherPath.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) || Clips.IsGameFolder(dir);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return false; }
+        }
 
         private static void InvalidateClipsCacheFromWatcher()
         {

@@ -18,6 +18,8 @@ ReplayKit/publish_tmp/
 # runtime state the installer and helper write into the users appdata; ignored in case a live folder is ever copied into the repo, so credentials, cookies and per-user paths can never be committed
 helper_config.json
 clips_db.json
+game_mappings.json
+ReplayKit/assets/obs-studio/obs-replayKit/game-icons/
 clips_index.json
 compression_history.json
 edit_drafts.json

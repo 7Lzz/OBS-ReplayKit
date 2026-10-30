@@ -74,7 +74,16 @@ namespace ReplayKitHelper
         {
             if (requestType != "GetReplayBufferStatus" && requestType != "StartReplayBuffer" && requestType != "StopReplayBuffer" && requestType != "ToggleReplayBuffer" && requestType != "SaveReplayBuffer")
                 return null;
-            if (EffectiveMode(ReplaykitSettings.ReadSettings()) != Disk) return null;
+            if (EffectiveMode(ReplaykitSettings.ReadSettings()) != Disk)
+            {
+                if (requestType != "SaveReplayBuffer") return null;
+                var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
+                if (!status.Ok) { status.RequestType = requestType; return status; }
+                if (status.Data?["outputActive"]?.Value<bool>() != true) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = "Clipping is off." };
+                if (PipeClient.SendClipSave()) return Answer(requestType, true);
+                Log.Write("Native capture tagging unavailable; OBS handles the replay save directly.");
+                return null;
+            }
             bool active;
             lock (StateGate) active = _diskActive;
             switch (requestType)
@@ -153,6 +162,10 @@ namespace ReplayKitHelper
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (name.Length == 0 || name.Length > 200 || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || (ext != ".mp4" && ext != ".mkv" && ext != ".mov"))
                 return Fail("The clip name is not valid.");
+            // the game folder the clip goes in, empty for the clip folder itself; its name is the one the clip name starts with
+            string folder = body?["folder"]?.Value<string>() ?? "";
+            if (folder.Length > 0 && (!Clips.IsGameFolderName(folder) || !name.StartsWith(folder + " ", StringComparison.OrdinalIgnoreCase)))
+                return Fail("The game folder is not valid.");
 
             Directory.CreateDirectory(DiskDir);
             string root = LongPath(Path.GetFullPath(DiskDir)).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -205,7 +218,13 @@ namespace ReplayKitHelper
                 }
                 list = Path.Combine(Constants.SCRATCH_DIR, "clip-buffer-" + Guid.NewGuid().ToString("N") + ".txt");
                 File.WriteAllText(list, entries.ToString(), new UTF8Encoding(false));
-                string target = UniquePath(Path.Combine(clipDir, name));
+                string targetDir = folder.Length > 0 ? Path.Combine(clipDir, folder) : clipDir;
+                if (folder.Length > 0)
+                {
+                    Directory.CreateDirectory(targetDir);
+                    if ((File.GetAttributes(targetDir) & FileAttributes.ReparsePoint) != 0) return Fail("The game folder cannot be a link.");
+                }
+                string target = UniquePath(Path.Combine(targetDir, name));
                 part = target + ".rkpart";
                 bool mp4Family = ext == ".mp4" || ext == ".mov";
                 var argv = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", list, "-map", "0", "-c", "copy", "-avoid_negative_ts", "make_zero" };
@@ -221,6 +240,9 @@ namespace ReplayKitHelper
                 }
                 File.Move(part, target);
                 part = null;
+                if (folder.Length > 0) Clips.RegisterGameFolder(target);
+                try { ClipGames.SavedDisk(target, id, files, lengths); }
+                catch (Exception ex) { Log.Write("Clip capture metadata unavailable: " + ex.GetType().Name); }
                 // said as soon as the file is in the folder, so a page that already lists the clip also reads that its save ended
                 MarkSaveEnded(id, Path.GetFileName(target));
                 Log.Write("clip buffer save: " + (files.Count - first) + " of " + files.Count + " piece(s), " + lengths.Sum().ToString("0.0", CultureInfo.InvariantCulture) + " s buffered -> " + target);
@@ -279,12 +301,12 @@ namespace ReplayKitHelper
 
         private static string UniquePath(string path)
         {
-            if (!File.Exists(path)) return path;
+            if (!File.Exists(path) && !Clips.NameTaken(Path.GetFileName(path))) return path;
             string dir = Path.GetDirectoryName(path), stem = Path.GetFileNameWithoutExtension(path), ext = Path.GetExtension(path);
             for (int i = 2; i < 1000; i++)
             {
                 string next = Path.Combine(dir, stem + " (" + i + ")" + ext);
-                if (!File.Exists(next)) return next;
+                if (!File.Exists(next) && !Clips.NameTaken(Path.GetFileName(next))) return next;
             }
             throw new IOException("No free clip name was found.");
         }

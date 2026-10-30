@@ -21,6 +21,17 @@
       <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="favorites-grid"></div>
+    <!-- linked and drafts sections of the all filter: plain rows like the favorites, and a clip shows in the first of favorites, linked, drafts it belongs to and not again under all clips -->
+    <div class="section-heading" id="linked-heading">
+      <svg data-i="action/link" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Linked</span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="linked" aria-label="Collapse Linked" aria-expanded="true" aria-controls="linked-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    </div>
+    <div class="grid favorites-grid" id="linked-grid"></div>
+    <div class="section-heading" id="drafts-heading">
+      <svg data-i="action/open-editor" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Drafts</span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="drafts" aria-label="Collapse Drafts" aria-expanded="true" aria-controls="drafts-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    </div>
+    <div class="grid favorites-grid" id="drafts-grid"></div>
     <section id="screenshots-area" hidden>
       <div class="section-heading is-shown" id="screenshots-heading">
         <svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Screenshots</span>
@@ -33,6 +44,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>
       <span id="rest-heading-label">All clips</span>
       <button class="icon-mini-btn section-toggle" type="button" data-section="clips" aria-label="Collapse All clips" aria-expanded="true" aria-controls="grid top-spacer bottom-spacer empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      <label class="group-games" id="group-games" data-tooltip="Sort all clips into a section per game" hidden><span>By game</span><input type="checkbox" class="rk-switch" id="group-games-switch" aria-label="Sort all clips by game"></label>
     </div>
     <div class="virtual-spacer" id="top-spacer"></div>
     <div class="grid" id="grid" style="display:none"></div>

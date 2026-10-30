@@ -184,7 +184,7 @@ namespace ReplayKitHelper
                 var entries = new JObject();
                 int count = 0;
 
-                var files = new DirectoryInfo(root).EnumerateFiles()
+                var files = Clips.LibraryFiles(root)
                     .Where(f => allowed.Contains(f.Extension) &&
                                 !f.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) &&
                                 !f.Name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) &&

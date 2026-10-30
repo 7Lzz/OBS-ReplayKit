@@ -4,6 +4,8 @@ using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Threading;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Newtonsoft.Json.Linq;
 
 namespace ReplayKitHelper
@@ -19,6 +21,9 @@ namespace ReplayKitHelper
         private static readonly object WriteLock = new object();
         private static NamedPipeClientStream _stream;
         private static StreamWriter _writer;
+        private static bool capturePeer;
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint pid);
         private static bool _setupWizardKicked;
         private static readonly ManualResetEventSlim AllowCloseAck = new ManualResetEventSlim(false);
         private static readonly ManualResetEventSlim OutputsReleasedAck = new ManualResetEventSlim(false);
@@ -47,6 +52,16 @@ namespace ReplayKitHelper
                     using (var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous))
                     {
                         pipe.Connect(2000);
+                        capturePeer = false;
+                        // only obs itself may send capture evidence; a check that cannot be made leaves tagging off and the rest of the pipe working
+                        try
+                        {
+                            if (GetNamedPipeServerProcessId(pipe.SafePipeHandle, out uint serverPid))
+                                using (var owner = Process.GetProcessById((int)serverPid))
+                                    capturePeer = string.Equals(owner.MainModule?.FileName, Constants.ResolveObsExe(), StringComparison.OrdinalIgnoreCase);
+                        }
+                        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is ArgumentException)
+                        { Log.Write("Capture tagging off: the pipe owner could not be checked (" + ex.GetType().Name + ")"); }
                         var reader = new StreamReader(pipe, utf8);
                         var writer = new StreamWriter(pipe, utf8) { AutoFlush = true, NewLine = "\n" };
                         lock (WriteLock) { _stream = pipe; _writer = writer; }
@@ -85,6 +100,7 @@ namespace ReplayKitHelper
                 }
                 finally
                 {
+                    capturePeer = false;
                     lock (WriteLock) { _stream = null; _writer = null; }
                     lock (Server.State.IpcLock)
                     {
@@ -130,6 +146,15 @@ namespace ReplayKitHelper
             string payload = sp < 0 ? "" : line.Substring(sp + 1);
             switch (verb)
             {
+                case "CAPTURE":
+                    if (capturePeer) ClipGames.Observe(payload);
+                    break;
+                case "CAPTUREFILE":
+                    if (capturePeer) ClipGames.NativeFile(payload);
+                    break;
+                case "CAPTURESAVE":
+                    if (capturePeer) ClipGames.BindSave(payload);
+                    break;
                 case "MAINWIN":
                     if (long.TryParse(payload.Trim(), out long hwnd))
                         lock (Server.State.IpcLock) Server.State.ObsMainWindowHwnd = hwnd;
@@ -201,6 +226,7 @@ namespace ReplayKitHelper
         // the disk clip buffer lives in the plugin: it is turned on, off or over, and asked to save the last stretch it holds
         public static bool SendClipBuffer(string state) => (state == "on" || state == "off" || state == "toggle") && TryWrite("CLIPBUFFER " + state);
         public static bool SendClipSave() => TryWrite("CLIPSAVE");
+        internal static bool SendCaptureName(long at, string session, long buffer, long start, int seconds, string name) => TryWrite("CAPTURENAME " + new JObject { ["at"] = at, ["session"] = session, ["buffer"] = buffer, ["start"] = start, ["seconds"] = seconds, ["name"] = name }.ToString(Newtonsoft.Json.Formatting.None));
 
         // a pick of the quick action menu, for the view it was made in; both parts are checked by the route before they get here
         public static bool SendQuickAction(string view, string id) => TryWrite("QUICKACTION " + view + " " + id);

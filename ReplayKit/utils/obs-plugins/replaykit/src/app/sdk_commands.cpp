@@ -16,6 +16,7 @@
 #include <mutex>
 
 #include "app/clip_buffer.hpp"
+#include "app/capture_context.hpp"
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
@@ -451,6 +452,7 @@ QJsonObject Commands(const QJsonObject &)
 
 void RegisterBuiltins()
 {
+    SdkRegister("capture.state", "reports capture attribution sampling without exposing process paths", [](const QJsonObject &) { auto out = CaptureContextProbe(); out["ok"] = true; return out; });
 	SdkRegister("commands", "the commands of the native plugin", Commands);
 	SdkRegister("ui.state", "the view, the window, the preview and its lock, the storage card and how many menus are open", UiState);
 	SdkRegister("memory.state", "committed and resident memory before and after the last hidden-window cleanup", [](const QJsonObject &) { return IdleMemory::Probe(); });

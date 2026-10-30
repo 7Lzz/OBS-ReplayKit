@@ -24,6 +24,7 @@ namespace ReplayKitHelper
 
         private readonly List<Layer> layers = new List<Layer>();
         public int Count => layers.Count;
+        public bool HasVideo => layers.Exists(layer => layer.Clip && layer.Opacity > 0);
 
         private static string N(double v) => v.ToString("0.######", CultureInfo.InvariantCulture);
 

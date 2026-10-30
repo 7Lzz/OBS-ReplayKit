@@ -62,6 +62,7 @@ window.RKScreenshots = {
       age.dataset.mtime = String(row.mtime);
       age.textContent = options.formatTimeAgo(row.mtime);
       target.append(size, dot, age);
+      if (window.RKClipGames) RKClipGames.badge(target, row, { change: true, screenshot: true });
     }
     const isFullscreen = () => (document.fullscreenElement || document.webkitFullscreenElement) === stage;
     function toggleFullscreen() {
@@ -215,6 +216,8 @@ window.RKScreenshots = {
       card.append(picture, body, actions);
       options.resize(card);
       const menu = body.querySelector(".menu-dropdown");
+      const revealItem = menu.querySelector('[data-act="reveal"]');
+      if (window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(row, true, options.closeMenus));
       const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
       async function remove(trigger, inMenu) {
         // the same two clicks as a clip: the first arms the button, the second deletes
@@ -257,7 +260,7 @@ window.RKScreenshots = {
     }
     function paint() {
       const key = sort === "oldest" ? row => row.mtime : sort === "biggest" ? row => -row.size : sort === "smallest" ? row => row.size : row => -row.mtime;
-      shown = rows.filter(row => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b) => key(a)-key(b) || a.name.localeCompare(b.name));
+      shown = rows.filter(row => (!options.filter || options.filter(row)) && row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b) => key(a)-key(b) || a.name.localeCompare(b.name));
       area.hidden = !active || (mode === "all" && !shown.length);
       const collapsed = options.collapsed();
       grid.hidden = collapsed;
@@ -277,7 +280,7 @@ window.RKScreenshots = {
         cards.forEach((card, id) => { if (!keep.has(id)) { card.remove(); cards.delete(id); } });
       }
       empty.hidden = collapsed || shown.length > 0;
-      empty.textContent = !loaded ? "Loading screenshots..." : rows.length ? "No screenshots match your search." : "No screenshots yet. Save a frame with the screenshot button in the editor.";
+      empty.textContent = !loaded ? "Loading screenshots..." : rows.length ? (query.trim() ? "No screenshots match your search." : "No screenshots match these filters.") : "No screenshots yet. Save a frame with the screenshot button in the editor.";
       if (dialog.open) {
         const row = shown.find(item => item.name === selected);
         if (!row) dialog.close();
@@ -346,7 +349,7 @@ window.RKScreenshots = {
         if (!isFullscreen()) toggleFullscreen();
         return true;
       },
-      count: () => loaded ? rows.length : undefined,
+      count: () => loaded ? rows.filter(row => !options.filter || options.filter(row)).length : undefined,
       update: function (search, order) { if (search !== query || order !== sort) { query = search; sort = order; if (active) paint(); } },
       show: function (value) {
         document.body.classList.toggle("is-screenshots", value === "screenshots");

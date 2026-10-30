@@ -15,7 +15,7 @@ namespace ReplayKitHelper
     {
         private static string GetThumbnailName(Clips.SafeClipPath selected, FileInfo fi)
         {
-            string key = selected.Full + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks;
+            string key = Clips.CacheIdentity(selected.Full) + "|" + fi.Length + "|" + fi.LastWriteTimeUtc.Ticks;
             using (var sha = SHA1.Create())
             {
                 byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(key));

@@ -87,6 +87,21 @@ namespace ReplayKitHelper
             lock (Gate) CompressionQueue.Clear();
         }
 
+        // moves a clip into another folder of the library while no job can start on it; a clip that a job, the editor or the compression queue holds stays where it is, and a file that is open somewhere throws and stays too
+        public static bool TryMove(string from, string to)
+        {
+            from = Path.GetFullPath(from);
+            to = Path.GetFullPath(to);
+            lock (Gate)
+            {
+                if (CompressionQueue.Contains(from) || Editors.Values.Any(e => e.Paths.Contains(from)) ||
+                    Jobs.Values.Any(j => j.Paths.Any(p => string.Equals(p, from, StringComparison.OrdinalIgnoreCase) || string.Equals(p, to, StringComparison.OrdinalIgnoreCase))))
+                    return false;
+                File.Move(from, to);
+                return true;
+            }
+        }
+
         public static Reservation TryReserve(string requestId, string name, string path, string kind, out string message, string destination = null)
         {
             var paths = new[] { path, destination }.Where(p => p != null).Select(Path.GetFullPath).ToArray();

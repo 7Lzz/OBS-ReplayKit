@@ -168,7 +168,19 @@
     const button = combo.querySelector(".combo-button");
     const label = combo.querySelector(".combo-label");
     const menu = combo.querySelector(".combo-menu");
-    let options = [], value = "";
+    const search = config.search ? document.createElement("input") : null;
+    if (search) {
+      search.className = "combo-search";
+      search.type = "search";
+      search.placeholder = config.search;
+      search.setAttribute("aria-label", config.search);
+      search.addEventListener("input", () => {
+        const text = search.value.trim().toLocaleLowerCase();
+        menu.querySelectorAll(".combo-option").forEach(row => { row.hidden = !row.textContent.toLocaleLowerCase().includes(text); });
+        place();
+      }, events);
+    }
+    let options = [], value = "", updating = false;
     // config.multi lets several rows be picked at once; value is then their values joined with commas in the order of the menu, and a row named in config.only stands alone, so picking it lets the others go and it comes back when nothing else is left
     const multi = !!config.multi;
     const only = (config.only || []).map(String);
@@ -204,6 +216,7 @@
       menu.style.maxHeight = Math.max(28, Math.min(height, up ? above : below)) + "px";
     }
     function open() {
+      if (config.beforeOpen) config.beforeOpen();
       if (!options.length) return;
       document.querySelectorAll(".combo.is-open").forEach((other) => {
         if (other !== combo) {
@@ -223,6 +236,7 @@
         const selected = menu.querySelector(".is-selected");
         if (selected) selected.scrollIntoView({ block:"nearest" });
       }
+      if (search) search.focus({ preventScroll:true });
     }
     function select(next, notify) {
       if (multi) { pick(String(next).split(","), notify); return; }
@@ -262,8 +276,9 @@
     function menuKey(event) {
       if (!combo.classList.contains("is-open")) return;
       const key = event.key;
+      if (event.target === search && key !== "Escape" && key !== "ArrowDown") return;
       if (key !== "Escape" && config.footer && config.footer.contains(event.target)) return;
-      const rows = Array.from(menu.querySelectorAll(".combo-option"));
+      const rows = Array.from(menu.querySelectorAll(".combo-option:not([hidden])"));
       const focused = rows.indexOf(document.activeElement);
       let next = -1;
       if (key === "Escape") {
@@ -320,6 +335,7 @@
     menu.addEventListener("mouseleave", () => preview(), events);
     combo.addEventListener("keydown", (event) => {
       const key = event.key;
+      if (event.target === search && key !== "Escape" && key !== "ArrowDown") return;
       if (key !== "Escape" && config.footer && config.footer.contains(event.target)) return;
       if (config.menuKeys && ["ArrowDown", "ArrowUp", "Home", "End"].includes(key)) {
         event.preventDefault(); event.stopPropagation(); open(); menuKey(event); return;
@@ -338,7 +354,7 @@
         select(options[next].value, true);
       }
     }, events);
-    combo.addEventListener("focusout", (event) => { if (!combo.contains(event.relatedTarget)) close(); }, events);
+    combo.addEventListener("focusout", (event) => { if (!updating && !combo.contains(event.relatedTarget)) close(); }, events);
     document.addEventListener("pointerdown", (event) => { if (!combo.contains(event.target)) close(); }, { capture:true, signal:config.signal });
     window.addEventListener("resize", place, events);
     if (config.signal) config.signal.addEventListener("abort", close, { once:true });
@@ -348,9 +364,16 @@
       set value(next) { select(next, false); },
       get options() { return options.slice(); },
       setOptions(next) {
-        close();
+        const keepOpen = !!config.live && combo.classList.contains("is-open");
+        const query = search ? search.value : "";
+        const focused = document.activeElement;
+        const restoreFocus = keepOpen && menu.contains(focused);
+        const focusValue = focused && focused.dataset.value;
+        updating = true;
+        if (!keepOpen) close();
         options = next.map((entry) => ({ value:String(entry.value), label:String(entry.label), font:entry.font || "", description:entry.description || "", icon:entry.icon || "", detail:entry.detail || "" }));
         menu.replaceChildren();
+        if (search) { search.value = ""; menu.appendChild(search); }
         options.forEach((entry) => {
           const row = document.createElement("div");
           row.className = "combo-option";
@@ -385,6 +408,14 @@
         });
         if (config.footer) menu.appendChild(config.footer);
         select(value, false);
+        if (keepOpen) {
+          if (search) search.value = query;
+          const rows = Array.from(menu.querySelectorAll(".combo-option"));
+          rows.forEach(row => { row.hidden = !row.textContent.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()); });
+          place();
+          if (restoreFocus) (rows.find(row => row.dataset.value === focusValue) || search || button).focus({preventScroll:true});
+        }
+        updating = false;
       },
       close,
     };

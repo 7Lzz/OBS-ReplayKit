@@ -112,10 +112,12 @@ function Repair-OneFile([string]$file) {
     # same reasoning as the compress/trim workers: this rewrites the container not the clip, so the original timestamps get restored after the swap instead of jumping to "now" and bumping an old clip to the top of the sorted-by-newest list.
     $origLastWriteUtc = $null
     $origCreationUtc  = $null
+    $origBytes = 0L
     try {
         $srcInfo = [System.IO.FileInfo]::new($file)
         $origLastWriteUtc = $srcInfo.LastWriteTimeUtc
         $origCreationUtc  = $srcInfo.CreationTimeUtc
+        $origBytes = $srcInfo.Length
     } catch {}
 
     # remuxed into scratch, not next to $file, so a crash mid-remux never leaves a stray tmp with a real video extension sitting in the clip folder where it could get indexed and shown as a bogus clip.
@@ -156,6 +158,13 @@ function Repair-OneFile([string]$file) {
                 }
             }
             Write-FixLog "fixed hev1 -> hvc1: $file"
+            if ($origBytes -gt 0 -and $origLastWriteUtc -and $origCreationUtc) {
+                $helperExe = Join-Path (Split-Path -Parent $PSScriptRoot) 'helper\OBSReplayKit.exe'
+                if (Test-Path -LiteralPath $helperExe) {
+                    & $helperExe --refresh-game-tag -File $file -Bytes ([string]$origBytes) -Written ([string]$origLastWriteUtc.Ticks) -Created ([string]$origCreationUtc.Ticks) 2>$null
+                    if ($LASTEXITCODE -ne 0) { Write-FixLog 'game tag refresh did not finish' }
+                }
+            }
         } catch {
             Write-FixLog "replace failed for $file : $($_.Exception.Message)"
             try { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } catch {}

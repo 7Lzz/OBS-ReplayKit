@@ -204,7 +204,7 @@ namespace ReplayKitHelper
                 string clipDir = AppConfig.GetClipDir();
                 if (!string.IsNullOrEmpty(clipDir) && Directory.Exists(clipDir))
                 {
-                    foreach (var file in SafeEnumerateFiles(clipDir))
+                    foreach (var file in new[] { clipDir }.Concat(Clips.GameFolders(clipDir)).SelectMany(dir => SafeEnumerateFiles(dir)))
                     {
                         string name = Path.GetFileName(file);
                         if (name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) ||

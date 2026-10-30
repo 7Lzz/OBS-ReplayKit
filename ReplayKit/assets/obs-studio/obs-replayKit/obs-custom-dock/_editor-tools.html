@@ -1280,6 +1280,11 @@
       card.appendChild(thumb);
       var title = c.name.replace(/\.[^.]+$/, "");
       card.appendChild(el("span", "ed-lib-name", title));
+      if (window.RKClipGames) {
+        var meta = el("span", "meta");
+        RKClipGames.badge(meta, c);
+        card.appendChild(meta);
+      }
       card.title = title;
       card.clipName = c.name;
       card.clip = c;

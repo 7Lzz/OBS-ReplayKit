@@ -3,6 +3,7 @@
 #include "core/ipc_pipe.hpp"
 
 #include "app/ipc_commands.hpp"
+#include "app/capture_context.hpp"
 
 namespace rk {
 
@@ -43,6 +44,9 @@ void PipeServeClient(HANDLE pipe)
 	std::string inbound;
 
 	while (!g_pipeStop.load()) {
+		for (const std::string &message : CaptureContextMessages())
+			if (!PipeWriteLine(pipe, message))
+				return;
 		quintptr mw = g_mainWinValue.load();
 		if (!mainWinSent && mw != 0) {
 			if (!PipeWriteLine(pipe, "MAINWIN " + std::to_string((unsigned long long)mw)))

@@ -460,7 +460,7 @@
   body.is-clip-fullscreen #toast,
   body.is-clip-fullscreen #grid .card:not(.is-fullscreen-card),
   body.is-clip-fullscreen .home-shelves :is(.home-head, .home-hero-info, .card:not(.is-fullscreen-card)),
-  body.is-clip-fullscreen #favorites-grid .card:not(.is-fullscreen-card) {
+  body.is-clip-fullscreen .favorites-grid .card:not(.is-fullscreen-card) {
     visibility: hidden;
   }
   body.is-clip-fullscreen .scroll-area {
@@ -472,7 +472,7 @@
   body.is-clip-theater #toast,
   body.is-clip-theater #grid .card:not(.is-theater-card),
   body.is-clip-theater .home-shelves :is(.home-head, .home-hero-info, .card:not(.is-theater-card)),
-  body.is-clip-theater #favorites-grid .card:not(.is-theater-card) {
+  body.is-clip-theater .favorites-grid .card:not(.is-theater-card) {
     visibility: hidden;
   }
   body.is-clip-theater .scroll-area { overflow: hidden; }
@@ -540,7 +540,7 @@
   /* favorites sub-section above the main virtualized grid. hidden by defualt; render() toggles `is-shown` on both the heading and the grid when the all filter is active and theres at least one favorite. same goes for the "all clips" heading -- it only shows in that case to seperate the two sub-sections visually. */
   .favorites-grid { display: none; margin-bottom: 18px; }
   /* the home view: this page with a big player for the newest clip and two shelves of clips under the header that RKHomeDashboard draws, and no toolbar. a clip is its player with the name and the age under it, without the card, the menus or the buttons of the clips view */
-  .rk-home .tabs, .rk-home #favorites-heading, .rk-home #favorites-grid, .rk-home #rest-heading, .rk-home .select-clip-btn, .rk-home .favorite-btn, .rk-home .codec-badge, .rk-home .card .actions { display: none !important; }
+  .rk-home .tabs, .rk-home #favorites-heading, .rk-home #linked-heading, .rk-home #drafts-heading, .rk-home .favorites-grid, .rk-home #rest-heading, .rk-home .select-clip-btn, .rk-home .favorite-btn, .rk-home .codec-badge, .rk-home .card .actions { display: none !important; }
   .rk-home .card .icon-mini-btn, .rk-home .card .title-actions, .rk-home .card .meta .size, .rk-home .card .meta .dot, .rk-home .card .meta .link-status, .rk-home .home-hero .card .body { display: none !important; }
   .rk-home .card .body { padding: 10px 6px 4px; }
   .rk-home .home-hero .card.is-theater-card .body { display: block !important; }
@@ -595,7 +595,7 @@
   #screenshots-area { margin-bottom:18px; }
   #screenshots-area[hidden], #screenshots-grid[hidden], .favorites-grid.section-collapsed,
   body.clips-collapsed #grid, body.clips-collapsed .virtual-spacer, body.clips-collapsed #empty,
-  body.is-screenshots #favorites-heading, body.is-screenshots #favorites-grid, body.is-screenshots #rest-heading,
+  body.is-screenshots #favorites-heading, body.is-screenshots #linked-heading, body.is-screenshots #drafts-heading, body.is-screenshots .favorites-grid, body.is-screenshots #rest-heading,
   body.is-screenshots #grid, body.is-screenshots .virtual-spacer, body.is-screenshots #empty { display:none !important; }
   /* divider above "all clips" so the favorites-vs-rest boundary reads clearly even with both headings now sharing the same bold white style. same border colour as every other hairline in this file (inputs, cards, toasts) for consistency. */
   .section-heading-rest {

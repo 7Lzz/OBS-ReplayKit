@@ -93,7 +93,7 @@ namespace ReplayKitHelper
             return thumb;
         }
 
-        public static void Delete(string path) => File.Delete(path);
+        public static void Delete(string path) { File.Delete(path); ClipGames.Forget(path); }
 
         // a screenshot that is renamed keeps its .png and stays in the screenshots folder; the new name of the file, or an exception that says why it could not be
         public static string Rename(string path, string to)
@@ -105,7 +105,10 @@ namespace ReplayKitHelper
             if (string.Equals(target, path, StringComparison.Ordinal)) return to;
             // a change of case only is the same file to windows, so it is moved on its own
             if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException("A screenshot with that name already exists");
+            var capture = ClipGames.Read(path);
             File.Move(path, target);
+            ClipGames.Write(target, capture);
+            ClipGames.Forget(path);
             return to;
         }
 
@@ -132,6 +135,7 @@ namespace ReplayKitHelper
         {
             string folder = Folder();
             if (!Directory.Exists(folder)) return new JArray();
+            var metadata = Clips.ReadClipsDb();
             return new JArray(new DirectoryInfo(folder).EnumerateFiles("*.png", SearchOption.TopDirectoryOnly)
                 .Where(file => (file.Attributes & FileAttributes.ReparsePoint) == 0 && !file.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(file => file.LastWriteTimeUtc)
@@ -140,6 +144,7 @@ namespace ReplayKitHelper
                     ["name"] = file.Name,
                     ["size"] = file.Length,
                     ["mtime"] = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds(),
+                    ["capture"] = ClipGames.Public(metadata["@screenshots/" + file.Name]?["capture"] as JObject, file),
                 }));
         }
     }

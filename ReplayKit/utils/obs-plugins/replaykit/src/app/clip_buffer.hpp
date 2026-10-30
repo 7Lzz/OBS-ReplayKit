@@ -4,6 +4,7 @@
 #include <string>
 
 class QJsonObject;
+class QString;
 
 namespace rk {
 
@@ -14,6 +15,9 @@ void ClipBufferStart();
 void ClipBufferStop();
 void ClipBufferToggle();
 void ClipBufferSave();
+void ClipBufferGameName(const QString &name);
+void ClipBufferPrepareName();
+int ClipBufferNameWindow();
 // the mode the helper settled on ("disk" or "memory"), read off every settings poll
 void ClipBufferApplySettings(const std::string &settingsBody);
 // what the settings poll tells the helper about the disk buffer

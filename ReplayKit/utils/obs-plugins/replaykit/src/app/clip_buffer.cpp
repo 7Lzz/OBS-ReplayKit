@@ -1,6 +1,7 @@
 // the clip buffer: obs keeps it in memory as its replay buffer, or this keeps it on disk as short pieces and the helper joins the newest of them into a clip
 #include "prelude.hpp"
 #include "app/clip_buffer.hpp"
+#include "app/capture_context.hpp"
 
 #include <QDateTime>
 #include <QFileInfo>
@@ -39,6 +40,8 @@ struct Piece {
 	std::string path;
 	qint64 startMs = 0;
 	qint64 endMs = 0;
+	qint64 captureStartMs = 0;
+	qint64 captureEndMs = 0;
 };
 
 Mode g_mode = Mode::Memory;
@@ -47,6 +50,22 @@ obs_encoder_t *g_video = nullptr;
 std::vector<obs_encoder_t *> g_audio;
 std::deque<Piece> g_pieces;
 Piece g_current;
+std::atomic<qint64> firstFrameAt{0}, lastFrameAt{0}, lastKeyframeAt{0};
+
+void CapturePacket(obs_output_t *, encoder_packet *packet, encoder_packet_time *time, void *)
+{
+	if (!packet || packet->type != OBS_ENCODER_VIDEO || !time || time->cts == 0)
+		return;
+	const uint64_t now = os_gettime_ns();
+	if (time->cts > now || now - time->cts > 3600000000000ULL)
+		return;
+	const qint64 at = qint64(GetTickCount64()) - qint64((now - time->cts) / 1000000ULL);
+	qint64 empty = 0;
+	firstFrameAt.compare_exchange_strong(empty, at);
+	lastFrameAt.store(qMax(lastFrameAt.load(), at));
+	if (packet->keyframe)
+		lastKeyframeAt.store(at);
+}
 std::vector<std::string> g_doomed;
 QPointer<QTimer> g_purgeTimer;
 int g_clipSeconds = 20;
@@ -61,6 +80,8 @@ bool g_sharedEncoders = false;
 bool g_restartShared = false;
 obs_hotkey_id g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 std::vector<obs_key_combination_t> g_mirrored;
+QString g_gameName, g_saveFormat, g_saveFolder;
+qint64 g_memoryNameUntil = 0;
 
 qint64 NowMs()
 {
@@ -152,6 +173,7 @@ void StartDisk(bool keepPieces);
 void DiskStopped()
 {
 	if (g_out) {
+		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
 		signal_handler_t *sh = obs_output_get_signal_handler(g_out);
 		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
 		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
@@ -164,6 +186,8 @@ void DiskStopped()
 		// the piece that was being written is finished by the stop and stays part of the buffer
 		if (!g_current.path.empty() && os_file_exists(g_current.path.c_str())) {
 			g_current.endMs = NowMs();
+			if (g_current.captureStartMs == 0) g_current.captureStartMs = firstFrameAt.load();
+			g_current.captureEndMs = lastFrameAt.load();
 			g_pieces.push_back(g_current);
 		}
 		g_current = Piece();
@@ -189,14 +213,16 @@ void DiskStopped()
 void SendSave();
 
 // a piece is finished when the muxer moves on to the next file; a save waiting on that split goes ahead from here
-void PieceChanged(const std::string &next)
+void PieceChanged(const std::string &next, qint64 captureAt)
 {
 	const qint64 now = NowMs();
 	if (!g_current.path.empty()) {
 		g_current.endMs = now;
+		if (g_current.captureStartMs == 0) g_current.captureStartMs = firstFrameAt.load();
+		g_current.captureEndMs = captureAt;
 		g_pieces.push_back(g_current);
 	}
-	g_current = Piece{next, now, 0};
+	g_current = Piece{next, now, 0, captureAt, 0};
 	if (g_awaitingSplit) {
 		g_awaitingSplit = false;
 		SendSave();
@@ -207,8 +233,9 @@ void OnFileChanged(void *, calldata_t *cd)
 {
 	const char *next = calldata_string(cd, "next_file");
 	const std::string path = next ? next : "";
+	const qint64 captured = lastKeyframeAt.load();
 	if (g_callbacks)
-		QMetaObject::invokeMethod(g_callbacks, [path]() { PieceChanged(path); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(g_callbacks, [path, captured]() { PieceChanged(path, captured); }, Qt::QueuedConnection);
 }
 
 void OnOutputStop(void *, calldata_t *cd)
@@ -224,6 +251,77 @@ std::string ProfileString(config_t *config, const char *section, const char *key
 {
 	const char *value = config ? config_get_string(config, section, key) : nullptr;
 	return value ? value : "";
+}
+
+QString GameName(const QString &name)
+{
+	if (name.size() > 160)
+		return {};
+	QString clean;
+	const QString unsafe = QStringLiteral("<>:\"/\\|?*%");
+	for (QChar letter : name) {
+		if (letter.isNull() || letter.category() == QChar::Other_Control)
+			return {};
+		clean += unsafe.contains(letter) ? QChar('-') : letter;
+	}
+	clean = clean.simplified().left(80);
+	if (!clean.isEmpty() && clean.back().isHighSurrogate())
+		clean.chop(1);
+	while (clean.endsWith('.') || clean.endsWith(' '))
+		clean.chop(1);
+	return clean;
+}
+
+// clips of a game go in a folder named after it inside the clip folder; the screenshots folder and windows device names stay with the clip folder itself
+QString GameFolder(const QString &game)
+{
+	static const QStringList reserved = {QStringLiteral("screenshots"), QStringLiteral("con"), QStringLiteral("prn"), QStringLiteral("aux"), QStringLiteral("nul")};
+	const QString lower = game.toLower();
+	const bool device = lower.size() == 4 && (lower.startsWith(QStringLiteral("com")) || lower.startsWith(QStringLiteral("lpt"))) && lower[3] >= '1' && lower[3] <= '9';
+	return game.isEmpty() || device || reserved.contains(lower) ? QString() : game;
+}
+
+QString ReplayFormat(const QString &game, QString format, QString prefix, const QString &suffix)
+{
+	const QString name = GameName(game);
+	if (!name.isEmpty())
+		prefix = name;
+	if (format.isEmpty())
+		format = QStringLiteral("%CCYY-%MM-%DD %hh-%mm-%ss");
+	if (!prefix.isEmpty())
+		format.prepend(prefix + " ");
+	if (!suffix.isEmpty())
+		format += " " + suffix;
+	return format;
+}
+
+QString CurrentReplayFormat()
+{
+	config_t *config = obs_frontend_get_profile_config();
+	return ReplayFormat(g_gameName, QString::fromStdString(ProfileString(config, "Output", "FilenameFormatting")),
+		QString::fromStdString(ProfileString(config, "SimpleOutput", "RecRBPrefix")), QString::fromStdString(ProfileString(config, "SimpleOutput", "RecRBSuffix")));
+}
+
+void ApplyMemoryName()
+{
+	if (g_mode != Mode::Memory || NowMs() < g_memoryNameUntil)
+		return;
+	obs_output_t *output = obs_frontend_get_replay_buffer_output();
+	if (!output)
+		return;
+	// obs makes the folder itself when the replay is written
+	const QString folder = GameFolder(g_gameName);
+	const QByteArray format = (folder.isEmpty() ? CurrentReplayFormat() : folder + '/' + CurrentReplayFormat()).toUtf8();
+	obs_data_t *current = obs_output_get_settings(output);
+	const bool changed = format != obs_data_get_string(current, "format");
+	obs_data_release(current);
+	if (changed) {
+		obs_data_t *settings = obs_data_create();
+		obs_data_set_string(settings, "format", format.constData());
+		obs_output_update(output, settings);
+		obs_data_release(settings);
+	}
+	obs_output_release(output);
 }
 
 // the encoders obs has put on its recording output once it has recorded or run its replay buffer; taking them means a recording and this buffer share one encode instead of two
@@ -360,10 +458,15 @@ void StartDisk(bool keepPieces)
 	signal_handler_t *sh = obs_output_get_signal_handler(g_out);
 	signal_handler_connect(sh, "file_changed", OnFileChanged, nullptr);
 	signal_handler_connect(sh, "stop", OnOutputStop, nullptr);
+	firstFrameAt.store(0);
+	lastFrameAt.store(0);
+	lastKeyframeAt.store(0);
+	obs_output_add_packet_callback(g_out, CapturePacket, nullptr);
 	g_current = Piece{path, NowMs(), 0};
 	if (!obs_output_start(g_out)) {
 		const char *error = obs_output_get_last_error(g_out);
 		blog(LOG_WARNING, "[replaykit] disk clip buffer did not start: %s", error ? error : "no reason given");
+		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
 		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
 		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
 		obs_output_release(g_out);
@@ -376,6 +479,8 @@ void StartDisk(bool keepPieces)
 		g_purgeTimer = new QTimer(g_callbacks);
 		QObject::connect(g_purgeTimer, &QTimer::timeout, g_callbacks, []() { Purge(); });
 	}
+	if (!keepPieces)
+		CaptureContextResetBuffer();
 	g_purgeTimer->start(5000);
 	blog(LOG_INFO, "[replaykit] disk clip buffer started: %d s clips in %d s pieces, %zu audio track(s), %s encoders%s", g_clipSeconds, kPieceSeconds, g_audio.size(),
 	     g_sharedEncoders ? "the recording" : "its own", keepPieces ? ", pieces kept" : "");
@@ -426,21 +531,20 @@ void SendSave()
 	}
 
 	config_t *config = obs_frontend_get_profile_config();
-	const std::string formatting = ProfileString(config, "Output", "FilenameFormatting");
-	std::string prefix = ProfileString(config, "SimpleOutput", "RecRBPrefix");
-	const std::string suffix = ProfileString(config, "SimpleOutput", "RecRBSuffix");
-	std::string format = formatting.empty() ? "%CCYY-%MM-%DD %hh-%mm-%ss" : formatting;
-	if (!prefix.empty())
-		format = prefix + " " + format;
-	if (!suffix.empty())
-		format += " " + suffix;
+	const std::string format = g_saveFormat.toStdString();
 	const std::string container = ProfileString(config, "AdvOut", "RecFormat2");
 	const char *ext = container.find("mkv") != std::string::npos ? "mkv" : container.find("mov") != std::string::npos ? "mov" : "mp4";
 	char *name = os_generate_formatted_filename(ext, true, format.c_str());
 	QJsonArray segments;
+	QJsonArray capturePieces;
 	for (const std::string &path : paths)
 		segments.append(QString::fromStdString(path));
-	const QByteArray body = QJsonDocument(QJsonObject{{"id", g_saveStamp}, {"segments", segments}, {"seconds", g_clipSeconds}, {"name", QString::fromUtf8(name ? name : "")}})
+	for (const std::string &path : paths)
+		for (const auto &piece : g_pieces)
+			if (piece.path == path)
+				capturePieces.append(QJsonObject{{"path", QString::fromStdString(path)}, {"s", piece.captureStartMs}, {"e", piece.captureEndMs}});
+	CaptureContextBindSave(g_saveStamp, capturePieces);
+	const QByteArray body = QJsonDocument(QJsonObject{{"id", g_saveStamp}, {"segments", segments}, {"seconds", g_clipSeconds}, {"name", QString::fromUtf8(name ? name : "")}, {"folder", g_saveFolder}})
 					.toJson(QJsonDocument::Compact);
 	bfree(name);
 	blog(LOG_INFO, "[replaykit] disk clip buffer saving %d s from %zu piece(s)", g_clipSeconds, paths.size());
@@ -478,6 +582,9 @@ void SaveDisk()
 		return;
 	}
 	g_saving = true;
+	CaptureContextRefresh();
+	g_saveFormat = CurrentReplayFormat();
+	g_saveFolder = GameFolder(g_gameName);
 	g_awaitingSplit = true;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
@@ -524,13 +631,13 @@ bool SameCombos(const std::vector<obs_key_combination_t> &a, const std::vector<o
 	return true;
 }
 
-// the clip keybind is the save hotkey of the obs replay buffer, which does nothing while that buffer is off, so in disk mode a hotkey of this plugin carries the same keys; in memory mode it carries none, or a press would save twice
+// the mirrored key saves disk clips and marks memory requests; obs alone performs the memory save
 void SyncSaveHotkey()
 {
 	if (g_saveHotkey == OBS_INVALID_HOTKEY_ID)
 		return;
 	std::vector<obs_key_combination_t> combos;
-	const obs_hotkey_id source = g_mode == Mode::Disk ? FindReplaySaveHotkey() : OBS_INVALID_HOTKEY_ID;
+	const obs_hotkey_id source = FindReplaySaveHotkey();
 	if (source != OBS_INVALID_HOTKEY_ID) {
 		struct Collect {
 			obs_hotkey_id id;
@@ -555,7 +662,9 @@ void OnSaveHotkey(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed)
 {
 	if (!pressed || !g_callbacks)
 		return;
+	// the hotkey thread is not the one the sampler and the clip name live on, so the press is marked on the ui thread like every other clip request
 	QMetaObject::invokeMethod(g_callbacks, []() {
+		CaptureContextRequested();
 		if (g_mode == Mode::Disk)
 			SaveDisk();
 	}, Qt::QueuedConnection);
@@ -673,6 +782,7 @@ void ClipBufferToggle()
 
 void ClipBufferSave()
 {
+	CaptureContextRequested();
 	if (g_mode == Mode::Disk)
 		SaveDisk();
 	else if (obs_frontend_replay_buffer_active())
@@ -689,6 +799,33 @@ void ClipBufferApplySettings(const std::string &settingsBody)
 	if (next != g_mode)
 		SwitchMode(next);
 	SyncSaveHotkey();
+}
+
+void ClipBufferGameName(const QString &name)
+{
+	g_gameName = GameName(name);
+	ApplyMemoryName();
+}
+
+void ClipBufferPrepareName()
+{
+	g_memoryNameUntil = 0;
+	ApplyMemoryName();
+	g_memoryNameUntil = NowMs() + 120000;
+}
+
+int ClipBufferNameWindow()
+{
+	if (g_mode == Mode::Disk)
+		return g_clipSeconds;
+	obs_output_t *output = obs_frontend_get_replay_buffer_output();
+	if (!output)
+		return 0;
+	obs_data_t *settings = obs_output_get_settings(output);
+	const int seconds = int(obs_data_get_int(settings, "max_time_sec"));
+	obs_data_release(settings);
+	obs_output_release(output);
+	return qBound(1, seconds, 3600);
 }
 
 std::string ClipBufferPollQuery()
@@ -716,6 +853,10 @@ void MoveOntoRecordingEncoders()
 
 void ClipBufferOnFrontendEvent(enum obs_frontend_event event)
 {
+	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED || event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
+		g_memoryNameUntil = 0;
+		ApplyMemoryName();
+	}
 	if (g_mode != Mode::Disk)
 		return;
 	// something started the memory buffer behind the setting (the obs controls, an auto start of obs itself): it is stopped and the disk one runs instead
@@ -740,6 +881,8 @@ QJsonObject ClipBufferProbe()
 		{"active", ClipBufferActive()},
 		{"diskPieces", (int)g_pieces.size()},
 		{"saving", g_saving},
+		{"game", g_gameName},
+		{"folder", GameFolder(g_gameName)},
 		{"sharedEncoders", g_sharedEncoders},
 		{"clipSeconds", g_clipSeconds},
 		{"hotkeyKeys", (int)g_mirrored.size()}};

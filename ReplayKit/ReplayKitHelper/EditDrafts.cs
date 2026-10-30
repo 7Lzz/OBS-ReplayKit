@@ -18,7 +18,7 @@ namespace ReplayKitHelper
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
-        private static string FullPath(string name) => Path.GetFullPath(Path.IsPathRooted(name) ? name : Path.Combine(AppConfig.GetClipDir(), name));
+        private static string FullPath(string name) => Path.GetFullPath(Path.IsPathRooted(name) ? name : Clips.LocateClip(name));
         private static string Key(string path) => FullPath(path).ToUpperInvariant();
 
         private static bool Matches(JObject entry, string path)
@@ -69,7 +69,7 @@ namespace ReplayKitHelper
                         string source = saved["source"]?.Value<string>();
                         string name = source == null ? prop.Name : Path.GetFileName(source);
                         var clip = Clips.GetSafeClipPath(name);
-                        if (clip == null || !string.Equals(Path.GetDirectoryName(clip.Full), folder, StringComparison.OrdinalIgnoreCase) ||
+                        if (clip == null || !string.Equals(Clips.LibraryRoot(Path.GetDirectoryName(clip.Full)), folder, StringComparison.OrdinalIgnoreCase) ||
                             (source != null && Key(source) != Key(clip.Full)) || !seen.Add(clip.Name)) continue;
                         var entry = Entry(db, clip, out bool migrated);
                         changed |= migrated;

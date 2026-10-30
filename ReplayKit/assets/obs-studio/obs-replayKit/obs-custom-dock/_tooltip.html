@@ -191,7 +191,10 @@
       node.removeAttribute("title");
     });
   }
+  var watched = new WeakSet();
   function watch(root) {
+    if (watched.has(root)) return;
+    watched.add(root);
     adopt(root);
     new MutationObserver(function (changes) {
       changes.forEach(function (change) {
@@ -200,6 +203,8 @@
       });
     }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["title"] });
   }
+  if (document.body) watch(document.body);
+  else document.addEventListener("DOMContentLoaded", function () { watch(document.body); }, { once:true });
 
   window.RKTooltip = {
     show: show,

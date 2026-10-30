@@ -8,6 +8,7 @@
 #include <QFileInfo>
 
 #include "app/clip_buffer.hpp"
+#include "app/capture_context.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/obs_menu.hpp"
 #include "app/settings_poll.hpp"
@@ -59,7 +60,7 @@ void CloseCefWidgetsBeforeShutdown()
 }
 
 // obs saves a screenshot where it saves recordings, which is the clip folder; it is moved into the Screenshots folder there, the one the clips page lists, keeping the name obs gave it. a file obs still holds is tried again a few times, and a Screenshots folder that is a link is left alone the way the helper leaves it alone
-void FileScreenshot(const QString &path, int tries)
+void FileScreenshot(const QString &path, int tries, qint64 captureAt)
 {
 	const QFileInfo shot(path);
 	if (!shot.isFile() || shot.suffix().compare(QStringLiteral("png"), Qt::CaseInsensitive) != 0)
@@ -78,11 +79,12 @@ void FileScreenshot(const QString &path, int tries)
 	for (int n = 2; QFileInfo::exists(target) && n < 1000; ++n)
 		target = QDir(folderPath).filePath(QStringLiteral("%1 (%2).png").arg(shot.completeBaseName()).arg(n));
 	if (QFile::rename(path, target)) {
+		CaptureContextFile(target.toStdString(), captureAt);
 		blog(LOG_INFO, "[replaykit] screenshot filed in the Screenshots folder");
 		return;
 	}
 	if (tries > 0)
-		QTimer::singleShot(250, g_callbacks, [path, tries]() { FileScreenshot(path, tries - 1); });
+		QTimer::singleShot(250, g_callbacks, [path, tries, captureAt]() { FileScreenshot(path, tries - 1, captureAt); });
 	else
 		blog(LOG_WARNING, "[replaykit] screenshot left where obs saved it: it could not be moved");
 }
@@ -96,6 +98,7 @@ NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
+		CaptureContextStop();
 		CefCloseForShutdown();
 		PatchBrowserDockTitleInUserIni(); // fires after obs already wrote user.ini, so this rename sticks
 		PrepareDocksForNextLaunch();
@@ -124,12 +127,19 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	}
 
 	ClipBufferOnFrontendEvent(event);
+	CaptureContextEvent(event);
+	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
+		char *path = obs_frontend_get_last_replay();
+		CaptureContextReplayFile(path ? path : "");
+		bfree(path);
+	}
 	if (event == OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN) {
+		const qint64 captureAt = qint64(GetTickCount64());
 		char *last = obs_frontend_get_last_screenshot();
 		const QString path = QString::fromUtf8(last ? last : "");
 		bfree(last);
 		if (!path.isEmpty())
-			FileScreenshot(path, 8);
+			FileScreenshot(path, 8, captureAt);
 		return;
 	}
 	// recording / replay-buffer state drives the red dot on the tray icon, the only surface that wears it
@@ -149,6 +159,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		return;
 
 	PrewarmCefBrowser();
+	CaptureContextStart();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();
 	// obs restores its saved dock state during init, so the dock half of the layout has to wait for this event; the chrome half already ran from obs_module_post_load and is simply re-asserted here

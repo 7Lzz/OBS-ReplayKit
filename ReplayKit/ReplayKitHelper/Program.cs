@@ -27,6 +27,17 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
+            if (args.Length > 0 && args[0] == "--refresh-game-tag")
+            {
+                try
+                {
+                    Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
+                    if (!long.TryParse(GetNamedArg(args, "-Bytes"), out long bytes) || !long.TryParse(GetNamedArg(args, "-Written"), out long written) || !long.TryParse(GetNamedArg(args, "-Created"), out long created)) return 1;
+                    ClipGames.RefreshedRetag(GetNamedArg(args, "-File"), bytes, written, created);
+                    return 0;
+                }
+                catch (Exception ex) { Console.Error.WriteLine("Game tag refresh failed: " + ex.GetType().Name); return 1; }
+            }
             if (args.Length == 1 && args[0] == "--host-info")
             {
                 Console.WriteLine(new JObject { ["hosted"] = ProcessHost.Hosted, ["helperRoot"] = Constants.HelperRoot,
@@ -153,6 +164,7 @@ namespace ReplayKitHelper
 
             // client half of the ipc pipe with the native plugin -- main-window + projector hwnds in, open-clips + allow-close out. connects when the plugins server is up and reconnects on its own; every consumer degrades gracefully while it isnt.
             try { PipeClient.Start(); } catch (Exception ex) { Log.Write("PipeClient.Start: " + ex.Message); }
+            SteamGames.Refresh();
 
             // surface admin / parent-process info at startup so its trivial to diagnose "vss not admin" later. with an elevation script that auto-relaunches obs, the lua can spawn the helper twice -- once under the pre-elevation non-admin obs (which then exits), and once under the post-elevation admin obs. the non-admin one can win port races and stick around as a useless orphan; the parent-process watchdog below kills the orphan when its obs goes away.
             bool isAdmin = false;
@@ -199,6 +211,7 @@ namespace ReplayKitHelper
             try { IdleMemory.Start(); } catch (Exception ex) { Log.Write("IdleMemory.Start: " + ex.Message); }
             try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
             try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
+            try { ClipFolderWorker.Start(); } catch (Exception ex) { Log.Write("ClipFolderWorker.Start: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
             var probe = new Thread(() =>
             {

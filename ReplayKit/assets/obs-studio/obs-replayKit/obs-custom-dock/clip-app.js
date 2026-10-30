@@ -227,12 +227,22 @@ const CLIP_HOVER_PROFILES = {
   const scrollAreaEl = document.querySelector(".scroll-area");
   const favoritesHeadingEl = document.getElementById("favorites-heading");
   const favoritesGridEl    = document.getElementById("favorites-grid");
+  const linkedHeadingEl    = document.getElementById("linked-heading");
+  const linkedGridEl       = document.getElementById("linked-grid");
+  const draftsHeadingEl    = document.getElementById("drafts-heading");
+  const draftsGridEl       = document.getElementById("drafts-grid");
+  // the plain rows above the virtual list on the all filter
+  const rowGridEls = [favoritesGridEl, linkedGridEl, draftsGridEl];
+  const inRowGrid = (node) => rowGridEls.some((grid) => grid.contains(node));
   const restHeadingEl      = document.getElementById("rest-heading");
+  const groupGamesEl       = document.getElementById("group-games");
+  const groupGamesSwitchEl = document.getElementById("group-games-switch");
   const restHeadingIconEl  = document.getElementById("rest-heading-icon");
   const restHeadingLabelEl = document.getElementById("rest-heading-label");
   // content for the heading above the main grid. "all" is the existing all-tab-plus-favorites case (grid icon, paired with the favorites split below); the other three give each single-filter tab its own header the same way.
   const FILTER_SECTION_HEADING = {
     all:       { icon: ICON.GRID, label: "All clips" },
+    clips:     { icon: ICON.GRID, label: "Clips" },
     favorites: { icon: ICON.STAR, label: "Favorites" },
     linked:    { icon: ICON.LINK, label: "Linked" },
     local:     { icon: ICON.GRID, label: "All clips" },
@@ -248,7 +258,6 @@ const CLIP_HOVER_PROFILES = {
   const popupBody = document.getElementById("popup-body");
   const popupOk = document.getElementById("popup-ok");
   const resizeGripEl = document.querySelector(".resize-grip");
-  const tabBtns = Array.from(document.querySelectorAll(".tab[data-filter]"));
   const sortWrap = document.getElementById("clip-sort");
   const sortButton = document.getElementById("clip-sort-button");
   const sortMenu = document.getElementById("clip-sort-menu");
@@ -301,6 +310,7 @@ const CLIP_HOVER_PROFILES = {
   let favoriteResolveInFlight = false;
   let favoriteResolveTimer = 0;
   let activeFilter = "all";
+  let gameFilters = null;
   let clipSearchQuery = "";
   // never persisted (session-only, unlike favorites) -- always starts fresh at newest so a closed-and-reopened clips window or an obs restart never comes back to whatever sort was last picked.
   let activeSort = "newest";
@@ -315,13 +325,13 @@ const CLIP_HOVER_PROFILES = {
         if (saved.length > 256) throw new Error("Invalid section preferences");
         const sections = JSON.parse(saved);
         if (!Array.isArray(sections) || sections.length > SECTION_KEYS.size || sections.some(key => !SECTION_KEYS.has(key))) throw new Error("Invalid section preferences");
-        sections.filter(key => ["favorites", "screenshots", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
+        sections.filter(key => ["favorites", "linked", "drafts", "screenshots", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
       }
     } catch {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -392,6 +402,13 @@ const CLIP_HOVER_PROFILES = {
   let allClipsExpected = 0;
   let virtualCardWidth = 330;
   let virtualRowStride = 318;
+  // all clips sorted into a section per game: allClips then holds each game in one run, and the virtual list gives every run a subtitle row of its own
+  const GROUP_BY_GAME_KEY = "replaykit.groupByGame.v1";
+  const GROUP_HEAD_HEIGHT = 40;
+  let groupByGame = false;
+  try { groupByGame = !HOME_MODE && localStorage.getItem(GROUP_BY_GAME_KEY) === "1"; } catch {}
+  let virtualGroups = [];
+  let lastRestKey = "";
   let virtualRenderQueued = false;
   let virtualRenderForceQueued = false;
   let virtualSettling = false;
@@ -734,7 +751,7 @@ const CLIP_HOVER_PROFILES = {
     ensureDraftResolve();
     updateTabs(loadedClips);
     syncAllDraftUi();
-    if (activeFilter === "drafts") renderLoadedClips(loadedClips);
+    if (activeFilter === "drafts" || activeFilter === "all") renderLoadedClips(loadedClips);
   }
 
   function currentDraftResolveKey() {
@@ -775,7 +792,7 @@ const CLIP_HOVER_PROFILES = {
       const byName = new Map(lastClipsByName);
       for (const clip of next.values()) byName.set(clip.name, clip);
       lastClipsByName = byName;
-      if (activeFilter === "drafts") renderLoadedClips(loadedClips);
+      if (activeFilter === "drafts" || activeFilter === "all") renderLoadedClips(loadedClips);
       else updateTabs(loadedClips);
     } catch {
       // asked for again in a moment, a few times at most
@@ -1078,25 +1095,21 @@ const CLIP_HOVER_PROFILES = {
     const known = total !== undefined;
     // favorites are kept by name for every folder, so the count is the favorites the helper found in this folder, not the length of that list
     const favoritesKnown = !favoriteNamesList().length || favoriteResolveKey === currentFavoriteResolveKey();
+    const videoCount = total;
     const counts = {
-      all: total === undefined ? undefined : total + (screenshotGallery ? screenshotGallery.count() || 0 : 0),
-      favorites: favoritesKnown ? resolvedFavoriteClips.length : undefined,
+      all: videoCount === undefined ? undefined : videoCount + (screenshotGallery ? screenshotGallery.count() || 0 : 0),
+      favorites: favoritesKnown ? resolvedFavoriteClips.filter(c => !gameFilters || gameFilters.matchesGame(c)).length : undefined,
       linked: linkedTotal,
       local: known ? Math.max(0, total - linkedTotal) : undefined,
       // the same for drafts: the ones whose clip is in this folder
-      drafts: draftsLoaded && draftResolveKey === currentDraftResolveKey() ? resolvedDraftClips.size : undefined,
+      drafts: draftsLoaded && draftResolveKey === currentDraftResolveKey() ? Array.from(resolvedDraftClips.values()).filter(c => !gameFilters || gameFilters.matchesGame(c)).length : undefined,
       screenshots: screenshotGallery ? screenshotGallery.count() : undefined,
     };
-    for (const btn of tabBtns) {
-      const key = btn.dataset.filter;
-      btn.classList.toggle("is-active", key === activeFilter);
-      const countEl = btn.querySelector(".count");
-      countEl.hidden = counts[key] === undefined;
-      countEl.textContent = counts[key] === undefined ? "" : String(counts[key]);
-    }
+    if (gameFilters) gameFilters.counts({...counts, clips:videoCount});
   }
 
   function clipMatchesFilter(clip) {
+    if (gameFilters && !gameFilters.matches(clip, isFavorite(clip.name))) return false;
     if (activeFilter === "favorites") return isFavorite(clip.name);
     if (activeFilter === "linked") return !!clip.streamable_url;
     if (activeFilter === "local") return !clip.streamable_url;
@@ -1114,6 +1127,7 @@ const CLIP_HOVER_PROFILES = {
 
   function emptyMessageForFilter() {
     if (clipSearchQuery.trim()) return "No clips match your search.";
+    if (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.favorites || gameFilters.state.linked)) return "No clips match these filters.";
     if (activeFilter === "favorites") return "No favorite clips yet.";
     if (activeFilter === "linked") return "No linked clips yet.";
     if (activeFilter === "local") return "No local-only clips.";
@@ -1221,7 +1235,7 @@ const CLIP_HOVER_PROFILES = {
     }
     ensureFavoriteResolve();
     if (activeFilter === "drafts") ensureDraftResolve();
-    const source = activeFilter === "favorites" ? favoriteClipsForRender(loadedClips)
+    const source = activeFilter === "favorites" || (gameFilters && gameFilters.state.favorites) ? favoriteClipsForRender(loadedClips)
       : activeFilter === "drafts" ? draftClipsForRender(loadedClips)
       : loadedClips;
     const filtered = applyClipFilter(source);
@@ -1238,6 +1252,10 @@ const CLIP_HOVER_PROFILES = {
     }
     document.body.classList.toggle("clips-collapsed", activeFilter === "all" && collapsedSections.has("clips"));
     favoritesGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("favorites"));
+    linkedGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("linked"));
+    draftsGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("drafts"));
+    groupGamesEl.hidden = activeFilter !== "all";
+    groupGamesSwitchEl.checked = groupByGame;
     document.querySelectorAll(".section-toggle").forEach(button => {
       const expanded = activeFilter !== "all" || !collapsedSections.has(button.dataset.section);
       button.hidden = activeFilter !== "all";
@@ -1271,6 +1289,84 @@ const CLIP_HOVER_PROFILES = {
       queueVirtualRender(true);
     });
   });
+
+  groupGamesSwitchEl.addEventListener("change", () => {
+    groupByGame = groupGamesSwitchEl.checked;
+    try { localStorage.setItem(GROUP_BY_GAME_KEY, groupByGame ? "1" : "0"); } catch {}
+    stopActivePreviewForScroll();
+    renderLoadedClips(loadedClips);
+    queueVirtualRender(true);
+  });
+
+  function clipGroupsActive() {
+    return groupByGame && !HOME_MODE && activeFilter === "all" && !!window.RKClipGames;
+  }
+
+  // puts each game in one run, the games in the order their first clip has in the list, and notes where every run starts
+  function groupClipsByGame(clips) {
+    const groups = new Map();
+    for (const clip of clips) {
+      const game = RKClipGames.group(clip);
+      if (!groups.has(game.key)) groups.set(game.key, { ...game, clips: [] });
+      groups.get(game.key).clips.push(clip);
+    }
+    const ordered = [];
+    virtualGroups = [];
+    for (const group of groups.values()) {
+      virtualGroups.push({ key: group.key, id: group.id, kind: group.kind, name: group.name, start: ordered.length, count: group.clips.length });
+      ordered.push(...group.clips);
+    }
+    return ordered;
+  }
+
+  // where every run of a game stands in the virtual list, for the number of columns there is now
+  function groupLayout(columns) {
+    let top = 0;
+    return virtualGroups.map((group) => {
+      const placed = { ...group, top, rowsTop: top + GROUP_HEAD_HEIGHT, rows: Math.ceil(group.count / columns) };
+      top = placed.rowsTop + placed.rows * virtualRowStride;
+      return placed;
+    });
+  }
+
+  function groupLayoutHeight(layout) {
+    const last = layout[layout.length - 1];
+    return last ? last.rowsTop + last.rows * virtualRowStride : 0;
+  }
+
+  // the top of the slot a clip of the virtual list has, from the top of the list
+  function virtualSlotTop(index, columns) {
+    if (!clipGroupsActive()) return Math.floor((index + saveGhostSlots()) / columns) * virtualRowStride;
+    const group = groupLayout(columns).find((g) => index >= g.start && index < g.start + g.count);
+    return group ? group.rowsTop + Math.floor((index - group.start) / columns) * virtualRowStride : 0;
+  }
+
+  function virtualGridHeight(columns) {
+    if (!clipGroupsActive()) return Math.ceil((Math.max(allClips.length, allClipsExpected) + saveGhostSlots()) / columns) * virtualRowStride;
+    // clips that are still to come get the room of plain rows under the last game until their page is in
+    return groupLayoutHeight(groupLayout(columns)) + Math.ceil(Math.max(0, allClipsExpected - allClips.length) / columns) * virtualRowStride;
+  }
+
+  // the subtitles of the games, one per run, kept in the virtual list next to its cards
+  function paintGroupHeadings(layout) {
+    const existing = new Map();
+    gridEl.querySelectorAll(":scope > .game-group-heading").forEach((el) => existing.set(el.dataset.key, el));
+    for (const group of layout) {
+      let el = existing.get(group.key);
+      existing.delete(group.key);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "game-group-heading";
+        el.dataset.key = group.key;
+        el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name"></span><span class="game-group-count"></span>';
+        gridEl.appendChild(el);
+      }
+      el.querySelector(".game-group-name").textContent = group.name;
+      el.querySelector(".game-group-count").textContent = String(group.count);
+      el.style.setProperty("--group-y", group.top + "px");
+    }
+    for (const leftover of existing.values()) leftover.remove();
+  }
 
   // upload caps the helper actually enforces, read from /me rather than hardcoded so they follow the signed-in plan (free/anon: 1 GB + 10 min; paid plans raise or remove both). 0 on either field means "no limit".
   let uploadLimits = { maxUploadBytes:0, maxDurationSec:0 };
@@ -1618,6 +1714,7 @@ const CLIP_HOVER_PROFILES = {
       clip.streamable_url || "",
       clip.uploaded_at || 0,
       clip.retention_days || 0,
+      JSON.stringify(clip.capture || null),
       isFavorite(clip.name) ? 1 : 0,
     ].join("|");
   }
@@ -1628,7 +1725,7 @@ const CLIP_HOVER_PROFILES = {
 
   // the columns of the list are the ones the css grid works out (.grid, with the chosen card size when there is one): the used track sizes are read back from the list itself or, when it is hidden, from the favorites above it, so every card of every tab stands on the same columns
   function computeVirtualLayout() {
-    const source = activeFilter === "screenshots" ? document.getElementById("screenshots-grid") : gridEl.style.display === "none" ? favoritesGridEl : gridEl;
+    const source = activeFilter === "screenshots" ? document.getElementById("screenshots-grid") : gridEl.style.display === "none" ? (rowGridEls.find((grid) => grid.classList.contains("is-shown")) || favoritesGridEl) : gridEl;
     const tracks = getComputedStyle(source).gridTemplateColumns.split(" ").map(parseFloat).filter((px) => px > 0);
     return tracks.length ? { columns: tracks.length, cardWidth: tracks[0] } : { columns: virtualColumns, cardWidth: virtualCardWidth };
   }
@@ -1644,7 +1741,7 @@ const CLIP_HOVER_PROFILES = {
       width: rect.width,
       height: rect.height,
       name,
-      row: favoritesGridEl.contains(card) || card.dataset.shot ? card.parentElement : null,
+      row: inRowGrid(card) || card.dataset.shot ? card.parentElement : null,
       index: allClips.findIndex((clip) => clip && clip.name === name),
       x: 0,
       y: 0,
@@ -1662,7 +1759,7 @@ const CLIP_HOVER_PROFILES = {
       return card ? card.getBoundingClientRect().top - origin : 0;
     }
     if (drag.index < 0) return 0;
-    return gridEl.getBoundingClientRect().top - origin + Math.floor(drag.index / columns) * virtualRowStride;
+    return gridEl.getBoundingClientRect().top - origin + virtualSlotTop(drag.index, columns);
   }
 
   // gives every card the width px, or takes the choice back with null, and keeps the card the drag began on at the same place on the screen
@@ -1676,7 +1773,7 @@ const CLIP_HOVER_PROFILES = {
     const layout = computeVirtualLayout();
     // a row is as high as a card, and a card is as much higher as its picture is: 16 to 9 of the width
     virtualRowStride = Math.ceil(drag.height + (layout.cardWidth - drag.width) * 9 / 16) + GRID_GAP;
-    gridEl.style.height = Math.ceil((Math.max(allClips.length, allClipsExpected) + saveGhostSlots()) / layout.columns) * virtualRowStride + "px";
+    gridEl.style.height = virtualGridHeight(layout.columns) + "px";
     scrollAreaEl.scrollTop = scrolled + cardResizeTop(drag, layout.columns) - before;
     renderVirtualWindow(true);
   }
@@ -1965,6 +2062,15 @@ const CLIP_HOVER_PROFILES = {
     card.style.setProperty("--virtual-card-y", (row * virtualRowStride) + "px");
   }
 
+  function positionGroupedCard(card, index, groups, columns, cardWidth) {
+    const group = groups.find((g) => index >= g.start && index < g.start + g.count);
+    if (!group) return;
+    const slot = index - group.start;
+    card.style.setProperty("--virtual-card-width", cardWidth + "px");
+    card.style.setProperty("--virtual-card-x", ((slot % columns) * (cardWidth + GRID_GAP)) + "px");
+    card.style.setProperty("--virtual-card-y", (group.rowsTop + Math.floor(slot / columns) * virtualRowStride) + "px");
+  }
+
   function resetVirtualWindow() {
     allClipsExpected = 0;
     virtualRangeStart = -1;
@@ -1974,6 +2080,7 @@ const CLIP_HOVER_PROFILES = {
     bottomSpacerEl.style.height = "0px";
     gridEl.style.height = "0px";
     gridEl.querySelectorAll(".card").forEach(releaseCard);
+    gridEl.querySelectorAll(":scope > .game-group-heading").forEach((el) => el.remove());
   }
 
   function updateVisibleCards() {
@@ -2019,18 +2126,38 @@ const CLIP_HOVER_PROFILES = {
     const layout = computeVirtualLayout();
     const columns = layout.columns;
     const cardWidth = layout.cardWidth;
-    const lead = saveGhostSlots();
+    const grouped = clipGroupsActive();
+    // the card of a clip being saved belongs to the front of one plain list, so the games sections go without it
+    const lead = grouped ? 0 : saveGhostSlots();
+    const groups = grouped ? groupLayout(columns) : [];
     const totalRows = Math.ceil((Math.max(allClips.length, allClipsExpected) + lead) / columns);
     // the virtualized grid sits below an optional favorites sub-section, so subtract that section height from scrollTop before computing visible rows.
     const virtScrollTop = Math.max(0,
       scrollAreaEl.scrollTop - (gridEl.offsetTop - scrollAreaEl.offsetTop));
-    const startRow = Math.max(0, Math.floor(virtScrollTop / virtualRowStride) - VIRTUAL_OVERSCAN_ROWS);
-    const endRow = Math.min(
-      totalRows,
-      Math.ceil((virtScrollTop + scrollAreaEl.clientHeight) / virtualRowStride) + VIRTUAL_OVERSCAN_ROWS
-    );
-    const start = Math.max(0, Math.min(allClips.length, startRow * columns - lead));
-    const end = Math.max(0, Math.min(allClips.length, endRow * columns - lead));
+    let startRow, start, end;
+    if (grouped) {
+      const viewTop = virtScrollTop - VIRTUAL_OVERSCAN_ROWS * virtualRowStride;
+      const viewBottom = virtScrollTop + scrollAreaEl.clientHeight + VIRTUAL_OVERSCAN_ROWS * virtualRowStride;
+      startRow = -1;
+      start = allClips.length;
+      end = 0;
+      for (const group of groups) {
+        const first = Math.max(0, Math.floor((viewTop - group.rowsTop) / virtualRowStride));
+        const last = Math.min(group.rows, Math.ceil((viewBottom - group.rowsTop) / virtualRowStride));
+        if (last <= first) continue;
+        start = Math.min(start, group.start + first * columns);
+        end = Math.max(end, Math.min(group.start + group.count, group.start + last * columns));
+      }
+      if (end <= start) start = end = 0;
+    } else {
+      startRow = Math.max(0, Math.floor(virtScrollTop / virtualRowStride) - VIRTUAL_OVERSCAN_ROWS);
+      const endRow = Math.min(
+        totalRows,
+        Math.ceil((virtScrollTop + scrollAreaEl.clientHeight) / virtualRowStride) + VIRTUAL_OVERSCAN_ROWS
+      );
+      start = Math.max(0, Math.min(allClips.length, startRow * columns - lead));
+      end = Math.max(0, Math.min(allClips.length, endRow * columns - lead));
+    }
 
     if (!force &&
         lead === virtualLead &&
@@ -2048,7 +2175,7 @@ const CLIP_HOVER_PROFILES = {
     virtualRangeEnd = end;
     topSpacerEl.style.height = "0px";
     bottomSpacerEl.style.height = "0px";
-    gridEl.style.height = Math.max(0, totalRows * virtualRowStride) + "px";
+    gridEl.style.height = Math.max(0, virtualGridHeight(columns)) + "px";
     // the height just set can bring the scrollbar in and the scrollbar takes its width from the grid, so the cards would stand at the width the grid had before it; the width is measured again and a layout that comes out different is made again right here, before the frame is drawn, instead of by whatever render comes next
     if (!virtualSettling) {
       const settled = computeVirtualLayout();
@@ -2080,9 +2207,12 @@ const CLIP_HOVER_PROFILES = {
         card = acquireCard(clip);
         gridEl.appendChild(card);
       }
-      positionVirtualCard(card, i + lead, columns, cardWidth);
+      if (grouped) positionGroupedCard(card, i, groups, columns, cardWidth);
+      else positionVirtualCard(card, i + lead, columns, cardWidth);
       observeThumb(card.querySelector(".thumb"));
     }
+    if (grouped) paintGroupHeadings(groups);
+    else gridEl.querySelectorAll(":scope > .game-group-heading").forEach((el) => el.remove());
 
     if (lead && startRow === 0) {
       if (!saveGhostEl) saveGhostEl = buildSaveGhost();
@@ -2099,7 +2229,7 @@ const CLIP_HOVER_PROFILES = {
     // the active preview belongs to the users current hover or a fullscreened card; abort only when it is no longer in the virtual window or favorites.
     if (activePreview &&
         !gridEl.contains(activePreview) &&
-        !favoritesGridEl.contains(activePreview)) {
+        !inRowGrid(activePreview)) {
       abortVideoLoad(activePreview);
       activePreview = null;
     }
@@ -2162,6 +2292,7 @@ const CLIP_HOVER_PROFILES = {
     const url = HELPER + "/clips?offset=" + encodeURIComponent(offset)
       + "&limit=" + encodeURIComponent(CLIPS_PAGE_LIMIT)
       + "&sort=" + encodeURIComponent(requestSort)
+      + (gameFilters ? "&game=" + encodeURIComponent(gameFilters.state.game) + (gameFilters.state.linked ? "&linked=1" : "") : "")
       + (refresh ? "&refresh=1" : "")
       + "&t=" + Date.now();
     const res = await fetch(url, { cache: "no-store" });
@@ -2181,11 +2312,13 @@ const CLIP_HOVER_PROFILES = {
   async function fetchClips() {
     const forceRefresh = clipsRefreshCounter++ % CLIPS_FORCE_REFRESH_EVERY === 0;
     const requestSort = activeSort;
+    const requestGames = gameFilters ? gameFilters.key : "";
     const page = await fetchClipsPage(0, forceRefresh, requestSort);
-    if (requestSort !== activeSort) return null;
+    if (requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return null;
     if (page.paged && page.folder && page.folder !== clipsFolder) {
       const switched = clipsFolder !== "";
       clipsFolder = page.folder;
+      if (gameFilters) gameFilters.folder(clipsFolder);
       if (switched) forgetFolderState();
     }
     if (!page.paged) {
@@ -2236,7 +2369,8 @@ const CLIP_HOVER_PROFILES = {
   async function loadMoreClipsIfNeeded(force) {
     if (HOME_MODE || clipsLoadingMore || document.hidden || clipsNextOffset >= clipsTotal) return;
     // a list that is not very long is read in full right away, so every clip is there before anybody scrolls to it; a very long one is read ahead of the scroll
-    if (!force && clipsNextOffset >= CLIPS_EAGER_LIMIT) {
+    // the games sections are laid out from every clip, so with them on the whole list is read
+    if (!force && clipsNextOffset >= CLIPS_EAGER_LIMIT && !clipGroupsActive()) {
       const loadedRows = Math.ceil(allClips.length / Math.max(1, virtualColumns));
       const loadedEnd = (gridEl.offsetTop - scrollAreaEl.offsetTop) + loadedRows * virtualRowStride;
       if (loadedEnd - (scrollAreaEl.scrollTop + scrollAreaEl.clientHeight) > virtualRowStride * CLIPS_LOAD_AHEAD_ROWS) return;
@@ -2244,8 +2378,9 @@ const CLIP_HOVER_PROFILES = {
     clipsLoadingMore = true;
     try {
       const requestSort = activeSort;
+      const requestGames = gameFilters ? gameFilters.key : "";
       const page = await fetchClipsPage(clipsNextOffset, false, requestSort);
-      if (requestSort !== activeSort) return;
+      if (requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return;
       if (!page.paged) return;
       if (page.version !== clipsPageVersion) {
         // the list was rebuilt between the pages: the first page is read again, and the pages read so far stay on the screen until their new copies are in
@@ -2846,6 +2981,10 @@ const CLIP_HOVER_PROFILES = {
       <div class="actions"></div>
       <div class="card-resize" data-tooltip="Drag to resize clips, double-click to reset">${CARD_GRIP_SVG}</div>
     `;
+
+    const cardMenu = card.querySelector(".menu-dropdown");
+    const revealItem = cardMenu && card.querySelector(".open-folder-item");
+    if (revealItem && window.RKClipGames) revealItem.after(RKClipGames.menuAction(clip, false, closeAllMenus));
 
     syncProcessing(card, clip);
     applyClipHovers(card);
@@ -4038,6 +4177,7 @@ const CLIP_HOVER_PROFILES = {
   function renderActions(card, clip, force) {
     const actions = card.querySelector(".actions");
     const meta = card.querySelector(".meta");
+    if (window.RKClipGames) RKClipGames.badge(meta, clip, { change: true });
     const status = lastUploadJobsByName.get(clip.name)
       || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
     // within the cancel grace window keep the card idle even if a stale status snapshot still reports the job active.
@@ -4347,7 +4487,7 @@ const CLIP_HOVER_PROFILES = {
       || loadedClips.find((c) => c && c.name === filename);
     if (!clip) return;
     const selector = '.card[data-name="' + CSS.escape(filename) + '"]';
-    const card = gridEl.querySelector(selector) || favoritesGridEl.querySelector(selector);
+    const card = gridEl.querySelector(selector) || rowGridEls.map((grid) => grid.querySelector(selector)).find(Boolean);
     if (card) renderActions(card, clip, true);
   }
 
@@ -4423,38 +4563,56 @@ const CLIP_HOVER_PROFILES = {
     const allFilterActive = (activeFilter === "all");
     if (allFilterActive) ensureFavoriteResolve();
     const favClips = allFilterActive ? applyClipFilter(favoriteClipsForRender(loadedClips)) : [];
-    const favClipNames = new Set(favClips.map(c => c.name));
-    const restClips = allFilterActive ? clips.filter(c => !favClipNames.has(c.name)) : clips;
+    const shownAbove = new Set(favClips.map(c => c.name));
+    const linkedClips = allFilterActive ? clips.filter(c => c.streamable_url && !shownAbove.has(c.name)) : [];
+    linkedClips.forEach(c => shownAbove.add(c.name));
+    if (allFilterActive) ensureDraftResolve();
+    const draftClips = allFilterActive ? applyClipFilter(draftClipsForRender(loadedClips)).filter(c => !shownAbove.has(c.name)) : [];
+    draftClips.forEach(c => shownAbove.add(c.name));
+    const restClips = allFilterActive ? clips.filter(c => !shownAbove.has(c.name)) : clips;
     const showFavSection = allFilterActive && favClips.length > 0;
     favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
     favoritesGridEl.classList.toggle("is-shown", showFavSection);
     if (showFavSection && !collapsedSections.has("favorites")) renderFavoritesGrid(favClips);
     else favoritesGridEl.replaceChildren();
+    for (const [headingEl, sectionGridEl, key, rows] of [[linkedHeadingEl, linkedGridEl, "linked", linkedClips], [draftsHeadingEl, draftsGridEl, "drafts", draftClips]]) {
+      headingEl.classList.toggle("is-shown", rows.length > 0);
+      sectionGridEl.classList.toggle("is-shown", rows.length > 0);
+      if (rows.length && !collapsedSections.has(key)) renderCardRow(sectionGridEl, rows);
+      else sectionGridEl.replaceChildren();
+    }
+    const showRowSections = showFavSection || linkedClips.length > 0 || draftClips.length > 0;
     // every section keeps its heading available while its contents are collapsed.
     const restHeadingContent = allFilterActive
       ? FILTER_SECTION_HEADING.all
       : FILTER_SECTION_HEADING[activeFilter];
     restHeadingEl.classList.toggle("is-shown", !!restHeadingContent);
-    restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showFavSection || !!(screenshotGallery && screenshotGallery.count())));
+    restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showRowSections || !!(screenshotGallery && screenshotGallery.count())));
     if (restHeadingContent) {
       restHeadingIconEl.innerHTML = restHeadingContent.icon;
       restHeadingLabelEl.textContent = restHeadingContent.label;
     }
     syncClipView();
-    allClips = restClips;
-    allClipsExpected = (clipsNextOffset >= clipsTotal || activeFilter !== "all" || clipSearchQuery.trim()) ? restClips.length : Math.max(restClips.length, clipsTotal - favClips.length);
+    const grouped = clipGroupsActive();
+    allClips = grouped ? groupClipsByGame(restClips) : restClips;
+    if (!grouped) virtualGroups = [];
+    allClipsExpected = (clipsNextOffset >= clipsTotal || activeFilter !== "all" || clipSearchQuery.trim()) ? restClips.length : Math.max(restClips.length, clipsTotal - shownAbove.size);
+    // a clip that moved into a section above, or a new order of the games, is a different list for the virtual window even when the clips themselves are the same
+    const restKey = (grouped ? "games|" : "") + allClips.map(c => c.name).join("\n");
+    const restChanged = restKey !== lastRestKey;
+    lastRestKey = restKey;
     if (!restClips.length) {
       resetVirtualWindow();
       gridEl.style.display = "none";
       topSpacerEl.style.display = "none";
       bottomSpacerEl.style.display = "none";
       // empty placeholder only when the whole view (favorites + rest) is empty. if favorites are visible but the rest is empty, hide the placeholder entirely -- the user can clearly see their favorites at the top.
-      if (showFavSection) {
+      if (showRowSections) {
         emptyEl.style.display = "none";
       } else {
         emptyEl.style.display = "block";
         emptyEl.classList.remove("error");
-        if (loadedClips.length > 0) {
+        if (loadedClips.length > 0 || (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.favorites || gameFilters.state.linked))) {
           emptyEl.innerHTML = escapeHtml(emptyMessageForFilter());
           if (activeFilter !== "all" && activeFilter !== "drafts" && clipsNextOffset < clipsTotal) {
             emptyEl.innerHTML += "<div class=\"hint\">Loading more clips for this filter...</div>";
@@ -4475,7 +4633,7 @@ const CLIP_HOVER_PROFILES = {
     gridEl.style.display = "";
     topSpacerEl.style.display = "none";
     bottomSpacerEl.style.display = "none";
-    if (listChanged) queueVirtualRender(true);
+    if (listChanged || restChanged) queueVirtualRender(true);
     else {
       updateVisibleCards();
       queueVirtualRender(false);
@@ -4630,6 +4788,7 @@ const CLIP_HOVER_PROFILES = {
       try { uploadStatus = await fetchUploadStatus(); } catch {}
       lastUploadStatus = uploadStatus;
       syncClipSave(uploadStatus && uploadStatus.clipSave);
+      syncClipFolders(uploadStatus && uploadStatus.clipFolders);
       const jobSync = syncUploadJobState(uploadStatus);
       if (jobSync.completed.length) {
         clips = applyCompletedUploadLinks(clips, jobSync.completed);
@@ -4691,8 +4850,7 @@ const CLIP_HOVER_PROFILES = {
       topSpacerEl.style.display = "none";
       bottomSpacerEl.style.display = "none";
       // hide the favorites sub-section too so the "helper offline" placeholder isnt bracketed by stale heading rows.
-      favoritesHeadingEl.classList.remove("is-shown");
-      favoritesGridEl.classList.remove("is-shown");
+      for (const el of [favoritesHeadingEl, favoritesGridEl, linkedHeadingEl, linkedGridEl, draftsHeadingEl, draftsGridEl]) el.classList.remove("is-shown");
       homeShelvesEl.classList.remove("is-shown");
       restHeadingEl.classList.remove("is-shown");
       emptyEl.style.display = "block";
@@ -4709,6 +4867,28 @@ const CLIP_HOVER_PROFILES = {
       const hasActiveStreamableUpload = Array.from(lastUploadJobsByName.values()).some((job) =>
         job && job.active && job.state === "uploading");
       scheduleNextPoll(hasActiveStreamableUpload ? POLL_UPLOAD_MS : pendingClipSave ? SAVE_GHOST_POLL_MS : (anyUploading ? POLL_FAST_MS : POLL_IDLE_MS));
+    }
+  }
+
+  // the helper files clips into the folders of their games in the background; a pass that moves clips shows its progress in the toolbar, and one this page watched says how it ended
+  const clipFoldersStatusEl = document.getElementById("clip-folders-status");
+  const clipFoldersTextEl = document.getElementById("clip-folders-text");
+  let clipFoldersWatchedPass = 0;
+  function syncClipFolders(state) {
+    if (HOME_MODE || !clipFoldersStatusEl) return;
+    const active = !!(state && state.active);
+    clipFoldersStatusEl.hidden = !active;
+    if (active) {
+      clipFoldersWatchedPass = Number(state.pass) || 0;
+      clipFoldersTextEl.textContent = "Sorting clips into folders · " + (Number(state.done) || 0) + " of " + (Number(state.total) || 0);
+      return;
+    }
+    if (!state || !clipFoldersWatchedPass || Number(state.pass) !== clipFoldersWatchedPass) return;
+    clipFoldersWatchedPass = 0;
+    const moved = Number(state.moved) || 0;
+    if (moved > 0) {
+      showToast(escapeHtml("Sorted " + moved + (moved === 1 ? " clip" : " clips") + " into their folders."), "info");
+      scheduleToastHide(2400);
     }
   }
 
@@ -4777,6 +4957,7 @@ const CLIP_HOVER_PROFILES = {
   }
 
   function selectClipFilter(next) {
+    if (gameFilters && ["all","clips","favorites","linked","screenshots","drafts"].includes(next)) gameFilters.setType(next);
     if (next === activeFilter) { renderLoadedClips(loadedClips); return; }
     activeFilter = next;
     if (next === "screenshots") {
@@ -4790,12 +4971,30 @@ const CLIP_HOVER_PROFILES = {
     renderLoadedClips(loadedClips);
     fadeGridSwap();
   }
-  tabBtns.forEach((btn) => {
-    btn.addEventListener("click", () => selectClipFilter(btn.dataset.filter || "all"));
+  if (!HOME_MODE && window.RKClipGames) gameFilters = RKClipGames.create(state => {
+    clearClipSelection();
+    stopActivePreviewForScroll();
+    clipsPageVersion = "";
+    clipsNextOffset = 0;
+    clipsTotalKnown = false;
+    loadedClips = [];
+    selectClipFilter(state.type);
+    if (screenshotGallery) screenshotGallery.paint();
+    poll();
+  });
+  window.addEventListener("replaykit:game-tags-changed", () => {
+    clipsPageVersion = "";
+    favoriteResolveKey = "";
+    draftResolveKey = "";
+    ensureFavoriteResolve();
+    if (activeFilter === "drafts") ensureDraftResolve();
+    if (screenshotGallery) screenshotGallery.refresh();
+    poll();
   });
   // the clip the home view asked for: the view is put on everything, then scrolled to the clip, and the card lights up for a moment. the clip is in one of two places, the favorites above the grid or the virtual window of the grid; one that is in neither yet is waited for while the list loads, and one that does not show up in time is searched by its name
   let revealTimer = 0;
   function revealClip(name) {
+    if (gameFilters) gameFilters.reset();
     clearTimeout(revealTimer);
     if (activeFilter !== "all") selectClipFilter("all");
     if (clipSearchQuery) {
@@ -4830,8 +5029,7 @@ const CLIP_HOVER_PROFILES = {
       } else {
         const index = allClips.findIndex((c) => c && c.name === name);
         if (index >= 0) {
-          const row = Math.floor((index + saveGhostSlots()) / Math.max(1, virtualColumns));
-          const top = (gridEl.offsetTop - scrollAreaEl.offsetTop) + row * virtualRowStride;
+          const top = (gridEl.offsetTop - scrollAreaEl.offsetTop) + virtualSlotTop(index, Math.max(1, virtualColumns));
           scrollAreaEl.scrollTo({ top: Math.max(0, top - Math.max(0, (scrollAreaEl.clientHeight - virtualRowStride) / 2)), behavior: "smooth" });
           queueVirtualRender(false);
         }

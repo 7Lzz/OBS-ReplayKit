@@ -225,7 +225,7 @@ namespace ReplayKitHelper
             var fi = new FileInfo(source.Full);
             if (!fi.Exists) return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
 
-            string cacheKey = fi.FullName.ToLowerInvariant();
+            string cacheKey = Clips.CacheIdentity(fi.FullName).ToLowerInvariant();
             string cacheSig = fi.Length + ":" + fi.LastWriteTimeUtc.Ticks;
             var cached = GetTrimKeyframeCache(cacheKey, cacheSig);
             if (cached != null) return cached;
@@ -257,11 +257,11 @@ namespace ReplayKitHelper
             string ext = Path.GetExtension(sourceName);
             string clipDir = folder ?? AppConfig.GetClipDir();
             string candidate = baseName + " (" + suffix + ")" + ext;
-            if (!File.Exists(Path.Combine(clipDir, candidate))) return candidate;
+            if (!File.Exists(Path.Combine(clipDir, candidate)) && !Clips.NameTaken(candidate)) return candidate;
             for (int i = 2; i <= 99; i++)
             {
                 candidate = baseName + " (" + suffix + " " + i + ")" + ext;
-                if (!File.Exists(Path.Combine(clipDir, candidate))) return candidate;
+                if (!File.Exists(Path.Combine(clipDir, candidate)) && !Clips.NameTaken(candidate)) return candidate;
             }
             return null;
         }
@@ -541,6 +541,7 @@ namespace ReplayKitHelper
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
         public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1, RenderOptions render = null)
         {
+            JObject sourceCapture = null;
             render ??= new RenderOptions();
             if (!RenderOptions.Valid(render)) return new TrimResult { Ok = false, Message = "Bad render settings" };
             if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = "Unknown aspect ratio" };
@@ -611,6 +612,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
             }
 
+            sourceCapture = ClipGames.Read(source.Full);
             string outName, tempPath, outPath, finalPath;
             if (overwrite)
             {
@@ -622,7 +624,7 @@ namespace ReplayKitHelper
             }
             else
             {
-                string outputFolder = screenshot ? Screenshots.Folder(Path.GetDirectoryName(source.Full), create: true) : Path.GetDirectoryName(source.Full);
+                string outputFolder = screenshot ? Screenshots.Folder(Clips.LibraryRoot(Path.GetDirectoryName(source.Full)), create: true) : Path.GetDirectoryName(source.Full);
                 string suffix = screenshot ? "screenshot" : precise ? "trimmed" : "trimmed (fast)";
                 outName = GetSuffixedOutputName(screenshot ? Path.ChangeExtension(source.Name, ".png") : source.Name, suffix, outputFolder);
                 if (outName == null) return new TrimResult { Ok = false, Message = "Too many existing trim outputs" };
@@ -925,7 +927,7 @@ namespace ReplayKitHelper
                     // plain File.Move, not an atomic replace -- a new output name colliding with an existing file is a genuine error above, not a case to silently overwrite.
                     JobCoordinator.Commit(requestId, () =>
                     {
-                        if (screenshot) Screenshots.Folder(Path.GetDirectoryName(source.Full));
+                        if (screenshot) Screenshots.Folder(Clips.LibraryRoot(Path.GetDirectoryName(source.Full)));
                         File.Move(tempPath, finalPath);
                     });
                 }
@@ -975,6 +977,8 @@ namespace ReplayKitHelper
             }
 
             // the clip under this name is another file now, so an edit that was kept for the old one fits nothing any more
+            try { ClipGames.Rendered(source.Full, finalPath, videoPlan, startSec, endSec, videoSpeed, screenshot, frameTime, sourceCapture, layerPlan?.HasVideo ?? false); }
+            catch (Exception ex) { Log.Write("Edited capture metadata unavailable: " + ex.GetType().Name); }
             if (overwrite) EditDrafts.Forget(source.Full);
             if (overwrite && precise) Clips.ClearCompressed(source.Name, source.Full);
             AppConfig.ClearClipsCache();

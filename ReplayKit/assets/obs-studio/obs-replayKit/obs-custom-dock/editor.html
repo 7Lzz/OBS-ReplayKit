@@ -526,13 +526,13 @@ window.__rkEditorApi = (function () {
       trimPreciseBeforeSpeed = trimPrecise.checked;
       trimPrecise.checked = true;
       trimPrecise.disabled = true;
-      if (row) row.title = retimed ? "A copy at another speed is always made again frame by frame." : subtitled ? "A copy with subtitles is always made again frame by frame, since they are drawn into the picture." : looked ? "A copy with colour, filters, effects or layers is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
+      if (row) row.dataset.tooltip = retimed ? "A copy at another speed is always made again frame by frame." : subtitled ? "A copy with subtitles is always made again frame by frame, since they are drawn into the picture." : looked ? "A copy with colour, filters, effects or layers is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
       trimPrecise.dispatchEvent(new Event("change"));
     } else if (!needed && trimPreciseBeforeSpeed !== null) {
       trimPrecise.disabled = false;
       trimPrecise.checked = trimPreciseBeforeSpeed;
       trimPreciseBeforeSpeed = null;
-      if (row) row.removeAttribute("title");
+      if (row) delete row.dataset.tooltip;
       trimPrecise.dispatchEvent(new Event("change"));
     }
     updateTrimUi();
@@ -1196,8 +1196,8 @@ window.__rkEditorApi = (function () {
     screenshotBtn.disabled = !valid || !free;
     document.getElementById("trim-rename").disabled = !free;
     document.querySelector("#editor-aspect .combo-button").disabled = !free;
-    if (importing) trimRender.title = "Wait until the audio has been added";
-    else trimRender.removeAttribute("title");
+    if (importing) trimRender.dataset.tooltip = "Wait until the audio has been added";
+    else delete trimRender.dataset.tooltip;
     if (window.__rkPublishQuickActions) window.__rkPublishQuickActions();
   }
 
