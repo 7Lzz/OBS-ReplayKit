@@ -57,7 +57,10 @@ namespace ReplayKitHelper
                 // a display capture of anything but a known game is the desktop; an app nobody knows that fills its display may be a game the catalog is missing, so it stays unassigned
                 bool fullscreen = raw["fullscreen"]?.Type == JTokenType.Boolean && raw["fullscreen"].Value<bool>();
                 string state = game != null ? "game" : kind == "display" && (path.Length == 0 || DesktopApps.Contains(Path.GetFileName(path)) || !fullscreen) ? "desktop" : "unknown";
-                CaptureTimeline.Observe(at, session, state, game?.Id, game?.Name);
+                // the plugin says why a sample shows no capture; a capture of a program this catalog does not know is not recognised
+                string reason = raw["reason"]?.Type == JTokenType.String ? raw["reason"].Value<string>() : "";
+                string why = state != "unknown" ? "" : kind == "unknown" ? reason : "not-recognised";
+                CaptureTimeline.Observe(at, session, state, game?.Id, game?.Name, why, why == "not-recognised" ? path : "");
                 long start = raw["start"]?.Value<long>() ?? 0, buffer = raw["buffer"]?.Value<long>() ?? 0;
                 int seconds = raw["seconds"]?.Value<int>() ?? 0;
                 string name = buffer > 0 && start >= buffer && start < at && seconds > 0 && seconds <= 3600 && at - start <= seconds * 1000L
@@ -284,7 +287,7 @@ namespace ReplayKitHelper
                                 if (start < 0 || stop <= start || stop > end || position >= duration) continue;
                                 var capture = CaptureTimeline.Between(start, Math.Min(stop, start + (long)((duration - position) * 1000)));
                                 foreach (var interval in (JArray)capture["intervals"])
-                                    CaptureTimeline.Add(intervals, position + interval["s"].Value<double>(), position + interval["e"].Value<double>(), interval["kind"].Value<string>(), interval["id"].Value<string>(), interval["name"].Value<string>());
+                                    CaptureTimeline.Add(intervals, position + interval["s"].Value<double>(), position + interval["e"].Value<double>(), interval);
                                 position += capture["duration"].Value<double>();
                             }
                             var recorded = CaptureTimeline.Pack(duration, intervals);
@@ -329,7 +332,7 @@ namespace ReplayKitHelper
                     var original = piece.Path == null || string.Equals(piece.Path, source, StringComparison.OrdinalIgnoreCase) ? sourceCapture : Read(piece.Path);
                     var cut = CaptureTimeline.Cut(original, piece.SrcStart + (a - piece.At) * rate, piece.SrcStart + (b - piece.At) * rate, rate);
                     foreach (var row in (JArray)cut["intervals"])
-                        CaptureTimeline.Add(rows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row["kind"].Value<string>(), row["id"].Value<string>(), row["name"].Value<string>());
+                        CaptureTimeline.Add(rows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row);
                 }
                 result = CaptureTimeline.Pack(right - left, rows);
             }

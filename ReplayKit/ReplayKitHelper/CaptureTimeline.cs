@@ -12,22 +12,33 @@ namespace ReplayKitHelper
             internal long At;
             internal long Until;
             internal string Kind, Id, Name;
+            // why a stretch has no game or desktop, and the program that was not recognised as a game
+            internal string Why, App;
         }
+
+        // the reasons a stretch of a clip can be unassigned, which the clips page puts into words
+        private static readonly HashSet<string> Reasons = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "no-visible-capture", "capture-not-live", "multiple-captures", "foreground-unavailable", "capture-target-not-focused",
+            "display-not-found", "shown-window-unreadable", "not-recognised", "no-evidence",
+        };
 
         private static readonly object Gate = new object();
         private static readonly List<Sample> History = new List<Sample>();
         private static string session = "";
         internal static int Count { get { lock (Gate) return History.Count; } }
 
-        internal static void Observe(long at, string key, string kind, string id, string name)
+        internal static void Observe(long at, string key, string kind, string id, string name, string why = "", string app = "")
         {
+            why = kind == "unknown" && Reasons.Contains(why ?? "") ? why : "";
+            app = why == "not-recognised" ? CleanApp(app) : "";
             lock (Gate)
             {
                 if (key != session) { History.Clear(); session = key; }
                 var last = History.LastOrDefault();
                 if (last != null && at <= last.Until - 1500) return;
-                if (last != null && at <= last.Until && last.Kind == kind && last.Id == (id ?? "") && last.Name == (name ?? "")) last.Until = at + 1500;
-                else History.Add(new Sample { At = at, Until = at + 1500, Kind = kind, Id = id ?? "", Name = name ?? "" });
+                if (last != null && at <= last.Until && last.Kind == kind && last.Id == (id ?? "") && last.Name == (name ?? "") && last.Why == why && last.App == app) last.Until = at + 1500;
+                else History.Add(new Sample { At = at, Until = at + 1500, Kind = kind, Id = id ?? "", Name = name ?? "", Why = why, App = app });
                 History.RemoveAll(s => s.Until < at - 604800000);
                 if (History.Count > 8192) History.RemoveRange(0, History.Count - 8192);
             }
@@ -46,7 +57,7 @@ namespace ReplayKitHelper
                     long until = Math.Min(next, sample.Until);
                     long left = Math.Max(start, sample.At), right = Math.Min(end, until);
                     if (right <= left) continue;
-                    Add(rows, (left - start) / 1000.0, (right - start) / 1000.0, sample.Kind, sample.Id, sample.Name);
+                    Add(rows, (left - start) / 1000.0, (right - start) / 1000.0, sample.Kind, sample.Id, sample.Name, sample.Why, sample.App);
                 }
             }
             return Pack((end - start) / 1000.0, rows);
@@ -86,7 +97,7 @@ namespace ReplayKitHelper
             }
             var intervals = new JArray();
             foreach (var row in output.OrderBy(r => r["s"].Value<double>()))
-                Add(intervals, row["s"].Value<double>(), row["e"].Value<double>(), row["kind"].Value<string>(), row["id"].Value<string>(), row["name"].Value<string>());
+                Add(intervals, row["s"].Value<double>(), row["e"].Value<double>(), row);
             return Pack(duration, intervals);
         }
 
@@ -94,12 +105,31 @@ namespace ReplayKitHelper
         private static double ReadNumber(JToken token) => token != null && (token.Type == JTokenType.Integer || token.Type == JTokenType.Float) ? token.Value<double>() : double.NaN;
         private static string ReadText(JToken token) => token?.Type == JTokenType.String ? token.Value<string>() : "";
 
-        internal static void Add(JArray rows, double start, double end, string kind, string id = "", string name = "")
+        internal static void Add(JArray rows, double start, double end, string kind, string id = "", string name = "", string why = "", string app = "")
         {
             if (!Number(start) || !Number(end) || start < 0 || end <= start || rows.Count >= 8192) return;
-            if (rows.Last is JObject previous && previous["kind"]?.Value<string>() == kind && previous["id"]?.Value<string>() == id && Math.Abs(previous["e"].Value<double>() - start) < .002)
+            why = kind == "unknown" && Reasons.Contains(why ?? "") ? why : "";
+            app = why == "not-recognised" ? CleanApp(app) : "";
+            if (rows.Last is JObject previous && previous["kind"]?.Value<string>() == kind && previous["id"]?.Value<string>() == id && ReadText(previous["why"]) == why && ReadText(previous["app"]) == app && Math.Abs(previous["e"].Value<double>() - start) < .002)
                 previous["e"] = end;
-            else rows.Add(new JObject { ["s"] = start, ["e"] = end, ["kind"] = kind, ["id"] = id, ["name"] = name });
+            else
+            {
+                var row = new JObject { ["s"] = start, ["e"] = end, ["kind"] = kind, ["id"] = id, ["name"] = name };
+                if (why.Length > 0) row["why"] = why;
+                if (app.Length > 0) row["app"] = app;
+                rows.Add(row);
+            }
+        }
+
+        // a stored row copied onto a new place in time, keeping what it says and why
+        internal static void Add(JArray rows, double start, double end, JToken row) =>
+            Add(rows, start, end, ReadText(row["kind"]), ReadText(row["id"]), ReadText(row["name"]), ReadText(row["why"]), ReadText(row["app"]));
+
+        // only the file name of a program, never its folder, and nothing a tooltip could not show
+        private static string CleanApp(string app)
+        {
+            string name = System.IO.Path.GetFileName((app ?? "").Replace('/', '\\'));
+            return name.Length == 0 || name.Length > 80 || name.Any(char.IsControl) ? "" : name;
         }
 
         internal static JObject Cut(JObject capture, double start, double end, double rate = 1)
@@ -109,7 +139,7 @@ namespace ReplayKitHelper
             foreach (var row in capture?["intervals"] as JArray ?? new JArray())
             {
                 double left = Math.Max(start, row["s"]?.Value<double>() ?? 0), right = Math.Min(end, row["e"]?.Value<double>() ?? 0);
-                if (right > left) Add(rows, (left - start) / rate, (right - start) / rate, row["kind"]?.Value<string>(), row["id"]?.Value<string>() ?? "", row["name"]?.Value<string>() ?? "");
+                if (right > left) Add(rows, (left - start) / rate, (right - start) / rate, row);
             }
             return Pack((end - start) / rate, rows, capture?["manual"]?.Value<bool>() ?? false);
         }
@@ -124,7 +154,9 @@ namespace ReplayKitHelper
             if (!Number(duration) || duration <= 0 || duration > 604800) return result;
             var totals = new Dictionary<string, double>(StringComparer.Ordinal);
             var names = new Dictionary<string, string>(StringComparer.Ordinal);
-            double last = 0;
+            double last = 0, covered = 0;
+            // the time each reason for having no game covers, keyed by reason and program
+            var unknown = new Dictionary<string, double>(StringComparer.Ordinal);
             string endKind = "", endKey = "";
             double endAt = 0;
             var intervals = capture?["intervals"] as JArray;
@@ -135,8 +167,18 @@ namespace ReplayKitHelper
                 double start = ReadNumber(row["s"]), end = ReadNumber(row["e"]);
                 if (!Number(start) || !Number(end) || start < last - .002 || end <= start || end > duration + .05) return result;
                 last = end;
+                covered += end - start;
                 string kind = ReadText(row["kind"]), id = ReadText(row["id"]);
                 string name = ReadText(row["name"]);
+                if (kind == "unknown")
+                {
+                    string why = ReadText(row["why"]);
+                    if (Reasons.Contains(why))
+                    {
+                        string reason = why + "|" + (why == "not-recognised" ? CleanApp(ReadText(row["app"])) : "");
+                        unknown[reason] = (unknown.TryGetValue(reason, out double held) ? held : 0) + end - start;
+                    }
+                }
                 if (kind != "desktop" && (kind != "game" || id.Length == 0 || id.Length > 80 || name.Length == 0 || name.Length > 160)) continue;
                 string key = kind == "desktop" ? "desktop" : id;
                 totals[key] = (totals.TryGetValue(key, out double amount) ? amount : 0) + end - start;
@@ -170,6 +212,18 @@ namespace ReplayKitHelper
             // the one game a clip without a main game holds is the game it goes by (name, folder, section) only when that game fills at least as much of it as the desktop does, so seconds of a game passing by do not take over a desktop clip
             if (result["kind"].Value<string>() == "unknown" && games.Count == 1 && totals[games[0]["id"].Value<string>()] >= (totals.TryGetValue("desktop", out double desktop) ? desktop : 0))
                 result["partial"] = games[0].DeepClone();
+            // a clip without a game says why, by the reason that covers most of it; time nothing was recorded for is time replaykit was not watching
+            if (result["kind"].Value<string>() == "unknown")
+            {
+                double gap = duration - covered;
+                if (gap > .5) unknown["no-evidence|"] = (unknown.TryGetValue("no-evidence|", out double held) ? held : 0) + gap;
+                if (unknown.Count > 0)
+                {
+                    var reason = unknown.OrderByDescending(p => p.Value).First().Key.Split('|');
+                    result["why"] = reason[0];
+                    if (reason[1].Length > 0) result["app"] = reason[1];
+                }
+            }
             result["manual"] = capture?["manual"]?.Type == JTokenType.Boolean && capture["manual"].Value<bool>();
             return result;
         }

@@ -88,6 +88,22 @@ window.RKClipGames = (function () {
     if (capture.kind === "mixed") return { key:"mixed", id:"mixed", kind:"game", name:"Mixed games" };
     return { key:"unknown", id:"unknown", kind:"unknown", name:"Unassigned" };
   }
+  // why a clip has no game, in words, from the reason the helper found for most of it; a clip set to unassigned by hand says so, and an older clip with no reason says nothing more
+  const REASONS = {
+    "multiple-captures": "several capture sources were showing and none clearly showed the game",
+    "no-visible-capture": "no capture source was showing in the scene",
+    "capture-not-live": "the capture source had no picture",
+    "capture-target-not-focused": "the captured window was not the one in focus",
+    "foreground-unavailable": "the window in focus could not be read",
+    "shown-window-unreadable": "the window on screen could not be read",
+    "display-not-found": "the captured display could not be found",
+    "no-evidence": "ReplayKit was not watching while it was recorded",
+  };
+  function unassignedReason(capture) {
+    if (capture.manual) return " (set by you)";
+    if (capture.why === "not-recognised") return ": " + (capture.app ? capture.app : "the app on screen") + " is not a known game";
+    return REASONS[capture.why] ? ": " + REASONS[capture.why] : "";
+  }
   // the game icon of a card; on a clip or screenshot card it opens the game picker as well, with the newest copy of the item so a renamed clip is changed by its new name
   function badge(parent, item, options) {
     if (!parent) return;
@@ -102,7 +118,7 @@ window.RKClipGames = (function () {
     // a roblox clip made in a known experience says which one, and shows its icon, while it is still grouped and filed as roblox
     const experience = capture.experience && capture.experience.id ? capture.experience : null;
     const place = experience && experience.name ? " - " + experience.name : "";
-    const label = contained ? "Contains " + capture.games.map(g => g.name + (capture.partial && g.id === capture.partial.id ? place : "")).join(" · ") : (capture.name || "Unassigned") + (capture.kind === "game" ? place : "");
+    const label = contained ? "Contains " + capture.games.map(g => g.name + (capture.partial && g.id === capture.partial.id ? place : "")).join(" · ") : (capture.name || "Unassigned") + (capture.kind === "game" ? place : "") + (capture.kind === "unknown" ? unassignedReason(capture) : "");
     const node = document.createElement("span");
     node.className = "clip-game-badge" + (changeable ? " is-changeable" : "");
     node.dataset.capture = key;

@@ -5,6 +5,9 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QUuid>
+#include <algorithm>
+#include <graphics/matrix4.h>
+#include <graphics/vec3.h>
 #include <deque>
 #include <mutex>
 #include "app/clip_buffer.hpp"
@@ -50,21 +53,54 @@ QString ImagePath(DWORD pid)
 
 struct Capture {
 	std::string kind, exe, title, windowClass, monitor;
+	// the share of the canvas the source covers, and its place in the stack, higher drawn later and so on top
+	double coverage = 0;
+	int order = 0;
 };
+
+// what one walk of the scene tree knows of the level it is in: the captures found so far, the size of the scene or group whose items it walks, and the share of the canvas that scene or group itself takes
+struct CollectLevel {
+	std::vector<Capture> *captures;
+	double width, height, share;
+};
+
+// the share of its scene an item covers: the corners of its box, as the scene places it, clipped to the scene
+double ItemShare(obs_sceneitem_t *item, double width, double height)
+{
+	if (width <= 0 || height <= 0)
+		return 0;
+	matrix4 box;
+	obs_sceneitem_get_box_transform(item, &box);
+	double left = 1e18, top = 1e18, right = -1e18, bottom = -1e18;
+	for (float x : {0.0f, 1.0f})
+		for (float y : {0.0f, 1.0f}) {
+			vec3 corner, placed;
+			vec3_set(&corner, x, y, 0.0f);
+			vec3_transform(&placed, &corner, &box);
+			left = qMin(left, double(placed.x));
+			right = qMax(right, double(placed.x));
+			top = qMin(top, double(placed.y));
+			bottom = qMax(bottom, double(placed.y));
+		}
+	const double w = qMax(0.0, qMin(right, width) - qMax(left, 0.0)), h = qMax(0.0, qMin(bottom, height) - qMax(top, 0.0));
+	return w * h / (width * height);
+}
 
 bool Collect(obs_scene_t *, obs_sceneitem_t *item, void *data)
 {
+	auto *level = static_cast<CollectLevel *>(data);
 	if (!obs_sceneitem_visible(item))
 		return true;
 	obs_source_t *source = obs_sceneitem_get_source(item);
 	if (!source || !obs_source_enabled(source))
 		return true;
-	if (obs_scene_t *nested = obs_scene_from_source(source)) {
-		obs_scene_enum_items(nested, Collect, data);
-		return true;
-	}
-	if (obs_sceneitem_is_group(item)) {
-		obs_scene_enum_items(obs_sceneitem_group_get_scene(item), Collect, data);
+	const double share = level->share * ItemShare(item, level->width, level->height);
+	obs_scene_t *inner = obs_scene_from_source(source);
+	if (!inner && obs_sceneitem_is_group(item))
+		inner = obs_sceneitem_group_get_scene(item);
+	if (inner) {
+		CollectLevel nested{level->captures, double(obs_source_get_width(source)), double(obs_source_get_height(source)), share};
+		obs_scene_enum_items(inner, Collect, &nested);
 		return true;
 	}
 	const std::string id = obs_source_get_unversioned_id(source);
@@ -72,6 +108,8 @@ bool Collect(obs_scene_t *, obs_sceneitem_t *item, void *data)
 		return true;
 	Capture capture;
 	capture.kind = "unknown";
+	capture.coverage = share;
+	capture.order = int(level->captures->size());
 	if (obs_source_get_width(source) && obs_source_get_height(source)) {
 		if (id == "monitor_capture") {
 			obs_data_t *settings = obs_source_get_settings(source);
@@ -89,7 +127,7 @@ bool Collect(obs_scene_t *, obs_sceneitem_t *item, void *data)
 			calldata_free(&info);
 		}
 	}
-	static_cast<std::vector<Capture> *>(data)->push_back(capture);
+	level->captures->push_back(capture);
 	return true;
 }
 
@@ -174,6 +212,46 @@ bool CoversMonitor(HWND window)
 	return rect.left <= info.rcMonitor.left && rect.top <= info.rcMonitor.top && rect.right >= info.rcMonitor.right && rect.bottom >= info.rcMonitor.bottom;
 }
 
+// a game or window capture shows the focused window when it is hooked to exactly that window
+bool TargetFocused(const Capture &capture, HWND foreground, const QString &path)
+{
+	if (!foreground || path.isEmpty() || (capture.kind != "game" && capture.kind != "window"))
+		return false;
+	wchar_t title[1024] = {}, windowClass[256] = {};
+	GetWindowTextW(foreground, title, 1024);
+	GetClassNameW(foreground, windowClass, 256);
+	return path.section('\\', -1).compare(QString::fromStdString(capture.exe), Qt::CaseInsensitive) == 0 &&
+	       QString::fromWCharArray(windowClass) == QString::fromStdString(capture.windowClass) && QString::fromWCharArray(title) == QString::fromStdString(capture.title);
+}
+
+// the capture a clip shows when several are in the scene: of those with a picture, the one on top that covers most of the canvas hides the rest; else the clearly biggest; else the only one showing what is in focus; else none, so a clip is never put down to a guess
+const Capture *Choose(const std::vector<Capture> &captures, HWND foreground, const QString &path)
+{
+	std::vector<const Capture *> live;
+	for (const Capture &capture : captures)
+		if (capture.kind != "unknown" && capture.coverage > 0.01)
+			live.push_back(&capture);
+	if (live.size() <= 1)
+		return live.empty() ? nullptr : live[0];
+	std::sort(live.begin(), live.end(), [](const Capture *a, const Capture *b) { return a->order > b->order; });
+	for (const Capture *capture : live)
+		if (capture->coverage >= 0.6)
+			return capture;
+	std::sort(live.begin(), live.end(), [](const Capture *a, const Capture *b) { return a->coverage > b->coverage; });
+	if (live[0]->coverage >= live[1]->coverage * 1.5)
+		return live[0];
+	const Capture *focused = nullptr;
+	for (const Capture *capture : live) {
+		const bool shows = capture->kind == "display" ? foreground && MatchesMonitor(foreground, capture->monitor) : TargetFocused(*capture, foreground, path);
+		if (!shows)
+			continue;
+		if (focused)
+			return nullptr;
+		focused = capture;
+	}
+	return focused;
+}
+
 void Sample()
 {
 	const auto began = std::chrono::steady_clock::now();
@@ -195,8 +273,9 @@ void Sample()
 		std::vector<Capture> captures;
 		obs_source_t *scene = obs_frontend_get_current_scene();
 		if (scene) {
+			CollectLevel root{&captures, double(obs_source_get_width(scene)), double(obs_source_get_height(scene)), 1.0};
 			if (obs_scene_t *current = obs_scene_from_source(scene))
-				obs_scene_enum_items(current, Collect, &captures);
+				obs_scene_enum_items(current, Collect, &root);
 			obs_source_release(scene);
 		}
 		HWND foreground = GetForegroundWindow();
@@ -204,10 +283,12 @@ void Sample()
 		GetWindowThreadProcessId(foreground, &pid);
 		const QString path = ImagePath(pid);
 		sourceCount = int(captures.size());
-		captureReason = captures.empty() ? "no-visible-capture" : captures.size() > 1 ? "multiple-captures" : !foreground || path.isEmpty() ? "foreground-unavailable" : "capture-not-live";
+		const Capture *chosen = Choose(captures, foreground, path);
+		const bool anyLive = std::any_of(captures.begin(), captures.end(), [](const Capture &c) { return c.kind != "unknown" && c.coverage > 0.01; });
+		captureReason = captures.empty() ? "no-visible-capture" : !anyLive ? "capture-not-live" : !chosen ? "multiple-captures" : !foreground || path.isEmpty() ? "foreground-unavailable" : "capture-not-live";
 		// a display capture records whatever its display shows, so the window judged is the focused one when it is on that display and else the one on top there
-		if (captures.size() == 1 && captures[0].kind == "display") {
-			const Capture &capture = captures[0];
+		if (chosen && chosen->kind == "display") {
+			const Capture &capture = *chosen;
 			const bool focusedThere = foreground && !IsIconic(foreground) && MatchesMonitor(foreground, capture.monitor);
 			HWND shown = focusedThere ? foreground : WindowShownOn(capture.monitor);
 			DWORD shownPid = 0;
@@ -220,19 +301,10 @@ void Sample()
 				data["path"] = shownPath;
 				data["fullscreen"] = CoversMonitor(shown);
 			}
-		} else if (captures.size() == 1 && foreground && !IsIconic(foreground) && !path.isEmpty()) {
-			const Capture &capture = captures[0];
-			const QString exe = path.section('\\', -1);
-			bool matched = false;
-			if (capture.kind == "game" || capture.kind == "window") {
-				wchar_t title[1024] = {}, windowClass[256] = {};
-				GetWindowTextW(foreground, title, 1024);
-				GetClassNameW(foreground, windowClass, 256);
-				matched = exe.compare(QString::fromStdString(capture.exe), Qt::CaseInsensitive) == 0 &&
-					  QString::fromWCharArray(windowClass) == QString::fromStdString(capture.windowClass) &&
-					  QString::fromWCharArray(title) == QString::fromStdString(capture.title);
-				captureReason = matched ? "matched" : "capture-target-not-focused";
-			}
+		} else if (chosen && foreground && !IsIconic(foreground) && !path.isEmpty()) {
+			const Capture &capture = *chosen;
+			const bool matched = TargetFocused(capture, foreground, path);
+			captureReason = matched ? "matched" : "capture-target-not-focused";
 			DWORD currentPid = 0;
 			GetWindowThreadProcessId(foreground, &currentPid);
 			if (matched && foreground == GetForegroundWindow() && pid == currentPid) {
@@ -243,6 +315,8 @@ void Sample()
 	}
 	if (clipStartedAt == 0 || at - lastNameAt > 1500)
 		ClipBufferGameName(QString());
+	// why a sample shows no capture, which the helper keeps with the stretch of the clip it covers
+	data["reason"] = captureReason;
 	Queue("CAPTURE", data);
 	lastKind = data["kind"].toString();
 	const uint64_t elapsed = uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - began).count());
