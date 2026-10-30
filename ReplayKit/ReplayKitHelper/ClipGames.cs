@@ -37,19 +37,25 @@ namespace ReplayKitHelper
                 if (at < 0 || Math.Abs((long)GetTickCount64() - at) > 5000 || session.Length == 0 || session.Length > 80) return;
                 valid = true;
                 string kind = raw["kind"]?.Value<string>() ?? "unknown", path = raw["path"]?.Value<string>() ?? "";
+                // the plugin sends a window title only for java, where it is what tells minecraft from other java programs
+                string title = raw["title"]?.Type == JTokenType.String ? raw["title"].Value<string>() : "";
+                if (title.Length > 256) title = "";
                 GameCatalog.Game game = null;
                 if ((kind == "game" || kind == "window" || kind == "display") && path.Length > 0 && path.Length < 32768)
                 {
                     lock (Gate)
                     {
                         // an app that is no game is looked up again only once a minute, as the steam library is read again; until that first read is done a fresh game may still turn up, so it is asked every two seconds
-                        if (!string.Equals(path, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled ? 60000 : 2000))
+                        string lookup = title.Length > 0 ? path + "|" + title : path;
+                        if (!string.Equals(lookup, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled ? 60000 : 2000))
                         {
                             lastGame = null;
-                            lastPath = path;
+                            lastPath = lookup;
                             resolvedAt = at;
-                            lastGame = DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path);
-                            if (lastGame != null) GameCatalog.CacheIcon(lastGame, path);
+                            var minecraft = GameCatalog.MinecraftJava(path, title);
+                            lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path));
+                            if (minecraft != null) { if (GameCatalog.MinecraftLauncher() is string launcher) GameCatalog.CacheIcon(minecraft, launcher); }
+                            else if (lastGame != null) GameCatalog.CacheIcon(lastGame, path);
                         }
                         game = lastGame;
                     }
@@ -135,6 +141,10 @@ namespace ReplayKitHelper
             var summary = CaptureTimeline.Describe(current);
             var experience = RobloxExperiences.Describe(current, summary);
             if (experience != null) summary["experience"] = experience;
+            // the icon version this clip was made with, when it is of the game the clip goes by
+            var pinned = current?["gameIcon"] as JObject;
+            string game = MainGame(summary), version = pinned?["version"]?.Type == JTokenType.String ? pinned["version"].Value<string>() : null;
+            if (game != null && pinned?["id"]?.ToString() == game && version != null && GameCatalog.ValidIconId(game + "-" + version)) summary["icon"] = game + "-" + version;
             return summary;
         }
 
@@ -146,22 +156,29 @@ namespace ReplayKitHelper
         internal static void Write(string file, JObject capture)
         {
             if (capture == null || !File.Exists(file)) return;
+            var summary = CaptureTimeline.Describe(capture);
+            // the clip keeps the icon its game has now, unless it already carries the icon of that same game from the clip it was made from
+            string game = MainGame(summary);
+            string version = game != null && (capture["gameIcon"] as JObject)?["id"]?.ToString() != game ? GameCatalog.CurrentIcon(game) : null;
             Clips.UpdateDb(db =>
             {
                 string key = Key(file);
                 var entry = db[key] as JObject ?? new JObject();
                 var saved = (JObject)capture.DeepClone();
+                if (version != null) saved["gameIcon"] = new JObject { ["id"] = game, ["version"] = version };
                 Stamp(saved, file);
                 entry["capture"] = saved;
                 db[key] = entry;
                 return true;
             }, Owner(file));
-            var summary = CaptureTimeline.Describe(capture);
             try { GameCatalog.Played(((JArray)summary["games"]).Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() })); }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException) { Log.Write("Played games not updated: " + ex.GetType().Name); }
         }
 
         internal static void Copy(string source, string target) => Write(target, Read(source));
+
+        // the game a clip goes by: its main game, or the one game it holds part of
+        private static string MainGame(JObject summary) => summary["kind"]?.Value<string>() == "game" ? summary["id"]?.Value<string>() : summary["partial"]?["id"]?.Value<string>();
 
         internal static bool Matches(JObject row, string game)
         {
@@ -338,6 +355,7 @@ namespace ReplayKitHelper
             }
             // an edit of a roblox clip keeps the experience it was made in
             if (sourceCapture?["experience"] is JObject experience) result["experience"] = experience.DeepClone();
+            if (sourceCapture?["gameIcon"] is JObject icon) result["gameIcon"] = icon.DeepClone();
             Write(target, result);
         }
     }

@@ -68,7 +68,7 @@ window.RKClipGames = (function () {
   const symbol = kind => icon(kind === "desktop" ? "audio/desktop" : kind === "unknown" ? "action/help" : "audio/game") || icon("toggle/grid");
   // the icon of a game, or of a roblox experience drawn over the roblox icon so roblox shows until the experience icon has been fetched
   function picture(id, kind, under) {
-    const img = key => /^(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32}|roblox-[0-9]{1,20}-[a-f0-9]{16})$/.test(key || "") ? '<img alt="" src="' + helper + '/games/icon?id=' + encodeURIComponent(key) + '">' : '';
+    const img = key => /^(?:(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})(?:-[a-f0-9]{16})?|roblox-[0-9]{1,20}-[a-f0-9]{16})$/.test(key || "") ? '<img alt="" src="' + helper + '/games/icon?id=' + encodeURIComponent(key) + '">' : '';
     return '<span class="clip-game-icon" aria-hidden="true">' + symbol(kind || id) + img(under) + img(id) + '</span>';
   }
   document.addEventListener("load", event => { if (event.target.matches(".clip-game-icon > img")) event.target.parentElement.classList.add("is-ready"); }, true);
@@ -134,7 +134,9 @@ window.RKClipGames = (function () {
       node.addEventListener("click", open);
       node.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") open(event); });
     }
-    node.innerHTML = experience ? picture(experience.id, "game", game.id) : picture(game.id, contained ? "game" : capture.kind);
+    // the icon the game had when this clip was made, when the helper kept one for it
+    const gameIcon = capture.icon && (!contained || capture.partial) ? capture.icon : game.id;
+    node.innerHTML = experience ? picture(experience.id, "game", gameIcon) : picture(gameIcon, contained ? "game" : capture.kind);
     parent.prepend(node);
   }
   // the picker lists desktop, unassigned and the games the library already has clips of; the whole catalog is only searched once something is typed

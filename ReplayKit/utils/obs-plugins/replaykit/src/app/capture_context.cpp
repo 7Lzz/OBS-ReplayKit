@@ -212,6 +212,17 @@ bool CoversMonitor(HWND window)
 	return rect.left <= info.rcMonitor.left && rect.top <= info.rcMonitor.top && rect.right >= info.rcMonitor.right && rect.bottom >= info.rcMonitor.bottom;
 }
 
+// the title of a java window, the only way minecraft java edition is told apart from other java programs; the title of any other program never leaves the plugin, since it can hold private text such as a browser tab
+QString JavaTitle(HWND window, const QString &path)
+{
+	const QString exe = path.section('\\', -1);
+	if (exe.compare(QStringLiteral("javaw.exe"), Qt::CaseInsensitive) != 0 && exe.compare(QStringLiteral("java.exe"), Qt::CaseInsensitive) != 0)
+		return {};
+	wchar_t title[256] = {};
+	GetWindowTextW(window, title, 256);
+	return QString::fromWCharArray(title);
+}
+
 // a game or window capture shows the focused window when it is hooked to exactly that window
 bool TargetFocused(const Capture &capture, HWND foreground, const QString &path)
 {
@@ -300,6 +311,7 @@ void Sample()
 				data["kind"] = QStringLiteral("display");
 				data["path"] = shownPath;
 				data["fullscreen"] = CoversMonitor(shown);
+				data["title"] = JavaTitle(shown, shownPath);
 			}
 		} else if (chosen && foreground && !IsIconic(foreground) && !path.isEmpty()) {
 			const Capture &capture = *chosen;
@@ -310,6 +322,7 @@ void Sample()
 			if (matched && foreground == GetForegroundWindow() && pid == currentPid) {
 				data["kind"] = QString::fromStdString(capture.kind);
 				data["path"] = path;
+				data["title"] = JavaTitle(foreground, path);
 			}
 		}
 	}
