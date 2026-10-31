@@ -3,6 +3,7 @@
 
 #include <array>
 #include <QCryptographicHash>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -31,6 +32,18 @@ bool ReadNumber(const QJsonValue &value, double bound, float &out)
 }
 
 } // namespace
+
+gs_texture_t *BongoTexture(const QString &path)
+{
+	QImage image(path);
+	if (image.isNull())
+		return nullptr;
+	// qt decodes a png into argb32, or rgb32 with an opaque alpha byte, which is bgra in memory with no row padding, so the pixels upload as they are and only an unusual png is converted
+	if (image.format() != QImage::Format_ARGB32 && image.format() != QImage::Format_RGB32)
+		image.convertTo(QImage::Format_ARGB32);
+	const uint8_t *data = image.constBits();
+	return gs_texture_create(uint32_t(image.width()), uint32_t(image.height()), GS_BGRA, 1, &data, 0);
+}
 
 bool BongoModel::Load(const QString &moc3, const QString &texturePath, const QString &bakes)
 {
@@ -62,11 +75,8 @@ bool BongoModel::Load(const QString &moc3, const QString &texturePath, const QSt
 		}
 		parameters.push_back(std::move(parameter));
 	}
-	const QByteArray textureUtf8 = texturePath.toUtf8();
-	gs_image_file_init(&texture, textureUtf8.constData());
-	if (texture.loaded)
-		gs_image_file_init_texture(&texture);
-	if (!texture.texture)
+	texture = BongoTexture(texturePath);
+	if (!texture)
 		return false;
 	for (const auto &entry : meshList) {
 		const auto object = entry.toObject();
@@ -168,7 +178,7 @@ void BongoModel::Render(gs_effect_t *effect, const std::vector<float> &values, c
 			data->points[i].z = 0;
 		}
 		gs_vertexbuffer_flush(mesh.buffer);
-		gs_effect_set_texture(image, texture.texture);
+		gs_effect_set_texture(image, texture);
 		gs_effect_set_float(opacity, alpha);
 		while (gs_effect_loop(effect, "Draw")) {
 			gs_load_vertexbuffer(mesh.buffer);
@@ -184,7 +194,9 @@ void BongoModel::Free()
 	for (auto &mesh : meshes)
 		gs_vertexbuffer_destroy(mesh.buffer);
 	meshes.clear();
-	gs_image_file_free(&texture);
+	if (texture)
+		gs_texture_destroy(texture);
+	texture = nullptr;
 	parameters.clear();
 }
 

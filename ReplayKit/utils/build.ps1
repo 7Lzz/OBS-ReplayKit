@@ -24,7 +24,18 @@ if ($LASTEXITCODE -ne 0) { throw 'OBS plugin build failed.' }
 Write-Host '[3b/4] Building win-capture-audio...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot 'obs-plugins\win-capture-audio\build.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'win-capture-audio build failed.' }
+Write-Host '[3c/4] Building input-overlay...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'obs-plugins\input-overlay\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'input-overlay build failed.' }
+Write-Host '[3d/4] Checking the plugins against every OBS version...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'verify_obs_versions.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'A bundled plugin does not load in every OBS version of obs-versions.json.' }
 Write-Host '[4/4] Publishing installer...'
+Write-Host 'Building browser and helper process roles for every supported OBS version...'
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'process-host\build.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'OBS process role build failed.' }
+& powershell -NoProfile -File (Join-Path $PSScriptRoot 'process-host\verify_versions.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'OBS process role verification failed.' }
 ClearPublishDirectory
 try {
     & dotnet publish (Join-Path $repoRoot 'ReplayKitSetup\ReplayKitSetup.csproj') -c Release -o $publishDir --nologo

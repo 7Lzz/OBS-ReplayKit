@@ -211,6 +211,15 @@ namespace ReplayKitSetup
                     return 1;
                 }
 
+                // an obs this release can never be put on stops the update before obs is closed or the update is marked pending, otherwise the startup check would close obs for it on every launch
+                string unreachable = ObsDownloader.UnreachableObs();
+                if (unreachable != null)
+                {
+                    LogBoth("preflight failed, OBS was left running: " + unreachable);
+                    WriteResult(false, "preflight", unreachable, releaseUrl);
+                    return 1;
+                }
+
                 MarkUpdatePending();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;

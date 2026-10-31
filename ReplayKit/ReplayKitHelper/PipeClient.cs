@@ -21,7 +21,8 @@ namespace ReplayKitHelper
         private static readonly object WriteLock = new object();
         private static NamedPipeClientStream _stream;
         private static StreamWriter _writer;
-        private static bool capturePeer;
+        private static volatile bool capturePeer;
+        internal static bool CapturePeer => capturePeer;
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint pid);
         private static bool _setupWizardKicked;
@@ -58,7 +59,11 @@ namespace ReplayKitHelper
                         {
                             if (GetNamedPipeServerProcessId(pipe.SafePipeHandle, out uint serverPid))
                                 using (var owner = Process.GetProcessById((int)serverPid))
-                                    capturePeer = string.Equals(owner.MainModule?.FileName, Constants.ResolveObsExe(), StringComparison.OrdinalIgnoreCase);
+                                {
+                                    string ownerPath = owner.MainModule?.FileName, obsPath = Constants.ResolveObsExe();
+                                    capturePeer = string.Equals(ownerPath, obsPath, StringComparison.OrdinalIgnoreCase);
+                                    if (!capturePeer) Log.Write("Capture tagging off: the pipe is owned by " + ownerPath + ", not " + obsPath);
+                                }
                         }
                         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is ArgumentException)
                         { Log.Write("Capture tagging off: the pipe owner could not be checked (" + ex.GetType().Name + ")"); }

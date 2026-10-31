@@ -137,6 +137,7 @@ namespace ReplayKitSetup
             text = SetIniValue(text, "AdvOut", "FFFilePath", recPath);
 
             text = SetIniValue(text, "Hotkeys", "ReplayBuffer", Keybind.ToBasicIniValue(prefs.ClipKeybind));
+            text = SetIniValue(text, "Hotkeys", "OBSBasic.SaveReplayBuffer", Keybind.ToObsHotkeyValue(prefs.ClipKeybind));
             if (prefs.RecordingKeybind != null && prefs.RecordingKeybind.Count > 0)
             {
                 string recordingHotkey = Keybind.ToObsHotkeyValue(prefs.RecordingKeybind);
@@ -764,6 +765,7 @@ namespace ReplayKitSetup
             ["deinterlace_mode"] = 0,
             ["deinterlace_field_order"] = 0,
             ["monitoring_type"] = 0,
+            ["monitoring_enabled"] = false,
             ["private_settings"] = new JObject(),
         };
 
@@ -861,6 +863,7 @@ namespace ReplayKitSetup
             ["deinterlace_mode"] = 0,
             ["deinterlace_field_order"] = 0,
             ["monitoring_type"] = 0,
+            ["monitoring_enabled"] = false,
             ["private_settings"] = new JObject(),
         };
 
@@ -975,6 +978,7 @@ namespace ReplayKitSetup
             ["deinterlace_mode"] = 0,
             ["deinterlace_field_order"] = 0,
             ["monitoring_type"] = 0,
+            ["monitoring_enabled"] = false,
             ["private_settings"] = new JObject(),
         };
 
@@ -1170,6 +1174,7 @@ namespace ReplayKitSetup
             ["deinterlace_mode"] = 0,
             ["deinterlace_field_order"] = 0,
             ["monitoring_type"] = 0,
+            ["monitoring_enabled"] = false,
             ["private_settings"] = new JObject(),
         };
 

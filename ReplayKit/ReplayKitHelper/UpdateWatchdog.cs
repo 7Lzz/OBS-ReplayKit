@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -77,7 +78,7 @@ namespace ReplayKitHelper
             foreach (var name in new[] { "obs64", "obs32", "obs" })
             {
                 var processes = Process.GetProcessesByName(name);
-                try { if (processes.Length > 0) return true; }
+                try { if (processes.Any(process => !Constants.IsRoleHost(process))) return true; }
                 finally { foreach (var process in processes) process.Dispose(); }
             }
             return false;

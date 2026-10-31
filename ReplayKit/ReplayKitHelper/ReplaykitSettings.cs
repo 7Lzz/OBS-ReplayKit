@@ -118,6 +118,8 @@ namespace ReplayKitHelper
                 ["developmentMode"] = false,
                 // a local command channel to talk to replaykit while it runs, on top of development mode
                 ["sdkMode"] = false,
+                // looks for a newer obs release and shows it on a grey badge of the title bar, on top of development mode; obs updates are locked, so this is how a developer hears of one
+                ["checkObsUpdates"] = false,
                 // the native plugin writes what the interface does (views, panels, the preview) to the obs log, on top of development mode
                 ["logInterfaceEvents"] = false,
                 ["trimPreciseDefault"] = true,
@@ -549,6 +551,7 @@ namespace ReplayKitHelper
                 ["compressSkipFavorites"] = GetBoolSetting(data, "compressSkipFavorites", defaults["compressSkipFavorites"].Value<bool>()),
                 ["developmentMode"] = developmentMode,
                 ["sdkMode"] = GetBoolSetting(data, "sdkMode", defaults["sdkMode"].Value<bool>()),
+                ["checkObsUpdates"] = GetBoolSetting(data, "checkObsUpdates", defaults["checkObsUpdates"].Value<bool>()),
                 ["logInterfaceEvents"] = GetBoolSetting(data, "logInterfaceEvents", defaults["logInterfaceEvents"].Value<bool>()),
                 ["trimPreciseDefault"] = true,
                 ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
@@ -891,6 +894,7 @@ namespace ReplayKitHelper
                 AppConfig.WriteUtf8(path, settings.ToString(Formatting.Indented));
                 SyncClipDirToRuntimeConfig(settings);
                 ClipGames.SetRecognition(settings["gameRecognition"]?.Type != JTokenType.Boolean || settings["gameRecognition"].Value<bool>());
+                ObsUpdate.SetEnabled(DevelopmentFlag(settings, "checkObsUpdates"));
             }
         }
 
@@ -1679,7 +1683,7 @@ namespace ReplayKitHelper
             source["enabled"] = true; source["muted"] = false;
             source["push-to-mute"] = false; source["push-to-mute-delay"] = 0; source["push-to-talk"] = false; source["push-to-talk-delay"] = 0;
             source["hotkeys"] = new JObject();
-            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0;
+            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0; source["monitoring_enabled"] = false;
             source["private_settings"] = new JObject();
 
             var sourceSettings = source["settings"] as JObject;
@@ -1733,7 +1737,7 @@ namespace ReplayKitHelper
             source["enabled"] = true; source["muted"] = false;
             source["push-to-mute"] = false; source["push-to-mute-delay"] = 0; source["push-to-talk"] = false; source["push-to-talk-delay"] = 0;
             source["hotkeys"] = new JObject();
-            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0;
+            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0; source["monitoring_enabled"] = false;
             source["private_settings"] = new JObject();
             source["settings"] = GetWindowCaptureInputSettings(settings);
         }
@@ -1755,7 +1759,7 @@ namespace ReplayKitHelper
             source["enabled"] = true; source["muted"] = false;
             source["push-to-mute"] = false; source["push-to-mute-delay"] = 0; source["push-to-talk"] = false; source["push-to-talk-delay"] = 0;
             source["hotkeys"] = new JObject();
-            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0;
+            source["deinterlace_mode"] = 0; source["deinterlace_field_order"] = 0; source["monitoring_type"] = 0; source["monitoring_enabled"] = false;
             source["private_settings"] = new JObject();
 
             var sourceSettings = new JObject
@@ -1913,7 +1917,7 @@ namespace ReplayKitHelper
                 hotkeys["libobs.hide_scene_item." + src.Id] = new JArray();
             }
             group["hotkeys"] = hotkeys;
-            group["deinterlace_mode"] = 0; group["deinterlace_field_order"] = 0; group["monitoring_type"] = 0;
+            group["deinterlace_mode"] = 0; group["deinterlace_field_order"] = 0; group["monitoring_type"] = 0; group["monitoring_enabled"] = false;
             group["canvas_uuid"] = "6c69626f-6273-4c00-9d88-c5136d61696e";
             group["private_settings"] = new JObject();
         }
@@ -2029,7 +2033,7 @@ namespace ReplayKitHelper
             filter["enabled"] = enabled; filter["muted"] = false;
             filter["push-to-mute"] = false; filter["push-to-mute-delay"] = 0; filter["push-to-talk"] = false; filter["push-to-talk-delay"] = 0;
             filter["hotkeys"] = new JObject();
-            filter["deinterlace_mode"] = 0; filter["deinterlace_field_order"] = 0; filter["monitoring_type"] = 0;
+            filter["deinterlace_mode"] = 0; filter["deinterlace_field_order"] = 0; filter["monitoring_type"] = 0; filter["monitoring_enabled"] = false;
             filter["private_settings"] = new JObject();
         }
 
@@ -2146,7 +2150,7 @@ namespace ReplayKitHelper
             filter["enabled"] = true; filter["muted"] = false;
             filter["push-to-mute"] = false; filter["push-to-mute-delay"] = 0; filter["push-to-talk"] = false; filter["push-to-talk-delay"] = 0;
             filter["hotkeys"] = new JObject();
-            filter["deinterlace_mode"] = 0; filter["deinterlace_field_order"] = 0; filter["monitoring_type"] = 0;
+            filter["deinterlace_mode"] = 0; filter["deinterlace_field_order"] = 0; filter["monitoring_type"] = 0; filter["monitoring_enabled"] = false;
             filter["private_settings"] = new JObject();
         }
 
@@ -2586,6 +2590,8 @@ namespace ReplayKitHelper
             var game = gameEnsure["ok"]?.Value<bool>() == true ? (JObject)gameEnsure["item"] : FindSceneItem(items, "Game Capture");
 
             var windowSettings = GetWindowCaptureInputSettings(settings);
+            // in automatic mode the capture switch script picks the window; writing the specific game window here pointed the capture at whatever that setting last held while the script still believed it showed its game
+            if (mode == "hybrid_auto") windowSettings.Remove("window");
             var windowEnsure = EnsureInputSceneItem(sceneName, "Window Capture", "window_capture", windowSettings, useWindowCapture);
             if (windowEnsure["ok"]?.Value<bool>() != true) warnings.Add("Could not prepare Window Capture: " + windowEnsure["message"]);
             itemsResult = GetSceneItems(sceneName);
@@ -3328,14 +3334,29 @@ namespace ReplayKitHelper
             try
             {
                 var data = JObject.Parse(json);
-                var bindings = data["ReplayBuffer.Save"] as JArray;
+                var bindings = (data["bindings"] ?? data["ReplayBuffer.Save"]) as JArray;
                 if (bindings == null || bindings.Count <= index || bindings[index] == null || bindings[index].Type == JTokenType.Null) return new JObject();
                 return index == 0 ? NormalizeClipKeybind(bindings[index]) : NormalizeExtraKeybind(bindings[index], "extra clip keybind");
             }
             catch (JsonException) { return new JObject(); }
         }
 
-        private static ObsWebSocketResult SetReplayBufferHotkeyJson(string json) => SetObsProfileParameterSafe("Hotkeys", "ReplayBuffer", json);
+        private static ObsWebSocketResult GetReplayBufferHotkeyJson()
+        {
+            var result = ObsWebSocket.InvokeRequest("GetVersion");
+            if (!result.Ok) return result;
+            if (!Version.TryParse(result.Data?["obsVersion"]?.Value<string>(), out var version))
+                return new ObsWebSocketResult { Ok = false, Message = "OBS version is invalid." };
+            return GetObsProfileParameterSafe("Hotkeys", version.Major >= 33 ? "OBSBasic.SaveReplayBuffer" : "ReplayBuffer");
+        }
+
+        // keep both formats current so switching obs versions preserves the saved clip bindings
+        private static ObsWebSocketResult SetReplayBufferHotkeyJson(JObject combo, JObject extra)
+        {
+            var result = SetObsProfileParameterSafe("Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(combo, extra));
+            if (!result.Ok) return result;
+            return SetObsProfileParameterSafe("Hotkeys", "OBSBasic.SaveReplayBuffer", ConvertRecordingKeybindToBasicIni(combo, extra));
+        }
 
         private static JObject SetRecordingHotkeyPairJson(string startJson, string stopJson)
         {
@@ -4659,6 +4680,12 @@ namespace ReplayKitHelper
             var mixer = SetDesktopAudioMixerState(inputName, monitorType);
             if (mixer["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = mixer["message"] };
             applied.AddRange((mixer["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
+            // obs opens its stream on the cable a moment after monitoring turns on, and a mute windows saved for obs there would silence the share
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                if (ShareCableMute.UnmuteObs(renderDevice.Id) > 0) { applied.Add("OBS unmuted on the share cable"); break; }
+                Thread.Sleep(150);
+            }
             return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
         }
 
@@ -4846,6 +4873,8 @@ namespace ReplayKitHelper
                     if (settingsBefore != settingsAfter) changed = true;
                     int current = source["monitoring_type"]?.Value<int>() ?? -1;
                     if (current != monitoringType) { source["monitoring_type"] = monitoringType; changed = true; }
+                    bool monitoringEnabled = monitoringType != 0;
+                    if (source["monitoring_enabled"]?.Value<bool>() != monitoringEnabled) { source["monitoring_enabled"] = monitoringEnabled; changed = true; }
                     bool currentMuted = source["muted"]?.Value<bool>() ?? true;
                     if (currentMuted != muted) { source["muted"] = muted; changed = true; }
                 }
@@ -5041,6 +5070,15 @@ namespace ReplayKitHelper
             }
         }
 
+        // what the share button of the shell polls every few seconds: the switches only, with no obs-websocket call, since reading the monitor type goes thru an obs api that obs 33 logs as deprecated on every call and the virtual camera script keeps the monitoring right by itself
+        public static JObject GetSharePreviewFlags()
+        {
+            var settings = ReadSettings();
+            bool available = TestDiscordScreenshareEnabled(settings);
+            bool enabled = available && settings["discord_output_mode"]?.Value<string>() == "projector" && (settings["discord_projector_enabled"]?.Value<bool>() ?? false);
+            return new JObject { ["ok"] = true, ["available"] = available, ["enabled"] = enabled };
+        }
+
         public static JObject GetSharePreviewState(bool repairMonitoring = false)
         {
             var settings = ReadSettings();
@@ -5062,6 +5100,7 @@ namespace ReplayKitHelper
             else warnings.Add("Could not read Desktop Audio mute state: " + mute.Message);
 
             bool synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && muteOk && inputMuted != true;
+            if (enabled && repairMonitoring && DiscordProjector.ClearCableMute() > 0) repaired = true;
             if (repairMonitoring && !synced)
             {
                 var repair = SetProjectorMonitoringState(settings, enabled);
@@ -5687,7 +5726,7 @@ namespace ReplayKitHelper
         {
             string before = HotkeySignature(settings);
 
-            var clip = GetObsProfileParameterSafe("Hotkeys", "ReplayBuffer");
+            var clip = GetReplayBufferHotkeyJson();
             if (clip.Ok)
             {
                 string json = clip.Data?["parameterValue"]?.Value<string>() ?? "";
@@ -5750,9 +5789,8 @@ namespace ReplayKitHelper
 
         private static JObject RestoreHotkeysFromSettings(JObject settings)
         {
-            string clipJson = ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject);
             string recordingJson = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
-            var r1 = SetReplayBufferHotkeyJson(clipJson);
+            var r1 = SetReplayBufferHotkeyJson(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject);
             var r2 = SetRecordingHotkeyPairJson(recordingJson, recordingJson);
             var r3 = SetObsProfileParameterSafe("Hotkeys", "OBSBasic.Screenshot", ConvertRecordingKeybindToBasicIni(settings["screenshotKeybind"] as JObject, settings["screenshotKeybindExtra"] as JObject));
             var errors = new List<string>();
@@ -5845,6 +5883,7 @@ namespace ReplayKitHelper
             profileUpdates.Add(new[] { "AdvOut", "RecEncoder", encoder["id"]?.Value<string>() ?? "" });
             profileUpdates.Add(new[] { "AdvOut", "RecTracks", RecTracksValue(settings) });
             profileUpdates.Add(new[] { "Hotkeys", "ReplayBuffer", ConvertClipKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject) });
+            profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.SaveReplayBuffer", ConvertRecordingKeybindToBasicIni(settings["clipKeybind"] as JObject, settings["clipKeybindExtra"] as JObject) });
             string recordingHotkey = ConvertRecordingKeybindToBasicIni(settings["recordingKeybind"] as JObject, settings["recordingKeybindExtra"] as JObject);
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StartRecording", recordingHotkey });
             profileUpdates.Add(new[] { "Hotkeys", "OBSBasic.StopRecording", recordingHotkey });
@@ -6009,7 +6048,7 @@ namespace ReplayKitHelper
             lock (SettingsStore.Gate)
             {
                 var settings = ReadSettings();
-                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings), ["updateReady"] = Update.ReadyVersion };
+                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings), ["updateReady"] = Update.ReadyVersion, ["obsUpdateReady"] = ObsUpdate.ReadyVersion };
             }
         }
 
@@ -6527,7 +6566,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         private static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
+            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
 
         private static readonly string[] StartupKeys = { "obsStartupEnabled" };
 

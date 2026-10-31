@@ -42,6 +42,7 @@ set(REPLAYKIT_SOURCES
     src/core/keybind_label.cpp
     src/core/main_window.cpp
     src/core/open_clips_hotkey.cpp
+    src/core/process_group.cpp
     src/core/state.cpp
     src/core/theme.cpp
     src/core/window_state.cpp

@@ -144,10 +144,21 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
         end
         return false
     end
-    local current = obs.obs_source_get_monitoring_type(src)
+    local monitoring_enabled_api = type(obs.obs_source_get_monitoring_enabled) == "function"
+        and type(obs.obs_source_set_monitoring_enabled) == "function"
+    local current
+    if monitoring_enabled_api then
+        current = obs.obs_source_get_monitoring_enabled(src) and OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT or OBS_MONITORING_TYPE_NONE
+    else
+        current = obs.obs_source_get_monitoring_type(src)
+    end
     local changed = current ~= target
     if changed then
-        obs.obs_source_set_monitoring_type(src, target)
+        if monitoring_enabled_api then
+            obs.obs_source_set_monitoring_enabled(src, target ~= OBS_MONITORING_TYPE_NONE)
+        else
+            obs.obs_source_set_monitoring_type(src, target)
+        end
         print(string.format("[AutoVirtCam] %s monitoring %d -> %d (%s)",
             source_name, current, target, friendly_target_name))
     else

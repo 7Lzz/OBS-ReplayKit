@@ -117,6 +117,7 @@ namespace ReplayKitSetup
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "input-overlay.dll"),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "SDL2.dll"),
                 Path.Combine(obsRoot, "data", "obs-plugins", "input-overlay"),
+                Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "input-overlay"),
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "bongobs-cat.dll"),
                 Path.Combine(obsRoot, "bin", "64bit", "Bango Cat"),
                 Path.Combine(obsRoot, "data", "obs-plugins", "bongobs-cat"),
@@ -128,6 +129,8 @@ namespace ReplayKitSetup
                 Path.Combine(obsRoot, "obs-plugins", "64bit", "obs-shaderfilter.pdb"),
                 Path.Combine(obsRoot, "data", "obs-plugins", "obs-shaderfilter"),
                 Config.REPLAYKIT_PLUGIN_DIR,
+                // the obs updater comes back with replaykit gone
+                ObsUpdateLock.MarkerPath,
             };
             bool ok = true;
             foreach (var target in targets)
@@ -806,6 +809,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
             var steps = new List<(string Title, string Detail, Func<object> Action)>
             {
                 ("Close OBS", "Stops OBS and ReplayKit helpers, but keeps this setup window alive.", () => StopObsAndHelpers(progress.LogLine)),
+                ("Restore OBS browser", "Restores the original OBS browser process files.", () => ProcessHost.Restore(progress.LogLine)),
                 ("Remove launch permission", "Deletes the ReplayKit scheduled task.", () => ScheduledTask.DeleteElevationTask(progress.LogLine)),
                 ("Remove Windows startup", "Stops ReplayKit from launching OBS when Windows signs in.", () => Startup.ConfigureObsStartup(false, progress.LogLine)),
                 ("Remove Windows sleep override", "Restores default Windows sleep behavior for OBS.", () => SleepOverride.RemoveSleepOverride(progress.LogLine)),

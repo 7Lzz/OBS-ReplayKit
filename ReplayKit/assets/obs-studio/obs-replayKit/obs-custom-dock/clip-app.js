@@ -156,6 +156,8 @@ const CLIP_HOVER_PROFILES = {
     CLIPBOARD: _svgInner(_RKI["action/clipboard"]),
     CHECK_CIRCLE: _svgInner(_RKI["action/check-circle"]),
     SELECT: _svgInner(_RKI["action/select"]),
+    // the deselect icon is drawn with strokes set on its own svg, which the menu svg it goes into does not carry
+    DESELECT: `<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${_svgInner(_RKI["editor/deselect"])}</g>`,
     FOLDER_OPEN: _svgInner(_RKI["action/folder-open"]),
     PLAY: _svgInner(_RKI["player/play"]),
     PAUSE: _svgInner(_RKI["player/pause"]),
@@ -2796,6 +2798,8 @@ const CLIP_HOVER_PROFILES = {
     const label = menuItem.querySelector(".menu-item-label");
     menuItem.setAttribute("aria-label", selected ? "Deselect clip" : "Select clip");
     if (label) label.textContent = selected ? "Deselect" : "Select";
+    const icon = menuItem.querySelector(".menu-item-icon");
+    if (icon) icon.innerHTML = selected ? ICON.DESELECT : ICON.SELECT;
   }
 
   function refreshBulkSelectionUi() {

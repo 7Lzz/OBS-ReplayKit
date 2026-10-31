@@ -1,0 +1,17 @@
+{
+  "lines": [
+    {
+      "from": "33.0.0",
+      "tested": "33.0.1",
+      "installer": {
+        "url": "https://github.com/obsproject/obs-studio/releases/download/33.0.1/OBS-Studio-33.0.1-Windows-x64-Installer.exe",
+        "sha256": "37ecde4d9a28e8aeeb07623c8469b5d558eb264e02ccf435bb859891c401758b"
+      },
+      "portable": {
+        "url": "https://github.com/obsproject/obs-studio/releases/download/33.0.1/OBS-Studio-33.0.1-Windows-x64.zip",
+        "sha256": "0d9436451c2d772b33428e3fdae9776f071895c335de17283176306fb72651d3"
+      },
+      "pluginLayout": "modern"
+    }
+  ]
+}

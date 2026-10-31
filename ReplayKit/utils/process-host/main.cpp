@@ -6,7 +6,6 @@
 #include <wrl/client.h>
 
 #include <filesystem>
-#include <algorithm>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -47,21 +46,10 @@ std::wstring Executable()
     return {path.data(), length};
 }
 
-std::string Utf8(const std::wstring &value)
-{
-    if (value.empty()) return {};
-    int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), int(value.size()), nullptr, 0, nullptr, nullptr);
-    if (!length) throw std::runtime_error("Invalid command-line text.");
-    std::string output(length, '\0');
-    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), int(value.size()), output.data(), length, nullptr, nullptr))
-        throw std::runtime_error("Cannot convert command-line text.");
-    return output;
-}
-
 HMODULE Load(const fs::path &path)
 {
-    HMODULE module = LoadLibraryExW(path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-    if (!module) throw std::runtime_error("Cannot load a required OBS host component (Windows error " + std::to_string(GetLastError()) + ").");
+    HMODULE module = LoadLibraryExW(fs::weakly_canonical(path).c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (!module) throw std::runtime_error("Cannot load " + path.filename().u8string() + " (Windows error " + std::to_string(GetLastError()) + ").");
     return module;
 }
 
@@ -112,6 +100,31 @@ int Helper()
 
 int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
 {
+    if (arguments.size() == 2 && arguments[1] == L"--version") {
+        std::puts("OBS Studio role host - " OBS_HOST_VERSION);
+        return 0;
+    }
+    if (arguments.size() == 2 && arguments[1] == L"--host-child-check") {
+        BOOL grouped = FALSE;
+        return IsProcessInJob(GetCurrentProcess(), nullptr, &grouped) && grouped ? 0 : 2;
+    }
+    if (arguments.size() == 2 && arguments[1] == L"--host-group-check") {
+        ProcessGroup group;
+        std::wstring executable = Executable();
+        std::wstring command = L"\"" + executable + L"\" --host-child-check";
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION child{};
+        if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                            nullptr, directory.c_str(), &startup, &child))
+            throw std::runtime_error("Cannot verify the OBS process group.");
+        CloseHandle(child.hThread);
+        DWORD result = 1;
+        if (WaitForSingleObject(child.hProcess, 10000) == WAIT_OBJECT_0) GetExitCodeProcess(child.hProcess, &result);
+        else TerminateProcess(child.hProcess, 1);
+        CloseHandle(child.hProcess);
+        return int(result);
+    }
     bool helper = false;
     bool browser = false;
     bool check = false;
@@ -130,29 +143,19 @@ int Run(const fs::path &directory, const std::vector<std::wstring> &arguments)
     if (browser && helper) throw std::runtime_error("Conflicting OBS host roles.");
     if (check) {
         if (arguments.size() != 2 || browser || helper) throw std::runtime_error("Invalid host verification arguments.");
-        return fs::is_regular_file(directory / L"obs-frontend-host.dll") &&
-                       fs::is_regular_file(directory / L".." / L".." / L"obs-plugins" / L"64bit" / L"obs-browser-role.dll") ? 0 : 2;
+        HMODULE role = Load(directory / OBS_BROWSER_ROLE_PATH);
+        if (!GetProcAddress(role, "RunBrowser"))
+            throw std::runtime_error("The OBS host components are incompatible.");
+        return 0;
     }
     if (helper) return Helper();
     if (browser) {
-        HMODULE module = Load(directory / L".." / L".." / L"obs-plugins" / L"64bit" / L"obs-browser-role.dll");
+        HMODULE module = Load(directory / OBS_BROWSER_ROLE_PATH);
         auto run = reinterpret_cast<int (*)(HINSTANCE)>(GetProcAddress(module, "RunBrowser"));
         if (!run) throw std::runtime_error("The browser host component is incompatible.");
         return run(GetModuleHandleW(nullptr));
     }
-    ProcessGroup group;
-    HMODULE module = Load(directory / L"obs-frontend-host.dll");
-    auto run = reinterpret_cast<int (*)(int, char **)>(GetProcAddress(module, "RunObs"));
-    if (!run) throw std::runtime_error("The OBS frontend host component is incompatible.");
-    if (!SetEnvironmentVariableW(L"OBS_REPLAYKIT_HOST_EXE", Executable().c_str()))
-        throw std::runtime_error("Cannot configure the helper host.");
-    std::vector<std::string> utf8;
-    for (const auto &argument : arguments) utf8.push_back(Utf8(argument));
-    if (std::find(utf8.begin(), utf8.end(), "--disable-updater") == utf8.end()) utf8.push_back("--disable-updater");
-    std::vector<char *> argv;
-    for (auto &argument : utf8) argv.push_back(argument.data());
-    argv.push_back(nullptr);
-    return run(int(utf8.size()), argv.data());
+    throw std::runtime_error("This OBS role host only starts browser or ReplayKit helper processes. Start OBS Studio normally.");
 }
 
 } // namespace
@@ -166,13 +169,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         if (!parsed) throw std::runtime_error("Cannot read startup arguments.");
         std::vector<std::wstring> arguments(parsed, parsed + count);
         LocalFree(parsed);
+        fs::path directory = fs::path(Executable()).parent_path();
+        if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS) || !AddDllDirectory(directory.parent_path().c_str()))
+            throw std::runtime_error("Cannot configure the OBS library directory.");
         Check(SetCurrentProcessExplicitAppUserModelID(L"OBS.ReplayKit.Clips"));
-        return Run(fs::path(Executable()).parent_path(), arguments);
+        return Run(directory, arguments);
     } catch (const std::exception &error) {
         OutputDebugStringA(error.what());
         std::fprintf(stderr, "%s\n", error.what());
         const std::wstring command = GetCommandLineW();
-        const bool diagnostic = command.find(L"--host-check") != std::wstring::npos || command.find(L"--host-info") != std::wstring::npos ||
+        const bool diagnostic = command.find(L"--host-") != std::wstring::npos ||
                                 command.find(L"--version") != std::wstring::npos || command.find(L"--help") != std::wstring::npos;
         if (!diagnostic && command.find(L"--type=") == std::wstring::npos)
             MessageBoxA(nullptr, error.what(), "ReplayKit OBS host", MB_OK | MB_ICONERROR);

@@ -58,7 +58,17 @@ namespace ReplayKitHelper
             }
 
             // lua can be hosted by a short-lived obs child process, so the running obs is watched instead and the helper does not exit as soon as that child does
-            if (!IsMainObsProcess(ParentName)) ResolveRunningObs();
+            if (!IsMainObsProcess(ParentName) || IsRoleHost(ParentPid)) ResolveRunningObs();
+        }
+
+        // a host copy of obs64.exe can start the helper too, and it ends with the page or helper it runs rather than with obs
+        private static bool IsRoleHost(int pid)
+        {
+            try
+            {
+                using (var process = Process.GetProcessById(pid)) return Constants.IsRoleHost(process.MainModule?.FileName);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { return false; }
         }
 
         private static bool IsMainObsProcess(string name) =>
@@ -73,9 +83,9 @@ namespace ReplayKitHelper
                 var processes = Process.GetProcessesByName(name);
                 try
                 {
-                    if (processes.Length == 0) continue;
-                    using (var process = processes[0])
+                    foreach (var process in processes)
                     {
+                        if (IsRoleHost(process.Id)) continue;
                         ParentPid = process.Id;
                         try { ParentStartTime = process.StartTime; } catch (System.ComponentModel.Win32Exception) { }
                         ParentName = process.ProcessName;
@@ -84,7 +94,7 @@ namespace ReplayKitHelper
                 }
                 finally
                 {
-                    for (int i = 1; i < processes.Length; i++) processes[i].Dispose();
+                    foreach (var process in processes) process.Dispose();
                 }
             }
         }

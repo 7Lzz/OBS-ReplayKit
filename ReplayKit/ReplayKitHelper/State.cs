@@ -79,7 +79,7 @@ namespace ReplayKitHelper
                 if (parentPid > 0)
                 {
                     var proc = Process.GetProcessById(parentPid);
-                    if (IsObsProcessName(proc.ProcessName) && proc.MainModule != null)
+                    if (IsObsProcessName(proc.ProcessName) && proc.MainModule != null && !IsRoleHost(proc.MainModule.FileName))
                     {
                         return proc.MainModule.FileName;
                     }
@@ -93,7 +93,7 @@ namespace ReplayKitHelper
                 {
                     foreach (var proc in Process.GetProcessesByName(name))
                     {
-                        try { if (proc.MainModule != null) return proc.MainModule.FileName; }
+                        try { if (proc.MainModule != null && !IsRoleHost(proc.MainModule.FileName)) return proc.MainModule.FileName; }
                         catch (System.ComponentModel.Win32Exception) { }
                         finally { proc.Dispose(); }
                     }
@@ -124,6 +124,16 @@ namespace ReplayKitHelper
                 if (File.Exists(candidate)) return candidate;
             }
             return null;
+        }
+
+        // the obs64.exe copy in bin\64bit\replaykit-host runs this helper and the browser pages so they show as obs, but it is never obs itself
+        internal static bool IsRoleHost(string path) =>
+            string.Equals(Path.GetFileName(Path.GetDirectoryName(path ?? "") ?? ""), "replaykit-host", StringComparison.OrdinalIgnoreCase);
+
+        internal static bool IsRoleHost(Process process)
+        {
+            try { return IsRoleHost(process.MainModule?.FileName); }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException) { return false; }
         }
 
         private static bool IsObsProcessName(string name) =>

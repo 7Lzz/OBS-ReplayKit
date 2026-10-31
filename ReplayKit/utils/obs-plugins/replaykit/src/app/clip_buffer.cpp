@@ -612,10 +612,15 @@ obs_hotkey_id FindReplaySaveHotkey()
 	obs_hotkey_id found = OBS_INVALID_HOTKEY_ID;
 	obs_enum_hotkeys(
 		[](void *data, obs_hotkey_id id, obs_hotkey_t *key) {
-			if (obs_hotkey_get_registerer_type(key) != OBS_HOTKEY_REGISTERER_OUTPUT || strcmp(obs_hotkey_get_name(key), "ReplayBuffer.Save") != 0)
-				return true;
-			*static_cast<obs_hotkey_id *>(data) = id;
-			return false;
+			const auto type = obs_hotkey_get_registerer_type(key);
+			const char *name = obs_hotkey_get_name(key);
+			if (type == OBS_HOTKEY_REGISTERER_FRONTEND && strcmp(name, "OBSBasic.SaveReplayBuffer") == 0) {
+				*static_cast<obs_hotkey_id *>(data) = id;
+				return false;
+			}
+			if (type == OBS_HOTKEY_REGISTERER_OUTPUT && strcmp(name, "ReplayBuffer.Save") == 0)
+				*static_cast<obs_hotkey_id *>(data) = id;
+			return true;
 		},
 		&found);
 	return found;

@@ -261,9 +261,9 @@ namespace ReplayKitSetup
                 ["settings.hook_rate"] = 2,
                 ["settings.limit_framerate"] = true,
             },
-            ["Audio Input Capture"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
-            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
-            ["Discord Audio (record only)"] = new Dictionary<string, object> { ["monitoring_type"] = 0 },
+            ["Audio Input Capture"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
+            ["Desktop Audio (excl. Discord)"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
+            ["Discord Audio (record only)"] = new Dictionary<string, object> { ["monitoring_type"] = 0, ["monitoring_enabled"] = false },
         };
 
         // remove ReplayKit-managed files that were renamed or retired.
@@ -495,6 +495,10 @@ namespace ReplayKitSetup
             string helperSource = Path.Combine(runtimeSrc, "scripts", "helper", "OBSReplayKit.exe");
             if (!File.Exists(helperSource) || new FileInfo(helperSource).Length < 256 * 1024)
                 throw new InvalidDataException("The bundled ReplayKit helper is missing or incomplete.");
+            // obs is brought to the one supported version before any file is copied: the plugins and the process host of this release are made for it, so an obs that cannot get there leaves the old replaykit as it was
+            ObsDownloader.EnsureObsVersion(log);
+            if (!ObsVersions.IsInstalledSupported())
+                throw new IOException("ReplayKit " + VersionInfo.Version + " needs OBS " + ObsVersions.Install.Tested + " and OBS could not be updated to it, so nothing was changed. Install OBS " + ObsVersions.Install.Tested + " from obsproject.com, then run the ReplayKit installer.");
 
             string transactionId = Guid.NewGuid().ToString("N");
             string transactionRoot = Path.Combine(Path.GetTempPath(), "ReplayKit", "runtime-update-" + transactionId);
@@ -627,6 +631,18 @@ namespace ReplayKitSetup
         public static List<string> RunUpdateDriverRefresh(Action<string> log = null)
         {
             var problems = new List<string>();
+            if (!ObsUpdateLock.Lock(log)) problems.Add("the OBS update lock");
+            // an install that only ever updated never got the process host, and one whose obs was just updated needs the one built for the new version; obs and the helper are closed here
+            try { ProcessHost.Install(log); }
+            catch (Exception ex)
+            {
+                log?.Invoke($"warn: OBS process roles not installed: {ex.Message}");
+                problems.Add("the OBS process roles");
+            }
+            // after the process host, whose files for the new obs are in core\ by then, so the ones for the old obs are seen as replaced too
+            try { ObsDownloader.RemoveReplacedCoreModules(log); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { log?.Invoke($"warn: old OBS files were left: {ex.Message}"); }
+
             try
             {
                 if (!InstallObsFfmpeg(log)) problems.Add("FFmpeg and FFprobe");

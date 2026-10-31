@@ -11,6 +11,7 @@
 #include "core/idle_memory.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
+#include "core/process_group.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
@@ -22,6 +23,7 @@ OBS_DECLARE_MODULE()
 bool obs_module_load(void)
 {
 	using namespace rk;
+	StartProcessGroup();
 	RegisterBongo();
 	g_callbacks = new QObject();
 	ClipBufferInit();
@@ -64,4 +66,5 @@ void obs_module_unload(void)
 	ClipBufferShutdown();
 	RemoveMainWindowCloseFilter();
 	StopReplayKitCrashReporter();
+	StopProcessGroup();
 }

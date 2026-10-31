@@ -66,16 +66,23 @@ namespace ReplayKitSetup
             void Add(string title, string detail, Func<object> action) => steps.Add((title, detail, action));
 
             // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
-            Add("Install OBS Studio", "Downloads OBS if it's missing.", () =>
+            Add("Install OBS Studio", "Installs OBS, or updates it to the version ReplayKit supports.", () =>
             {
-                string existing = Obs.FindObsExe();
-                if (existing != null) { progress.LogLine("OBS is already installed: " + existing); return (object)true; }
-                if (!ObsDownloader.EnsureObsInstalled(progress) || Obs.FindObsExe() == null)
+                ObsDownloader.EnsureObsVersion(progress);
+                if (Obs.FindObsExe() == null)
                     throw new InvalidOperationException(
                         "OBS Studio could not be installed automatically. Install OBS from obsproject.com, then run this installer again.");
+                // every plugin and the process host are made for the one supported version, so nothing is installed into another
+                if (!ObsVersions.IsInstalledSupported())
+                    throw new InvalidOperationException(
+                        "ReplayKit needs OBS " + ObsVersions.Install.Tested + " and the installed OBS could not be brought to it. Install OBS " + ObsVersions.Install.Tested + " from obsproject.com, then run this installer again.");
+                ProcessHost.Validate();
                 return (object)true;
             });
             Add("Close OBS", "Stops OBS to write settings.", () => (object)Obs.CloseObs(progress.LogLine));
+            Add("Lock OBS updates", "Keeps OBS on a version ReplayKit supports.", () => (object)ObsUpdateLock.Lock(progress.LogLine));
+            Add("Install OBS process roles", "Prepares OBS browser and ReplayKit helper processes.", () => { ProcessHost.Install(progress.LogLine); return (object)true; });
+            Add("Clear old OBS files", "Removes files an OBS update left behind.", () => { ObsDownloader.RemoveReplacedCoreModules(progress.LogLine); return (object)true; });
             Add("Back up current OBS settings", "Saves a restore copy first.", () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
             Add("Prepare OBS settings folder", "Creates the config folder.", () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
             // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old behaviour where a false here only added a "needs attention" line while the rest ran anyway.

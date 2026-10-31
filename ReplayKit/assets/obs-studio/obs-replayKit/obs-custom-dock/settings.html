@@ -84,9 +84,22 @@
     justify-content:space-between;
     gap:6px;
   }
+  /* each version says which program it is, split by the dot of the clip cards */
   .sidebar-version {
+    display:flex;
+    align-items:center;
+    gap:5px;
+    min-width:0;
+    white-space:nowrap;
     font-size:11px;
     color:var(--muted);
+  }
+  .sidebar-version .dot {
+    flex:none;
+    width:3px;
+    height:3px;
+    border-radius:50%;
+    background:var(--muted);
   }
   .sidebar-github {
     display:flex;
@@ -901,7 +914,7 @@
       <span>Advanced</span>
     </button>
     <div class="sidebar-footer">
-      <span class="sidebar-version" id="sidebarVersion"></span>
+      <span class="sidebar-version" id="sidebarVersion"><span id="sidebarRkVersion"></span><span class="dot" id="sidebarVersionDot" hidden></span><span id="sidebarObsVersion"></span></span>
       <a class="sidebar-github" id="sidebarGithubLink" href="https://github.com/7Lzz/OBS-ReplayKit" title="ReplayKit on GitHub">
         <svg data-i="brand/github" viewBox="0 0 16 16" aria-hidden="true"></svg>
       </a>
@@ -1845,6 +1858,13 @@
               <span>SDK mode</span>
             </div>
           </div>
+          <div class="form-row tight" data-search="obs update version check new release">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="checkObsUpdates" aria-label="Check for OBS updates">
+              <span>Check for OBS updates<span class="control-note">Shows a grey badge at the top when a newer OBS is out. OBS doesn't update itself while ReplayKit is installed, so this only lets you know.</span></span>
+            </div>
+          </div>
           <div class="form-row tight">
             <div></div>
             <div class="field-wrap">
@@ -2353,6 +2373,7 @@
     developmentMode: document.getElementById("developmentMode"),
     developmentSettings: document.getElementById("developmentSettings"),
     sdkMode: document.getElementById("sdkMode"),
+    checkObsUpdates: document.getElementById("checkObsUpdates"),
     logInterfaceEvents: document.getElementById("logInterfaceEvents"),
     pinObsTrayIcon: document.getElementById("pinObsTrayIcon"),
     clipNotificationEnabled: document.getElementById("clipNotificationEnabled"),
@@ -3790,6 +3811,7 @@
     syncStorageCompression();
     els.developmentMode.checked = !!state.developmentMode;
     els.sdkMode.checked = !!state.sdkMode;
+    els.checkObsUpdates.checked = !!state.checkObsUpdates;
     els.logInterfaceEvents.checked = !!state.logInterfaceEvents;
     syncStorageLimit();
     syncDevelopmentFields();
@@ -3884,6 +3906,7 @@
     syncStorageCompression();
     state.developmentMode = els.developmentMode.checked;
     state.sdkMode = els.sdkMode.checked;
+    state.checkObsUpdates = els.checkObsUpdates.checked;
     state.logInterfaceEvents = els.logInterfaceEvents.checked;
     state.storageLimitGb = readStorageLimit();
   }
@@ -4275,7 +4298,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -6005,7 +6028,11 @@
   (async () => {
     try {
       const data = await helperJson("version?t=" + Date.now());
-      if (data.version) els.sidebarVersion.textContent = "v" + data.version;
+      if (data.version) document.getElementById("sidebarRkVersion").textContent = "ReplayKit " + data.version;
+      if (data.obsVersion) {
+        document.getElementById("sidebarObsVersion").textContent = "OBS " + data.obsVersion;
+        document.getElementById("sidebarVersionDot").hidden = !data.version;
+      }
     } catch (e) {}
   })();
 

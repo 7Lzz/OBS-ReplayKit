@@ -40,6 +40,7 @@ namespace ReplayKitHelper
         static Sdk()
         {
             Register("update.badge", "shows the update button of the title bar for args.version (9.9.9 when left out) as if the update check had found it, or takes it away with args.clear; the next update check, every 30 minutes, puts the real state back", args => Update.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "9.9.9"));
+            Register("update.obs-badge", "shows the grey obs update button of the title bar for args.version (99.0.0 when left out) as if the obs check had found it, or takes it away with args.clear; the next obs check puts the real state back", args => ObsUpdate.PreviewBadge(args["clear"]?.Value<bool>() == true ? "" : args["version"]?.ToString() ?? "99.0.0"));
             Register("helper.info", "version, process id, uptime and the switches that matter of the helper", HelperInfo);
             Register("capture.state", "reports accepted native capture evidence without exposing process paths", args => ClipGames.Status());
             Register("roblox.state", "the roblox experience the roblox logs say is open now, and how many experiences have a name and icon", args => RobloxExperiences.State());

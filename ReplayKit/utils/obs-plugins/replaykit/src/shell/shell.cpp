@@ -34,7 +34,7 @@ namespace {
 void PollSharePreview()
 {
 	RunAsync([]() {
-		const std::string body = HttpRequest("GET", "/share-preview", 8767, nullptr, 800);
+		const std::string body = HttpRequest("GET", "/share-preview?quick=1", 8767, nullptr, 800);
 		if (body.empty())
 			return;
 		const bool available = JsonBoolField(body, "available", false);
@@ -102,6 +102,8 @@ void ShellApplySettings(const std::string &settingsBody)
 	// only the short read of the poll carries it, so a full read of the settings leaves the badge as it is
 	if (settingsBody.find("\"updateReady\":") != std::string::npos)
 		g_shellTitle->SetUpdateReady(QString::fromStdString(ExtractJsonStringField(settingsBody, "updateReady")));
+	if (settingsBody.find("\"obsUpdateReady\":") != std::string::npos)
+		g_shellTitle->SetObsUpdateReady(QString::fromStdString(ExtractJsonStringField(settingsBody, "obsUpdateReady")));
 }
 
 // switches the process into the clean shell. must run before the main window has a native window: a frameless flag set later makes qt recreate it while obs is using it

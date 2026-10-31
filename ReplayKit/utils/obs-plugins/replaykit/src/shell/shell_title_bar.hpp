@@ -32,10 +32,11 @@ protected:
 	void PaintGlyph(QPainter &p, const QRectF &pill, qreal hover) override;
 };
 
-// the yellow badge left of the bell, its icon and then "ReplayKit <version> Available": a newer release was found while obs was open, and a click opens the update window, since only the check at startup updates by itself
+// the yellow badge left of the bell, its icon and then "ReplayKit <version> Available": a newer release was found while obs was open, and a click opens the update window, since only the check at startup updates by itself. the obs kind is the grey one left of it, "OBS <version> Available" from the development check for obs releases, and a click opens the notes of that release, since replaykit decides when obs is updated
 class ShellUpdateButton : public ShellTitleButton {
 public:
-	explicit ShellUpdateButton(QWidget *parent);
+	enum class Kind { ReplayKit, Obs };
+	ShellUpdateButton(Kind kind, QWidget *parent);
 	// the version that is ready, or empty to take the button away
 	void SetVersion(const QString &version);
 	const QString &Version() const { return m_version; }
@@ -45,8 +46,9 @@ protected:
 
 private:
 	static QFont LabelFont();
-	QString Label() const { return QStringLiteral("ReplayKit %1 Available").arg(m_version); }
+	QString Label() const { return (m_kind == Kind::Obs ? QStringLiteral("OBS %1 Available") : QStringLiteral("ReplayKit %1 Available")).arg(m_version); }
 
+	Kind m_kind;
 	QString m_version;
 };
 
@@ -73,6 +75,8 @@ public:
 	void SetPage(const QString &page);
 	// the release the update check found while obs was open, empty when there is none
 	void SetUpdateReady(const QString &version);
+	// the newer obs the development check found, empty when there is none or the check is off
+	void SetObsUpdateReady(const QString &version);
 	void RestoreTitle();
 	// the menu of the circle is up, so the shell reads the account every second instead of every half minute
 	bool AccountPanelOpen() const;
@@ -111,6 +115,7 @@ private:
 	ShellLogoButton *m_logo = nullptr;
 	ShellQuickMenu *m_quick = nullptr;
 	ShellUpdateButton *m_update = nullptr;
+	ShellUpdateButton *m_obsUpdate = nullptr;
 	NotifyButton *m_bell = nullptr;
 	ShellAccountButton *m_account = nullptr;
 	ShellWinButton *m_min = nullptr;

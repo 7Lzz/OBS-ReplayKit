@@ -87,14 +87,24 @@ void ShellLogoButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
 	p.restore();
 }
 
-ShellUpdateButton::ShellUpdateButton(QWidget *parent) : ShellTitleButton(kHeight, parent)
+ShellUpdateButton::ShellUpdateButton(Kind kind, QWidget *parent) : ShellTitleButton(kHeight, parent), m_kind(kind)
 {
 	hide();
+	if (kind == Kind::Obs) {
+		SetTip(QStringLiteral("Click to see what changed"));
+		onPress = [this]() {
+			// the version goes into the address as it is, so only a plain release number is let through
+			if (!QRegularExpression(QStringLiteral("^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}$")).match(m_version).hasMatch())
+				return;
+			QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/obsproject/obs-studio/releases/tag/") + m_version));
+		};
+		return;
+	}
 	SetTip(QStringLiteral("Click to install"));
 	onPress = [this]() {
 		const QString version = m_version;
 		// the version goes into the address as it is, so only the characters a release tag uses are let through
-		if (version.isEmpty() || version.contains(QRegularExpression(QStringLiteral("[^0-9A-Za-z.\-]"))))
+		if (version.isEmpty() || version.contains(QRegularExpression(QStringLiteral("[^0-9A-Za-z.-]"))))
 			return;
 		const std::string path = "/update/open-prompt?version=" + version.toStdString();
 		RunAsync([path]() { HttpRequest("POST", path.c_str(), 8767, "", 5000); });
@@ -116,15 +126,17 @@ void ShellUpdateButton::SetVersion(const QString &version)
 
 void ShellUpdateButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
 {
-	// a warning wash under the glyph at all times, a little stronger under the pointer
-	QColor wash = g_chromeWarning;
-	wash.setAlphaF(0.16 + 0.12 * hover);
+	// a wash under the glyph at all times, a little stronger under the pointer: the warning colour for replaykit, the grey of the theme ink for obs
+	const bool obs = m_kind == Kind::Obs;
+	QColor wash = obs ? ChromeInk(0.08 + 0.07 * hover) : g_chromeWarning;
+	if (!obs)
+		wash.setAlphaF(0.16 + 0.12 * hover);
 	p.setPen(Qt::NoPen);
 	p.setBrush(wash);
 	p.drawRoundedRect(pill, kRadius, kRadius);
 	// an arrow down into a tray, then the words
 	const QPointF c(pill.left() + kUpdatePadLeft + kUpdateIcon / 2.0, pill.center().y());
-	QPen pen(g_chromeWarning, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+	QPen pen(obs ? ChromeInk(0.62 + 0.18 * hover) : g_chromeWarning, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 	p.setPen(pen);
 	p.setBrush(Qt::NoBrush);
 	p.drawLine(QPointF(c.x(), c.y() - 6.0), QPointF(c.x(), c.y() + 2.0));
@@ -193,7 +205,8 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_rec->onContextMenu = [this]() { m_hotkeys->Toggle(m_rec, ShellHotkeyMenu::Kind::Record); };
 	m_rec->onEnter = [this]() { m_hotkeys->Prepare(m_rec, ShellHotkeyMenu::Kind::Record); };
 
-	m_update = new ShellUpdateButton(this);
+	m_update = new ShellUpdateButton(ShellUpdateButton::Kind::ReplayKit, this);
+	m_obsUpdate = new ShellUpdateButton(ShellUpdateButton::Kind::Obs, this);
 	m_bell = new NotifyButton(mw, this);
 	g_notifyButtons.append(QPointer<NotifyButton>(m_bell));
 	m_account = new ShellAccountButton(mw, this);
@@ -236,6 +249,14 @@ void ShellTitleBar::SetUpdateReady(const QString &version)
 	if (version == m_update->Version())
 		return;
 	m_update->SetVersion(version);
+	LayoutChildren();
+}
+
+void ShellTitleBar::SetObsUpdateReady(const QString &version)
+{
+	if (version == m_obsUpdate->Version())
+		return;
+	m_obsUpdate->SetVersion(version);
 	LayoutChildren();
 }
 
@@ -345,10 +366,12 @@ void ShellTitleBar::LayoutChildren()
 	right -= m_account->width() + 2;
 	m_bell->move(right - m_bell->width(), (h - m_bell->height()) / 2);
 	right -= m_bell->width() + 2;
-	// switched on, whether or not the window is on screen right now
-	if (!m_update->isHidden()) {
-		m_update->move(right - m_update->width(), (h - m_update->height()) / 2);
-		right -= m_update->width() + 2;
+	// the update badges that are switched on, whether or not the window is on screen right now, the obs one left of the replaykit one
+	for (ShellUpdateButton *badge : {m_update, m_obsUpdate}) {
+		if (badge->isHidden())
+			continue;
+		badge->move(right - badge->width(), (h - badge->height()) / 2);
+		right -= badge->width() + 2;
 	}
 	right -= 10;
 

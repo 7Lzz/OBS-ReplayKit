@@ -211,6 +211,7 @@ namespace ReplayKitHelper
             try { IdleMemory.Start(); } catch (Exception ex) { Log.Write("IdleMemory.Start: " + ex.Message); }
             try { SetupExe.CheckAtStartup(); } catch (Exception ex) { Log.Write("SetupExe.CheckAtStartup: " + ex.Message); }
             try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
+            try { ObsUpdate.Start(); } catch (Exception ex) { Log.Write("ObsUpdate.Start: " + ex.Message); }
             try { ClipFolderWorker.Start(); } catch (Exception ex) { Log.Write("ClipFolderWorker.Start: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
             var probe = new Thread(() =>

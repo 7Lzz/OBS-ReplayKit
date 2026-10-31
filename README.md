@@ -107,6 +107,7 @@ To build the Windows x64 installer, you'll need:
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - .NET Framework 4.8 developer and targeting pack
 - [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with Desktop development with C++, Windows SDK, CMake, and Ninja
+- Visual Studio 2026 with C++, CMake 4.2 or newer, and Windows SDK 10.0.26100.0 for the OBS browser and helper role launchers, matching the upstream OBS build presets
 - [OBS Studio](https://obsproject.com/) installed on Windows x64
 
 ```powershell
@@ -118,6 +119,8 @@ gh auth login
 ```
 
 The build creates `build/OBSReplayKit.exe` and `build/OBSReplayKit.exe.sha256`. You can compare the checksum with `Get-FileHash`.
+
+The build packages browser and helper role launchers for each tested OBS version. Setup preserves the stock OBS executable and frontend, including its account connections, and keeps a verified copy of the original browser for uninstall. OBS and its child roles use the same executable name and app identity; Windows controls their visual grouping in Task Manager.
 
 > [!NOTE]
 > The plugin build scripts expect OBS at `C:\Program Files\obs-studio` and use specific Visual Studio Build Tools paths. You may need to adjust them if your setup is different.

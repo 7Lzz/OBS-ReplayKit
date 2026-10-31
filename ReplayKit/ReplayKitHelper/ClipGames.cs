@@ -102,7 +102,7 @@ namespace ReplayKitHelper
 
         internal static JObject Status()
         {
-            lock (Gate) return new JObject { ["ok"] = true, ["samples"] = acceptedSamples, ["kind"] = acceptedKind,
+            lock (Gate) return new JObject { ["ok"] = true, ["peer"] = PipeClient.CapturePeer, ["samples"] = acceptedSamples, ["kind"] = acceptedKind,
                 ["ageMs"] = acceptedAt > 0 ? (JToken)((long)GetTickCount64() - acceptedAt) : JValue.CreateNull(), ["historyEntries"] = CaptureTimeline.Count, ["pendingSaves"] = Saves.Count, ["steam"] = SteamGames.Status() };
         }
 

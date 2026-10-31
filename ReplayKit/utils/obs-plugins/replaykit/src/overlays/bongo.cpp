@@ -9,7 +9,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <graphics/image-file.h>
 
 namespace rk {
 namespace {
@@ -56,16 +55,17 @@ technique Draw { pass { vertex_shader = VSDraw(v_in); pixel_shader = PSDraw(v_in
 )";
 
 struct Image {
-	gs_image_file_t file{};
+	gs_texture_t *texture = nullptr;
 	bool Load(const QString &path)
 	{
-		const QByteArray utf8 = path.toUtf8();
-		gs_image_file_init(&file, utf8.constData());
-		if (file.loaded)
-			gs_image_file_init_texture(&file);
-		return file.texture != nullptr;
+		texture = BongoTexture(path);
+		return texture != nullptr;
 	}
-	~Image() { gs_image_file_free(&file); }
+	~Image()
+	{
+		if (texture)
+			gs_texture_destroy(texture);
+	}
 };
 
 struct ModelSlot {
@@ -420,10 +420,10 @@ struct Bongo {
 	{
 		if (!picture)
 			return;
-		gs_effect_set_texture(image, picture->file.texture);
+		gs_effect_set_texture(image, picture->texture);
 		gs_effect_set_float(opacity, 1.0f);
 		while (gs_effect_loop(effect, "Draw"))
-			gs_draw_sprite(picture->file.texture, 0, uint32_t(FrameWidth), uint32_t(FrameHeight));
+			gs_draw_sprite(picture->texture, 0, uint32_t(FrameWidth), uint32_t(FrameHeight));
 	}
 
 	void DrawModel(ModelSlot *slot, const Settings &now)

@@ -390,7 +390,7 @@ local helper_started = false
 
 local function helper_command()
     local module = kernel32.GetModuleHandleA(nil)
-    if module ~= nil and kernel32.GetProcAddress(module, "ProcessHostVersion") ~= nil then
+    if module ~= nil then
         local buffer = ffi.new("char[32768]")
         local length = kernel32.GetModuleFileNameA(module, buffer, ffi.sizeof(buffer))
         if length == 0 or length >= ffi.sizeof(buffer) then
@@ -398,7 +398,14 @@ local function helper_command()
             return nil
         end
         local host = ffi.string(buffer, length)
-        return win_quote(host) .. ' --replaykit-helper', true
+        if kernel32.GetProcAddress(module, "ProcessHostVersion") ~= nil then
+            return win_quote(host) .. ' --replaykit-helper', true
+        end
+        local directory = host:gsub("\\", "/"):match("^(.*)/[^/]+$")
+        local launcher = directory and (directory .. "/replaykit-host/obs64.exe")
+        if launcher and file_exists(launcher) then
+            return win_quote(launcher) .. ' --replaykit-helper', true
+        end
     end
     return win_quote(helper_path()), false
 end

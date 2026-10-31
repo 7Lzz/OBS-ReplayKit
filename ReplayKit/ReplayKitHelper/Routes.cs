@@ -223,7 +223,7 @@ namespace ReplayKitHelper
             var procs = GetProcessesByNames("obs64", "obs32", "obs");
             foreach (var p in procs)
             {
-                try { if (!string.IsNullOrEmpty(p.MainModule?.FileName)) return p.MainModule.FileName; }
+                try { if (!string.IsNullOrEmpty(p.MainModule?.FileName) && !Constants.IsRoleHost(p.MainModule.FileName)) return p.MainModule.FileName; }
                 catch (Win32Exception) { } catch (InvalidOperationException) { }
             }
             foreach (var p in procs)
@@ -314,7 +314,7 @@ namespace ReplayKitHelper
             }
             else
             {
-                var found = GetProcessesByNames("obs64", "obs32", "obs");
+                var found = GetProcessesByNames("obs64", "obs32", "obs").Where(p => !Constants.IsRoleHost(p)).ToArray();
                 if (found.Length > 0) obsTargetPid = found[0].Id;
             }
             bool detached = StartDetachedObsRelauncher(obsPath, obsTargetPid);
@@ -820,7 +820,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method == "GET")
                 {
-                    try { HttpResponse.SendJson(stream, 200, ReplaykitSettings.GetSharePreviewState(true)); }
+                    try { HttpResponse.SendJson(stream, 200, Q("quick") == "1" ? ReplaykitSettings.GetSharePreviewFlags() : ReplaykitSettings.GetSharePreviewState(true)); }
                     catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                     return false;
                 }
@@ -1257,7 +1257,7 @@ namespace ReplayKitHelper
             if (path == "/version")
             {
                 // local file read only, no github call -- for ui labels that just want "what am i running", not the update-check flow.
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["version"] = Update.GetInstalledVersion() });
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["version"] = Update.GetInstalledVersion(), ["obsVersion"] = ObsUpdate.InstalledVersion()?.ToString() ?? "" });
                 return false;
             }
 

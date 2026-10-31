@@ -6,7 +6,8 @@ local ffi_ok, ffi = pcall(require, "ffi")
 local REFRESH_SECONDS = 1.0
 local CAPTURE_POLL_SECONDS = 0.05
 local MAX_SETTINGS_BYTES = 65536
-local CLIP_HOTKEY_NAMES = { "ReplayBuffer.Save" }
+-- obs 33 moved replay saving from the output to a frontend hotkey
+local CLIP_HOTKEY_NAMES = { "ReplayBuffer.Save", "OBSBasic.SaveReplayBuffer" }
 local RECORDING_HOTKEY_NAMES = {
     "OBSBasic.StartRecording",
     "OBSBasic.StopRecording",

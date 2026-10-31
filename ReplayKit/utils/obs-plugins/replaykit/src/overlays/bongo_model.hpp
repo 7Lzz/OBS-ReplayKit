@@ -2,9 +2,11 @@
 #pragma once
 
 #include <vector>
-#include <graphics/image-file.h>
 
 namespace rk {
+
+// a png as a straight alpha rgba texture, decoded by qt instead of the gs_image_file api, which obs 33 replaced by an incompatible one so a dll importing either set fails to load on the other; needs the graphics context, null when the file does not decode
+gs_texture_t *BongoTexture(const QString &path);
 
 struct BongoModel {
 	struct Parameter {
@@ -25,7 +27,7 @@ struct BongoModel {
 	};
 	std::vector<Parameter> parameters;
 	std::vector<Mesh> meshes;
-	gs_image_file_t texture{};
+	gs_texture_t *texture = nullptr;
 
 	// the bake is chosen by the md5 of the moc3, so a model that was swapped for another draws nothing instead of the wrong shape
 	bool Load(const QString &moc3, const QString &texturePath, const QString &bakes);

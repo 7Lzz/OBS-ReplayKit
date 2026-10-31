@@ -721,7 +721,7 @@ namespace ReplayKitHelper
             {
                 foreach (var p in procs)
                 {
-                    try { if (p.MainModule != null) return p.MainModule.FileName; }
+                    try { if (p.MainModule != null && !Constants.IsRoleHost(p.MainModule.FileName)) return p.MainModule.FileName; }
                     catch (System.ComponentModel.Win32Exception) { }
                 }
                 foreach (var p in procs)

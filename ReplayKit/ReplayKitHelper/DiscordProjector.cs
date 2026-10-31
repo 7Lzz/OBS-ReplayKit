@@ -738,6 +738,13 @@ namespace ReplayKitHelper
             public string Name;
         }
 
+        // takes a windows mixer mute of obs off the share cable, see ShareCableMute
+        public static int ClearCableMute()
+        {
+            var cable = GetObsStreamAudioRenderDevice();
+            return cable.Ok ? ShareCableMute.UnmuteObs(cable.Id) : -1;
+        }
+
         public static AudioDeviceResult GetObsStreamAudioRenderDevice()
         {
             const string renderPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render";
@@ -835,6 +842,7 @@ namespace ReplayKitHelper
                 Log.Write("Discord projector keep-alive skipped: projector disabled in settings");
                 return;
             }
+            ClearCableMute();
             string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
             if (mode != "projector")
             {

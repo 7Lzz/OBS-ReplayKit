@@ -2,6 +2,7 @@
 #include "core/idle_memory.hpp"
 
 #include <QPixmapCache>
+#include <filesystem>
 #include <iphlpapi.h>
 #include <psapi.h>
 #include <tlhelp32.h>
@@ -123,6 +124,18 @@ bool UserStillIdle(DWORD lastInputTick)
 	return ReadUserIdle(currentInputTick, idleMs) && currentInputTick == lastInputTick && idleMs >= kVisibleIdleMs;
 }
 
+bool ChildExecutable(const std::wstring &ownPath, const wchar_t *childPath)
+{
+	if (_wcsicmp(ownPath.c_str(), childPath) == 0)
+		return true;
+	const auto root = std::filesystem::path(ownPath).parent_path().parent_path().parent_path();
+	for (const auto *relative : {L"obs-plugins\\64bit\\obs-browser-page.exe", L"core\\obs-browser\\obs-browser-page.exe", L"bin\\64bit\\replaykit-host\\obs64.exe"}) {
+		if (_wcsicmp((root / relative).c_str(), childPath) == 0)
+			return true;
+	}
+	return false;
+}
+
 ChildResult TrimChildProcesses(unsigned current, bool requireUserIdle = false, DWORD lastInputTick = 0)
 {
 	ChildResult result;
@@ -164,9 +177,9 @@ ChildResult TrimChildProcesses(unsigned current, bool requireUserIdle = false, D
 			} else {
 				std::vector<wchar_t> childPath(32768);
 				DWORD childPathSize = static_cast<DWORD>(childPath.size());
-				const bool sameExecutable = QueryFullProcessImageNameW(child, 0, childPath.data(), &childPathSize) &&
-							   _wcsicmp(ownPath.data(), childPath.data()) == 0;
-				if (sameExecutable) {
+				const bool eligible = QueryFullProcessImageNameW(child, 0, childPath.data(), &childPathSize) &&
+						      ChildExecutable(ownPath.data(), childPath.data());
+				if (eligible) {
 					++result.processes;
 					PROCESS_MEMORY_COUNTERS_EX counters{};
 					counters.cb = sizeof(counters);

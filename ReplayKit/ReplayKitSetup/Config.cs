@@ -41,7 +41,7 @@ namespace ReplayKitSetup
         public static readonly string OBS_INSTALL_DIR;
         public static readonly string PROGRAMFILES_OBS_DIR;
 
-        // input-overlay ships as its own raw plugin files (dll + data), extracted once and checked into input-overlay-plugin.zip -- not an embedded, silently-executed third-party installer. an embedded-and-executed installer is exactly the shape av "application bundler" heuristics exist to catch, and BongoCat.cs already proved the raw-files-plus-safe-extract approach works. vc++ is the one real prerequisite still downloaded (from microsoft only when missing, signature-checked before running).
+        // input-overlay ships as its own raw plugin files (dll + data), extracted once and checked into input-overlay-plugin.zip (built from source by utils/obs-plugins/input-overlay so one build loads in every obs line) -- not an embedded, silently-executed third-party installer. an embedded-and-executed installer is exactly the shape av "application bundler" heuristics exist to catch, and BongoCat.cs already proved the raw-files-plus-safe-extract approach works. vc++ is the one real prerequisite still downloaded (from microsoft only when missing, signature-checked before running).
         public static readonly string INPUT_OVERLAY_PLUGIN_ZIP;
         public const string VCPP_REDIST_DOWNLOAD_URL = "https://aka.ms/vc14/vc_redist.x64.exe";
         public const long VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
@@ -62,14 +62,13 @@ namespace ReplayKitSetup
         // the Bango Cat folder (modes, pictures, live2d models) from the bongobs-cat project, laid out as an obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
         public static readonly string BONGO_CAT_ZIP;
 
-        // obs shaderfilter plugin -- replaykit uses its bundled motion_blur.shader when the optional motion blur setting is enabled.
+        // obs shaderfilter plugin -- replaykit uses its bundled motion_blur.shader when the optional motion blur setting is enabled. the archive is the upstream 2.6.1 windows release cut down to the 64-bit plugin, its locale and internal effect and motion_blur.shader, since replaykit uses nothing else of it.
         public static readonly string SHADERFILTER_ZIP;
-        public const string SHADERFILTER_ZIP_SHA256 = "0e75fc5f2523befd9c66c0adb14f9c838cc0cd705b32487e121abb03ad2f2486";
+        public const string SHADERFILTER_ZIP_SHA256 = "9ef94f7656c4dc1d5fa7f076a2d96b5c25fa1d0d4c172a09837309665ba4858f";
 
         // replaykits own obs plugin (window chrome, tray menu, notifications, hotkeys) -- compiled from source at release time and bundled straight into assets/, installed under %programdata%\obs-studio\plugins\ (obss no-admin plugin search path).
         public static readonly string REPLAYKIT_PLUGIN_DLL_BUNDLED;
         public static readonly string REPLAYKIT_PLUGIN_DIR;
-        public static readonly string REPLAYKIT_PLUGIN_DLL_TARGET;
 
         // pre-unification plugin locations. obs loads every dll it finds under plugins\<name>\bin\64bit\, so an old replaykit-tray left sitting beside the current replaykit\ is loaded alongside it and injects a second copy of every tray menu item.
         public static readonly string REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR;
@@ -122,7 +121,6 @@ namespace ReplayKitSetup
 
             REPLAYKIT_PLUGIN_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
             REPLAYKIT_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
-            REPLAYKIT_PLUGIN_DLL_TARGET = Path.Combine(REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
             REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit-tray");
             REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR = Path.Combine(REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");
         }
@@ -141,6 +139,8 @@ namespace ReplayKitSetup
         {
             if (string.IsNullOrEmpty(path)) return false;
             string name = Path.GetFileName(path).ToLowerInvariant();
+            // the obs64.exe copy in bin\64bit\replaykit-host runs the browser pages and the helper so they show as obs, but it is never obs itself
+            if (string.Equals(Path.GetFileName(Path.GetDirectoryName(path) ?? ""), "replaykit-host", StringComparison.OrdinalIgnoreCase)) return false;
             return OBS_PROCESSES.Contains(name) && File.Exists(path);
         }
 

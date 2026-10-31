@@ -9,15 +9,22 @@ namespace ReplayKitSetup
         // true when this build carries a plugin to install
         public static bool IsBundled() => File.Exists(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED);
 
+        // obs 33 reads plugins\replaykit\replaykit.dll first and marks the bin\64bit copy legacy, while older obs only reads bin\64bit, so the layout follows the line of the installed obs
+        private static string TargetPath(bool modern) =>
+            modern ? Path.Combine(Config.REPLAYKIT_PLUGIN_DIR, "replaykit.dll") : Path.Combine(Config.REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
+
         // the installed plugin is byte for byte the bundled one
         public static bool IsCurrent()
         {
             try
             {
-                if (!IsBundled() || !File.Exists(Config.REPLAYKIT_PLUGIN_DLL_TARGET)) return false;
-                return HashOf(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED) == HashOf(Config.REPLAYKIT_PLUGIN_DLL_TARGET);
+                var line = ObsVersions.Current;
+                if (line == null) return false;
+                string target = TargetPath(line.ModernPlugins);
+                if (!IsBundled() || !File.Exists(target)) return false;
+                return HashOf(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED) == HashOf(target);
             }
-            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is InvalidDataException)
             {
                 return false;
             }
@@ -38,7 +45,14 @@ namespace ReplayKitSetup
                 return false;
             }
 
-            string target = Config.REPLAYKIT_PLUGIN_DLL_TARGET;
+            var line = ObsVersions.Current;
+            if (line == null)
+            {
+                log?.Invoke("warn: the OBS version could not be read, so where OBS loads the ReplayKit plugin from is unknown");
+                return false;
+            }
+            bool modern = line.ModernPlugins;
+            string target = TargetPath(modern);
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
@@ -57,6 +71,8 @@ namespace ReplayKitSetup
             }
 
             RemoveLegacyTrayPlugins(log);
+            // a copy in the other layout is from before obs changed line; obs 33 skips it, but an older obs would load it instead of this one
+            NeutralizeLegacyDll(TargetPath(!modern), log);
             log?.Invoke("installed -> " + target);
             log?.Invoke("    OBS will load it on next launch (the ReplayKit window, notifications and tray menu come from it)");
             return true;

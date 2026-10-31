@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -13,15 +14,18 @@ namespace ReplayKitSetup
     // install the input-overlay plugin from its raw bundled files and extract its preset pack. downloads the vc++ redist on demand if missing
     public static class InputOverlay
     {
-        // canonical install paths -- same locations the official inno setup installer used to write, so nothing downstream (obs, cli.cs) needed to change.
-        private static readonly string PluginDll = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "input-overlay.dll");
-        private static readonly string PluginSdl2 = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "SDL2.dll");
+        // the install paths older setups used -- same locations the official inno setup installer used to write. obs before 34 still loads from them, so they are cleared once the plugin folder copy is in
+        private static readonly string LegacyDll = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "input-overlay.dll");
+        private static readonly string LegacySdl2 = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "obs-plugins", "64bit", "SDL2.dll");
+        private static readonly string LegacyData = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "input-overlay");
+        // the plugin folder under programdata, which every supported obs reads in the layout of its line
+        private static readonly string PluginDir = Path.Combine(Config.PROGRAMDATA, "obs-studio", "plugins", "input-overlay");
 
         private const string MouseLayoutRel = "mouse/mouse-no-movement.json";
         private const int MouseLayoutWidth = 285;
         private const int MouseLayoutHeight = 421;
 
-        // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against Config.PROGRAMFILES_OBS_DIR before writing, so a malformed archive path can never escape the install root.
+        // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against the folder it extracts into before writing, so a malformed archive path can never escape the install root.
         private const string PluginZipRoot = "input-overlay/";
 
         // vc++ 2015-2022 (x64) redistributable -- prerequisite for input-overlay.dll. downloaded from microsoft only when missing.
@@ -214,26 +218,21 @@ $cert = $sig.SignerCertificate
             return false;
         }
 
-        // description of the installed plugin, or null.
-        private static string AlreadyInstalled()
-        {
-            return BundledFiles.IsCurrent(Config.INPUT_OVERLAY_PLUGIN_ZIP, Config.PROGRAMFILES_OBS_DIR, PluginZipRoot) ? "installed at " + PluginDll : null;
-        }
+        private static readonly string[] Binaries = { "input-overlay.dll", "SDL3.dll", "uiohook.dll" };
 
-        // install input-overlay and verify obs can load its dlls.
+        // the dlls sit where the line of the installed obs loads a plugin from, the data always beside them in data\
+        private static string BinDir(bool modern) => modern ? PluginDir : Path.Combine(PluginDir, "bin", "64bit");
+
+        private static bool IsBinary(string relative) => relative.IndexOf('/') < 0;
+        private static bool IsData(string relative) => relative.StartsWith("data/", StringComparison.Ordinal);
+
+        // install the bundled input-overlay where the installed obs line loads it from and verify obs can load its dlls.
         public static bool InstallInputOverlayPlugin(Action<string> log = null)
         {
             if (!InstallVcppRedist(log))
             {
                 log?.Invoke("input-overlay prerequisite missing; skipping input-overlay install");
                 return false;
-            }
-
-            string existing = AlreadyInstalled();
-            if (existing != null)
-            {
-                log?.Invoke("already " + existing);
-                return true;
             }
 
             if (!File.Exists(Config.INPUT_OVERLAY_PLUGIN_ZIP))
@@ -247,12 +246,26 @@ $cert = $sig.SignerCertificate
                 log?.Invoke($"OBS not installed at {Config.PROGRAMFILES_OBS_DIR} (no bin\\64bit\\obs64.exe) - install OBS first, then re-run");
                 return false;
             }
+            var line = ObsVersions.Current;
+            if (line == null)
+            {
+                log?.Invoke("warn: the OBS version could not be read, so where OBS loads input-overlay from is unknown");
+                return false;
+            }
+            string bin = BinDir(line.ModernPlugins);
 
-            log?.Invoke($"extracting {Path.GetFileName(Config.INPUT_OVERLAY_PLUGIN_ZIP)} -> {Config.PROGRAMFILES_OBS_DIR}");
+            if (BundledFiles.IsCurrent(Config.INPUT_OVERLAY_PLUGIN_ZIP, bin, PluginZipRoot, IsBinary) &&
+                BundledFiles.IsCurrent(Config.INPUT_OVERLAY_PLUGIN_ZIP, PluginDir, PluginZipRoot, IsData))
+            {
+                log?.Invoke("already installed at " + Path.Combine(bin, Binaries[0]));
+                return RemoveStaleCopies(line.ModernPlugins, log);
+            }
 
+            log?.Invoke($"extracting {Path.GetFileName(Config.INPUT_OVERLAY_PLUGIN_ZIP)} -> {PluginDir}");
             try
             {
-                if (!BundledFiles.Install(Config.INPUT_OVERLAY_PLUGIN_ZIP, Config.PROGRAMFILES_OBS_DIR, log, PluginZipRoot)) return false;
+                if (!BundledFiles.Install(Config.INPUT_OVERLAY_PLUGIN_ZIP, bin, log, PluginZipRoot, IsBinary)) return false;
+                if (!BundledFiles.Install(Config.INPUT_OVERLAY_PLUGIN_ZIP, PluginDir, log, PluginZipRoot, IsData)) return false;
             }
             catch (Exception exc)
             {
@@ -260,22 +273,43 @@ $cert = $sig.SignerCertificate
                 return false;
             }
 
-            if (!File.Exists(PluginDll))
+            foreach (string name in Binaries)
             {
-                log?.Invoke("installer ran but " + PluginDll + " is missing");
+                if (File.Exists(Path.Combine(bin, name))) continue;
+                // every bundled dll is required; a partial install must be reported as failed.
+                log?.Invoke("warn: " + name + " missing at " + bin + " - plugin cannot be verified");
                 return false;
             }
-            if (!File.Exists(PluginSdl2))
-            {
-                // Both bundled DLLs are required; a partial install must be reported as failed.
-                log?.Invoke("warn: SDL2.dll missing at " + PluginSdl2 + " - plugin cannot be verified");
-                return false;
-            }
+            if (!RemoveStaleCopies(line.ModernPlugins, log)) return false;
 
-            log?.Invoke("installed -> " + PluginDll);
-            log?.Invoke($"           + {Path.GetFileName(PluginSdl2)} ({(File.Exists(PluginSdl2) ? "ok" : "MISSING!")})");
+            log?.Invoke("installed -> " + Path.Combine(bin, Binaries[0]));
             log?.Invoke("    OBS will load it on next launch (Tools menu)");
             return true;
+        }
+
+        // the copy older setups put into the obs install folder, and the dlls of the other layout from before obs changed line: an older build next to a newer obs fails to load and shows as an error in its plugin manager, and two copies load as duplicates
+        private static bool RemoveStaleCopies(bool modern, Action<string> log)
+        {
+            var stale = new List<string> { LegacyDll, LegacySdl2, LegacyData };
+            if (modern) stale.Add(Path.Combine(PluginDir, "bin"));
+            else stale.AddRange(Binaries.Select(name => Path.Combine(PluginDir, name)));
+            bool ok = true;
+            foreach (string path in stale)
+            {
+                try
+                {
+                    if (Directory.Exists(path)) Directory.Delete(path, true);
+                    else if (File.Exists(path)) File.Delete(path);
+                    else continue;
+                    log?.Invoke("removed an old input-overlay copy: " + path);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    log?.Invoke("warn: could not remove " + path + ": " + ex.Message);
+                    ok = false;
+                }
+            }
+            return ok;
         }
 
         private static byte[] PresetBytes(string relative, byte[] bytes)

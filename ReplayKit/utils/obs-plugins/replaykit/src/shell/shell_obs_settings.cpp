@@ -104,6 +104,8 @@ void ShellEmbedObsSettings(QDialog *dlg)
 				ShellTrayClickWithObsSettings();
 		});
 	}
+	// a dialog marked native (asking for its window handle does that) keeps its own top level window thru the reparent: windows leaves it where it was, qt logs that it could not set the geometry, and every dropdown, menu and tooltip of the dialog is placed from that stray window instead of from where the dialog is drawn; unmarked, qt turns it into a plain child of the host
+	dlg->setAttribute(Qt::WA_NativeWindow, false);
 	dlg->setParent(g_viewObsHost, Qt::Widget);
 	// obs runs this dialog with exec(), which makes it application modal, and qt then disables every other window of the app. folded into the main window that would disable the window it lives in, so nothing else could be clicked while it is open
 	dlg->setWindowModality(Qt::NonModal);
@@ -134,7 +136,8 @@ void ShellEmbedObsSettings(QDialog *dlg)
 		if (g_shellView == ShellView::ObsSettings)
 			ShellSurfaceView();
 	});
-	blog(LOG_INFO, "[replaykit] obs settings embedded in the main window, %lld ms after the request", g_obsBuildTimer.isValid() ? (long long)g_obsBuildTimer.elapsed() : -1LL);
+	blog(LOG_INFO, "[replaykit] obs settings embedded in the main window, %lld ms after the request (own native window: %s)", g_obsBuildTimer.isValid() ? (long long)g_obsBuildTimer.elapsed() : -1LL,
+	     dlg->windowHandle() ? "yes" : "no");
 }
 
 } // namespace

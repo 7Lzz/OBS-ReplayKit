@@ -318,10 +318,19 @@ end
 local function update_window_capture_source(hwnd)
     local token = window_token_from_hwnd(hwnd)
     if token == nil then return false end
-    if token == last_window_token then return true end
 
     local source = obs.obs_get_source_by_name(cfg.window_source)
     if source == nil then return false end
+    -- the memo alone is not enough: a settings save or the user can point the source at another window, so what it captures now is read back before a push is skipped
+    if token == last_window_token then
+        local current = obs.obs_source_get_settings(source)
+        local window = obs.obs_data_get_string(current, "window")
+        obs.obs_data_release(current)
+        if window == token then
+            obs.obs_source_release(source)
+            return true
+        end
+    end
 
     local settings = obs.obs_data_create()
     obs.obs_data_set_string(settings, "window", token)
