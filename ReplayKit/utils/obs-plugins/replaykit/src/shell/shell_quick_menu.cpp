@@ -197,6 +197,10 @@ void ShellQuickMenu::Open(ShellTitleButton *button, const std::string &pageList)
 		if (target)
 			target->SetOpen(open);
 	};
+	anchor.closing = [target]() {
+		if (target)
+			target->TurnClosed();
+	};
 	const QString show = QStringLiteral("window.__replaykitShowQuickActions && window.__replaykitShowQuickActions();");
 	m_panel->Toggle(anchor, show);
 	// a page can miss a script while it is still waking up, so the open is said again a moment later, the way the hotkey menu does

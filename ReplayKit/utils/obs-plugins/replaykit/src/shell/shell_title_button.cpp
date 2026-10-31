@@ -20,11 +20,17 @@ void ShellTitleButton::SetTip(const QString &tip)
 
 void ShellTitleButton::SetOpen(bool open)
 {
+	// the arrow follows every call, since a panel opened again while it rolls up finds the tab still open and the arrow already turning back
+	AnimateTurn(this, m_turnAnim, m_turn, open ? 1.0 : 0.0);
 	if (open == m_open)
 		return;
 	m_open = open;
-	AnimateTurn(this, m_turnAnim, m_turn, open ? 1.0 : 0.0);
 	update();
+}
+
+void ShellTitleButton::TurnClosed()
+{
+	AnimateTurn(this, m_turnAnim, m_turn, 0.0);
 }
 
 QEasingCurve SmoothEase()
@@ -46,6 +52,9 @@ void AnimateTurn(QWidget *widget, QVariantAnimation *&anim, qreal &value, qreal 
 			widget->update();
 		});
 	}
+	// a turn already on its way there is left to finish, so the close a roll reports at its end does not start it over
+	if (anim->state() == QAbstractAnimation::Running && qFuzzyCompare(anim->endValue().toReal() + 1.0, target + 1.0))
+		return;
 	anim->stop();
 	if (qFuzzyCompare(value + 1.0, target + 1.0))
 		return;

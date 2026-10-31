@@ -73,6 +73,11 @@ void ShowNotificationPanel(NotifyButton *bell)
 		if (button)
 			button->SetOpen(open);
 	};
+	// the bell paints its tab from the panel being shown, so turning its chevron back early leaves the tab as it is
+	anchor.closing = [button]() {
+		if (button)
+			button->SetOpen(false);
+	};
 	anchor.onHidden = []() { PollNotificationCount(); };
 	anchor.raiseControl = [button]() {
 		if (button)

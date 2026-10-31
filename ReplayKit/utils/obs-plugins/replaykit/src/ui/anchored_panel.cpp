@@ -437,6 +437,8 @@ void AnchoredPanel::Hide(bool animate)
 	if (animate && IsShown()) {
 		if (!m_closing) {
 			m_closing = true;
+			if (m_anchor.closing)
+				m_anchor.closing();
 			Roll(1, [this]() { Finish(); });
 		}
 		return;

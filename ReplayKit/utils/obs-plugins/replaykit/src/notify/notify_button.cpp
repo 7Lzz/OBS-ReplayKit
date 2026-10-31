@@ -221,6 +221,8 @@ void NotifyButton::paintEvent(QPaintEvent *)
 		QRectF box(25.0, midY - 6.0, 12.0, 12.0);
 		p.save();
 		p.setOpacity(0.65);
+		// the shell bell draws a tinted bitmap, which steps through the turn unless it is sampled smoothly
+		p.setRenderHint(QPainter::SmoothPixmapTransform, true);
 		// turns on open, same as .clip-sort-wrap.is-open .clip-sort-chevron
 		p.translate(box.center());
 		p.rotate(180.0 * m_turn);

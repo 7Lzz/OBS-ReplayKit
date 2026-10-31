@@ -39,6 +39,8 @@ public:
 		std::function<bool(const POINT &, const QPoint &)> owns;
 		// paints the tab open while the panel shows and closed again when it is gone
 		std::function<void(bool)> setOpen;
+		// runs as the panel starts to roll up, so the arrow of the control turns back with it the way a page menu turns its chevron, while the tab stays until the panel is gone
+		std::function<void()> closing;
 		// runs once the panel is hidden
 		std::function<void()> onHidden;
 		// keeps the control above its panel where it is a window of its own

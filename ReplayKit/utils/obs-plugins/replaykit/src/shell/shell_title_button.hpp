@@ -28,6 +28,8 @@ public:
 	void SetTip(const QString &tip);
 	// the panel of this button is open, so the pill is the tab of that panel
 	void SetOpen(bool open);
+	// turns the arrow back while the tab stays, for a panel that has started to roll up
+	void TurnClosed();
 	bool IsOpen() const { return m_open; }
 	// 0 closed to 1 open, eased over the same 200ms as the chevron of the clips sort trigger
 	qreal OpenTurn() const { return m_turn; }
