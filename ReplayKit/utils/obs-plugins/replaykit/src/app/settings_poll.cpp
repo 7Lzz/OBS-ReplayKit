@@ -4,6 +4,7 @@
 
 #include <QApplication>
 
+#include "app/capture_context.hpp"
 #include "app/clip_buffer.hpp"
 #include "app/sdk_commands.hpp"
 #include "chrome/title_keybind_badge.hpp"
@@ -207,6 +208,9 @@ void PollHelperSettings()
 			const bool development = JsonBoolField(settingsBody, "developmentMode", false);
 			DevLogSetEnabled(development && JsonBoolField(settingsBody, "logInterfaceEvents", false));
 			SdkSetEnabled(development && JsonBoolField(settingsBody, "sdkMode", false));
+			// a helper that did not answer leaves the switch as it was
+			if (!settingsBody.empty())
+				CaptureContextSetRecognition(JsonBoolField(settingsBody, "gameRecognition", true));
 			SyncStartMinimized(settingsBody);
 			RegisterOpenClipsHotkey(settingsBody);
 			ApplyNotifyThemeColors(settingsBody);

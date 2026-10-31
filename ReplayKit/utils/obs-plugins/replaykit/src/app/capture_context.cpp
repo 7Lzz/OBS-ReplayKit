@@ -22,6 +22,8 @@ QPointer<QTimer> timer;
 QString session;
 std::atomic<qint64> requestedAt{0};
 std::atomic<bool> replayRunning{false}, replayAmbiguous{false};
+// off while game recognition is turned off in the settings: no sample walks the scene or reads the windows, and the helper is sent nothing to look up
+std::atomic<bool> recognition{true};
 HWINEVENTHOOK focusHook = nullptr;
 QString lastKind = "unknown";
 qint64 clipStartedAt = 0, lastNameAt = 0;
@@ -265,6 +267,10 @@ const Capture *Choose(const std::vector<Capture> &captures, HWND foreground, con
 
 void Sample()
 {
+	if (!recognition.load()) {
+		ClipBufferGameName(QString());
+		return;
+	}
 	const auto began = std::chrono::steady_clock::now();
 	const qint64 at = qint64(GetTickCount64());
 	QJsonObject data{{"at", at}, {"session", session}, {"kind", "unknown"}};
@@ -376,6 +382,16 @@ void CaptureContextStop()
 	messages.clear();
 }
 
+void CaptureContextSetRecognition(bool on)
+{
+	if (recognition.exchange(on) == on)
+		return;
+	if (on)
+		CaptureContextRefresh();
+	else
+		ClipBufferGameName(QString());
+}
+
 void CaptureContextRequested()
 {
 	if (!replayRunning.load())
@@ -466,7 +482,7 @@ void CaptureContextEvent(enum obs_frontend_event event)
 QJsonObject CaptureContextProbe()
 {
 	std::lock_guard<std::mutex> lock(gate);
-	return QJsonObject{{"running", timer && timer->isActive()}, {"focusEvents", focusHook != nullptr}, {"kind", lastKind}, {"queued", int(messages.size())},
+	return QJsonObject{{"running", timer && timer->isActive()}, {"recognition", recognition.load()}, {"focusEvents", focusHook != nullptr}, {"kind", lastKind}, {"queued", int(messages.size())},
 		{"sources", sourceCount}, {"reason", captureReason},
 		{"samples", qint64(sampleCalls)}, {"averageUs", sampleCalls ? double(totalSampleNs) / double(sampleCalls) / 1000.0 : 0}, {"maximumUs", double(maxSampleNs) / 1000.0}};
 }

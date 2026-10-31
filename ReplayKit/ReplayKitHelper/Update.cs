@@ -311,6 +311,16 @@ namespace ReplayKitHelper
             return new JObject { ["ok"] = true, ["updateReady"] = version };
         }
 
+        // what a check found goes on the badge of the title bar, which opens the update window when it is clicked; a check made in settings goes there too instead of opening that window itself
+        public static void ShowBadge(JObject status)
+        {
+            if (status?["ok"]?.Value<bool>() != true) return;
+            bool ready = status["updateAvailable"]?.Value<bool>() == true || status["repairRequired"]?.Value<bool>() == true;
+            string version = ready ? status["latestVersion"]?.Value<string>() ?? "" : "";
+            if (version != readyVersion) WriteUpdateDebug("update check: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
+            readyVersion = version;
+        }
+
         public static void StartPolling()
         {
             lock (Server.State.UpdateCheckLock)
@@ -343,12 +353,8 @@ namespace ReplayKitHelper
                     WriteUpdateDebug("periodic update check failed: " + status["message"]);
                     return;
                 }
-                // only the check at startup updates by itself; one found while obs is open is shown as the badge of the title bar, which opens the update window when it is clicked
-                bool ready = status["autoUpdateEnabled"]?.Value<bool>() == true &&
-                    (status["updateAvailable"]?.Value<bool>() == true || status["repairRequired"]?.Value<bool>() == true);
-                string version = ready ? status["latestVersion"]?.Value<string>() ?? "" : "";
-                if (version != readyVersion) WriteUpdateDebug("periodic update check: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
-                readyVersion = version;
+                // only the check at startup updates by itself; one found while obs is open is shown as the badge
+                ShowBadge(status);
             }
             catch (Exception ex) { WriteUpdateDebug("periodic update check failed: " + ex.Message); }
             finally { Interlocked.Exchange(ref pollRunning, 0); }
@@ -359,18 +365,7 @@ namespace ReplayKitHelper
             try
             {
                 var settings = ReplaykitSettings.ReadSettings();
-                bool enabled = settings["autoUpdateEnabled"]?.Value<bool>() ?? true;
-                if (!enabled)
-                {
-                    return new JObject
-                    {
-                        ["ok"] = true, ["autoUpdateEnabled"] = false, ["updateAvailable"] = false,
-                        ["prompt"] = false, ["message"] = "Automatic update prompts are disabled.",
-                    };
-                }
-
                 var status = GetUpdateStatus(manual);
-                status["autoUpdateEnabled"] = true;
                 status["prompt"] = false;
                 if ((status["ok"]?.Value<bool>() ?? false) && ((status["updateAvailable"]?.Value<bool>() ?? false) || (status["repairRequired"]?.Value<bool>() ?? false)) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>()))
                 {
@@ -406,27 +401,10 @@ namespace ReplayKitHelper
                 };
             }
 
-            // honors the autoUpdateEnabled toggle, but intentionally does NOT consult lastUpdatePromptVersion here -- the popup should show on every launch, since a previous "later" click shouldnt suppress it forever; the admin gate is also dropped since install self-elevates via uac if needed.
-            JObject settings;
-            try { settings = ReplaykitSettings.ReadSettings(); }
-            catch (Exception) { settings = new JObject { ["autoUpdateEnabled"] = true }; }
-            bool enabled = settings["autoUpdateEnabled"]?.Value<bool>() ?? true;
-            if (!enabled)
-            {
-                var disabled = new JObject
-                {
-                    ["ok"] = true, ["prompt"] = false, ["startupCheck"] = true,
-                    ["admin"] = Elevation.IsAdmin(), ["autoUpdateEnabled"] = false,
-                    ["message"] = "Automatic update prompts are disabled in settings.",
-                };
-                WriteUpdateDebug("autoUpdateEnabled=false; returning prompt=false");
-                return disabled;
-            }
-
+            // intentionally does NOT consult lastUpdatePromptVersion here -- the popup should show on every launch, since a previous "later" click shouldnt suppress it forever; the admin gate is also dropped since install self-elevates via uac if needed.
             var status = GetUpdateStatus();
             status["startupCheck"] = true;
             status["admin"] = Elevation.IsAdmin();
-            status["autoUpdateEnabled"] = true;
             status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && ((status["updateAvailable"]?.Value<bool>() ?? false) || (status["repairRequired"]?.Value<bool>() ?? false)) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
 
             // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a fresh update window stacked on the one still showing them why the last attempt failed.

@@ -60,10 +60,19 @@
   .game-group-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-group-count { color:var(--muted); font-weight:500; }
   @media(max-width:650px) { .clip-filter-caption { display:none; } .clip-filter { min-width:90px; max-width:150px; } }
+  /* game recognition is off: no game filter, no sorting by game, and no game icon or change game row on the cards */
+  html.rk-games-off #clip-game-filter, html.rk-games-off .group-games, html.rk-games-off .clip-game-badge, html.rk-games-off .change-game-item { display:none !important; }
 </style>
 <script>
 window.RKClipGames = (function () {
   const helper = location.origin;
+  // the game recognition switch of the settings; while it is off no game icon is drawn and the game list is never asked for
+  let enabled = true, onEnabled = null;
+  function setEnabled(on) {
+    if (on === enabled) return;
+    enabled = on;
+    if (onEnabled) onEnabled(on);
+  }
   const icon = key => (window.RK_ICONS || {})[key] || "";
   const symbol = kind => icon(kind === "desktop" ? "audio/desktop" : kind === "unknown" ? "action/help" : "audio/game") || icon("toggle/grid");
   // the icon of a game, or of a roblox experience drawn over the roblox icon so roblox shows until the experience icon has been fetched
@@ -107,6 +116,11 @@ window.RKClipGames = (function () {
   // the game icon of a card; on a clip or screenshot card it opens the game picker as well, with the newest copy of the item so a renamed clip is changed by its new name
   function badge(parent, item, options) {
     if (!parent) return;
+    if (!enabled) {
+      const shown = parent.querySelector(".clip-game-badge");
+      if (shown) shown.remove();
+      return;
+    }
     const changeable = !!(options && options.change);
     const old = parent.querySelector(".clip-game-badge");
     const key = JSON.stringify(item.capture || null) + (changeable ? "|change" : "");
@@ -277,7 +291,7 @@ window.RKClipGames = (function () {
       markTypes();
     }
     async function refresh(force) {
-      if (!force && Date.now() - refreshAt < 10000) return;
+      if (!enabled || (!force && Date.now() - refreshAt < 10000)) return;
       refreshAt = Date.now();
       const run = ++refreshGeneration, owner = folder;
       try {
@@ -293,6 +307,12 @@ window.RKClipGames = (function () {
     }
     paint(); refresh(true);
     window.addEventListener("replaykit:game-tags-changed", () => refresh(true));
+    // nothing is filtered by a game the page no longer shows, and the list is read again once games are back
+    onEnabled = on => {
+      if (on) { refresh(true); return; }
+      if (state.game === "all") return;
+      state.game = "all"; paintGameIcon(); notify();
+    };
     return {
       get state() {return {...state};}, get key() {return state.game + "|" + state.linked;},
       matches(item, favorite) {return matches(item,state.game) && (!state.linked || !!item.streamable_url) && (!state.favorites || favorite);},
@@ -305,7 +325,7 @@ window.RKClipGames = (function () {
         const before = JSON.stringify(state);
         folder = value; gameRows = []; counts = {}; libraryCounts = {}; libraryReady = false; ++refreshGeneration;
         state = {game:"all",type:"all",favorites:false,linked:false};
-        try {const saved = JSON.parse(localStorage.getItem("rk-game-filters:" + folder) || "null"); if (saved && Object.hasOwnProperty.call(typeNames,saved.type) && /^(?:all|desktop|mixed|unknown|[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})$/.test(saved.game || "")) {const type = saved.favorites ? "favorites" : saved.linked ? "linked" : saved.type; state = {game:saved.game,type,favorites:type === "favorites",linked:type === "linked"};}} catch (_) {}
+        try {const saved = JSON.parse(localStorage.getItem("rk-game-filters:" + folder) || "null"); if (saved && Object.hasOwnProperty.call(typeNames,saved.type) && /^(?:all|desktop|mixed|unknown|[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})$/.test(saved.game || "")) {const type = saved.favorites ? "favorites" : saved.linked ? "linked" : saved.type; state = {game:enabled ? saved.game : "all",type,favorites:type === "favorites",linked:type === "linked"};}} catch (_) {}
         paint(); refresh(true);
         if (JSON.stringify(state) !== before) notify();
       }, refresh,
@@ -320,6 +340,6 @@ window.RKClipGames = (function () {
     row.addEventListener("click", event => {event.stopPropagation();closeMenus();correct(item,screenshot);});
     return row;
   }
-  return {create,badge,matches,correct,menuAction,group,picture};
+  return {create,badge,matches,correct,menuAction,group,picture,setEnabled,get enabled() {return enabled;}};
 })();
 </script>

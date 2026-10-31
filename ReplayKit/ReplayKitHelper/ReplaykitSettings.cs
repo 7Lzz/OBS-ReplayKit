@@ -124,6 +124,10 @@ namespace ReplayKitHelper
                 // the saves that make the video again are encoded by an nvidia card when there is one, in the recording codec; off keeps them on the processor
                 ["trimGpuEncode"] = true,
                 ["showCodecTags"] = false,
+                // whether the game on screen is looked up for new clips and screenshots; clips that already have a game keep it either way
+                ["gameRecognition"] = true,
+                // how the date line of the clip and screenshot cards reads: the time ago, the date, the date and time, or the short date of the region
+                ["cardDateFormat"] = "date",
                 // how the clip editor behaves: whether it starts playing and loops the selection, how far the arrow keys skip in seconds, the mouse wheel zoom and how a zoomed in video is drawn (smooth or sharp)
                 ["editorAutoplay"] = false,
                 ["editorLoopPreview"] = false,
@@ -134,7 +138,6 @@ namespace ReplayKitHelper
                 ["clipAntialiasing"] = "none",
                 ["debugLoggingEnabled"] = false,
                 ["autoDeleteLogsOnLaunch"] = true,
-                ["autoUpdateEnabled"] = true,
                 ["lastUpdatePromptVersion"] = "",
                 ["clipSoundVolume"] = 25,
                 ["recordingSoundVolume"] = 25,
@@ -550,6 +553,8 @@ namespace ReplayKitHelper
                 ["trimPreciseDefault"] = true,
                 ["trimGpuEncode"] = GetBoolSetting(data, "trimGpuEncode", defaults["trimGpuEncode"].Value<bool>()),
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
+                ["gameRecognition"] = GetBoolSetting(data, "gameRecognition", defaults["gameRecognition"].Value<bool>()),
+                ["cardDateFormat"] = GetEnumSetting(data, "cardDateFormat", defaults["cardDateFormat"].Value<string>(), new[] { "relative", "date", "datetime", "short" }),
                 ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
                 ["editorLoopPreview"] = GetBoolSetting(data, "editorLoopPreview", defaults["editorLoopPreview"].Value<bool>()),
                 ["editorSeekStep"] = GetIntSetting(data, "editorSeekStep", defaults["editorSeekStep"].Value<int>(), 1, 60),
@@ -558,7 +563,6 @@ namespace ReplayKitHelper
                 ["clipAntialiasing"] = GetEnumSetting(data, "clipAntialiasing", defaults["clipAntialiasing"].Value<string>(), new[] { "none", "msaa", "fxaa" }),
                 ["debugLoggingEnabled"] = GetBoolSetting(data, "debugLoggingEnabled", defaults["debugLoggingEnabled"].Value<bool>()),
                 ["autoDeleteLogsOnLaunch"] = GetBoolSetting(data, "autoDeleteLogsOnLaunch", defaults["autoDeleteLogsOnLaunch"].Value<bool>()),
-                ["autoUpdateEnabled"] = GetBoolSetting(data, "autoUpdateEnabled", defaults["autoUpdateEnabled"].Value<bool>()),
                 ["lastUpdatePromptVersion"] = GetVersionMarkerSetting(data, "lastUpdatePromptVersion", defaults["lastUpdatePromptVersion"].Value<string>()),
                 ["clipSoundVolume"] = GetIntSetting(data, "clipSoundVolume", defaults["clipSoundVolume"].Value<int>(), 0, 100),
                 ["recordingSoundVolume"] = GetIntSetting(data, "recordingSoundVolume", defaults["recordingSoundVolume"].Value<int>(), 0, 100),
@@ -886,6 +890,7 @@ namespace ReplayKitHelper
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 AppConfig.WriteUtf8(path, settings.ToString(Formatting.Indented));
                 SyncClipDirToRuntimeConfig(settings);
+                ClipGames.SetRecognition(settings["gameRecognition"]?.Type != JTokenType.Boolean || settings["gameRecognition"].Value<bool>());
             }
         }
 
@@ -6522,7 +6527,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         private static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
+            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
 
         private static readonly string[] StartupKeys = { "obsStartupEnabled" };
 

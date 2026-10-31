@@ -1005,7 +1005,9 @@ namespace ReplayKitHelper
             if (path == "/update/check")
             {
                 if (req.Method != "GET" && req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET or POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, Update.GetUpdateStatus(Q("manual") == "1"));
+                var status = Update.GetUpdateStatus(Q("manual") == "1");
+                if (Q("manual") == "1") Update.ShowBadge(status);
+                HttpResponse.SendJson(stream, 200, status);
                 return false;
             }
 
@@ -2813,7 +2815,48 @@ namespace ReplayKitHelper
                     ["maxUploadBytes"] = Constants.GetEffectiveUploadCap(),
                     ["maxDurationSec"] = Upload.SubjectToStreamableDurationLimit() ? Constants.STREAMABLE_FREE_MAX_DURATION_SEC : 0,
                     ["retentionDays"] = Constants.GetEffectiveRetentionDays(),
+                    ["picture"] = ProfilePicture.Version(),
                 });
+                return false;
+            }
+
+            if (path == "/profile-picture")
+            {
+                byte[] picture = null;
+                try { if (File.Exists(ProfilePicture.FilePath)) picture = File.ReadAllBytes(ProfilePicture.FilePath); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("/profile-picture read: " + ex.Message); }
+                if (picture == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
+                HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" }), picture);
+                return false;
+            }
+
+            // the account menu picks a picture or removes it; the plugin is told so the circle in the title bar follows at once instead of on its next poll
+            if (path == "/profile-picture/pick" || path == "/profile-picture/clear")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    if (path == "/profile-picture/clear") ProfilePicture.Clear();
+                    else
+                    {
+                        string picked = PickPath(false, "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files (*.*)|*.*", "");
+                        if (string.IsNullOrEmpty(picked))
+                        {
+                            HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = false, ["picture"] = ProfilePicture.Version() });
+                            return false;
+                        }
+                        ProfilePicture.Save(picked);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is OutOfMemoryException || ex is System.Runtime.InteropServices.ExternalException)
+                {
+                    // gdi+ reports a file it cannot decode as out of memory or an argument error
+                    Log.Write(path + ": " + ex.GetType().Name + ": " + ex.Message);
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["message"] = ex is InvalidDataException ? ex.Message : "That file could not be used as a picture." });
+                    return false;
+                }
+                PipeClient.SendAccountChanged();
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = true, ["picture"] = ProfilePicture.Version() });
                 return false;
             }
 

@@ -124,6 +124,9 @@ namespace ReplayKitHelper
         [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, uint dwFlags);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool CreateHardLinkW(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr BeginUpdateResourceW(string pFileName, bool bDeleteExistingResources);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool UpdateResourceW(IntPtr hUpdate, IntPtr lpType, IntPtr lpName, ushort wLanguage, byte[] lpData, uint cb);
+        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool EndUpdateResourceW(IntPtr hUpdate, bool fDiscard);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool CreateProcessW(string lpApplicationName, StringBuilder lpCommandLine, IntPtr lpProcessAttributes,
             IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment,
@@ -1082,6 +1085,41 @@ namespace ReplayKitHelper
         {
             if (!CreateHardLinkW(newLinkPath, existingFilePath, IntPtr.Zero))
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        // writes the images of an .ico into an exe as rt_icon 1..n under rt_group_icon 1, which is the icon explorer and task manager show for it; the group entries are the 16 byte entries of the .ico with the file offset swapped for the resource id
+        public static void StampIcon(string exePath, byte[] ico)
+        {
+            if (ico == null || ico.Length < 6 || BitConverter.ToUInt16(ico, 0) != 0 || BitConverter.ToUInt16(ico, 2) != 1) throw new InvalidDataException("Not an icon file.");
+            int count = BitConverter.ToUInt16(ico, 4);
+            if (count == 0 || ico.Length < 6 + count * 16) throw new InvalidDataException("Icon file is truncated.");
+            var group = new byte[6 + count * 14];
+            Array.Copy(ico, 0, group, 0, 6);
+            IntPtr update = BeginUpdateResourceW(exePath, false);
+            if (update == IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            bool written = false;
+            try
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int entry = 6 + i * 16;
+                    int size = BitConverter.ToInt32(ico, entry + 8);
+                    int offset = BitConverter.ToInt32(ico, entry + 12);
+                    if (size <= 0 || offset < 0 || (long)offset + size > ico.Length) throw new InvalidDataException("Icon file is truncated.");
+                    var image = new byte[size];
+                    Array.Copy(ico, offset, image, 0, size);
+                    if (!UpdateResourceW(update, (IntPtr)3, (IntPtr)(i + 1), 0, image, (uint)size)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                    Array.Copy(ico, entry, group, 6 + i * 14, 12);
+                    group[6 + i * 14 + 12] = (byte)(i + 1);
+                    group[6 + i * 14 + 13] = (byte)((i + 1) >> 8);
+                }
+                if (!UpdateResourceW(update, (IntPtr)14, (IntPtr)1, 0, group, (uint)group.Length)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                written = true;
+            }
+            finally
+            {
+                if (!EndUpdateResourceW(update, !written) && written) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            }
         }
 
         private static readonly object TaskbarLock = new object();

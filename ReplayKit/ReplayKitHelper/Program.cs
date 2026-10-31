@@ -164,7 +164,7 @@ namespace ReplayKitHelper
 
             // client half of the ipc pipe with the native plugin -- main-window + projector hwnds in, open-clips + allow-close out. connects when the plugins server is up and reconnects on its own; every consumer degrades gracefully while it isnt.
             try { PipeClient.Start(); } catch (Exception ex) { Log.Write("PipeClient.Start: " + ex.Message); }
-            SteamGames.Refresh();
+            if (ClipGames.RecognitionOn()) SteamGames.Refresh();
 
             // surface admin / parent-process info at startup so its trivial to diagnose "vss not admin" later. with an elevation script that auto-relaunches obs, the lua can spawn the helper twice -- once under the pre-elevation non-admin obs (which then exits), and once under the post-elevation admin obs. the non-admin one can win port races and stick around as a useless orphan; the parent-process watchdog below kills the orphan when its obs goes away.
             bool isAdmin = false;

@@ -56,14 +56,28 @@
   .head-title { font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--text_muted); text-transform:uppercase; }
 
   .who { flex:none; display:flex; align-items:center; gap:14px; padding:18px 16px 12px; }
-  .av { position:relative; flex:none; width:48px; height:48px; border-radius:50%; overflow:visible; }
+  .av { position:relative; flex:none; width:48px; height:48px; padding:0; border:0; border-radius:50%; overflow:visible; cursor:pointer; }
+  .av:disabled { cursor:default; }
+  .av:focus-visible { outline:2px solid var(--primary_light); outline-offset:2px; }
+  /* a picked picture covers the disc; the status light of a signed in account stays on top of it */
+  .av.pic { background:var(--grey6); box-shadow:inset 0 0 0 1px rgba(var(--text-rgb), .16); }
+  .av.pic img { position:absolute; inset:0; width:100%; height:100%; border-radius:50%; object-fit:cover; }
+  /* the pencil that says the circle can be clicked, over a dark wash while the pointer is on it */
+  .av-edit { position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(0, 0, 0, .5); opacity:0; transition:opacity 120ms linear; }
+  .av-edit svg { width:18px; height:18px; fill:#fff; }
+  .av:hover:not(:disabled) .av-edit, .av:focus-visible .av-edit { opacity:1; }
+  .who-links { display:flex; gap:12px; margin-top:5px; }
+  .who-link { padding:0; border:0; background:none; font-size:12px; color:var(--primary_light); cursor:pointer; }
+  .who-link:hover { text-decoration:underline; }
+  .who-link:disabled { opacity:.5; cursor:default; text-decoration:none; }
+  .note.is-error { color:var(--red); }
   /* nobody signed in: a grey see-through disc with the outline of a person in it, head and shoulders well inside the ring */
   .av.anon { background:rgba(var(--text-rgb), .08); box-shadow:inset 0 0 0 1px rgba(var(--text-rgb), .2); overflow:hidden; }
-  .av.anon svg { position:absolute; inset:0; width:100%; height:100%; }
-  .av.anon svg * { fill:none; stroke:rgba(var(--text-rgb), .5); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .av.anon > svg { position:absolute; inset:0; width:100%; height:100%; }
+  .av.anon > svg * { fill:none; stroke:rgba(var(--text-rgb), .5); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   /* signed in: the colour of the account with its first letter, and a live status light */
   .av.on { display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:#fff; box-shadow:inset 0 0 0 1px rgba(var(--text-rgb), .16); }
-  .av.on::after { content:""; position:absolute; right:-1px; bottom:-1px; width:13px; height:13px; border-radius:50%; background:var(--green); border:2.5px solid var(--grey5); }
+  .av.on::after { content:""; position:absolute; z-index:2; right:-1px; bottom:-1px; width:13px; height:13px; border-radius:50%; background:var(--green); border:2.5px solid var(--grey5); }
   .who-name { font-size:15px; font-weight:700; line-height:1.25; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .who-sub { margin-top:3px; font-size:12px; color:var(--text_muted); }
 
@@ -95,10 +109,14 @@
     <div class="head"><span class="head-title">Streamable account</span></div>
 
     <div class="who">
-      <div class="av anon" id="avatar"></div>
+      <button class="av anon" id="avatar" type="button" aria-label="Change picture"></button>
       <div style="min-width:0">
         <div class="who-name" id="name">Anonymous</div>
         <div class="who-sub" id="sub">Not signed in</div>
+        <div class="who-links">
+          <button class="who-link" type="button" id="changePicture">Change picture</button>
+          <button class="who-link" type="button" id="removePicture" hidden>Remove</button>
+        </div>
       </div>
     </div>
 
@@ -123,12 +141,15 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     clip:$("clip"), avatar:$("avatar"), name:$("name"), sub:$("sub"), note:$("note"), busy:$("busy"), busyText:$("busyText"),
-    signIn:$("signIn"), cancel:$("cancel"), open:$("open"), signOut:$("signOut"),
+    signIn:$("signIn"), cancel:$("cancel"), open:$("open"), signOut:$("signOut"), changePicture:$("changePicture"), removePicture:$("removePicture"),
   };
+  const EDIT_SVG = (window.RK_ICONS && window.RK_ICONS["action/edit"]) || "";
   const ANON_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16.2" r="6.1"/><path d="M12.7 37.1V32.7Q12.7 27.9 17.5 27.9H30.5Q35.3 27.9 35.3 32.7V37.1"/></svg>';
   const LOGIN_POLL_MS = 500;
   const LOGIN_TIMEOUT_MS = 120000;
   let auth = { signedIn:false, name:"", plan:"", retentionDays:2 };
+  // the version of the picked picture, empty for none; the picker blocks the request until it closes, so a second one is not opened meanwhile
+  const picture = { version:"", picking:false, error:"" };
   const flow = { active:false, poll:0, timeout:0 };
 
   async function helperJson(path, options) {
@@ -154,8 +175,14 @@
 
   function render(busyText) {
     const on = auth.signedIn;
-    els.avatar.className = "av " + (on ? "on" : "anon");
-    if (on) {
+    els.avatar.className = "av " + (on ? "on" : "anon") + (picture.version ? " pic" : "");
+    if (picture.version) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = HELPER + "/profile-picture?v=" + encodeURIComponent(picture.version);
+      els.avatar.replaceChildren(img);
+      els.avatar.style.background = "";
+    } else if (on) {
       const hue = hueOf(auth.name);
       els.avatar.textContent = initialOf(auth.name);
       els.avatar.style.background = "linear-gradient(135deg, hsl(" + hue + " 54% 50%), hsl(" + hue + " 52% 36%))";
@@ -163,6 +190,11 @@
       els.avatar.innerHTML = ANON_SVG;
       els.avatar.style.background = "";
     }
+    if (EDIT_SVG) els.avatar.insertAdjacentHTML("beforeend", '<span class="av-edit" aria-hidden="true">' + EDIT_SVG + "</span>");
+    els.avatar.disabled = picture.picking;
+    els.changePicture.disabled = picture.picking;
+    els.removePicture.disabled = picture.picking;
+    els.removePicture.hidden = !picture.version;
     els.name.textContent = on ? (auth.name || "Signed in") : "Anonymous";
     els.sub.textContent = on ? planLabel(auth.plan) + " plan" : "Not signed in";
     els.note.innerHTML = on
@@ -172,6 +204,8 @@
     els.busy.hidden = !working;
     if (working) els.busyText.textContent = busyText;
     els.note.hidden = working;
+    els.note.classList.toggle("is-error", !!picture.error);
+    if (picture.error) els.note.textContent = picture.error;
     els.signIn.hidden = on || working;
     els.cancel.hidden = !working;
     els.open.hidden = !on || working;
@@ -185,7 +219,23 @@
       plan: data.plan || "",
       retentionDays: Number(data.retentionDays) || 2,
     };
+    picture.version = typeof data.picture === "string" ? data.picture : "";
     render();
+  }
+
+  async function changePicture(remove) {
+    if (picture.picking) return;
+    picture.picking = true;
+    picture.error = "";
+    render(flow.active ? "Sign in in the Streamable window..." : "");
+    try {
+      const data = await helperJson("/profile-picture/" + (remove ? "clear" : "pick"), { method:"POST" });
+      picture.version = typeof data.picture === "string" ? data.picture : "";
+    } catch (e) {
+      picture.error = e.message || "That file could not be used as a picture.";
+    }
+    picture.picking = false;
+    render(flow.active ? "Sign in in the Streamable window..." : "");
   }
 
   async function readAccount() {
@@ -229,6 +279,9 @@
   }
 
   els.signIn.addEventListener("click", startSignIn);
+  els.avatar.addEventListener("click", () => changePicture(false));
+  els.changePicture.addEventListener("click", () => changePicture(false));
+  els.removePicture.addEventListener("click", () => changePicture(true));
   els.cancel.addEventListener("click", stopFlow);
   els.open.addEventListener("click", () => {
     fetch(HELPER + "/open-url?url=" + encodeURIComponent("https://streamable.com/"), { cache:"no-store" }).catch(() => {});
@@ -244,6 +297,7 @@
     els.clip.classList.remove("is-opening");
     void els.clip.offsetWidth;
     els.clip.classList.add("is-opening");
+    picture.error = "";
     render(flow.active ? "Sign in in the Streamable window..." : "");
     readAccount();
   };

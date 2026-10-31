@@ -771,7 +771,10 @@
   .page .projector-action-row { max-width:none; }
   .page .combo-option { min-height:30px; padding:6px 10px; line-height:1.4; }
   .page .combo-option.is-selected { padding-right:30px; }
-  .combo-note { min-height:2.9em; }
+  /* every blurb of the combo sits in the same grid cell and only the one shown is visible, so the note is as tall as the longest of them and the card keeps its height while the options are hovered */
+  .combo-note { display:grid; min-height:2.9em; }
+  .combo-note > .combo-note-text { grid-area:1 / 1; visibility:hidden; }
+  .combo-note > .combo-note-text.is-shown { visibility:visible; }
   .combo-note:empty { display:block; }
   .combo-note[hidden] { display:none; }
   .search-summary { width:100%; max-width:900px; margin:0 auto 16px; color:var(--muted); font-size:12px; }
@@ -781,6 +784,19 @@
   .account-status, .account-value { width:100%; text-align:right; font-weight:600; overflow-wrap:anywhere; }
   .account-label { display:flex; align-items:center; gap:8px; }
   .account-label svg { width:17px; height:17px; fill:currentColor; flex:none; }
+  /* the picture of the account circle in the title bar, drawn the way the account menu draws it: the circle leads the label like a profile header, and its buttons sit on one line in the field column */
+  .profile-label { display:flex; align-items:center; gap:14px; }
+  .profile-label > span { min-width:0; }
+  .page .profile-actions { flex-wrap:nowrap; margin-top:0; }
+  .profile-avatar { position:relative; flex:none; width:44px; height:44px; padding:0; border:0; border-radius:50%; overflow:hidden; background:rgba(var(--text-rgb), .08); box-shadow:inset 0 0 0 1px rgba(var(--text-rgb), .2); color:var(--text); font:inherit; font-size:18px; font-weight:700; cursor:pointer; }
+  .profile-avatar:disabled { cursor:default; }
+  .profile-avatar:focus-visible { outline:2px solid var(--selected2); outline-offset:2px; }
+  .profile-avatar > img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .profile-avatar > .profile-person { position:absolute; inset:0; width:100%; height:100%; fill:none; stroke:rgba(var(--text-rgb), .5); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .profile-edit { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0, 0, 0, .5); opacity:0; transition:opacity 120ms linear; }
+  .profile-edit svg { width:18px; height:18px; fill:var(--on-accent); }
+  .profile-avatar:hover:not(:disabled) .profile-edit, .profile-avatar:focus-visible .profile-edit { opacity:1; }
+  .profile-picture-error { margin-top:6px; color:var(--danger); font-size:12px; text-align:right; }
   .page .account-actions { justify-content:flex-end; margin:0 0 0 auto; }
   .upload-details-note { margin:0; padding:12px 0 16px; border-top:1px solid var(--hairline); color:var(--muted); font-size:12px; line-height:1.6; }
   .account-actions:not(:has(button:not([hidden]))) { display:none; }
@@ -1687,6 +1703,19 @@
     <section class="page" id="page-account">
       <div class="box">
         <div class="box-title">Streamable account</div>
+        <div class="form-row" data-search="profile picture avatar account icon image photo">
+          <div class="label profile-label">
+            <button class="profile-avatar" type="button" id="profileAvatar" aria-label="Change profile picture"><span class="profile-edit" aria-hidden="true"><svg data-i="action/edit" viewBox="0 0 24 24"></svg></span></button>
+            <span>Profile Picture<span class="setting-description">Shown in the account circle at the top of the window. Any image works and is cut to a square.</span></span>
+          </div>
+          <div class="field-wrap is-stacked">
+            <div class="account-actions profile-actions">
+              <button class="btn" type="button" id="profilePictureChange">Change picture</button>
+              <button class="btn" type="button" id="profilePictureRemove" hidden>Remove</button>
+            </div>
+            <div class="profile-picture-error" id="profilePictureError" role="alert" hidden></div>
+          </div>
+        </div>
         <div class="form-row" data-search="streamable account anonymous uploads connection">
           <div class="label">Connection<span class="setting-description" id="streamableHelp">You can upload clips and create shareable links without an account.</span></div>
           <div class="field-wrap is-stacked">
@@ -1736,16 +1765,16 @@
             <span>Show codec tags on clips</span>
           </div>
         </div>
+        <div class="form-row tight" data-search="game detection game recognition game folders game icons">
+          <div></div>
+          <div class="check-row">
+            <input type="checkbox" id="gameRecognition" aria-label="Recognize games in clips">
+            <span>Recognize games in clips<span class="control-note">Finds the game you were playing, so new clips and screenshots get its name, icon and folder. Turn it off to hide game icons and the game filter, and ReplayKit stops looking up games.</span></span>
+          </div>
+        </div>
       </div>
       <div class="box">
         <div class="box-title">Updates</div>
-        <div class="form-row tight">
-          <div></div>
-          <div class="check-row">
-            <input type="checkbox" id="autoUpdateEnabled" aria-label="Prompt when ReplayKit updates are available">
-            <span>Prompt when ReplayKit updates are available</span>
-          </div>
-        </div>
         <div class="form-row">
           <div class="label">ReplayKit</div>
           <div class="field-wrap">
@@ -1972,6 +2001,10 @@
               </button>
             </div>
           </div>
+        </div>
+        <div class="form-row" data-search="date format time ago days ago clip cards screenshots">
+          <div class="label">Card Dates</div>
+          <div class="field-wrap"><div class="combo" id="cardDateFormat" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
       </div>
     </section>
@@ -2350,6 +2383,8 @@
     showCursorGameCapture: document.getElementById("showCursorGameCapture"),
     showCursorWindowCapture: document.getElementById("showCursorWindowCapture"),
     showCodecTags: document.getElementById("showCodecTags"),
+    gameRecognition: document.getElementById("gameRecognition"),
+    cardDateFormat: document.getElementById("cardDateFormat"),
     debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
     autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
     autoDeleteLogsOnLaunchRow: document.getElementById("autoDeleteLogsOnLaunchRow"),
@@ -2357,7 +2392,6 @@
     logFolderStatusLine: document.getElementById("logFolderStatusLine"),
     settingsProjectorInspectBtn: document.getElementById("settingsProjectorInspectBtn"),
     settingsProjectorReparkBtn: document.getElementById("settingsProjectorReparkBtn"),
-    autoUpdateEnabled: document.getElementById("autoUpdateEnabled"),
     settingsSearch: document.getElementById("settingsSearch"),
     searchEmpty: document.getElementById("searchEmpty"),
     applyBtn: document.getElementById("applyBtn"),
@@ -2401,6 +2435,14 @@
   fillCombo(els.editorZoomScaling, [
     { value:"smooth", label:"Smooth", blurb:"Blend pixels for smoother zoomed-in video." },
     { value:"sharp", label:"Sharp pixels", blurb:"Keep pixels crisp when zooming in to see small details." }
+  ]);
+  // the examples are today written each way, in the same formats the cards use
+  const cardDateSample = new Date();
+  fillCombo(els.cardDateFormat, [
+    { value:"date", label:"Date", blurb:"Like " + cardDateSample.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" }) + "." },
+    { value:"datetime", label:"Date and time", blurb:"Like " + cardDateSample.toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" }) + "." },
+    { value:"short", label:"Short date", blurb:"Like " + cardDateSample.toLocaleDateString() + "." },
+    { value:"relative", label:"Time ago", blurb:"Like 3 days ago." }
   ]);
   fillCombo(els.clipAntialiasing, [
     { value:"none", label:"None", blurb:"Play videos without extra edge smoothing." },
@@ -2900,9 +2942,19 @@
       combo.setAttribute("aria-describedby", [combo.getAttribute("aria-describedby"), note.id].filter(Boolean).join(" "));
     }
     const current = value === undefined ? (combo.dataset.noteValue === undefined ? comboValue(combo) : combo.dataset.noteValue) : value;
-    const option = options.find((entry) => entry.value === current);
-    const text = option && option.blurb ? option.blurb : "";
-    if (note.textContent !== text) note.textContent = text;
+    const blurbs = options.filter((entry) => !!entry.blurb);
+    const key = JSON.stringify(blurbs.map((entry) => [entry.value, entry.blurb]));
+    if (note.dataset.blurbs !== key) {
+      note.dataset.blurbs = key;
+      note.replaceChildren(...blurbs.map((entry) => {
+        const text = document.createElement("span");
+        text.className = "combo-note-text";
+        text.dataset.value = entry.value;
+        text.textContent = entry.blurb;
+        return text;
+      }));
+    }
+    for (const text of note.children) text.classList.toggle("is-shown", text.dataset.value === current);
     note.hidden = !hasDescription;
   }
 
@@ -3726,10 +3778,11 @@
     setComboValue(els.editorZoomScaling, state.editorZoomScaling === "sharp" ? "sharp" : "smooth", false);
     setComboValue(els.clipAntialiasing, state.clipAntialiasing === "msaa" || state.clipAntialiasing === "fxaa" ? state.clipAntialiasing : "none", false);
     els.showCodecTags.checked = !!state.showCodecTags;
+    els.gameRecognition.checked = state.gameRecognition !== false;
+    setComboValue(els.cardDateFormat, ["relative", "datetime", "short"].includes(state.cardDateFormat) ? state.cardDateFormat : "date", false);
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
     els.autoDeleteLogsOnLaunch.checked = state.autoDeleteLogsOnLaunch !== false;
     syncDebugLoggingFields();
-    els.autoUpdateEnabled.checked = state.autoUpdateEnabled !== false;
     els.autoCopyLink.checked = state.autoCopyLink !== false;
     els.linkNotificationEnabled.checked = state.linkNotificationEnabled !== false;
     els.compressSkipFavorites.checked = state.compressSkipFavorites !== false;
@@ -3820,9 +3873,10 @@
     state.editorZoomScaling = comboValue(els.editorZoomScaling) === "sharp" ? "sharp" : "smooth";
     state.clipAntialiasing = ["msaa", "fxaa"].includes(comboValue(els.clipAntialiasing)) ? comboValue(els.clipAntialiasing) : "none";
     state.showCodecTags = els.showCodecTags.checked;
+    state.gameRecognition = els.gameRecognition.checked;
+    state.cardDateFormat = ["relative", "datetime", "short"].includes(comboValue(els.cardDateFormat)) ? comboValue(els.cardDateFormat) : "date";
     state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
-    state.autoUpdateEnabled = els.autoUpdateEnabled.checked;
     state.autoCopyLink = els.autoCopyLink.checked;
     state.linkNotificationEnabled = els.linkNotificationEnabled.checked;
     state.compressSkipFavorites = els.compressSkipFavorites.checked;
@@ -3929,7 +3983,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -4221,7 +4275,7 @@
     markDirty();
   }, { passive: false });
 
-  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.autoUpdateEnabled, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+  [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -4516,6 +4570,11 @@
         return;
       }
       setUpdateReleaseLink(data.releaseUrl, true);
+      // in the clean layout the check only looks: the helper puts what it found on the update button of the title bar, which opens the update window when it is clicked
+      if (EMBEDDED) {
+        setUpdateStatus((data.repairRequired ? "ReplayKit needs repair." : "Update available: " + data.latestVersion + " (installed " + data.installedVersion + ").") + " Use the update button at the top to install it.", "good");
+        return;
+      }
       if (dirty) {
         setUpdateStatus((data.repairRequired ? "ReplayKit needs repair." : "Update available: " + data.latestVersion + ".") + " Apply or cancel your settings changes first.", "bad");
         return;
@@ -5793,6 +5852,56 @@
     acct.signOut.hidden = !authState.signedIn;
     acct.force.hidden = !authState.signedIn;
   }
+  // the picture the helper keeps for the account circle: its version, empty when there is none; the picker holds the request open until it closes, so a second one is not opened meanwhile
+  const profile = { avatar: document.getElementById("profileAvatar"), change: document.getElementById("profilePictureChange"), remove: document.getElementById("profilePictureRemove"), error: document.getElementById("profilePictureError"), version:"", picking:false };
+  const PERSON_SVG = '<svg class="profile-person" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16.2" r="6.1"/><path d="M12.7 37.1V32.7Q12.7 27.9 17.5 27.9H30.5Q35.3 27.9 35.3 32.7V37.1"/></svg>';
+  // the same colour and letter the account menu and the title bar give a signed in account without a picture
+  function accountHue(name) {
+    let hash = 2166136261;
+    for (const ch of String(name).toLowerCase()) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619) >>> 0;
+    return hash % 360;
+  }
+  function renderProfilePicture() {
+    const edit = profile.avatar.querySelector(".profile-edit");
+    profile.avatar.replaceChildren();
+    profile.avatar.style.background = "";
+    if (profile.version) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = HELPER + "/profile-picture?v=" + encodeURIComponent(profile.version);
+      profile.avatar.append(img);
+    } else if (authState.signedIn) {
+      const match = String(authState.username).match(/[A-Za-z0-9]/);
+      const hue = accountHue(authState.username);
+      profile.avatar.textContent = match ? match[0].toUpperCase() : "S";
+      profile.avatar.style.background = "linear-gradient(135deg, hsl(" + hue + " 54% 50%), hsl(" + hue + " 52% 36%))";
+    } else {
+      profile.avatar.innerHTML = PERSON_SVG;
+    }
+    profile.avatar.append(edit);
+    profile.avatar.disabled = profile.change.disabled = profile.remove.disabled = profile.picking;
+    profile.avatar.setAttribute("aria-busy", String(profile.picking));
+    profile.change.textContent = profile.picking ? "Choosing..." : "Change picture";
+    profile.remove.hidden = !profile.version;
+  }
+  async function changeProfilePicture(remove) {
+    if (profile.picking) return;
+    profile.picking = true;
+    profile.error.hidden = true;
+    renderProfilePicture();
+    try {
+      const data = await helperJson("profile-picture/" + (remove ? "clear" : "pick"), { method:"POST" });
+      profile.version = typeof data.picture === "string" ? data.picture : "";
+    } catch (e) {
+      profile.error.textContent = e.message || "That file could not be used as a picture.";
+      profile.error.hidden = false;
+    }
+    profile.picking = false;
+    renderProfilePicture();
+  }
+  profile.avatar.addEventListener("click", () => changeProfilePicture(false));
+  profile.change.addEventListener("click", () => changeProfilePicture(false));
+  profile.remove.addEventListener("click", () => changeProfilePicture(true));
   function applyAuthData(data) {
     authState = {
       signedIn: !!data.signedIn,
@@ -5802,7 +5911,10 @@
       maxUploadBytes: Number.isFinite(data.maxUploadBytes) && data.maxUploadBytes >= 0 ? data.maxUploadBytes : null,
       maxDurationSec: Number.isFinite(data.maxDurationSec) && data.maxDurationSec >= 0 ? data.maxDurationSec : null,
     };
+    // the sign-in answers carry no picture, so only /me changes it
+    if (typeof data.picture === "string") profile.version = data.picture;
     renderAuth();
+    renderProfilePicture();
   }
   async function fetchMe() {
     try { applyAuthData(await helperJson("me?t=" + Date.now())); } catch (e) { /* helper offline, the box keeps its last state */ }

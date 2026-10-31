@@ -15,6 +15,7 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
+#include "shell/shell_account.hpp"
 #include "shell/shell_grip.hpp"
 #include "shell/shell_history.hpp"
 #include "shell/shell_notify_reader.hpp"
@@ -87,6 +88,8 @@ void PipeDispatchLine(const std::string &line)
 			const QString id = QString::fromStdString(rest.substr(space + 1));
 			QMetaObject::invokeMethod(g_callbacks, [view, id]() { ShellQuickMenu::Run(view, id); }, Qt::QueuedConnection);
 		}
+	} else if (line == "ACCOUNT") {
+		QMetaObject::invokeMethod(g_callbacks, []() { ShellAccountPoll(); }, Qt::QueuedConnection);
 	} else if (line == "CLIPSAVE") {
 		QMetaObject::invokeMethod(g_callbacks, []() { ClipBufferSave(); }, Qt::QueuedConnection);
 	} else if (line.rfind("CAPTURENAME ", 0) == 0 && line.size() < 40000) {

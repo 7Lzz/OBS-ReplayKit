@@ -1,7 +1,7 @@
 <style>
   body.is-screenshots .clip-sort-group[data-group="length"] { display:none; }
   /* a screenshot card is built like a clip card: the picture, then the title row with the pencil, the delete button and the menu, then the size and age; the menu hangs out of the card, so only the picture clips */
-  .screenshot-card { min-width:0; padding:0; color:var(--text); text-align:left; font:inherit; cursor:pointer; }
+  .screenshot-card { min-width:0; padding:0; color:var(--text); text-align:left; font:inherit; }
   .screenshot-card.menu-open { z-index:20; }
   .screenshot-card .preview { display:block; width:100%; overflow:hidden; border-radius:5px 5px 0 0; }
   .screenshot-open { position:absolute; inset:0; width:100%; height:100%; padding:0; border:0; background:transparent; cursor:pointer; }
@@ -60,7 +60,7 @@ window.RKScreenshots = {
       const age = document.createElement("span");
       age.className = "age";
       age.dataset.mtime = String(row.mtime);
-      age.textContent = options.formatTimeAgo(row.mtime);
+      age.textContent = options.formatAge(row.mtime);
       target.append(size, dot, age);
       if (window.RKClipGames) RKClipGames.badge(target, row, { change: true, screenshot: true });
     }
@@ -254,7 +254,6 @@ window.RKScreenshots = {
         options.openMenu(card, menu, event);
       });
       card.addEventListener("click", event => { if (event.target.closest(".preview")) preview(row); });
-      body.addEventListener("click", event => { if (!event.defaultPrevented && !event.target.closest("button, .menu-item, input")) preview(row); });
       options.hovers(card);
       return card;
     }
@@ -264,7 +263,8 @@ window.RKScreenshots = {
       area.hidden = !active || (mode === "all" && !shown.length);
       const collapsed = options.collapsed();
       grid.hidden = collapsed;
-      const current = JSON.stringify(shown);
+      // the game recognition switch is part of it, so the cards lose or get back their game icon when it changes
+      const current = JSON.stringify(shown) + (window.RKClipGames && !RKClipGames.enabled ? "|games-off" : "");
       // a card whose name is being typed is left as it is until the name is in
       if (current !== signature && !grid.querySelector(".name-edit-input")) {
         signature = current;

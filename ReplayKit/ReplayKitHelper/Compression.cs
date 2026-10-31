@@ -53,31 +53,37 @@ namespace ReplayKitHelper
             return "";
         }
 
-        // create / reuse a same-volume hard link from ffmpeg.exe to a branded filename so task manager shows our naming when the process is running. hard link shares the underlying ntfs file content -- no extra disk, no stale copy to manage; an in-place ffmpeg.exe update is automatically picked up. falls back to the original path if the alias cant be created (cross-volume, fat/exfat, permissions, etc.). the icon and pe filedescription stay ffmpegs (the gpld binarys resources cant be modified) -- only the visible process name changes.
+        private static readonly object FfmpegAliasLock = new object();
+
+        // a copy of ffmpeg.exe under a replaykit name with the replaykit icon stamped into it, so the encodes read as replaykit in task manager; a hard link would share the blank icon of ffmpeg, so this costs a second copy of it on disk. the copy carries the write time of the ffmpeg it was made from and is always larger than it, which tells it apart from a stale copy and from the hard link older versions made. ffmpeg.exe itself is never touched, and the plain ffmpeg path is used whenever the copy cannot be made
         public static string EnsureFfmpegAlias(string ffmpegPath)
         {
             if (string.IsNullOrEmpty(ffmpegPath) || !File.Exists(ffmpegPath)) return ffmpegPath;
-            try
+            string aliasPath = Path.Combine(Path.GetDirectoryName(ffmpegPath), "OBSReplayKit-Encoder.exe");
+            string tempPath = aliasPath + ".tmp";
+            lock (FfmpegAliasLock)
             {
-                string aliasDir = Path.GetDirectoryName(ffmpegPath);
-                string aliasPath = Path.Combine(aliasDir, "OBSReplayKit-Encoder.exe");
-                if (File.Exists(aliasPath)) return Path.GetFullPath(aliasPath);
-                string srcVol = Path.GetPathRoot(ffmpegPath);
-                string dstVol = Path.GetPathRoot(aliasPath);
-                if (string.Equals(srcVol, dstVol, StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    Native.CreateHardLink(aliasPath, ffmpegPath);
-                    Log.Write("ffmpeg alias created: " + aliasPath + " -> " + ffmpegPath + "  (hard link)");
+                    var source = new FileInfo(ffmpegPath);
+                    var alias = new FileInfo(aliasPath);
+                    if (alias.Exists && alias.LastWriteTimeUtc == source.LastWriteTimeUtc && alias.Length > source.Length) return alias.FullName;
+                    byte[] icon = File.ReadAllBytes(Constants.OBS_ICON_PATH);
+                    File.Copy(ffmpegPath, tempPath, true);
+                    Native.StampIcon(tempPath, icon);
+                    File.SetLastWriteTimeUtc(tempPath, source.LastWriteTimeUtc);
+                    // a running encode keeps the old alias open, so it cannot be replaced until that encode is done
+                    if (alias.Exists) File.Delete(aliasPath);
+                    File.Move(tempPath, aliasPath);
+                    Log.Write("ffmpeg alias created: " + aliasPath + " (copy of " + ffmpegPath + " with the replaykit icon)");
                     return Path.GetFullPath(aliasPath);
                 }
-                // cross-volume: hard links arent supported on windows. copying ~80 mb of ffmpeg around just for a process-name cosmetic isnt worth it, so fall back to the original path.
-                Log.Write("ffmpeg alias skipped: cross-volume (would require a full copy)");
-                return ffmpegPath;
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
-            {
-                Log.Write("ffmpeg alias failed: " + ex.Message + " (falling back to ffmpeg.exe)");
-                return ffmpegPath;
+                catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
+                {
+                    try { File.Delete(tempPath); } catch (Exception cleanup) when (cleanup is IOException || cleanup is UnauthorizedAccessException) { }
+                    Log.Write("ffmpeg alias failed: " + ex.Message + " (falling back to ffmpeg.exe)");
+                    return ffmpegPath;
+                }
             }
         }
 

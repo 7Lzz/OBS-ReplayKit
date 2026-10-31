@@ -9,6 +9,8 @@ class QJsonArray;
 namespace rk {
 void CaptureContextStart();
 void CaptureContextStop();
+// the game recognition switch of the settings
+void CaptureContextSetRecognition(bool on);
 void CaptureContextRequested();
 void CaptureContextRefresh();
 void CaptureContextResetBuffer();

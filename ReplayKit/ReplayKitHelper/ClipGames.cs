@@ -22,10 +22,25 @@ namespace ReplayKitHelper
         private static string acceptedKind = "unknown";
         private sealed class SaveBounds { internal long At; internal JArray Pieces; }
         private static readonly Dictionary<long, SaveBounds> Saves = new Dictionary<long, SaveBounds>();
+        // the recognition switch of the settings, read from disk once and then kept in step by every settings write instead of read again for each sample; -1 until it is known
+        private static int recognition = -1;
+
+        internal static void SetRecognition(bool on) => Volatile.Write(ref recognition, on ? 1 : 0);
+
+        internal static bool RecognitionOn()
+        {
+            int known = Volatile.Read(ref recognition);
+            if (known >= 0) return known == 1;
+            bool on;
+            try { on = ReplaykitSettings.ReadSettings()["gameRecognition"]?.Value<bool>() ?? true; }
+            catch (InvalidOperationException) { return true; }
+            Interlocked.CompareExchange(ref recognition, on ? 1 : 0, -1);
+            return Volatile.Read(ref recognition) == 1;
+        }
 
         internal static void Observe(string json)
         {
-            if (json.Length > 4000) return;
+            if (json.Length > 4000 || !RecognitionOn()) return;
             long at = 0;
             string session = "";
             bool valid = false;
@@ -139,7 +154,8 @@ namespace ReplayKitHelper
         {
             var current = Current(capture, file) ? capture : null;
             var summary = CaptureTimeline.Describe(current);
-            var experience = RobloxExperiences.Describe(current, summary);
+            // the name and icon of a roblox experience may have to be fetched, which waits while recognition is off
+            var experience = RecognitionOn() ? RobloxExperiences.Describe(current, summary) : null;
             if (experience != null) summary["experience"] = experience;
             // the icon version this clip was made with, when it is of the game the clip goes by
             var pinned = current?["gameIcon"] as JObject;
@@ -228,7 +244,7 @@ namespace ReplayKitHelper
 
         internal static void BindSave(string json)
         {
-            if (json.Length > 400000) return;
+            if (json.Length > 400000 || !RecognitionOn()) return;
             try
             {
                 var raw = JObject.Parse(json);
@@ -248,6 +264,7 @@ namespace ReplayKitHelper
 
         internal static void SavedDisk(string file, long id, IList<string> files, IList<double> lengths)
         {
+            if (!RecognitionOn()) return;
             SaveBounds saved = null;
             for (int attempt = 0; attempt < 10; attempt++)
             {
@@ -268,7 +285,8 @@ namespace ReplayKitHelper
 
         internal static void NativeFile(string json)
         {
-            if (json.Length > 400000) return;
+            // with recognition off a new file gets no tag, so it is neither probed nor written to the db
+            if (json.Length > 400000 || !RecognitionOn()) return;
             if (Interlocked.Increment(ref pending) > 16) { Interlocked.Decrement(ref pending); return; }
             ThreadPool.QueueUserWorkItem(_ =>
             {

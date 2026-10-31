@@ -226,6 +226,9 @@ namespace ReplayKitHelper
         // the disk clip buffer lives in the plugin: it is turned on, off or over, and asked to save the last stretch it holds
         public static bool SendClipBuffer(string state) => (state == "on" || state == "off" || state == "toggle") && TryWrite("CLIPBUFFER " + state);
         public static bool SendClipSave() => TryWrite("CLIPSAVE");
+
+        // the account circle of the title bar reads the account again, after its picture changed
+        public static void SendAccountChanged() => TryWrite("ACCOUNT");
         internal static bool SendCaptureName(long at, string session, long buffer, long start, int seconds, string name) => TryWrite("CAPTURENAME " + new JObject { ["at"] = at, ["session"] = session, ["buffer"] = buffer, ["start"] = start, ["seconds"] = seconds, ["name"] = name }.ToString(Newtonsoft.Json.Formatting.None));
 
         // a pick of the quick action menu, for the view it was made in; both parts are checked by the route before they get here

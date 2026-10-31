@@ -15,6 +15,7 @@ namespace ReplayKitShared
         public const string CompressionHistoryFile = "compression_history.json";
         public const string GameMappingsFile = "game_mappings.json";
         public const string UpdatePendingFile = "update_pending.json";
+        public const string ProfilePictureFile = "profile_picture.png";
 
         private sealed class Entry
         {

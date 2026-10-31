@@ -153,6 +153,8 @@ namespace ReplayKitHelper
 
         private static void Pass()
         {
+            // with game recognition off clips stay where they are saved, and the game folders that are there are left alone
+            if (!ClipGames.RecognitionOn()) return;
             string root = Path.GetFullPath(AppConfig.GetClipDir()).TrimEnd(Path.DirectorySeparatorChar);
             if (!Directory.Exists(root)) return;
             // nothing changed since the last pass and nothing was waiting to settle: the pass would find what it found then

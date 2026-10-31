@@ -1,6 +1,7 @@
 // the streamable account circle of the title bar
 #pragma once
 
+#include <QPixmap>
 #include <QPointer>
 #include <QString>
 
@@ -10,7 +11,7 @@ namespace rk {
 
 class AnchoredPanel;
 
-// the account circle next to the bell. anonymous while nobody is signed in to streamable, a coloured circle with the first letter of the account while somebody is. a press opens the account menu under it, where signing in or out happens
+// the account circle next to the bell. anonymous while nobody is signed in to streamable, a coloured circle with the first letter of the account while somebody is, and the picture picked in the account menu over either. a press opens the account menu under it, where signing in or out and picking the picture happen
 class ShellAccountButton : public ShellTitleButton {
 public:
 	static constexpr int kWidth = 40;
@@ -19,6 +20,8 @@ public:
 	struct Account {
 		bool signedIn = false;
 		QString name;
+		// the version of the picture the helper keeps, empty when there is none
+		QString picture;
 	};
 
 	ShellAccountButton(QWidget *owner, QWidget *parent);
@@ -38,6 +41,9 @@ protected:
 private:
 	QPointer<QWidget> m_owner;
 	Account m_account;
+	QPixmap m_picture;
+	// the picture brought down to the pixels of the circle once, since a plain smooth draw from 256px leaves it grainy
+	QPixmap m_pictureScaled;
 	AnchoredPanel *m_panel = nullptr;
 };
 

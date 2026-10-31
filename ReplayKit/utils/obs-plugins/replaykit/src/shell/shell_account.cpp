@@ -53,8 +53,15 @@ ShellAccountButton::~ShellAccountButton()
 
 void ShellAccountButton::SetAccount(const Account &account)
 {
-	if (account.signedIn == m_account.signedIn && account.name == m_account.name)
+	if (account.signedIn == m_account.signedIn && account.name == m_account.name && account.picture == m_account.picture)
 		return;
+	if (account.picture != m_account.picture) {
+		// the helper saves it in the obs-replayKit folder, which the plugin reads straight from disk like window_state.ini
+		m_picture = QPixmap();
+		m_pictureScaled = QPixmap();
+		if (!account.picture.isEmpty())
+			m_picture.load(qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit/profile_picture.png"), "PNG");
+	}
 	m_account = account;
 	SetTip(account.signedIn ? QStringLiteral("Streamable: %1").arg(account.name.isEmpty() ? QStringLiteral("signed in") : account.name) : QStringLiteral("Streamable: anonymous"));
 	update();
@@ -64,6 +71,30 @@ void ShellAccountButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover
 {
 	const QPointF mid = pill.center();
 	const QRectF disc(mid.x() - kCircleD / 2.0, mid.y() - kCircleD / 2.0, kCircleD, kCircleD);
+	if (!m_picture.isNull()) {
+		const qreal ratio = devicePixelRatioF();
+		const int pixels = qRound(kCircleD * ratio);
+		if (m_pictureScaled.width() != pixels) {
+			m_pictureScaled = m_picture.scaled(pixels, pixels, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+			m_pictureScaled.setDevicePixelRatio(ratio);
+		}
+		QPainterPath round;
+		round.addEllipse(disc);
+		p.save();
+		p.setClipPath(round);
+		p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+		p.drawPixmap(disc, m_pictureScaled, QRectF(QPointF(0, 0), m_pictureScaled.size()));
+		p.restore();
+		p.setPen(QPen(ChromeInk(0.14 + 0.25 * hover), 1.0));
+		p.setBrush(Qt::NoBrush);
+		p.drawEllipse(disc.adjusted(0.5, 0.5, -0.5, -0.5));
+		if (m_account.signedIn) {
+			p.setPen(QPen(g_chromeBar, 2.0));
+			p.setBrush(g_chromeSuccess);
+			p.drawEllipse(QPointF(disc.right() - 2.2, disc.bottom() - 2.2), 3.2, 3.2);
+		}
+		return;
+	}
 	if (!m_account.signedIn) {
 		// nobody signed in: a see-through grey disc with the outline of a person in it. the head and the shoulders end well inside the ring, so nothing of the person runs into it
 		p.setPen(Qt::NoPen);
@@ -161,6 +192,7 @@ void ShellAccountPoll()
 			if (name.empty())
 				name = ExtractJsonStringField(body, "displayName");
 			account.name = QString::fromStdString(name);
+			account.picture = QString::fromStdString(ExtractJsonStringField(body, "picture"));
 		}
 		QMetaObject::invokeMethod(
 			g_callbacks,

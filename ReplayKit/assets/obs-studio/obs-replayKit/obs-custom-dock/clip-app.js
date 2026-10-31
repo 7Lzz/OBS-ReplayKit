@@ -86,7 +86,16 @@ const CLIP_HOVER_PROFILES = {
   const PENDING_LINK_CREATION_MS = 20 * 60 * 1000;
   // after a cancel the helper can still report the old job as active (or as error=Cancelled) for a poll or two -- ignore that jobs status this long so the instant card repaint isnt undone.
   const CANCEL_GRACE_MS = 8000;
-  const replayKitSettings = { showCodecTags: false, editorAutoplay: false, editorLoopPreview: false, editorSeekStep: 5, editorWheelZoom: true, editorZoomScaling: "smooth", clipAntialiasing: "none" };
+  const replayKitSettings = { showCodecTags: false, editorAutoplay: false, editorLoopPreview: false, editorSeekStep: 5, editorWheelZoom: true, editorZoomScaling: "smooth", clipAntialiasing: "none", cardDateFormat: "date", gameRecognition: true };
+  const CARD_DATE_FORMATS = new Set(["relative", "date", "datetime", "short"]);
+  // the game recognition switch as the last settings read left it, so a page that opens with it off draws nothing of games before the settings come back
+  const GAME_RECOGNITION_KEY = "replaykit.gameRecognition.v1";
+  try { replayKitSettings.gameRecognition = localStorage.getItem(GAME_RECOGNITION_KEY) !== "0"; } catch {}
+  function applyGameRecognition() {
+    document.documentElement.classList.toggle("rk-games-off", !replayKitSettings.gameRecognition);
+    if (window.RKClipGames) RKClipGames.setEnabled(replayKitSettings.gameRecognition);
+  }
+  applyGameRecognition();
 
   async function loadReplayKitSettings() {
     try {
@@ -101,6 +110,19 @@ const CLIP_HOVER_PROFILES = {
         document.documentElement.dataset.editorZoom = replayKitSettings.editorZoomScaling;
         replayKitSettings.clipAntialiasing = ["msaa", "fxaa"].includes(data.settings.clipAntialiasing) ? data.settings.clipAntialiasing : "none";
         if (window.RKVideoFx) RKVideoFx.setMode(replayKitSettings.clipAntialiasing);
+        const cardDateFormat = CARD_DATE_FORMATS.has(data.settings.cardDateFormat) ? data.settings.cardDateFormat : "date";
+        if (cardDateFormat !== replayKitSettings.cardDateFormat) {
+          replayKitSettings.cardDateFormat = cardDateFormat;
+          refreshCardDates();
+        }
+        const gameRecognition = data.settings.gameRecognition !== false;
+        if (gameRecognition !== replayKitSettings.gameRecognition) {
+          replayKitSettings.gameRecognition = gameRecognition;
+          try { localStorage.setItem(GAME_RECOGNITION_KEY, gameRecognition ? "1" : "0"); } catch {}
+          applyGameRecognition();
+          if (screenshotGallery) screenshotGallery.paint();
+          if (loadedClips.length) renderLoadedClips(loadedClips);
+        }
         const showCodecTags = !!data.settings.showCodecTags;
         if (showCodecTags !== replayKitSettings.showCodecTags) {
           replayKitSettings.showCodecTags = showCodecTags;
@@ -331,7 +353,7 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatTimeAgo, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -1299,7 +1321,7 @@ const CLIP_HOVER_PROFILES = {
   });
 
   function clipGroupsActive() {
-    return groupByGame && !HOME_MODE && activeFilter === "all" && !!window.RKClipGames;
+    return groupByGame && replayKitSettings.gameRecognition && !HOME_MODE && activeFilter === "all" && !!window.RKClipGames;
   }
 
   // puts each game in one run, the games in the order their first clip has in the list, and notes where every run starts
@@ -1410,6 +1432,23 @@ const CLIP_HOVER_PROFILES = {
     if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
     if (diff < 172800) return "a day ago";
     return Math.floor(diff / 86400) + " days ago";
+  }
+
+  // the date line of a card in the format picked in the Appearance tab, the time ago by default
+  function formatClipDate(unixSec) {
+    const format = replayKitSettings.cardDateFormat;
+    if (format === "relative" || !(unixSec > 0)) return formatTimeAgo(unixSec);
+    const date = new Date(unixSec * 1000);
+    if (format === "short") return date.toLocaleDateString();
+    if (format === "datetime") return date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function refreshCardDates() {
+    document.querySelectorAll(".age").forEach(el => {
+      const m = parseInt(el.dataset.mtime, 10);
+      if (m) el.textContent = formatClipDate(m);
+    });
   }
 
   // honors the per-clip retention sent by the helper. anonymous uploads are 1 days; signed-in uploads carry their own retention_days field.
@@ -2975,7 +3014,7 @@ const CLIP_HOVER_PROFILES = {
         <div class="meta">
           <span class="size">${formatSize(clip.size)}</span>
           <span class="dot"></span>
-          <span class="age" data-mtime="${clip.mtime}">${formatTimeAgo(clip.mtime)}</span>
+          <span class="age" data-mtime="${clip.mtime}">${formatClipDate(clip.mtime)}</span>
         </div>
       </div>
       <div class="actions"></div>
@@ -4542,7 +4581,7 @@ const CLIP_HOVER_PROFILES = {
     const ageEl = card.querySelector(".age");
     if (ageEl) {
       ageEl.dataset.mtime = String(clip.mtime);
-      ageEl.textContent = formatTimeAgo(clip.mtime);
+      ageEl.textContent = formatClipDate(clip.mtime);
     }
     if (duration > 0) setDurationBadge(card, duration);
     // the clip index has not measured the new file yet, so the card measures it itself
@@ -4674,7 +4713,7 @@ const CLIP_HOVER_PROFILES = {
     if (width > 0 && height > 0) facts.push(["Resolution", width + " \u00d7 " + height + (fps > 0 ? " \u00b7 " + Math.round(fps) + " fps" : "")]);
     facts.push(["Size", formatSize(clip.size)]);
     return '<div class="home-hero-name" title="' + name + '">' + name + "</div>"
-      + '<div class="home-hero-age age" data-mtime="' + (Number(clip.mtime) || 0) + '">' + formatTimeAgo(clip.mtime) + "</div>"
+      + '<div class="home-hero-age age" data-mtime="' + (Number(clip.mtime) || 0) + '">' + formatClipDate(clip.mtime) + "</div>"
       + '<dl class="home-hero-facts">' + facts.map(([label, value]) => "<dt>" + label + "</dt><dd>" + escapeHtml(value) + "</dd>").join("") + "</dl>";
   }
 
@@ -5197,7 +5236,8 @@ const CLIP_HOVER_PROFILES = {
       refreshBulkSelectionUi();
     }
 
-    activeFilter = "all";
+    // the type dropdown keeps what it was left on, the way a fresh window restores it, so the view follows it instead of showing everything under another label
+    activeFilter = gameFilters ? gameFilters.state.type : "all";
     syncClipView();
     if (screenshotGallery) screenshotGallery.refresh();
     updateTabs(loadedClips);
@@ -5273,6 +5313,8 @@ const CLIP_HOVER_PROFILES = {
         resetClipsWindowState();
       }
       if (!HOME_MODE) applyPendingClipsFilter();
+      // a setting changed in the settings view, which an embedded page sits behind without losing focus
+      loadReplayKitSettings();
       poll();
       queueVirtualRender(true);
       // the clips view may have changed favorites while this one was hidden
@@ -5291,10 +5333,7 @@ const CLIP_HOVER_PROFILES = {
 
   setInterval(() => {
     if (document.hidden) return;
-    document.querySelectorAll(".age").forEach(el => {
-      const m = parseInt(el.dataset.mtime, 10);
-      if (m) el.textContent = formatTimeAgo(m);
-    });
+    refreshCardDates();
     document.querySelectorAll(".card").forEach(card => {
       const clip = lastClipsByName.get(card.dataset.name);
       if (clip && clip.streamable_url) renderActions(card, clip, true);
