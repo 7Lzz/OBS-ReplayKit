@@ -4884,11 +4884,6 @@
     if (e.key === "Escape") {
       e.preventDefault();
       closeUninstallConfirmModal(false);
-    } else if (e.key === "Tab") {
-      const controls = Array.from(els.uninstallConfirmModal.querySelectorAll("input:not(:disabled), button:not(:disabled)")).filter((element) => element.getClientRects().length && (element.type !== "radio" || element.checked));
-      const first = controls[0], last = controls[controls.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   });
   window.addEventListener("pagehide", releaseHotkeyCapture);

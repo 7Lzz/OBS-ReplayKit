@@ -23,6 +23,8 @@ extern bool g_setupPending;
 
 // close-to-tray: when true, the OBS windows X hides to tray instead of quitting. polled from /settings on the same 1s timer as the open-clips hotkey. real quits/restarts (tray Exit, restart routes) send ALLOWCLOSE over the ipc pipe just before posting WM_CLOSE so the filter lets those through untouched.
 extern bool g_closeToTray;
+// deleted history is on (kept for at least a day), polled with the rest of the settings; while it is off the quick action menu offers no bin
+extern bool g_deletedHistoryOn;
 extern QPointer<QWidget> g_mainWindow;
 
 // menu opens upward from the cursor so restart obs lands right where an accidental double-clicks second click hits -- every action here bails if triggered within kMenuClickDebounceMs of aboutToShow

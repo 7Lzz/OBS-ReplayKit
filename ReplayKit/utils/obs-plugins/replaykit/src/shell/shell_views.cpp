@@ -46,6 +46,8 @@ constexpr int kHostMissLimit = 4;
 bool g_setupForeground = false;
 bool g_homeEditor = false;
 bool g_clipsEditor = false;
+// the deleted history was picked from another view and opens once the clips page says it is the one showing
+bool g_deletedPending = false;
 int probePending = 0;
 int probeGeneration = 0;
 QElapsedTimer resumeTimer;
@@ -655,6 +657,8 @@ bool ShellActivate(ShellView view)
 	NotifyReaderClose();
 	// the place is noted now and not when the change lands, since a dip may take a moment to come about
 	ShellHistoryNote(view);
+	if (view != ShellView::Clips)
+		g_deletedPending = false;
 	const int gen = ++g_activateGen;
 	// the rail answers the click at once, and the stage follows
 	if (g_shellRail)
@@ -719,6 +723,10 @@ void ShellHostShown(const std::string &name)
 		QMainWindow *mw = ObsMainWindowQt();
 		if (mw && mw->isVisible() && !mw->isMinimized() && !ShellMainWindowIsForeground())
 			ShellForegroundMainWindow();
+	}
+	if (view == ShellView::Clips && g_deletedPending && g_shellView == ShellView::Clips && g_shellHost) {
+		g_deletedPending = false;
+		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.quickAction && RKShell.quickAction('clips', 'deleted-history');");
 	}
 }
 
@@ -894,6 +902,25 @@ void ShellSetClipsFullscreen(bool active)
 bool ShellEditorActive()
 {
 	return g_homeEditor || g_clipsEditor;
+}
+
+bool ShellEditorOpen(ShellView view)
+{
+	return view == ShellView::Home ? g_homeEditor : view == ShellView::Clips && g_clipsEditor;
+}
+
+void ShellOpenDeletedHistory()
+{
+	if (!g_shellHost)
+		return;
+	// the bin is a dialog of the clips page, so from any other view the window goes to clips first and the bin opens once that page shows; a change of view that is held back, by unsaved settings or obs settings that will not close, opens nothing
+	if (g_shellView == ShellView::Clips && g_hostShown == ShellView::Clips) {
+		ShellRunJs(g_shellHost->browser, "window.RKShell && RKShell.quickAction && RKShell.quickAction('clips', 'deleted-history');");
+		return;
+	}
+	g_deletedPending = true;
+	if (!ShellActivate(ShellView::Clips))
+		g_deletedPending = false;
 }
 
 } // namespace rk

@@ -6,6 +6,7 @@
 #include "core/draw_util.hpp"
 #include "core/theme.hpp"
 #include "notify/notify_tip.hpp"
+#include "shell/shell_title_button.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_views.hpp"
 
@@ -13,17 +14,17 @@ namespace rk {
 
 namespace {
 
-// svg glyphs for the rail, same 24 grid the dock icons use. fill is irrelevant, only the painted shape is kept and recoloured
+// svg glyphs for the rail, all on one 24 grid with the longest side of the drawing 20 and centred, so every icon shows at the same size; fill is irrelevant, only the painted shape is kept and recoloured
 const char kRailHomeSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(-1.333333 25.333333) scale(0.027778)"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Z"/></g></svg>)SVG";
 const char kRailClipsSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(-1.3333 -1.3333) scale(1.11111)"><path fill-rule="evenodd" d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-10a4 4 0 0 1 -4 -4v-10a4 4 0 0 1 4 -4zM7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2zM10.132 8.652v6.696l5.4 -3.348zM6.6 6.2h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4zM6.6 11.1h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4zM6.6 16h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4zM16.4 6.2h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4zM16.4 11.1h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4zM16.4 16h1a0.4 0.4 0 0 1 0.4 0.4v1a0.4 0.4 0 0 1 -0.4 0.4h-1a0.4 0.4 0 0 1 -0.4 -0.4v-1a0.4 0.4 0 0 1 0.4 -0.4z"/></g></svg>)SVG";
 const char kRailProjectorSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(-1.333333 -1.333333) scale(1.111111)"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></g></svg>)SVG";
 const char kRailShareSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="1 1 14 14"><path d="M3.25 2C2.56 2 2 2.56 2 3.25v6.5C2 10.44 2.56 11 3.25 11H7v1.5H4.75a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5H9V11h3.75c.69 0 1.25-.56 1.25-1.25v-6.5C14 2.56 13.44 2 12.75 2h-9.5zM3.5 3.5h9v6h-9v-6zM6.5 4.85v3.3l3.3-1.65-3.3-1.65z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(-1.333333 -1.333333) scale(1.666667)"><path d="M3.25 2C2.56 2 2 2.56 2 3.25v6.5C2 10.44 2.56 11 3.25 11H7v1.5H4.75a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5H9V11h3.75c.69 0 1.25-.56 1.25-1.25v-6.5C14 2.56 13.44 2 12.75 2h-9.5zM3.5 3.5h9v6h-9v-6zM6.5 4.85v3.3l3.3-1.65-3.3-1.65z"/></g></svg>)SVG";
 const char kRailGearSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>)SVG";
+	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g transform="translate(-0.5 -0.5) scale(1.041667)"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></g></svg>)SVG";
 
 } // namespace
 
@@ -156,9 +157,10 @@ void ShellRail::paintEvent(QPaintEvent *)
 		const bool hover = i == m_hover;
 		const bool down = i == m_pressed;
 		if (selected || hover || down) {
+			// the rounded square of the buttons of the title bar, not a circle
 			p.setPen(Qt::NoPen);
 			p.setBrush(ChromeInk(selected ? 0.16 : down ? 0.13 : 0.08));
-			p.drawEllipse(r);
+			p.drawRoundedRect(r, ShellTitleButton::kRadius, ShellTitleButton::kRadius);
 		}
 		const QRectF glyph(r.center().x() - 11, r.center().y() - 11, 22, 22);
 		QColor ink = ChromeInk(selected || hover || down ? 1.0 : 0.62);
@@ -174,8 +176,8 @@ void ShellRail::paintEvent(QPaintEvent *)
 
 QRectF ShellRail::ItemRect(int index) const
 {
-	const qreal d = 44.0;
-	const qreal pitch = 52.0;
+	const qreal d = 40.0;
+	const qreal pitch = 48.0;
 	int bottomCount = 0;
 	int slot = 0;
 	for (int i = 0; i < m_items.size(); ++i)

@@ -201,7 +201,7 @@
   .tl-gap svg { width: 16px; height: 16px; fill: currentColor; opacity: 0; pointer-events: none; }
   .tl-gap.is-selected svg { opacity: 1; }
   .tl-film { position: absolute; top: 0; pointer-events: none; }
-  /* a track wears a faint outline in its own colour at rest: the audio tracks in the blue of their fill and the video track in a tint taken from the clip itself. the track that is selected wears the bright outline and the grips of the cut, the same on every track */
+  /* a track wears a faint outline in its own colour at rest: the audio tracks in the blue of their fill and the video track in the neutral grey, or the link colour of the clip a piece was taken from. the track that is selected wears the bright outline and the grips of the cut, the same on every track */
   .tl-seg {
     position: absolute;
     top: 0;
@@ -365,7 +365,7 @@
   .trim-time-ruler .trim-time-mark.is-end { transform: translateX(-100%); }
   .trim-time-ruler .trim-time-mark.is-end::after { left: 100%; }
 
-  /* the video row is a row of pieces like the audio rows are. the script draws the frames of the pieces, leaving the row empty where the saved clip has none, and every piece wears a faint outline in a tint of the clip, the bright one while it is selected. the two handles of the cut show while the video or one of its pieces is selected */
+  /* the video row is a row of pieces like the audio rows are. the script draws the frames of the pieces, leaving the row empty where the saved clip has none, and every piece wears a faint grey outline, or the link colour of the clip it was taken from, the bright one while it is selected. the two handles of the cut show while the video or one of its pieces is selected */
   .trim-timeline .trim-filmstrip { background: transparent !important; overflow: visible; }
   .tl-vseg {
     position: absolute;
@@ -6072,12 +6072,6 @@
         film = f && f.frames && f.frames.length ? f : null;
         if (!film && filmCanvas) { filmCanvas.remove(); filmCanvas = null; }
         drawSoon();
-      },
-      // the colour of the faint outline of the video row, any css colour; empty puts the neutral one back
-      setVideoTint: function (css) {
-        if (!dom.timeline) return;
-        if (css) dom.timeline.style.setProperty("--tl-video-line", css);
-        else dom.timeline.style.removeProperty("--tl-video-line");
       },
       setPlayhead: function (t) { setPlayhead(t); if (els.split) refreshToolbar(); },
       showBounds: setBoundsUi,

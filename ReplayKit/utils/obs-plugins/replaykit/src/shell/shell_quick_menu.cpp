@@ -19,6 +19,7 @@
 #include "shell/shell_state.hpp"
 #include "shell/shell_title_button.hpp"
 #include "shell/shell_types.hpp"
+#include "shell/shell_views.hpp"
 #include "ui/anchored_panel.hpp"
 
 namespace rk {
@@ -37,16 +38,19 @@ QJsonObject Action(const QString &id, const QString &label, const QString &icon,
 	return QJsonObject{{"id", id}, {"label", label}, {"icon", icon}, {"disabled", disabled}};
 }
 
-// what the plugin does itself in every view: keep a clip, start or stop recording and take a screenshot of what obs shows
+// what the plugin does itself in every view: keep a clip, start or stop recording, take a screenshot of what obs shows and open the deleted history, which is left out while it is turned off and while an editor is open, since the pick would land in it
 QJsonArray GlobalActions()
 {
 	const bool clipping = ClipBufferActive();
-	return QJsonArray{
+	QJsonArray out{
 		Action(QStringLiteral("save-clip"), QStringLiteral("Save clip"), QStringLiteral("quick/save-clip"), !clipping),
 		obs_frontend_recording_active() ? Action(QStringLiteral("record"), QStringLiteral("Stop recording"), QStringLiteral("quick/stop"))
 						: Action(QStringLiteral("record"), QStringLiteral("Start recording"), QStringLiteral("quick/record")),
 		Action(QStringLiteral("screenshot"), QStringLiteral("Take screenshot"), QStringLiteral("quick/screenshot")),
 	};
+	if (g_deletedHistoryOn && !ShellEditorOpen(g_shellView) && !ShellEditorOpen(ShellView::Clips))
+		out.append(Action(QStringLiteral("deleted-history"), QStringLiteral("Deleted history"), QStringLiteral("action/trash")));
+	return out;
 }
 
 // the rows the view itself offers: the list its page gave the helper, or the actions of a native view
@@ -236,6 +240,9 @@ void ShellQuickMenu::Run(const QString &view, const QString &id)
 		ToggleRecording();
 	} else if (id == QLatin1String("screenshot")) {
 		obs_frontend_take_screenshot();
+	} else if (id == QLatin1String("deleted-history")) {
+		if (g_deletedHistoryOn && view != QLatin1String("setup"))
+			ShellOpenDeletedHistory();
 	} else if (id == QLatin1String("preview") && view == QLatin1String("projector")) {
 		ShellProjectorSetPreview(!ShellPreviewTarget());
 	} else if (id == QLatin1String("obs-save") && view == QLatin1String("obs-settings")) {

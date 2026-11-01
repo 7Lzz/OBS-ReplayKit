@@ -108,6 +108,15 @@ namespace ReplayKitHelper
             catch { return html; }
         }
 
+        // every page keeps tab from walking the focus through its controls, which only lit up whatever it landed on in an app driven by the pointer and keybinds; the key still reaches the page, so a keybind field can record it, and the guard keeps a page that takes in the scripts of another (the editor) to one listener
+        private const string NoTabTag = "<script>(function(){if(window.__rkNoTab)return;window.__rkNoTab=true;window.addEventListener(\"keydown\",function(e){if(e.key===\"Tab\")e.preventDefault();},true);})();</script>";
+
+        private static string InjectNoTab(string html)
+        {
+            int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            return i < 0 ? html : html.Insert(i, NoTabTag);
+        }
+
         private static readonly object _dockIconLock = new object();
         private static string _dockIconStamp;
         private static string _dockIconTag;
@@ -196,7 +205,7 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectDockIcons(InjectThemeStyle(InjectPartials(File.ReadAllText(f))));
+                        string html = InjectNoTab(InjectDockIcons(InjectThemeStyle(InjectPartials(File.ReadAllText(f)))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var input = File.OpenRead(DockScriptPath()))

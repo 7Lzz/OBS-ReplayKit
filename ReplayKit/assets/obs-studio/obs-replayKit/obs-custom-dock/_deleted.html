@@ -18,6 +18,7 @@
   .deleted-card .action-link-btn:disabled { opacity:.6; cursor:default; }
   /* the count of the trash button in the toolbar, so a delete shows where it went */
   .clip-deleted-btn { position:relative; }
+  .clip-deleted-btn[hidden] { display:none; }
   .clip-deleted-count { position:absolute; top:1px; right:0; min-width:15px; height:15px; padding:0 4px; border-radius:8px; background:var(--grey4-solid,var(--grey4)); color:var(--text); font-size:10px; font-weight:600; line-height:15px; text-align:center; pointer-events:none; }
   .clip-deleted-count[hidden] { display:none; }
 </style>
@@ -155,11 +156,13 @@ window.RKDeleted = {
       return card;
     }
     function paintHeading() {
-      note.textContent = days > 0 ? "Kept for " + days + (days === 1 ? " day" : " days") : rows.length ? "Deleted history is off, these go when their time is up" : "";
+      note.textContent = days > 0 ? "Kept for " + days + (days === 1 ? " day" : " days") : "";
       emptyAll.hidden = !rows.length;
     }
     function paintButton() {
       if (!button) return;
+      // with deleted history off a delete is final, so there is no bin to open; what it still holds goes when its time is up
+      button.hidden = !loaded || days <= 0;
       badge.hidden = !rows.length;
       badge.textContent = rows.length > 99 ? "99+" : String(rows.length);
       const label = rows.length ? "Deleted history (" + rows.length + ")" : "Deleted history";
@@ -185,8 +188,7 @@ window.RKDeleted = {
       }
       empty.hidden = rows.length > 0;
       empty.textContent = !loaded ? "Loading deleted clips..."
-        : days > 0 ? "Nothing here. Clips and screenshots you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good."
-        : "Deleted history is off, so deletes are final. Turn it on in Settings, under Storage.";
+        : "Nothing here. Clips and screenshots you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good.";
     }
     // the page asks for the list from several places as it starts and as things change, so asks that come while a read is out are folded into one more read after it
     let reading = null, readAgain = false;
@@ -213,6 +215,7 @@ window.RKDeleted = {
         days = Number(data.days) || 0;
         if (options.history) options.history(days > 0);
         loaded = true;
+        if (days <= 0 && dialog.open) dialog.close();
         paint();
       } catch (error) {
         if (run !== epoch) return;
@@ -249,6 +252,7 @@ window.RKDeleted = {
     window.addEventListener("replaykit:deleted-changed", refresh);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
     function open() {
+      if (loaded && days <= 0) return;
       if (!dialog.open) { dialog.showModal(); dialog.focus({preventScroll:true}); }
       signature = "";
       paint();

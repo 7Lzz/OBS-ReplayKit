@@ -201,6 +201,8 @@ void PollHelperSettings()
 			if (full && settingsBody.empty())
 				g_fullSyncDue = true;
 			g_closeToTray = JsonBoolField(settingsBody, "closeToTray", true);
+			if (!settingsBody.empty())
+				g_deletedHistoryOn = JsonIntField(settingsBody, "deletedHistoryDays", 7) > 0;
 			const bool setupPending = JsonBoolField(settingsBody, "setupWizardPending", g_setupPending);
 			if (setupPending != g_setupPending)
 				SetupPendingChanged(setupPending);

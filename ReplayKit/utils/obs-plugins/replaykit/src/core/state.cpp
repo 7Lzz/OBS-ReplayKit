@@ -13,6 +13,7 @@ QPointer<QWidget> g_settingsWindow;
 QPointer<QWidget> g_setupWindow;
 bool g_setupPending = false;
 bool g_closeToTray = true;
+bool g_deletedHistoryOn = true;
 QPointer<QWidget> g_mainWindow;
 QElapsedTimer g_menuShownTimer;
 bool g_shellOn = false;

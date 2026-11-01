@@ -48,6 +48,10 @@ void ShellCloseView(ShellView view);
 void ShellLeaveSettings(const std::string &target);
 void ShellSetClipsFullscreen(bool active);
 bool ShellEditorActive();
+// whether the page of that view has its editor open
+bool ShellEditorOpen(ShellView view);
+// the deleted history of the clips page, from whichever view the window shows
+void ShellOpenDeletedHistory();
 // tells the clips view a clip save started or ended, args being the json array of the state and the saved file name
 void ShellClipSaving(const std::string &args);
 

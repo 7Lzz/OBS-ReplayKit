@@ -6276,6 +6276,8 @@ const CLIP_HOVER_PROFILES = {
     const api = editorApi();
     if (api && trimVeil.classList.contains("is-open")) { api.quickAction(id); return; }
     if (id === "open-folder") fetch(HELPER + "/open-clip-folder", { method:"POST", cache:"no-store" }).catch(() => {});
+    // the deleted history is an action of the plugin in every view, which brings the window to this page and then asks for it here
+    else if (id === "deleted-history" && deletedGallery) deletedGallery.open();
   };
   // the editor opening or closing changes the list
   const editorStatusObserver = new MutationObserver(publishQuickActions);
