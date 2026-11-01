@@ -203,7 +203,6 @@ window.RKScreenshots = {
         '<div class="meta"></div>';
       const name = body.querySelector(".name");
       name.textContent = row.name.replace(/\.png$/i, "");
-      name.title = row.name;
       details(row, body.querySelector(".meta"));
       const actions = document.createElement("div");
       actions.className = "actions";

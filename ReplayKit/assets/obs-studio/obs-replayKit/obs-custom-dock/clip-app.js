@@ -2949,7 +2949,7 @@ const CLIP_HOVER_PROFILES = {
       </div>
       <div class="body">
         <div class="title-row">
-          <span class="name" title="${nameEsc}">${nameEsc}</span>
+          <span class="name">${nameEsc}</span>
           <button class="icon-mini-btn edit-btn" data-tooltip="Rename" type="button">
             <svg viewBox="0 0 24 24">${ICON.EDIT}</svg>
           </button>
@@ -3896,7 +3896,6 @@ const CLIP_HOVER_PROFILES = {
         transferFavorite(currentName, finalName);
         card.dataset.name = finalName;
         nameSpan.textContent = displayClipName(card.dataset.name);
-        nameSpan.title       = displayClipName(card.dataset.name);
         syncFavoriteButton(card, card.dataset.name);
         swapBackToNameSpan();
         flushRenderAfterRename();
@@ -4563,7 +4562,6 @@ const CLIP_HOVER_PROFILES = {
       const nameEl = card.querySelector(".name");
       if (nameEl) {
         nameEl.textContent = displayClipName(clip.name);
-        nameEl.title = displayClipName(clip.name);
       }
       const sizeEl = card.querySelector(".size");
       if (sizeEl) sizeEl.textContent = formatSize(clip.size);
@@ -4716,7 +4714,7 @@ const CLIP_HOVER_PROFILES = {
     const fps = Number(clip.fps) || 0;
     if (width > 0 && height > 0) facts.push(["Resolution", width + " \u00d7 " + height + (fps > 0 ? " \u00b7 " + Math.round(fps) + " fps" : "")]);
     facts.push(["Size", formatSize(clip.size)]);
-    return '<div class="home-hero-name" title="' + name + '">' + name + "</div>"
+    return '<div class="home-hero-name">' + name + "</div>"
       + '<div class="home-hero-age age" data-mtime="' + (Number(clip.mtime) || 0) + '">' + formatClipDate(clip.mtime) + "</div>"
       + '<dl class="home-hero-facts">' + facts.map(([label, value]) => "<dt>" + label + "</dt><dd>" + escapeHtml(value) + "</dd>").join("") + "</dl>";
   }

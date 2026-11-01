@@ -191,6 +191,7 @@ void ShellSurfacePage()
 		if (g_shellCurtain) {
 			g_shellCurtain->show();
 			g_shellCurtain->raise();
+			ShellRaiseGrip();
 		}
 		g_hostOnTop = false;
 		ShellEnsureHost();

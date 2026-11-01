@@ -16,6 +16,7 @@ public:
 protected:
 	void mousePressEvent(QMouseEvent *event) override;
 	void paintEvent(QPaintEvent *) override;
+	bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
 };
 
 // a page of the shell grabbed at its right edge, bottom edge or the corner between them: the window is resized by the resize loop of windows itself, as its own frame would be, which repaints as it goes. nothing happens once the button is already up, or for a maximized or fullscreen window

@@ -179,6 +179,29 @@ void HookSourceSelection(QWidget *sourcesDock)
 
 } // namespace
 
+// obs-browser places the window of a browser at the origin of its container once, when it makes it, and every later resize keeps whatever position it has; the shell browser was once found shifted far up and to the left with no move of ours, which left the page showing only its bottom right corner, so it is put back and the offset is logged
+void ShellKeepBrowserAtOrigin(QWidget *browser)
+{
+	if (!browser)
+		return;
+	auto check = [](HWND hwnd, LPARAM) -> BOOL {
+		wchar_t name[32] = {};
+		if (!GetClassNameW(hwnd, name, 32) || wcscmp(name, L"CefBrowserWindow") != 0)
+			return TRUE;
+		RECT rc;
+		HWND parent = GetParent(hwnd);
+		if (!parent || !GetWindowRect(hwnd, &rc))
+			return FALSE;
+		MapWindowPoints(HWND_DESKTOP, parent, reinterpret_cast<POINT *>(&rc), 2);
+		if (rc.left != 0 || rc.top != 0) {
+			blog(LOG_WARNING, "[replaykit] the shell browser window sat at %ld,%ld in its container, put back at 0,0", rc.left, rc.top);
+			SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+		return FALSE;
+	};
+	EnumChildWindows((HWND)browser->winId(), check, 0);
+}
+
 // the preview display fills what the scene does not cover with a colour from the obs theme, which shows as a slab of its own inside the stage; it takes the stage colour so the projector view reads as one surface with the others
 void ShellTintPreview()
 {
@@ -310,14 +333,17 @@ void ShellLayoutViews()
 		pageRect.setBottom(central->geometry().bottom());
 	}
 	const bool coverAll = g_clipsFullscreenActive && ShellShowsClips(g_shellView);
+	const bool page = !coverAll && ShellIsPageView(g_shellView);
 	if (g_shellHost) {
-		g_shellHost->setGeometry(coverAll ? mw->rect() : ShellIsPageView(g_shellView) ? pageRect : stage);
+		g_shellHost->setGeometry(coverAll ? mw->rect() : page ? pageRect : stage);
 		ShellTintBrowserWindows(mw, g_shellHost->browser);
+		ShellKeepBrowserAtOrigin(g_shellHost->browser);
 	}
-	for (QWidget *cover : {g_viewObsHost.data(), g_shellCurtain.data()}) {
-		if (cover)
-			cover->setGeometry(stage);
-	}
+	if (g_viewObsHost)
+		g_viewObsHost->setGeometry(stage);
+	// the curtain covers all of the browser it stands in for: a page also spans the resize strip, where a browser made fresh shows black until its first frame
+	if (g_shellCurtain)
+		g_shellCurtain->setGeometry(page ? pageRect : stage);
 	if (g_shellGrip) {
 		// only a window that can still be resized wears it: not maximized, not fullscreen, not under a clip that plays fullscreen
 		const bool wanted = !mw->isFullScreen() && !mw->isMaximized() && !coverAll;

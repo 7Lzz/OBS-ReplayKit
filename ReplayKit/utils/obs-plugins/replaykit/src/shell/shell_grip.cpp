@@ -48,6 +48,21 @@ void ShellGrip::paintEvent(QPaintEvent *)
 			p.drawEllipse(QPointF(kShellGrip - 5.0 - col * 4.0, kShellGrip - 5.0 - row * 4.0), 1.15, 1.15);
 }
 
+// shown again after a while in the tray, the corner came up white until its first paint, since qt answers the erase without drawing; it gets the window colour there instead
+bool ShellGrip::nativeEvent(const QByteArray &, void *message, qintptr *result)
+{
+	MSG *msg = static_cast<MSG *>(message);
+	if (!msg || msg->message != WM_ERASEBKGND)
+		return false;
+	RECT rc;
+	GetClientRect(msg->hwnd, &rc);
+	HBRUSH brush = CreateSolidBrush(RGB(g_chromeBg.red(), g_chromeBg.green(), g_chromeBg.blue()));
+	FillRect(reinterpret_cast<HDC>(msg->wParam), &rc, brush);
+	DeleteObject(brush);
+	*result = 1;
+	return true;
+}
+
 void ShellStartEdgeResize(Qt::Edges edges)
 {
 	QMainWindow *mw = ObsMainWindowQt();

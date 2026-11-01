@@ -80,6 +80,9 @@ void ShellTick()
 		g_shellTitle->RefreshStates();
 	const int tick = ++g_shellTickCount;
 	ShellWarmStep();
+	// the browser can end up shifted inside its container with no resize, which the layout would never see
+	if (tick % 4 == 0 && g_shellHost && g_shellHost->isVisible())
+		ShellKeepBrowserAtOrigin(g_shellHost->browser);
 	if (tick % 12 == 0) {
 		PollSharePreview();
 		ShellProbeHost();

@@ -14,6 +14,7 @@ void ShellTintPreview();
 bool ShellShowsClips(ShellView view);
 void ShellLayout();
 void ShellLayoutViews();
+void ShellKeepBrowserAtOrigin(QWidget *browser);
 
 // keeps the title bar, rail and embedded pages in step with the window, and binds the native frame the moment the window handle exists
 class ShellHostFilter : public QObject {
