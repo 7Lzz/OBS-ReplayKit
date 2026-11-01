@@ -267,7 +267,7 @@ namespace ReplayKitHelper
             long freed = 0;
             foreach (var victim in plan.Victims)
             {
-                var result = Clips.DeleteClip(victim.Path, victim.Size, victim.WriteTime);
+                var result = Clips.DeleteClip(victim.Path, victim.Size, victim.WriteTime, keep: false);
                 if (result.Status == 200) { deleted++; freed += victim.Size; }
                 else failed++;
             }

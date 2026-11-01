@@ -17,7 +17,8 @@ namespace ReplayKitHelper
             if (string.IsNullOrEmpty(raw)) return null;
             if (raw.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
             string name = Path.GetFileName(raw).Trim();
-            if (string.IsNullOrEmpty(name)) return null;
+            // windows holds no file name longer than this, and a longer one threw from deep in the path handling instead of failing here
+            if (string.IsNullOrEmpty(name) || name.Length > 255) return null;
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (!Constants.ALLOWED_EXTS.Contains(ext)) return null;
             return name;
@@ -34,7 +35,10 @@ namespace ReplayKitHelper
             string name = GetSafeFilename(raw);
             if (name == null) return null;
             string root = Path.GetFullPath(folder ?? AppConfig.GetClipDir());
-            string full = Path.GetFullPath(LocateClip(name, root));
+            string full;
+            // a name that makes the path longer than windows allows names no clip of the folder
+            try { full = Path.GetFullPath(LocateClip(name, root)); }
+            catch (PathTooLongException) { return null; }
             string prefix = root.EndsWith(Path.DirectorySeparatorChar.ToString()) ? root : root + Path.DirectorySeparatorChar;
             if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
             if (File.Exists(full) && (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0) return null;
@@ -219,6 +223,8 @@ namespace ReplayKitHelper
             // the http status the delete route answers with: 200 deleted, 404 not there, 409 another operation holds the clip, 500 the delete failed
             public int Status;
             public string Name;
+            // the clip went into deleted history rather than being deleted for good
+            public bool Kept;
             public string Message = "";
         }
 
@@ -228,9 +234,12 @@ namespace ReplayKitHelper
             return DeleteClip(GetSafeClipPath(rawName));
         }
 
-        internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null)
+        // keep false is for the deletes whose point is the space they free, which a clip kept in deleted history would not give back
+        internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null, bool keep = true)
         {
             if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = "Clip not found" };
+            string root = LibraryRoot(Path.GetDirectoryName(selected.Full));
+            bool kept = false;
             string requestId = UploadState.NewRequestId();
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "delete", out string busy))
             {
@@ -245,11 +254,14 @@ namespace ReplayKitHelper
                             !current.Exists || (size.HasValue && current.Length != size.Value) ||
                             (writeTime.HasValue && current.LastWriteTimeUtc != writeTime.Value))
                             throw new IOException("The selected clip changed; review the library again.");
-                        File.Delete(selected.Full);
+                        // its row of the clips db goes with it, so a restore gets back its link, game and compression marker
+                        var record = keep ? ClipStore.ReadFolder(AppConfig.GetDbPath(), root, db => (db[selected.Name] as JObject)?.DeepClone() as JObject) : null;
+                        kept = keep && DeletedHistory.Keep(selected.Full, "clip", root, record);
+                        if (!kept) File.Delete(selected.Full);
                     });
                     UpdateDb(db => db.Remove(selected.Name), Path.GetDirectoryName(selected.Full));
                     EditDrafts.Forget(selected.Full);
-                    return new DeleteResult { Status = 200, Name = selected.Name };
+                    return new DeleteResult { Status = 200, Name = selected.Name, Kept = kept };
                 }
                 catch (Exception ex) { return new DeleteResult { Status = 500, Name = selected.Name, Message = ex.Message }; }
             }

@@ -1599,6 +1599,10 @@
           </div>
         </div>
         <div class="form-row">
+          <div class="label">Deleted history<span class="setting-description">How long deleted clips and screenshots stay in Deleted, the trash button next to the folder button in Clips, before they're gone for good. Off deletes them right away.</span></div>
+          <div class="field-wrap"><div class="combo" id="deletedHistoryDays" tabindex="0" role="combobox" aria-expanded="false" aria-label="Deleted history"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+        <div class="form-row">
           <div class="label">Free-up Space</div>
           <div class="field-wrap">
             <button class="btn" type="button" id="openStorageCard">Open Free-up Space</button>
@@ -2367,6 +2371,7 @@
     storageCompressionType: document.getElementById("storageCompressionType"),
     storageCompressionWarning: document.getElementById("storageCompressionWarning"),
     storageLimit: document.getElementById("storageLimit"),
+    deletedHistoryDays: document.getElementById("deletedHistoryDays"),
     storageLimitCustomRow: document.getElementById("storageLimitCustomRow"),
     storageLimitGb: document.getElementById("storageLimitGb"),
     openStorageCard: document.getElementById("openStorageCard"),
@@ -2452,6 +2457,7 @@
   const STORAGE_LIMITS = [{ value:"0", label:"No limit" }, { value:"25", label:"25 GB" }, { value:"50", label:"50 GB" }, { value:"100", label:"100 GB" }, { value:"250", label:"250 GB" }, { value:"500", label:"500 GB" }, { value:"1024", label:"1 TB" }, { value:"custom", label:"Custom..." }];
   fillCombo(els.storageLimit, STORAGE_LIMITS);
   fillCombo(els.storageCompressionType, [{ value:"fast", label:"Fast" }, { value:"smaller", label:"Smaller" }]);
+  fillCombo(els.deletedHistoryDays, [{ value:"0", label:"Off" }, { value:"1", label:"1 day" }, { value:"3", label:"3 days" }, { value:"7", label:"7 days" }, { value:"14", label:"14 days" }, { value:"30", label:"30 days" }]);
   fillCombo(els.editorSeekStep, [{ value:"1", label:"1 second" }, { value:"2", label:"2 seconds" }, { value:"5", label:"5 seconds" }, { value:"10", label:"10 seconds" }, { value:"15", label:"15 seconds" }, { value:"30", label:"30 seconds" }]);
   fillCombo(els.editorZoomScaling, [
     { value:"smooth", label:"Smooth", blurb:"Blend pixels for smoother zoomed-in video." },
@@ -3809,6 +3815,8 @@
     els.compressSkipFavorites.checked = state.compressSkipFavorites !== false;
     setComboValue(els.storageCompressionType, state.storageCompressionType || "fast", false);
     syncStorageCompression();
+    // a number the list does not offer shows the default, never Off, so saving the page cannot turn the history off by itself
+    setComboValue(els.deletedHistoryDays, String([0, 1, 3, 7, 14, 30].includes(state.deletedHistoryDays) ? state.deletedHistoryDays : 7), false);
     els.developmentMode.checked = !!state.developmentMode;
     els.sdkMode.checked = !!state.sdkMode;
     els.checkObsUpdates.checked = !!state.checkObsUpdates;
@@ -3904,6 +3912,7 @@
     state.compressSkipFavorites = els.compressSkipFavorites.checked;
     state.storageCompressionType = comboValue(els.storageCompressionType);
     syncStorageCompression();
+    state.deletedHistoryDays = Number(comboValue(els.deletedHistoryDays)) || 0;
     state.developmentMode = els.developmentMode.checked;
     state.sdkMode = els.sdkMode.checked;
     state.checkObsUpdates = els.checkObsUpdates.checked;
@@ -4006,7 +4015,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.deletedHistoryDays, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {

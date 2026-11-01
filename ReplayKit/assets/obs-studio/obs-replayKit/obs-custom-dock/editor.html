@@ -1674,7 +1674,7 @@ window.__rkEditorApi = (function () {
       keepTrimDraft();
       try {
         await draftWrites;
-        const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(clip.name) + "&to=" + encodeURIComponent(next + ext), { method: "POST", cache: "no-store" });
+        const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(clip.name) + "&to=" + encodeURIComponent(next + ext) + "&view=" + (HOME_MODE ? "home" : "clips"), { method: "POST", cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
         refreshDrafts();

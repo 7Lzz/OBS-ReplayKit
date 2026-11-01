@@ -29,6 +29,8 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
+                // a helper that started again knows no session, while the page registered with the one before it keeps going and never registers again, which turned every open of the editor away until the page was reloaded
+                if (!Editors.ContainsKey(view)) Editors[view] = new Editor { Id = id };
                 if (!Editors.TryGetValue(view, out var editor) || editor.Id != id || revision <= editor.Revision)
                 {
                     message = "The editor session changed. Reopen the editor.";
@@ -102,7 +104,7 @@ namespace ReplayKitHelper
             }
         }
 
-        public static Reservation TryReserve(string requestId, string name, string path, string kind, out string message, string destination = null)
+        public static Reservation TryReserve(string requestId, string name, string path, string kind, out string message, string destination = null, string editorView = null)
         {
             var paths = new[] { path, destination }.Where(p => p != null).Select(Path.GetFullPath).ToArray();
             lock (Gate)
@@ -110,6 +112,17 @@ namespace ReplayKitHelper
                 if (kind.StartsWith("compress", StringComparison.Ordinal) && paths.Any(p => Editors.Values.Any(e => e.Paths.Contains(p))))
                 {
                     message = "That clip is open in the editor. Close the editor before compressing it.";
+                    return null;
+                }
+                // the next save of an editor reads its clip, so a delete from the other view or the storage card would lose the edit; the editor of a view still renames its own clip, which it reopens under the new name
+                if (kind == "delete" && Editors.Values.Any(e => e.Paths.Contains(paths[0])))
+                {
+                    message = "That clip is open in the editor. Close the editor before deleting it.";
+                    return null;
+                }
+                if (kind == "rename" && Editors.Any(e => e.Key != editorView && e.Value.Paths.Contains(paths[0])))
+                {
+                    message = "That clip is open in the editor. Close the editor before renaming it.";
                     return null;
                 }
                 if (Jobs.Values.Any(j => j.Paths.Any(p => paths.Contains(p, StringComparer.OrdinalIgnoreCase))))

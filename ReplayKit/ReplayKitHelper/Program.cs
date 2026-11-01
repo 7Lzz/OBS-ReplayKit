@@ -213,6 +213,7 @@ namespace ReplayKitHelper
             try { Update.StartPolling(); } catch (Exception ex) { Log.Write("Update.StartPolling: " + ex.Message); }
             try { ObsUpdate.Start(); } catch (Exception ex) { Log.Write("ObsUpdate.Start: " + ex.Message); }
             try { ClipFolderWorker.Start(); } catch (Exception ex) { Log.Write("ClipFolderWorker.Start: " + ex.Message); }
+            try { DeletedHistory.Start(); } catch (Exception ex) { Log.Write("DeletedHistory.Start: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
             var probe = new Thread(() =>
             {
@@ -279,6 +280,8 @@ namespace ReplayKitHelper
         }
 
         private static readonly SemaphoreSlim ConnectionSlots = new SemaphoreSlim(Constants.MAX_CONNECTION_THREADS);
+        private const int MaxWaitingConnections = 256;
+        private static int waitingConnections;
 
         // single-threaded accept loop. the accept waits on its handle with a 50ms cap, so a connection is taken the moment it arrives (a Pending() check followed by a 50ms sleep added 25ms on average to every request) and the shutdown flag and the parent-process watchdog still get looked at every ~50ms: with the users auto-elevation flow we can end up spawned by a non-admin obs that then exits when its elevated replacement takes over -- without this, the orphan helper happily holds the port forever.
         private static void RunAcceptLoop()
@@ -305,9 +308,19 @@ namespace ReplayKitHelper
                     if (!accept.AsyncWaitHandle.WaitOne(50)) continue;
                     var client = _listener.EndAcceptTcpClient(accept);
                     accept = null;
-                    if (!ConnectionSlots.Wait(0)) { client.Close(); continue; }
-                    Task.Run(() =>
+                    // a connection over the limit waits its turn rather than being closed, since obs keeps up to six of its own open to this port and a closed one reached the page as a failed fetch; only a pile of waiting ones far past anything real is turned away
+                    if (Interlocked.Increment(ref waitingConnections) > MaxWaitingConnections)
                     {
+                        Interlocked.Decrement(ref waitingConnections);
+                        client.Close();
+                        continue;
+                    }
+                    Task.Run(async () =>
+                    {
+                        bool slot;
+                        try { slot = await ConnectionSlots.WaitAsync(10000).ConfigureAwait(false); }
+                        finally { Interlocked.Decrement(ref waitingConnections); }
+                        if (!slot) { client.Close(); return; }
                         try { Connection.HandleConnection(client); }
                         finally { ConnectionSlots.Release(); }
                     });

@@ -1,0 +1,266 @@
+<style>
+  /* the popup is the screenshot viewer with a list in it: same frame, same head, the cards of the screenshots inside */
+  /* one size whatever it holds, so the popup never grows or shrinks as items come and go; only its list scrolls, with the gutter and inset the clip list keeps */
+  .deleted-dialog { width:min(1080px, calc(100vw - 48px)); height:min(720px, calc(100vh - 48px)); overflow:hidden; }
+  .deleted-dialog[open] { display:flex; flex-direction:column; }
+  .deleted-dialog .screenshot-dialog-head > svg { width:16px; height:16px; fill:currentColor; flex:none; }
+  .deleted-dialog .screenshot-dialog-head h2 { flex:0 1 auto; }
+  .deleted-note { flex:1; min-width:0; font-size:12px; font-weight:500; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .deleted-dialog .deleted-empty-btn { flex:none; display:inline-flex; height:28px; padding:0 12px; font-size:12px; font-weight:600; }
+  .deleted-empty-btn[hidden] { display:none; }
+  .deleted-body { flex:1; min-height:0; overflow-y:auto; scrollbar-gutter:stable; padding:16px 10px 16px 16px; margin-right:6px; --sb-start:8px; --sb-end:8px; }
+  #deleted-grid { grid-template-columns:repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
+  #deleted-grid:empty { display:none; }
+  /* a deleted card is a screenshot card without the viewer: its picture is only a picture */
+  .deleted-card .preview { position:relative; }
+  .deleted-card .preview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; }
+  .deleted-card .meta .left.is-soon { color:var(--warning, var(--muted)); }
+  .deleted-card .action-link-btn:disabled { opacity:.6; cursor:default; }
+  /* the count of the trash button in the toolbar, so a delete shows where it went */
+  .clip-deleted-btn { position:relative; }
+  .clip-deleted-count { position:absolute; top:1px; right:0; min-width:15px; height:15px; padding:0 4px; border-radius:8px; background:var(--grey4-solid,var(--grey4)); color:var(--text); font-size:10px; font-weight:600; line-height:15px; text-align:center; pointer-events:none; }
+  .clip-deleted-count[hidden] { display:none; }
+</style>
+<dialog class="screenshot-dialog deleted-dialog" id="deleted-dialog" aria-labelledby="deleted-title" tabindex="-1">
+  <div class="screenshot-dialog-head">
+    <svg data-i="action/trash" viewBox="0 0 24 24" aria-hidden="true"></svg>
+    <h2 id="deleted-title">Deleted history</h2>
+    <span class="deleted-note" id="deleted-note"></span>
+    <button class="btn danger-action deleted-empty-btn" type="button" id="deleted-empty-all" hidden>Empty</button>
+    <button class="icon-mini-btn" type="button" id="deleted-close" aria-label="Close deleted history" data-tooltip="Close"><svg data-i="editor/close" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+  </div>
+  <div class="deleted-body">
+    <div class="grid" id="deleted-grid"></div>
+    <div class="empty" id="deleted-empty" role="status">Loading deleted clips...</div>
+  </div>
+</dialog>
+<script>
+window.RKDeleted = {
+  create: function (options) {
+    const dialog = document.getElementById("deleted-dialog");
+    const button = document.getElementById("clip-deleted-btn");
+    const badge = document.getElementById("clip-deleted-count");
+    const grid = document.getElementById("deleted-grid");
+    const empty = document.getElementById("deleted-empty");
+    const note = document.getElementById("deleted-note");
+    const emptyAll = document.getElementById("deleted-empty-all");
+    let rows = [], days = 7, loaded = false, epoch = 0, signature = "", rowsSignature = "";
+    const IDLE_REFRESH_MS = 30000;
+    let refreshedAt = 0;
+    const cards = new Map();
+    const svg = (inner) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + inner + "</svg>";
+    const baseName = (name) => name.replace(/\.[^.]+$/, "");
+    function daysLeft(row) { return Math.max(0, Math.ceil((row.expiresAt * 1000 - Date.now()) / 86400000)); }
+    function details(row, target) {
+      target.replaceChildren();
+      const size = document.createElement("span");
+      size.className = "size";
+      size.textContent = options.formatSize(row.size);
+      const kind = document.createElement("span");
+      kind.textContent = row.kind === "screenshot" ? "Screenshot" : "Clip";
+      const left = document.createElement("span");
+      const n = daysLeft(row);
+      left.className = "left" + (n <= 1 ? " is-soon" : "");
+      left.textContent = n <= 0 ? "Deleted for good soon" : n === 1 ? "1 day left" : n + " days left";
+      const dot = () => { const d = document.createElement("span"); d.className = "dot"; return d; };
+      target.append(size, dot(), kind, dot(), left);
+      if (window.RKClipGames) RKClipGames.badge(target, row, {});
+    }
+    async function act(kind, id) {
+      const response = await fetch(options.helper + "/deleted/" + kind + (id ? "?id=" + encodeURIComponent(id) + "&t=" : "?t=") + Date.now(), {method:"POST", cache:"no-store"});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || "That could not be done");
+      return data;
+    }
+    async function restore(row, button) {
+      if (button) button.disabled = true;
+      try {
+        const done = await act("restore", row.id);
+        options.toast("Restored " + baseName(done.name || row.name));
+        options.restored(done.kind || row.kind);
+        refresh();
+      } catch (error) { options.notify(error.message); }
+      finally { if (button) button.disabled = false; }
+    }
+    function buildCard(row) {
+      const icons = options.icons;
+      const card = document.createElement("div");
+      card.className = "screenshot-card deleted-card rk-hover-card";
+      card.dataset.deleted = row.id;
+      const picture = document.createElement("span");
+      picture.className = "preview";
+      const thumb = document.createElement("img");
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      thumb.alt = row.name;
+      thumb.src = options.helper + "/deleted/thumb?id=" + encodeURIComponent(row.id);
+      picture.appendChild(thumb);
+      const body = document.createElement("div");
+      body.className = "body";
+      body.innerHTML =
+        '<div class="title-row"><span class="name"></span>' +
+        '<div class="title-actions">' +
+          '<button class="icon-mini-btn delete-btn" data-delete-label="Delete for good" data-tooltip="Delete for good" aria-label="Delete for good" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
+          '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
+            '<div class="menu-dropdown">' +
+              '<div class="menu-item" data-act="restore">' + svg(icons.RESTORE).replace("<svg", '<svg class="menu-item-icon"') + "<span>Restore</span></div>" +
+              '<div class="menu-separator"></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-label="Delete for good" role="button" tabindex="0" aria-label="Delete for good">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
+            "</div></div>" +
+        "</div></div>" +
+        '<div class="meta"></div>';
+      body.querySelector(".name").textContent = baseName(row.name);
+      details(row, body.querySelector(".meta"));
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const restoreButton = document.createElement("button");
+      restoreButton.type = "button";
+      restoreButton.className = "btn action-link-btn";
+      restoreButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.RESTORE + '</svg><span class="btn-label">Restore</span>';
+      restoreButton.addEventListener("click", event => { event.stopPropagation(); restore(row, restoreButton); });
+      actions.appendChild(restoreButton);
+      card.append(picture, body, actions);
+      const menu = body.querySelector(".menu-dropdown");
+      async function remove(trigger, inMenu) {
+        // the same two clicks as every delete: the first arms the button, the second deletes for good
+        options.resetDeletes(trigger);
+        if (!trigger.classList.contains("is-armed")) {
+          if (!inMenu) options.closeMenus();
+          options.armDelete(trigger);
+          if (inMenu) { menu.classList.add("is-open"); card.classList.add("menu-open"); }
+          return;
+        }
+        options.resetDeletes();
+        options.closeMenus();
+        try { await act("remove", row.id); refresh(); }
+        catch (error) { options.notify(error.message); }
+      }
+      body.addEventListener("click", event => {
+        const button = event.target.closest("button, .menu-item");
+        if (!button) return;
+        event.stopPropagation();
+        if (button.classList.contains("menu-btn")) { options.openMenu(card, menu, event); return; }
+        if (button.matches(".title-actions > .delete-btn")) { remove(button, false); return; }
+        if (button.dataset.act === "delete") { remove(button, true); return; }
+        menu.classList.remove("is-open");
+        card.classList.remove("menu-open");
+        if (button.dataset.act === "restore") restore(row, restoreButton);
+      });
+      card.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        options.openMenu(card, menu, event);
+      });
+      options.hovers(card);
+      return card;
+    }
+    function paintHeading() {
+      note.textContent = days > 0 ? "Kept for " + days + (days === 1 ? " day" : " days") : rows.length ? "Deleted history is off, these go when their time is up" : "";
+      emptyAll.hidden = !rows.length;
+    }
+    function paintButton() {
+      if (!button) return;
+      badge.hidden = !rows.length;
+      badge.textContent = rows.length > 99 ? "99+" : String(rows.length);
+      const label = rows.length ? "Deleted history (" + rows.length + ")" : "Deleted history";
+      button.dataset.tooltip = label;
+      button.setAttribute("aria-label", label);
+    }
+    function paint() {
+      paintHeading();
+      paintButton();
+      if (!dialog.open) return;
+      const current = JSON.stringify(rows) + (window.RKClipGames && !RKClipGames.enabled ? "|games-off" : "");
+      if (current !== signature) {
+        signature = current;
+        const keep = new Set();
+        rows.forEach((row, index) => {
+          keep.add(row.id);
+          let card = cards.get(row.id);
+          if (!card) { card = buildCard(row); cards.set(row.id, card); }
+          else details(row, card.querySelector(".meta"));
+          if (grid.children[index] !== card) grid.insertBefore(card, grid.children[index] || null);
+        });
+        cards.forEach((card, id) => { if (!keep.has(id)) { card.remove(); cards.delete(id); } });
+      }
+      empty.hidden = rows.length > 0;
+      empty.textContent = !loaded ? "Loading deleted clips..."
+        : days > 0 ? "Nothing here. Clips and screenshots you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good."
+        : "Deleted history is off, so deletes are final. Turn it on in Settings, under Storage.";
+    }
+    async function refresh() {
+      if (document.hidden) return;
+      refreshedAt = Date.now();
+      const run = ++epoch;
+      try {
+        const response = await fetch(options.helper + "/deleted?t=" + Date.now(), {cache:"no-store"});
+        const data = await response.json();
+        if (!response.ok || !data.ok || !Array.isArray(data.items)) throw new Error("Could not load deleted items");
+        if (run !== epoch) return;
+        const next = data.items.filter(row => row && typeof row.id === "string" && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.deletedAt) && Number.isFinite(row.expiresAt));
+        const listed = JSON.stringify(next) + "|" + data.days;
+        if (loaded && listed === rowsSignature) return;
+        rowsSignature = listed;
+        rows = next;
+        days = Number(data.days) || 0;
+        if (options.history) options.history(days > 0);
+        loaded = true;
+        paint();
+      } catch (error) {
+        if (run !== epoch) return;
+        rows = []; loaded = false; signature = ""; rowsSignature = "";
+        grid.replaceChildren(); cards.clear();
+        paintButton();
+        empty.hidden = false;
+        empty.textContent = "The deleted items could not be loaded.";
+      }
+    }
+    // emptying is the one action here that takes everything at once, so it asks twice like a delete does
+    let emptyArmTimer = 0;
+    function disarmEmpty() {
+      clearTimeout(emptyArmTimer);
+      emptyAll.classList.remove("is-armed");
+      emptyAll.textContent = "Empty";
+      emptyAll.dataset.tooltip = "Delete everything here for good";
+    }
+    emptyAll.addEventListener("click", async () => {
+      if (!emptyAll.classList.contains("is-armed")) {
+        emptyAll.classList.add("is-armed");
+        emptyAll.textContent = "Empty?";
+        emptyAll.dataset.tooltip = "Click again to delete everything here";
+        emptyArmTimer = setTimeout(disarmEmpty, 3000);
+        return;
+      }
+      disarmEmpty();
+      emptyAll.disabled = true;
+      try { await act("empty"); refresh(); }
+      catch (error) { options.notify(error.message); }
+      finally { emptyAll.disabled = false; }
+    });
+    disarmEmpty();
+    window.addEventListener("replaykit:deleted-changed", refresh);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    function open() {
+      if (!dialog.open) { dialog.showModal(); dialog.focus({preventScroll:true}); }
+      signature = "";
+      paint();
+      refresh();
+    }
+    if (button) button.addEventListener("click", event => { event.stopPropagation(); open(); });
+    document.getElementById("deleted-close").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener("close", () => { options.resetDeletes(); options.closeMenus(); disarmEmpty(); });
+    dialog.addEventListener("keydown", event => event.stopPropagation());
+    setInterval(() => { if (dialog.open || Date.now() - refreshedAt >= IDLE_REFRESH_MS) refresh(); }, 5000);
+    return {
+      refresh: refresh,
+      open: open,
+      reset: function () {
+        ++epoch; rows = []; loaded = false; signature = ""; rowsSignature = ""; grid.replaceChildren(); cards.clear();
+        if (dialog.open) dialog.close();
+        paint(); refresh();
+      },
+    };
+  },
+};
+</script>

@@ -188,7 +188,7 @@ window.RKScreenshots = {
         '<div class="title-row"><span class="name"></span>' +
         '<button class="icon-mini-btn edit-btn" data-tooltip="Rename" aria-label="Rename" type="button">' + svg(icons.EDIT) + "</button>" +
         '<div class="title-actions">' +
-          '<button class="icon-mini-btn delete-btn" data-delete-label="Delete screenshot" data-tooltip="Delete screenshot" aria-label="Delete screenshot" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
+          '<button class="icon-mini-btn delete-btn" data-delete-kind="screenshot" data-tooltip="Delete screenshot" aria-label="Delete screenshot" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
           '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
             '<div class="menu-dropdown">' +
               '<div class="menu-heading">Share</div>' +
@@ -197,7 +197,7 @@ window.RKScreenshots = {
               '<div class="menu-item" data-act="rename">' + svg(icons.EDIT).replace("<svg", '<svg class="menu-item-icon"') + "<span>Edit name</span></div>" +
               '<div class="menu-item" data-act="reveal">' + svg(icons.FOLDER_OPEN).replace("<svg", '<svg class="menu-item-icon"') + "<span>Open file location</span></div>" +
               '<div class="menu-separator"></div>' +
-              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-label="Delete screenshot" role="button" tabindex="0" aria-label="Delete screenshot">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-kind="screenshot" role="button" tabindex="0" aria-label="Delete screenshot">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
             "</div></div>" +
         "</div></div>" +
         '<div class="meta"></div>';
@@ -214,6 +214,7 @@ window.RKScreenshots = {
       actions.appendChild(copyButton);
       card.append(picture, body, actions);
       options.resize(card);
+      if (options.relabel) options.relabel(card);
       const menu = body.querySelector(".menu-dropdown");
       const revealItem = menu.querySelector('[data-act="reveal"]');
       if (window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(row, true, options.closeMenus));
@@ -229,7 +230,7 @@ window.RKScreenshots = {
         }
         options.resetDeletes();
         options.closeMenus();
-        try { await act(row, "delete"); refresh(); }
+        try { await act(row, "delete"); refresh(); window.dispatchEvent(new Event("replaykit:deleted-changed")); }
         catch (error) { options.notify(error.message); }
       }
       body.addEventListener("click", async event => {

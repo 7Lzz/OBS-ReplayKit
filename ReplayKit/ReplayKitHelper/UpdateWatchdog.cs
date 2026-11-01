@@ -66,11 +66,13 @@ namespace ReplayKitHelper
             return 1;
         }
 
+        // the installer runs elevated, and Process.HasExited asks for rights a process of the user never gets on it, which threw and ended the watchdog before it could write a result; limited query rights work across integrity levels
         private static bool IsRunning(int pid)
         {
-            try { using (var process = Process.GetProcessById(pid)) return !process.HasExited; }
-            catch (ArgumentException) { return false; }
-            catch (InvalidOperationException) { return false; }
+            IntPtr handle = Native.OpenParentForSync((uint)pid);
+            if (handle == IntPtr.Zero) return System.Runtime.InteropServices.Marshal.GetLastWin32Error() == 5;
+            try { return !Native.ParentExited(handle); }
+            finally { Native.CloseParentHandle(handle); }
         }
 
         private static bool IsObsRunning()

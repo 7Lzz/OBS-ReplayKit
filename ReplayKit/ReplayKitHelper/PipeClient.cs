@@ -286,8 +286,16 @@ namespace ReplayKitHelper
         // asks the plugin to draw a themed confirm over the whole dimmed obs window (a cef dock cannot paint past its own panel). the plugin runs the follow-up action itself on ok, so nothing comes back. kind is one short token, letters and dashes only.
         public static void SendUiConfirm(string kind) { if (!string.IsNullOrEmpty(kind)) TryWrite("CONFIRM " + kind); }
 
+        // the plugin drops the whole connection on a line past 64 KB, which cut every message after it until the reconnect, so such a line is refused here instead
+        internal const int MaxLineChars = 60 * 1024;
+
         private static bool TryWrite(string line)
         {
+            if (line.Length > MaxLineChars)
+            {
+                Log.Write("IPC: a " + line.Length + " character message was not sent, the plugin takes at most " + MaxLineChars);
+                return false;
+            }
             lock (WriteLock)
             {
                 if (_writer == null) return false;

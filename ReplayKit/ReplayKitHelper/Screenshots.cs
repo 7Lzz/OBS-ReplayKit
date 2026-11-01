@@ -27,7 +27,7 @@ namespace ReplayKitHelper
         }
 
         // a name a screenshot can have: a plain png file name, not one of the temporary files of a save
-        private static bool ValidName(string name) =>
+        internal static bool ValidName(string name) =>
             !string.IsNullOrWhiteSpace(name) && name.Length <= 200 && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && name == Path.GetFileName(name) && name.Trim() == name &&
             string.Equals(Path.GetExtension(name), ".png", StringComparison.OrdinalIgnoreCase) && !name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase);
 
@@ -93,7 +93,14 @@ namespace ReplayKitHelper
             return thumb;
         }
 
-        public static void Delete(string path) { File.Delete(path); ClipGames.Forget(path); }
+        // a screenshot goes into deleted history with its game tag while that is on, and is deleted for good when it is off; true when it was kept
+        public static bool Delete(string path)
+        {
+            bool kept = DeletedHistory.Keep(path, "screenshot", Path.GetDirectoryName(Path.GetDirectoryName(path)), ClipGames.Read(path));
+            if (!kept) File.Delete(path);
+            ClipGames.Forget(path);
+            return kept;
+        }
 
         // a screenshot that is renamed keeps its .png and stays in the screenshots folder; the new name of the file, or an exception that says why it could not be
         public static string Rename(string path, string to)

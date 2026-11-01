@@ -146,6 +146,7 @@ const CLIP_HOVER_PROFILES = {
     EDIT: _svgInner(_RKI["action/edit"]),
     LINK: _svgInner(_RKI["action/link"]),
     TRASH: _svgInner(_RKI["action/trash"]),
+    RESTORE: _svgInner(_RKI["editor/undo"]),
     STAR: _svgInner(_RKI["toggle/star"]),
     STAR_BORDER: _svgInner(_RKI["toggle/star-border"]),
     GRID: _svgInner(_RKI["toggle/grid"]),
@@ -355,7 +356,9 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  // what was deleted, in the popup of the trash button by the folder button: restoring a clip brings the list back at once, and a screenshot the screenshots list
+  const deletedGallery = !HOME_MODE && window.RKDeleted ? RKDeleted.create({helper:HELPER, formatSize, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -875,9 +878,10 @@ const CLIP_HOVER_PROFILES = {
     const trash = card.querySelector(".title-actions > .delete-btn");
     if (trash) {
       const inDrafts = activeFilter === "drafts" && drafted;
-      trash.dataset.tooltip = inDrafts ? "Delete draft" : "Delete clip";
-      trash.setAttribute("aria-label", inDrafts ? "Delete draft" : "Delete clip");
+      if (inDrafts) trash.dataset.deleteLabel = "Delete draft";
+      else delete trash.dataset.deleteLabel;
     }
+    card.querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
   }
 
   function syncAllDraftUi() {
@@ -2389,6 +2393,7 @@ const CLIP_HOVER_PROFILES = {
   // the clip folder was switched: nothing read from the old one may stay, neither the loaded clips nor the favorites and drafts found in it nor the counts of the tabs, which come back from the new folder
   function forgetFolderState() {
     if (screenshotGallery) screenshotGallery.reset();
+    if (deletedGallery) deletedGallery.reset();
     clipsPageVersion = "";
     clipsTotal = 0;
     clipsTotalKnown = false;
@@ -2856,10 +2861,30 @@ const CLIP_HOVER_PROFILES = {
       btn._deleteArmTimer = 0;
     }
     btn.classList.remove("is-armed");
-    btn.dataset.tooltip = btn.dataset.deleteLabel || "Delete clip";
-    btn.setAttribute("aria-label", btn.dataset.deleteLabel || "Delete clip");
+    btn.dataset.tooltip = deleteLabelFor(btn);
+    btn.setAttribute("aria-label", deleteLabelFor(btn));
+    const toTrash = trashOn && !btn.dataset.deleteLabel;
     const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = "Delete";
+    if (label) label.textContent = toTrash ? "Move to trash" : "Delete";
+    const confirm = btn.querySelector(".delete-confirm-text");
+    if (confirm) confirm.textContent = toTrash ? "Trash?" : "Delete?";
+  }
+
+  // while deleted history is on a delete only moves the clip or screenshot into the trash, so its buttons say so; a button with a label of its own (a draft, the trash itself) keeps it
+  let trashOn = true;
+  function deleteLabelFor(btn) {
+    if (btn.dataset.deleteLabel) return btn.dataset.deleteLabel;
+    if (trashOn) return "Move to trash";
+    return btn.dataset.deleteKind === "screenshot" ? "Delete screenshot" : "Delete clip";
+  }
+  function relabelDeleteButtons(root) {
+    (root || document).querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
+  }
+  function setTrashOn(on) {
+    if (on === trashOn) return;
+    trashOn = on;
+    relabelDeleteButtons();
+    if (!bulkDeleteArmed) resetBulkDeleteButton();
   }
 
   function resetAllArmedDeleteButtons(exceptBtn) {
@@ -2872,10 +2897,11 @@ const CLIP_HOVER_PROFILES = {
     if (!btn) return;
     resetDeleteButton(btn);
     btn.classList.add("is-armed");
-    btn.dataset.tooltip = "Click again to delete";
-    btn.setAttribute("aria-label", "Click again to delete");
+    const toTrash = trashOn && !btn.dataset.deleteLabel;
+    btn.dataset.tooltip = toTrash ? "Click again to move to trash" : "Click again to delete";
+    btn.setAttribute("aria-label", btn.dataset.tooltip);
     const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = "Delete?";
+    if (label) label.textContent = toTrash ? "Trash?" : "Delete?";
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
@@ -3807,8 +3833,9 @@ const CLIP_HOVER_PROFILES = {
       clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
       renderLoadedClips(loadedClips);
       refreshBulkSelectionUi();
-      showToast("Deleted " + escapeHtml(displayClipName(filename)), "info");
-      scheduleToastHide(1800);
+      showToast(data.kept ? "Moved " + escapeHtml(displayClipName(filename)) + " to the trash" : "Deleted " + escapeHtml(displayClipName(filename)), "info");
+      scheduleToastHide(data.kept ? 3200 : 1800);
+      window.dispatchEvent(new Event("replaykit:deleted-changed"));
       scheduleNextPoll(250);
     } catch (e) {
       showToast("Delete failed: " + escapeHtml(e.message || e));
@@ -5242,6 +5269,7 @@ const CLIP_HOVER_PROFILES = {
     activeFilter = gameFilters ? gameFilters.state.type : "all";
     syncClipView();
     if (screenshotGallery) screenshotGallery.refresh();
+    if (deletedGallery) deletedGallery.refresh();
     updateTabs(loadedClips);
 
     activeSort = "newest";
@@ -5995,8 +6023,8 @@ const CLIP_HOVER_PROFILES = {
     if (bulkDeleteArmTimer) { clearTimeout(bulkDeleteArmTimer); bulkDeleteArmTimer = 0; }
     if (!bulkDeleteBtn) return;
     bulkDeleteBtn.classList.remove("is-armed");
-    bulkDeleteBtn.dataset.tooltip = "Delete";
-    bulkDeleteBtn.setAttribute("aria-label", "Delete selected clips");
+    bulkDeleteBtn.dataset.tooltip = trashOn ? "Move to trash" : "Delete";
+    bulkDeleteBtn.setAttribute("aria-label", trashOn ? "Move selected clips to trash" : "Delete selected clips");
   }
 
   async function deleteSelectedClips() {
@@ -6005,11 +6033,12 @@ const CLIP_HOVER_PROFILES = {
     if (bulkDeleteBtn) bulkDeleteBtn.disabled = true;
     if (bulkClearBtn) bulkClearBtn.disabled = true;
     const deleted = [];
+    let trashed = 0;
     const failed = [];
     let firstFailure = "";
     for (let i = 0; i < names.length; i++) {
       if (bulkDeleteBtn) {
-        bulkDeleteBtn.dataset.tooltip = "Deleting " + (i + 1) + " / " + names.length;
+        bulkDeleteBtn.dataset.tooltip = (trashOn ? "Moving to trash " : "Deleting ") + (i + 1) + " / " + names.length;
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
       }
       try {
@@ -6019,12 +6048,14 @@ const CLIP_HOVER_PROFILES = {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.message || "Delete failed");
         deleted.push(names[i]);
+        if (data.kept) trashed++;
       } catch (err) {
         failed.push(names[i]);
         if (!firstFailure) firstFailure = (err && err.message) || "";
       }
     }
     const deletedSet = new Set(deleted);
+    if (deleted.length) window.dispatchEvent(new Event("replaykit:deleted-changed"));
     deleted.forEach((name) => {
       selectedClipNames.delete(name);
       localState.delete(name);
@@ -6045,7 +6076,7 @@ const CLIP_HOVER_PROFILES = {
     resetBulkDeleteButton();
     refreshBulkSelectionUi();
     if (deleted.length) {
-      showToast("Deleted " + deleted.length + " selected clip" + (deleted.length === 1 ? "" : "s") + ".", "info");
+      showToast((trashed === deleted.length ? "Moved " : "Deleted ") + deleted.length + " selected clip" + (deleted.length === 1 ? "" : "s") + (trashed === deleted.length ? " to the trash." : "."), "info");
       scheduleToastHide(3000);
     }
     if (failed.length) {
@@ -6089,7 +6120,7 @@ const CLIP_HOVER_PROFILES = {
       if (!bulkDeleteArmed) {
         bulkDeleteArmed = true;
         bulkDeleteBtn.classList.add("is-armed");
-        bulkDeleteBtn.dataset.tooltip = "Confirm delete (" + selectedClipNames.size + ")";
+        bulkDeleteBtn.dataset.tooltip = (trashOn ? "Confirm move to trash (" : "Confirm delete (") + selectedClipNames.size + ")";
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
         bulkDeleteArmTimer = setTimeout(resetBulkDeleteButton, 3000);
         return;
@@ -6307,6 +6338,7 @@ const CLIP_HOVER_PROFILES = {
   hydrateClipUiState();
   refreshDrafts();
   if (screenshotGallery) screenshotGallery.refresh();
+  if (deletedGallery) deletedGallery.refresh();
   // the caps gate Create Link, so fetch them before the first paint and repaint once they land; re-fetched on re-show because signing in or out between sessions changes what Streamable will accept.
   refreshUploadLimits().then(() => queueVirtualRender(true));
   document.addEventListener("visibilitychange", () => {

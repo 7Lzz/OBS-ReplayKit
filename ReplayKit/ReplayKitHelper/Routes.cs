@@ -2595,15 +2595,43 @@ namespace ReplayKitHelper
                     string shot = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
                     if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Screenshot not found" }); return false; }
                     var answer = new JObject { ["ok"] = true };
-                    if (path == "/screenshots/delete") Screenshots.Delete(shot);
+                    if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot);
                     else if (path == "/screenshots/rename") answer["name"] = Screenshots.Rename(shot, query.ContainsKey("to") ? query["to"] : null);
                     else if (path == "/screenshots/copy") Screenshots.Copy(shot);
                     else answer["focused"] = RevealInExplorer(shot);
                     HttpResponse.SendJson(stream, 200, answer);
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException || ex is Newtonsoft.Json.JsonException)
                 {
                     HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message });
+                }
+                return false;
+            }
+
+            // what the deleted view of the clips page lists and does: restore an item, delete one for good, or empty the whole history
+            if (path == "/deleted" || path == "/deleted/thumb" || path == "/deleted/restore" || path == "/deleted/remove" || path == "/deleted/empty")
+            {
+                bool read = path == "/deleted" || path == "/deleted/thumb";
+                if (req.Method != (read ? "GET" : "POST")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", read ? "GET required" : "POST required"); return false; }
+                try
+                {
+                    if (path == "/deleted") HttpResponse.SendJson(stream, 200, DeletedHistory.List());
+                    else if (path == "/deleted/thumb")
+                    {
+                        string stored = DeletedHistory.StoredFile(Q("id"), out string kind);
+                        string thumb = stored == null ? null : kind == "screenshot" ? Screenshots.Thumb(stored) : Media.GetCachedThumbnail(new Clips.SafeClipPath { Name = Path.GetFileName(stored), Full = stored }, new FileInfo(stored));
+                        if (thumb == null) HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" }), Media.GetPlaceholderThumbnail());
+                        else HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "image/jpeg", ["Cache-Control"] = "private, max-age=31536000, immutable", ["X-Content-Type-Options"] = "nosniff" }, thumb);
+                    }
+                    else
+                    {
+                        var done = path == "/deleted/restore" ? DeletedHistory.Restore(Q("id")) : path == "/deleted/remove" ? DeletedHistory.Remove(Q("id")) : DeletedHistory.Empty();
+                        HttpResponse.SendJson(stream, done.Value<bool>("ok") ? 200 : 409, done);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is Newtonsoft.Json.JsonException || ex is System.Runtime.InteropServices.ExternalException)
+                {
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message });
                 }
                 return false;
             }
@@ -2612,7 +2640,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var deleted = Clips.DeleteClip(query.ContainsKey("file") ? query["file"] : null);
-                if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name });
+                if (deleted.Status == 200) HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = deleted.Name, ["kept"] = deleted.Kept });
                 else HttpResponse.SendJson(stream, deleted.Status, new JObject { ["ok"] = false, ["message"] = deleted.Message });
                 return false;
             }
@@ -2778,11 +2806,17 @@ namespace ReplayKitHelper
                 string newName = Clips.GetSafeFilename(query.ContainsKey("to") ? query["to"] : null);
                 if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad new filename" }); return false; }
                 if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
+                // the name is all a rename changes; the pages keep the extension, and a clip under another one would be read as another kind of file
+                if (!string.Equals(Path.GetExtension(newName), Path.GetExtension(selected.Name), StringComparison.OrdinalIgnoreCase)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "A rename keeps the file type of the clip" }); return false; }
                 // a renamed clip stays in its own folder, and the name stays unique across the clip folder and its game folders
                 string newPath = Path.Combine(Path.GetDirectoryName(selected.Full), newName);
-                if (File.Exists(newPath) || Clips.NameTaken(newName)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
+                if (newPath.Length >= 260) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "That name is too long" }); return false; }
+                // a change of capitals only is the same file to windows, so it is not a name another clip already has
+                bool caseOnly = string.Equals(newName, selected.Name, StringComparison.OrdinalIgnoreCase);
+                if (!caseOnly && (File.Exists(newPath) || Clips.NameTaken(newName))) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
+                string editorView = query.ContainsKey("view") && (query["view"] == "clips" || query["view"] == "home") ? query["view"] : null;
                 string requestId = UploadState.NewRequestId();
-                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath);
+                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath, editorView);
                 if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                 try
                 {
