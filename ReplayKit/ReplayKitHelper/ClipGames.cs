@@ -52,24 +52,25 @@ namespace ReplayKitHelper
                 if (at < 0 || Math.Abs((long)GetTickCount64() - at) > 5000 || session.Length == 0 || session.Length > 80) return;
                 valid = true;
                 string kind = raw["kind"]?.Value<string>() ?? "unknown", path = raw["path"]?.Value<string>() ?? "";
-                // the plugin sends a window title only for java, where it is what tells minecraft from other java programs
+                // the plugin sends a window title and whether it was launched as minecraft only for java, where they are what tell minecraft from other java programs
                 string title = raw["title"]?.Type == JTokenType.String ? raw["title"].Value<string>() : "";
                 if (title.Length > 256) title = "";
+                bool launched = raw["minecraft"]?.Type == JTokenType.Boolean && raw["minecraft"].Value<bool>();
                 GameCatalog.Game game = null;
                 if ((kind == "game" || kind == "window" || kind == "display") && path.Length > 0 && path.Length < 32768)
                 {
                     lock (Gate)
                     {
                         // an app that is no game is looked up again only once a minute, as the steam library is read again; until that first read is done a fresh game may still turn up, so it is asked every two seconds
-                        string lookup = title.Length > 0 ? path + "|" + title : path;
+                        string lookup = title.Length > 0 || launched ? path + "|" + title + (launched ? "|minecraft" : "") : path;
                         if (!string.Equals(lookup, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled ? 60000 : 2000))
                         {
                             lastGame = null;
                             lastPath = lookup;
                             resolvedAt = at;
-                            var minecraft = GameCatalog.MinecraftJava(path, title);
+                            var minecraft = GameCatalog.MinecraftJava(path, title, launched);
                             lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path));
-                            if (minecraft != null) { if (GameCatalog.MinecraftLauncher() is string launcher) GameCatalog.CacheIcon(minecraft, launcher); }
+                            if (minecraft != null) { if (GameCatalog.MinecraftIcon() is string icon) GameCatalog.CacheIcon(minecraft, icon); }
                             else if (lastGame != null) GameCatalog.CacheIcon(lastGame, path);
                         }
                         game = lastGame;

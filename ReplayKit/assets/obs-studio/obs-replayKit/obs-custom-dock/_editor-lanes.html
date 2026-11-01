@@ -5136,6 +5136,15 @@
       return { start: w.start * st.vspeed, end: w.end * st.vspeed };
     }
 
+    // the picture at a time of the player, counted the way the page counts it: the clip it comes from (a ref of "" being the clip in the editor) and the time in it, the same piece and time vFollow plays there, or null where no piece of the video lies and the picture is black
+    function pictureAt(t) {
+      if (!vt.on) return { ref: "", time: clamp(t, 0, st.Dsrc) };
+      var T = t / st.vspeed;
+      var piece = vAt(T, T >= windowT().end - 0.001);
+      if (!piece) return null;
+      return { ref: piece.ref || "", time: clamp(piece.srcStart + (T - piece.at) * vSpeed(piece), 0, piece.ref ? piece.dur || 0 : st.Dsrc) };
+    }
+
     function installTransport() {
       Object.defineProperty(video, "currentTime", {
         configurable: true,
@@ -6049,6 +6058,7 @@
       videoEdited: videoEdited,
       // the part of the timeline between which the preview plays, in the time of the video, while the timeline plays by itself; null otherwise
       windowBounds: windowBounds,
+      pictureAt: pictureAt,
       available: function () { return st.ready; },
       // true while audio is being added to the clip
       busy: isBusy,

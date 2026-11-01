@@ -24,6 +24,85 @@
         </div>
       </div>`;
   }
-  window.RKClipPlayer = { controlsHtml: controlsHtml };
+  // the preview over a seek bar, the way youtube shows one: the frame where the cursor is over the time there. the frame comes from a second muted copy of the clip that is never put in the page, so nothing that looks for the videos of a player finds it; it seeks one time at a time and keeps only the newest time asked for, so a quick sweep never queues seeks behind each other. box is a .progress-hover-preview and host the video of the player, whose shape the frame takes. show({ text, x, width, url, time }) puts it at x of a bar that wide and draws the frame of url at time, or black for no url; hide() empties it for the next hover; drop() lets go of the copy
+  function hoverFrame(box, host) {
+    const canvas = box.querySelector(".progress-hover-frame");
+    const label = box.querySelector(".progress-hover-label");
+    let source = null, wanted = -1, sought = -1, shown = 0, asked = 0, failed = "";
+    function fit() {
+      const w = host && host.videoWidth || source && source.videoWidth;
+      const h = host && host.videoHeight || source && source.videoHeight;
+      const height = w > 0 && h > 0 ? Math.max(1, Math.round(canvas.width * h / w)) : canvas.height;
+      if (canvas.height !== height) canvas.height = height;
+    }
+    function seek() {
+      if (!source || source.seeking || source.readyState < 1 || wanted < 0 || wanted === sought) return;
+      sought = wanted;
+      asked = shown;
+      source.currentTime = wanted;
+    }
+    function draw(e) {
+      if (e.target !== source) return;
+      // a seek asked for before the last hide is not drawn, so a new hover never opens on a frame from somewhere else
+      if (asked === shown && wanted >= 0 && source.videoWidth > 0 && source.videoHeight > 0) {
+        fit();
+        const ctx = canvas.getContext("2d");
+        const scale = Math.min(canvas.width / source.videoWidth, canvas.height / source.videoHeight);
+        const w = source.videoWidth * scale, h = source.videoHeight * scale;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(source, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+        box.classList.add("has-frame");
+      }
+      seek();
+    }
+    function drop() {
+      hide();
+      if (!source) return;
+      const old = source;
+      source = null;
+      old.removeAttribute("src");
+      try { old.load(); } catch (_) {}
+    }
+    function hide() {
+      box.classList.remove("has-frame");
+      shown++;
+      // forgetting the last seek lets a hover on the same spot seek and draw again, and a copy that failed is tried again on the next hover
+      wanted = sought = -1;
+      failed = "";
+    }
+    function show(at) {
+      if (label) label.textContent = at.text;
+      if (!at.url) {
+        // where the player shows nothing the preview is black as well, and a frame still being sought is not drawn over it
+        shown++;
+        wanted = sought = -1;
+        fit();
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        box.classList.add("has-frame");
+      } else if (at.url !== failed) {
+        if (!source || source.getAttribute("src") !== at.url) {
+          drop();
+          source = document.createElement("video");
+          source.muted = true;
+          source.preload = "metadata";
+          source.addEventListener("loadedmetadata", (e) => { if (e.target === source) seek(); });
+          source.addEventListener("seeked", draw);
+          // the helper answers busy while other videos stream, so the copy is let go and made again on the next hover instead of on every move
+          source.addEventListener("error", (e) => { if (e.target !== source) return; const url = source.getAttribute("src"); drop(); failed = url; });
+          source.src = at.url;
+        }
+        wanted = Math.max(0, Math.min(at.time, (source.duration || at.time) - 0.04));
+        seek();
+      }
+      // centred on the cursor, but never hanging past either end of the bar
+      const half = box.offsetWidth / 2;
+      box.style.setProperty("--hover-preview-x", (half * 2 >= at.width ? at.width / 2 : Math.max(half, Math.min(at.width - half, at.x))) + "px");
+    }
+    return { show: show, hide: hide, drop: drop };
+  }
+  window.RKClipPlayer = { controlsHtml: controlsHtml, hoverFrame: hoverFrame };
 })();
 </script>

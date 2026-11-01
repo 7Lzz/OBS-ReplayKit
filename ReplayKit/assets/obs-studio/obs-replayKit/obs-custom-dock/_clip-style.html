@@ -1307,6 +1307,36 @@
   .card.is-theater-card .player-shade { opacity: 1; }
   .card.is-theater-card .progress-bar { bottom: 42px; height: 12px; }
   .card.is-theater-card .progress-fill { background: var(--primary_light); }
+  /* the play and pause button of fullscreen, left of the volume as there, but small and round like the other buttons of theater mode */
+  .card.is-theater-card .controls-left { display: flex; align-items: center; gap: 4px; }
+  .card.is-theater-card .play-toggle-btn {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    transition: background-color 80ms linear;
+  }
+  .card.is-theater-card .play-toggle-btn:hover { background: rgba(0, 0, 0, 0.85); }
+  .card.is-theater-card .play-toggle-btn svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  /* the lighter band up to the cursor, like the fullscreen bar; it comes before the fill in the markup, so the fill draws over it */
+  .card.is-theater-card .progress-hover-fill {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 5px;
+    height: 3px;
+    width: var(--hover-fill, 0%);
+    background: rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+    transition: top 80ms linear, height 80ms linear;
+  }
+  .card.is-theater-card .progress-bar:hover .progress-hover-fill,
+  .card.is-theater-card .progress-bar.is-scrubbing .progress-hover-fill {
+    top: 3px;
+    height: 5px;
+  }
 
   /* hoist the controls row to a youtube-like bottom bar: edge-to-edge, play/volume/time on the left, fullscreen on the right. */
   .preview:is(:fullscreen, .rk-fs) .preview-controls,
@@ -1449,26 +1479,42 @@
     height: 6px;
   }
   .preview .progress-hover-fill { display: none; }
-  /* time tooltip floating above the cursor when hovering the bar. */
-  .preview .progress-hover-time { display: none; }
-  .preview:is(:fullscreen, .rk-fs) .progress-bar:hover .progress-hover-time,
-  .preview:-webkit-full-screen .progress-bar:hover .progress-hover-time,
-  .preview:is(:fullscreen, .rk-fs) .progress-bar.is-scrubbing .progress-hover-time,
-  .preview:-webkit-full-screen .progress-bar.is-scrubbing .progress-hover-time {
-    display: block;
+  /* the youtube style preview over the bar of a clip in theater mode or fullscreen and of the editor: the frame at the cursor over the time there (RKClipPlayer.hoverFrame). js centres it on the cursor inside the bar and shows the frame once one is drawn, so the time alone shows until then */
+  .progress-hover-preview {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
     position: absolute;
     bottom: calc(100% + 6px);
+    left: var(--hover-preview-x, 0px);
     transform: translateX(-50%);
-    left: var(--hover-x, 0px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .card.is-theater-card .progress-bar:is(:hover, .is-scrubbing) .progress-hover-preview,
+  .preview:is(:fullscreen, .rk-fs) .progress-bar:is(:hover, .is-scrubbing) .progress-hover-preview,
+  .preview:-webkit-full-screen .progress-bar:is(:hover, .is-scrubbing) .progress-hover-preview,
+  .trim-video-wrap .trim-seek-overlay:is(:hover, .is-scrubbing) .progress-hover-preview { display: flex; }
+  .progress-hover-frame {
+    display: none;
+    width: 208px;
+    height: auto;
+    border-radius: 6px;
+    background: #000;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 4px 14px rgba(0, 0, 0, 0.5);
+  }
+  .preview:is(:fullscreen, .rk-fs) .progress-hover-frame,
+  .preview:-webkit-full-screen .progress-hover-frame { width: 288px; }
+  .progress-hover-preview.has-frame .progress-hover-frame { display: block; }
+  .progress-hover-label {
     padding: 3px 7px;
     background: rgba(0, 0, 0, 0.78);
     color: #fff;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     border-radius: 3px;
-    pointer-events: none;
     white-space: nowrap;
-    z-index: 5;
   }
   /* scrub dot riding the playhead. lives inside the .progress-fill so its right:-7px anchor lines up with the playheads actual x position. previously the dot was a sibling of .progress-fill anchored to the right edge of the whole .progress-bar -- which meant it sat at the end of the bar regardless of playback position. hidden by defualt, revealed on bar hover. */
   .preview:is(:fullscreen, .rk-fs) .progress-scrub-dot,
@@ -2193,10 +2239,10 @@
   }
   .editor-stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
   .editor-stage .trim-video-wrap { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; border-radius: 4px; }
-  /* the preview is only the picture while editing: its controls live in the toolbar, and they come back over the video in fullscreen */
-  #trim-veil .trim-video-wrap:not(:fullscreen) .player-shade,
-  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-preview-controls,
-  #trim-veil .trim-video-wrap:not(:fullscreen) .trim-seek-overlay { display: none; }
+  /* the preview is only the picture while editing: its controls live in the toolbar, and they come back over the video in fullscreen, the browsers own or the stand-in of a page embedded in obs */
+  #trim-veil .trim-video-wrap:not(:fullscreen, .rk-fs) .player-shade,
+  #trim-veil .trim-video-wrap:not(:fullscreen, .rk-fs) .trim-preview-controls,
+  #trim-veil .trim-video-wrap:not(:fullscreen, .rk-fs) .trim-seek-overlay { display: none; }
   .tl-toolbar .trim-volume-control { position: static; opacity: 1; }
   /* the volume in the toolbar is always open, its slider showing */
   .tl-toolbar .volume-control { flex: 0 0 124px; width: 124px; height: 28px; background: transparent; transition: background-color 90ms linear; }
@@ -2477,23 +2523,6 @@
   .trim-video-wrap .trim-seek-overlay.is-scrubbing .trim-progress-hover {
     top: 4px;
     height: 6px;
-  }
-  .trim-video-wrap .trim-seek-overlay:hover .progress-hover-time,
-  .trim-video-wrap .trim-seek-overlay.is-scrubbing .progress-hover-time {
-    display: block;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: var(--hover-x, 0px);
-    transform: translateX(-50%);
-    padding: 3px 7px;
-    border-radius: 3px;
-    background: rgba(0, 0, 0, .78);
-    color: #fff;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    pointer-events: none;
-    white-space: nowrap;
-    z-index: 5;
   }
   /* danger-tinted "overwrite original" button. the first click "arms" it (turns red + text changes to "click again to confirm"); a second click within 3s actualy fires. avoids the ugly browser confirm() dialog. */
   .btn.danger-action {

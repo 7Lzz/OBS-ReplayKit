@@ -1926,6 +1926,7 @@ const CLIP_HOVER_PROFILES = {
       resetVideoZoom(video);
       abortVideoLoad(video);
     }
+    if (card._dropHoverFrame) card._dropHoverFrame();
   }
 
   function bindCardToClip(card, clip) {
@@ -2016,6 +2017,7 @@ const CLIP_HOVER_PROFILES = {
     theaterPreview = null;
     const card = preview.closest(".card");
     if (card) card.classList.remove("is-theater-card");
+    if (card && card._dropHoverFrame) card._dropHoverFrame();
     preview.classList.remove("is-idle");
     document.body.classList.remove("is-clip-theater");
     playTheaterRestore();
@@ -2967,8 +2969,8 @@ const CLIP_HOVER_PROFILES = {
           <div class="progress-fill">
             <div class="progress-scrub-dot"></div>
           </div>
-          <!-- timestamp tooltip that follows the cursor: js positions it horizontally and fills it with the formatted time at that x, CSS handles centering above the bar. -->
-          <div class="progress-hover-time"></div>
+          <!-- what a click would seek to in theater mode and fullscreen: the frame at the cursor x, drawn by js from a second copy of the clip, over the time there; js keeps it inside the bar. -->
+          <div class="progress-hover-preview"><canvas class="progress-hover-frame" width="480" height="270"></canvas><span class="progress-hover-label"></span></div>
         </div>
         <span class="duration-badge" data-duration=""></span>
         <span class="codec-badge${codecReady ? " is-ready" : ""}${codecUnfixed ? " is-unfixed" : ""}">${codecLabel}</span>
@@ -3178,7 +3180,7 @@ const CLIP_HOVER_PROFILES = {
       if (!timeCurrentEl || !timeTotalEl) return;
       if (isFinite(video.duration) && video.duration > 0) {
         timeTotalEl.textContent   = formatDuration(video.duration);
-        timeCurrentEl.textContent = formatDuration(video.currentTime);
+        timeCurrentEl.textContent = formatDuration(video.currentTime) || "0:00";
       }
     }
     // first fill once metadata is in (so total time replaces the placeholder "0:00" the markup ships with).
@@ -3278,7 +3280,8 @@ const CLIP_HOVER_PROFILES = {
 
     // scrubber (click + drag on the progress bar to seek) the .progress-bars hit area grows in fullscreen via css; the pointer-event listeners below are wired in every mode so a future "show scrubber in the dock too" tweak is just a css change. uses pointer events so the drag survives the cursor briefly leaving the bar -- mouse events would lose the drag the moment the cursor went above the bars 10 px strip.
     const progressBar = card.querySelector(".progress-bar");
-    const hoverTimeEl = card.querySelector(".progress-hover-time");
+    const hoverFrame = RKClipPlayer.hoverFrame(card.querySelector(".progress-hover-preview"), video);
+    card._dropHoverFrame = hoverFrame.drop;
     function seekToPointer(e) {
       const rect = progressBar.getBoundingClientRect();
       const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -3288,20 +3291,21 @@ const CLIP_HOVER_PROFILES = {
         progressFill.style.width = (pct * 100) + "%";
       }
     }
-    // youtube-style hover preview: writes two css vars on the bar each pointermove. --hover-fill is the band that fills from 0 to the cursor x (rendered by .progress-hover-fill); --hover-x is the pixel x position used to centre the time tooltip above the bar. both pure-css once the vars are set, so no relayout cost per move. skipped entirely when the bar isnt being hovered in fullscreen (the css only renders the elements inside .preview:fullscreen .progress-bar:hover anyway).
+    // youtube-style hover preview: --hover-fill on the bar is the band that fills from 0 to the cursor x (rendered by .progress-hover-fill), and in theater mode and fullscreen the frame and time at the cursor show above it at --hover-preview-x.
     progressBar.addEventListener("pointermove", (e) => {
       const rect = progressBar.getBoundingClientRect();
       const xPx  = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
       const pct  = rect.width ? xPx / rect.width : 0;
       progressBar.style.setProperty("--hover-fill", (pct * 100) + "%");
-      progressBar.style.setProperty("--hover-x",     xPx + "px");
-      if (hoverTimeEl && isFinite(video.duration) && video.duration > 0) {
-        hoverTimeEl.textContent = formatDuration(pct * video.duration);
-      }
+      // the frame preview belongs to the big player, and lives while the clip is big: theater mode, fullscreen and the card each drop it
+      if (!card.dataset.previewUrl || !(video.duration > 0) || !isFinite(video.duration) || (!isTheaterPreview(preview) && !isVideoFullscreen(video))) return;
+      hoverFrame.show({ text: formatDuration(pct * video.duration) || "0:00", x: xPx, width: rect.width, url: card.dataset.previewUrl, time: pct * video.duration });
     });
     progressBar.addEventListener("pointerleave", () => {
       // wipe the hover-fill back to 0 so it doesnt get stuck at the last cursor position the next time the bar is shown.
       progressBar.style.setProperty("--hover-fill", "0%");
+      // the next hover starts without a frame instead of showing this one where the cursor no longer is; a drag keeps it, since the drag goes on off the bar
+      if (!scrubbing) hoverFrame.hide();
     });
     let scrubbing = false;
     // true if the video was mid-playback when a scrub started -- nothing in the scrub handlers below ever paused it, so it kept playing the whole drag, just visually masked by seekToPointer firing on every pointermove faster than the browser could render a frame; the moment the cursor stopped moving there was nothing left to interrupt it, so it would visibly start playing until the next move, looking exactly like holding still while dragging "started" playback when it actually never stopped.
@@ -3347,6 +3351,7 @@ const CLIP_HOVER_PROFILES = {
       document.removeEventListener("pointerup", onDocPointerUp);
       document.removeEventListener("pointercancel", onDocPointerUp);
       if (scrubResumePlay) { scrubResumePlay = false; video.play().catch(() => {}); }
+      if (!progressBar.matches(":hover")) hoverFrame.hide();
       // restart a fresh idle countdown from "now" so the user gets the full 2.5s after they let go.
       bumpIdle();
     };
@@ -3373,7 +3378,7 @@ const CLIP_HOVER_PROFILES = {
       else {
         preview.classList.remove("is-idle");
         if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
-        if (!isTheaterPreview(preview)) resetVideoZoom(video);
+        if (!isTheaterPreview(preview)) { resetVideoZoom(video); hoverFrame.drop(); }
         resetPlaybackRate(video);
       }
       // swap the fullscreen toggle icon so it always shows the action itll perform next (youtube convention): the "exit" brackets when were in fullscreen, the "enter" brackets when were out. same listener fires for both directions.

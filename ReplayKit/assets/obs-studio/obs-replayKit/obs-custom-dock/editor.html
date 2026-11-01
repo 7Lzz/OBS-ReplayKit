@@ -111,7 +111,7 @@
           <div class="trim-seek-overlay progress-bar">
             <div class="progress-hover-fill trim-progress-hover" id="trim-progress-hover"></div>
             <div class="trim-seek-fill progress-fill" id="trim-seek-fill"><div class="progress-scrub-dot"></div></div>
-            <div class="progress-hover-time" id="trim-progress-time"></div>
+            <div class="progress-hover-preview" id="trim-progress-preview"><canvas class="progress-hover-frame" width="480" height="270"></canvas><span class="progress-hover-label"></span></div>
             <input type="hidden" id="trim-seek" min="0" max="100" value="0">
           </div>
         </div>
@@ -308,7 +308,7 @@ window.__rkEditorApi = (function () {
   const trimSeekFill     = document.getElementById("trim-seek-fill");
   const trimProgressBar  = document.querySelector(".trim-seek-overlay");
   const trimProgressHover = document.getElementById("trim-progress-hover");
-  const trimProgressTime = document.getElementById("trim-progress-time");
+  const trimProgressPreview = document.getElementById("trim-progress-preview");
   const trimRangeFill    = document.getElementById("trim-range-fill");
   const trimFilmstrip    = document.getElementById("trim-filmstrip");
   const trimTimeRuler    = document.getElementById("trim-time-ruler");
@@ -822,17 +822,25 @@ window.__rkEditorApi = (function () {
     syncTrimTimeDisplay();
   }
 
+  // the frame preview over the bar, the same one as the big player of a clip; it shows what the player would show at the cursor, through the pieces of the video, which may come from other clips or leave the picture black
+  const trimHoverFrame = trimProgressPreview && window.RKClipPlayer ? RKClipPlayer.hoverFrame(trimProgressPreview, trimVideo) : null;
+
   function updateTrimProgressHover(clientX) {
     if (!trimProgressBar) return;
     const rect = trimProgressBar.getBoundingClientRect();
     const xPx = Math.max(0, Math.min(rect.width, clientX - rect.left));
     const ratio = rect.width > 0 ? xPx / rect.width : 0;
-    trimProgressBar.style.setProperty("--hover-x", xPx + "px");
     if (trimProgressHover) trimProgressHover.style.width = (ratio * 100) + "%";
-    if (trimProgressTime) {
-      const span = playSpan();
-      trimProgressTime.textContent = formatDuration(ratio * (span.end - span.start) / trimLanes.videoSpeed());
-    }
+    const span = playSpan();
+    if (!trimHoverFrame || !trimSourceClip || !(span.end > span.start)) return;
+    const picture = trimLanes.available() ? trimLanes.pictureAt(span.start + ratio * (span.end - span.start)) : { ref: "", time: span.start + ratio * (span.end - span.start) };
+    trimHoverFrame.show({
+      text: formatDuration(ratio * (span.end - span.start) / trimLanes.videoSpeed()) || "0:00",
+      x: xPx,
+      width: rect.width,
+      url: !picture ? null : picture.ref ? HELPER + "/file/" + encodeURIComponent(picture.ref) : clipPreviewUrlFor(trimSourceClip),
+      time: picture ? picture.time : 0,
+    });
   }
 
   if (trimProgressBar) {
@@ -852,13 +860,16 @@ window.__rkEditorApi = (function () {
       updateTrimProgressHover(e.clientX);
     });
     trimProgressBar.addEventListener("pointerleave", () => {
-      if (trimProgressHover && !trimPlayerScrubbing) trimProgressHover.style.width = "0%";
+      if (trimPlayerScrubbing) return;
+      if (trimProgressHover) trimProgressHover.style.width = "0%";
+      if (trimHoverFrame) trimHoverFrame.hide();
     });
     const stopTrimPlayerScrub = (e) => {
       trimPlayerScrubbing = false;
       trimProgressBar.classList.remove("is-scrubbing");
       try { trimProgressBar.releasePointerCapture(e.pointerId); } catch (_) {}
       if (trimScrubResumePlay) { trimScrubResumePlay = false; trimVideo.play().catch(() => {}); }
+      if (trimHoverFrame && !trimProgressBar.matches(":hover")) trimHoverFrame.hide();
     };
     trimProgressBar.addEventListener("pointerup", stopTrimPlayerScrub);
     trimProgressBar.addEventListener("pointercancel", stopTrimPlayerScrub);
@@ -1213,7 +1224,7 @@ window.__rkEditorApi = (function () {
     const current = (trimVideo.currentTime || 0) - (saved ? saved.start : 0);
     const rate = trimLanes.videoSpeed();
     if (trimTotalTime) trimTotalTime.textContent = formatDuration(duration / rate);
-    if (trimCurrentTime) trimCurrentTime.textContent = formatDuration(current / rate);
+    if (trimCurrentTime) trimCurrentTime.textContent = formatDuration(current / rate) || "0:00";
   }
 
   function isTrimFullscreen() {
@@ -1374,6 +1385,7 @@ window.__rkEditorApi = (function () {
     trimTimelineScrubbing = false;
     trimPlayerScrubbing = false;
     if (trimProgressBar) trimProgressBar.classList.remove("is-scrubbing");
+    if (trimHoverFrame) trimHoverFrame.drop();
     closeExitMenu();
     closeRenderSettings();
     try { trimVideo.pause(); } catch {}
@@ -1523,6 +1535,8 @@ window.__rkEditorApi = (function () {
   });
   trimVideo.addEventListener("loadedmetadata", syncTrimTimeDisplay);
   document.addEventListener("fullscreenchange", syncTrimFullscreenIcon, { signal: EDITOR_SIGNAL });
+  // the bar with the frame preview only shows in fullscreen, so the copy of the clip behind it goes when fullscreen does
+  document.addEventListener("fullscreenchange", () => { if (trimHoverFrame && !isTrimFullscreen()) trimHoverFrame.drop(); }, { signal: EDITOR_SIGNAL });
   document.addEventListener("webkitfullscreenchange", syncTrimFullscreenIcon, { signal: EDITOR_SIGNAL });
   const blockTrimFullscreenDblclick = (e) => {
     e.preventDefault();
@@ -2191,6 +2205,7 @@ window.__rkEditorApi = (function () {
       try { editorTools.closed(); } catch {}
       try { trimLanes.unload(); } catch {}
       try { if (editorFx) editorFx.reset(); } catch {}
+      if (trimHoverFrame) trimHoverFrame.drop();
       releaseEditorSources();
     },
   };

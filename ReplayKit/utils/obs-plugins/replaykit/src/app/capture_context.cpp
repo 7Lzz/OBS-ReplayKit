@@ -214,15 +214,51 @@ bool CoversMonitor(HWND window)
 	return rect.left <= info.rcMonitor.left && rect.top <= info.rcMonitor.top && rect.right >= info.rcMonitor.right && rect.bottom >= info.rcMonitor.bottom;
 }
 
-// the title of a java window, the only way minecraft java edition is told apart from other java programs; the title of any other program never leaves the plugin, since it can hold private text such as a browser tab
-QString JavaTitle(HWND window, const QString &path)
+bool IsJava(const QString &path)
 {
 	const QString exe = path.section('\\', -1);
-	if (exe.compare(QStringLiteral("javaw.exe"), Qt::CaseInsensitive) != 0 && exe.compare(QStringLiteral("java.exe"), Qt::CaseInsensitive) != 0)
+	return exe.compare(QStringLiteral("javaw.exe"), Qt::CaseInsensitive) == 0 || exe.compare(QStringLiteral("java.exe"), Qt::CaseInsensitive) == 0;
+}
+
+// the title of a java window, one way minecraft java edition is told apart from other java programs; the title of any other program never leaves the plugin, since it can hold private text such as a browser tab
+QString JavaTitle(HWND window, const QString &path)
+{
+	if (!IsJava(path))
 		return {};
 	wchar_t title[256] = {};
 	GetWindowTextW(window, title, 256);
 	return QString::fromWCharArray(title);
+}
+
+// a modpack titles its window whatever it likes, so java also counts as minecraft when it was started with the asset index argument every minecraft launcher passes, the vanilla main class discord looks for, or the entry point of prism, polymc or multimc, which hand the arguments over stdin instead; the arguments carry the account token, so only the answer leaves this function
+bool LaunchedAsMinecraft(DWORD pid, const QString &path)
+{
+	using QueryProcess = LONG(NTAPI *)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+	static const auto query = reinterpret_cast<QueryProcess>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess"));
+	if (!pid || !query || !IsJava(path))
+		return false;
+	HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+	if (!process)
+		return false;
+	// ProcessCommandLineInformation, which answers a UNICODE_STRING followed by the text it points to
+	constexpr ULONG commandLine = 60;
+	struct Text {
+		USHORT length, maximum;
+		PWSTR buffer;
+	};
+	ULONG size = 0;
+	query(process, commandLine, nullptr, 0, &size);
+	std::vector<BYTE> data(size >= sizeof(Text) && size <= 131072 ? size : 0);
+	const bool read = !data.empty() && query(process, commandLine, data.data(), size, &size) >= 0;
+	CloseHandle(process);
+	if (!read)
+		return false;
+	const auto *text = reinterpret_cast<const Text *>(data.data());
+	if (!text->buffer || text->length > data.size() - sizeof(Text))
+		return false;
+	const QString line = QString::fromWCharArray(text->buffer, text->length / 2);
+	return line.contains(QStringLiteral("--assetIndex")) || line.contains(QStringLiteral("net.minecraft.client.main.Main")) || line.contains(QStringLiteral("org.prismlauncher.EntryPoint")) ||
+	       line.contains(QStringLiteral("org.polymc.EntryPoint")) || line.contains(QStringLiteral("org.multimc.EntryPoint"));
 }
 
 // a game or window capture shows the focused window when it is hooked to exactly that window
@@ -318,6 +354,8 @@ void Sample()
 				data["path"] = shownPath;
 				data["fullscreen"] = CoversMonitor(shown);
 				data["title"] = JavaTitle(shown, shownPath);
+				if (LaunchedAsMinecraft(shownPid, shownPath))
+					data["minecraft"] = true;
 			}
 		} else if (chosen && foreground && !IsIconic(foreground) && !path.isEmpty()) {
 			const Capture &capture = *chosen;
@@ -329,6 +367,8 @@ void Sample()
 				data["kind"] = QString::fromStdString(capture.kind);
 				data["path"] = path;
 				data["title"] = JavaTitle(foreground, path);
+				if (LaunchedAsMinecraft(pid, path))
+					data["minecraft"] = true;
 			}
 		}
 	}

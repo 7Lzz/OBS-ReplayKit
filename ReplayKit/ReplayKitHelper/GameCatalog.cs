@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -91,18 +92,18 @@ namespace ReplayKitHelper
             return installed;
         }
 
-        // minecraft java edition runs as the plain java runtime, so only java with a minecraft window title is it: the vanilla, forge, fabric and prism launchers title it "Minecraft ...", and the lunar, badlion and feather clients carry their own names
+        // minecraft java edition runs as the plain java runtime, so only java the plugin saw launched as minecraft or with a minecraft window title is it: the vanilla, forge, fabric and prism launchers title it "Minecraft ...", and the lunar, badlion and feather clients carry their own names
         private static readonly Regex MinecraftTitle = new Regex(@"^(?:Minecraft\b|Lunar Client\b|Feather Client\b|Badlion Minecraft Client\b)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-        internal static Game MinecraftJava(string path, string title)
+        internal static Game MinecraftJava(string path, string title, bool launched)
         {
             string exe = Path.GetFileName(path ?? "");
             if (!exe.Equals("javaw.exe", StringComparison.OrdinalIgnoreCase) && !exe.Equals("java.exe", StringComparison.OrdinalIgnoreCase)) return null;
-            return MinecraftTitle.IsMatch(title ?? "") ? Known("Minecraft") : null;
+            return launched || MinecraftTitle.IsMatch(title ?? "") ? Known("Minecraft") : null;
         }
 
         // where the minecraft icon comes from, since the java runtime carries only the java cup: the launcher from the xbox app or from the classic installer
-        internal static string MinecraftLauncher()
+        internal static string MinecraftIcon()
         {
             foreach (string file in new[]
             {
@@ -201,6 +202,20 @@ namespace ReplayKitHelper
 
         private static readonly Regex IconVersion = new Regex("^[a-f0-9]{16}$", RegexOptions.Compiled);
 
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint count);
+        private static readonly Regex StoreLogoName = new Regex("StoreLogo=\"([A-Za-z0-9 ._-]{1,100}\\.png)\"", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        // a game the xbox app installed often has an exe with no icon of its own, which windows hands out as a blank window, so the store logo that the MicrosoftGame.config beside it names is its icon instead
+        private static string IconSource(string path)
+        {
+            if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || ExtractIconEx(path, -1, null, null, 0) > 0) return path;
+            string dir = Path.GetDirectoryName(path), config = Path.Combine(dir, "MicrosoftGame.config");
+            if (!File.Exists(config) || new FileInfo(config).Length > 256 * 1024) return path;
+            var name = StoreLogoName.Match(File.ReadAllText(config));
+            string logo = name.Success ? Path.Combine(dir, name.Groups[1].Value) : null;
+            return logo != null && File.Exists(logo) ? logo : path;
+        }
+
         // the icon version a new clip of this game gets: the newest one read from its exe, or none yet
         internal static string CurrentIcon(string id)
         {
@@ -228,18 +243,33 @@ namespace ReplayKitHelper
                     if (!File.Exists(path)) return;
                     Directory.CreateDirectory(IconDir);
                     if ((File.GetAttributes(IconDir) & FileAttributes.ReparsePoint) != 0) return;
+                    string from = IconSource(path);
                     byte[] png;
-                    using (var icon = Icon.ExtractAssociatedIcon(path))
+                    using (var bitmap = new Bitmap(32, 32))
+                    using (var draw = Graphics.FromImage(bitmap))
+                    using (var output = new MemoryStream())
                     {
-                        if (icon == null) throw new IOException("no icon");
-                        using (var bitmap = new Bitmap(32, 32))
-                        using (var draw = Graphics.FromImage(bitmap))
-                        using (var output = new MemoryStream())
+                        // a picture file is drawn as it is, since the icon windows associates with it is the one of the picture viewer
+                        if (Path.GetExtension(from).Equals(".png", StringComparison.OrdinalIgnoreCase))
                         {
-                            draw.DrawIcon(icon, new Rectangle(0, 0, 32, 32));
-                            bitmap.Save(output, ImageFormat.Png);
-                            png = output.ToArray();
+                            if (new FileInfo(from).Length > 1024 * 1024) throw new IOException("icon picture too large");
+                            using (var source = new MemoryStream(File.ReadAllBytes(from)))
+                            using (var picture = Image.FromStream(source))
+                            {
+                                draw.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                                draw.DrawImage(picture, new Rectangle(0, 0, 32, 32));
+                            }
                         }
+                        else
+                        {
+                            using (var icon = Icon.ExtractAssociatedIcon(from))
+                            {
+                                if (icon == null) throw new IOException("no icon");
+                                draw.DrawIcon(icon, new Rectangle(0, 0, 32, 32));
+                            }
+                        }
+                        bitmap.Save(output, ImageFormat.Png);
+                        png = output.ToArray();
                     }
                     string version;
                     using (var sha = SHA256.Create()) version = string.Concat(sha.ComputeHash(png).Take(8).Select(x => x.ToString("x2")));
