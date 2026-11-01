@@ -130,12 +130,15 @@ namespace ReplayKitHelper
                     message = "That clip already has an operation running";
                     return null;
                 }
-                if (Jobs.Count >= Constants.MAX_CONCURRENT_VIDEO_JOBS)
+                // the cap is for the jobs that encode or copy for a while; a delete or a rename is over in a moment, and counting them refused every delete while two clips compressed or uploaded
+                bool instant = kind == "delete" || kind == "rename";
+                int running = Jobs.Values.Count(j => !j.Instant);
+                if (!instant && running >= Constants.MAX_CONCURRENT_VIDEO_JOBS)
                 {
-                    message = "Already running " + Jobs.Count + " clip operations";
+                    message = "Already running " + running + " clip operations";
                     return null;
                 }
-                var job = new Reservation(requestId, paths);
+                var job = new Reservation(requestId, paths, instant);
                 Jobs.Add(requestId, job);
                 UploadState.SetUploadState(requestId: requestId, state: "preparing", active: true,
                     clipName: name, kind: kind);
@@ -168,10 +171,11 @@ namespace ReplayKitHelper
             private readonly object gate = new object();
             private readonly string id;
             internal readonly string[] Paths;
+            internal readonly bool Instant;
             internal readonly CancellationTokenSource Source = new CancellationTokenSource();
             private bool started, finished, committed;
 
-            internal Reservation(string id, string[] paths) { this.id = id; Paths = paths; }
+            internal Reservation(string id, string[] paths, bool instant) { this.id = id; Paths = paths; Instant = instant; }
 
             public void Start<T>(Func<T> work, Action<Task<T>> complete)
             {

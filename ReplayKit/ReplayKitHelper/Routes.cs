@@ -2820,7 +2820,12 @@ namespace ReplayKitHelper
                 if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                 try
                 {
-                    JobCoordinator.Commit(requestId, () => File.Move(selected.Full, newPath));
+                    JobCoordinator.Commit(requestId, () =>
+                    {
+                        // a restore from deleted history or a save can take the name between the check above and here
+                        if (!caseOnly && File.Exists(newPath)) throw new IOException("A file with that name already exists");
+                        File.Move(selected.Full, newPath);
+                    });
                     // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
                     Clips.UpdateDb(db =>
                     {

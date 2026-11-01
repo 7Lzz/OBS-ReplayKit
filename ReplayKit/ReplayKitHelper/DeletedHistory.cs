@@ -23,6 +23,41 @@ namespace ReplayKitHelper
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
+        // a record that cannot be read turned every delete away; it is kept aside, and the files of the hidden folder come back as recovered items, so they can still be restored and still expire. runs under Gate
+        private static void Heal()
+        {
+            try { ClipStore.Read(StorePath(), db => true); return; }
+            catch (JsonException) { }
+            string store = StorePath();
+            string aside = store + ".broken-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            File.Move(store, aside);
+            string root = Path.GetFullPath(AppConfig.GetClipDir());
+            string dir = Path.Combine(root, FolderName);
+            var recovered = new JObject();
+            if (Directory.Exists(dir) && (File.GetAttributes(dir) & FileAttributes.ReparsePoint) == 0)
+            {
+                int days = Math.Max(1, ReplaykitSettings.GetDeletedHistoryDays());
+                foreach (var file in new DirectoryInfo(dir).EnumerateFiles().OrderBy(f => f.Name, StringComparer.Ordinal))
+                {
+                    string id = Path.GetFileNameWithoutExtension(file.Name);
+                    if (!ValidId(id) || (file.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                    bool shot = file.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase);
+                    recovered[id] = new JObject
+                    {
+                        ["kind"] = shot ? "screenshot" : "clip",
+                        ["name"] = "Recovered " + (recovered.Count + 1) + file.Extension.ToLowerInvariant(),
+                        ["folder"] = Path.Combine(root, shot ? "Screenshots" : "Unassigned"),
+                        ["stored"] = file.FullName,
+                        ["size"] = file.Length,
+                        ["deletedAt"] = Now(),
+                        ["keepDays"] = days,
+                    };
+                }
+            }
+            ClipStore.Update(store, db => { foreach (var prop in recovered.Properties()) db[prop.Name] = prop.Value; return true; });
+            Log.Write("Deleted history: the record could not be read, kept it as " + Path.GetFileName(aside) + " and recovered " + recovered.Count + " item(s) from the hidden folder");
+        }
+
         // moves the file into the history and says so; false when deleted history is off, and the caller then deletes it for good
         public static bool Keep(string path, string kind, string libraryRoot, JObject record)
         {
@@ -49,6 +84,7 @@ namespace ReplayKitHelper
             if (record != null) entry["record"] = record;
             lock (Gate)
             {
+                Heal();
                 File.Move(path, stored);
                 try { ClipStore.Update(StorePath(), db => { db[id] = entry; return true; }); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
@@ -71,7 +107,11 @@ namespace ReplayKitHelper
             var items = new JArray();
             long total = 0;
             JObject db;
-            lock (Gate) db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone());
+            lock (Gate)
+            {
+                Heal();
+                db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone());
+            }
             foreach (var prop in db.Properties().OrderByDescending(p => (p.Value as JObject)?["deletedAt"]?.Value<long>() ?? 0))
             {
                 if (!(prop.Value is JObject entry)) continue;
@@ -119,6 +159,7 @@ namespace ReplayKitHelper
             if (!ValidId(id)) return Fail("That deleted item was not found.");
             lock (Gate)
             {
+                Heal();
                 var entry = ClipStore.Read(StorePath(), db => (db[id] as JObject)?.DeepClone() as JObject);
                 string stored = entry?["stored"]?.Value<string>();
                 if (string.IsNullOrEmpty(stored) || !File.Exists(stored))
@@ -139,7 +180,9 @@ namespace ReplayKitHelper
                 string restored = FreeName(folder, name, screenshot);
                 if (restored == null) return Fail("There is no free name to restore that item under.");
                 string target = Path.Combine(folder, restored);
-                File.Move(stored, target);
+                // a rename or a save can take the name between the check and the move
+                try { File.Move(stored, target); }
+                catch (IOException) when (File.Exists(target)) { return Fail("Another clip just took that name. Try restoring it again."); }
                 Forget(id);
                 var record = entry["record"] as JObject;
                 if (screenshot)
@@ -172,6 +215,7 @@ namespace ReplayKitHelper
             if (!ValidId(id)) return Fail("That deleted item was not found.");
             lock (Gate)
             {
+                Heal();
                 var entry = ClipStore.Read(StorePath(), db => (db[id] as JObject)?.DeepClone() as JObject);
                 if (entry == null) return Fail("That deleted item was not found.");
                 DeleteStored(entry);
@@ -185,6 +229,7 @@ namespace ReplayKitHelper
             int removed = 0;
             lock (Gate)
             {
+                Heal();
                 var db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone());
                 foreach (var prop in db.Properties().ToList())
                 {
@@ -215,7 +260,7 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 JObject db;
-                try { db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone()); }
+                try { Heal(); db = ClipStore.Read(StorePath(), data => (JObject)data.DeepClone()); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException) { Log.Write("Deleted history: could not be read: " + ex.Message); return; }
                 var gone = new List<string>();
                 foreach (var prop in db.Properties())

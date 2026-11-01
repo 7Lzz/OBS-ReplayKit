@@ -188,8 +188,16 @@ window.RKDeleted = {
         : days > 0 ? "Nothing here. Clips and screenshots you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good."
         : "Deleted history is off, so deletes are final. Turn it on in Settings, under Storage.";
     }
+    // the page asks for the list from several places as it starts and as things change, so asks that come while a read is out are folded into one more read after it
+    let reading = null, readAgain = false;
     async function refresh() {
       if (document.hidden) return;
+      if (reading) { readAgain = true; return reading; }
+      reading = read();
+      try { await reading; } finally { reading = null; }
+      if (readAgain) { readAgain = false; return refresh(); }
+    }
+    async function read() {
       refreshedAt = Date.now();
       const run = ++epoch;
       try {

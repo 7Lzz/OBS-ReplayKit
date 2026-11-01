@@ -216,6 +216,47 @@ if (Test-Path ""C:\IddSampleDriver"") {
             return result.ExitCode == 0;
         }
 
+        // the items of deleted history live in a hidden folder of the clip folder, which the config wipe never reaches, so they would stay hidden on the disk for good; only the files the history recorded, inside a folder of that name, are removed
+        public static bool EmptyDeletedHistory(Action<string> log = null)
+        {
+            string store = Path.Combine(Config.REPLAYKIT_CONFIG, "deleted_history.json");
+            if (!File.Exists(store)) return true;
+            JObject db;
+            try { db = JObject.Parse(File.ReadAllText(store)); }
+            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is JsonException)
+            {
+                log?.Invoke("warn: deleted history could not be read: " + exc.Message);
+                return false;
+            }
+            bool ok = true;
+            int removed = 0;
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var prop in db.Properties())
+            {
+                string stored = (prop.Value as JObject)?["stored"]?.Value<string>();
+                if (string.IsNullOrEmpty(stored) || !Path.IsPathRooted(stored)) continue;
+                string folder = Path.GetDirectoryName(Path.GetFullPath(stored));
+                if (!string.Equals(Path.GetFileName(folder), ".replaykit-deleted", StringComparison.OrdinalIgnoreCase)) continue;
+                folders.Add(folder);
+                try
+                {
+                    if (File.Exists(stored) && (File.GetAttributes(stored) & FileAttributes.ReparsePoint) == 0) { File.Delete(stored); removed++; }
+                }
+                catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
+                {
+                    ok = false;
+                    log?.Invoke("warn: could not delete " + stored + ": " + exc.Message);
+                }
+            }
+            foreach (string folder in folders)
+            {
+                try { if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder); }
+                catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException) { log?.Invoke("warn: could not remove " + folder + ": " + exc.Message); }
+            }
+            log?.Invoke("deleted history emptied: " + removed + " item(s)");
+            return ok;
+        }
+
         public static bool WipeObsConfig(Action<string> log = null)
         {
             if (!Directory.Exists(Config.REPLAYKIT_CONFIG)) return true;
@@ -823,6 +864,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
                 steps.Add(("Keep ReplayKit settings", "Saves current ReplayKit settings for the next install.", () => SaveUserSettings(progress.LogLine)));
             else
                 steps.Add(("Remove ReplayKit settings", "Deletes saved ReplayKit preferences.", () => RemoveUserSettings(progress.LogLine)));
+            steps.Add(("Empty deleted history", "Deletes the clips and screenshots that are waiting in ReplayKit's deleted history, since nothing could restore or clear them once ReplayKit is gone.", () => EmptyDeletedHistory(progress.LogLine)));
             steps.Add(("Wipe OBS ReplayKit config", "Deletes ReplayKit's OBS config folder while preserving OBS scenes and profiles.", () => WipeObsConfig(progress.LogLine)));
             steps.Add(("Clear the setup cache", "Removes Streamable login data and schedules the cached uninstaller in LOCALAPPDATA for deletion on the next reboot.", () => ClearSetupCache(keepUserSettings, progress.LogLine)));
             if (removeObs)
