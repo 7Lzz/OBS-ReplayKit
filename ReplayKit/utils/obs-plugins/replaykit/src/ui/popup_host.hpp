@@ -25,6 +25,8 @@ public:
 	static void Release(const void *owner);
 	static void Reload(const QString &url);
 	static void Destroy();
+	// false while the window is kept off the screen until its page has drawn what it was asked to show
+	static bool Revealed();
 	static QJsonObject Probe();
 };
 

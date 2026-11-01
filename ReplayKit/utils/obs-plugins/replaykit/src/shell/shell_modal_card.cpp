@@ -319,6 +319,11 @@ void ModalCard::CheckCardPainted(int run)
 {
 	if (run != m_run || !IsOpen())
 		return;
+	// a card still kept off the screen until its page has drawn shows what is under it, which is not an empty card
+	if (!PopupHost::Revealed()) {
+		QTimer::singleShot(250, m_curtain.data(), [this, run]() { CheckCardPainted(run); });
+		return;
+	}
 	if (!CardLooksEmpty()) {
 		m_heals = 0;
 		return;

@@ -19,12 +19,14 @@
     "/notification-reader-view": ["__replaykitShowReader", "__replaykitHideReader"]
   };
   let active = "";
+  // the last pick of the plugin that has been drawn; the plugin keeps the window off the screen until the one it asked for is
+  let drawn = 0;
   function find(raw) {
     const url = new URL(raw, location.href);
     if (url.origin !== location.origin || !Object.hasOwn(hooks, url.pathname)) throw new Error("Unknown popup page");
     return { page: pages.get(url.pathname), url };
   }
-  function report() { document.title = "rk-popup-ready:" + Array.from(pages).filter(([, p]) => p.ready).map(([path]) => path).sort().join(","); }
+  function report() { document.title = "rk-popup-ready:" + Array.from(pages).filter(([, p]) => p.ready).map(([path]) => path).sort().join(",") + "|" + drawn; }
   function hide(page) {
     page.el.classList.remove("on");
     page.el.inert = true;
@@ -36,7 +38,7 @@
     page.hash = target.url.hash;
     if (page.ready && page.el.contentWindow.location.hash !== page.hash) page.el.contentWindow.location.hash = page.hash;
   }
-  function select(raw) {
+  function select(raw, pick) {
     const target = find(raw);
     url(raw);
     for (const page of pages.values()) {
@@ -45,6 +47,11 @@
     }
     active = target.url.pathname;
     if (target.page.ready) target.page.el.contentWindow.focus();
+    // two frames of the page it picked: the first one with it showing is on the screen by the second
+    if (pick > 0) {
+      const w = target.page.ready ? target.page.el.contentWindow : window;
+      w.requestAnimationFrame(() => w.requestAnimationFrame(() => { if (pick > drawn) { drawn = pick; report(); } }));
+    }
   }
   function run(raw, script) {
     const page = find(raw).page;

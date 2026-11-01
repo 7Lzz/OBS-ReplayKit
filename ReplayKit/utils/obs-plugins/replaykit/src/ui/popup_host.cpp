@@ -21,6 +21,13 @@ QSet<QString> ready;
 const void *active = nullptr;
 QString activeUrl;
 std::function<void()> suspend;
+// the window is cloaked from each pick of a page until the page says that pick has been drawn: the page shares its renderer with the pages of the shell, which keep it busy at startup, and the window came up empty until the pick got its turn
+int pick = 0;
+bool held = false;
+// how long a page that never answers can keep the window off the screen
+constexpr int kHoldCapMs = 2500;
+// DWMWA_CLOAK: a cloaked window is still composed and painted, but not put on the screen
+constexpr DWORD kDwmCloak = 13;
 
 QString Page(const QString &url)
 {
@@ -41,6 +48,29 @@ void Call(const char *method, const QJsonArray &args)
 	QByteArray values = QJsonDocument(args).toJson(QJsonDocument::Compact);
 	values = values.mid(1, values.size() - 2);
 	RunBrowserScript(browser, "window.RKPopup && window.RKPopup." + std::string(method) + "(" + values.toStdString() + ");");
+}
+
+void Hold(bool on)
+{
+	if (!window || held == on)
+		return;
+	held = on;
+	const BOOL value = on ? TRUE : FALSE;
+	DwmSetWindowAttribute((HWND)window->winId(), kDwmCloak, &value, sizeof(value));
+}
+
+// asks the page for a pick and keeps the window cloaked until the page says that pick is drawn, or the cap runs out
+void Pick(const QString &url)
+{
+	const int seq = ++pick;
+	Hold(true);
+	Call("select", {url, seq});
+	QTimer::singleShot(kHoldCapMs, window, [seq]() {
+		if (seq != pick || !held)
+			return;
+		blog(LOG_WARNING, "[replaykit] the popup page did not draw its pick in time, so it is shown as it is");
+		Hold(false);
+	});
 }
 
 } // namespace
@@ -71,14 +101,21 @@ QWidget *PopupHost::Prepare(QWidget *owner)
 		Destroy();
 		return nullptr;
 	}
+	// the title is the pages that are up, then after a bar the last pick the page has drawn
 	QObject::connect(probe, &QLineEdit::textChanged, window, [](const QString &title) {
 		if (!title.startsWith(QLatin1String("rk-popup-ready:")))
 			return;
-		ready.clear();
-		for (const QString &path : title.mid(15).split(QLatin1Char(','), Qt::SkipEmptyParts))
+		const int bar = title.indexOf(QLatin1Char('|'));
+		QSet<QString> up;
+		for (const QString &path : title.mid(15, bar < 0 ? -1 : bar - 15).split(QLatin1Char(','), Qt::SkipEmptyParts))
 			if (!Page(QStringLiteral("http://127.0.0.1:8767") + path).isEmpty())
-				ready.insert(path);
-		if (active)
+				up.insert(path);
+		const bool changed = up != ready;
+		ready = up;
+		if (bar >= 0 && title.mid(bar + 1).toInt() == pick)
+			Hold(false);
+		// a page that came back up while it is the one showing is picked again
+		if (changed && active)
 			Call("select", {activeUrl});
 	});
 	return window;
@@ -109,7 +146,7 @@ bool PopupHost::Acquire(const void *owner, QWidget *windowOwner, const QString &
 	DwmSetWindowAttribute((HWND)window->winId(), 33, &square, sizeof(square));
 	DwmSetWindowAttribute((HWND)window->winId(), 34, &noBorder, sizeof(noBorder));
 	SetOwner(owner, windowOwner);
-	Call("select", {url});
+	Pick(url);
 	return true;
 }
 
@@ -141,6 +178,7 @@ void PopupHost::Release(const void *owner)
 	Call("park", {});
 	if (window) {
 		window->hide();
+		Hold(false);
 		// the owner it was lent to can be deleted next (a card that is built again deletes its dim), and windows destroys the windows a window owns along with it, the browser inside included, so it goes back to the obs window
 		if (QWidget *host = window->parentWidget())
 			SetWindowLongPtrW((HWND)window->winId(), GWLP_HWNDPARENT, (LONG_PTR)host->winId());
@@ -165,15 +203,18 @@ void PopupHost::Destroy()
 	activeUrl.clear();
 	suspend = nullptr;
 	ready.clear();
+	held = false;
 	if (window)
 		delete window.data();
 	browser.clear();
 }
 
+bool PopupHost::Revealed() { return !held; }
+
 QJsonObject PopupHost::Probe()
 {
 	return {{"built", !window.isNull()}, {"visible", window && window->isVisible()}, {"parked", false}, {"page", Page(activeUrl)},
-		{"readyPages", ready.size()}, {"surface", window ? QString::number(quintptr(window->internalWinId()), 16) : QString()}};
+		{"readyPages", ready.size()}, {"held", held}, {"surface", window ? QString::number(quintptr(window->internalWinId()), 16) : QString()}};
 }
 
 } // namespace rk
