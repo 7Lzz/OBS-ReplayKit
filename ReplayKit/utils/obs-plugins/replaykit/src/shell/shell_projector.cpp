@@ -32,6 +32,46 @@ bool WindowOnScreen()
 	return mw && mw->isVisible() && !mw->isMinimized();
 }
 
+class SourceSettingsHost : public QWidget {
+public:
+	explicit SourceSettingsHost(QWidget *parent) : QWidget(parent)
+	{
+		setObjectName(QStringLiteral("sourceSettingsHost"));
+		setAttribute(Qt::WA_NativeWindow, true);
+		setAttribute(Qt::WA_OpaquePaintEvent, true);
+		setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	}
+
+protected:
+	void paintEvent(QPaintEvent *) override
+	{
+		QPainter painter(this);
+		painter.fillRect(rect(), g_chromeBg);
+	}
+	bool nativeEvent(const QByteArray &, void *message, qintptr *result) override
+	{
+		const MSG *msg = static_cast<MSG *>(message);
+		if (!msg || msg->message != WM_ERASEBKGND)
+			return false;
+		RECT area;
+		GetClientRect(msg->hwnd, &area);
+		HBRUSH brush = CreateSolidBrush(RGB(g_chromeBg.red(), g_chromeBg.green(), g_chromeBg.blue()));
+		FillRect(reinterpret_cast<HDC>(msg->wParam), &area, brush);
+		DeleteObject(brush);
+		*result = 1;
+		return true;
+	}
+	bool eventFilter(QObject *watched, QEvent *event) override
+	{
+		QWidget *context = static_cast<QWidget *>(watched);
+		if (event->type() == QEvent::ShowToParent && !context->isHidden() && isHidden())
+			show();
+		else if (event->type() == QEvent::HideToParent && context->isHidden() && !isHidden())
+			hide();
+		return false;
+	}
+};
+
 // the sources panel of obs is the way to add a camera, a text or a picture to the scene, so the projector view has it under the preview and no other view does. it is only shown and hidden, never closed, since closing a dock of obs asks a question first
 void ShowSourcesPanel(bool show)
 {
@@ -47,9 +87,6 @@ void ShowSourcesPanel(bool show)
 	}
 	if (dock->isHidden() == show)
 		dock->setVisible(show);
-	// the stage is what is left of the window around the dock, and the views read it right after this
-	if (QLayout *layout = mw->layout())
-		layout->activate();
 }
 
 ShellCurtain *Cover()
@@ -194,6 +231,11 @@ private:
 			if (QRect(at, g_shellCorner->size()).intersects(rect()))
 				shape = shape.subtracted(QRegion(ShellCornerEar()).translated(at));
 		}
+		if (g_shellGrip && g_shellGrip->isVisible()) {
+			const QPoint at = g_shellGrip->mapToGlobal(QPoint(0, 0)) - geometry().topLeft();
+			const QRegion grip = g_shellGrip->mask().isEmpty() ? QRegion(g_shellGrip->rect()) : g_shellGrip->mask();
+			shape = shape.subtracted(grip.translated(at));
+		}
 		if (m_whole)
 			shape = shape.subtracted(WindowCorners());
 		if (shape != m_shape) {
@@ -315,12 +357,43 @@ void ShellProjectorSetup()
 		QSizePolicy policy = context->sizePolicy();
 		policy.setVerticalPolicy(QSizePolicy::Fixed);
 		context->setSizePolicy(policy);
+		if (QLayout *layout = context->layout())
+			layout->setContentsMargins(6, 6, 6, 6);
+		QWidget *parent = context->parentWidget();
+		if (parent && parent->objectName() != QLatin1String("sourceSettingsHost") && parent->layout()) {
+			const bool shown = !context->isHidden();
+			auto *host = new SourceSettingsHost(parent);
+			if (QLayoutItem *item = parent->layout()->replaceWidget(context, host)) {
+				delete item;
+				auto *layout = new QVBoxLayout(host);
+				layout->setContentsMargins(12, 4, 12, 8);
+				layout->setSpacing(0);
+				layout->addWidget(context);
+				context->installEventFilter(host);
+				context->setVisible(shown);
+				host->setVisible(shown);
+			} else {
+				delete host;
+				blog(LOG_WARNING, "[replaykit] the source settings could not be wrapped in their background");
+			}
+		}
 	}
+	if (QDockWidget *sources = mw->findChild<QDockWidget *>(QStringLiteral("sourcesDock")))
+		if (sources->widget() && sources->widget()->layout())
+			sources->widget()->layout()->setContentsMargins(12, 0, 12, 12);
 }
 
 void ShellProjectorPrepare()
 {
+	QMainWindow *mw = ObsMainWindowQt();
+	QLayout *layout = mw ? mw->layout() : nullptr;
+	const bool enabled = layout && layout->isEnabled();
+	// the dock and the projector strip change together, before the caller lays out the stage
+	if (enabled)
+		layout->setEnabled(false);
 	ShowSourcesPanel(ProjectorShowing());
+	if (enabled)
+		layout->setEnabled(true);
 }
 
 void ShellProjectorApply()

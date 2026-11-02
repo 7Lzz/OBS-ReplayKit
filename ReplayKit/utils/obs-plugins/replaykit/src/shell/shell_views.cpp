@@ -577,8 +577,13 @@ static void FinishActivate(ShellView view, bool coverUp, bool entering, bool dip
 	if (dipIn) {
 		const int gen = g_activateGen;
 		QTimer::singleShot(kSettleMs, g_callbacks, [gen]() {
-			if (gen == g_activateGen)
+			if (gen == g_activateGen) {
+				if (QMainWindow *window = ObsMainWindowQt())
+					if (QWidget *central = window->centralWidget())
+						central->repaint();
+				DwmFlush();
 				ShellProjectorReveal();
+			}
 		});
 	}
 	if (g_shellRail) {

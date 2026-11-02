@@ -13,6 +13,7 @@
 
 #include <QCheckBox>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QWindowStateChangeEvent>
 
@@ -22,6 +23,33 @@ namespace {
 
 HBRUSH g_pageBrush = nullptr;
 QRgb g_pageBrushColor = 0;
+
+QString SourceResizeStyle()
+{
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/source-resize");
+	if (!QDir().mkpath(dir)) {
+		blog(LOG_WARNING, "[replaykit] the source resize indicator folder could not be made");
+		return {};
+	}
+	QStringList images;
+	for (int hover = 0; hover < 2; ++hover) {
+		const QString path = dir + QLatin1Char('/') + g_notifyTipFg.name().mid(1) + QStringLiteral("-46x10-") + QString::number(hover) + QStringLiteral(".svg");
+		if (!QFile::exists(path)) {
+			QSaveFile file(path);
+			const QByteArray svg = QStringLiteral("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"46\" height=\"10\"><rect y=\"3\" width=\"46\" height=\"3\" rx=\"1.5\" fill=\"%1\" fill-opacity=\"%2\"/></svg>")
+				.arg(g_notifyTipFg.name(), hover ? QStringLiteral(".55") : QStringLiteral(".22")).toUtf8();
+			if (!file.open(QIODevice::WriteOnly) || file.write(svg) != svg.size() || !file.commit()) {
+				blog(LOG_WARNING, "[replaykit] the source resize indicator could not be written");
+				return {};
+			}
+		}
+		images.append(QDir::fromNativeSeparators(path));
+	}
+	return QStringLiteral("QMainWindow#OBSBasic::separator { width:10px; height:10px; background:%1; }"
+			      "QMainWindow#OBSBasic::separator:horizontal { image:url(\"%2\"); image-position:center; }"
+			      "QMainWindow#OBSBasic::separator:horizontal:hover { image:url(\"%3\"); }")
+		.arg(g_chromeBg.name(), images[0], images[1]);
+}
 
 // windows fills a native window with the background of its class where it has grown and nothing is drawn yet, and the windows cef keeps under a page carry white, which flashed along the edges while the window was resized; they and the window itself take the window colour instead, again whenever the theme changes it. an earlier brush is never deleted, since a window of the same class elsewhere may still be using it
 void ShellTintBrowserWindows(QMainWindow *mw, QWidget *browser)
@@ -227,31 +255,68 @@ void ShellTintPreview()
 	}
 	const QString sourcesStyle = QStringLiteral(
 		"QDockWidget#sourcesDock, #dockWidgetContents_6, #sourcesFrame, SourceTree { background:%1; color:%3; }"
-		"QDockWidget::title { background:%2; color:%3; border:none; }"
-		"#sourcesToolbar { background:%2; color:%3; }"
-		"SourceTree { alternate-background-color:%1; selection-background-color:%4; selection-color:%5; }"
+		"QDockWidget#sourcesDock, #dockWidgetContents_6 { border:none; }"
+		"QDockWidget::title { background:%1; color:%3; border:none; padding-left:12px; }"
+		"#sourcesFrame { border:none; border-radius:8px; }"
+		"#sourcesToolbar { background:transparent; color:%3; border:none; padding:4px 6px; }"
+		"#sourcesToolbar QToolButton:hover { background:%2; border-radius:6px; }"
+		"SourceTree { border:none; border-radius:8px; padding:6px 14px; alternate-background-color:%1; selection-background-color:%4; selection-color:%5; }"
+		"SourceTree QScrollBar:vertical { background:transparent; border:none; width:8px; margin:0px; }"
+		"SourceTree QScrollBar::handle:vertical { background:%7; min-height:24px; border-radius:4px; }"
+		"SourceTree QScrollBar::handle:vertical:hover { background:%8; }"
+		"SourceTree QScrollBar::add-line:vertical, SourceTree QScrollBar::sub-line:vertical { height:0px; border:none; background:transparent; }"
+		"SourceTree QScrollBar::add-page:vertical, SourceTree QScrollBar::sub-page:vertical { background:transparent; border:none; }"
 		"SourceTreeItem { background:transparent; color:%3; }"
 		// the last rows stop above the resize corner, which sits over the bottom right of the window
 		"SourceTree { padding-bottom:%6px; }"
-		"SourceTree::item:selected { background:%4; }"
+		"SourceTree::item:selected { background:%4; border-radius:5px; }"
 		"SourceTreeItem[rkSelected=\"true\"], SourceTreeItem[rkSelected=\"true\"] QLabel { color:%5; }")
-		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name(), QString::number(kShellGrip))
+		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name(), QString::number(kShellGrip), ChromeInk(0.26).name(QColor::HexArgb), ChromeInk(0.46).name(QColor::HexArgb))
 		+ InkedIndicatorRules(g_menuOnAccent);
 	if (QWidget *sources = mw->findChild<QWidget *>(QStringLiteral("sourcesDock"))) {
 		if (sources->styleSheet() != sourcesStyle)
 			sources->setStyleSheet(sourcesStyle);
 		HookSourceSelection(sources);
 	}
-	// the theme gives the toolbar a 4px top margin that nothing paints, so whatever obs settings left there in the window backing store stayed on screen above it; the gap is drawn as a top border in the stage colour instead
+	// the source settings use the editor toolbar's panel mix, rounded outline and inset ends
+	const QColor editorPanel(qRound(g_menuPanel.red() * 0.45 + g_chromeBg.red() * 0.55),
+				 qRound(g_menuPanel.green() * 0.45 + g_chromeBg.green() * 0.55),
+				 qRound(g_menuPanel.blue() * 0.45 + g_chromeBg.blue() * 0.55));
+	QWidget *central = mw->centralWidget();
+	const QMargins stageMargins = central && central->layout() ? central->layout()->contentsMargins() : QMargins();
+	const int leftGap = qMax(0, 12 - stageMargins.left());
+	const int rightGap = qMax(0, 12 - stageMargins.right());
+	if (central) {
+		central->setAutoFillBackground(true);
+		QPalette palette = central->palette();
+		if (palette.color(QPalette::Window) != g_chromeBg) {
+			palette.setColor(QPalette::Window, g_chromeBg);
+			central->setPalette(palette);
+		}
+	}
 	const QString contextStyle = QStringLiteral(
-		"#contextContainer, #contextSubContainer { background:%1; color:%2; }"
-		"#contextContainer { margin-top:0px; border-top:4px solid %6; border-top-left-radius:0px; border-top-right-radius:0px; }"
+		"#contextContainer { background:%1; color:%2; margin:0px; border:1px solid %3; border-radius:8px; }"
+		"#contextSubContainer { background:transparent; color:%2; border:none; }"
 		"QLabel { color:%2; } QPushButton { background:%3; color:%2; border:1px solid %4; }"
 		"QPushButton:hover { background:%4; } QPushButton:disabled { color:%5; }")
-		.arg(g_menuPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name(), g_chromeBg.name());
+		.arg(editorPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name());
 	if (QWidget *context = mw->findChild<QWidget *>(QStringLiteral("contextContainer"))) {
+		QWidget *host = context->parentWidget();
+		if (host && host->objectName() == QLatin1String("sourceSettingsHost") && host->layout())
+			host->layout()->setContentsMargins(leftGap, 4, rightGap, 8);
 		if (context->styleSheet() != contextStyle)
 			context->setStyleSheet(contextStyle);
+	}
+	const QString resizeStyle = SourceResizeStyle();
+	if (!resizeStyle.isEmpty()) {
+		const QString previous = mw->property("rkSourceResizeStyle").toString();
+		QString style = mw->styleSheet();
+		if (previous != resizeStyle || !style.contains(resizeStyle)) {
+			if (!previous.isEmpty())
+				style.remove(previous);
+			mw->setProperty("rkSourceResizeStyle", resizeStyle);
+			mw->setStyleSheet(style + resizeStyle);
+		}
 	}
 }
 
