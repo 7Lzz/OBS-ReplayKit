@@ -13,6 +13,7 @@
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
+#include "app/clip_buffer.hpp"
 #include "ui/anchored_panel.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_types.hpp"
@@ -91,15 +92,21 @@ protected:
 				g_obsSettingsDialog->close();
 			return true;
 		}
-		if (type != QEvent::Close || !g_closeToTray)
+		if (type != QEvent::Close)
 			return false;
 
-		if (GetTickCount64() < g_allowCloseUntilMs.load())
-			return false; // a real restart/exit is in progress -- let obs close and save geometry
-
 		QSystemTrayIcon *tray = (QSystemTrayIcon *)obs_frontend_get_system_tray();
-		if (!tray || !tray->isVisible())
-			return false; // nothing to minimize into -- fall back to a normal close
+		if (!g_closeToTray || GetTickCount64() < g_allowCloseUntilMs.load() || !tray || !tray->isVisible()) {
+			if (ClipBufferPrepareClose())
+				return false;
+			event->ignore();
+			if (!closePending) {
+				closePending = true;
+				closeDeadline = GetTickCount64() + 10000;
+				QTimer::singleShot(100, this, [this]() { WaitForBuffer(); });
+			}
+			return true;
+		}
 
 		// EXIT wont fire on a hide-to-tray, so capture position now.
 		SaveWindowGeometry("obsMainWindow", m_mw);
@@ -114,6 +121,24 @@ protected:
 	}
 
 private:
+	void WaitForBuffer()
+	{
+		if (ClipBufferPrepareClose()) {
+			closePending = false;
+			if (!m_mw->close())
+				ClipBufferCancelClose();
+			return;
+		}
+		if (GetTickCount64() >= closeDeadline) {
+			closePending = false;
+			ClipBufferCancelClose();
+			blog(LOG_WARNING, "[replaykit] close cancelled: disk clip buffer did not stop in 10 seconds");
+			return;
+		}
+		QTimer::singleShot(100, this, [this]() { WaitForBuffer(); });
+	}
+	bool closePending = false;
+	ULONGLONG closeDeadline = 0;
 	void ScheduleIconRefresh()
 	{
 		if (m_iconRefreshQueued)

@@ -19,6 +19,7 @@ namespace ReplayKitHelper
     internal static class Routes
     {
         private static readonly string[] AppIconExtensions = { ".ico", ".png", ".jpg", ".jpeg", ".bmp" };
+        private static readonly object RenameGate = new object();
 
         // "40-a1b2c3d4.ico" -> "40" -- drop the source-hash suffix ImportCustomIcon appends so the grid shows a clean label.
         private static string UserIconLabel(string fileName) =>
@@ -244,27 +245,43 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // close the main window first so obss own closeEvent runs and saves window position to global.ini -- Process.Kill() skips that entirely, which is why obs kept reopening at a stale (sometimes wrong-monitor) position after every replaykit-triggered restart. uses Native.CloseObsMainWindow (hwnd published once per session by the native plugin) instead of MainWindowHandle/CloseMainWindow() -- .nets heuristic can grab a parked/hidden Discord-share projector instead of the real main window, which silently skips the graceful close and falls thru to the force-kill below every time. obs-browser-page helpers never own the published main-window hwnd so this is correctly a no-op for them.
+        // leave obs and the helper running if a normal close cannot finish
         private static void StopObsForRestart(string reason)
         {
             Thread.Sleep(300);
-            // tell the plugins close-to-tray filter this WM_CLOSE is a real restart/exit, not the user clicking X -- otherwise it swallows the close and obs never gets to save its geometry before the force-kill below. wait for the plugin to ack so the close cant beat the message; proceed anyway if it doesnt (older bundle without the pipe -- same as before this signal existed).
-            try { if (!PipeClient.SendAllowCloseAndWait(1000)) Log.Write(reason + ": native plugin did not ack ALLOWCLOSE; proceeding."); } catch { }
-            var procs = GetProcessesByNames("obs64", "obs32", "obs", "obs-browser-page");
-            foreach (var p in procs)
+            try
             {
-                try { Native.CloseObsMainWindow((uint)p.Id); } catch { }
+                if (!PipeClient.SendAllowCloseAndWait(1000))
+                    Log.Write(reason + ": native plugin did not acknowledge ALLOWCLOSE.");
             }
-            DateTime deadline = DateTime.UtcNow.AddMilliseconds(5000);
+            catch (Exception ex) { Log.Write(reason + ": close acknowledgement failed: " + ex.Message); }
+            var procs = GetProcessesByNames("obs64", "obs32", "obs");
+            bool stopped = true;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(15);
             foreach (var p in procs)
             {
-                int remaining = (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds);
-                try { if (!p.HasExited) p.WaitForExit(remaining); } catch (InvalidOperationException) { } catch (Win32Exception) { }
+                try
+                {
+                    if (Constants.IsRoleHost(p)) continue;
+                    Native.CloseObsMainWindow((uint)p.Id);
+                    int remaining = (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds);
+                    if (!p.HasExited && !p.WaitForExit(remaining)) stopped = false;
+                }
+                catch (InvalidOperationException) { }
+                catch (Win32Exception ex)
+                {
+                    stopped = false;
+                    Log.Write(reason + ": could not confirm OBS exit: " + ex.Message);
+                }
+                finally { p.Dispose(); }
             }
-            foreach (var p in procs)
+            if (!stopped)
             {
-                try { if (!p.HasExited) p.Kill(); }
-                catch (Exception ex) { Log.Write(reason + ": Stop-Process PID " + p.Id + " failed: " + ex.Message); }
+                Server.State.RestartAfterCleanObsPath = null;
+                const string message = "OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.";
+                Log.Write(reason + ": " + message);
+                Notifications.Add("warning", "obs-close-timeout", "OBS could not close safely", message);
+                return;
             }
             Server.State.Shutdown = true;
         }
@@ -304,7 +321,7 @@ namespace ReplayKitHelper
             }
         }
 
-        // arms the detached relauncher (or falls back to the legacy in-process path), sends the response, then force-closes obs. shared by /settings' restart-required branch, /restart-obs, and /restart-obs-clean.
+        // arms the detached relauncher (or the in-process path) before requesting a normal obs close. shared by /settings' restart-required branch, /restart-obs, and /restart-obs-clean.
         private static void ArmRelaunchAndCloseObs(string obsPath, string routeName)
         {
             int obsTargetPid = 0;
@@ -572,11 +589,17 @@ namespace ReplayKitHelper
             string Q(string key, string def = "") => query.TryGetValue(key, out string v) ? v : def;
             bool QFlag(string key) => query.TryGetValue(key, out string v) && v == "1";
 
-            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set" || path == "/games/reset")
+            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set" || path == "/games/reset" || path == "/games/remove")
             {
                 try
                 {
-                    if (path == "/games/set" || path == "/games/reset")
+                    if (path == "/games/remove")
+                    {
+                        if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                        GameCatalog.Remove(Q("id"));
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                    }
+                    else if (path == "/games/set" || path == "/games/reset")
                     {
                         if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                         string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file")) : Clips.GetSafeClipPath(Q("file"))?.Full;
@@ -2802,43 +2825,55 @@ namespace ReplayKitHelper
             if (path == "/rename")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Source clip not found" }); return false; }
-                string newName = Clips.GetSafeFilename(query.ContainsKey("to") ? query["to"] : null);
-                if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad new filename" }); return false; }
-                if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
-                // the name is all a rename changes; the pages keep the extension, and a clip under another one would be read as another kind of file
-                if (!string.Equals(Path.GetExtension(newName), Path.GetExtension(selected.Name), StringComparison.OrdinalIgnoreCase)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "A rename keeps the file type of the clip" }); return false; }
-                // a renamed clip stays in its own folder, and the name stays unique across the clip folder and its game folders
-                string newPath = Path.Combine(Path.GetDirectoryName(selected.Full), newName);
-                if (newPath.Length >= 260) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "That name is too long" }); return false; }
-                // a change of capitals only is the same file to windows, so it is not a name another clip already has
-                bool caseOnly = string.Equals(newName, selected.Name, StringComparison.OrdinalIgnoreCase);
-                if (!caseOnly && (File.Exists(newPath) || Clips.NameTaken(newName))) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "A file with that name already exists" }); return false; }
-                string editorView = query.ContainsKey("view") && (query["view"] == "clips" || query["view"] == "home") ? query["view"] : null;
-                string requestId = UploadState.NewRequestId();
-                using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath, editorView);
-                if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
-                try
+                lock (RenameGate)
                 {
-                    JobCoordinator.Commit(requestId, () => JobCoordinator.ChangeSource(selected.Full, () =>
+                    var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
+                    if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Source clip not found" }); return false; }
+                    string newName = Clips.GetSafeFilename(query.ContainsKey("to") ? query["to"] : null);
+                    if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad new filename" }); return false; }
+                    if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
+                    // the name is all a rename changes; the pages keep the extension, and a clip under another one would be read as another kind of file
+                    if (!string.Equals(Path.GetExtension(newName), Path.GetExtension(selected.Name), StringComparison.OrdinalIgnoreCase)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "A rename keeps the file type of the clip" }); return false; }
+                    // a renamed clip stays in its own folder, and the name stays unique across the clip folder and its game folders
+                    try
                     {
-                        // a restore from deleted history or a save can take the name between the check above and here
-                        if (!caseOnly && File.Exists(newPath)) throw new IOException("A file with that name already exists");
-                        File.Move(selected.Full, newPath);
-                        JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);
-                    }));
-                    // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
-                    Clips.UpdateDb(db =>
+                        string requestedName = newName;
+                        newName = ClipFiles.AvailableName(newName, candidate =>
+                            !(string.Equals(candidate, selected.Name, StringComparison.OrdinalIgnoreCase) && string.Equals(candidate, requestedName, StringComparison.OrdinalIgnoreCase)) &&
+                            (Clips.NameTaken(candidate) || File.Exists(Path.Combine(Path.GetDirectoryName(selected.Full), candidate)) ||
+                             Directory.Exists(Path.Combine(Path.GetDirectoryName(selected.Full), candidate))));
+                    }
+                    catch (ArgumentException ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); return false; }
+                    if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
+                    string newPath = Path.Combine(Path.GetDirectoryName(selected.Full), newName);
+                    if (newPath.Length >= 260) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "That name is too long" }); return false; }
+                    // a change of capitals only is the same file to windows, so it is not a name another clip already has
+                    bool caseOnly = string.Equals(newName, selected.Name, StringComparison.OrdinalIgnoreCase);
+                    string editorView = query.ContainsKey("view") && (query["view"] == "clips" || query["view"] == "home") ? query["view"] : null;
+                    string requestId = UploadState.NewRequestId();
+                    using var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "rename", out string busy, newPath, editorView);
+                    if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
+                    try
                     {
-                        if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
-                        return true;
-                    }, Path.GetDirectoryName(selected.Full));
-                    EditDrafts.Rename(selected.Full, newPath);
-                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
+                        JobCoordinator.Commit(requestId, () => JobCoordinator.ChangeSource(selected.Full, () =>
+                        {
+                            // a restore from deleted history or a save can take the name between the check above and here
+                            if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath) || Clips.NameTaken(newName))) throw new IOException("A file with that name already exists");
+                            File.Move(selected.Full, newPath);
+                            JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);
+                        }));
+                        // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
+                        Clips.UpdateDb(db =>
+                        {
+                            if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
+                            return true;
+                        }, Path.GetDirectoryName(selected.Full));
+                        EditDrafts.Rename(selected.Full, newPath);
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
+                    }
+                    catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                    return false;
                 }
-                catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
-                return false;
             }
 
             if (path == "/me")
@@ -2935,7 +2970,7 @@ namespace ReplayKitHelper
 
             if (path == "/restart-obs")
             {
-                // plain restart -- close and reopen obs, no streamable sign-out, distinct from /restart-obs-clean below which forces a re-login; same relaunch mechanics as that route and the /settings restart-required branch: spawn the detached relauncher (survives this process dying, waits for the obs pid we hand it, then launches fresh), respond, then force-kill obs and set shutdown so our own accept loop exits and this port frees up for the new helper the relaunched obs will spawn.
+                // the detached relauncher starts obs only after the original process exits normally
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string obsPath = GetRunningObsPath();
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
@@ -2945,9 +2980,16 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/exit-obs/safety")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["gracefulOnly"] = true });
+                return false;
+            }
+
             if (path == "/exit-obs")
             {
-                // plain graceful exit, no relaunch -- reuses the same StopObsForRestart used by /restart-obs above, so the tray menus Exit button gets the same close-main-window-first-then-force-kill-if-needed behavior as a restart or clicking obss own X button, instead of skipping straight to a force-kill.
+                // requests a normal exit; a stalled shutdown is reported without killing obs
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is closing." });
                 StopObsForRestart("/exit-obs");
@@ -2956,7 +2998,7 @@ namespace ReplayKitHelper
 
             if (path == "/restart-obs-clean")
             {
-                // full-cycle "force re-login": note the obs executable path before we kill it, wipe the saved auth state immediately, send the response so the dock can react, then force-close obs64 + every obs-browser-page child. sets shutdown = true so our accept loop exits and the shutdown path runs the cookie cleanup (which needs the file unlocked, which happens once obs is dead), then relaunches obs via the path we saved.
+                // clears the sign-in state and requests a normal restart before the unlocked profile is cleaned
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string obsPath = GetRunningObsPath();
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
@@ -2967,7 +3009,7 @@ namespace ReplayKitHelper
                 Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile and will relaunch from '" + obsPath + "'.");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
 
-                // give the response a moment to flush before we kill obs (otherwise the docks fetch sees a torn connection).
+                // allow the response to flush before closing obs
                 StopObsForRestart("/restart-obs-clean");
                 return false;
             }

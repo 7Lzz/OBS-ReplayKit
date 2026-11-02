@@ -484,7 +484,7 @@ window.__rkEditorApi = (function () {
       side.classList.remove("is-closing");
     };
     const showing = () => Array.from(side.children).some((c) => c.classList.contains("editor-card") && !c.hidden && c !== ghost);
-    new MutationObserver((records) => {
+    const sideObserver = new MutationObserver((records) => {
       if (showing()) { if (ghost) end(); return; }
       if (ghost) return;
       const gone = records.find((r) => r.target.parentNode === side && r.oldValue === null && r.target.classList.contains("editor-card") && r.target.hidden);
@@ -499,7 +499,9 @@ window.__rkEditorApi = (function () {
       side.appendChild(ghost);
       side.classList.add("is-closing");
       timer = setTimeout(end, 140);
-    }).observe(side, { subtree: true, attributes: true, attributeFilter: ["hidden"], attributeOldValue: true });
+    });
+    sideObserver.observe(side, { subtree: true, attributes: true, attributeFilter: ["hidden"], attributeOldValue: true });
+    EDITOR_SIGNAL.addEventListener("abort", () => { sideObserver.disconnect(); end(); }, { once:true });
   })();
   // both overlays cover the frame that is saved, which is the whole of the output box
   const editorOutput = trimVideoWrap.querySelector(".editor-output");
@@ -1138,6 +1140,7 @@ window.__rkEditorApi = (function () {
 
   if (trimBar && window.ResizeObserver) {
     const trimSnapResizeObserver = new ResizeObserver(() => renderTrimSnapMarks());
+    EDITOR_SIGNAL.addEventListener("abort", () => trimSnapResizeObserver.disconnect(), { once:true });
     trimSnapResizeObserver.observe(trimBar);
   } else {
     window.addEventListener("resize", renderTrimSnapMarks, { signal: EDITOR_SIGNAL });

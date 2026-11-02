@@ -148,7 +148,7 @@ namespace ReplayKitHelper
         }, 1024 * 1024);
 
         // every game a clip or screenshot was ever tagged with stays one of the users games, so it is still offered after those clips are deleted; returns all of them
-        internal static List<Game> Played(IEnumerable<Game> seen)
+        internal static List<Game> Played(IEnumerable<Game> seen, bool restore = false)
         {
             var fresh = seen.Where(g => g != null && ValidId(g.Id) && !string.IsNullOrWhiteSpace(g.Name) && g.Name.Length <= 160).GroupBy(g => g.Id).Select(g => g.First()).ToList();
             var played = new List<Game>();
@@ -158,6 +158,12 @@ namespace ReplayKitHelper
                 foreach (var game in fresh)
                 {
                     var row = db[game.Id] as JObject;
+                    if (row?["hidden"]?.Type == JTokenType.Boolean && row["hidden"].Value<bool>())
+                    {
+                        if (!restore) continue;
+                        row.Remove("hidden");
+                        changed = true;
+                    }
                     if (row?["played"]?.Type == JTokenType.Boolean && row["played"].Value<bool>()) continue;
                     if (row == null && db.Count >= 1000) continue;
                     row = row ?? new JObject { ["name"] = game.Name };
@@ -170,6 +176,28 @@ namespace ReplayKitHelper
                 return changed;
             }, 1024 * 1024);
             return played;
+        }
+
+        internal static HashSet<string> Hidden() => ClipStore.Read(CustomFile, db => new HashSet<string>(db.Properties()
+            .Where(p => ValidId(p.Name) && p.Value is JObject row && row["hidden"]?.Type == JTokenType.Boolean && row["hidden"].Value<bool>())
+            .Select(p => p.Name), StringComparer.Ordinal), 1024 * 1024);
+
+        internal static void Remove(string id)
+        {
+            var game = Get(id) ?? throw new ArgumentException("Unknown game.");
+            ClipStore.Update(CustomFile, db =>
+            {
+                if (db[id] == null && db.Count >= 1000) throw new InvalidDataException("Too many saved games.");
+                var row = db[id] as JObject ?? new JObject { ["name"] = game.Name };
+                db[id] = row;
+                foreach (var entry in db.Properties().Where(p => p.Value is JObject && (p.Name == id || p.Name.StartsWith("custom-", StringComparison.Ordinal) &&
+                    string.Equals(p.Value["name"]?.Value<string>(), game.Name, StringComparison.OrdinalIgnoreCase))))
+                {
+                    entry.Value["played"] = false;
+                    entry.Value["hidden"] = true;
+                }
+                return true;
+            }, 1024 * 1024);
         }
 
         internal static JArray Search(string query)

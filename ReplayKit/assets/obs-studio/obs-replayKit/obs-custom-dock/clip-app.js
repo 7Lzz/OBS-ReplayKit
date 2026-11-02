@@ -436,6 +436,7 @@ const CLIP_HOVER_PROFILES = {
   let groupByGame = false;
   try { groupByGame = !HOME_MODE && localStorage.getItem(GROUP_BY_GAME_KEY) === "1"; } catch {}
   let virtualGroups = [];
+  const collapsedGameGroups = new Set();
   let lastRestKey = "";
   let virtualRenderQueued = false;
   let virtualRenderForceQueued = false;
@@ -1007,6 +1008,11 @@ const CLIP_HOVER_PROFILES = {
       const serverExists = !!(data && data.exists);
       const serverFavorites = normalizeFavoriteList(state.favorites);
       favoriteFolderKey = data.folderKey;
+      collapsedGameGroups.clear();
+      try {
+        const saved = JSON.parse(localStorage.getItem("rk-collapsed-games:" + favoriteFolderKey) || "[]");
+        if (Array.isArray(saved)) saved.slice(0, 1000).filter(key => typeof key === "string" && key.length <= 100).forEach(key => collapsedGameGroups.add(key));
+      } catch (_) {}
       favoriteRevision = data.revision;
       const nextFavorites = new Set(serverFavorites);
       if (!serverExists) {
@@ -1352,7 +1358,8 @@ const CLIP_HOVER_PROFILES = {
   function groupLayout(columns) {
     let top = 0;
     return virtualGroups.map((group) => {
-      const placed = { ...group, top, rowsTop: top + GROUP_HEAD_HEIGHT, rows: Math.ceil(group.count / columns) };
+      const collapsed = collapsedGameGroups.has(group.key);
+      const placed = { ...group, top, collapsed, rowsTop: top + GROUP_HEAD_HEIGHT, rows: collapsed ? 0 : Math.ceil(group.count / columns) };
       top = placed.rowsTop + placed.rows * virtualRowStride;
       return placed;
     });
@@ -1377,6 +1384,11 @@ const CLIP_HOVER_PROFILES = {
   }
 
   // the subtitles of the games, one per run, kept in the virtual list next to its cards
+  function saveCollapsedGames() {
+    try { if (favoriteFolderKey) localStorage.setItem("rk-collapsed-games:" + favoriteFolderKey, JSON.stringify([...collapsedGameGroups])); }
+    catch (error) { console.warn("Collapsed game groups could not be saved", error); }
+  }
+
   function paintGroupHeadings(layout) {
     const existing = new Map();
     gridEl.querySelectorAll(":scope > .game-group-heading").forEach((el) => existing.set(el.dataset.key, el));
@@ -1384,14 +1396,23 @@ const CLIP_HOVER_PROFILES = {
       let el = existing.get(group.key);
       existing.delete(group.key);
       if (!el) {
-        el = document.createElement("div");
+        el = document.createElement("button");
+        el.type = "button";
         el.className = "game-group-heading";
         el.dataset.key = group.key;
-        el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name"></span><span class="game-group-count"></span>';
+          el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name"></span><span class="game-group-count"></span><span class="icon-mini-btn game-group-caret" aria-hidden="true">' + ((window.RK_ICONS || {})["nav/combo-arrow"] || "") + '</span>';
+          applyClipHovers(el);
+        el.addEventListener("click", () => {
+          if (collapsedGameGroups.has(group.key)) collapsedGameGroups.delete(group.key); else collapsedGameGroups.add(group.key);
+          saveCollapsedGames();
+          queueVirtualRender(true);
+        });
         gridEl.appendChild(el);
       }
       el.querySelector(".game-group-name").textContent = group.name;
       el.querySelector(".game-group-count").textContent = String(group.count);
+      el.setAttribute("aria-expanded", String(!group.collapsed));
+      el.setAttribute("aria-label", (group.collapsed ? "Expand " : "Collapse ") + group.name + " clips");
       el.style.setProperty("--group-y", group.top + "px");
     }
     for (const leftover of existing.values()) leftover.remove();
@@ -2235,8 +2256,9 @@ const CLIP_HOVER_PROFILES = {
     }
 
     const desiredNames = new Set();
+    const visible = index => !grouped || !groups.some(group => group.collapsed && index >= group.start && index < group.start + group.count);
     for (let i = start; i < end; i++) {
-      if (allClips[i] && allClips[i].name) desiredNames.add(allClips[i].name);
+      if (visible(i) && allClips[i] && allClips[i].name) desiredNames.add(allClips[i].name);
     }
 
     const existingByName = new Map();
@@ -2247,6 +2269,7 @@ const CLIP_HOVER_PROFILES = {
     });
 
     for (let i = start; i < end; i++) {
+      if (!visible(i)) continue;
       const clip = allClips[i];
       let card = existingByName.get(clip.name);
       if (card) {
@@ -3883,6 +3906,10 @@ const CLIP_HOVER_PROFILES = {
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       finalName = data.name || to;
       renameClipIdentity(name, finalName);
+      if (finalName !== to) {
+        showToast("A clip named “" + escapeHtml(displayClipName(to)) + "” already exists, so this clip was renamed to “" + escapeHtml(displayClipName(finalName)) + "”.", "info");
+        scheduleToastHide(5000);
+      }
       return finalName;
     } finally {
       for (const source of sources) {
@@ -5164,6 +5191,8 @@ const CLIP_HOVER_PROFILES = {
       } else {
         const index = allClips.findIndex((c) => c && c.name === name);
         if (index >= 0) {
+          const group = virtualGroups.find(group => index >= group.start && index < group.start + group.count);
+          if (group && collapsedGameGroups.delete(group.key)) { saveCollapsedGames(); queueVirtualRender(true); }
           const top = (gridEl.offsetTop - scrollAreaEl.offsetTop) + virtualSlotTop(index, Math.max(1, virtualColumns));
           scrollAreaEl.scrollTo({ top: Math.max(0, top - Math.max(0, (scrollAreaEl.clientHeight - virtualRowStride) / 2)), behavior: "smooth" });
           queueVirtualRender(false);

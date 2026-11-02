@@ -39,7 +39,12 @@
   .game-picker-x svg { width:14px; height:14px; fill:currentColor; }
   .game-picker-search { box-sizing:border-box; width:calc(100% - 48px); margin:0 24px 10px; padding:8px 10px; border:1px solid var(--grey3); border-radius:4px; background:var(--window); color:var(--text); font:inherit; font-size:13px; outline:none; transition:border-color 90ms linear; }
   .game-picker-search:focus { border-color:var(--primary_light,var(--selected2)); }
-  .game-picker-list { flex:1; min-height:0; overflow-y:auto; margin-right:6px; padding:0 12px 4px 24px; border-top:1px solid var(--grey3); }
+  .game-picker-list { flex:1; min-height:0; overflow-y:auto; margin-right:6px; padding:10px 12px 10px 24px; border-top:1px solid var(--grey3); }
+  .game-picker-entry { display:flex; align-items:center; gap:4px; }
+  .game-picker-entry > .game-picker-choice { flex:1; min-width:0; width:auto; }
+  .game-picker-remove { display:grid; place-items:center; flex:none; width:28px; height:28px; padding:6px; border:0; border-radius:4px; background:transparent; color:var(--text_muted,var(--muted)); cursor:pointer; }
+  .game-picker-remove:hover, .game-picker-remove:focus-visible { color:var(--danger,var(--text)); background:var(--button_bg_hover,var(--grey3)); }
+  .game-picker-remove svg { width:14px; height:14px; fill:currentColor; }
   .game-picker-section { margin:12px 0 4px; color:var(--text_muted,var(--muted)); font-size:12px; font-weight:700; }
   .game-picker-choice { display:flex; width:100%; gap:10px; align-items:center; padding:8px 10px; border:0; border-radius:4px; background:transparent; color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer; transition:background-color 90ms linear; }
   .game-picker-choice:hover, .game-picker-choice:focus-visible { background:var(--button_bg_hover,var(--grey3)); outline:none; }
@@ -61,7 +66,10 @@
   .group-games { display:inline-flex; align-items:center; gap:8px; margin-left:10px; font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer; --sw-w:32px; --sw-h:18px; }
   .group-games[hidden] { display:none; }
   .group-games input[type=checkbox].rk-switch { margin:0; }
-  #grid .game-group-heading { position:absolute; left:0; right:0; top:0; display:flex; align-items:center; gap:8px; height:40px; padding:0 4px 8px; box-sizing:border-box; color:var(--text); font-size:13px; font-weight:600; transform:translate3d(0,var(--group-y,0px),0); }
+  #grid .game-group-heading { position:absolute; left:0; right:0; top:0; display:flex; align-items:center; gap:8px; height:40px; padding:0 4px 8px; box-sizing:border-box; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; font-weight:600; text-align:left; cursor:pointer; transform:translate3d(0,var(--group-y,0px),0); }
+  .game-group-caret svg { width:14px; height:14px; fill:currentColor; transition:transform var(--anim_press,130ms) var(--ease_smooth,ease); }
+  .game-group-heading[aria-expanded="false"] .game-group-caret svg { transform:rotate(-90deg); }
+  .game-group-heading:focus-visible { outline:2px solid var(--selected2); outline-offset:-2px; border-radius:4px; }
   #grid .game-group-heading .clip-game-icon { width:16px; height:16px; }
   .game-group-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-group-count { color:var(--muted); font-weight:500; }
@@ -197,11 +205,29 @@ window.RKClipGames = (function () {
       const box = dialog.getBoundingClientRect();
       if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) dialog.close();
     });
+    function busy(on) {
+      saving = on;
+      search.disabled = on;
+      reset.disabled = on || !item.capture?.canReset;
+      list.querySelectorAll("button").forEach(button => { button.disabled = on; });
+    }
+    async function removeGame(id) {
+      if (saving) return;
+      generation++;
+      busy(true);
+      status.textContent = "Removing game…";
+      try {
+        const response = await fetch(helper + "/games/remove?id=" + encodeURIComponent(id), {method:"POST",cache:"no-store"});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw Error(data.message || "Game could not be removed.");
+        owned = null;
+        busy(false);
+        await load();
+      } catch (error) { busy(false); status.textContent = error.message; }
+    }
     async function choose(id, name, universe, restore) {
       if (saving) return;
-      saving = true;
-      search.disabled = reset.disabled = true;
-      list.querySelectorAll("button").forEach(button => { button.disabled = true; });
+      busy(true);
       status.textContent = "Saving…";
       try {
         const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + "?file=" + encodeURIComponent(item.name) + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : "") + (screenshot ? "&screenshot=1" : ""), {method:"POST",cache:"no-store"});
@@ -210,10 +236,7 @@ window.RKClipGames = (function () {
         window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed")); dialog.close();
       } catch (error) {
         status.textContent = error.message;
-        saving = false;
-        search.disabled = false;
-        reset.disabled = !item.capture?.canReset;
-        list.querySelectorAll("button").forEach(button => { button.disabled = false; });
+        busy(false);
       }
     }
     function section(text) {
@@ -225,7 +248,14 @@ window.RKClipGames = (function () {
       if (isCurrent) button.setAttribute("aria-current", "true");
       button.innerHTML = picture(experience?.id || id, kind, experience ? id : null) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : "");
       button.querySelector(".game-picker-name").textContent = name;
-      target.append(button);
+      if (target === list && owned.some(game => game.id === id)) {
+        const entry = document.createElement("div"); entry.className = "game-picker-entry";
+        const remove = document.createElement("button"); remove.type = "button"; remove.className = "game-picker-remove";
+        remove.setAttribute("aria-label", "Remove " + name + " from Your games"); remove.title = "Remove from Your games; clips keep their game tags";
+        remove.innerHTML = icon("action/trash");
+        remove.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); removeGame(id); });
+        entry.append(button, remove); target.append(entry);
+      } else target.append(button);
       if (children?.length) {
         const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", name + " experiences");
         sublist.hidden = !search.value.trim(); button.setAttribute("aria-expanded", String(!sublist.hidden));
@@ -252,11 +282,13 @@ window.RKClipGames = (function () {
           const response = await fetch(helper + "/games/library", {cache:"no-store"});
           const data = await response.json();
           if (!response.ok || !data.ok) throw Error("Games could not be loaded.");
+          if (seq !== generation || !dialog.open || saving) return;
           // the games of the clips there are now plus every game a clip ever had, so a game stays here after its clips are deleted
           const byId = new Map();
+          const hidden = new Set(data.hidden || []);
           for (const game of [...(data.games || []), ...(data.played || [])])
-            if (!["desktop","mixed","unknown"].includes(game.id) && !byId.has(game.id)) byId.set(game.id, game);
-          if (data.roblox?.experiences?.length) byId.set(data.roblox.id, Object.assign({}, byId.get(data.roblox.id) || data.roblox, { experiences:data.roblox.experiences }));
+            if (!["desktop","mixed","unknown"].includes(game.id) && !hidden.has(game.id) && !byId.has(game.id)) byId.set(game.id, game);
+          if (data.roblox?.experiences?.length && !hidden.has(data.roblox.id)) byId.set(data.roblox.id, Object.assign({}, byId.get(data.roblox.id) || data.roblox, { experiences:data.roblox.experiences }));
           owned = uniqueGames([...byId.values()]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
         }
         let found = [];

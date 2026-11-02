@@ -232,7 +232,8 @@ namespace ReplayKitHelper
             var played = GameCatalog.Played(games.Values.Where(g => GameCatalog.ValidId(g["id"].Value<string>())).Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() }));
             return new JObject { ["ok"] = true, ["total"] = files.Count, ["clips"] = clips.Count, ["screenshots"] = shots.Count, ["games"] = new JArray(games.Values.OrderBy(g => g["name"].Value<string>())),
                 ["played"] = new JArray(played.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Json())),
-                ["roblox"] = new JObject { ["id"] = RobloxExperiences.RobloxId, ["name"] = "Roblox", ["experiences"] = RobloxExperiences.Library() } };
+                ["roblox"] = new JObject { ["id"] = RobloxExperiences.RobloxId, ["name"] = "Roblox", ["experiences"] = RobloxExperiences.Library() },
+                ["hidden"] = new JArray(GameCatalog.Hidden()) };
         }
 
         internal static void Saved(string file, long end, double duration = 0)
@@ -358,6 +359,7 @@ namespace ReplayKitHelper
             if (original != null) corrected["original"] = original.DeepClone();
             if (experience != null) corrected["experience"] = experience;
             Write(file, corrected);
+            if (game != null) GameCatalog.Played(new[] { game }, restore: true);
         }
 
         internal static void Reset(string file)

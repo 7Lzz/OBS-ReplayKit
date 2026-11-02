@@ -573,6 +573,8 @@
     // the clock of the timeline while it plays by itself: on, the time on the timeline, whether it runs, whether it reached the end, when it was last stepped, its timer, the piece of the video the element is on, whether the element has to be placed again, and when the page was last told the time
     var vt = { on: false, T: 0, playing: false, ended: false, since: 0, timer: 0, piece: "", dirty: true, fired: 0 };
     var drag = null;
+    var dragEvents = new AbortController();
+    if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { dragEvents.abort(); }, { once: true });
     var menu = null;
     var frameQueued = 0;
     var rulerQueued = 0;
@@ -1355,9 +1357,9 @@
         commit();
         subsChanged();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // a box dragged across a row picks the cues of that row it touches; shift keeps what was picked before
@@ -1386,9 +1388,9 @@
         if (box) { box.remove(); return; }
         seekT(seekTimeAtClient(startX));
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // a subtitle on the preview is dragged to a place of its own, the way the overlay preview of the settings moves the overlay: its edges and its centre snap to the margins and the middle of the picture, shift places it freely, and it stays whole on the picture. the place belongs to the row; a press without a drag selects the subtitle
@@ -1438,9 +1440,9 @@
         commit();
         subsChanged();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // a corner of a subtitle on the preview resizes it the way a corner of the overlay preview does: by how far the corner moved from where it was grabbed, both axes averaged so a diagonal pull feels even; the size is the size of the row, held to its range
@@ -1473,9 +1475,9 @@
         commit();
         subsChanged();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     function resizeSub(e, node, row, corner) {
@@ -1501,9 +1503,9 @@
         commit();
         subsChanged();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // the cue after this one in its row, which a merge joins it to
@@ -1985,9 +1987,9 @@
         commit();
         layersChanged();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // a layer on the preview is dragged by its body and sized by a corner the way a subtitle is, its centre staying put while it is sized
@@ -2035,9 +2037,9 @@
         dom.layerOverlay.classList.remove("is-dragging");
         if (moved) commit();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     // the stem above a layer turns it about its centre the way the one of a subtitle does: straight angles catch it within a few degrees, and shift turns that off
@@ -2067,9 +2069,9 @@
         dom.layerOverlay.classList.remove("is-dragging");
         if ((l.rotate || 0) !== start.rotate) commit();
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", up, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", up, { signal: dragEvents.signal });
     }
 
     function addLayer(l) {
@@ -3495,9 +3497,9 @@
           thumb.removeEventListener("pointerup", up);
           thumb.removeEventListener("pointercancel", up);
         };
-        thumb.addEventListener("pointermove", move);
-        thumb.addEventListener("pointerup", up);
-        thumb.addEventListener("pointercancel", up);
+        thumb.addEventListener("pointermove", move, { signal: dragEvents.signal });
+        thumb.addEventListener("pointerup", up, { signal: dragEvents.signal });
+        thumb.addEventListener("pointercancel", up, { signal: dragEvents.signal });
       });
       // a press in the gutter next to the thumb moves the view by a page
       barEl.addEventListener("pointerdown", function (e) {
@@ -4454,9 +4456,9 @@
         moved: false,
         lift: null,
       };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onUp);
+      window.addEventListener("pointermove", onMove, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", onUp, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", onUp, { signal: dragEvents.signal });
     }
 
     function onMove(e) {
@@ -4655,9 +4657,9 @@
         e.preventDefault();
         select(owner.seg.id);
         drag = { id: owner.seg.id, mode: grip.classList.contains("l") ? "vtrimL" : "vtrimR", x: e.clientX, y: e.clientY, orig: clone(owner.seg), moved: false, lift: null };
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-        window.addEventListener("pointercancel", onUp);
+        window.addEventListener("pointermove", onMove, { signal: dragEvents.signal });
+        window.addEventListener("pointerup", onUp, { signal: dragEvents.signal });
+        window.addEventListener("pointercancel", onUp, { signal: dragEvents.signal });
         return;
       }
       var v = vAt(rawTimeAtClient(e.clientX));
@@ -4665,9 +4667,9 @@
       e.preventDefault();
       select(v.id);
       drag = { id: v.id, mode: "vmove", x: e.clientX, y: e.clientY, orig: clone(v), moved: false, lift: null };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-      window.addEventListener("pointercancel", onUp);
+      window.addEventListener("pointermove", onMove, { signal: dragEvents.signal });
+      window.addEventListener("pointerup", onUp, { signal: dragEvents.signal });
+      window.addEventListener("pointercancel", onUp, { signal: dragEvents.signal });
     }
 
     function onVideoContext(e) {
@@ -5515,6 +5517,14 @@
     }
 
     function unloadState() {
+      dragEvents.abort();
+      dragEvents = new AbortController();
+      drag = null;
+      [dom.bottom, dom.subOverlay, dom.layerOverlay].forEach(function (node) {
+        if (!node) return;
+        node.classList.remove("is-dragging", "is-leaving");
+        node.querySelectorAll(".is-dragging, .is-leaving").forEach(function (child) { child.classList.remove("is-dragging", "is-leaving"); });
+      });
       Object.keys(gapNodes).forEach(function (key) { gapNodes[key].remove(); });
       gapNodes = {};
       selectedGap = null;
@@ -5733,6 +5743,7 @@
       els.dropLabel = el("span");
       els.drop.appendChild(els.dropLabel);
       document.body.appendChild(els.drop);
+      if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { dropShow(false); closeMenu(); els.drop.remove(); }, { once: true });
       [els.playline, els.snapline].forEach(function (n) { (dom.tracks || dom.lanes).appendChild(n); });
       // a press on the video row selects the video or the piece of it that was pressed; every piece carries its own tag
       if (dom.timeline) {
@@ -5786,6 +5797,7 @@
         watcher.observe(dom.frame);
         watcher.observe(dom.content);
         watcher.observe(video);
+        if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { watcher.disconnect(); }, { once: true });
       }
       document.addEventListener("keydown", onKey, { capture: true, signal: EDITOR_SIGNAL });
       document.addEventListener("dragenter", onDragEnter, { capture: true, signal: EDITOR_SIGNAL });
@@ -5822,9 +5834,9 @@
           dom.resizer.removeEventListener("pointercancel", up);
           savePrefs();
         };
-        dom.resizer.addEventListener("pointermove", move);
-        dom.resizer.addEventListener("pointerup", up);
-        dom.resizer.addEventListener("pointercancel", up);
+        dom.resizer.addEventListener("pointermove", move, { signal: dragEvents.signal });
+        dom.resizer.addEventListener("pointerup", up, { signal: dragEvents.signal });
+        dom.resizer.addEventListener("pointercancel", up, { signal: dragEvents.signal });
       });
       if (prefs.height > 0) {
         dom.bottom.style.height = prefs.height + "px";

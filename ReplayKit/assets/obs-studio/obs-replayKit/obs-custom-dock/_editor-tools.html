@@ -1194,6 +1194,7 @@
       card.appendChild(body);
       veil.appendChild(card);
       document.body.appendChild(veil);
+      if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { veil.remove(); }, { once: true });
       veil.addEventListener("pointerdown", function (e) { if (e.target === veil) closeLibrary(); });
       input.addEventListener("input", paintLibrary);
       input.addEventListener("keydown", function (e) { e.stopPropagation(); });
@@ -2092,8 +2093,12 @@
       overlay.style.height = r.height + "px";
       overlay.style.setProperty("--sub-h", r.height + "px");
     }
-    video.addEventListener("loadedmetadata", place);
-    if (window.ResizeObserver) new ResizeObserver(place).observe(video);
+    video.addEventListener("loadedmetadata", place, { signal: EDITOR_SIGNAL });
+    if (window.ResizeObserver) {
+      var observer = new ResizeObserver(place);
+      observer.observe(video);
+      if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", function () { observer.disconnect(); }, { once: true });
+    }
     window.addEventListener("resize", place, { signal: EDITOR_SIGNAL });
     place();
     return place;

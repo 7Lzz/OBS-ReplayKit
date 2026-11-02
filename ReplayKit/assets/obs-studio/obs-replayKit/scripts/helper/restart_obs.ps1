@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)][int]$ObsPid
 )
 
-# standalone obs relauncher. spawned detached by the helpers /settings restart path before the helper kills obs and exits. lives outside the helpers kill-on-close job (createprocess flag create_breakaway_from_job) so it survives helper death. waits for the targeted obs pid to exit, clears the unclean-exit sentinel that obs writes on launch, then starts a fresh obs with the same flags the helper uses elsewhere.
+# standalone obs relauncher. spawned detached by the helpers /settings restart path before the helper requests a normal obs exit. lives outside the helpers kill-on-close job (createprocess flag create_breakaway_from_job) so it survives helper death. waits for the targeted obs pid to exit, clears the unclean-exit sentinel that obs writes on launch, then starts a fresh obs with the same flags the helper uses elsewhere.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -16,13 +16,14 @@ function Wait-ObsExit([int]$obsPid, [int]$timeoutMs) {
     return $false
 }
 
-# helper already called stop-process -force, but the exit takes a moment. wait up to 15s; if obs still hasnt died we force it ourselves so the new instance doesnt collide on the singleton.
-if (-not (Wait-ObsExit -obsPid $ObsPid -timeoutMs 15000)) {
-    try { Stop-Process -Id $ObsPid -Force -ErrorAction Stop } catch {}
-    [void](Wait-ObsExit -obsPid $ObsPid -timeoutMs 5000)
+# a relaunch must never terminate a process that still owns graphics or output resources
+if ($ObsPid -le 0 -or -not (Wait-ObsExit -obsPid $ObsPid -timeoutMs 15000)) {
+    $logPath = Join-Path $env:TEMP 'ReplayKit\logs\restart_obs.log'
+    Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('s'))] Restart stopped: OBS did not exit safely."
+    exit 3
 }
 
-# obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes it on graceful exit. stop-process -force never gets to delete it, and on the next launch obs sees the leftover file and shows its safe-mode prompt. wipe the file before relaunching.
+# only remove leftover crash markers after the original obs process is confirmed gone
 $sentinelDir = Join-Path $env:APPDATA 'obs-studio\.sentinel'
 if (Test-Path -LiteralPath $sentinelDir) {
     Get-ChildItem -LiteralPath $sentinelDir -Filter 'run_*' -Force -ErrorAction SilentlyContinue |

@@ -97,6 +97,10 @@ NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 
 void OnFrontendEvent(enum obs_frontend_event event, void *)
 {
+	if (event == OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN) {
+		ClipBufferShutdown();
+		return;
+	}
 	if (event == OBS_FRONTEND_EVENT_EXIT) {
 		CaptureContextStop();
 		CefCloseForShutdown();

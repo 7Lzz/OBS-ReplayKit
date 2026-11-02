@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -31,33 +33,74 @@ namespace ReplayKitSetup
         // the port the helper listens on; the dock url written into the scene is fixed to it as well
         private const int HelperPort = 8767;
 
-        private static bool AnyObsRunning()
+        private static Process[] ObsProcesses()
         {
-            foreach (var proc in Config.OBS_PROCESSES)
+            string root = Path.GetFullPath(Config.PROGRAMFILES_OBS_DIR).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+            string helper = Path.GetFullPath(Path.Combine(Config.REPLAYKIT_CONFIG, "scripts", "helper", "OBSReplayKit.exe"));
+            using var current = Process.GetCurrentProcess();
+            var result = new List<Process>();
+            try
             {
-                Process[] found;
-                try { found = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(proc)); }
-                catch (InvalidOperationException) { continue; }
-                bool any = found.Length > 0;
-                foreach (var p in found) p.Dispose();
-                if (any) return true;
+                foreach (string name in Config.OBS_PROCESSES.Concat(new[] { "obs-browser-page.exe", "OBSReplayKit.exe" }))
+                    foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(name)))
+                    {
+                        try
+                        {
+                            if (process.Id == current.Id || process.HasExited) { process.Dispose(); continue; }
+                            string path = process.MainModule?.FileName;
+                            bool owned = string.Equals(name, "OBSReplayKit.exe", StringComparison.OrdinalIgnoreCase)
+                                ? string.Equals(path, helper, StringComparison.OrdinalIgnoreCase)
+                                : path != null && Path.GetFullPath(path).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+                            if (owned) result.Add(process);
+                            else process.Dispose();
+                        }
+                        catch (InvalidOperationException) { process.Dispose(); }
+                        catch (System.ComponentModel.Win32Exception) when (process.HasExited) { process.Dispose(); }
+                        catch { process.Dispose(); throw; }
+                    }
+                return result.ToArray();
             }
-            return false;
+            catch
+            {
+                foreach (var process in result) process.Dispose();
+                throw;
+            }
         }
 
-        // asks the running helper for the exit the tray menu uses: the window is closed the normal way, so obs saves its window position, finishes a recording and leaves its files in order. waits for obs to go; whatever is still running after that is killed by the caller. no helper, or one that does not answer, means the kill happens right away, as it always did
+        private static bool AnyObsRunning()
+        {
+            var processes = ObsProcesses();
+            foreach (var process in processes) process.Dispose();
+            return processes.Length > 0;
+        }
+
+        // asks for a normal exit; an unavailable helper or a stalled shutdown leaves obs running
         internal static void RequestGracefulExit(int port, Func<bool> obsRunning, TimeSpan wait, Action<string> log)
         {
             if (!obsRunning()) return;
             try
             {
                 using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) })
-                using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "http://127.0.0.1:" + port + "/exit-obs"))
                 {
-                    // the helper only takes calls that come from its own page
-                    request.Headers.Add("Origin", "http://127.0.0.1:" + port);
-                    using (var response = http.SendAsync(request).GetAwaiter().GetResult())
-                        if (!response.IsSuccessStatusCode) return;
+                    using (var check = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, "http://127.0.0.1:" + port + "/exit-obs/safety"))
+                    {
+                        check.Headers.Add("Origin", "http://127.0.0.1:" + port);
+                        using (var safety = http.SendAsync(check).GetAwaiter().GetResult())
+                        {
+                            if (!safety.IsSuccessStatusCode)
+                                throw new IOException("The running ReplayKit helper does not support graceful-only shutdown.");
+                            var supported = JObject.Parse(safety.Content.ReadAsStringAsync().GetAwaiter().GetResult())["gracefulOnly"];
+                            if (supported?.Type != JTokenType.Boolean || !supported.Value<bool>())
+                                throw new IOException("The running ReplayKit helper does not support graceful-only shutdown.");
+                        }
+                    }
+                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "http://127.0.0.1:" + port + "/exit-obs"))
+                    {
+                        // the helper only takes calls that come from its own page
+                        request.Headers.Add("Origin", "http://127.0.0.1:" + port);
+                        using (var response = http.SendAsync(request).GetAwaiter().GetResult())
+                            if (!response.IsSuccessStatusCode) return;
+                    }
                 }
             }
             catch (Exception ex) when (ex is System.Net.Http.HttpRequestException || ex is System.Threading.Tasks.TaskCanceledException || ex is InvalidOperationException)
@@ -68,52 +111,50 @@ namespace ReplayKitSetup
             log?.Invoke("asked obs to exit through the helper");
             DateTime deadline = DateTime.UtcNow + wait;
             while (DateTime.UtcNow < deadline && obsRunning()) Thread.Sleep(250);
-            log?.Invoke(obsRunning() ? "obs did not exit by itself, closing it" : "obs exited by itself");
+            log?.Invoke(obsRunning() ? "obs did not exit in time" : "obs exited by itself");
         }
 
-        // closes any running obs process: first the way the user would, so a recording is finished and the window position is saved, then taskkill for whatever is still there. returns the kill count.
+        // installation takes priority after the normal close has had time to drain outputs
         public static int CloseObs(Action<string> log = null)
         {
-            RequestGracefulExit(HelperPort, AnyObsRunning, TimeSpan.FromSeconds(15), log);
-            int killed = 0;
-            foreach (var proc in Config.OBS_PROCESSES)
+            if (!AnyObsRunning()) return 0;
+            try { RequestGracefulExit(HelperPort, AnyObsRunning, TimeSpan.FromSeconds(30), log); }
+            catch (Exception ex) when (ex is IOException || ex is JsonException)
             {
-                // no /T: this runs from the update flow, where this very process can be a descendant of obs64.exe (helper -> updater) -- /T walks the whole tree by parent pid regardless of job/breakaway state, so it would take the updater down with obs mid-copy. obs-browser-page.exe is reaped separately below instead.
-                var result = RunTaskkill(proc);
-                if (result == 0)
-                {
-                    log?.Invoke("killed " + proc);
-                    killed++;
-                }
+                log?.Invoke("normal OBS shutdown unavailable: " + ex.Message);
             }
-            // cef renderer children outlive obs64.exe otherwise and keep plugin_config/obs-browser locked, which stalls the backup step right after this.
-            RunTaskkill("obs-browser-page.exe");
-            if (killed > 0) Thread.Sleep(1500); // give the process tree time to actualy exit
-            if (AnyObsRunning()) throw new IOException("OBS could not be closed. Installation was stopped; close OBS and run the installer again.");
-            return killed;
-        }
-
-        private static int RunTaskkill(string imageName)
-        {
+            if (!AnyObsRunning()) return 0;
+            log?.Invoke("normal shutdown did not finish; force-closing OBS and its remaining processes to continue installation");
+            var processes = ObsProcesses();
+            int killed = 0;
             try
             {
-                var psi = new ProcessStartInfo("taskkill", $"/F /IM {imageName}")
+                foreach (var process in processes)
                 {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                using (var proc = Process.Start(psi))
+                    try
+                    {
+                        if (process.HasExited) continue;
+                        process.Kill();
+                        killed++;
+                        log?.Invoke("terminated OBS process pid " + process.Id);
+                    }
+                    catch (InvalidOperationException) { }
+                    catch (System.ComponentModel.Win32Exception ex) { log?.Invoke("OBS termination failed: " + ex.Message); }
+                }
+                var timer = Stopwatch.StartNew();
+                foreach (var process in processes)
                 {
-                    proc.WaitForExit();
-                    return proc.ExitCode;
+                    try
+                    {
+                        if (!process.HasExited) process.WaitForExit((int)Math.Max(0, 10000 - timer.ElapsedMilliseconds));
+                    }
+                    catch (InvalidOperationException) { }
+                    catch (System.ComponentModel.Win32Exception ex) { log?.Invoke("OBS exit could not be confirmed: " + ex.Message); }
                 }
             }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
-            {
-                return -1;
-            }
+            finally { foreach (var process in processes) process.Dispose(); }
+            if (AnyObsRunning()) throw new IOException("OBS or its helper/browser processes are still running after termination. No update files were replaced; restart Windows before trying again.");
+            return killed;
         }
 
         // remove safe_mode + .sentinel/* so obs doesnt show its crash-recovery prompt on the next launch.

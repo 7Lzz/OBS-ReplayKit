@@ -78,6 +78,8 @@ qint64 g_saveStamp = 0;
 bool g_sharedEncoders = false;
 // a stop that is only the first half of moving onto those encoders, which keeps the pieces already recorded
 bool g_restartShared = false;
+bool g_closing = false;
+bool g_shuttingDown = false;
 obs_hotkey_id g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 std::vector<obs_key_combination_t> g_mirrored;
 QString g_gameName, g_saveFormat, g_saveFolder;
@@ -172,6 +174,8 @@ void StartDisk(bool keepPieces);
 
 void DiskStopped()
 {
+	if (g_shuttingDown)
+		return;
 	if (g_out) {
 		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
 		signal_handler_t *sh = obs_output_get_signal_handler(g_out);
@@ -405,7 +409,7 @@ bool BuildEncoders(config_t *config)
 
 void StartDisk(bool keepPieces)
 {
-	if (DiskActive() || g_mode != Mode::Disk)
+	if (g_out || g_mode != Mode::Disk || g_closing || g_shuttingDown)
 		return;
 	config_t *config = obs_frontend_get_profile_config();
 	if (!config || ProfileString(config, "Output", "Mode") != "Advanced") {
@@ -739,11 +743,19 @@ void ClipBufferInit()
 
 void ClipBufferShutdown()
 {
+	if (g_shuttingDown)
+		return;
+	g_shuttingDown = true;
+	g_restartShared = false;
+	if (g_purgeTimer)
+		g_purgeTimer->stop();
 	signal_handler_disconnect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);
 	if (g_saveHotkey != OBS_INVALID_HOTKEY_ID)
 		obs_hotkey_unregister(g_saveHotkey);
 	g_saveHotkey = OBS_INVALID_HOTKEY_ID;
 	if (g_out) {
+		blog(LOG_INFO, "[replaykit] stopping disk clip buffer before scene teardown");
+		obs_output_remove_packet_callback(g_out, CapturePacket, nullptr);
 		signal_handler_t *sh = obs_output_get_signal_handler(g_out);
 		signal_handler_disconnect(sh, "file_changed", OnFileChanged, nullptr);
 		signal_handler_disconnect(sh, "stop", OnOutputStop, nullptr);
@@ -752,6 +764,25 @@ void ClipBufferShutdown()
 		g_out = nullptr;
 	}
 	ReleaseEncoders();
+	blog(LOG_INFO, "[replaykit] clip buffer shutdown complete");
+}
+
+bool ClipBufferPrepareClose()
+{
+	if (!g_out)
+		return true;
+	if (!g_closing) {
+		g_closing = true;
+		g_restartShared = false;
+		blog(LOG_INFO, "[replaykit] draining disk clip buffer before closing");
+		StopDisk();
+	}
+	return false;
+}
+
+void ClipBufferCancelClose()
+{
+	g_closing = false;
 }
 
 bool ClipBufferActive()
@@ -761,10 +792,16 @@ bool ClipBufferActive()
 
 void ClipBufferStart()
 {
-	if (g_mode == Mode::Disk)
-		ShellStartOutputWhenFree([]() { StartDisk(false); });
-	else
-		ShellStartOutputWhenFree([]() { obs_frontend_replay_buffer_start(); });
+	if (g_closing || g_shuttingDown)
+		return;
+	ShellStartOutputWhenFree([]() {
+		if (g_closing || g_shuttingDown)
+			return;
+		if (g_mode == Mode::Disk)
+			StartDisk(false);
+		else
+			obs_frontend_replay_buffer_start();
+	});
 }
 
 void ClipBufferStop()
@@ -796,6 +833,8 @@ void ClipBufferSave()
 
 void ClipBufferApplySettings(const std::string &settingsBody)
 {
+	if (g_closing || g_shuttingDown)
+		return;
 	const std::string mode = ExtractJsonStringField(settingsBody, "clipBufferMode");
 	// a helper that did not answer says nothing about the mode
 	if (mode != "disk" && mode != "memory")
@@ -842,7 +881,7 @@ namespace {
 
 void MoveOntoRecordingEncoders()
 {
-	if (g_mode != Mode::Disk || !DiskActive() || g_sharedEncoders || g_restartShared)
+	if (g_closing || g_shuttingDown || g_mode != Mode::Disk || !DiskActive() || g_sharedEncoders || g_restartShared)
 		return;
 	// a save reads the pieces as they are, so the move waits for it
 	if (g_saving) {
@@ -858,6 +897,8 @@ void MoveOntoRecordingEncoders()
 
 void ClipBufferOnFrontendEvent(enum obs_frontend_event event)
 {
+	if (g_shuttingDown)
+		return;
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED || event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED || event == OBS_FRONTEND_EVENT_PROFILE_CHANGED) {
 		g_memoryNameUntil = 0;
 		ApplyMemoryName();
@@ -884,6 +925,9 @@ QJsonObject ClipBufferProbe()
 {
 	return {{"mode", ModeName(g_mode)},
 		{"active", ClipBufferActive()},
+		{"outputPending", g_out != nullptr},
+		{"closing", g_closing},
+		{"shuttingDown", g_shuttingDown},
 		{"diskPieces", (int)g_pieces.size()},
 		{"saving", g_saving},
 		{"game", g_gameName},

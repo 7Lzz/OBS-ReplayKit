@@ -1,10 +1,33 @@
 using System;
 using System.IO;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace ReplayKitHelper
 {
     internal static class ClipFiles
     {
+        internal static string AvailableName(string requested, Func<string, bool> taken)
+        {
+            if (!taken(requested)) return requested;
+            string extension = Path.GetExtension(requested);
+            string name = Path.GetFileNameWithoutExtension(requested);
+            long number = 2;
+            var suffix = Regex.Match(name, @"^(.+) \(([0-9]+)\)$");
+            if (suffix.Success && long.TryParse(suffix.Groups[2].Value, out long previous) && previous >= 2)
+            {
+                if (previous > long.MaxValue - 10000) throw new ArgumentException("The numbered name is too large.");
+                name = suffix.Groups[1].Value;
+                number = previous + 1;
+            }
+            for (int attempt = 0; attempt < 10000; attempt++, number++)
+            {
+                string candidate = name + " (" + number.ToString(CultureInfo.InvariantCulture) + ")" + extension;
+                if (!taken(candidate)) return candidate;
+            }
+            throw new ArgumentException("No available numbered name was found.");
+        }
+
         public static void Replace(string requestId, string temporary, string source, long expectedSize, DateTime expectedWriteTime)
         {
             string staged = temporary;

@@ -726,25 +726,24 @@
     function visibility() { set(current); }
     canvas.addEventListener("webglcontextlost", lost);
     document.addEventListener("visibilitychange", visibility, { signal: EDITOR_SIGNAL });
-    return {
-      supported: supported,
-      set: set,
-      destroy: function () {
-        if (destroyed) return;
-        destroyed = true; current = null;
-        release();
-        mutations.disconnect(); resize.disconnect();
-        ["seeked", "loadeddata", "pause", "play"].forEach(function (n) { video.removeEventListener(n, redraw); });
-        video.removeEventListener("rkframe", draw);
-        document.removeEventListener("visibilitychange", visibility);
-        canvas.removeEventListener("webglcontextlost", lost);
-        delete video.dataset.rkFxOwned;
-        canvas.remove();
-        var lose = context && context.getExtension("WEBGL_lose_context");
-        if (lose) lose.loseContext();
-        context = null;
-      },
-    };
+    function destroy() {
+      if (destroyed) return;
+      destroyed = true; current = null;
+      if (EDITOR_SIGNAL) EDITOR_SIGNAL.removeEventListener("abort", destroy);
+      release();
+      mutations.disconnect(); resize.disconnect();
+      ["seeked", "loadeddata", "pause", "play"].forEach(function (n) { video.removeEventListener(n, redraw); });
+      video.removeEventListener("rkframe", draw);
+      document.removeEventListener("visibilitychange", visibility);
+      canvas.removeEventListener("webglcontextlost", lost);
+      delete video.dataset.rkFxOwned;
+      canvas.remove();
+      var lose = context && context.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+      context = null;
+    }
+    if (EDITOR_SIGNAL) EDITOR_SIGNAL.addEventListener("abort", destroy, { once: true });
+    return { supported: supported, set: set, destroy: destroy };
   }
 
   // one hidden canvas draws the small pictures of the filters and effects in turn, each copied into its own tile

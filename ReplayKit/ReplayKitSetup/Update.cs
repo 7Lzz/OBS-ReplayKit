@@ -220,9 +220,9 @@ namespace ReplayKitSetup
                     return 1;
                 }
 
-                MarkUpdatePending();
                 Obs.CloseObs(LogBoth);
                 obsClosed = true;
+                MarkUpdatePending();
                 // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
