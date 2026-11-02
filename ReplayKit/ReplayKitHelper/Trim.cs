@@ -385,6 +385,7 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return null;
             try
             {
+                using var reader = JobCoordinator.ReadSource(path);
                 var r = Compression.InvokeNativeCapture(ffprobe, new[]
                 {
                     "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate,pix_fmt,sample_aspect_ratio,bit_rate:format=duration",

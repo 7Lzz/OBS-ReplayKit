@@ -155,6 +155,7 @@ namespace ReplayKitHelper
         {
             var current = Current(capture, file) ? capture : null;
             var summary = CaptureTimeline.Describe(current);
+            summary["canReset"] = current?["original"] is JObject;
             // the name and icon of a roblox experience may have to be fetched, which waits while recognition is off
             var experience = RecognitionOn() ? RobloxExperiences.Describe(current, summary) : null;
             if (experience != null) summary["experience"] = experience;
@@ -230,7 +231,8 @@ namespace ReplayKitHelper
             // the games of the clips there are now join the played ones, which the game picker keeps offering after their clips are gone
             var played = GameCatalog.Played(games.Values.Where(g => GameCatalog.ValidId(g["id"].Value<string>())).Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() }));
             return new JObject { ["ok"] = true, ["total"] = files.Count, ["clips"] = clips.Count, ["screenshots"] = shots.Count, ["games"] = new JArray(games.Values.OrderBy(g => g["name"].Value<string>())),
-                ["played"] = new JArray(played.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Json())) };
+                ["played"] = new JArray(played.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Json())),
+                ["roblox"] = new JObject { ["id"] = RobloxExperiences.RobloxId, ["name"] = "Roblox", ["experiences"] = RobloxExperiences.Library() } };
         }
 
         internal static void Saved(string file, long end, double duration = 0)
@@ -338,17 +340,31 @@ namespace ReplayKitHelper
             });
         }
 
-        internal static void Correct(string file, string id, string customName, double duration)
+        internal static void Correct(string file, string id, string customName, double duration, string universe = "")
         {
             if (!File.Exists(file)) throw new FileNotFoundException("Clip not found.");
             GameCatalog.Game game = null;
             if (!string.IsNullOrWhiteSpace(customName)) game = GameCatalog.Custom(customName);
             else if (id != "desktop" && id != "unknown") game = GameCatalog.Get(id) ?? throw new ArgumentException("Unknown game.");
+            if (universe.Length > 0 && game?.Id != RobloxExperiences.RobloxId) throw new ArgumentException("An experience must belong to Roblox.");
+            var experience = universe.Length > 0 ? RobloxExperiences.Select(universe) : null;
             if (duration <= 0) duration = Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase) ? .001 : (Trim.ProbeVideo(file)?.Duration ?? 0);
             if (!CaptureTimeline.Number(duration) || duration <= 0) throw new ArgumentException("The clip length is unavailable.");
             var rows = new JArray();
             CaptureTimeline.Add(rows, 0, duration, game != null ? "game" : id, game?.Id ?? "", game?.Name ?? "");
-            Write(file, CaptureTimeline.Pack(duration, rows, true));
+            var previous = Read(file);
+            var corrected = CaptureTimeline.Pack(duration, rows, true);
+            var original = previous?["original"] as JObject ?? (previous?["manual"]?.Value<bool>() != true ? previous : null);
+            if (original != null) corrected["original"] = original.DeepClone();
+            if (experience != null) corrected["experience"] = experience;
+            Write(file, corrected);
+        }
+
+        internal static void Reset(string file)
+        {
+            var capture = Read(file);
+            if (!(capture?["original"] is JObject original)) throw new ArgumentException("The original game assignment is unavailable.");
+            Write(file, original);
         }
 
         internal static void Rendered(string source, string target, VideoPlan plan, double start, double end, double speed, bool screenshot, double frame, JObject sourceCapture, bool ambiguous = false)
@@ -359,6 +375,9 @@ namespace ReplayKitHelper
             else
             {
                 var rows = new JArray();
+                var originalRows = new JArray();
+                var originalDetails = new List<JObject>();
+                bool corrected = false;
                 double left = screenshot ? frame : plan.Start, right = screenshot ? frame + .001 : plan.End;
                 foreach (var piece in plan.Pieces)
                 {
@@ -367,10 +386,28 @@ namespace ReplayKitHelper
                     double rate = piece.Rate(speed);
                     var original = piece.Path == null || string.Equals(piece.Path, source, StringComparison.OrdinalIgnoreCase) ? sourceCapture : Read(piece.Path);
                     var cut = CaptureTimeline.Cut(original, piece.SrcStart + (a - piece.At) * rate, piece.SrcStart + (b - piece.At) * rate, rate);
+                    corrected |= cut["original"] is JObject;
+                    var baseline = cut["original"] as JObject ?? cut;
+                    var recorded = original?["original"] as JObject ?? original;
+                    originalDetails.Add(new JObject { ["id"] = MainGame(CaptureTimeline.Describe(baseline)), ["experience"] = recorded?["experience"]?.DeepClone(), ["gameIcon"] = recorded?["gameIcon"]?.DeepClone() });
                     foreach (var row in (JArray)cut["intervals"])
                         CaptureTimeline.Add(rows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row);
+                    foreach (var row in (JArray)baseline["intervals"])
+                        CaptureTimeline.Add(originalRows, a - left + row["s"].Value<double>(), a - left + row["e"].Value<double>(), row);
                 }
                 result = CaptureTimeline.Pack(right - left, rows);
+                if (corrected)
+                {
+                    result["manual"] = true;
+                    var baseline = CaptureTimeline.Pack(right - left, originalRows);
+                    string game = MainGame(CaptureTimeline.Describe(baseline));
+                    foreach (string key in new[] { "experience", "gameIcon" })
+                    {
+                        var details = originalDetails.Where(d => game != null && d["id"]?.Value<string>() == game).Select(d => d[key]).ToList();
+                        if (details.Count > 0 && details[0] is JObject && details.All(d => JToken.DeepEquals(d, details[0]))) baseline[key] = details[0].DeepClone();
+                    }
+                    result["original"] = baseline;
+                }
             }
             // an edit of a roblox clip keeps the experience it was made in
             if (sourceCapture?["experience"] is JObject experience) result["experience"] = experience.DeepClone();

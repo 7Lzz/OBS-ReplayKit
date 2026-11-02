@@ -6042,6 +6042,15 @@
           });
       },
       load: load,
+      renameSource: function (from, to) {
+        if (st.name === from) st.name = to;
+        function rename(value) {
+          if (!value || typeof value !== "object") return;
+          if (value.ref === from) value.ref = to;
+          Object.keys(value).forEach(function (key) { if (typeof value[key] === "object") rename(value[key]); });
+        }
+        [st.vsegs, st.layers, st.clipboard, st.history, st.future].forEach(rename);
+      },
       unload: function () { seq += 1; unloadState(); },
       plan: plan,
       videoPlan: videoPlan,

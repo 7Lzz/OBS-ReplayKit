@@ -148,7 +148,27 @@ namespace ReplayKitHelper
                     Want(universe, false);
                 }
             }
-            return new JObject { ["id"] = icon != null ? IconId(universe, icon) : "", ["name"] = name ?? "" };
+            return new JObject { ["id"] = icon != null ? IconId(universe, icon) : "", ["universe"] = universe, ["name"] = name ?? "" };
+        }
+
+        internal static JArray Library()
+        {
+            Load();
+            lock (Gate) return new JArray(Cache.Where(p => !string.IsNullOrWhiteSpace(p.Value.Name)).OrderBy(p => p.Value.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(p => new JObject { ["universe"] = p.Key, ["name"] = p.Value.Name, ["id"] = p.Value.Icon != null ? IconId(p.Key, p.Value.Icon) : "" }));
+        }
+
+        internal static JObject Select(string universe)
+        {
+            if (!ValidUniverse(universe)) throw new ArgumentException("Invalid Roblox experience.");
+            Load();
+            lock (Gate)
+            {
+                if (!Cache.TryGetValue(universe, out var known) || string.IsNullOrWhiteSpace(known.Name)) throw new ArgumentException("Unknown Roblox experience.");
+                var experience = new JObject { ["universe"] = universe, ["name"] = known.Name };
+                if (known.Icon != null) experience["icon"] = known.Icon;
+                return experience;
+            }
         }
 
         internal static string IconId(string universe, string version) => "roblox-" + universe + "-" + version;

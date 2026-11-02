@@ -73,6 +73,7 @@ namespace ReplayKitHelper
         private static JObject ReadFfprobeMetadata(string ffprobe, string path)
         {
             if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe)) return null;
+            using var reader = JobCoordinator.ReadSource(path);
             var psi = new ProcessStartInfo
             {
                 FileName = ffprobe,

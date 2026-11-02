@@ -353,7 +353,9 @@ namespace ReplayKitHelper
                 if (tracks.Length == 1) extract.AddRange(new[] { "-map", "0:a:" + tracks[0].ToString(CultureInfo.InvariantCulture) });
                 else extract.AddRange(new[] { "-filter_complex", string.Concat(tracks.Select(t => "[0:a:" + t.ToString(CultureInfo.InvariantCulture) + "]")) + "amix=inputs=" + tracks.Length + ":duration=longest:normalize=0[voices]", "-map", "[voices]" });
                 extract.AddRange(new[] { "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-y", wav });
-                var extracted = Compression.InvokeNativeCapture(ffmpeg, extract, job.Cancel.Token, 10 * 60 * 1000, true);
+                Compression.NativeCaptureResult extracted;
+                using (JobCoordinator.ReadSource(clipPath))
+                    extracted = Compression.InvokeNativeCapture(ffmpeg, extract, job.Cancel.Token, 10 * 60 * 1000, true);
                 if (extracted.ExitCode != 0 || !File.Exists(wav)) throw new InvalidOperationException("The audio of the clip could not be read.");
 
                 lock (Gate) job.State = "listening";

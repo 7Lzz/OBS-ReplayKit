@@ -84,6 +84,7 @@ namespace ReplayKitHelper
             string temp = output + "." + Guid.NewGuid().ToString("N") + ".tmp.jpg";
             try
             {
+                using var reader = JobCoordinator.ReadSource(source);
                 Native.SaveThumbnail(source, temp);
                 File.Move(temp, output);
                 return output;

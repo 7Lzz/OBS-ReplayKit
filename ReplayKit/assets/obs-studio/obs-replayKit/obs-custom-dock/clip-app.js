@@ -362,6 +362,7 @@ const CLIP_HOVER_PROFILES = {
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
+  let clipIdentityRevision = 0;
   let pollTimer = null;
   let pollInFlight = false;
   let lastPollAt = 0;
@@ -2427,8 +2428,9 @@ const CLIP_HOVER_PROFILES = {
     try {
       const requestSort = activeSort;
       const requestGames = gameFilters ? gameFilters.key : "";
+      const identityRevision = clipIdentityRevision;
       const page = await fetchClipsPage(clipsNextOffset, false, requestSort);
-      if (requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return;
+      if (identityRevision !== clipIdentityRevision || requestSort !== activeSort || requestGames !== (gameFilters ? gameFilters.key : "")) return;
       if (!page.paged) return;
       if (page.version !== clipsPageVersion) {
         // the list was rebuilt between the pages: the first page is read again, and the pages read so far stay on the screen until their new copies are in
@@ -3055,7 +3057,7 @@ const CLIP_HOVER_PROFILES = {
 
     const cardMenu = card.querySelector(".menu-dropdown");
     const revealItem = cardMenu && card.querySelector(".open-folder-item");
-    if (revealItem && window.RKClipGames) revealItem.after(RKClipGames.menuAction(clip, false, closeAllMenus));
+    if (revealItem && window.RKClipGames) revealItem.after(RKClipGames.menuAction(() => currentClipForCard(card), false, closeAllMenus));
 
     syncProcessing(card, clip);
     applyClipHovers(card);
@@ -3860,6 +3862,72 @@ const CLIP_HOVER_PROFILES = {
     renderLoadedClips(loadedClips);
   }
 
+  async function renameClipFile(name, to, view) {
+    const media = HTMLMediaElement.prototype;
+    const time = Object.getOwnPropertyDescriptor(media, "currentTime");
+    const paused = Object.getOwnPropertyDescriptor(media, "paused");
+    const sources = [];
+    for (const video of document.querySelectorAll("video")) {
+      if (!video.getAttribute("src")) continue;
+      const url = new URL(video.src);
+      if (url.origin !== HELPER || url.pathname !== "/file/" + encodeURIComponent(name)) continue;
+      sources.push({ video, url, at:time.get.call(video), playing:!paused.get.call(video), active:video === activePreview, preload:video.preload });
+      media.pause.call(video);
+      video.removeAttribute("src");
+      media.load.call(video);
+    }
+    let finalName = name;
+    try {
+      const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(name) + "&to=" + encodeURIComponent(to) + (view ? "&view=" + encodeURIComponent(view) : ""), { method:"POST", cache:"no-store" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+      finalName = data.name || to;
+      renameClipIdentity(name, finalName);
+      return finalName;
+    } finally {
+      for (const source of sources) {
+        const { video, url, at, playing, active, preload } = source;
+        if (!video.isConnected || video.getAttribute("src")) continue;
+        url.pathname = "/file/" + encodeURIComponent(finalName);
+        const src = url.href;
+        video.preload = "metadata";
+        const failed = () => { if (video.src === src) video.preload = preload; };
+        video.addEventListener("error", failed, { once:true });
+        video.addEventListener("loadedmetadata", () => {
+          video.removeEventListener("error", failed);
+          if (video.src !== src) return;
+          video.preload = preload;
+          time.set.call(video, at);
+          if (playing && (!active || !activePreview || activePreview === video)) {
+            if (active) activePreview = video;
+            media.play.call(video).catch(() => {});
+          }
+        }, { once:true });
+        video.src = src;
+        media.load.call(video);
+      }
+    }
+  }
+
+  function renameClipIdentity(from, to) {
+    clipIdentityRevision++;
+    const clips = new Set([...loadedClips, ...allClips, ...resolvedFavoriteClips, ...resolvedDraftClips.values(), ...lastClipsByName.values()]);
+    for (const clip of clips) if (clip.name === from) clip.name = to;
+    for (const cache of [lastClipsByName, resolvedDraftClips, draftsByName, durationCache]) {
+      if (!cache.has(from)) continue;
+      const value = cache.get(from);
+      cache.delete(from);
+      cache.set(to, value);
+    }
+    if (selectedClipNames.delete(from)) selectedClipNames.add(to);
+    const clip = lastClipsByName.get(to) || [...clips].find(clip => clip.name === to);
+    document.querySelectorAll(".card").forEach(card => {
+      if (card.dataset.name !== from) return;
+      card.dataset.name = to;
+      if (clip) card.dataset.previewUrl = clipPreviewUrlFor(clip);
+    });
+  }
+
   function startRename(card) {
     const currentName = card.dataset.name;
     const titleRow = card.querySelector(".title-row");
@@ -3915,16 +3983,8 @@ const CLIP_HOVER_PROFILES = {
       if (!newBase || newName === currentName) { restore(); return; }
       settled = true;
       try {
-        const res = await fetch(HELPER + "/rename"
-          + "?file=" + encodeURIComponent(currentName)
-          + "&to="   + encodeURIComponent(newName),
-          { method: "POST", cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          throw new Error(data.message || ("HTTP " + res.status));
-        }
+        const finalName = await renameClipFile(currentName, newName);
         // optimistically update the card so we dont wait for the next /clips poll to relabel. the next poll will reconcile.
-        const finalName = data.name || newName;
         transferFavorite(currentName, finalName);
         card.dataset.name = finalName;
         nameSpan.textContent = displayClipName(card.dataset.name);
@@ -4251,7 +4311,7 @@ const CLIP_HOVER_PROFILES = {
   function renderActions(card, clip, force) {
     const actions = card.querySelector(".actions");
     const meta = card.querySelector(".meta");
-    if (window.RKClipGames) RKClipGames.badge(meta, clip, { change: true });
+    if (window.RKClipGames) RKClipGames.badge(meta, clip, { change: true, current: () => currentClipForCard(card) });
     const status = lastUploadJobsByName.get(clip.name)
       || (lastUploadStatus && lastUploadStatus.clipName === clip.name ? lastUploadStatus : null);
     // within the cancel grace window keep the card idle even if a stale status snapshot still reports the job active.
@@ -4586,11 +4646,11 @@ const CLIP_HOVER_PROFILES = {
       card.dataset.name = clip.name;
       card.dataset.clipSig = sig;
       card.dataset.mtime = String(clip.mtime || 0);
-      // refresh the cache-busted preview url and drop any previously-loaded src. after a trim/compress overwrite the file on disk is diffrent; without resetting video.src the next hover would replay cefs cached old bytes (and crash on seek becuase the byte offsets no longer match the file). cache key is size+mtime, not mtime alone, becuase compress-overwrite restores the source mtime to preserve sort order -- so the size delta is what guarantees a fresh url.
+      // only changed media bytes or a stale source need a reload; renames and metadata updates keep playing
       card.dataset.previewUrl = clipPreviewUrlFor(clip);
       const v = card.querySelector("video");
       const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-      if (v && v.src && v !== fsEl) abortVideoLoad(v);
+      if (v && v.src && v.src !== card.dataset.previewUrl && v !== fsEl) abortVideoLoad(v);
       const nameEl = card.querySelector(".name");
       if (nameEl) {
         nameEl.textContent = displayClipName(clip.name);
@@ -4852,6 +4912,7 @@ const CLIP_HOVER_PROFILES = {
     }
     if (pollInFlight) return;
     pollInFlight = true;
+    const identityRevision = clipIdentityRevision;
     try {
       let clips = await fetchClips();
       if (!clips) return;
@@ -4859,6 +4920,7 @@ const CLIP_HOVER_PROFILES = {
       closeErrorPopup("helper-offline");
       let uploadStatus = null;
       try { uploadStatus = await fetchUploadStatus(); } catch {}
+      if (identityRevision !== clipIdentityRevision) return;
       lastUploadStatus = uploadStatus;
       syncClipSave(uploadStatus && uploadStatus.clipSave);
       syncClipFolders(uploadStatus && uploadStatus.clipFolders);

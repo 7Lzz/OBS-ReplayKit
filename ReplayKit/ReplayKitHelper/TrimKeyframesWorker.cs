@@ -77,6 +77,7 @@ namespace ReplayKitHelper
         {
             try
             {
+                using var reader = JobCoordinator.ReadSource(sourcePath);
                 if (!File.Exists(ffprobe)) return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found" };
                 if (!File.Exists(sourcePath)) return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
 

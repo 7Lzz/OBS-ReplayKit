@@ -432,6 +432,7 @@ namespace ReplayKitHelper
 
         private static string ReadCompressComment(string ffprobe, string path)
         {
+            using var reader = JobCoordinator.ReadSource(path);
             var info = new ProcessStartInfo
             {
                 FileName = ffprobe,

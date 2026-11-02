@@ -80,7 +80,7 @@ namespace ReplayKitHelper
         // returns the error of a cut that just failed, or null; starts a cut when none is running
         private static string EnsureJob(string key, string source, int first, int count, string dir, bool lowPriority)
         {
-            return Jobs.Ensure(key, () => Extract(source, first, count, dir, lowPriority));
+            return Jobs.Ensure(key, source, () => Extract(source, first, count, dir, lowPriority));
         }
 
         private static void Extract(string source, int first, int count, string dir, bool lowPriority)

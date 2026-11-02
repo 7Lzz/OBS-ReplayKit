@@ -19,6 +19,55 @@ namespace ReplayKitHelper
         }
         private static readonly Dictionary<string, Editor> Editors = new Dictionary<string, Editor>();
         private static readonly HashSet<string> CompressionQueue = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, int> Readers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> Changing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        internal static IDisposable ReadSource(string path)
+        {
+            path = Path.GetFullPath(path);
+            lock (Gate)
+            {
+                while (Changing.Contains(path)) Monitor.Wait(Gate);
+                Readers[path] = Readers.TryGetValue(path, out int count) ? count + 1 : 1;
+                return new Reader(path);
+            }
+        }
+
+        internal static void ChangeSource(string path, Action change)
+        {
+            path = Path.GetFullPath(path);
+            lock (Gate)
+            {
+                if (!Changing.Add(path)) throw new IOException("That clip is already being changed.");
+                try
+                {
+                    var wait = System.Diagnostics.Stopwatch.StartNew();
+                    while (Readers.ContainsKey(path))
+                    {
+                        int remaining = (int)Math.Max(0, 30000 - wait.ElapsedMilliseconds);
+                        if (remaining == 0 || !Monitor.Wait(Gate, remaining)) throw new IOException("The clip is still being prepared. Rename it after preparation finishes.");
+                    }
+                    change();
+                }
+                finally { Changing.Remove(path); Monitor.PulseAll(Gate); }
+            }
+        }
+
+        private sealed class Reader : IDisposable
+        {
+            private string path;
+            internal Reader(string path) { this.path = path; }
+            public void Dispose()
+            {
+                string source = Interlocked.Exchange(ref path, null);
+                if (source == null) return;
+                lock (Gate)
+                {
+                    if (--Readers[source] == 0) Readers.Remove(source);
+                    Monitor.PulseAll(Gate);
+                }
+            }
+        }
 
         public static void RegisterEditor(string view, string id)
         {
@@ -61,6 +110,12 @@ namespace ReplayKitHelper
         public static bool IsEditorSource(string path)
         {
             lock (Gate) return Editors.Values.Any(e => e.Paths.Contains(path));
+        }
+
+        public static void RenameEditorSource(string from, string to, string view)
+        {
+            lock (Gate)
+                if (view != null && Editors.TryGetValue(view, out var editor) && editor.Paths.Remove(from)) editor.Paths.Add(to);
         }
 
         public static bool QueueCompression(IEnumerable<string> paths, out string message)
@@ -114,7 +169,7 @@ namespace ReplayKitHelper
                     message = "That clip is open in the editor. Close the editor before compressing it.";
                     return null;
                 }
-                // the next save of an editor reads its clip, so a delete from the other view or the storage card would lose the edit; the editor of a view still renames its own clip, which it reopens under the new name
+                // an editor keeps its source protected when it renames it; other views cannot rename or delete that source
                 if (kind == "delete" && Editors.Values.Any(e => e.Paths.Contains(paths[0])))
                 {
                     message = "That clip is open in the editor. Close the editor before deleting it.";

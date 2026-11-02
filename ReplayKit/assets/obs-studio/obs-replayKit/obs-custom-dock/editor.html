@@ -64,7 +64,7 @@
               </div>
             </div>
             <div class="compress-downsample-row render-replace-row">
-              <input type="checkbox" class="rk-switch" id="render-replace" aria-label="Replace the original">
+              <input type="checkbox" class="rk-switch" id="render-replace" aria-label="Replace the original" checked>
               <span>Replace the original<span class="render-replace-note">The clip is replaced on disk, which can't be undone.</span></span>
             </div>
             <div class="render-meta"><span id="render-size"></span><span id="render-length"></span></div>
@@ -552,6 +552,7 @@ window.__rkEditorApi = (function () {
   // while the user previews the trimmed window, this caps playback at the end handle so the video loops the selection instead of playing out the entire source.
   let trimPreviewActive = false;
   let trimSourceClip = null;
+  let trimRenaming = false;
   // the save that is running, or null: the editor cannot be closed or changed while there is one
   // the draft of the open editor: armed once the editor is up, and what was last sent, so an edit that did not change is not sent again
   let trimDraftArmed = false;
@@ -1169,7 +1170,7 @@ window.__rkEditorApi = (function () {
     }
     const valid = (e - s) >= TRIM_MIN_SECONDS;
     const importing = trimLanes.busy();
-    const free = !trimSaving && !importing;
+    const free = !trimSaving && !trimRenaming && !importing;
     trimRender.disabled = !valid || !free;
     screenshotBtn.disabled = !valid || !free;
     document.getElementById("trim-rename").disabled = !free;
@@ -1339,7 +1340,7 @@ window.__rkEditorApi = (function () {
 
   function closeTrimModal() {
     // a save in progress keeps the editor up, and the save closes it when the file is written
-    if (trimSaving) return false;
+    if (trimSaving || trimRenaming) return false;
     // the edit stays behind as a draft wherever the editor is left from: the cancel button, escape, another view, a closed obs
     const kept = keepTrimDraft();
     editorTools.closed();
@@ -1619,9 +1620,9 @@ window.__rkEditorApi = (function () {
     if (editorExit.classList.contains("is-open") && !editorExit.contains(e.target)) closeExitMenu();
   }, { signal: EDITOR_SIGNAL });
 
-  // the name of the clip is changed from the bar the way a card changes it: the edit is kept as a draft first, the helper renames the clip and its draft together, and the editor opens again on the clip under its new name, so nothing in it still points at the old file
+  // rename the source and its draft in place so the prepared timeline and undo history stay loaded
   function startClipRename() {
-    if (trimSaving || !trimSourceClip) return;
+    if (trimSaving || trimRenaming || !trimSourceClip) return;
     const clip = trimSourceClip;
     const nameSpan = trimClipName;
     const dot = clip.name.lastIndexOf(".");
@@ -1653,20 +1654,28 @@ window.__rkEditorApi = (function () {
       back();
       if (!next || next + ext === clip.name || trimSourceClip !== clip) return;
       keepTrimDraft();
+      trimRenaming = true;
+      updateTrimUi();
+      const previous = clip.name;
       try {
         await draftWrites;
-        const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(clip.name) + "&to=" + encodeURIComponent(next + ext) + "&view=" + (HOME_MODE ? "home" : "clips"), { method: "POST", cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+        const name = await renameClipFile(previous, next + ext, HOME_MODE ? "home" : "clips");
+        transferFavorite(previous, name);
+        clip.name = name;
         refreshDrafts();
         scheduleNextPoll(0);
         if (trimSourceClip !== clip) return;
-        closeTrimModal();
-        openEditor(Object.assign({}, clip, { name: data.name || next + ext }));
+        trimClipName.textContent = name;
+        trimLanes.renameSource(previous, name);
+        editorTools.renamed(name);
+        trimDraftSent = "";
       } catch (err) {
-        if (trimSourceClip === clip) trimDraftArmed = true;
         showToast("The clip could not be renamed: " + escapeHtml(err.message || String(err)), "bad", "Rename");
         scheduleToastHide(TOAST_ERROR_MS);
+      } finally {
+        trimRenaming = false;
+        if (trimSourceClip === clip) { trimDraftArmed = true; scheduleTrimDraft(); }
+        updateTrimUi();
       }
     }
     input.addEventListener("keydown", (e) => {
@@ -1969,7 +1978,7 @@ window.__rkEditorApi = (function () {
 
   // single submit helper -- both buttons funnel thru here with a diffrent mode.
   async function submitTrim(mode, render) {
-    if (trimSaving || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
+    if (trimSaving || trimRenaming || !trimSourceClip || trimDuration() < TRIM_MIN_SECONDS) return;
     const sourceName = trimSourceClip.name;
     const screenshot = mode === "screenshot";
     const videoPlan = trimLanes.videoPlan(screenshot);
@@ -2115,7 +2124,7 @@ window.__rkEditorApi = (function () {
   function openRenderSettings() {
     if (trimRender.disabled || trimSaving) return;
     closeExitMenu();
-    document.getElementById("render-replace").checked = false;
+    document.getElementById("render-replace").checked = true;
     paintRenderSettings();
     renderVeil.classList.add("is-open");
     document.getElementById("render-go").focus();

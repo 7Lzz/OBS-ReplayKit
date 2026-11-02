@@ -19,7 +19,7 @@ namespace ReplayKitHelper
         private readonly object gate = new object();
         private readonly Dictionary<string, Job> jobs = new Dictionary<string, Job>();
 
-        internal string Ensure(string key, Action work)
+        internal string Ensure(string key, string source, Action work)
         {
             lock (gate)
             {
@@ -38,7 +38,7 @@ namespace ReplayKitHelper
                     Task.Run(() =>
                     {
                         string error = null;
-                        try { work(); }
+                        try { using (JobCoordinator.ReadSource(source)) work(); }
                         catch (Exception ex) { error = ex.Message; Log.Write("Preview job: " + ex.Message); }
                         finally
                         {

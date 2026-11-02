@@ -50,6 +50,7 @@ namespace ReplayKitHelper
             if (!(limited ?? SubjectToStreamableDurationLimit())) return null;
             try
             {
+                using var reader = JobCoordinator.ReadSource(path);
                 var meta = Compression.GetVideoMetadata(Compression.FindCompressionFfprobe(), Compression.FindCompressionFfmpeg(), path);
                 if (!meta.Ok || meta.Duration <= Constants.STREAMABLE_FREE_MAX_DURATION_SEC) return null;
                 int total = (int)Math.Round(meta.Duration);

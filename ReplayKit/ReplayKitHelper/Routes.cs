@@ -572,16 +572,17 @@ namespace ReplayKitHelper
             string Q(string key, string def = "") => query.TryGetValue(key, out string v) ? v : def;
             bool QFlag(string key) => query.TryGetValue(key, out string v) && v == "1";
 
-            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set")
+            if (path == "/games/library" || path == "/games/search" || path == "/games/icon" || path == "/games/set" || path == "/games/reset")
             {
                 try
                 {
-                    if (path == "/games/set")
+                    if (path == "/games/set" || path == "/games/reset")
                     {
                         if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                         string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file")) : Clips.GetSafeClipPath(Q("file"))?.Full;
                         if (file == null || !File.Exists(file)) throw new ArgumentException("Clip not found.");
-                        ClipGames.Correct(file, Q("id"), Q("name"), 0);
+                        if (path == "/games/reset") ClipGames.Reset(file);
+                        else ClipGames.Correct(file, Q("id"), Q("name"), 0, Q("universe"));
                         // a clip given another game is filed in the folder of that game
                         if (!QFlag("screenshot")) ClipFolderWorker.Poke();
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
@@ -2820,12 +2821,13 @@ namespace ReplayKitHelper
                 if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                 try
                 {
-                    JobCoordinator.Commit(requestId, () =>
+                    JobCoordinator.Commit(requestId, () => JobCoordinator.ChangeSource(selected.Full, () =>
                     {
                         // a restore from deleted history or a save can take the name between the check above and here
                         if (!caseOnly && File.Exists(newPath)) throw new IOException("A file with that name already exists");
                         File.Move(selected.Full, newPath);
-                    });
+                        JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);
+                    }));
                     // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
                     Clips.UpdateDb(db =>
                     {

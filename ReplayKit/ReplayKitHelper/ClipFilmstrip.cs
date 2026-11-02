@@ -68,7 +68,7 @@ namespace ReplayKitHelper
         // returns the error of a strip that just failed, or null; starts making one when none is running
         private static string EnsureJob(string key, string source, string dir, bool lowPriority)
         {
-            return Jobs.Ensure(key, () => Make(source, dir, lowPriority));
+            return Jobs.Ensure(key, source, () => Make(source, dir, lowPriority));
         }
 
         private static void Make(string source, string dir, bool gentle)

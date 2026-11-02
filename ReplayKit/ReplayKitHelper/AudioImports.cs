@@ -243,7 +243,9 @@ namespace ReplayKitHelper
                 "-map", "0:a:0", "-t", limit, "-c:a", "aac", "-b:a", "192k", "-ar", SampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture), "-ac", "2", "-movflags", "+faststart", audio,
                 "-map", "0:a:0", "-t", limit, "-ac", "1", "-ar", "8000", "-f", "s16le", raw,
             };
-            var run = Compression.InvokeNativeCapture(ffmpeg, argv, CancellationToken.None, 10 * 60 * 1000, true);
+            Compression.NativeCaptureResult run;
+            using (JobCoordinator.ReadSource(source))
+                run = Compression.InvokeNativeCapture(ffmpeg, argv, CancellationToken.None, 10 * 60 * 1000, true);
             if (run.ExitCode != 0)
             {
                 string text = string.Join(" ", run.Output).Trim();

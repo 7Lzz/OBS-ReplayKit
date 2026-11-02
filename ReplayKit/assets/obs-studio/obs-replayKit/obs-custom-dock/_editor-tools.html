@@ -2073,7 +2073,7 @@
       refresh();
     }
 
-    return { prepare: prepare, refresh: refresh, opened: opened, closed: closed, recording: function () { return rec.on || rec.starting; } };
+    return { prepare: prepare, refresh: refresh, opened: opened, renamed: function (name) { if (clip) clip.name = name; }, closed: closed, recording: function () { return rec.on || rec.starting; } };
   }
 
   // keeps the overlay of the subtitles on the picture of the video: the element letterboxes the video, so the overlay takes the box the picture is drawn in and its height sets the size of the text; a host that cuts the picture to a frame of its own says where that frame is with box

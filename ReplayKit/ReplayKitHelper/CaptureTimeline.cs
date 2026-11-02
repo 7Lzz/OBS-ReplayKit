@@ -141,7 +141,16 @@ namespace ReplayKitHelper
                 double left = Math.Max(start, row["s"]?.Value<double>() ?? 0), right = Math.Min(end, row["e"]?.Value<double>() ?? 0);
                 if (right > left) Add(rows, (left - start) / rate, (right - start) / rate, row);
             }
-            return Pack((end - start) / rate, rows, capture?["manual"]?.Value<bool>() ?? false);
+            var result = Pack((end - start) / rate, rows, capture?["manual"]?.Value<bool>() ?? false);
+            if (capture?["original"] is JObject original)
+            {
+                var source = (JObject)original.DeepClone();
+                source.Remove("original");
+                result["original"] = Cut(source, start, end, rate);
+                foreach (string key in new[] { "experience", "gameIcon" })
+                    if (source[key] is JObject detail) result["original"][key] = detail.DeepClone();
+            }
+            return result;
         }
 
         // the seconds at the end of a clip that may pass without evidence, the time it takes to switch to obs and press clip, before the game focused last stops being the game the clip ends on

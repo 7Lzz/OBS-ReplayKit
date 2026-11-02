@@ -240,6 +240,7 @@ namespace ReplayKitHelper
         // makes the first audio track the enabled one and puts all audio tracks into one alternate group. only two small fields of the tkhd boxes are rewritten in place, so no offset or size of the file moves, and what was there is written back when anything goes wrong
         public static Fix NormalizeAudio(string path)
         {
+            using var reader = JobCoordinator.ReadSource(path);
             // looked at read only first, so a clip that needs nothing is never opened for writing
             List<Track> tracks;
             try

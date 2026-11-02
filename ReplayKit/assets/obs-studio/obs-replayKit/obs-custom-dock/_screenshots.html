@@ -217,7 +217,7 @@ window.RKScreenshots = {
       if (options.relabel) options.relabel(card);
       const menu = body.querySelector(".menu-dropdown");
       const revealItem = menu.querySelector('[data-act="reveal"]');
-      if (window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(row, true, options.closeMenus));
+    if (window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(() => row, true, options.closeMenus));
       const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
       async function remove(trigger, inMenu) {
         // the same two clicks as a clip: the first arms the button, the second deletes
