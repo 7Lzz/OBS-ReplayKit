@@ -14,6 +14,7 @@
 #include <QCheckBox>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QWindowStateChangeEvent>
 
 namespace rk {
 
@@ -382,6 +383,7 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 			ShellBindHwnd();
 			break;
 		case QEvent::Show:
+			ShellPrepareShow();
 			ShellResetHostProbe();
 			ShellBindHwnd();
 			ShellLayout();
@@ -402,6 +404,9 @@ bool ShellHostFilter::eventFilter(QObject *watched, QEvent *event)
 		case QEvent::Resize:
 		case QEvent::WindowStateChange:
 			if (event->type() == QEvent::WindowStateChange) {
+				const auto *state = static_cast<QWindowStateChangeEvent *>(event);
+				if ((state->oldState() & Qt::WindowMinimized) && m_mw->isVisible() && !m_mw->isMinimized())
+					ShellPrepareShow();
 				ShellResetHostProbe();
 				if (g_shellHost) {
 					const bool minimizedEditor = m_mw->isMinimized() && ShellEditorActive();

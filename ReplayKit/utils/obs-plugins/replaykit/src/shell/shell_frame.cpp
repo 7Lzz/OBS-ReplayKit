@@ -64,7 +64,7 @@ void ShellEnsureMinimumSize(HWND hwnd)
 constexpr DWORD kDwmCloak = 13;
 bool g_shellFirstShown = false;
 bool g_shellCloaked = false;
-QElapsedTimer g_shellFirstShowClock;
+QElapsedTimer g_shellShowClock;
 
 void ShellSetCloak(HWND hwnd, bool on)
 {
@@ -75,8 +75,8 @@ void ShellSetCloak(HWND hwnd, bool on)
 	g_shellCloaked = on;
 }
 
-// the chrome has had its first paint and the compositor has taken it in, so the window can be let out
-void ShellFinishFirstShow()
+// the chrome has painted and the compositor has taken it in, so the window can be let out
+void ShellFinishShow()
 {
 	if (!g_shellCloaked)
 		return;
@@ -88,10 +88,11 @@ void ShellFinishFirstShow()
 			if (w && w->isVisible())
 				w->repaint();
 		}
+		RedrawWindow(g_shellHwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 		DwmFlush();
 	}
 	ShellSetCloak(g_shellHwnd, false);
-	blog(LOG_INFO, "[replaykit] first show: the window stayed out of sight %d ms until its chrome had painted", int(g_shellFirstShowClock.elapsed()));
+	blog(LOG_INFO, "[replaykit] window show: the window stayed out of sight %d ms until its chrome had painted", int(g_shellShowClock.elapsed()));
 }
 
 // a window that was maximized before it ever had a normal size restores to a rectangle as big as the screen, which looks as if nothing happened, so a restore that lands on one is given a proper size, centred on the work area
@@ -198,6 +199,19 @@ ITaskbarList2 *ShellTaskbarList()
 }
 
 } // namespace
+
+void ShellPrepareShow()
+{
+	if (!g_shellHwnd || g_shellCloaked)
+		return;
+	const int delay = g_shellFirstShown ? 0 : 90;
+	g_shellFirstShown = true;
+	g_shellShowClock.start();
+	ShellSetCloak(g_shellHwnd, true);
+	QTimer::singleShot(delay, g_callbacks, []() { ShellFinishShow(); });
+	// a window must never stay hidden, whatever becomes of the first timer
+	QTimer::singleShot(1500, g_callbacks, []() { ShellFinishShow(); });
+}
 
 // the extended frame is what gives a frameless window its shadow, and it is also a hairline of frame colour along every edge: right for a window floating on the desktop, wrong once the window fills the screen or a whole monitor
 void ShellSyncFrameMargins(HWND hwnd)
@@ -427,6 +441,20 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 	MSG *msg = static_cast<MSG *>(message);
 	if (!msg || !g_shellHwnd)
 		return false;
+	if (msg->message == WM_ERASEBKGND) {
+		QWidget *surface = QWidget::find(reinterpret_cast<WId>(msg->hwnd));
+		const bool chrome = surface && (surface == g_shellTitle || surface == g_shellRail || surface == g_shellCorner);
+		if (msg->hwnd != g_shellHwnd && !chrome && (!surface || surface != g_shellBar))
+			return false;
+		const QColor &color = chrome ? g_chromeBar : g_chromeBg;
+		RECT rc;
+		GetClientRect(msg->hwnd, &rc);
+		HBRUSH brush = CreateSolidBrush(RGB(color.red(), color.green(), color.blue()));
+		FillRect(reinterpret_cast<HDC>(msg->wParam), &rc, brush);
+		DeleteObject(brush);
+		*result = 1;
+		return true;
+	}
 	if (msg->message == WM_NCHITTEST && msg->hwnd != g_shellHwnd && IsChild(g_shellHwnd, msg->hwnd)) {
 		// the title bar, the rail and the preview are native child windows, and each would answer this hit test itself with plain client area, so the frame never got asked and the window could be neither dragged nor resized from them. wherever the frame should answer they step aside and the question falls through to the main window
 		QMainWindow *mw = ObsMainWindowQt();
@@ -440,15 +468,8 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		return false;
 	switch (msg->message) {
 	case WM_SHOWWINDOW:
-		// the first time the window comes up, the title bar, the rail and the cover of the stage paint for the first time and the browser is made, and until that has happened a native window shows black or white for a frame. the window stays cloaked meanwhile, and is let out once the chrome has painted
-		if (msg->wParam && !g_shellFirstShown) {
-			g_shellFirstShown = true;
-			g_shellFirstShowClock.start();
-			ShellSetCloak(g_shellHwnd, true);
-			QTimer::singleShot(90, g_callbacks, []() { ShellFinishFirstShow(); });
-			// a window must never stay hidden, whatever becomes of the first timer
-			QTimer::singleShot(1500, g_callbacks, []() { ShellFinishFirstShow(); });
-		}
+		if (msg->wParam)
+			ShellPrepareShow();
 		return false;
 	case WM_GETMINMAXINFO: {
 		// a frameless window that the system sizes has no floor but the height of a caption, so it could be made smaller than anything on it
@@ -468,16 +489,6 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		// the whole window is client area: leaving the proposed rectangle as it came in and answering 0 is what removes the frame
 		*result = 0;
 		return true;
-	case WM_ERASEBKGND: {
-		// the area a resize uncovers is erased here before anything paints it, and qt answers this message without painting, which left that area white for a frame or two while the window grew; it gets the window colour instead
-		RECT rc;
-		GetClientRect(msg->hwnd, &rc);
-		HBRUSH brush = CreateSolidBrush(RGB(g_chromeBg.red(), g_chromeBg.green(), g_chromeBg.blue()));
-		FillRect(reinterpret_cast<HDC>(msg->wParam), &rc, brush);
-		DeleteObject(brush);
-		*result = 1;
-		return true;
-	}
 	case WM_NCHITTEST: {
 		QMainWindow *mw = ObsMainWindowQt();
 		if (!mw)
