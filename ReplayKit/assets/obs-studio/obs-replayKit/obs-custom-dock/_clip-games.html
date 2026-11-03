@@ -14,7 +14,14 @@
   .clip-game-icon { display:inline-flex; position:relative; flex:none; width:16px; height:16px; align-items:center; justify-content:center; }
   .clip-game-icon svg, .clip-game-icon img { width:100%; height:100%; object-fit:contain; fill:currentColor; }
   .clip-game-icon img { position:absolute; inset:0; }
+  .clip-game-icon > img[data-artwork] { visibility:hidden; }
   .clip-game-icon.is-ready > svg { visibility:hidden; }
+  .clip-game-icon > .processing-spinner {
+    display:none; position:absolute; inset:0; margin:auto;
+    width:12px; height:12px; box-sizing:border-box; border-width:2px;
+  }
+  .clip-game-icon:has(> img[data-artwork]) > svg { visibility:hidden; }
+  .clip-game-icon:not(.is-ready):has(> img.artwork-visible) > .processing-spinner { display:block; }
   .combo-search { box-sizing:border-box; width:100%; min-width:0; margin:0 0 6px; padding:8px 10px; border:1px solid var(--line); border-radius:4px; background:var(--window); color:var(--text); font:inherit; outline:none; }
   .combo-search:focus { border-color:var(--selected2); }
   .clip-game-badge { position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; flex:none; vertical-align:middle; color:var(--muted); outline-offset:2px; }
@@ -90,9 +97,11 @@ window.RKClipGames = (function () {
   const icon = key => (window.RK_ICONS || {})[key] || "";
   const symbol = kind => icon(kind === "desktop" ? "audio/desktop" : kind === "unknown" ? "action/help" : "audio/game") || icon("toggle/grid");
   // the icon of a game, or of a roblox experience drawn over the roblox icon so roblox shows until the experience icon has been fetched
-  function picture(id, kind, under) {
-    const img = key => /^(?:(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})(?:-[a-f0-9]{16})?|roblox-[0-9]{1,20}-[a-f0-9]{16})$/.test(key || "") ? '<img alt="" src="' + helper + '/games/icon?id=' + encodeURIComponent(key) + '">' : '';
-    return '<span class="clip-game-icon" aria-hidden="true">' + symbol(kind || id) + img(under) + img(id) + '</span>';
+  function picture(id, kind, under, catalog = false) {
+    const img = key => /^(?:(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})(?:-[a-f0-9]{16})?|roblox-[0-9]{1,20}-[a-f0-9]{16})$/.test(key || "") ? '<img alt="" ' + (catalog ? 'data-artwork' : 'src') + '="' + helper + '/games/icon?id=' + encodeURIComponent(key) + (catalog ? '&amp;catalog=1' : '') + '">' : '';
+    const images = img(under) + img(id);
+    const spinner = catalog && images ? '<span class="processing-spinner"></span>' : '';
+    return '<span class="clip-game-icon" aria-hidden="true">' + symbol(kind || id) + spinner + images + '</span>';
   }
   document.addEventListener("load", event => { if (event.target.matches(".clip-game-icon > img")) event.target.parentElement.classList.add("is-ready"); }, true);
   document.addEventListener("error", event => { if (event.target.matches(".clip-game-icon > img")) event.target.remove(); }, true);
@@ -192,6 +201,37 @@ window.RKClipGames = (function () {
     reset.addEventListener("click", () => choose("", "", "", true));
     dialog.append(top, search, list, reset, status); document.body.append(dialog);
     let generation = 0, timer, owned = null, saving = false, selectedId = current.id;
+    let artworkActive = 0;
+    const artworkQueue = new Set();
+    const artworkObserver = new IntersectionObserver(entries => {
+      for (const {target, isIntersecting} of entries) {
+        if (!target.isConnected || !target.dataset.artwork) continue;
+        target.classList.toggle("artwork-visible", isIntersecting);
+        if (isIntersecting && !target.hasAttribute("src")) artworkQueue.add(target);
+        else artworkQueue.delete(target);
+      }
+      loadArtwork();
+    }, {root:list});
+    function loadArtwork() {
+      for (const image of artworkQueue) {
+        if (artworkActive >= 2 || !dialog.open) break;
+        artworkQueue.delete(image);
+        if (!image.isConnected) continue;
+        artworkActive++;
+        const done = () => {
+          artworkObserver.unobserve(image);
+          image.classList.remove("artwork-visible");
+          delete image.dataset.artwork;
+          image.removeEventListener("load", done);
+          image.removeEventListener("error", done);
+          artworkActive--;
+          loadArtwork();
+        };
+        image.addEventListener("load", done);
+        image.addEventListener("error", done);
+        image.src = image.dataset.artwork;
+      }
+    }
     const gameName = game => String(game.name || "").trim().toLocaleLowerCase();
     function uniqueGames(games) {
       const byId = new Map();
@@ -199,7 +239,9 @@ window.RKClipGames = (function () {
       const knownNames = new Set([...byId.values()].filter(game => !game.id.startsWith("custom-")).map(gameName));
       return [...byId.values()].filter(game => !game.id.startsWith("custom-") || !knownNames.has(gameName(game)));
     }
-    dialog.addEventListener("close", () => { generation++; clearTimeout(timer); dialog.remove(); });
+    dialog.addEventListener("close", () => {
+      generation++; clearTimeout(timer); artworkObserver.disconnect(); artworkQueue.clear(); dialog.remove();
+    });
     dialog.addEventListener("click", e => {
       if (e.target !== dialog) return;
       const box = dialog.getBoundingClientRect();
@@ -246,7 +288,7 @@ window.RKClipGames = (function () {
       const button = document.createElement("button"); button.type = "button"; button.className = "game-picker-choice";
       const isCurrent = !custom && id === selectedId && (experience ? item.capture?.experience?.universe === experience.universe : !item.capture?.experience?.universe);
       if (isCurrent) button.setAttribute("aria-current", "true");
-      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : "");
+      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : "");
       button.querySelector(".game-picker-name").textContent = name;
       if (target === list && owned.some(game => game.id === id)) {
         const entry = document.createElement("div"); entry.className = "game-picker-entry";
@@ -296,9 +338,13 @@ window.RKClipGames = (function () {
           const response = await fetch(helper + "/games/search?q=" + encodeURIComponent(query), {cache:"no-store"});
           const data = await response.json();
           if (!response.ok || !data.ok) throw Error("Games could not be loaded.");
-          found = uniqueGames([...owned, ...(data.games || [])]).filter(game => gameName(game).includes(needle));
+          const ownedSteam = new Set(owned.filter(game => game.steamAppId && gameName(game).includes(needle))
+            .map(game => game.steamAppId));
+          found = (data.games || []).filter(game => !ownedSteam.has(game.steamAppId));
         }
         if (seq !== generation || !dialog.open || saving) return;
+        artworkObserver.disconnect();
+        artworkQueue.clear();
         list.replaceChildren();
         const choices = uniqueGames([...owned, ...found]);
         const available = new Set(choices.map(game => game.id));
@@ -316,6 +362,7 @@ window.RKClipGames = (function () {
         if (others.length) { section("All games"); others.forEach(game => row(game.name, game.id, "game")); }
         if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section("Not listed"); row("Use “" + query + "”", "", "game", query); }
         if (!list.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = "No games match."; list.append(empty); }
+        list.querySelectorAll("img[data-artwork]").forEach(image => artworkObserver.observe(image));
         status.textContent = "Games you record or pick stay in this list. Your video is not changed.";
       } catch (error) { if (seq === generation) status.textContent = error.message; }
     }

@@ -18,8 +18,10 @@ namespace ReplayKitHelper
         internal sealed class Game
         {
             internal string Id, Name;
+            internal string IconHash, SteamIconHash;
+            internal uint SteamAppId;
             internal List<string> Rules = new List<string>();
-            internal JObject Json() => new JObject { ["id"] = Id, ["name"] = Name };
+            internal JObject Json() => new JObject { ["id"] = Id, ["name"] = Name, ["steamAppId"] = SteamAppIdFor(Id) };
         }
 
         private sealed class Index
@@ -27,6 +29,7 @@ namespace ReplayKitHelper
             internal readonly Dictionary<string, Game> Games = new Dictionary<string, Game>(StringComparer.Ordinal);
             internal readonly Dictionary<string, List<Game>> Exes = new Dictionary<string, List<Game>>(StringComparer.OrdinalIgnoreCase);
             internal readonly Dictionary<string, List<Game>> Names = new Dictionary<string, List<Game>>(StringComparer.OrdinalIgnoreCase);
+            internal Dictionary<uint, Game> Steam;
         }
 
         // a catalog that failed to load is tried again on the next use instead of failing for the whole session
@@ -35,7 +38,7 @@ namespace ReplayKitHelper
         private static int iconJobs;
         internal static string CustomFile => Path.Combine(AppConfig.GetReplayKitRoot(), "game_mappings.json");
         internal static string IconDir => Path.Combine(AppConfig.GetReplayKitRoot(), "game-icons");
-        internal static bool ValidId(string id) => id != null && Regex.IsMatch(id, "^(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})$");
+        internal static bool ValidId(string id) => id != null && Regex.IsMatch(id, @"\A(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})\z");
         // the icon of a roblox experience sits beside the game icons, though an experience is no game of its own
         internal static bool ValidIconId(string id) => ValidId(id) || id != null && Regex.IsMatch(id, "^(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32}|roblox-[0-9]{1,20})-[a-f0-9]{16}$");
         internal static bool Playable(string exe)
@@ -56,14 +59,20 @@ namespace ReplayKitHelper
                 string id = raw["id"]?.Value<string>(), name = raw["name"]?.Value<string>();
                 if (!ValidId(id) || string.IsNullOrWhiteSpace(name) || name.Length > 160 || name.Any(char.IsControl)) continue;
                 var game = new Game { Id = id, Name = name == "ROBLOX" ? "Roblox" : name };
+                string icon = raw["iconHash"]?.Value<string>();
+                if (icon != null && Regex.IsMatch(icon, @"\A[a-f0-9]{32}\z")) game.IconHash = icon;
+                uint.TryParse(raw["steamAppId"]?.Value<string>(), out game.SteamAppId);
+                string steamIcon = raw["steamIconHash"]?.Value<string>();
+                if (game.SteamAppId != 0 && steamIcon != null && Regex.IsMatch(steamIcon, @"\A[a-f0-9]{40}\z"))
+                    game.SteamIconHash = steamIcon;
                 foreach (string rule in (raw["executables"] as JArray ?? new JArray()).Values<string>())
                 {
                     string clean = (rule ?? "").Replace('\\', '/').ToLowerInvariant();
                     if (clean.Length > 400 || clean.Contains("..") || clean.Any(c => char.IsControl(c) || "*?:\"<>|".Contains(c)) || !clean.EndsWith(".exe", StringComparison.Ordinal)) continue;
                     game.Rules.Add(clean.TrimStart('/'));
                 }
-                if (game.Rules.Count == 0) continue;
                 index.Games[id] = game;
+                if (game.Rules.Count == 0) continue;
                 if (!index.Names.TryGetValue(game.Name, out var names)) index.Names[game.Name] = names = new List<Game>();
                 names.Add(game);
                 foreach (string rule in game.Rules)
@@ -73,6 +82,9 @@ namespace ReplayKitHelper
                     if (!list.Contains(game)) list.Add(game);
                 }
             }
+            index.Steam = index.Games.Values.Where(game => game.SteamAppId != 0)
+                .GroupBy(game => game.SteamAppId).Where(group => group.Count() == 1)
+                .ToDictionary(group => group.Key, group => group.First());
             return index;
         }
 
@@ -115,6 +127,15 @@ namespace ReplayKitHelper
         }
 
         internal static Game Known(string name) => Catalog.Value.Names.TryGetValue(name, out var games) && games.Count == 1 ? games[0] : null;
+
+        internal static Game BySteamId(uint appId) => Catalog.Value.Steam.TryGetValue(appId, out var game) ? game : null;
+
+        internal static uint SteamAppIdFor(string id)
+        {
+            if (id != null && Catalog.Value.Games.TryGetValue(id, out var game)) return game.SteamAppId;
+            return id != null && id.StartsWith("steam-", StringComparison.Ordinal) &&
+                uint.TryParse(id.Substring(6), out uint appId) ? appId : 0;
+        }
 
         internal static Game Get(string id)
         {
@@ -205,7 +226,15 @@ namespace ReplayKitHelper
             string text = (query ?? "").Trim();
             if (text.Length > 100) throw new ArgumentException("Search is too long.");
             var custom = ClipStore.Read(CustomFile, db => db.Properties().Where(p => ValidId(p.Name)).Select(p => new Game { Id = p.Name, Name = p.Value["name"]?.Value<string>() ?? "Game" }).ToList(), 1024 * 1024);
-            return new JArray(Catalog.Value.Games.Values.Concat(SteamGames.Games()).Concat(custom).GroupBy(g => g.Id).Select(g => g.First()).Where(g => g.Name.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0).OrderBy(g => g.Name).Take(60).Select(g => g.Json()));
+            return new JArray(Catalog.Value.Games.Values.Concat(SteamGames.Games()).Concat(custom)
+                .GroupBy(game => game.Id).Select(group => group.First())
+                .Where(game => game.Name.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+                .GroupBy(game =>
+                {
+                    uint appId = SteamAppIdFor(game.Id);
+                    return appId == 0 ? game.Id : "steam-" + appId;
+                })
+                .Select(group => group.First()).OrderBy(game => game.Name).Take(60).Select(game => game.Json()));
         }
 
         // a game icon is read from the exe of the game, again whenever the game is seen after an hour, and kept under a hash of its pixels: an unchanged icon reuses its file, a changed one becomes a new file, and each clip keeps the version it was made with

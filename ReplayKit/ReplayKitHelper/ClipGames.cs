@@ -229,6 +229,8 @@ namespace ReplayKitHelper
                 }
             }
             // the games of the clips there are now join the played ones, which the game picker keeps offering after their clips are gone
+            foreach (var entry in games.Values)
+                entry["steamAppId"] = GameCatalog.SteamAppIdFor(entry["id"].Value<string>());
             var played = GameCatalog.Played(games.Values.Where(g => GameCatalog.ValidId(g["id"].Value<string>())).Select(g => new GameCatalog.Game { Id = g["id"].Value<string>(), Name = g["name"].Value<string>() }));
             return new JObject { ["ok"] = true, ["total"] = files.Count, ["clips"] = clips.Count, ["screenshots"] = shots.Count, ["games"] = new JArray(games.Values.OrderBy(g => g["name"].Value<string>())),
                 ["played"] = new JArray(played.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.Json())),

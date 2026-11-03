@@ -616,8 +616,11 @@ namespace ReplayKitHelper
                     else
                     {
                         byte[] icon = GameCatalog.IconBytes(Q("id"));
+                        string contentType = "image/png";
+                        if (icon == null && QFlag("catalog"))
+                            icon = CatalogArtwork.Get(Q("id"), out contentType);
                         if (icon == null) HttpResponse.SendText(stream, 404, "Not Found", "Game icon unavailable.");
-                        else HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/png" }), icon);
+                        else HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = contentType }), icon);
                     }
                 }
                 catch (Exception ex) when (ex is ArgumentException || ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
