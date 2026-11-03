@@ -5,7 +5,11 @@
 #include "overlays/bongo_model.hpp"
 
 #include <array>
+#include <cmath>
 #include <memory>
+#include <QCryptographicHash>
+#include <QFileInfo>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -78,6 +82,12 @@ struct ModelSlot {
 // one entry of mode/config.json, read like InfoReader::ModeFromConfig
 struct Mode {
 	QString name;
+	// the files its background, cat background and keys are read from, to draw them again with other labels on the keys
+	QString backFile, catBackFile;
+	QStringList keyFiles;
+	// the keys whose labels are drawn now (the bongoKeys codes of this mode), and the md5 of each file looked at
+	QStringList labelled;
+	QHash<QString, QString> md5;
 	std::unique_ptr<Image> back, catBack, leftUp, rightUp;
 	std::vector<std::unique_ptr<Image>> keys, leftHands, rightHands;
 	std::vector<int> keyUse;
@@ -92,6 +102,8 @@ struct Settings {
 	bool breath = true, eyeBlink = true, track = true, live2d = true, relative = false, horizontalFlip = true, verticalFlip = true, mask = false;
 	// the virtual key of each key slot of the mode, 0 where the mode keeps its own; ReplayKit writes them as a comma list in keys
 	std::vector<int> keys;
+	// the same keys as the KeyboardEvent codes of the bongoKeys setting (key_codes), which name the labels drawn on them
+	QStringList codes;
 };
 
 std::vector<int> ParseKeys(const char *text)
@@ -172,16 +184,21 @@ std::unique_ptr<Mode> LoadMode(const QString &root, const QString &name, const Q
 	auto mode = std::make_unique<Mode>();
 	mode->name = name;
 	auto at = [&](const QString &folder, const QString &file) { return QDir(QDir(dir).filePath(folder)).filePath(file); };
-	if (!config["BackgroundImageName"].toString().isEmpty())
-		mode->back = LoadImage(QDir(dir).filePath(config["BackgroundImageName"].toString()));
-	if (!config["CatBackgroundImageName"].toString().isEmpty())
-		mode->catBack = LoadImage(QDir(dir).filePath(config["CatBackgroundImageName"].toString()));
+	if (!config["BackgroundImageName"].toString().isEmpty()) {
+		mode->backFile = QDir(dir).filePath(config["BackgroundImageName"].toString());
+		mode->back = LoadImage(mode->backFile);
+	}
+	if (!config["CatBackgroundImageName"].toString().isEmpty()) {
+		mode->catBackFile = QDir(dir).filePath(config["CatBackgroundImageName"].toString());
+		mode->catBack = LoadImage(mode->catBackFile);
+	}
 
 	// KeysCount is the shorter of the two lists
 	const QStringList keyImages = Strings(config["KeysImageName"]), keyUse = Strings(config["KeyUse"]);
 	const int keysCount = int(std::min(keyImages.size(), keyUse.size()));
 	for (int i = 0; i < keysCount; ++i) {
-		mode->keys.push_back(LoadImage(at(config["KeysImagePath"].toString(), keyImages[i])));
+		mode->keyFiles.append(at(config["KeysImagePath"].toString(), keyImages[i]));
+		mode->keys.push_back(LoadImage(mode->keyFiles.back()));
 		mode->keyUse.push_back(KeyIndex(keyUse[i]));
 	}
 
@@ -211,6 +228,66 @@ std::unique_ptr<Mode> LoadMode(const QString &root, const QString &name, const Q
 	return mode;
 }
 
+// which form of a label fits a key (the long one, "short" or "tiny") and how much it is shrunk from its natural size, as
+// utils/bongo-keys/render.py choose()
+QJsonObject ChooseLabel(const QJsonObject &entry, const QJsonObject &slot, double &f)
+{
+	const QJsonArray room = slot["room"].toArray(), matrix = slot["matrix"].toArray();
+	auto fit = [&](const QJsonObject &e) {
+		return std::min({1.0, room[0].toDouble() / std::max(1.0, e["w"].toDouble()), room[1].toDouble() / std::max(1.0, e["h"].toDouble())});
+	};
+	const double down = std::hypot(matrix[2].toDouble(), matrix[3].toDouble());
+	f = fit(entry);
+	if (entry.contains("short") && (f < 0.55 || entry["smallCap"].toDouble(1e9) * f * down < 8.0)) {
+		const QJsonObject shorter = entry["short"].toObject();
+		f = fit(shorter);
+		if (entry.contains("tiny") && f < 0.55) {
+			f = fit(entry["tiny"].toObject());
+			return entry["tiny"].toObject();
+		}
+		return shorter;
+	}
+	if (entry.contains("tiny") && f < 0.55) {
+		f = fit(entry["tiny"].toObject());
+		return entry["tiny"].toObject();
+	}
+	return entry;
+}
+
+// the white label tinted to colour and laid on its key: sprite pixel (u, v) lands at anchor + f * matrix @ (u - w/2, v - h/2)
+void DrawLabel(QPainter &painter, const QImage &sprite, const QColor &colour, const QJsonObject &slot, double f)
+{
+	if (sprite.isNull())
+		return;
+	QImage tinted(sprite.size(), QImage::Format_ARGB32_Premultiplied);
+	tinted.fill(colour);
+	{
+		QPainter tint(&tinted);
+		tint.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+		tint.drawImage(0, 0, sprite);
+	}
+	const QJsonArray matrix = slot["matrix"].toArray(), anchor = slot["anchor"].toArray();
+	double m11 = matrix[0].toDouble() * f, m12 = matrix[1].toDouble() * f, m21 = matrix[2].toDouble() * f, m22 = matrix[3].toDouble() * f;
+	// a label drawn at under half its size is shrunk smoothly first, or the one-step resample leaves it jagged
+	const double k = std::min(1.0, 2.0 * std::sqrt(std::abs(m11 * m22 - m12 * m21)));
+	if (k < 1.0) {
+		const QImage smaller = tinted.scaled(std::max(1, int(std::lround(tinted.width() * k))), std::max(1, int(std::lround(tinted.height() * k))),
+						     Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		const double kx = double(smaller.width()) / tinted.width(), ky = double(smaller.height()) / tinted.height();
+		m11 /= kx;
+		m12 /= kx;
+		m21 /= ky;
+		m22 /= ky;
+		tinted = smaller;
+	}
+	painter.save();
+	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+	// the manifest counts pixels from their middles and qt from their corners: half a pixel each way
+	painter.setTransform(QTransform(m11, m12, m21, m22, anchor[0].toDouble() + 0.5, anchor[1].toDouble() + 0.5));
+	painter.drawImage(QPointF(-tinted.width() / 2.0 - 0.5, -tinted.height() / 2.0 - 0.5), tinted);
+	painter.restore();
+}
+
 struct Bongo {
 	obs_source_t *source;
 	gs_effect_t *effect = nullptr;
@@ -218,6 +295,9 @@ struct Bongo {
 	std::vector<std::unique_ptr<Image>> faces;
 	std::vector<int> faceKeys;
 	std::unique_ptr<BongoInput> input;
+	// overlay-preview/bongo-keys: the labels of other keys, the blank faces they go on and where (utils/bongo-keys/README.md)
+	QString labelsDir;
+	QJsonObject labels;
 
 	std::mutex settingsLock;
 	Settings settings;
@@ -240,6 +320,10 @@ struct Bongo {
 		input = std::make_unique<BongoInput>();
 		const QString bakes = replaykit + "obs-custom-dock/overlay-preview/bongo-models";
 		const QString root = BangoCatFolder();
+		labelsDir = replaykit + "obs-custom-dock/overlay-preview/bongo-keys";
+		labels = ReadJson(QDir(labelsDir).filePath(QStringLiteral("manifest.json")));
+		if (labels["version"].toInt() != 2)
+			labels = QJsonObject();
 		ReadSettings(data, "delaytime");
 
 		obs_enter_graphics();
@@ -295,6 +379,11 @@ struct Bongo {
 		next.verticalFlip = obs_data_get_bool(data, "mouse_vertical_flip");
 		next.mask = obs_data_get_bool(data, "mask");
 		next.keys = ParseKeys(obs_data_get_string(data, "keys"));
+		next.codes = QString::fromUtf8(obs_data_get_string(data, "key_codes")).split(QLatin1Char(','));
+		while (!next.codes.isEmpty() && next.codes.back().isEmpty())
+			next.codes.removeLast();
+		if (next.codes.size() > 32)
+			next.codes = next.codes.mid(0, 32);
 		std::lock_guard<std::mutex> guard(settingsLock);
 		settings = next;
 	}
@@ -451,6 +540,94 @@ struct Bongo {
 		slot->model.Render(effect, slot->animation.Values(slot->model, slot->blinkIds, motion), camera);
 	}
 
+	QString Md5(Mode &mode, const QString &path)
+	{
+		auto it = mode.md5.find(path);
+		if (it != mode.md5.end())
+			return it.value();
+		QFile file(path);
+		QString sum;
+		if (file.open(QIODevice::ReadOnly) && file.size() <= 16 * 1024 * 1024)
+			sum = QString::fromLatin1(QCryptographicHash::hash(file.readAll(), QCryptographicHash::Md5).toHex());
+		mode.md5.insert(path, sum);
+		return sum;
+	}
+
+	// the mode's background, cat background and pressed keys read again from their files, with the label of the key given to each
+	// key that has one drawn over its blank face; a key given its own key, a key the labels do not know, and a picture that is not the
+	// one the faces were cut from (the Bango Cat folder was changed by hand) keep the picture as it is. Runs on the graphics thread.
+	void Relabel(Mode &mode, const QStringList &codes)
+	{
+		mode.labelled = codes;
+		const QJsonObject m = labels["modes"].toObject()[mode.name].toObject();
+		const QJsonObject style = labels["styles"].toObject()[m["style"].toString()].toObject();
+		const QJsonArray keySlots = m["slots"].toArray();
+		struct Change {
+			QJsonObject slot, form;
+			double f;
+		};
+		std::vector<std::pair<int, Change>> changes;
+		for (int i = 0; i < int(keySlots.size()) && i < int(codes.size()) && i < int(mode.keyFiles.size()); ++i) {
+			const QJsonObject slot = keySlots[i].toObject();
+			const QString &code = codes[i];
+			if (code.isEmpty() || code == slot["label"].toString() || !style.contains(code))
+				continue;
+			if (Md5(mode, mode.keyFiles[i]) != slot["pressed"].toObject()["md5"].toString())
+				continue;
+			Change change{slot, QJsonObject(), 1.0};
+			change.form = ChooseLabel(style[code].toObject(), slot, change.f);
+			changes.emplace_back(i, change);
+		}
+		auto picture = [&](const QString &name) { return QImage(QDir(labelsDir).filePath(name)); };
+		auto rebuild = [&](const QString &path, std::unique_ptr<Image> &target, bool rest, int only) {
+			if (path.isEmpty())
+				return;
+			QImage image(path);
+			if (image.isNull())
+				return;
+			// painted as straight alpha: a round trip through premultiplied would darken the nearly clear pixels at the keys' soft edges,
+			// and qt only converts the pixels a draw touches, all of them inside the keys
+			image = image.convertToFormat(QImage::Format_ARGB32);
+			const bool touched = std::any_of(changes.begin(), changes.end(), [&](const auto &change) { return only < 0 || change.first == only; });
+			if (touched) {
+				QPainter painter(&image);
+				// every blank face first, then the labels, so no face covers a label already drawn
+				for (const auto &[i, change] : changes) {
+					if (only >= 0 && i != only)
+						continue;
+					const QJsonObject side = change.slot[rest ? "rest" : "pressed"].toObject();
+					const QJsonArray at = side["at"].toArray();
+					if (!side["patch"].toString().isEmpty())
+						painter.drawImage(QPointF(at[0].toDouble(), at[1].toDouble()), picture(side["patch"].toString()));
+				}
+				for (const auto &[i, change] : changes) {
+					if (only >= 0 && i != only)
+						continue;
+					const QJsonObject side = change.slot[rest ? "rest" : "pressed"].toObject();
+					DrawLabel(painter, picture(change.form["file"].toString()), QColor(side["color"].toString()), change.slot, change.f);
+				}
+			}
+			auto rebuilt = std::make_unique<Image>();
+			rebuilt->texture = BongoTexture(std::move(image));
+			if (rebuilt->texture)
+				target = std::move(rebuilt);
+		};
+		const QJsonObject backgrounds = m["backgrounds"].toObject();
+		for (auto [path, target] : {std::pair<const QString *, std::unique_ptr<Image> *>{&mode.backFile, &mode.back},
+					    std::pair<const QString *, std::unique_ptr<Image> *>{&mode.catBackFile, &mode.catBack}}) {
+			const QString file = QFileInfo(*path).fileName();
+			const bool cut = backgrounds.contains(file) && backgrounds[file].toString() == Md5(mode, *path);
+			// a background the faces were not cut from is drawn as it is
+			const auto keep = changes;
+			if (!cut)
+				changes.clear();
+			rebuild(*path, *target, true, -1);
+			changes = keep;
+		}
+		for (int i = 0; i < int(mode.keyFiles.size()) && i < int(mode.keys.size()); ++i)
+			rebuild(mode.keyFiles[i], mode.keys[size_t(i)], false, i);
+	}
+
 	// View::Render with live2d as the source asks: background, held keys, the cat, the hands or hand models, the face, then the raised hands
 	void Render()
 	{
@@ -458,6 +635,10 @@ struct Bongo {
 		if (!effect || modes.empty() || now.width <= 0 || now.height <= 0)
 			return;
 		Mode &mode = *modes[current];
+		// the codes are those of the mode the settings name; a mode name that matched nothing keeps its own keys
+		const QStringList codes = mode.name == now.mode ? now.codes : QStringList();
+		if (mode.labelled != codes)
+			Relabel(mode, codes);
 		gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
 		gs_eparam_t *opacity = gs_effect_get_param_by_name(effect, "opacity");
 		gs_blend_state_push();

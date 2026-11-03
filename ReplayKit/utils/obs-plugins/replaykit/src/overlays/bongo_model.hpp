@@ -7,6 +7,8 @@ namespace rk {
 
 // a png as a straight alpha rgba texture, decoded by qt instead of the gs_image_file api, which obs 33 replaced by an incompatible one so a dll importing either set fails to load on the other; needs the graphics context, null when the file does not decode
 gs_texture_t *BongoTexture(const QString &path);
+// the same for a picture already decoded (and drawn on), as straight alpha argb32 or anything qt converts to it
+gs_texture_t *BongoTexture(QImage image);
 
 struct BongoModel {
 	struct Parameter {

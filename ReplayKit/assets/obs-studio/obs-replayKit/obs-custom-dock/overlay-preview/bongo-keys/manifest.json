@@ -1,0 +1,3178 @@
+{
+ "version": 2,
+ "styles": {
+  "hand": {
+   "KeyA": {
+    "file": "hand-keya.png",
+    "w": 96,
+    "h": 124
+   },
+   "KeyB": {
+    "file": "hand-keyb.png",
+    "w": 80,
+    "h": 126
+   },
+   "KeyC": {
+    "file": "hand-keyc.png",
+    "w": 86,
+    "h": 124
+   },
+   "KeyD": {
+    "file": "hand-keyd.png",
+    "w": 100,
+    "h": 124
+   },
+   "KeyE": {
+    "file": "hand-keye.png",
+    "w": 82,
+    "h": 122
+   },
+   "KeyF": {
+    "file": "hand-keyf.png",
+    "w": 82,
+    "h": 122
+   },
+   "KeyG": {
+    "file": "hand-keyg.png",
+    "w": 100,
+    "h": 124
+   },
+   "KeyH": {
+    "file": "hand-keyh.png",
+    "w": 102,
+    "h": 122
+   },
+   "KeyI": {
+    "file": "hand-keyi.png",
+    "w": 80,
+    "h": 121
+   },
+   "KeyJ": {
+    "file": "hand-keyj.png",
+    "w": 96,
+    "h": 122
+   },
+   "KeyK": {
+    "file": "hand-keyk.png",
+    "w": 82,
+    "h": 124
+   },
+   "KeyL": {
+    "file": "hand-keyl.png",
+    "w": 79,
+    "h": 124
+   },
+   "KeyM": {
+    "file": "hand-keym.png",
+    "w": 127,
+    "h": 124
+   },
+   "KeyN": {
+    "file": "hand-keyn.png",
+    "w": 112,
+    "h": 124
+   },
+   "KeyO": {
+    "file": "hand-keyo.png",
+    "w": 113,
+    "h": 124
+   },
+   "KeyP": {
+    "file": "hand-keyp.png",
+    "w": 73,
+    "h": 123
+   },
+   "KeyQ": {
+    "file": "hand-keyq.png",
+    "w": 113,
+    "h": 132
+   },
+   "KeyR": {
+    "file": "hand-keyr.png",
+    "w": 78,
+    "h": 124
+   },
+   "KeyS": {
+    "file": "hand-keys.png",
+    "w": 96,
+    "h": 122
+   },
+   "KeyT": {
+    "file": "hand-keyt.png",
+    "w": 106,
+    "h": 122
+   },
+   "KeyU": {
+    "file": "hand-keyu.png",
+    "w": 98,
+    "h": 121
+   },
+   "KeyV": {
+    "file": "hand-keyv.png",
+    "w": 81,
+    "h": 122
+   },
+   "KeyW": {
+    "file": "hand-keyw.png",
+    "w": 143,
+    "h": 124
+   },
+   "KeyX": {
+    "file": "hand-keyx.png",
+    "w": 102,
+    "h": 122
+   },
+   "KeyY": {
+    "file": "hand-keyy.png",
+    "w": 96,
+    "h": 122
+   },
+   "KeyZ": {
+    "file": "hand-keyz.png",
+    "w": 102,
+    "h": 122
+   },
+   "Digit0": {
+    "file": "hand-digit0.png",
+    "w": 89,
+    "h": 123
+   },
+   "Numpad0": {
+    "file": "hand-numpad0.png",
+    "w": 138,
+    "h": 202,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad0-short.png",
+     "w": 89,
+     "h": 123
+    }
+   },
+   "Digit1": {
+    "file": "hand-digit1.png",
+    "w": 26,
+    "h": 124
+   },
+   "Numpad1": {
+    "file": "hand-numpad1.png",
+    "w": 138,
+    "h": 203,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad1-short.png",
+     "w": 26,
+     "h": 124
+    }
+   },
+   "Digit2": {
+    "file": "hand-digit2.png",
+    "w": 73,
+    "h": 123
+   },
+   "Numpad2": {
+    "file": "hand-numpad2.png",
+    "w": 138,
+    "h": 202,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad2-short.png",
+     "w": 73,
+     "h": 123
+    }
+   },
+   "Digit3": {
+    "file": "hand-digit3.png",
+    "w": 80,
+    "h": 128
+   },
+   "Numpad3": {
+    "file": "hand-numpad3.png",
+    "w": 138,
+    "h": 207,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad3-short.png",
+     "w": 80,
+     "h": 128
+    }
+   },
+   "Digit4": {
+    "file": "hand-digit4.png",
+    "w": 63,
+    "h": 123
+   },
+   "Numpad4": {
+    "file": "hand-numpad4.png",
+    "w": 138,
+    "h": 202,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad4-short.png",
+     "w": 63,
+     "h": 123
+    }
+   },
+   "Digit5": {
+    "file": "hand-digit5.png",
+    "w": 92,
+    "h": 125
+   },
+   "Numpad5": {
+    "file": "hand-numpad5.png",
+    "w": 138,
+    "h": 204,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad5-short.png",
+     "w": 92,
+     "h": 125
+    }
+   },
+   "Digit6": {
+    "file": "hand-digit6.png",
+    "w": 80,
+    "h": 127
+   },
+   "Numpad6": {
+    "file": "hand-numpad6.png",
+    "w": 138,
+    "h": 206,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad6-short.png",
+     "w": 80,
+     "h": 127
+    }
+   },
+   "Digit7": {
+    "file": "hand-digit7.png",
+    "w": 80,
+    "h": 126
+   },
+   "Numpad7": {
+    "file": "hand-numpad7.png",
+    "w": 138,
+    "h": 206,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad7-short.png",
+     "w": 80,
+     "h": 126
+    }
+   },
+   "Digit8": {
+    "file": "hand-digit8.png",
+    "w": 80,
+    "h": 122
+   },
+   "Numpad8": {
+    "file": "hand-numpad8.png",
+    "w": 138,
+    "h": 202,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad8-short.png",
+     "w": 80,
+     "h": 122
+    }
+   },
+   "Digit9": {
+    "file": "hand-digit9.png",
+    "w": 80,
+    "h": 123
+   },
+   "Numpad9": {
+    "file": "hand-numpad9.png",
+    "w": 138,
+    "h": 202,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpad9-short.png",
+     "w": 80,
+     "h": 123
+    }
+   },
+   "F1": {
+    "file": "hand-f1.png",
+    "w": 131,
+    "h": 124
+   },
+   "F2": {
+    "file": "hand-f2.png",
+    "w": 167,
+    "h": 123
+   },
+   "F3": {
+    "file": "hand-f3.png",
+    "w": 170,
+    "h": 128
+   },
+   "F4": {
+    "file": "hand-f4.png",
+    "w": 162,
+    "h": 123
+   },
+   "F5": {
+    "file": "hand-f5.png",
+    "w": 176,
+    "h": 125
+   },
+   "F6": {
+    "file": "hand-f6.png",
+    "w": 170,
+    "h": 127
+   },
+   "F7": {
+    "file": "hand-f7.png",
+    "w": 170,
+    "h": 126
+   },
+   "F8": {
+    "file": "hand-f8.png",
+    "w": 170,
+    "h": 122
+   },
+   "F9": {
+    "file": "hand-f9.png",
+    "w": 170,
+    "h": 123
+   },
+   "F10": {
+    "file": "hand-f10.png",
+    "w": 244,
+    "h": 124
+   },
+   "F11": {
+    "file": "hand-f11.png",
+    "w": 200,
+    "h": 124
+   },
+   "F12": {
+    "file": "hand-f12.png",
+    "w": 236,
+    "h": 124
+   },
+   "Space": {
+    "file": "hand-space.png",
+    "w": 400,
+    "h": 130,
+    "short": {
+     "file": "hand-space-short.png",
+     "w": 232,
+     "h": 130
+    },
+    "tiny": {
+     "file": "hand-space-tiny.png",
+     "w": 176,
+     "h": 68
+    }
+   },
+   "Tab": {
+    "file": "hand-tab.png",
+    "w": 237,
+    "h": 131,
+    "tiny": {
+     "file": "hand-tab-tiny.png",
+     "w": 154,
+     "h": 116
+    }
+   },
+   "Enter": {
+    "file": "hand-enter.png",
+    "w": 392,
+    "h": 130,
+    "short": {
+     "file": "hand-enter-short.png",
+     "w": 232,
+     "h": 130
+    },
+    "tiny": {
+     "file": "hand-enter-tiny.png",
+     "w": 130,
+     "h": 132
+    }
+   },
+   "Backspace": {
+    "file": "hand-backspace.png",
+    "w": 728,
+    "h": 170,
+    "short": {
+     "file": "hand-backspace-short.png",
+     "w": 322,
+     "h": 170
+    },
+    "tiny": {
+     "file": "hand-backspace-tiny.png",
+     "w": 182,
+     "h": 120
+    }
+   },
+   "CapsLock": {
+    "file": "hand-capslock.png",
+    "w": 646,
+    "h": 170,
+    "short": {
+     "file": "hand-capslock-short.png",
+     "w": 308,
+     "h": 130
+    },
+    "tiny": {
+     "file": "hand-capslock-tiny.png",
+     "w": 140,
+     "h": 136
+    }
+   },
+   "Escape": {
+    "file": "hand-escape.png",
+    "w": 231,
+    "h": 90
+   },
+   "ShiftLeft": {
+    "file": "hand-shiftleft.png",
+    "w": 357,
+    "h": 130,
+    "tiny": {
+     "file": "hand-shiftleft-tiny.png",
+     "w": 140,
+     "h": 140
+    }
+   },
+   "ShiftRight": {
+    "file": "hand-shiftright.png",
+    "w": 357,
+    "h": 130,
+    "tiny": {
+     "file": "hand-shiftright-tiny.png",
+     "w": 140,
+     "h": 140
+    }
+   },
+   "ControlLeft": {
+    "file": "hand-controlleft.png",
+    "w": 254,
+    "h": 130,
+    "tiny": {
+     "file": "hand-controlleft-tiny.png",
+     "w": 128,
+     "h": 80
+    }
+   },
+   "ControlRight": {
+    "file": "hand-controlright.png",
+    "w": 254,
+    "h": 130,
+    "tiny": {
+     "file": "hand-controlright-tiny.png",
+     "w": 128,
+     "h": 80
+    }
+   },
+   "AltLeft": {
+    "file": "hand-altleft.png",
+    "w": 192,
+    "h": 131
+   },
+   "AltRight": {
+    "file": "hand-altright.png",
+    "w": 192,
+    "h": 131
+   },
+   "Insert": {
+    "file": "hand-insert.png",
+    "w": 419,
+    "h": 130,
+    "short": {
+     "file": "hand-insert-short.png",
+     "w": 184,
+     "h": 122
+    }
+   },
+   "Delete": {
+    "file": "hand-delete.png",
+    "w": 456,
+    "h": 130,
+    "short": {
+     "file": "hand-delete-short.png",
+     "w": 204,
+     "h": 130
+    }
+   },
+   "Home": {
+    "file": "hand-home.png",
+    "w": 366,
+    "h": 130,
+    "tiny": {
+     "file": "hand-home-tiny.png",
+     "w": 140,
+     "h": 140
+    }
+   },
+   "End": {
+    "file": "hand-end.png",
+    "w": 248,
+    "h": 130,
+    "tiny": {
+     "file": "hand-end-tiny.png",
+     "w": 140,
+     "h": 140
+    }
+   },
+   "PageUp": {
+    "file": "hand-pageup.png",
+    "w": 528,
+    "h": 130,
+    "short": {
+     "file": "hand-pageup-short.png",
+     "w": 318,
+     "h": 130
+    },
+    "tiny": {
+     "file": "hand-pageup-tiny.png",
+     "w": 128,
+     "h": 128
+    }
+   },
+   "PageDown": {
+    "file": "hand-pagedown.png",
+    "w": 726,
+    "h": 170,
+    "short": {
+     "file": "hand-pagedown-short.png",
+     "w": 327,
+     "h": 170
+    },
+    "tiny": {
+     "file": "hand-pagedown-tiny.png",
+     "w": 128,
+     "h": 128
+    }
+   },
+   "Semicolon": {
+    "file": "hand-semicolon.png",
+    "w": 28,
+    "h": 114
+   },
+   "Equal": {
+    "file": "hand-equal.png",
+    "w": 64,
+    "h": 60
+   },
+   "Comma": {
+    "file": "hand-comma.png",
+    "w": 27,
+    "h": 41
+   },
+   "Minus": {
+    "file": "hand-minus.png",
+    "w": 53,
+    "h": 16
+   },
+   "Period": {
+    "file": "hand-period.png",
+    "w": 24,
+    "h": 24
+   },
+   "Slash": {
+    "file": "hand-slash.png",
+    "w": 72,
+    "h": 134
+   },
+   "Backquote": {
+    "file": "hand-backquote.png",
+    "w": 36,
+    "h": 40
+   },
+   "BracketLeft": {
+    "file": "hand-bracketleft.png",
+    "w": 44,
+    "h": 150
+   },
+   "Backslash": {
+    "file": "hand-backslash.png",
+    "w": 72,
+    "h": 134
+   },
+   "BracketRight": {
+    "file": "hand-bracketright.png",
+    "w": 44,
+    "h": 151
+   },
+   "Quote": {
+    "file": "hand-quote.png",
+    "w": 18,
+    "h": 44
+   },
+   "NumpadAdd": {
+    "file": "hand-numpadadd.png",
+    "w": 138,
+    "h": 146,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpadadd-short.png",
+     "w": 66,
+     "h": 66
+    }
+   },
+   "NumpadSubtract": {
+    "file": "hand-numpadsubtract.png",
+    "w": 138,
+    "h": 96,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpadsubtract-short.png",
+     "w": 53,
+     "h": 16
+    }
+   },
+   "NumpadMultiply": {
+    "file": "hand-numpadmultiply.png",
+    "w": 138,
+    "h": 145,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpadmultiply-short.png",
+     "w": 70,
+     "h": 66
+    }
+   },
+   "NumpadDivide": {
+    "file": "hand-numpaddivide.png",
+    "w": 138,
+    "h": 214,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpaddivide-short.png",
+     "w": 72,
+     "h": 134
+    }
+   },
+   "NumpadDecimal": {
+    "file": "hand-numpaddecimal.png",
+    "w": 138,
+    "h": 103,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpaddecimal-short.png",
+     "w": 24,
+     "h": 24
+    }
+   },
+   "NumpadEnter": {
+    "file": "hand-numpadenter.png",
+    "w": 392,
+    "h": 210,
+    "smallCap": 60.0,
+    "short": {
+     "file": "hand-numpadenter-short.png",
+     "w": 232,
+     "h": 130
+    }
+   },
+   "ArrowLeft": {
+    "file": "hand-arrowleft.png",
+    "w": 184,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowUp": {
+    "file": "hand-arrowup.png",
+    "w": 88,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowRight": {
+    "file": "hand-arrowright.png",
+    "w": 160,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowDown": {
+    "file": "hand-arrowdown.png",
+    "w": 90,
+    "h": 120,
+    "source": "keyboard"
+   }
+  },
+  "handbold": {
+   "KeyA": {
+    "file": "handbold-keya.png",
+    "w": 99,
+    "h": 120
+   },
+   "KeyB": {
+    "file": "handbold-keyb.png",
+    "w": 84,
+    "h": 122
+   },
+   "KeyC": {
+    "file": "handbold-keyc.png",
+    "w": 90,
+    "h": 120
+   },
+   "KeyD": {
+    "file": "handbold-keyd.png",
+    "w": 98,
+    "h": 119
+   },
+   "KeyE": {
+    "file": "handbold-keye.png",
+    "w": 89,
+    "h": 119
+   },
+   "KeyF": {
+    "file": "handbold-keyf.png",
+    "w": 85,
+    "h": 118
+   },
+   "KeyG": {
+    "file": "handbold-keyg.png",
+    "w": 105,
+    "h": 120
+   },
+   "KeyH": {
+    "file": "handbold-keyh.png",
+    "w": 106,
+    "h": 119
+   },
+   "KeyI": {
+    "file": "handbold-keyi.png",
+    "w": 77,
+    "h": 118
+   },
+   "KeyJ": {
+    "file": "handbold-keyj.png",
+    "w": 98,
+    "h": 120
+   },
+   "KeyK": {
+    "file": "handbold-keyk.png",
+    "w": 86,
+    "h": 120
+   },
+   "KeyL": {
+    "file": "handbold-keyl.png",
+    "w": 82,
+    "h": 120
+   },
+   "KeyM": {
+    "file": "handbold-keym.png",
+    "w": 130,
+    "h": 120
+   },
+   "KeyN": {
+    "file": "handbold-keyn.png",
+    "w": 116,
+    "h": 120
+   },
+   "KeyO": {
+    "file": "handbold-keyo.png",
+    "w": 115,
+    "h": 120
+   },
+   "KeyP": {
+    "file": "handbold-keyp.png",
+    "w": 74,
+    "h": 120
+   },
+   "KeyQ": {
+    "file": "handbold-keyq.png",
+    "w": 122,
+    "h": 129
+   },
+   "KeyR": {
+    "file": "handbold-keyr.png",
+    "w": 87,
+    "h": 122
+   },
+   "KeyS": {
+    "file": "handbold-keys.png",
+    "w": 104,
+    "h": 118
+   },
+   "KeyT": {
+    "file": "handbold-keyt.png",
+    "w": 108,
+    "h": 119
+   },
+   "KeyU": {
+    "file": "handbold-keyu.png",
+    "w": 102,
+    "h": 118
+   },
+   "KeyV": {
+    "file": "handbold-keyv.png",
+    "w": 91,
+    "h": 119
+   },
+   "KeyW": {
+    "file": "handbold-keyw.png",
+    "w": 152,
+    "h": 121
+   },
+   "KeyX": {
+    "file": "handbold-keyx.png",
+    "w": 108,
+    "h": 120
+   },
+   "KeyY": {
+    "file": "handbold-keyy.png",
+    "w": 97,
+    "h": 120
+   },
+   "KeyZ": {
+    "file": "handbold-keyz.png",
+    "w": 106,
+    "h": 118
+   },
+   "Digit0": {
+    "file": "handbold-digit0.png",
+    "w": 92,
+    "h": 120
+   },
+   "Numpad0": {
+    "file": "handbold-numpad0.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad0-short.png",
+     "w": 92,
+     "h": 120
+    }
+   },
+   "Digit1": {
+    "file": "handbold-digit1.png",
+    "w": 57,
+    "h": 119
+   },
+   "Numpad1": {
+    "file": "handbold-numpad1.png",
+    "w": 139,
+    "h": 195,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad1-short.png",
+     "w": 57,
+     "h": 119
+    }
+   },
+   "Digit2": {
+    "file": "handbold-digit2.png",
+    "w": 78,
+    "h": 120
+   },
+   "Numpad2": {
+    "file": "handbold-numpad2.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad2-short.png",
+     "w": 78,
+     "h": 120
+    }
+   },
+   "Digit3": {
+    "file": "handbold-digit3.png",
+    "w": 78,
+    "h": 120
+   },
+   "Numpad3": {
+    "file": "handbold-numpad3.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad3-short.png",
+     "w": 78,
+     "h": 120
+    }
+   },
+   "Digit4": {
+    "file": "handbold-digit4.png",
+    "w": 94,
+    "h": 120
+   },
+   "Numpad4": {
+    "file": "handbold-numpad4.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad4-short.png",
+     "w": 94,
+     "h": 120
+    }
+   },
+   "Digit5": {
+    "file": "handbold-digit5.png",
+    "w": 86,
+    "h": 120
+   },
+   "Numpad5": {
+    "file": "handbold-numpad5.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad5-short.png",
+     "w": 86,
+     "h": 120
+    }
+   },
+   "Digit6": {
+    "file": "handbold-digit6.png",
+    "w": 82,
+    "h": 120
+   },
+   "Numpad6": {
+    "file": "handbold-numpad6.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad6-short.png",
+     "w": 82,
+     "h": 120
+    }
+   },
+   "Digit7": {
+    "file": "handbold-digit7.png",
+    "w": 94,
+    "h": 120
+   },
+   "Numpad7": {
+    "file": "handbold-numpad7.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad7-short.png",
+     "w": 94,
+     "h": 120
+    }
+   },
+   "Digit8": {
+    "file": "handbold-digit8.png",
+    "w": 84,
+    "h": 119
+   },
+   "Numpad8": {
+    "file": "handbold-numpad8.png",
+    "w": 139,
+    "h": 195,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad8-short.png",
+     "w": 84,
+     "h": 119
+    }
+   },
+   "Digit9": {
+    "file": "handbold-digit9.png",
+    "w": 86,
+    "h": 120
+   },
+   "Numpad9": {
+    "file": "handbold-numpad9.png",
+    "w": 139,
+    "h": 196,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpad9-short.png",
+     "w": 86,
+     "h": 120
+    }
+   },
+   "F1": {
+    "file": "handbold-f1.png",
+    "w": 162,
+    "h": 119
+   },
+   "F2": {
+    "file": "handbold-f2.png",
+    "w": 176,
+    "h": 120
+   },
+   "F3": {
+    "file": "handbold-f3.png",
+    "w": 174,
+    "h": 120
+   },
+   "F4": {
+    "file": "handbold-f4.png",
+    "w": 182,
+    "h": 120
+   },
+   "F5": {
+    "file": "handbold-f5.png",
+    "w": 180,
+    "h": 120
+   },
+   "F6": {
+    "file": "handbold-f6.png",
+    "w": 178,
+    "h": 120
+   },
+   "F7": {
+    "file": "handbold-f7.png",
+    "w": 184,
+    "h": 120
+   },
+   "F8": {
+    "file": "handbold-f8.png",
+    "w": 178,
+    "h": 119
+   },
+   "F9": {
+    "file": "handbold-f9.png",
+    "w": 178,
+    "h": 120
+   },
+   "F10": {
+    "file": "handbold-f10.png",
+    "w": 277,
+    "h": 120
+   },
+   "F11": {
+    "file": "handbold-f11.png",
+    "w": 258,
+    "h": 119
+   },
+   "F12": {
+    "file": "handbold-f12.png",
+    "w": 271,
+    "h": 120
+   },
+   "Space": {
+    "file": "handbold-space.png",
+    "w": 406,
+    "h": 126,
+    "short": {
+     "file": "handbold-space-short.png",
+     "w": 232,
+     "h": 126
+    },
+    "tiny": {
+     "file": "handbold-space-tiny.png",
+     "w": 178,
+     "h": 70
+    }
+   },
+   "Tab": {
+    "file": "handbold-tab.png",
+    "w": 244,
+    "h": 128,
+    "tiny": {
+     "file": "handbold-tab-tiny.png",
+     "w": 156,
+     "h": 118
+    }
+   },
+   "Enter": {
+    "file": "handbold-enter.png",
+    "w": 400,
+    "h": 127,
+    "short": {
+     "file": "handbold-enter-short.png",
+     "w": 237,
+     "h": 127
+    },
+    "tiny": {
+     "file": "handbold-enter-tiny.png",
+     "w": 132,
+     "h": 134
+    }
+   },
+   "Backspace": {
+    "file": "handbold-backspace.png",
+    "w": 746,
+    "h": 166,
+    "short": {
+     "file": "handbold-backspace-short.png",
+     "w": 328,
+     "h": 166
+    },
+    "tiny": {
+     "file": "handbold-backspace-tiny.png",
+     "w": 184,
+     "h": 122
+    }
+   },
+   "CapsLock": {
+    "file": "handbold-capslock.png",
+    "w": 680,
+    "h": 166,
+    "short": {
+     "file": "handbold-capslock-short.png",
+     "w": 318,
+     "h": 126
+    },
+    "tiny": {
+     "file": "handbold-capslock-tiny.png",
+     "w": 142,
+     "h": 138
+    }
+   },
+   "Escape": {
+    "file": "handbold-escape.png",
+    "w": 234,
+    "h": 86
+   },
+   "ShiftLeft": {
+    "file": "handbold-shiftleft.png",
+    "w": 358,
+    "h": 128,
+    "tiny": {
+     "file": "handbold-shiftleft-tiny.png",
+     "w": 142,
+     "h": 142
+    }
+   },
+   "ShiftRight": {
+    "file": "handbold-shiftright.png",
+    "w": 358,
+    "h": 128,
+    "tiny": {
+     "file": "handbold-shiftright-tiny.png",
+     "w": 142,
+     "h": 142
+    }
+   },
+   "ControlLeft": {
+    "file": "handbold-controlleft.png",
+    "w": 260,
+    "h": 127,
+    "tiny": {
+     "file": "handbold-controlleft-tiny.png",
+     "w": 130,
+     "h": 82
+    }
+   },
+   "ControlRight": {
+    "file": "handbold-controlright.png",
+    "w": 260,
+    "h": 127,
+    "tiny": {
+     "file": "handbold-controlright-tiny.png",
+     "w": 130,
+     "h": 82
+    }
+   },
+   "AltLeft": {
+    "file": "handbold-altleft.png",
+    "w": 196,
+    "h": 128
+   },
+   "AltRight": {
+    "file": "handbold-altright.png",
+    "w": 196,
+    "h": 128
+   },
+   "Insert": {
+    "file": "handbold-insert.png",
+    "w": 424,
+    "h": 128,
+    "short": {
+     "file": "handbold-insert-short.png",
+     "w": 186,
+     "h": 120
+    }
+   },
+   "Delete": {
+    "file": "handbold-delete.png",
+    "w": 462,
+    "h": 127,
+    "short": {
+     "file": "handbold-delete-short.png",
+     "w": 210,
+     "h": 127
+    }
+   },
+   "Home": {
+    "file": "handbold-home.png",
+    "w": 369,
+    "h": 128,
+    "tiny": {
+     "file": "handbold-home-tiny.png",
+     "w": 142,
+     "h": 142
+    }
+   },
+   "End": {
+    "file": "handbold-end.png",
+    "w": 252,
+    "h": 127,
+    "tiny": {
+     "file": "handbold-end-tiny.png",
+     "w": 142,
+     "h": 142
+    }
+   },
+   "PageUp": {
+    "file": "handbold-pageup.png",
+    "w": 565,
+    "h": 126,
+    "short": {
+     "file": "handbold-pageup-short.png",
+     "w": 324,
+     "h": 126
+    },
+    "tiny": {
+     "file": "handbold-pageup-tiny.png",
+     "w": 130,
+     "h": 130
+    }
+   },
+   "PageDown": {
+    "file": "handbold-pagedown.png",
+    "w": 762,
+    "h": 166,
+    "short": {
+     "file": "handbold-pagedown-short.png",
+     "w": 332,
+     "h": 166
+    },
+    "tiny": {
+     "file": "handbold-pagedown-tiny.png",
+     "w": 130,
+     "h": 130
+    }
+   },
+   "Semicolon": {
+    "file": "handbold-semicolon.png",
+    "w": 32,
+    "h": 115
+   },
+   "Equal": {
+    "file": "handbold-equal.png",
+    "w": 68,
+    "h": 62
+   },
+   "Comma": {
+    "file": "handbold-comma.png",
+    "w": 30,
+    "h": 44
+   },
+   "Minus": {
+    "file": "handbold-minus.png",
+    "w": 56,
+    "h": 19
+   },
+   "Period": {
+    "file": "handbold-period.png",
+    "w": 26,
+    "h": 26
+   },
+   "Slash": {
+    "file": "handbold-slash.png",
+    "w": 74,
+    "h": 131
+   },
+   "Backquote": {
+    "file": "handbold-backquote.png",
+    "w": 40,
+    "h": 43
+   },
+   "BracketLeft": {
+    "file": "handbold-bracketleft.png",
+    "w": 47,
+    "h": 148
+   },
+   "Backslash": {
+    "file": "handbold-backslash.png",
+    "w": 74,
+    "h": 131
+   },
+   "BracketRight": {
+    "file": "handbold-bracketright.png",
+    "w": 46,
+    "h": 148
+   },
+   "Quote": {
+    "file": "handbold-quote.png",
+    "w": 21,
+    "h": 46
+   },
+   "NumpadAdd": {
+    "file": "handbold-numpadadd.png",
+    "w": 139,
+    "h": 145,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpadadd-short.png",
+     "w": 69,
+     "h": 69
+    }
+   },
+   "NumpadSubtract": {
+    "file": "handbold-numpadsubtract.png",
+    "w": 139,
+    "h": 95,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpadsubtract-short.png",
+     "w": 56,
+     "h": 19
+    }
+   },
+   "NumpadMultiply": {
+    "file": "handbold-numpadmultiply.png",
+    "w": 139,
+    "h": 144,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpadmultiply-short.png",
+     "w": 74,
+     "h": 68
+    }
+   },
+   "NumpadDivide": {
+    "file": "handbold-numpaddivide.png",
+    "w": 139,
+    "h": 207,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpaddivide-short.png",
+     "w": 74,
+     "h": 131
+    }
+   },
+   "NumpadDecimal": {
+    "file": "handbold-numpaddecimal.png",
+    "w": 139,
+    "h": 102,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpaddecimal-short.png",
+     "w": 26,
+     "h": 26
+    }
+   },
+   "NumpadEnter": {
+    "file": "handbold-numpadenter.png",
+    "w": 400,
+    "h": 203,
+    "smallCap": 60.0,
+    "short": {
+     "file": "handbold-numpadenter-short.png",
+     "w": 237,
+     "h": 127
+    }
+   },
+   "ArrowLeft": {
+    "file": "handbold-arrowleft.png",
+    "w": 184,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowUp": {
+    "file": "handbold-arrowup.png",
+    "w": 88,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowRight": {
+    "file": "handbold-arrowright.png",
+    "w": 160,
+    "h": 120,
+    "source": "keyboard"
+   },
+   "ArrowDown": {
+    "file": "handbold-arrowdown.png",
+    "w": 90,
+    "h": 120,
+    "source": "keyboard"
+   }
+  },
+  "plain": {
+   "KeyA": {
+    "file": "plain-keya.png",
+    "w": 116,
+    "h": 119
+   },
+   "KeyB": {
+    "file": "plain-keyb.png",
+    "w": 98,
+    "h": 119
+   },
+   "KeyC": {
+    "file": "plain-keyc.png",
+    "w": 112,
+    "h": 122
+   },
+   "KeyD": {
+    "file": "plain-keyd.png",
+    "w": 104,
+    "h": 119
+   },
+   "KeyE": {
+    "file": "plain-keye.png",
+    "w": 96,
+    "h": 119
+   },
+   "KeyF": {
+    "file": "plain-keyf.png",
+    "w": 86,
+    "h": 119
+   },
+   "KeyG": {
+    "file": "plain-keyg.png",
+    "w": 115,
+    "h": 122
+   },
+   "KeyH": {
+    "file": "plain-keyh.png",
+    "w": 99,
+    "h": 119
+   },
+   "KeyI": {
+    "file": "plain-keyi.png",
+    "w": 20,
+    "h": 119
+   },
+   "KeyJ": {
+    "file": "plain-keyj.png",
+    "w": 76,
+    "h": 120
+   },
+   "KeyK": {
+    "file": "plain-keyk.png",
+    "w": 106,
+    "h": 119
+   },
+   "KeyL": {
+    "file": "plain-keyl.png",
+    "w": 82,
+    "h": 119
+   },
+   "KeyM": {
+    "file": "plain-keym.png",
+    "w": 118,
+    "h": 119
+   },
+   "KeyN": {
+    "file": "plain-keyn.png",
+    "w": 100,
+    "h": 119
+   },
+   "KeyO": {
+    "file": "plain-keyo.png",
+    "w": 119,
+    "h": 122
+   },
+   "KeyP": {
+    "file": "plain-keyp.png",
+    "w": 95,
+    "h": 119
+   },
+   "KeyQ": {
+    "file": "plain-keyq.png",
+    "w": 119,
+    "h": 154
+   },
+   "KeyR": {
+    "file": "plain-keyr.png",
+    "w": 106,
+    "h": 119
+   },
+   "KeyS": {
+    "file": "plain-keys.png",
+    "w": 102,
+    "h": 122
+   },
+   "KeyT": {
+    "file": "plain-keyt.png",
+    "w": 100,
+    "h": 119
+   },
+   "KeyU": {
+    "file": "plain-keyu.png",
+    "w": 101,
+    "h": 120
+   },
+   "KeyV": {
+    "file": "plain-keyv.png",
+    "w": 114,
+    "h": 119
+   },
+   "KeyW": {
+    "file": "plain-keyw.png",
+    "w": 162,
+    "h": 119
+   },
+   "KeyX": {
+    "file": "plain-keyx.png",
+    "w": 110,
+    "h": 119
+   },
+   "KeyY": {
+    "file": "plain-keyy.png",
+    "w": 108,
+    "h": 119
+   },
+   "KeyZ": {
+    "file": "plain-keyz.png",
+    "w": 95,
+    "h": 119
+   },
+   "Digit0": {
+    "file": "plain-digit0.png",
+    "w": 82,
+    "h": 122
+   },
+   "Numpad0": {
+    "file": "plain-numpad0.png",
+    "w": 176,
+    "h": 218,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad0-short.png",
+     "w": 82,
+     "h": 122
+    }
+   },
+   "Digit1": {
+    "file": "plain-digit1.png",
+    "w": 78,
+    "h": 119
+   },
+   "Numpad1": {
+    "file": "plain-numpad1.png",
+    "w": 176,
+    "h": 214,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad1-short.png",
+     "w": 78,
+     "h": 119
+    }
+   },
+   "Digit2": {
+    "file": "plain-digit2.png",
+    "w": 81,
+    "h": 120
+   },
+   "Numpad2": {
+    "file": "plain-numpad2.png",
+    "w": 176,
+    "h": 216,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad2-short.png",
+     "w": 81,
+     "h": 120
+    }
+   },
+   "Digit3": {
+    "file": "plain-digit3.png",
+    "w": 84,
+    "h": 122
+   },
+   "Numpad3": {
+    "file": "plain-numpad3.png",
+    "w": 176,
+    "h": 218,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad3-short.png",
+     "w": 84,
+     "h": 122
+    }
+   },
+   "Digit4": {
+    "file": "plain-digit4.png",
+    "w": 90,
+    "h": 119
+   },
+   "Numpad4": {
+    "file": "plain-numpad4.png",
+    "w": 176,
+    "h": 214,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad4-short.png",
+     "w": 90,
+     "h": 119
+    }
+   },
+   "Digit5": {
+    "file": "plain-digit5.png",
+    "w": 84,
+    "h": 120
+   },
+   "Numpad5": {
+    "file": "plain-numpad5.png",
+    "w": 176,
+    "h": 216,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad5-short.png",
+     "w": 84,
+     "h": 120
+    }
+   },
+   "Digit6": {
+    "file": "plain-digit6.png",
+    "w": 82,
+    "h": 122
+   },
+   "Numpad6": {
+    "file": "plain-numpad6.png",
+    "w": 176,
+    "h": 218,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad6-short.png",
+     "w": 82,
+     "h": 122
+    }
+   },
+   "Digit7": {
+    "file": "plain-digit7.png",
+    "w": 80,
+    "h": 119
+   },
+   "Numpad7": {
+    "file": "plain-numpad7.png",
+    "w": 176,
+    "h": 214,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad7-short.png",
+     "w": 80,
+     "h": 119
+    }
+   },
+   "Digit8": {
+    "file": "plain-digit8.png",
+    "w": 84,
+    "h": 122
+   },
+   "Numpad8": {
+    "file": "plain-numpad8.png",
+    "w": 176,
+    "h": 218,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad8-short.png",
+     "w": 84,
+     "h": 122
+    }
+   },
+   "Digit9": {
+    "file": "plain-digit9.png",
+    "w": 82,
+    "h": 122
+   },
+   "Numpad9": {
+    "file": "plain-numpad9.png",
+    "w": 176,
+    "h": 218,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpad9-short.png",
+     "w": 82,
+     "h": 122
+    }
+   },
+   "F1": {
+    "file": "plain-f1.png",
+    "w": 182,
+    "h": 119
+   },
+   "F2": {
+    "file": "plain-f2.png",
+    "w": 181,
+    "h": 120
+   },
+   "F3": {
+    "file": "plain-f3.png",
+    "w": 182,
+    "h": 122
+   },
+   "F4": {
+    "file": "plain-f4.png",
+    "w": 186,
+    "h": 119
+   },
+   "F5": {
+    "file": "plain-f5.png",
+    "w": 183,
+    "h": 120
+   },
+   "F6": {
+    "file": "plain-f6.png",
+    "w": 182,
+    "h": 122
+   },
+   "F7": {
+    "file": "plain-f7.png",
+    "w": 180,
+    "h": 120
+   },
+   "F8": {
+    "file": "plain-f8.png",
+    "w": 182,
+    "h": 122
+   },
+   "F9": {
+    "file": "plain-f9.png",
+    "w": 182,
+    "h": 122
+   },
+   "F10": {
+    "file": "plain-f10.png",
+    "w": 278,
+    "h": 122
+   },
+   "F11": {
+    "file": "plain-f11.png",
+    "w": 267,
+    "h": 119
+   },
+   "F12": {
+    "file": "plain-f12.png",
+    "w": 278,
+    "h": 120
+   },
+   "Space": {
+    "file": "plain-space.png",
+    "w": 488,
+    "h": 157,
+    "short": {
+     "file": "plain-space-short.png",
+     "w": 297,
+     "h": 157
+    },
+    "tiny": {
+     "file": "plain-space-tiny.png",
+     "w": 168,
+     "h": 60
+    }
+   },
+   "Tab": {
+    "file": "plain-tab.png",
+    "w": 276,
+    "h": 127,
+    "tiny": {
+     "file": "plain-tab-tiny.png",
+     "w": 146,
+     "h": 108
+    }
+   },
+   "Enter": {
+    "file": "plain-enter.png",
+    "w": 412,
+    "h": 120,
+    "short": {
+     "file": "plain-enter-short.png",
+     "w": 255,
+     "h": 120
+    },
+    "tiny": {
+     "file": "plain-enter-tiny.png",
+     "w": 122,
+     "h": 124
+    }
+   },
+   "Backspace": {
+    "file": "plain-backspace.png",
+    "w": 856,
+    "h": 161,
+    "short": {
+     "file": "plain-backspace-short.png",
+     "w": 384,
+     "h": 161
+    },
+    "tiny": {
+     "file": "plain-backspace-tiny.png",
+     "w": 174,
+     "h": 113
+    }
+   },
+   "CapsLock": {
+    "file": "plain-capslock.png",
+    "w": 839,
+    "h": 161,
+    "short": {
+     "file": "plain-capslock-short.png",
+     "w": 398,
+     "h": 157
+    },
+    "tiny": {
+     "file": "plain-capslock-tiny.png",
+     "w": 132,
+     "h": 128
+    }
+   },
+   "Escape": {
+    "file": "plain-escape.png",
+    "w": 280,
+    "h": 120
+   },
+   "ShiftLeft": {
+    "file": "plain-shiftleft.png",
+    "w": 358,
+    "h": 126,
+    "tiny": {
+     "file": "plain-shiftleft-tiny.png",
+     "w": 132,
+     "h": 132
+    }
+   },
+   "ShiftRight": {
+    "file": "plain-shiftright.png",
+    "w": 358,
+    "h": 126,
+    "tiny": {
+     "file": "plain-shiftright-tiny.png",
+     "w": 132,
+     "h": 132
+    }
+   },
+   "ControlLeft": {
+    "file": "plain-controlleft.png",
+    "w": 264,
+    "h": 126,
+    "tiny": {
+     "file": "plain-controlleft-tiny.png",
+     "w": 120,
+     "h": 72
+    }
+   },
+   "ControlRight": {
+    "file": "plain-controlright.png",
+    "w": 264,
+    "h": 126,
+    "tiny": {
+     "file": "plain-controlright-tiny.png",
+     "w": 120,
+     "h": 72
+    }
+   },
+   "AltLeft": {
+    "file": "plain-altleft.png",
+    "w": 213,
+    "h": 126
+   },
+   "AltRight": {
+    "file": "plain-altright.png",
+    "w": 213,
+    "h": 126
+   },
+   "Insert": {
+    "file": "plain-insert.png",
+    "w": 436,
+    "h": 120,
+    "short": {
+     "file": "plain-insert-short.png",
+     "w": 220,
+     "h": 120
+    }
+   },
+   "Delete": {
+    "file": "plain-delete.png",
+    "w": 490,
+    "h": 126,
+    "short": {
+     "file": "plain-delete-short.png",
+     "w": 240,
+     "h": 126
+    }
+   },
+   "Home": {
+    "file": "plain-home.png",
+    "w": 452,
+    "h": 120,
+    "tiny": {
+     "file": "plain-home-tiny.png",
+     "w": 132,
+     "h": 132
+    }
+   },
+   "End": {
+    "file": "plain-end.png",
+    "w": 293,
+    "h": 126,
+    "tiny": {
+     "file": "plain-end-tiny.png",
+     "w": 132,
+     "h": 132
+    }
+   },
+   "PageUp": {
+    "file": "plain-pageup.png",
+    "w": 662,
+    "h": 155,
+    "short": {
+     "file": "plain-pageup-short.png",
+     "w": 422,
+     "h": 155
+    },
+    "tiny": {
+     "file": "plain-pageup-tiny.png",
+     "w": 120,
+     "h": 120
+    }
+   },
+   "PageDown": {
+    "file": "plain-pagedown.png",
+    "w": 890,
+    "h": 155,
+    "short": {
+     "file": "plain-pagedown-short.png",
+     "w": 418,
+     "h": 155
+    },
+    "tiny": {
+     "file": "plain-pagedown-tiny.png",
+     "w": 120,
+     "h": 120
+    }
+   },
+   "Semicolon": {
+    "file": "plain-semicolon.png",
+    "w": 21,
+    "h": 114
+   },
+   "Equal": {
+    "file": "plain-equal.png",
+    "w": 86,
+    "h": 60
+   },
+   "Comma": {
+    "file": "plain-comma.png",
+    "w": 21,
+    "h": 46
+   },
+   "Minus": {
+    "file": "plain-minus.png",
+    "w": 43,
+    "h": 17
+   },
+   "Period": {
+    "file": "plain-period.png",
+    "w": 20,
+    "h": 22
+   },
+   "Slash": {
+    "file": "plain-slash.png",
+    "w": 47,
+    "h": 128
+   },
+   "Backquote": {
+    "file": "plain-backquote.png",
+    "w": 40,
+    "h": 26
+   },
+   "BracketLeft": {
+    "file": "plain-bracketleft.png",
+    "w": 40,
+    "h": 161
+   },
+   "Backslash": {
+    "file": "plain-backslash.png",
+    "w": 47,
+    "h": 128
+   },
+   "BracketRight": {
+    "file": "plain-bracketright.png",
+    "w": 40,
+    "h": 161
+   },
+   "Quote": {
+    "file": "plain-quote.png",
+    "w": 20,
+    "h": 40
+   },
+   "NumpadAdd": {
+    "file": "plain-numpadadd.png",
+    "w": 176,
+    "h": 181,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpadadd-short.png",
+     "w": 86,
+     "h": 86
+    }
+   },
+   "NumpadSubtract": {
+    "file": "plain-numpadsubtract.png",
+    "w": 176,
+    "h": 112,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpadsubtract-short.png",
+     "w": 43,
+     "h": 17
+    }
+   },
+   "NumpadMultiply": {
+    "file": "plain-numpadmultiply.png",
+    "w": 176,
+    "h": 158,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpadmultiply-short.png",
+     "w": 64,
+     "h": 62
+    }
+   },
+   "NumpadDivide": {
+    "file": "plain-numpaddivide.png",
+    "w": 176,
+    "h": 223,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpaddivide-short.png",
+     "w": 47,
+     "h": 128
+    }
+   },
+   "NumpadDecimal": {
+    "file": "plain-numpaddecimal.png",
+    "w": 176,
+    "h": 117,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpaddecimal-short.png",
+     "w": 20,
+     "h": 22
+    }
+   },
+   "NumpadEnter": {
+    "file": "plain-numpadenter.png",
+    "w": 412,
+    "h": 216,
+    "smallCap": 60.0,
+    "short": {
+     "file": "plain-numpadenter-short.png",
+     "w": 255,
+     "h": 120
+    }
+   },
+   "ArrowLeft": {
+    "file": "plain-arrowleft.png",
+    "w": 102,
+    "h": 41
+   },
+   "ArrowUp": {
+    "file": "plain-arrowup.png",
+    "w": 41,
+    "h": 102
+   },
+   "ArrowRight": {
+    "file": "plain-arrowright.png",
+    "w": 102,
+    "h": 41
+   },
+   "ArrowDown": {
+    "file": "plain-arrowdown.png",
+    "w": 41,
+    "h": 102
+   }
+  }
+ },
+ "modes": {
+  "standard": {
+   "style": "hand",
+   "backgrounds": {
+    "bg.png": "e8f46a18dcd67ae07491dd5f9fcf9043",
+    "catbg.png": "72e6422c11cf954ced65c33862cbee39"
+   },
+   "slots": [
+    {
+     "key": "1",
+     "label": "Digit1",
+     "blank": false,
+     "matrix": [
+      -0.134647,
+      -0.035433,
+      0.044218,
+      -0.122758
+     ],
+     "anchor": [
+      454.333,
+      337.146
+     ],
+     "room": [
+      104.6,
+      132.0
+     ],
+     "fit": 0.604,
+     "rest": {
+      "patch": "face-standard-rest-0.png",
+      "at": [
+       443,
+       327
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-0.png",
+      "at": [
+       441,
+       325
+      ],
+      "color": "#ffffff",
+      "md5": "5f6a1bb3ae9ec1967955f13d64ea235d"
+     }
+    },
+    {
+     "key": "2",
+     "label": "Digit2",
+     "blank": false,
+     "matrix": [
+      -0.102817,
+      -0.027057,
+      -0.000427,
+      -0.132629
+     ],
+     "anchor": [
+      428.421,
+      330.977
+     ],
+     "room": [
+      137.2,
+      136.8
+     ],
+     "fit": 0.55,
+     "rest": {
+      "patch": "face-standard-rest-1.png",
+      "at": [
+       418,
+       322
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-1.png",
+      "at": [
+       416,
+       320
+      ],
+      "color": "#ffffff",
+      "md5": "74499f2f1f7fb62a156819eeb51f77ef"
+     }
+    },
+    {
+     "key": "3",
+     "label": "Digit3",
+     "blank": false,
+     "matrix": [
+      -0.143855,
+      -0.028771,
+      0.068656,
+      -0.124108
+     ],
+     "anchor": [
+      405.889,
+      325.924
+     ],
+     "room": [
+      101.5,
+      124.0
+     ],
+     "fit": 0.539,
+     "rest": {
+      "patch": "face-standard-rest-2.png",
+      "at": [
+       393,
+       316
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-2.png",
+      "at": [
+       391,
+       314
+      ],
+      "color": "#ffffff",
+      "md5": "8a769072edbc97b5597acd9853bc4e52"
+     }
+    },
+    {
+     "key": "4",
+     "label": "Digit4",
+     "blank": false,
+     "matrix": [
+      -0.143104,
+      -0.037659,
+      0.048024,
+      -0.093179
+     ],
+     "anchor": [
+      379.625,
+      318.65
+     ],
+     "room": [
+      99.6,
+      166.6
+     ],
+     "fit": 0.475,
+     "rest": {
+      "patch": "face-standard-rest-3.png",
+      "at": [
+       367,
+       311
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-3.png",
+      "at": [
+       365,
+       309
+      ],
+      "color": "#ffffff",
+      "md5": "97508b44f89c76c1ffbf232a8213da3d"
+     }
+    },
+    {
+     "key": "5",
+     "label": "Digit5",
+     "blank": false,
+     "matrix": [
+      -0.113764,
+      -0.023336,
+      0.070385,
+      -0.114645
+     ],
+     "anchor": [
+      355.097,
+      312.4
+     ],
+     "room": [
+      125.6,
+      134.9
+     ],
+     "fit": 0.514,
+     "rest": {
+      "patch": "face-standard-rest-4.png",
+      "at": [
+       341,
+       305
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-4.png",
+      "at": [
+       339,
+       303
+      ],
+      "color": "#ffffff",
+      "md5": "b0c7d05315b2606566e5237c6404705a"
+     }
+    },
+    {
+     "key": "6",
+     "label": "Digit6",
+     "blank": false,
+     "matrix": [
+      -0.118779,
+      -0.027564,
+      0.055952,
+      -0.114983
+     ],
+     "anchor": [
+      328.816,
+      308.761
+     ],
+     "room": [
+      127.7,
+      134.1
+     ],
+     "fit": 0.714,
+     "rest": {
+      "patch": "face-standard-rest-5.png",
+      "at": [
+       315,
+       300
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-5.png",
+      "at": [
+       313,
+       298
+      ],
+      "color": "#ffffff",
+      "md5": "6c90839aad0442311df8d9f8aa14b347"
+     }
+    },
+    {
+     "key": "7",
+     "label": "Digit7",
+     "blank": false,
+     "matrix": [
+      -0.115502,
+      -0.023693,
+      0.041294,
+      -0.121517
+     ],
+     "anchor": [
+      300.718,
+      302.231
+     ],
+     "room": [
+      128.1,
+      133.0
+     ],
+     "fit": 0.721,
+     "rest": {
+      "patch": "face-standard-rest-6.png",
+      "at": [
+       290,
+       294
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-6.png",
+      "at": [
+       287,
+       292
+      ],
+      "color": "#ffffff",
+      "md5": "225a7066bbbe043ded6a65af7dba4568"
+     }
+    },
+    {
+     "key": "q",
+     "label": "KeyQ",
+     "blank": false,
+     "matrix": [
+      -0.228518,
+      -0.044339,
+      0.0392,
+      -0.237254
+     ],
+     "anchor": [
+      453.827,
+      301.9
+     ],
+     "room": [
+      125.0,
+      122.3
+     ],
+     "fit": 0.765,
+     "rest": {
+      "patch": "face-standard-rest-7.png",
+      "at": [
+       433,
+       287
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-7.png",
+      "at": [
+       431,
+       285
+      ],
+      "color": "#ffffff",
+      "md5": "cb1b2b1a4be938a3cb492ef46b1b2017"
+     }
+    },
+    {
+     "key": "e",
+     "label": "KeyE",
+     "blank": false,
+     "matrix": [
+      -0.214351,
+      -0.053588,
+      0.105743,
+      -0.2132
+     ],
+     "anchor": [
+      368.582,
+      283.574
+     ],
+     "room": [
+      129.9,
+      126.2
+     ],
+     "fit": 0.591,
+     "rest": {
+      "patch": "face-standard-rest-8.png",
+      "at": [
+       348,
+       269
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-8.png",
+      "at": [
+       346,
+       267
+      ],
+      "color": "#ffffff",
+      "md5": "993b01001e3597594792078d2c1e522a"
+     }
+    },
+    {
+     "key": "r",
+     "label": "KeyR",
+     "blank": false,
+     "matrix": [
+      -0.273246,
+      -0.066108,
+      0.161703,
+      -0.21918
+     ],
+     "anchor": [
+      326.319,
+      274.471
+     ],
+     "room": [
+      100.8,
+      118.3
+     ],
+     "fit": 0.684,
+     "rest": {
+      "patch": "face-standard-rest-9.png",
+      "at": [
+       304,
+       260
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-9.png",
+      "at": [
+       302,
+       258
+      ],
+      "color": "#ffffff",
+      "md5": "5230e1d936f6fb863d691b867dd8b9b3"
+     }
+    },
+    {
+     "key": "space",
+     "label": "Space",
+     "blank": true,
+     "matrix": [
+      -0.197825,
+      -0.050466,
+      0.122353,
+      -0.161514
+     ],
+     "anchor": [
+      330.174,
+      238.652
+     ],
+     "room": [
+      226.0,
+      129.0
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-standard-rest-10.png",
+      "at": [
+       298,
+       223
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-10.png",
+      "at": [
+       296,
+       221
+      ],
+      "color": "#ffffff",
+      "md5": "d20d4b781dc087a9debc7eb2431c3dd2"
+     }
+    },
+    {
+     "key": "a",
+     "label": "KeyA",
+     "blank": false,
+     "matrix": [
+      -0.24277,
+      -0.060693,
+      0.060562,
+      -0.216315
+     ],
+     "anchor": [
+      460.64,
+      269.227
+     ],
+     "room": [
+      106.9,
+      128.5
+     ],
+     "fit": 0.761,
+     "rest": {
+      "patch": "face-standard-rest-11.png",
+      "at": [
+       442,
+       254
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-11.png",
+      "at": [
+       440,
+       252
+      ],
+      "color": "#ffffff",
+      "md5": "48250017bd7f160db91278961d064498"
+     }
+    },
+    {
+     "key": "d",
+     "label": "KeyD",
+     "blank": false,
+     "matrix": [
+      -0.242942,
+      -0.047021,
+      0.093611,
+      -0.183619
+     ],
+     "anchor": [
+      377.452,
+      249.37
+     ],
+     "room": [
+      103.1,
+      121.6
+     ],
+     "fit": 0.72,
+     "rest": {
+      "patch": "face-standard-rest-12.png",
+      "at": [
+       359,
+       236
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-12.png",
+      "at": [
+       357,
+       234
+      ],
+      "color": "#ffffff",
+      "md5": "346c5c2be510726edfdc1bad107e287a"
+     }
+    },
+    {
+     "key": "s",
+     "label": "KeyS",
+     "blank": false,
+     "matrix": [
+      -0.177786,
+      -0.039508,
+      0.058121,
+      -0.215997
+     ],
+     "anchor": [
+      420.866,
+      259.355
+     ],
+     "room": [
+      146.0,
+      120.5
+     ],
+     "fit": 0.65,
+     "rest": {
+      "patch": "face-standard-rest-13.png",
+      "at": [
+       401,
+       245
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-13.png",
+      "at": [
+       400,
+       243
+      ],
+      "color": "#ffffff",
+      "md5": "ae78217c0a9b10d4b83c735cd8419fd0"
+     }
+    },
+    {
+     "key": "w",
+     "label": "KeyW",
+     "blank": false,
+     "matrix": [
+      -0.243207,
+      -0.043559,
+      0.085974,
+      -0.199192
+     ],
+     "anchor": [
+      411.911,
+      292.387
+     ],
+     "room": [
+      152.8,
+      137.8
+     ],
+     "fit": 0.714,
+     "rest": {
+      "patch": "face-standard-rest-14.png",
+      "at": [
+       390,
+       278
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-standard-pressed-14.png",
+      "at": [
+       388,
+       276
+      ],
+      "color": "#ffffff",
+      "md5": "35be460bdb690bc5c010a4bccb57a411"
+     }
+    }
+   ]
+  },
+  "keyboard": {
+   "style": "handbold",
+   "backgrounds": {
+    "bg.png": "dd0a8837d7b717ca2d614772688ad319",
+    "catbg.png": "146b099bdc508a26cf8c9f4c7060af08"
+   },
+   "slots": [
+    {
+     "key": "lctrl",
+     "label": "ControlLeft",
+     "blank": false,
+     "matrix": [
+      -0.220356,
+      -0.044367,
+      0.105897,
+      -0.168935
+     ],
+     "anchor": [
+      420.095,
+      276.746
+     ],
+     "room": [
+      303.5,
+      138.9
+     ],
+     "fit": 0.785,
+     "rest": {
+      "patch": "face-keyboard-rest-0.png",
+      "at": [
+       379,
+       259
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-0.png",
+      "at": [
+       375,
+       256
+      ],
+      "color": "#ffffff",
+      "md5": "e980e3f4d912a4c82b9c262d73df0fd8"
+     }
+    },
+    {
+     "key": "lshift",
+     "label": "ShiftLeft",
+     "blank": false,
+     "matrix": [
+      -0.217727,
+      -0.044892,
+      0.108338,
+      -0.169282
+     ],
+     "anchor": [
+      405.065,
+      318.506
+     ],
+     "room": [
+      424.0,
+      198.3
+     ],
+     "fit": 0.806,
+     "rest": {
+      "patch": "face-keyboard-rest-1.png",
+      "at": [
+       349,
+       293
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-1.png",
+      "at": [
+       347,
+       291
+      ],
+      "color": "#ffffff",
+      "md5": "8d1ef90245263904dbe98d1a5051c635"
+     }
+    },
+    {
+     "key": "r",
+     "label": "KeyR",
+     "blank": false,
+     "matrix": [
+      -0.453605,
+      -0.116317,
+      0.167674,
+      -0.293212
+     ],
+     "anchor": [
+      309.225,
+      270.011
+     ],
+     "room": [
+      151.3,
+      165.9
+     ],
+     "fit": 0.811,
+     "rest": {
+      "patch": "face-keyboard-rest-2.png",
+      "at": [
+       271,
+       245
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-2.png",
+      "at": [
+       269,
+       243
+      ],
+      "color": "#ffffff",
+      "md5": "c3618bc81960d67bf0066cb3f1b98510"
+     }
+    },
+    {
+     "key": "down",
+     "label": "ArrowDown",
+     "blank": false,
+     "matrix": [
+      -0.258641,
+      -0.066237,
+      0.157361,
+      -0.176437
+     ],
+     "anchor": [
+      163.045,
+      225.641
+     ],
+     "room": [
+      142.2,
+      165.9
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-keyboard-rest-3.png",
+      "at": [
+       130,
+       207
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-3.png",
+      "at": [
+       128,
+       205
+      ],
+      "color": "#ffffff",
+      "md5": "63ff9d59e5c0f21910520852affe2678"
+     }
+    },
+    {
+     "key": "right",
+     "label": "ArrowLeft",
+     "blank": false,
+     "matrix": [
+      -0.270118,
+      -0.070465,
+      0.157241,
+      -0.190936
+     ],
+     "anchor": [
+      219.668,
+      239.587
+     ],
+     "room": [
+      157.5,
+      165.9
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-keyboard-rest-4.png",
+      "at": [
+       184,
+       219
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-4.png",
+      "at": [
+       182,
+       217
+      ],
+      "color": "#ffffff",
+      "md5": "7f799f30b79ad8f4530fedd280de1cfa"
+     }
+    },
+    {
+     "key": "left",
+     "label": "ArrowRight",
+     "blank": false,
+     "matrix": [
+      -0.252364,
+      -0.064796,
+      0.162157,
+      -0.16388
+     ],
+     "anchor": [
+      112.455,
+      212.148
+     ],
+     "room": [
+      130.0,
+      165.9
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-keyboard-rest-5.png",
+      "at": [
+       81,
+       195
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-5.png",
+      "at": [
+       79,
+       193
+      ],
+      "color": "#ffffff",
+      "md5": "d985248c01321c0c7fb2c9b5aea3f336"
+     }
+    },
+    {
+     "key": "up",
+     "label": "ArrowUp",
+     "blank": false,
+     "matrix": [
+      -0.287975,
+      -0.085707,
+      0.175014,
+      -0.20064
+     ],
+     "anchor": [
+      125.923,
+      265.667
+     ],
+     "room": [
+      133.9,
+      165.9
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-keyboard-rest-6.png",
+      "at": [
+       91,
+       244
+      ],
+      "color": "#000000"
+     },
+     "pressed": {
+      "patch": "face-keyboard-pressed-6.png",
+      "at": [
+       89,
+       242
+      ],
+      "color": "#ffffff",
+      "md5": "937dba4887804001cf83ec82bab534c4"
+     }
+    }
+   ]
+  },
+  "feixue": {
+   "style": "plain",
+   "backgrounds": {
+    "l2dmousebg.png": "ac44d0348726a60a18931dba9dbf01fb"
+   },
+   "slots": [
+    {
+     "key": "w",
+     "label": "KeyW",
+     "blank": false,
+     "matrix": [
+      0.149519,
+      0.006572,
+      -0.001241,
+      0.135522
+     ],
+     "anchor": [
+      135.263,
+      241.066
+     ],
+     "room": [
+      264.4,
+      323.2
+     ],
+     "fit": 0.688,
+     "rest": {
+      "patch": "face-feixue-rest-0.png",
+      "at": [
+       124,
+       232
+      ],
+      "color": "#252525"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-0.png",
+      "at": [
+       112,
+       215
+      ],
+      "color": "#181818",
+      "md5": "077564b881fb74c0d278376022ec09c3"
+     }
+    },
+    {
+     "key": "a",
+     "label": "KeyA",
+     "blank": false,
+     "matrix": [
+      0.135378,
+      -0.004513,
+      0.002096,
+      0.13779
+     ],
+     "anchor": [
+      71.269,
+      299.972
+     ],
+     "room": [
+      283.2,
+      313.3
+     ],
+     "fit": 0.762,
+     "rest": {
+      "patch": "face-feixue-rest-1.png",
+      "at": [
+       63,
+       291
+      ],
+      "color": "#2c2a2b"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-1.png",
+      "at": [
+       46,
+       273
+      ],
+      "color": "#202020",
+      "md5": "efe7228f4d9ad6e1007151026fbbaa1e"
+     }
+    },
+    {
+     "key": "s",
+     "label": "KeyS",
+     "blank": false,
+     "matrix": [
+      0.130131,
+      -0.001414,
+      0.005293,
+      0.132295
+     ],
+     "anchor": [
+      137.701,
+      299.463
+     ],
+     "room": [
+      296.4,
+      321.5
+     ],
+     "fit": 0.737,
+     "rest": {
+      "patch": "face-feixue-rest-2.png",
+      "at": [
+       131,
+       290
+      ],
+      "color": "#282728"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-2.png",
+      "at": [
+       112,
+       272
+      ],
+      "color": "#232323",
+      "md5": "20b8ef6cd60f6beb782390ce4053e5ad"
+     }
+    },
+    {
+     "key": "d",
+     "label": "KeyD",
+     "blank": false,
+     "matrix": [
+      0.136638,
+      -0.004505,
+      0.004535,
+      0.139877
+     ],
+     "anchor": [
+      205.295,
+      299.424
+     ],
+     "room": [
+      278.1,
+      305.9
+     ],
+     "fit": 0.778,
+     "rest": {
+      "patch": "face-feixue-rest-3.png",
+      "at": [
+       198,
+       290
+      ],
+      "color": "#2b2b2b"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-3.png",
+      "at": [
+       179,
+       272
+      ],
+      "color": "#2b2b2b",
+      "md5": "aac9e4d363f455ef53a64a7bc6cf140d"
+     }
+    },
+    {
+     "key": "shift",
+     "label": "ShiftLeft",
+     "blank": false,
+     "matrix": [
+      0.124607,
+      0.002308,
+      -0.000307,
+      0.113765
+     ],
+     "anchor": [
+      523.612,
+      244.047
+     ],
+     "room": [
+      770.4,
+      317.2
+     ],
+     "fit": 0.657,
+     "rest": {
+      "patch": "face-feixue-rest-4.png",
+      "at": [
+       502,
+       236
+      ],
+      "color": "#353535"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-4.png",
+      "at": [
+       468,
+       224
+      ],
+      "color": "#313131",
+      "md5": "48b0b6ba29c0614bde2d4c8c2309785c"
+     }
+    },
+    {
+     "key": "ctrl",
+     "label": "ControlLeft",
+     "blank": false,
+     "matrix": [
+      0.129957,
+      0.003332,
+      -0.00119,
+      0.120796
+     ],
+     "anchor": [
+      367.706,
+      244.977
+     ],
+     "room": [
+      386.2,
+      328.6
+     ],
+     "fit": 0.693,
+     "rest": {
+      "patch": "face-feixue-rest-5.png",
+      "at": [
+       350,
+       237
+      ],
+      "color": "#2c2c2c"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-5.png",
+      "at": [
+       338,
+       224
+      ],
+      "color": "#262626",
+      "md5": "1f7b8e94a7ef0a58c98caa3b189f7c43"
+     }
+    },
+    {
+     "key": "space",
+     "label": "Space",
+     "blank": false,
+     "matrix": [
+      0.276743,
+      0.000574,
+      -0.006114,
+      0.268491
+     ],
+     "anchor": [
+      458.0,
+      298.0
+     ],
+     "room": [
+      802.9,
+      142.5
+     ],
+     "fit": null,
+     "rest": {
+      "patch": "face-feixue-rest-6.png",
+      "at": [
+       352,
+       280
+      ],
+      "color": "#1e80ff"
+     },
+     "pressed": {
+      "patch": "face-feixue-pressed-6.png",
+      "at": [
+       337,
+       273
+      ],
+      "color": "#1d7fff",
+      "md5": "b8e54e3a3ff9ec265be9ff7cff5a4a38"
+     }
+    }
+   ]
+  }
+ }
+}

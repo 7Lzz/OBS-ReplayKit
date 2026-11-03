@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -50,9 +51,22 @@ namespace ReplayKitHelper
                 var config = ReadJson(Path.Combine(dir, "config.json"));
                 if (config == null) continue;
                 JObject ModelAt(string key) { string rel = config[key]?.Value<string>(); return string.IsNullOrEmpty(rel) ? null : Model(root, Path.Combine(dir, rel)); }
+                // the md5 of its backgrounds and key pictures: the preview draws other keys' labels on them only when they are the pictures the labels were made for
+                var md5 = new JObject();
+                var files = new List<string> { config["BackgroundImageName"]?.Value<string>(), config["CatBackgroundImageName"]?.Value<string>() };
+                string keyFolder = config["KeysImagePath"]?.Value<string>() ?? "";
+                files.AddRange((config["KeysImageName"] as JArray ?? new JArray()).Select(t => string.IsNullOrEmpty(keyFolder) ? null : keyFolder + "/" + t.Value<string>()));
+                foreach (string rel in files.Where(f => !string.IsNullOrEmpty(f)).Distinct())
+                {
+                    string full = Path.Combine(dir, rel.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(full) || new FileInfo(full).Length > 16 * 1024 * 1024) continue;
+                    using (var hash = MD5.Create())
+                    using (var stream = File.OpenRead(full))
+                        md5[rel] = BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+                }
                 modes.Add(new JObject
                 {
-                    ["name"] = name, ["config"] = config,
+                    ["name"] = name, ["config"] = config, ["md5"] = md5,
                     ["cat"] = ModelAt("CatModelPath"), ["left"] = ModelAt("ModelLeftHandModelPath"), ["right"] = ModelAt("ModelRightHandModelPath"),
                 });
             }

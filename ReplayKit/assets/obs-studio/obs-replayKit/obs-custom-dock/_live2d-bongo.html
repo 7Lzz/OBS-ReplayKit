@@ -89,6 +89,10 @@
       return {
         name: entry.name, hasModel: !!c.HasModel,
         back: texture(got[0]), catBack: texture(got[1]), keys: got[2].map(texture),
+        // the pictures as read and their files, drawn again with other keys' labels on the keys by relabel()
+        raw: { back: got[0], catBack: got[1], keys: got[2] }, md5: entry.md5 || {}, labelled: "", labelling: null,
+        files: { back: c.BackgroundImageName || "", catBack: c.CatBackgroundImageName || "",
+          keys: (c.KeysImageName || []).slice(0, keyCount).map(function (file) { return (c.KeysImagePath || "") + "/" + file; }) },
         keyUse: (c.KeyUse || []).slice(0, keyCount).map(function (name) { return KEY_DEFINE.indexOf(name); }),
         leftUp: texture(got[3]), leftHands: got[4].map(texture), rightUp: texture(got[5]), rightHands: got[6].map(texture),
         cat: got[7], leftModel: got[8], rightModel: got[9],
@@ -244,6 +248,106 @@
   }
 
   // View::Render with Live2D on: background, held keys, the cat, the hands, then the raised hands; a mode with no hand pictures has no raised hand either, since its hands are models only drawn with Live2D off
+  // other keys' labels drawn on the keys, as replaykit.dll draws them (overlay-preview/bongo-keys, utils/bongo-keys/README.md)
+  var labels = null, sprites = {};
+  function labelsReady() {
+    if (!labels) labels = fetchJson(HELPER + "/overlay-preview/bongo-keys/manifest.json").then(function (m) { return m && m.version === 2 ? m : null; }).catch(function () { return null; });
+    return labels;
+  }
+  function sprite(name) {
+    if (!sprites[name]) sprites[name] = new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { resolve(null); };
+      img.src = HELPER + "/overlay-preview/bongo-keys/" + name;
+    });
+    return sprites[name];
+  }
+  // which form of a label fits the key (the long one, short or tiny) and how much it is shrunk from its natural size
+  function chooseLabel(entry, slot) {
+    function fit(e) { return Math.min(1, slot.room[0] / Math.max(1, e.w), slot.room[1] / Math.max(1, e.h)); }
+    var down = Math.hypot(slot.matrix[2], slot.matrix[3]), f = fit(entry);
+    if (entry.short && (f < 0.55 || (entry.smallCap || 1e9) * f * down < 8)) {
+      var g = fit(entry.short);
+      if (entry.tiny && g < 0.55) return [entry.tiny, fit(entry.tiny)];
+      return [entry.short, g];
+    }
+    if (entry.tiny && f < 0.55) return [entry.tiny, fit(entry.tiny)];
+    return [entry, f];
+  }
+  // the white label tinted and laid on its key: sprite pixel (u, v) lands at anchor + f * matrix @ (u - w/2, v - h/2); the manifest counts
+  // pixels from their middles and a canvas from their corners, so half a pixel each way
+  function drawLabel(c, img, colour, slot, f) {
+    var t = document.createElement("canvas"); t.width = img.width; t.height = img.height;
+    var tc = t.getContext("2d");
+    tc.fillStyle = colour; tc.fillRect(0, 0, t.width, t.height);
+    tc.globalCompositeOperation = "destination-in"; tc.drawImage(img, 0, 0);
+    var m = slot.matrix.map(function (v) { return v * f; });
+    // a label drawn at under half its size is shrunk smoothly first, or the one-step resample leaves it jagged
+    var k = Math.min(1, 2 * Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])));
+    if (k < 1) {
+      var small = document.createElement("canvas");
+      small.width = Math.max(1, Math.round(t.width * k)); small.height = Math.max(1, Math.round(t.height * k));
+      var sc = small.getContext("2d"); sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = "high";
+      sc.drawImage(t, 0, 0, small.width, small.height);
+      var kx = small.width / t.width, ky = small.height / t.height;
+      m = [m[0] / kx, m[1] / kx, m[2] / ky, m[3] / ky]; t = small;
+    }
+    c.save(); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+    c.setTransform(m[0], m[1], m[2], m[3], slot.anchor[0] + 0.5, slot.anchor[1] + 0.5);
+    c.drawImage(t, -t.width / 2 - 0.5, -t.height / 2 - 0.5);
+    c.restore();
+  }
+  function freeTexture(t) { if (gl && t && t.gl) gl.deleteTexture(t.gl); }
+  // the mode's background, cat background and pressed keys drawn again from the pictures read, with the label of the key given to each key
+  // that has one; a key given its own key or one the labels do not know, and a picture that is not the one they were made for, stay as they are
+  function relabel(mode, codes) {
+    var key = codes.join(",").replace(/,+$/, "");
+    if (mode.labelled === key || mode.labelling === key) return;
+    mode.labelling = key;
+    labelsReady().then(function (L) {
+      var m = L && L.modes[mode.name], style = m && L.styles[m.style], changes = [];
+      if (style) m.slots.forEach(function (slot, i) {
+        var code = codes[i] || "";
+        if (!code || code === slot.label || !style[code] || i >= mode.raw.keys.length) return;
+        if ((mode.md5[mode.files.keys[i]] || "") !== slot.pressed.md5) return;
+        var picked = chooseLabel(style[code], slot);
+        changes.push({ i: i, slot: slot, form: picked[0], f: picked[1] });
+      });
+      var names = [];
+      changes.forEach(function (ch) {
+        names.push(ch.form.file);
+        if (ch.slot.rest.patch) names.push(ch.slot.rest.patch);
+        if (ch.slot.pressed.patch) names.push(ch.slot.pressed.patch);
+      });
+      return Promise.all(names.map(sprite)).then(function (imgs) {
+        if (mode.labelling !== key) return;
+        var got = {};
+        names.forEach(function (n, j) { got[n] = imgs[j]; });
+        var backs = (m && m.backgrounds) || {};
+        function cut(file) { return !!file && !!backs[file] && backs[file] === mode.md5[file]; }
+        function build(img, side, only, ok) {
+          var mine = ok ? changes.filter(function (ch) { return only < 0 || ch.i === only; }) : [];
+          if (!img || !mine.length) return img;
+          var cv = document.createElement("canvas"); cv.width = img.width; cv.height = img.height;
+          var c = cv.getContext("2d");
+          c.drawImage(img, 0, 0);
+          // every blank face first, then the labels, so no face covers a label already drawn
+          mine.forEach(function (ch) { var s = ch.slot[side]; if (s.patch && got[s.patch]) c.drawImage(got[s.patch], s.at[0], s.at[1]); });
+          mine.forEach(function (ch) { if (got[ch.form.file]) drawLabel(c, got[ch.form.file], ch.slot[side].color, ch.slot, ch.f); });
+          return cv;
+        }
+        var back = build(mode.raw.back, "rest", -1, cut(mode.files.back));
+        var catBack = build(mode.raw.catBack, "rest", -1, cut(mode.files.catBack));
+        var keys = mode.raw.keys.map(function (img, i) { return build(img, "pressed", i, true); });
+        [mode.back, mode.catBack].concat(mode.keys).forEach(freeTexture);
+        mode.back = texture(back); mode.catBack = texture(catBack); mode.keys = keys.map(texture);
+        mode.labelled = key; mode.labelling = null;
+        schedule();
+      });
+    }).catch(function (error) { console.error(error); mode.labelling = null; });
+  }
+
   function draw(now) {
     frame = 0;
     if (!running || !current) return;
@@ -265,6 +369,7 @@
     }
     // the held keys of the mode in KeyDefine order, the way the source visits them; a key of its own that KeyDefine does not name comes after
     var codes = custom[mode.name] || [], order = [];
+    relabel(mode, codes);
     for (var j = 0; j < mode.keyUse.length; j++) {
       var code = codes[j] || "";
       var rank = code ? (CODE_TO_KEY[code] ? KEY_DEFINE.indexOf(CODE_TO_KEY[code]) : KEY_DEFINE.length + j) : mode.keyUse[j];

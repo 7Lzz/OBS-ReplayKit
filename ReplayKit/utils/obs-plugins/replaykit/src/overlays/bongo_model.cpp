@@ -35,7 +35,11 @@ bool ReadNumber(const QJsonValue &value, double bound, float &out)
 
 gs_texture_t *BongoTexture(const QString &path)
 {
-	QImage image(path);
+	return BongoTexture(QImage(path));
+}
+
+gs_texture_t *BongoTexture(QImage image)
+{
 	if (image.isNull())
 		return nullptr;
 	// qt decodes a png into argb32, or rgb32 with an opaque alpha byte, which is bgra in memory with no row padding, so the pixels upload as they are and only an unusual png is converted

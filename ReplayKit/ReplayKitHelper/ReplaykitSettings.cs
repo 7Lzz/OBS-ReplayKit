@@ -1703,6 +1703,13 @@ namespace ReplayKitHelper
             return string.Join(",", list.Select(k => k.Type == JTokenType.String && BongoKeyCodes.TryGetValue(k.Value<string>(), out int vk) ? vk : 0));
         }
 
+        // the same keys as their KeyboardEvent codes, "" where the mode keeps its own: the source draws their labels on the keys (overlay-preview/bongo-keys)
+        private static string BongoSourceCodes(JObject settings, string mode)
+        {
+            if (!(settings?["bongoKeys"]?[mode] is JArray list)) return "";
+            return string.Join(",", list.Select(k => k.Type == JTokenType.String && BongoKeyCodes.ContainsKey(k.Value<string>()) ? k.Value<string>() : ""));
+        }
+
         private static bool BongoSettingsChanged(JObject previous, JObject settings) =>
             new[] { "bongoMode", "bongoKeys", "bongoLive2d", "bongoTrack", "bongoBreath", "bongoBlink", "bongoFaces", "bongoRelativeMouse", "bongoSpeed" }
                 .Any(key => !JToken.DeepEquals(previous?[key], settings?[key]));
@@ -1741,6 +1748,7 @@ namespace ReplayKitHelper
             sourceSettings["mouse_horizontal_flip"] = true; sourceSettings["mouse_vertical_flip"] = true;
             sourceSettings["mask"] = settings?["bongoFaces"]?.Value<bool>() ?? false;
             sourceSettings["keys"] = BongoSourceKeys(settings, mode);
+            sourceSettings["key_codes"] = BongoSourceCodes(settings, mode);
         }
 
         private static JObject NewBongoSourceJson(string uuid, JObject settings)
