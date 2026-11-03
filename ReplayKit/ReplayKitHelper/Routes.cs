@@ -2692,6 +2692,34 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/gifs" || path == "/gifs/media" || path == "/gifs/export")
+            {
+                bool export = path == "/gifs/export";
+                if (req.Method != (export ? "POST" : "GET")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", "Wrong method"); return false; }
+                try
+                {
+                    if (export)
+                    {
+                        if (!double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double start) ||
+                            !double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double end))
+                            throw new ArgumentException("Invalid GIF range.");
+                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["file"] = GifExports.Export(Q("file"), start, end) });
+                    }
+                    else if (path == "/gifs") HttpResponse.SendJson(stream, 200, new JObject { ["gifs"] = GifExports.List() });
+                    else
+                    {
+                        string file = GifExports.Resolve(Q("file"));
+                        if (file == null) HttpResponse.SendText(stream, 404, "Not Found", "GIF not found");
+                        else HttpResponse.SendFile(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(
+                            new Dictionary<string, string> { ["Content-Type"] = "image/gif" }), file);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                    ex is ArgumentException || ex is InvalidOperationException || ex is OperationCanceledException)
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
+                return false;
+            }
+
             if (path == "/trim")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -2743,7 +2771,10 @@ namespace ReplayKitHelper
                     int.TryParse(Q("fps", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderFps);
                     int.TryParse(Q("bitrate", "0"), NumberStyles.None, CultureInfo.InvariantCulture, out int renderKbps);
                     var render = new Trim.RenderOptions { Height = renderHeight, Fps = renderFps, BitrateKbps = renderKbps };
-                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime, render);
+                    if (!double.TryParse(Q("pictureScale", "1"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureScale) ||
+                        !double.TryParse(Q("pictureRotation", "0"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureRotation))
+                        throw new ArgumentException("Invalid video transform.");
+                    var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime, render, pictureScale, pictureRotation);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
                 catch (Exception ex)

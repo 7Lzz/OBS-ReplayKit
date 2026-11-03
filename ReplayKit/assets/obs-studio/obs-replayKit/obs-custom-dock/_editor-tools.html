@@ -738,9 +738,9 @@
     }
 
     function addManual() {
-      if (!subs.add("")) return;
+      if (!subs.add("Text")) return;
       // the new subtitle is typed into at once
-      requestAnimationFrame(function () { els.subText.focus(); });
+      requestAnimationFrame(function () { els.subText.focus(); els.subText.select(); });
     }
 
     // controls of the style of a row; each write goes to the row being edited
@@ -924,9 +924,12 @@
         if (!editing) return;
         subs.setText(editing, els.subText.value);
         clearTimeout(textTimer);
-        textTimer = setTimeout(function () { subs.checkpoint(); }, 700);
+        textTimer = setTimeout(function () { textTimer = 0; subs.checkpoint(); }, 700);
       });
-      els.subText.addEventListener("change", function () { clearTimeout(textTimer); subs.checkpoint(); });
+      els.subText.addEventListener("change", function () {
+        if (!textTimer) return;
+        clearTimeout(textTimer); textTimer = 0; subs.checkpoint();
+      });
       text.appendChild(els.subText);
       var nav = el("div", "ed-btns");
       els.subPrev = el("button", "btn", "Previous");
@@ -1761,7 +1764,6 @@
       var cue = list[i];
       // the presets of subtitles, or the list of words to check, take the place of this card while their tab is picked
       if (cue && o.subtitlePane && o.subtitlePane() !== "edit") cue = null;
-      if (editing && editing !== id) { clearTimeout(textTimer); subs.checkpoint(); }
       editing = cue ? cue.id : "";
       editRow = cue ? cue.row : "";
       var card = els.subEdit;
@@ -2074,7 +2076,12 @@
       refresh();
     }
 
-    return { prepare: prepare, refresh: refresh, opened: opened, renamed: function (name) { if (clip) clip.name = name; }, closed: closed, recording: function () { return rec.on || rec.starting; } };
+    function cancelPendingHistory() {
+      clearTimeout(textTimer); textTimer = 0;
+      clearTimeout(styleTimer); styleTimer = 0;
+    }
+
+    return { prepare: prepare, refresh: refresh, cancelPendingHistory: cancelPendingHistory, opened: opened, renamed: function (name) { if (clip) clip.name = name; }, closed: closed, recording: function () { return rec.on || rec.starting; } };
   }
 
   // keeps the overlay of the subtitles on the picture of the video: the element letterboxes the video, so the overlay takes the box the picture is drawn in and its height sets the size of the text; a host that cuts the picture to a frame of its own says where that frame is with box

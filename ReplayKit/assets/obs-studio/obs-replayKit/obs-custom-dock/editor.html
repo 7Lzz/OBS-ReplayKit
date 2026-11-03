@@ -86,6 +86,11 @@
           <div class="lay-overlay" id="trim-layer-overlay" hidden aria-hidden="true"></div>
           <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true"></div>
           </div>
+          <div class="lay-item is-selected main-picture-handles" id="main-picture-handles" hidden>
+            <i class="sub-grip lay-grip" data-corner="nw"></i><i class="sub-grip lay-grip" data-corner="ne"></i>
+            <i class="sub-grip lay-grip" data-corner="sw"></i><i class="sub-grip lay-grip" data-corner="se"></i>
+            <i class="sub-rot lay-rot"></i>
+          </div>
           <div class="player-shade"></div>
           <div class="preview-controls trim-preview-controls">
             <div class="controls-left">
@@ -401,6 +406,7 @@ window.__rkEditorApi = (function () {
     videoPane: () => (editorFx ? editorFx.pane() : "general"),
     onSelectKind: (kind) => { if (editorFx) editorFx.selected(kind); },
     onPanel: () => { if (editorFx) editorFx.refresh(); },
+    onHistoryRestore: () => { if (editorTools) editorTools.cancelPendingHistory(); },
     onFx: () => { if (editorFx) editorFx.changed(); syncTrimReencodeLock(); },
     onFrame: () => updateEditorFrame(),
     // where a subtitle breaks into lines, shared by the preview and the saved copy so both break it the same way
@@ -1480,7 +1486,6 @@ window.__rkEditorApi = (function () {
     }
   }
   trimPlayPauseBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePlayback(); });
-  trimVideo.addEventListener("click", togglePlayback);
   trimVideo.addEventListener("play",  syncTrimPlayIcon);
   trimVideo.addEventListener("pause", syncTrimPlayIcon);
   // the video reports its time only about four times a second, so the playhead and the time of the toolbar step by tenths of a second unevenly; while it plays they follow it every frame instead
@@ -1989,7 +1994,8 @@ window.__rkEditorApi = (function () {
     const lookPlan = trimLanes.lookPlan();
     const layerPlan = trimLanes.layerPlan();
     const rendered = !!render && !!(render.height || render.fps || render.bitrate);
-    const precise = trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original" || rendered;
+    const transform = trimLanes.mainTransform();
+    const precise = transform.w !== 1 || transform.rotate !== 0 || trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original" || rendered;
     if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
       showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
       scheduleToastHide(TOAST_ERROR_MS);
@@ -2024,6 +2030,7 @@ window.__rkEditorApi = (function () {
                   "&precise=" + (precise ? "1" : "0") +
                   "&removeAudio=" + (removeAudio ? "1" : "0") +
                   "&aspect=" + encodeURIComponent(trimLanes.aspect()) +
+                  "&pictureScale=" + transform.w + "&pictureRotation=" + transform.rotate +
                   (screenshot ? "&time=" + frameTime.toFixed(6) : "") +
                   (render && render.height ? "&height=" + render.height : "") +
                   (render && render.fps ? "&fps=" + render.fps : "") +
@@ -2146,6 +2153,18 @@ window.__rkEditorApi = (function () {
     closeRenderSettings();
     submitTrim(replace ? "overwrite" : "copy", settings);
   });
+  const mainHandles = document.getElementById("main-picture-handles");
+  const mainPicture = trimVideoWrap.querySelector(".editor-picture");
+  trimLanes.bindMainPicture(mainPicture, mainHandles);
+  mainPicture.addEventListener("click", () => {
+    if (!trimSourceClip || trimSaving || isTrimFullscreen()) return;
+    mainHandles.hidden = false;
+    trimVideo.dispatchEvent(new Event("rkframe"));
+  }, {signal:EDITOR_SIGNAL});
+  document.addEventListener("pointerdown", event => {
+    if (!mainPicture.contains(event.target) && !mainHandles.contains(event.target)) mainHandles.hidden = true;
+  }, {signal:EDITOR_SIGNAL});
+  mainHandles.addEventListener("dblclick", () => trimLanes.resetMainPicture(), {signal:EDITOR_SIGNAL});
   trimRender.addEventListener("click", openRenderSettings);
   screenshotBtn.addEventListener("click", () => submitTrim("screenshot"));
   aspectControl = RKCombo.bind(document.getElementById("editor-aspect"), (value) => trimLanes.aspect(value === sourceEditorFrame().value ? "original" : value), { menuKeys:true, signal:EDITOR_SIGNAL, footer:blackBarsRow() });

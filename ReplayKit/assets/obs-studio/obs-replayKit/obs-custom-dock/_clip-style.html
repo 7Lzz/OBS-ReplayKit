@@ -2909,3 +2909,22 @@
   .modal-veil.is-open .modal { animation: rk-modal-in 190ms var(--ease_pop) both; }
   .toast.is-shown { animation: rk-toast-in 160ms var(--ease_pop) both; }
 </style>
+
+<style>
+  .section-heading:has(> .section-drag) { position:relative; }
+  .section-heading .section-drag { position:absolute; left:-17px; width:16px; margin:0; cursor:grab; }
+  .export-gif-item[aria-disabled="true"] { opacity:.5; cursor:default; background:transparent; }
+  .section-heading .section-drag:active { cursor:grabbing; }
+  .section-drag::before { content:""; width:14px; height:14px; background:currentColor; mask:url(/icons/ui/section-grip.svg) center / contain no-repeat; }
+  .trim-video-wrap:has(.main-picture-handles:not([hidden])) { overflow:visible; }
+  .trim-video-wrap .main-picture-handles { position:absolute; left:50%; top:50%; z-index:6; border:1px solid var(--selected2); pointer-events:none; }
+  .main-picture-handles[hidden] { display:none; }
+  .main-picture-handles :is(.lay-grip,.lay-rot) { pointer-events:auto; touch-action:none; }
+  #gifs-area { margin-bottom:18px; }
+  body.is-gifs .scroll-area > :is(.section-heading,.favorites-grid,.virtual-spacer,#grid,#empty,#screenshots-area) { display:none !important; }
+  #gif-filter { width:160px; margin:0 0 0 8px; text-transform:none; }
+  #gifs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+  .gif-card { display:grid; gap:6px; min-width:0; overflow:hidden; border-radius:6px; background:var(--bg_card); color:var(--text); text-decoration:none; }
+  .gif-card img { width:100%; aspect-ratio:16/9; object-fit:contain; }
+  .gif-card span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 8px 8px; }
+</style>

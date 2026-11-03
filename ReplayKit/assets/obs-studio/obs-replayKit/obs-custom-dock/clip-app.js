@@ -332,6 +332,7 @@ const CLIP_HOVER_PROFILES = {
   let favoriteResolveInFlight = false;
   let favoriteResolveTimer = 0;
   let activeFilter = "all";
+  let syncGifs = () => {};
   let gameFilters = null;
   let clipSearchQuery = "";
   // never persisted (session-only, unlike favorites) -- always starts fresh at newest so a closed-and-reopened clips window or an obs restart never comes back to whatever sort was last picked.
@@ -1246,6 +1247,7 @@ const CLIP_HOVER_PROFILES = {
     if (pendingClipSave && pendingClipSave.name && loadedClips.some((c) => c && c.name === pendingClipSave.name)) endClipSave(pendingClipSave);
     updateTabs(loadedClips);
     syncClipView();
+    if (activeFilter === "gifs") return;
     if (activeFilter === "screenshots") {
       screenshotGallery.update(clipSearchQuery, activeSort);
       setClipSortLoading(false);
@@ -1278,6 +1280,8 @@ const CLIP_HOVER_PROFILES = {
 
   function syncClipView() {
     if (HOME_MODE) return;
+    document.body.classList.toggle("is-gifs", activeFilter === "gifs");
+    syncGifs();
     if (screenshotGallery) {
       screenshotGallery.show(activeFilter);
       screenshotGallery.update(clipSearchQuery, activeSort);
@@ -3020,6 +3024,10 @@ const CLIP_HOVER_PROFILES = {
                   <span>Copy to clipboard</span>
                 </div>
                 <div class="menu-heading">Edit</div>
+                <div class="menu-item export-gif-item" role="menuitem">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.PLAY}</svg>
+                  <span class="menu-item-label">Export GIF</span>
+                </div>
                 <div class="menu-item trim-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
                   <span>Edit clip</span>
@@ -3759,6 +3767,29 @@ const CLIP_HOVER_PROFILES = {
     }
     deleteMenuItem.addEventListener("click", (e) => handleDeleteAction(e, deleteMenuItem));
     deleteClipEl.addEventListener("click", (e) => handleDeleteAction(e, deleteClipEl));
+    card.querySelector(".export-gif-item").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const name = card.dataset.name;
+      if (gifUnavailable(card)) return;
+      const duration = Number(card.dataset.duration) || durationCache.get(name);
+      gifExports.add(name);
+      closeCardMenu(menuDropdown);
+      showToast("Exporting GIF…", "info");
+      try {
+        const query = "file=" + encodeURIComponent(name) + "&start=0&end=" + encodeURIComponent(duration);
+        const response = await fetch(HELPER + "/gifs/export?" + query, {method:"POST"});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw Error(data.message || "GIF export failed");
+        window.dispatchEvent(new Event("replaykit:gif-saved"));
+        showToast("Saved to the GIFs section.", "info", "GIF saved");
+        scheduleToastHide(2400);
+      } catch (error) {
+        showToast(escapeHtml(error.message), "bad", "GIF export failed");
+        scheduleToastHide(TOAST_ERROR_MS);
+      } finally {
+        gifExports.delete(name);
+      }
+    });
     card.querySelector(".trim-clip-item").addEventListener("click", (e) => {
       e.stopPropagation();
       closeCardMenu(menuDropdown);
@@ -4029,7 +4060,25 @@ const CLIP_HOVER_PROFILES = {
 
   // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
   // opens the menu of a card, a clip or a screenshot, with its top-left corner at the pointer, clamped to the visible scroll area so every item stays reachable
+  const gifExports = new Set();
+  function gifUnavailable(card) {
+    const name = card.dataset.name;
+    if (gifExports.has(name)) return "GIF export is in progress.";
+    const duration = Number(card.dataset.duration) || durationCache.get(name);
+    if (!name || !duration) return "Clip duration is unavailable.";
+    if (duration > 15) return "GIFs are limited to 15 seconds.";
+    if (duration < 0.5) return "GIFs must be at least 0.5 seconds.";
+    return "";
+  }
+
   function openCardMenuAt(card, menuDropdown, e) {
+    const gif = menuDropdown.querySelector(".export-gif-item");
+    if (gif) {
+      const reason = gifUnavailable(card);
+      gif.setAttribute("aria-disabled", String(!!reason));
+      if (reason) { gif.dataset.tooltip = reason; gif.dataset.tooltipInMenu = ""; }
+      else { delete gif.dataset.tooltip; delete gif.dataset.tooltipInMenu; }
+    }
     if (window.RKTooltip) RKTooltip.hide();
     resetAllArmedDeleteButtons();
     document.querySelectorAll(".menu-dropdown.is-open").forEach((d) => {
@@ -4074,6 +4123,7 @@ const CLIP_HOVER_PROFILES = {
 
   function closeCardMenu(menu) {
     if (!menu) return;
+    if (menu.querySelector("[data-tooltip-in-menu]") && window.RKTooltip) RKTooltip.hide();
     menu.classList.remove("is-open");
     const card = menu.closest(".card, .screenshot-card");
     if (!card) return;
@@ -6451,5 +6501,117 @@ const CLIP_HOVER_PROFILES = {
     // the shell page holds back the first reveal of this view until the summary, the first clips and the favorites are in; a favorites list that never answers must not hold it for good
     setTimeout(resolveFirstRender, 3000);
     window.__rkReady = Promise.all([RKHomeDashboard.ready, firstRender]);
+  }
+  if (!HOME_MODE) {
+    const sections = {
+      favorites: ["favorites-heading", "favorites-grid"],
+      linked: ["linked-heading", "linked-grid"],
+      drafts: ["drafts-heading", "drafts-grid"],
+      screenshots: ["screenshots-area"],
+      gifs: ["gifs-area"],
+      clips: ["rest-heading", "top-spacer", "grid", "bottom-spacer", "empty"],
+    };
+    const key = "rk-library-section-order";
+    let order = Object.keys(sections), dragging = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || "[]");
+      if (Array.isArray(saved)) order = [...new Set([...saved.filter(id => Object.hasOwn(sections,id)), ...order])];
+    } catch (error) { console.warn("Library section order could not be read", error); }
+    function arrange() {
+      for (const id of order)
+        for (const node of sections[id]) scrollAreaEl.appendChild(document.getElementById(node));
+    }
+    function move(id, index) {
+      order.splice(order.indexOf(id), 1);
+      order.splice(index, 0, id);
+      arrange();
+      queueVirtualRender(true);
+      try { localStorage.setItem(key, JSON.stringify(order)); }
+      catch (error) { console.warn("Library section order could not be saved", error); }
+    }
+    for (const [id, nodes] of Object.entries(sections)) {
+      const section = document.getElementById(nodes[0]);
+      const heading = section.matches(".section-heading") ? section : section.querySelector(".section-heading");
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "icon-mini-btn section-drag";
+      handle.draggable = true;
+      handle.setAttribute("aria-label", "Reorder " + heading.querySelector("span").textContent);
+      handle.dataset.tooltip = "Drag to reorder, or use Up and Down.";
+      heading.prepend(handle);
+      handle.addEventListener("dragstart", event => {
+        dragging = id;
+        event.dataTransfer.setData("text/plain", id);
+        event.dataTransfer.effectAllowed = "move";
+      });
+      handle.addEventListener("dragend", () => { dragging = null; });
+      handle.addEventListener("keydown", event => {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+        event.preventDefault();
+        const index = order.indexOf(id) + (event.key === "ArrowUp" ? -1 : 1);
+        if (index >= 0 && index < order.length) { move(id, index); handle.focus(); }
+      });
+      heading.addEventListener("dragover", event => {
+        if (dragging && dragging !== id) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
+      });
+      heading.addEventListener("drop", event => {
+        if (!dragging || dragging === id) return;
+        event.preventDefault();
+        const source = dragging;
+        dragging = null;
+        const rect = heading.getBoundingClientRect();
+        const index = order.filter(item => item !== source).indexOf(id);
+        move(source, index + (event.clientY > rect.top + rect.height / 2 ? 1 : 0));
+      });
+    }
+    arrange();
+    const gifSection = document.getElementById("gifs-area");
+    const gifGrid = document.getElementById("gifs-grid");
+    const gifFilter = document.getElementById("gif-filter");
+    let gifs = [], gifRequest = false;
+    function paintGifs() {
+      syncGifs();
+      const search = gifFilter.value.trim().toLowerCase();
+      const fragment = document.createDocumentFragment();
+      for (const name of gifs.filter(name => name.toLowerCase().includes(search)).slice(0,60)) {
+        const link = document.createElement("a");
+        link.className = "gif-card";
+        link.href = HELPER + "/gifs/media?file=" + encodeURIComponent(name);
+        link.download = name;
+        const image = document.createElement("img");
+        image.loading = "lazy";
+        image.src = link.href;
+        image.alt = "";
+        const title = document.createElement("span");
+        title.textContent = name;
+        link.append(image, title);
+        fragment.append(link);
+      }
+      if (!fragment.childNodes.length) {
+        const empty = document.createElement("p");
+        empty.textContent = search ? "No GIFs match." : "Export a short selection from the editor to create a GIF.";
+        fragment.append(empty);
+      }
+      gifGrid.replaceChildren(fragment);
+    }
+    async function refreshGifs() {
+      if (gifRequest) return;
+      gifRequest = true;
+      try {
+        const response = await fetch(HELPER + "/gifs", {cache:"no-store"});
+        if (!response.ok) return;
+        const result = await response.json();
+        if (Array.isArray(result.gifs) && JSON.stringify(gifs) !== JSON.stringify(result.gifs)) {
+          gifs = result.gifs; paintGifs();
+        }
+      } catch (error) { console.warn("GIF list could not be loaded", error); }
+      finally { gifRequest = false; }
+    }
+    gifFilter.addEventListener("input", paintGifs);
+    syncGifs = () => { gifSection.hidden = activeFilter !== "gifs" && (activeFilter !== "all" || !gifs.length); };
+    window.addEventListener("focus", refreshGifs);
+    window.addEventListener("replaykit:gif-saved", refreshGifs);
+    paintGifs();
+    refreshGifs();
   }
   poll();

@@ -10,6 +10,7 @@
   /* above every popup a page opens, the colour picker and the menus among them, so a tip on a control inside one shows */
   #rk-tip {
     position: fixed;
+    inset: auto; margin: 0; border: 0; background: transparent; overflow: visible;
     z-index: 10100;
     padding: 5px 8px;
     border-radius: 3px;
@@ -52,6 +53,7 @@
   var tip = document.createElement("div");
   tip.id = "rk-tip";
   tip.setAttribute("role", "tooltip");
+  if (tip.showPopover) tip.setAttribute("popover", "manual");
   // the outline and the text are the only children, and the text has a span of its own so setting it never removes the outline
   var SVG_NS = "http://www.w3.org/2000/svg";
   var shape = document.createElementNS(SVG_NS, "svg");
@@ -139,6 +141,7 @@
     if (!el || !el.dataset.tooltip || el.disabled) return;
     if (suppress(el)) return;
     attach();
+    if (tip.showPopover && !tip.matches(":popover-open")) tip.showPopover();
     current = el;
     label.textContent = el.dataset.tooltip;
     tip.classList.add("is-shown");
@@ -148,6 +151,7 @@
   function hide() {
     current = null;
     tip.classList.remove("is-shown");
+    if (tip.hidePopover && tip.matches(":popover-open")) tip.hidePopover();
   }
 
   // controls that rewrite their own label (Upload -> "Stop uploads (3 / 8)") update the visible tip instead of making the user re-hover. only the hovered one is watched, so this costs nothing when nothing is tipped.
@@ -162,7 +166,7 @@
   document.addEventListener("mouseover", function (e) {
     var el = e.target.closest("[data-tooltip]");
     // menu rows already show their text, so nothing inside an open menu ever gets a tip
-    if (!el || el === current || el.closest(".menu-item, .menu-dropdown, [role=menu]")) return;
+    if (!el || el === current || (!el.hasAttribute("data-tooltip-in-menu") && el.closest(".menu-item, .menu-dropdown, [role=menu]"))) return;
     observer.disconnect();
     show(el);
     if (current) observer.observe(el, { attributes: true, attributeFilter: ["data-tooltip", "hidden"] });
@@ -176,6 +180,9 @@
   document.addEventListener("mousedown", function (e) {
     if (current && current.contains(e.target)) return;
     hide();
+  }, true);
+  document.addEventListener("close", function (event) {
+    if (current && event.target.contains(current)) hide();
   }, true);
   window.addEventListener("resize", reposition);
   window.addEventListener("scroll", hide, true);

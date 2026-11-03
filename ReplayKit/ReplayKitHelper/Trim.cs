@@ -540,14 +540,18 @@ namespace ReplayKitHelper
         }
 
         // trim a clip with ffmpeg. two precision modes: precise=true (defualt): decode-then-seek (-ss after -i, read from a keyframe near the cut when TrimSeek finds one that decodes the same frames) + libx264 crf 14 re-encode. cut lands frame-accurate at the picked time; encode takes roughly clip-length seconds at the veryfast preset. precise=false: stream-copy with input-side seek. lossless and near-instant, but the cut snaps to the previous keyframe (every 1-2s for obs replay-buffer recordings). mode is copy (defualt; new file) or overwrite (replaces the source in place via a temp sibling + atomic replace). removeAudio drops all audio streams from the edited output.
-        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1, RenderOptions render = null)
+        public static TrimResult InvokeClipTrim(string sourceName, double startSec, double endSec, string mode = "copy", bool precise = true, bool removeAudio = false, JToken audioEdit = null, double videoSpeed = 1, JToken videoEdit = null, JToken subtitleEdit = null, JToken lookEdit = null, JToken layerEdit = null, string aspect = "original", double frameTime = -1, RenderOptions render = null, double pictureScale = 1, double pictureRotation = 0)
         {
             JObject sourceCapture = null;
             render ??= new RenderOptions();
             if (!RenderOptions.Valid(render)) return new TrimResult { Ok = false, Message = "Bad render settings" };
             if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = "Unknown aspect ratio" };
             bool screenshot = string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase);
-            bool framed = aspect != "original";
+            if (double.IsNaN(pictureScale) || double.IsNaN(pictureRotation) ||
+                pictureScale < .1 || pictureScale > 3 || pictureRotation < -180 || pictureRotation > 180)
+                return new TrimResult { Ok = false, Message = "Invalid video transform." };
+            bool transformed = pictureScale != 1 || pictureRotation != 0;
+            bool framed = aspect != "original" || transformed;
             if (screenshot)
             {
                 if (double.IsNaN(frameTime) || double.IsInfinity(frameTime) || frameTime < 0 || videoEdit == null)
@@ -698,6 +702,17 @@ namespace ReplayKitHelper
                 try
                 {
                     frameFilter = EditorFrame.Filter(aspect, sourceInfo.Width, sourceInfo.Height);
+                    if (transformed)
+                    {
+                        string scale = pictureScale.ToString("0.######", CultureInfo.InvariantCulture);
+                        string angle = (pictureRotation * Math.PI / 180).ToString("0.########", CultureInfo.InvariantCulture);
+                        int w = sourceInfo.Width, h = sourceInfo.Height;
+                        string picture = $"scale=max(2\\,trunc(iw*{scale}/2)*2):max(2\\,trunc(ih*{scale}/2)*2)";
+                        if (pictureRotation != 0)
+                            picture += $",rotate={angle}:ow=ceil(rotw({angle})/2)*2:oh=ceil(roth({angle})/2)*2:c=black";
+                        picture += $",pad=max(iw\\,{w}):max(ih\\,{h}):(ow-iw)/2:(oh-ih)/2:black,crop={w}:{h}:(iw-ow)/2:(ih-oh)/2";
+                        frameFilter = frameFilter == null ? picture : picture + "," + frameFilter;
+                    }
                     (frameW, frameH) = EditorFrame.Size(aspect, sourceInfo.Width, sourceInfo.Height);
                 }
                 catch (ArgumentException ex) { return new TrimResult { Ok = false, Message = ex.Message }; }
