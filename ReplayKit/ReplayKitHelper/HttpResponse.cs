@@ -140,7 +140,7 @@ namespace ReplayKitHelper
                 {
                     string key = f.Substring(dir.Length).TrimStart('\\', '/').Replace('\\', '/');
                     if (key.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) key = key.Substring(0, key.Length - 4);
-                    if (key.StartsWith("ui/", StringComparison.Ordinal)) continue; // css-only masks, served by /icons/, no js consumer
+                    if (key.StartsWith("ui/", StringComparison.Ordinal) || key.StartsWith("glyph/", StringComparison.Ordinal)) continue; // css-only masks, served by /icons/, no js consumer
                     map[key] = File.ReadAllText(f).Trim();
                 }
                 // escape < > so nothing in an svg can break out of the <script> block or be read as a tag
@@ -150,6 +150,29 @@ namespace ReplayKitHelper
                 return _dockIconTag;
             }
         }
+
+        private static readonly Regex GlyphReference = new Regex(
+            @"\{\{glyph(-quoted)?:([a-z0-9-]+)\}\}", RegexOptions.Compiled);
+
+        private static string ExpandGlyphs(string markup)
+        {
+            var glyphs = new Dictionary<string, string>(StringComparer.Ordinal);
+            return GlyphReference.Replace(markup, match =>
+            {
+                string name = match.Groups[2].Value;
+                if (!glyphs.TryGetValue(name, out string body))
+                {
+                    string svg = File.ReadAllText(Path.Combine(Constants.APP_ICONS_DIR, "glyph", name + ".svg"));
+                    int start = svg.IndexOf('>') + 1;
+                    int end = svg.LastIndexOf("</svg>", StringComparison.Ordinal);
+                    if (start == 0 || end < start) throw new InvalidDataException("Invalid SVG glyph: " + name);
+                    glyphs[name] = body = svg.Substring(start, end - start);
+                }
+                return match.Groups[1].Success ? body.Replace("\"", "\\\"") : body;
+            });
+        }
+
+        private static byte[] DockScriptBytes() => Encoding.UTF8.GetBytes(ExpandGlyphs(File.ReadAllText(DockScriptPath())));
 
         private static readonly Regex _partialRe = new Regex(@"<!--#include ([a-z][a-z0-9-]{0,40})-->", RegexOptions.Compiled);
 
@@ -205,12 +228,11 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectNoTab(InjectDockIcons(InjectThemeStyle(InjectPartials(File.ReadAllText(f)))));
+                        string html = InjectNoTab(InjectDockIcons(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
-                            using (var input = File.OpenRead(DockScriptPath()))
                             using (var hash = SHA256.Create())
-                                html = html.Replace("__RK_CLIP_APP_VERSION__", BitConverter.ToString(hash.ComputeHash(input)).Replace("-", "").ToLowerInvariant());
+                                html = html.Replace("__RK_CLIP_APP_VERSION__", BitConverter.ToString(hash.ComputeHash(DockScriptBytes())).Replace("-", "").ToLowerInvariant());
                         }
                         byte[] bytes = new UTF8Encoding(false).GetBytes(html);
                         var h = GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "text/html; charset=utf-8" });
@@ -240,11 +262,11 @@ namespace ReplayKitHelper
         {
             try
             {
-                SendFile(stream, 200, "OK", GetNoStoreHeaders(new Dictionary<string, string>
+                SendBytes(stream, 200, "OK", GetNoStoreHeaders(new Dictionary<string, string>
                 {
                     ["Content-Type"] = "application/javascript; charset=utf-8",
                     ["Cache-Control"] = "private, max-age=31536000, immutable"
-                }), DockScriptPath());
+                }), DockScriptBytes());
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { SendText(stream, 404, "Not Found", "Script not found"); }
         }

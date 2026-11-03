@@ -144,7 +144,7 @@
     signIn:$("signIn"), cancel:$("cancel"), open:$("open"), signOut:$("signOut"), changePicture:$("changePicture"), removePicture:$("removePicture"),
   };
   const EDIT_SVG = (window.RK_ICONS && window.RK_ICONS["action/edit"]) || "";
-  const ANON_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16.2" r="6.1"/><path d="M12.7 37.1V32.7Q12.7 27.9 17.5 27.9H30.5Q35.3 27.9 35.3 32.7V37.1"/></svg>';
+  const ANON_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true">{{glyph:account-menu-1}}</svg>';
   const LOGIN_POLL_MS = 500;
   const LOGIN_TIMEOUT_MS = 120000;
   let auth = { signedIn:false, name:"", plan:"", retentionDays:2 };

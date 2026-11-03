@@ -69,8 +69,8 @@
   }
   .opt input:checked::after {
     content:""; position:absolute; inset:0; background:var(--text);
-    -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/></svg>") center / 12px 12px no-repeat;
-            mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='29.213' y1='66.025' x2='54.362' y2='91.168'/><line fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round' stroke-miterlimit='10' x1='98.213' y1='38.12' x2='45.165' y2='91.168'/></svg>") center / 12px 12px no-repeat;
+    -webkit-mask:url("{{SETUP_CHECK}}") center / 12px 12px no-repeat;
+            mask:url("{{SETUP_CHECK}}") center / 12px 12px no-repeat;
   }
   .opt input:focus-visible { outline:2px solid var(--selected2); outline-offset:1px; }
   .opt .t { font-size:12.5px; color:var(--text); }

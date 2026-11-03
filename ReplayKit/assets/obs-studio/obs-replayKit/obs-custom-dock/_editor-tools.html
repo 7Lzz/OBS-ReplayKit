@@ -379,12 +379,12 @@
   var REC_MAX_MIN = 15;
   var WAVE_BARS = 48;
   var HOVERS = { control: ".btn, .tl-mini, .ed-x" };
-  var SPARKLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2.5l1.9 5.6 5.6 1.9-5.6 1.9L10 17.5l-1.9-5.6L2.5 10l5.6-1.9zM18 13l1 2.9 3 1.1-3 1.1-1 2.9-1-2.9-3-1.1 3-1.1z"/></svg>';
-  var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>';
+  var SPARKLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-5}}</svg>';
+  var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-1}}</svg>';
   var ALIGN_ICONS = {
-    left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4zm0 4h10v2H4zm0 4h16v2H4zm0 4h10v2H4z"/></svg>',
-    center: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4zm3 4h10v2H7zm-3 4h16v2H4zm3 4h10v2H7z"/></svg>',
-    right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4zm6 4h10v2H10zm-6 4h16v2H4zm6 4h10v2H10z"/></svg>',
+    left: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-1}}</svg>',
+    center: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-2}}</svg>',
+    right: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-3}}</svg>',
   };
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -1042,11 +1042,11 @@
 
     var LIB_SORT_GROUPS = { length: { base: "Length", members: ["shortest", "longest"] }, filesize: { base: "File size", members: ["smallest", "biggest"] } };
     var LIB_SORT_LABELS = { newest: "Newest", oldest: "Oldest", longest: "Longest", shortest: "Shortest", biggest: "Biggest", smallest: "Smallest" };
-    var LIB_SORT_ICON = "<svg class=\"clip-sort-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.59934 2.30001L9.89679 5.90001C10.1964 6.4 9.7969 7 9.29745 7H8.2V17.0001H9.29745C9.79689 17.0001 10.1964 17.6001 9.89679 18.1L7.59934 21.7C7.29967 22.1001 6.70033 22.1001 6.40067 21.7L4.10322 18.1C3.80356 17.6001 4.20311 17.0001 4.70256 17.0001H5.8V7H4.70256C4.20311 7 3.80356 6.4 4.10322 5.90001L6.40067 2.30001C6.70033 1.9 7.29967 1.9 7.59934 2.30001ZM12.5 6.3C11.8373 6.3 11.3 6.83725 11.3 7.5C11.3 8.16274 11.8373 8.7 12.5 8.7H20.5C21.1628 8.7 21.7 8.16274 21.7 7.5C21.7 6.83725 21.1628 6.3 20.5 6.3H12.5ZM11.3 12C11.3 11.3373 11.8373 10.8 12.5 10.8H17C17.6628 10.8 18.2 11.3373 18.2 12C18.2 12.6628 17.6628 13.2 17 13.2H12.5C11.8373 13.2 11.3 12.6628 11.3 12ZM12.5 14.8C11.8373 14.8 11.3 15.3372 11.3 16C11.3 16.6627 11.8373 17.2 12.5 17.2H15C15.6627 17.2 16.2 16.6627 16.2 16C16.2 15.3372 15.6627 14.8 15 14.8H12.5Z\" fill=\"currentColor\"/></svg>";
-    var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z\"/></svg>";
-    var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4.25543 12.5303C3.96253 12.2374 3.96253 11.7626 4.25543 11.4697C4.54832 11.1768 5.02319 11.1768 5.31609 11.4697L9.54147 15.695L18.6841 6.55238C18.977 6.25956 19.4519 6.25954 19.7448 6.55238C20.0377 6.84525 20.0376 7.32014 19.7448 7.61304L10.0718 17.286C9.7789 17.5789 9.30403 17.5789 9.01114 17.286L4.25543 12.5303Z\" fill=\"currentColor\"/></svg>";
-    var LIB_SORT_CARET = "<svg class=\"clip-sort-caret\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z\"/></svg>";
-    var LIB_FOLDER_ICON = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z\"/></svg>";
+    var LIB_SORT_ICON = "<svg class=\"clip-sort-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-clip-sort-icon}}</svg>";
+    var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-games-game-picker-caret}}</svg>";
+    var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-clip-sort-check}}</svg>";
+    var LIB_SORT_CARET = "<svg class=\"clip-sort-caret\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-games-game-picker-caret}}</svg>";
+    var LIB_FOLDER_ICON = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-3}}</svg>";
 
     // the sort of the clips page, the same trigger and menu: newest and oldest, and length and file size that each open to their two ways
     function buildLibrarySort() {
@@ -1164,7 +1164,7 @@
       var sort = buildLibrarySort();
       head.appendChild(sort);
       var search = el("label", "ed-fx-search");
-      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M9.86.85a9 9 0 0 1 6.92 14.76l5.78 5.79a.82.82 0 1 1-1.16 1.16l-5.79-5.79A9 9 0 1 1 9.86.85zm0 1.65a7.35 7.35 0 1 0 0 14.7 7.35 7.35 0 0 0 0-14.7z"/></svg>';
+      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-4}}</svg>';
       var input = el("input");
       input.type = "text";
       input.placeholder = "Search";
@@ -1323,7 +1323,7 @@
     // elements: shapes drawn in a colour, stickers, and gifs or pictures from the computer; each goes over the video at the playhead for five seconds
     function buildElements(pane) {
       var search = el("label", "ed-fx-search");
-      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M9.86.85a9 9 0 0 1 6.92 14.76l5.78 5.79a.82.82 0 1 1-1.16 1.16l-5.79-5.79A9 9 0 1 1 9.86.85zm0 1.65a7.35 7.35 0 1 0 0 14.7 7.35 7.35 0 0 0 0-14.7z"/></svg>';
+      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-4}}</svg>';
       var input = el("input");
       input.type = "text";
       input.placeholder = "Search elements";

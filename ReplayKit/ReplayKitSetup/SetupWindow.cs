@@ -344,6 +344,7 @@ namespace ReplayKitSetup
             // the hero art + brand icon are the same files the update window fetches over http; there is no helper here, so pull them straight out of the embedded asset bundle and inline them as data uris.
             html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
             html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
+            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/obs-replayKit/icons/ui/setup-check.svg", "image/svg+xml"));
             html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
             return html;
         }

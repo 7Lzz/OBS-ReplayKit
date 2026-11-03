@@ -26,6 +26,7 @@
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\assets\obs-studio\obs-replayKit\icons\fallback\*.svg" LogicalName="ReplayKitHelper.icons.%(Filename)%(Extension)" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Management" />
     <Reference Include="System.Net.Http" />

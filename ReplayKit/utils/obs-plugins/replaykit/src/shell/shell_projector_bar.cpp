@@ -30,14 +30,6 @@ constexpr int kTintMs = 220;
 constexpr int kGrowMs = 130;
 
 // glyphs stroked like the icons of the rail; the colour is put on when they are drawn
-const char kEyeSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.1"/></svg>)SVG";
-const char kEyeOffSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 5.7A9.6 9.6 0 0 1 12 5.5C18 5.5 21.5 12 21.5 12a17 17 0 0 1-2.6 3.5"/><path d="M6.6 6.9A17 17 0 0 0 2.5 12S6 18.5 12 18.5a9.5 9.5 0 0 0 4.5-1.1"/><path d="M9.9 9.9a3.1 3.1 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>)SVG";
-const char kLockSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.6v2.2"/></svg>)SVG";
-const char kUnlockedSvg[] =
-	R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/><path d="M12 14.6v2.2"/></svg>)SVG";
 
 QFont LabelFont()
 {
@@ -168,10 +160,10 @@ protected:
 
 	void PaintGlyph(QPainter &p, const QRectF &pill, qreal hover) override
 	{
-		static QSvgRenderer eye{QByteArray::fromRawData(kEyeSvg, qsizetype(sizeof(kEyeSvg) - 1))};
-		static QSvgRenderer eyeOff{QByteArray::fromRawData(kEyeOffSvg, qsizetype(sizeof(kEyeOffSvg) - 1))};
-		static QSvgRenderer locked{QByteArray::fromRawData(kLockSvg, qsizetype(sizeof(kLockSvg) - 1))};
-		static QSvgRenderer unlocked{QByteArray::fromRawData(kUnlockedSvg, qsizetype(sizeof(kUnlockedSvg) - 1))};
+		static QSvgRenderer eye{IconPath(QStringLiteral("nav/projector-eye.svg"))};
+		static QSvgRenderer eyeOff{IconPath(QStringLiteral("nav/projector-eye-off.svg"))};
+		static QSvgRenderer locked{IconPath(QStringLiteral("nav/projector-lock.svg"))};
+		static QSvgRenderer unlocked{IconPath(QStringLiteral("nav/projector-unlock.svg"))};
 
 		const bool preview = m_kind == Kind::Preview;
 		// what is switched on reads brighter than what is off, and the lock takes the accent while it holds, since that is the state that has to be noticed

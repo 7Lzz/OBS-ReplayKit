@@ -14,6 +14,7 @@
 
 namespace rk {
 
+QString IconPath(const QString &name);
 QPixmap TintedSvgPixmap(QSvgRenderer &svg, const QSizeF &logicalSize, qreal dpr, const QColor &color);
 void DrawPageText(QPainter &p, const QRectF &rect, Qt::Alignment align, const QString &text, QFont font, const QColor &color, qreal stroke);
 

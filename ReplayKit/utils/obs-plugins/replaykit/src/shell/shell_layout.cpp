@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "shell/shell_layout.hpp"
 
+#include "core/draw_util.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
@@ -35,8 +36,13 @@ QString SourceResizeStyle()
 	for (int hover = 0; hover < 2; ++hover) {
 		const QString path = dir + QLatin1Char('/') + g_notifyTipFg.name().mid(1) + QStringLiteral("-46x10-") + QString::number(hover) + QStringLiteral(".svg");
 		if (!QFile::exists(path)) {
+			QFile indicator(IconPath(QStringLiteral("ui/source-resize.svg")));
+			if (!indicator.open(QIODevice::ReadOnly)) {
+				blog(LOG_WARNING, "[replaykit] the source resize indicator asset could not be read");
+				return {};
+			}
 			QSaveFile file(path);
-			const QByteArray svg = QStringLiteral("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"46\" height=\"10\"><rect y=\"3\" width=\"46\" height=\"3\" rx=\"1.5\" fill=\"%1\" fill-opacity=\"%2\"/></svg>")
+			const QByteArray svg = QString::fromUtf8(indicator.readAll())
 				.arg(g_notifyTipFg.name(), hover ? QStringLiteral(".55") : QStringLiteral(".22")).toUtf8();
 			if (!file.open(QIODevice::WriteOnly) || file.write(svg) != svg.size() || !file.commit()) {
 				blog(LOG_WARNING, "[replaykit] the source resize indicator could not be written");

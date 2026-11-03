@@ -885,7 +885,7 @@
     </button>
     <div class="nav-group">User settings</div>
     <button class="nav-btn" type="button" data-page="account">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3z"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:settings-1}}</svg>
       <span>Account</span>
     </button>
     <div class="nav-group">App settings</div>
@@ -925,7 +925,7 @@
       <button class="nav-switch" type="button" id="openObsSettings">
         <img class="nav-logo" id="obsSwitchIcon" alt="" width="17" height="17">
         <span>OBS Settings</span>
-        <svg class="nav-chev" viewBox="0 0 10 12" aria-hidden="true"><polyline points="3 1 8 6 3 11"/></svg>
+        <svg class="nav-chev" viewBox="0 0 10 12" aria-hidden="true">{{glyph:settings-nav-chev}}</svg>
       </button>
     </div>
   </aside>
@@ -1750,7 +1750,7 @@
         <div class="form-row"><div class="label">Plan<span class="setting-description">The plan used for new uploads.</span></div><div class="field-wrap"><span class="account-value" id="streamablePlan"></span></div></div>
         <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-storage" viewBox="0 0 16 16" aria-hidden="true"></svg>Upload size</span><span class="setting-description">Maximum file size per video.</span></div><div class="field-wrap"><span class="account-value" id="streamableSize"></span></div></div>
         <div class="form-row"><div class="label"><span class="account-label"><svg data-i="nav/tab-editor" viewBox="0 0 16 16" aria-hidden="true"></svg>Video length</span><span class="setting-description">Maximum length per video.</span></div><div class="field-wrap"><span class="account-value" id="streamableDuration"></span></div></div>
-        <div class="form-row"><div class="label"><span class="account-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l4 2 1-1.7-3-1.5V7z"/></svg>Clip retention</span><span class="setting-description">How long new uploads remain available.</span></div><div class="field-wrap"><span class="account-value" id="streamableRetention"></span></div></div>
+        <div class="form-row"><div class="label"><span class="account-label"><svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:settings-3}}</svg>Clip retention</span><span class="setting-description">How long new uploads remain available.</span></div><div class="field-wrap"><span class="account-value" id="streamableRetention"></span></div></div>
         <p class="upload-details-note">Limits apply to new uploads. Existing links keep the limits they were uploaded with.</p>
       </div>
     </section>
@@ -5881,7 +5881,7 @@
   }
   // the picture the helper keeps for the account circle: its version, empty when there is none; the picker holds the request open until it closes, so a second one is not opened meanwhile
   const profile = { avatar: document.getElementById("profileAvatar"), change: document.getElementById("profilePictureChange"), remove: document.getElementById("profilePictureRemove"), error: document.getElementById("profilePictureError"), version:"", picking:false };
-  const PERSON_SVG = '<svg class="profile-person" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="16.2" r="6.1"/><path d="M12.7 37.1V32.7Q12.7 27.9 17.5 27.9H30.5Q35.3 27.9 35.3 32.7V37.1"/></svg>';
+  const PERSON_SVG = '<svg class="profile-person" viewBox="0 0 48 48" aria-hidden="true">{{glyph:account-menu-1}}</svg>';
   // the same colour and letter the account menu and the title bar give a signed in account without a picture
   function accountHue(name) {
     let hash = 2166136261;

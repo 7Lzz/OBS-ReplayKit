@@ -43,8 +43,7 @@ protected:
 private:
 	struct Item {
 		int id;
-		const char *svg;
-		size_t svgLen;
+		const char *iconFile;
 		QString tip;
 		bool bottom;
 		QSvgRenderer *renderer = nullptr;

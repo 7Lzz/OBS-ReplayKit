@@ -145,11 +145,13 @@ const CLIP_HOVER_PROFILES = {
     MORE: _svgInner(_RKI["action/more"]),
     EDIT: _svgInner(_RKI["action/edit"]),
     LINK: _svgInner(_RKI["action/link"]),
+    LINKED: _svgInner(_RKI["nav/linked"]),
     TRASH: _svgInner(_RKI["action/trash"]),
     RESTORE: _svgInner(_RKI["editor/undo"]),
     STAR: _svgInner(_RKI["toggle/star"]),
     STAR_BORDER: _svgInner(_RKI["toggle/star-border"]),
     GRID: _svgInner(_RKI["toggle/grid"]),
+    CLIPS: _svgInner(_RKI["nav/clips"]),
     CONTENT_CUT: _svgInner(_RKI["action/content-cut"]),
     CONTENT_COPY: _svgInner(_RKI["action/content-copy"]),
     COMPRESS: _svgInner(_RKI["action/compress"]),
@@ -179,13 +181,8 @@ const CLIP_HOVER_PROFILES = {
   const _volMuteParts = ICON.VOL_MUTED.match(/<path[^>]*\/>/g) || [];
   const VOL_SPEAKER = (_volMuteParts[0] || "") + (_volMuteParts[1] || "");
   const VOL_X = (_volMuteParts[2] || "").replace("<path ", '<path class="vol-x" ');
-  const VOL_WAVE_ATTRS = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"';
   const VOLUME_ICON =
-    '<svg viewBox="0 0 24 24">' + VOL_SPEAKER +
-    '<path class="vol-wave vol-wave-1" d="M15.5 9.5a3.5 3.5 0 0 1 0 5" ' + VOL_WAVE_ATTRS + '/>' +
-    '<path class="vol-wave vol-wave-2" d="M18 7a7 7 0 0 1 0 10" ' + VOL_WAVE_ATTRS + '/>' +
-    '<path class="vol-wave vol-wave-3" d="M20.5 4.5a10.5 10.5 0 0 1 0 15" ' + VOL_WAVE_ATTRS + '/>' +
-    VOL_X + '</svg>';
+    '<svg viewBox="0 0 24 24">' + VOL_SPEAKER + '{{glyph:player-volume-waves}}' + VOL_X + '</svg>';
 
   const bulkCompressIcon = document.getElementById("bulk-compress-icon");
   if (bulkCompressIcon) bulkCompressIcon.innerHTML = ICON.COMPRESS;
@@ -266,11 +263,11 @@ const CLIP_HOVER_PROFILES = {
   const restHeadingLabelEl = document.getElementById("rest-heading-label");
   // content for the heading above the main grid. "all" is the existing all-tab-plus-favorites case (grid icon, paired with the favorites split below); the other three give each single-filter tab its own header the same way.
   const FILTER_SECTION_HEADING = {
-    all:       { icon: ICON.GRID, label: "All clips" },
-    clips:     { icon: ICON.GRID, label: "Clips" },
+    all:       { icon: ICON.CLIPS, label: "All clips" },
+    clips:     { icon: ICON.CLIPS, label: "Clips" },
     favorites: { icon: ICON.STAR, label: "Favorites" },
-    linked:    { icon: ICON.LINK, label: "Linked" },
-    local:     { icon: ICON.GRID, label: "All clips" },
+    linked:    { icon: ICON.LINKED, label: "Linked" },
+    local:     { icon: ICON.CLIPS, label: "All clips" },
     drafts:    { icon: ICON.OPEN_EDITOR, label: "Edit drafts" },
   };
   const gridEl = document.getElementById("grid");
@@ -464,7 +461,7 @@ const CLIP_HOVER_PROFILES = {
   const CARD_MIN_WIDTH = 260;
   const CARD_MAX_WIDTH = 520;
   // the triangle of dots of the corner of the window: three along the bottom, two above them, one above those, all flush to the right
-  const CARD_GRIP_SVG = '<svg viewBox="0 0 14 14" aria-hidden="true"><circle cx="11" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="11" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="3" r="1.2"/></svg>';
+  const CARD_GRIP_SVG = '<svg viewBox="0 0 14 14" aria-hidden="true">{{glyph:clip-app-1}}</svg>';
   function loadCardWidth() {
     try {
       const value = Number(localStorage.getItem(CARD_SIZE_KEY));
@@ -2968,14 +2965,11 @@ const CLIP_HOVER_PROFILES = {
         </div>
         <div class="draft-mark" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON.OPEN_EDITOR}</svg></div>
         <button class="locate-btn" type="button" data-tooltip="Show in Clips" aria-label="Show in Clips">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-app-2}}</svg>
         </button>
         <div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div>
         <button class="select-clip-btn" type="button" data-tooltip="Select clip" aria-label="Select clip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="select-ring" cx="12" cy="12" r="8"></circle>
-            <path class="select-check" d="m7.5 12 3 3 6-6"></path>
-          </svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-app-3}}</svg>
         </button>
         <button class="favorite-btn" type="button" data-tooltip="Favorite clip" aria-label="Favorite clip">
           <svg viewBox="0 0 24 24">${isFavorite(clip.name) ? ICON.STAR : ICON.STAR_BORDER}</svg>
@@ -4750,6 +4744,7 @@ const CLIP_HOVER_PROFILES = {
     restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showRowSections || !!(screenshotGallery && screenshotGallery.count())));
     if (restHeadingContent) {
       restHeadingIconEl.innerHTML = restHeadingContent.icon;
+      restHeadingIconEl.classList.toggle("is-favorite", restHeadingContent === FILTER_SECTION_HEADING.favorites);
       restHeadingLabelEl.textContent = restHeadingContent.label;
     }
     syncClipView();

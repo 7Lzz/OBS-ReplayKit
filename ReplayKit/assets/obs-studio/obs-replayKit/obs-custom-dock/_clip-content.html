@@ -6,24 +6,24 @@
         <div class="home-hero"><div class="home-hero-player" id="home-hero"></div><div class="home-hero-info" id="home-hero-info"></div></div>
       </section>
       <section class="home-section" id="home-recent-section" aria-label="Recent clips">
-        <div class="home-head"><h2 class="home-h2">Recent</h2><button type="button" class="home-see" data-see="all">See all<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button></div>
+        <div class="home-head"><h2 class="home-h2">Recent</h2><button type="button" class="home-see" data-see="all">See all<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
         <div class="home-row" id="home-recent"></div>
       </section>
       <section class="home-section" id="home-favs-section" aria-label="Favorite clips" hidden>
-        <div class="home-head"><h2 class="home-h2">Favorites</h2><button type="button" class="home-see" data-see="favorites">See all<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></button></div>
+        <div class="home-head"><h2 class="home-h2">Favorites</h2><button type="button" class="home-see" data-see="favorites">See all<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
         <div class="home-row" id="home-favs"></div>
       </section>
     </div>
     <!-- favorites sub-section, only rendered when the all filter is active and the user has at least one favorite -- the grid below (id="grid") is the virtualized list of non-favorites in that case, otherwise the full filtered list; both grids live inside the same scroll-area so they scroll together. rest-headings icon/label are rewritten per tab in render() (FILTER_SECTION_HEADING) -- "all clips" is only paired with this favorites split, the other three tabs get their own heading standalone. -->
     <div class="section-heading" id="favorites-heading">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-2}}</svg>
       <span>Favorites</span>
       <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="favorites-grid"></div>
     <!-- linked and drafts sections of the all filter: plain rows like the favorites, and a clip shows in the first of favorites, linked, drafts it belongs to and not again under all clips -->
     <div class="section-heading" id="linked-heading">
-      <svg data-i="action/link" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Linked</span>
+      <svg data-i="nav/linked" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Linked</span>
       <button class="icon-mini-btn section-toggle" type="button" data-section="linked" aria-label="Collapse Linked" aria-expanded="true" aria-controls="linked-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="linked-grid"></div>
@@ -34,14 +34,14 @@
     <div class="grid favorites-grid" id="drafts-grid"></div>
     <section id="screenshots-area" hidden>
       <div class="section-heading is-shown" id="screenshots-heading">
-        <svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Screenshots</span>
+        <svg data-i="nav/screenshots" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Screenshots</span>
         <button class="icon-mini-btn section-toggle" type="button" data-section="screenshots" aria-label="Collapse Screenshots" aria-expanded="true" aria-controls="screenshots-grid screenshots-empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
       </div>
       <div class="grid" id="screenshots-grid"></div>
       <div class="empty" id="screenshots-empty" role="status">Loading screenshots...</div>
     </section>
     <div class="section-heading" id="rest-heading">
-      <svg viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>
+      <svg data-i="nav/clips" viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"></svg>
       <span id="rest-heading-label">All clips</span>
       <button class="icon-mini-btn section-toggle" type="button" data-section="clips" aria-label="Collapse All clips" aria-expanded="true" aria-controls="grid top-spacer bottom-spacer empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
       <label class="group-games" id="group-games" data-tooltip="Sort all clips into a section per game" hidden><span>By game</span><input type="checkbox" class="rk-switch" id="group-games-switch" aria-label="Sort all clips by game"></label>
@@ -55,7 +55,7 @@
   <div class="modal-veil popup-veil" id="popup-veil">
     <div class="modal popup-card" id="popup-card" role="alertdialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body">
       <div class="popup-head">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2zm0 5.5L19.5 19h-15L12 7.5zM11 11v4h2v-4h-2zm0 5v2h2v-2h-2z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-3}}</svg>
         <h2 id="popup-title"></h2>
       </div>
       <div class="body popup-body" id="popup-body"></div>

@@ -795,15 +795,15 @@
     };
   }
 
-  var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.85547 0.854492C14.8259 0.854621 18.8555 4.88498 18.8555 9.85547C18.8554 12.0437 18.0729 14.0485 16.7744 15.6084L22.5625 21.3965C22.8842 21.7183 22.8843 22.2407 22.5625 22.5625C22.2407 22.8842 21.7183 22.8842 21.3965 22.5625L15.6084 16.7744C14.0485 18.0728 12.0437 18.8554 9.85547 18.8555C4.88506 18.8555 0.85573 14.8258 0.855469 9.85547C0.855469 4.8849 4.8849 0.854492 9.85547 0.854492ZM9.85547 2.50195C5.79439 2.50195 2.50195 5.79439 2.50195 9.85547C2.50221 13.9163 5.79455 17.208 9.85547 17.208C13.9163 17.2079 17.2077 13.9162 17.208 9.85547C17.208 5.79447 13.9165 2.50208 9.85547 2.50195Z"/></svg>';
-  var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>';
+  var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-6}}</svg>';
+  var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-1}}</svg>';
   var TAB_ICONS = {
-    general: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>',
-    color: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>',
-    filters: '<svg viewBox="0 0 24 24" class="is-line" aria-hidden="true"><circle cx="9" cy="9.5" r="5.2"/><circle cx="15" cy="9.5" r="5.2"/><circle cx="12" cy="14.8" r="5.2"/></svg>',
-    effects: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2.5l1.9 5.6 5.6 1.9-5.6 1.9L10 17.5l-1.9-5.6L2.5 10l5.6-1.9zM18 13l1 2.9 3 1.1-3 1.1-1 2.9-1-2.9-3-1.1 3-1.1z"/></svg>',
+    general: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-2}}</svg>',
+    color: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-3}}</svg>',
+    filters: '<svg viewBox="0 0 24 24" class="is-line" aria-hidden="true">{{glyph:editor-fx-is-line}}</svg>',
+    effects: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-5}}</svg>',
   };
-  TAB_ICONS.presets = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2zm0 15-5-2.18L7 18V5h10v13z"/></svg>';
+  TAB_ICONS.presets = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-6}}</svg>';
   var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"], ["presets", "Presets"]];
   var PRESET_KINDS = { video: "the look of this video", subtitle: "the style of these subtitles" };
   var COLOR_GROUPS = [
@@ -1230,7 +1230,7 @@
       els.checkTab.type = "button";
       els.checkTab.dataset.kind = "check";
       els.checkTab.dataset.tooltip = "Subtitles that might be misheard";
-      els.checkTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2zm0-4h-2V7h2z"/></svg>';
+      els.checkTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-7}}</svg>';
       els.checkTab.appendChild(el("span", "", "Check"));
       els.checkTab.addEventListener("click", function () {
         setSubPane("check");
