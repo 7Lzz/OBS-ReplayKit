@@ -175,6 +175,8 @@ namespace ReplayKitHelper
 
             // the parent handle is diagnostic only -- obs can host the lua through a short-lived child process, so a failed open must not make the helper exit
             ParentWatchdog.OpenHandle();
+            // a close that stalled is about the obs that was running then; this is a new one, so the notice of it goes
+            try { Notifications.Forget("obs-close-timeout"); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Notifications.Forget: " + ex.Message); }
 
             // bind this process to a windows job object with kill-on-close. any worker child we spawn (compress/trim ffmpeg, etc) inherits the job automatically on windows 8+; when this process exits for any reason the kernel terminates every process still in the job, so orphaned ffmpeg workers cannot keep encoding into clip files no ui is watching.
             try

@@ -850,6 +850,10 @@ namespace ReplayKitHelper
             }
         }
 
+        // set once this helper started an installer; it is never cleared, since obs and this helper are on their way out from then on
+        private static volatile bool installerStarted;
+        public static bool InstallerRunning() => installerStarted;
+
         public static JObject ApplyUpdate()
         {
             // claim before doing anything else -- a second concurrent call would otherwise race the delete + recreate + download into the same fixed temp dir below.
@@ -888,6 +892,7 @@ namespace ReplayKitHelper
                     ClearInstallResult();
                     SetProgressStage("install");
                     started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
+                    installerStarted = true;
                 }
                 catch
                 {

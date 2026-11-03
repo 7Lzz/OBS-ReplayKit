@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 
 #include "app/clip_buffer.hpp"
+#include "app/encoder_guard.hpp"
 #include "app/frontend_events.hpp"
 #include "app/main_window_filter.hpp"
 #include "app/sdk_commands.hpp"
@@ -39,6 +40,8 @@ bool obs_module_load(void)
 void obs_module_post_load(void)
 {
 	using namespace rk;
+	// before obs builds its outputs from the profile, so a gpu encoder that did not load never reaches them
+	EnsureUsableEncoders();
 	InitLayoutAtStartup();
 	if (g_wantedLayout == UiLayout::Clean && !g_shellBootSkipped) {
 		QSettings(WindowStateIniPath(), QSettings::IniFormat).setValue("shellBootPending", true);

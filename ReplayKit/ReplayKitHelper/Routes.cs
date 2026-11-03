@@ -245,8 +245,8 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // leave obs and the helper running if a normal close cannot finish
-        private static void StopObsForRestart(string reason)
+        // leave obs and the helper running if a normal close cannot finish; an update is the exception, since the installer cannot replace the files of a running obs and closes it anyway, so for an update obs is made to stop and nothing is left in the bell about it
+        private static void StopObsForRestart(string reason, bool forUpdate = false)
         {
             Thread.Sleep(300);
             try
@@ -274,6 +274,19 @@ namespace ReplayKitHelper
                     Log.Write(reason + ": could not confirm OBS exit: " + ex.Message);
                 }
                 finally { p.Dispose(); }
+            }
+            if (!stopped && forUpdate)
+            {
+                Log.Write(reason + ": OBS did not close within 15 s for the update, stopping it");
+                foreach (var p in GetProcessesByNames("obs64", "obs32", "obs"))
+                {
+                    try { if (!Constants.IsRoleHost(p) && !p.HasExited) { p.Kill(); p.WaitForExit(5000); } }
+                    catch (InvalidOperationException) { }
+                    catch (Win32Exception ex) { Log.Write(reason + ": could not stop OBS for the update: " + ex.Message); }
+                    finally { p.Dispose(); }
+                }
+                Server.State.Shutdown = true;
+                return;
             }
             if (!stopped)
             {
@@ -647,6 +660,7 @@ namespace ReplayKitHelper
             if (Regex.IsMatch(path, @"^/hotkey-menu$|^/hotkey-menu\.html$")) { HttpResponse.ServeHtml(stream, "hotkey-menu.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/storage-view$|^/storage\.html$")) { HttpResponse.ServeHtml(stream, "storage.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/notification-reader-view$|^/notification-reader\.html$")) { HttpResponse.ServeHtml(stream, "notification-reader.html", framed); return false; }
+            if (Regex.IsMatch(path, @"^/done-popup-view$|^/done-popup\.html$")) { HttpResponse.ServeHtml(stream, "done-popup.html", framed); return false; }
 
             // the plugin, which owns the disk clip buffer, says whether it runs; once on every change and again with each settings poll, so a helper that restarted learns it within a second
             if (path == "/clip-buffer/state")
@@ -1008,6 +1022,30 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            // the plugin says which video encoders obs loaded, and which one of the profile it had to replace
+            if (path == "/encoders/report")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try { HttpResponse.SendJson(stream, 200, GpuDrivers.Report(JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body))); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad report" }); }
+                return false;
+            }
+
+            if (path == "/done-popup/item")
+            {
+                var item = DonePopups.Get(Q("id"));
+                HttpResponse.SendJson(stream, item == null ? 404 : 200, item == null ? new JObject { ["ok"] = false } : new JObject { ["ok"] = true, ["item"] = item });
+                return false;
+            }
+
+            if (path == "/done-popup/close")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                PipeClient.SendDonePopupClose();
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
             if (path == "/notifications/reader/close")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
@@ -1020,10 +1058,10 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string url = Q("url");
-                // scoped to github release pages on purpose -- this is not a general "open any url/file" primitive, only ever used for the link a notification itself carries
+                // scoped to github release pages and the driver pages of the three gpu makers on purpose -- this is not a general "open any url/file" primitive, only ever used for the link a notification itself carries
                 bool validUrl = !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
-                    uri.Scheme == Uri.UriSchemeHttps && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase);
-                if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only a github.com release link can be opened this way." }); return false; }
+                    uri.Scheme == Uri.UriSchemeHttps && (string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) || GpuDrivers.IsDriverPage(uri));
+                if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only a release page or a graphics driver page can be opened this way." }); return false; }
                 try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true }); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -2559,12 +2597,12 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/open-clip-folder" || path == "/open-screenshot-folder")
+            if (path == "/open-clip-folder" || path == "/open-screenshot-folder" || path == "/open-gif-folder")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    string root = path == "/open-screenshot-folder" ? Screenshots.Folder(create: true) : Path.GetFullPath(AppConfig.GetClipDir());
+                    string root = path == "/open-screenshot-folder" ? Screenshots.Folder(create: true) : path == "/open-gif-folder" ? GifExports.Folder(true) : Path.GetFullPath(AppConfig.GetClipDir());
                     if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip folder not found" }); return false; }
                     // dedupe: if explorer already has the clip folder open, raise it instead of spawning another window. falls thru to the normal launch path if the com probe fails or no match is found.
                     var existing = GetExplorerHwndForPath(root);
@@ -2646,7 +2684,7 @@ namespace ReplayKitHelper
                     else if (path == "/deleted/thumb")
                     {
                         string stored = DeletedHistory.StoredFile(Q("id"), out string kind);
-                        string thumb = stored == null ? null : kind == "screenshot" ? Screenshots.Thumb(stored) : Media.GetCachedThumbnail(new Clips.SafeClipPath { Name = Path.GetFileName(stored), Full = stored }, new FileInfo(stored));
+                        string thumb = stored == null ? null : kind == "screenshot" ? Screenshots.Thumb(stored) : kind == "gif" ? GifExports.Thumb(stored) : Media.GetCachedThumbnail(new Clips.SafeClipPath { Name = Path.GetFileName(stored), Full = stored }, new FileInfo(stored));
                         if (thumb == null) HttpResponse.SendBytes(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/svg+xml" }), Media.GetPlaceholderThumbnail());
                         else HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "image/jpeg", ["Cache-Control"] = "private, max-age=31536000, immutable", ["X-Content-Type-Options"] = "nosniff" }, thumb);
                     }
@@ -2692,30 +2730,74 @@ namespace ReplayKitHelper
                 return false;
             }
 
-            if (path == "/gifs" || path == "/gifs/media" || path == "/gifs/export")
+            // the gifs of the clips page: the list, the file and the first-frame thumb of each card, an export from the clip menu, and what the menu of a gif card does
+            if (path == "/gifs" || path == "/gifs/file" || path == "/gifs/thumb")
             {
-                bool export = path == "/gifs/export";
-                if (req.Method != (export ? "POST" : "GET")) { HttpResponse.SendText(stream, 405, "Method Not Allowed", "Wrong method"); return false; }
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
                 try
                 {
-                    if (export)
+                    if (path == "/gifs") HttpResponse.SendJson(stream, 200, new JObject { ["gifs"] = GifExports.List() });
+                    else
+                    {
+                        string file = GifExports.Resolve(Q("file"));
+                        if (file == null) { HttpResponse.SendText(stream, 404, "Not Found", "GIF not found"); return false; }
+                        bool thumb = path == "/gifs/thumb";
+                        // the address carries the size and time of the file, as for screenshots, so the browser keeps each picture instead of reading it again on every paint of the grid
+                        HttpResponse.SendFile(stream, 200, "OK", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["Content-Type"] = thumb ? "image/jpeg" : "image/gif",
+                            ["Cache-Control"] = "private, max-age=31536000, immutable",
+                            ["X-Content-Type-Options"] = "nosniff",
+                        }, thumb ? GifExports.Thumb(file) : file);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
+                {
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "The GIFs could not be read" });
+                }
+                return false;
+            }
+
+            if (path == "/gifs/export" || path == "/gifs/delete" || path == "/gifs/rename" || path == "/gifs/copy" || path == "/gifs/reveal")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    var answer = new JObject { ["ok"] = true };
+                    if (path == "/gifs/export")
                     {
                         if (!double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double start) ||
                             !double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double end))
                             throw new ArgumentException("Invalid GIF range.");
-                        HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["file"] = GifExports.Export(Q("file"), start, end) });
+                        string made = GifExports.Export(Q("file"), start, end);
+                        long size = new FileInfo(Path.Combine(GifExports.Folder(), made)).Length;
+                        answer["file"] = made;
+                        answer["size"] = size;
+                        // the popup over the obs window, so it is seen from any view; the clips page shows its own toast only when that popup could not be shown
+                        answer["popup"] = DonePopups.Show("done", "GIF exported",
+                            new JObject
+                            {
+                                ["icon"] = "gif",
+                                ["media"] = "/gifs/file?file=" + Uri.EscapeDataString(made) + "&v=" + size,
+                                ["text"] = Path.GetFileNameWithoutExtension(made),
+                                ["detail"] = Storage.FormatBytes(size) + " · Saved to the GIFs section",
+                                ["action"] = new JObject { ["label"] = "Go to GIF", ["kind"] = "reveal-gif", ["file"] = made },
+                            });
                     }
-                    else if (path == "/gifs") HttpResponse.SendJson(stream, 200, new JObject { ["gifs"] = GifExports.List() });
                     else
                     {
-                        string file = GifExports.Resolve(Q("file"));
-                        if (file == null) HttpResponse.SendText(stream, 404, "Not Found", "GIF not found");
-                        else HttpResponse.SendFile(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(
-                            new Dictionary<string, string> { ["Content-Type"] = "image/gif" }), file);
+                        string gif = GifExports.Resolve(Q("file"));
+                        if (gif == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "GIF not found" }); return false; }
+                        if (path == "/gifs/delete") answer["kept"] = GifExports.Delete(gif);
+                        else if (path == "/gifs/rename") answer["name"] = GifExports.Rename(gif, Q("to"));
+                        else if (path == "/gifs/copy") GifExports.Copy(gif);
+                        else answer["focused"] = RevealInExplorer(gif);
                     }
+                    HttpResponse.SendJson(stream, 200, answer);
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
-                    ex is ArgumentException || ex is InvalidOperationException || ex is OperationCanceledException)
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException ||
+                    ex is InvalidOperationException || ex is OperationCanceledException || ex is System.ComponentModel.Win32Exception ||
+                    ex is System.Runtime.InteropServices.ExternalException)
                 { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
@@ -2893,7 +2975,7 @@ namespace ReplayKitHelper
                         {
                             // a restore from deleted history or a save can take the name between the check above and here
                             if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath) || Clips.NameTaken(newName))) throw new IOException("A file with that name already exists");
-                            File.Move(selected.Full, newPath);
+                            ClipFiles.MoveWhenFree(selected.Full, newPath);
                             JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);
                         }));
                         // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
@@ -3026,7 +3108,8 @@ namespace ReplayKitHelper
                 // requests a normal exit; a stalled shutdown is reported without killing obs
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is closing." });
-                StopObsForRestart("/exit-obs");
+                // the installer says when the close is for an update
+                StopObsForRestart("/exit-obs", Q("reason") == "update" || Update.InstallerRunning());
                 return false;
             }
 

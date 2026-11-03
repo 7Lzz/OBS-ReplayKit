@@ -290,15 +290,12 @@ namespace ReplayKitSetup
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
 
-            private static readonly string[] IssueWords = { "warn", "failed", "missing", "not found", "skipped", "timed out", "permission denied" };
-
             public void LogLine(string message)
             {
                 string text = (message ?? "").Trim();
                 if (text.Length == 0) return;
                 Log(text);
-                string lowered = text.ToLowerInvariant();
-                if (IssueWords.Any(word => lowered.Contains(word))) AddIssue(text);
+                if (Apply.LooksLikeIssue(text)) AddIssue(text);
                 try { Console.WriteLine(text); } catch (IOException) { }
             }
 

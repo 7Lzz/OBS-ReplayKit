@@ -270,6 +270,9 @@ namespace ReplayKitHelper
         // the id is checked by the route already, the plugin checks it again before it reaches a script
         public static void SendNotificationReader(string id) => TryWrite("NOTIFYREADER " + id);
         public static void SendNotificationReaderClose() => TryWrite("NOTIFYREADERCLOSE");
+        // the popup of a finished job, over the obs window; the id is a notification id the helper made itself
+        public static bool SendDonePopup(string id) => !string.IsNullOrEmpty(id) && TryWrite("DONEPOPUP " + id);
+        public static void SendDonePopupClose() => TryWrite("DONEPOPUPCLOSE");
 
         public static void SendSettingsDirty(bool dirty) => TryWrite("SETTINGSDIRTY " + (dirty ? "1" : "0"));
         public static void SendSettingsLeave(string view) { if (view == "home" || view == "clips" || view == "setup" || view == "projector") TryWrite("SETTINGSLEAVE " + view); }

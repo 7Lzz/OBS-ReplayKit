@@ -1,5 +1,5 @@
 <style>
-  body.is-screenshots .clip-sort-group[data-group="length"] { display:none; }
+  body.is-screenshots .clip-sort-group[data-group="length"], body.is-gifs .clip-sort-group[data-group="length"] { display:none; }
   /* a screenshot card is built like a clip card: the picture, then the title row with the pencil, the delete button and the menu, then the size and age; the menu hangs out of the card, so only the picture clips */
   .screenshot-card { min-width:0; padding:0; color:var(--text); text-align:left; font:inherit; }
   .screenshot-card.menu-open { z-index:20; }
@@ -35,18 +35,37 @@
   <p class="meta screenshot-meta" id="screenshot-details"></p>
 </dialog>
 <script>
+// the screenshots and the gifs of the clips page are one kind of gallery: the same cards, viewer, menu, search and sort, over their own folder of the helper
 window.RKScreenshots = {
+  KINDS: {
+    screenshot: {base:"/screenshots", list:"screenshots", ext:".png", noun:"screenshot", Noun:"Screenshot", plural:"screenshots", filter:"screenshots", body:"is-screenshots", area:"screenshots-area", grid:"screenshots-grid", empty:"screenshots-empty", saved:"replaykit:screenshot-saved", games:true, copyLabel:"Copy image", none:"No screenshots yet. Save a frame with the screenshot button in the editor."},
+    gif: {base:"/gifs", list:"gifs", ext:".gif", noun:"GIF", Noun:"GIF", plural:"GIFs", filter:"gifs", body:"is-gifs", area:"gifs-area", grid:"gifs-grid", empty:"gifs-empty", saved:"replaykit:gif-saved", games:false, animate:true, copyLabel:"Copy GIF", none:"No GIFs yet. Choose Export GIF in the menu of a clip up to 15 seconds long."},
+  },
   create: function (options) {
-    const area = document.getElementById("screenshots-area");
-    const grid = document.getElementById("screenshots-grid");
-    const empty = document.getElementById("screenshots-empty");
-    const dialog = document.getElementById("screenshot-dialog");
-    const image = document.getElementById("screenshot-image");
-    const stage = document.getElementById("screenshot-stage");
-    const fullscreen = document.getElementById("screenshot-fullscreen");
+    const kind = RKScreenshots.KINDS[options.kind || "screenshot"];
+    const area = document.getElementById(kind.area);
+    const grid = document.getElementById(kind.grid);
+    const empty = document.getElementById(kind.empty);
+    // the viewer is written once in the page; every other gallery gets a copy of its own, so their keys and buttons never act on each other
+    const template = document.getElementById("screenshot-dialog");
+    const dialog = kind.list === "screenshots" ? template : template.cloneNode(true);
+    if (dialog !== template) {
+      dialog.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
+      dialog.id = kind.list + "-dialog";
+      dialog.querySelector(".screenshot-dialog-head h2").id = kind.list + "-dialog-title";
+      dialog.setAttribute("aria-labelledby", kind.list + "-dialog-title");
+      dialog.querySelector(".screenshot-dialog-head button").setAttribute("aria-label", "Close " + kind.noun);
+      template.after(dialog);
+    }
+    const title = dialog.querySelector(".screenshot-dialog-head h2");
+    const closeButton = dialog.querySelector(".screenshot-dialog-head button");
+    const detailsEl = dialog.querySelector(".screenshot-meta");
+    const image = dialog.querySelector(".screenshot-stage > img");
+    const stage = dialog.querySelector(".screenshot-stage");
+    const fullscreen = dialog.querySelector(".screenshot-fullscreen");
     let fullscreenActive = false;
     let rows = [], shown = [], mode = "", active = false, loaded = false, query = "", sort = "newest", epoch = 0, selected = "", signature = "", rowsSignature = "";
-    const url = (row, kind) => options.helper + "/screenshots/" + (kind || "file") + "?file=" + encodeURIComponent(row.name) + "&v=" + encodeURIComponent(row.size + "-" + row.mtime);
+    const url = (row, what) => options.helper + kind.base + "/" + (what || "file") + "?file=" + encodeURIComponent(row.name) + "&v=" + encodeURIComponent(row.size + "-" + row.mtime);
     // the list is read every few seconds while it is on screen, and now and then otherwise for the count of its tab
     const IDLE_REFRESH_MS = 30000;
     let refreshedAt = 0;
@@ -62,7 +81,7 @@ window.RKScreenshots = {
       age.dataset.mtime = String(row.mtime);
       age.textContent = options.formatAge(row.mtime);
       target.append(size, dot, age);
-      if (window.RKClipGames) RKClipGames.badge(target, row, { change: true, screenshot: true });
+      if (kind.games && window.RKClipGames) RKClipGames.badge(target, row, { change: true, screenshot: true });
     }
     const isFullscreen = () => (document.fullscreenElement || document.webkitFullscreenElement) === stage;
     function toggleFullscreen() {
@@ -86,8 +105,8 @@ window.RKScreenshots = {
     }
     function preview(row) {
       selected = row.name;
-      document.getElementById("screenshot-title").textContent = row.name;
-      details(row, document.getElementById("screenshot-details"));
+      title.textContent = row.name;
+      details(row, detailsEl);
       image.alt = row.name;
       image.src = url(row);
       if (!dialog.open) {
@@ -102,15 +121,20 @@ window.RKScreenshots = {
     // the cards are kept by name and the state of their file, so a list read again only builds the cards of what changed and moves the rest, and their pictures are not loaded again
     const cards = new Map();
     const svg = (inner, box) => '<svg viewBox="' + (box || "0 0 24 24") + '" aria-hidden="true">' + inner + "</svg>";
-    async function act(row, kind, extra) {
-      const response = await fetch(options.helper + "/screenshots/" + kind + "?file=" + encodeURIComponent(row.name) + (extra || "") + "&t=" + Date.now(), {method:"POST", cache:"no-store"});
+    async function act(row, action, extra) {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), 20000);
+      let response;
+      try { response = await fetch(options.helper + kind.base + "/" + action + "?file=" + encodeURIComponent(row.name) + (extra || "") + "&t=" + Date.now(), {method:"POST", cache:"no-store", signal:abort.signal}); }
+      catch (error) { throw new Error(error && error.name === "AbortError" ? "ReplayKit took too long to answer." : "ReplayKit could not be reached."); }
+      finally { clearTimeout(timer); }
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.message || "The screenshot could not be changed");
+      if (!response.ok || !data.ok) throw new Error(data.message || "The " + kind.noun + " could not be changed");
       return data;
     }
     async function copy(row, button) {
       if (button) button.disabled = true;
-      try { await act(row, "copy"); options.toast("Screenshot copied to the clipboard"); }
+      try { await act(row, "copy"); options.toast(kind.Noun + " copied to the clipboard"); }
       catch (error) { options.notify(error.message); }
       finally { if (button) button.disabled = false; }
     }
@@ -119,15 +143,17 @@ window.RKScreenshots = {
       if (!nameSpan) return;
       const titleRow = card.querySelector(".title-row");
       const moving = [card.querySelector(".edit-btn"), card.querySelector(".title-actions")];
-      const base = row.name.replace(/\.png$/i, "");
+      const base = row.name.slice(0, -kind.ext.length);
       const input = document.createElement("input");
       input.type = "text";
       input.className = "name-edit-input";
       input.value = base;
-      input.setAttribute("aria-label", "Screenshot name");
+      input.setAttribute("aria-label", kind.Noun + " name");
+      input.spellcheck = false;
+      if (window.RKNameInput) RKNameInput.guard(input);
       const ext = document.createElement("span");
       ext.className = "name-edit-ext";
-      ext.textContent = ".png";
+      ext.textContent = kind.ext;
       options.flip(moving, () => {
         titleRow.replaceChild(input, nameSpan);
         titleRow.insertBefore(ext, input.nextSibling);
@@ -135,33 +161,52 @@ window.RKScreenshots = {
       input.animate([{ opacity:0 }, { opacity:1 }], { duration:150, easing:"ease-out" });
       input.focus();
       input.select();
-      let settled = false;
+      let settled = false, saving = false;
       const back = () => {
         options.flip(moving, () => { if (input.parentNode) titleRow.replaceChild(nameSpan, input); ext.remove(); });
         paint();
         options.changed();
       };
-      async function commit() {
-        if (settled) return;
-        settled = true;
-        const next = input.value.trim();
-        if (!next || next === base) { back(); return; }
-        try { await act(row, "rename", "&to=" + encodeURIComponent(next + ".png")); back(); refresh(); }
-        catch (error) { back(); options.notify(error.message); }
+      // enter keeps the box open when the name cannot be used, so it can be fixed; leaving the box puts the old name back. while the helper renames, the box holds still
+      async function commit(viaEnter) {
+        if (settled || saving) return;
+        const next = window.RKNameInput ? RKNameInput.clean(input.value) : input.value.trim();
+        if (!next || next === base) { settled = true; back(); return; }
+        const problem = window.RKNameInput ? RKNameInput.problem(next) : "";
+        const reject = message => { if (window.RKNameInput) RKNameInput.reject(input, message); else options.notify(message); };
+        if (problem) { reject(problem); if (viaEnter) { input.focus(); input.select(); } else { settled = true; back(); } return; }
+        saving = true;
+        input.readOnly = true;
+        input.classList.add("is-saving");
+        try {
+          await act(row, "rename", "&to=" + encodeURIComponent(next + kind.ext));
+          settled = true;
+          back();
+          refresh();
+        } catch (error) {
+          saving = false;
+          input.readOnly = false;
+          input.classList.remove("is-saving");
+          reject("Couldn’t rename: " + error.message);
+          if (viaEnter && input.isConnected) { input.focus(); input.select(); return; }
+          settled = true;
+          back();
+        }
       }
       input.addEventListener("click", event => event.stopPropagation());
       input.addEventListener("keydown", event => {
         event.stopPropagation();
-        if (event.key === "Enter") { event.preventDefault(); commit(); }
-        if (event.key === "Escape") { event.preventDefault(); settled = true; back(); }
+        if (event.key === "Enter") { event.preventDefault(); commit(true); }
+        if (event.key === "Escape") { event.preventDefault(); if (!saving) { settled = true; back(); } }
       });
-      input.addEventListener("blur", commit);
+      input.addEventListener("blur", () => commit(false));
     }
     function buildCard(row) {
       const icons = options.icons;
       const card = document.createElement("div");
       card.className = "screenshot-card rk-hover-card";
       card.dataset.shot = row.name;
+      card.dataset.gallery = kind.list;
       const picture = document.createElement("span");
       picture.className = "preview";
       const thumb = document.createElement("img");
@@ -169,6 +214,14 @@ window.RKScreenshots = {
       thumb.decoding = "async";
       thumb.alt = row.name;
       thumb.src = url(row, "thumb");
+      // a gif plays only while its card is hovered or focused, and is back on its first frame after, so a grid of them stays still and cheap
+      if (kind.animate) {
+        const play = on => { const next = url(row, on ? "file" : "thumb"); if (thumb.getAttribute("src") !== next) thumb.src = next; };
+        card.addEventListener("pointerenter", () => play(true));
+        card.addEventListener("pointerleave", () => { if (!card.contains(document.activeElement)) play(false); });
+        card.addEventListener("focusin", () => play(true));
+        card.addEventListener("focusout", event => { if (!card.contains(event.relatedTarget) && !card.matches(":hover")) play(false); });
+      }
       const open = document.createElement("button");
       open.type = "button";
       open.className = "screenshot-open";
@@ -184,11 +237,12 @@ window.RKScreenshots = {
       picture.append(open, expand);
       const body = document.createElement("div");
       body.className = "body";
+      const deleteAttrs = 'data-delete-kind="' + kind.noun.toLowerCase() + '"' + (kind.deleteLabel ? ' data-delete-label="' + kind.deleteLabel + '"' : "");
       body.innerHTML =
         '<div class="title-row"><span class="name"></span>' +
         '<button class="icon-mini-btn edit-btn" data-tooltip="Rename" aria-label="Rename" type="button">' + svg(icons.EDIT) + "</button>" +
         '<div class="title-actions">' +
-          '<button class="icon-mini-btn delete-btn" data-delete-kind="screenshot" data-tooltip="Delete screenshot" aria-label="Delete screenshot" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
+          '<button class="icon-mini-btn delete-btn" ' + deleteAttrs + ' data-tooltip="Delete ' + kind.noun + '" aria-label="Delete ' + kind.noun + '" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
           '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
             '<div class="menu-dropdown">' +
               '<div class="menu-heading">Share</div>' +
@@ -197,19 +251,19 @@ window.RKScreenshots = {
               '<div class="menu-item" data-act="rename">' + svg(icons.EDIT).replace("<svg", '<svg class="menu-item-icon"') + "<span>Edit name</span></div>" +
               '<div class="menu-item" data-act="reveal">' + svg(icons.FOLDER_OPEN).replace("<svg", '<svg class="menu-item-icon"') + "<span>Open file location</span></div>" +
               '<div class="menu-separator"></div>' +
-              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-kind="screenshot" role="button" tabindex="0" aria-label="Delete screenshot">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" ' + deleteAttrs + ' role="button" tabindex="0" aria-label="Delete ' + kind.noun + '">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
             "</div></div>" +
         "</div></div>" +
         '<div class="meta"></div>';
       const name = body.querySelector(".name");
-      name.textContent = row.name.replace(/\.png$/i, "");
+      name.textContent = row.name.slice(0, -kind.ext.length);
       details(row, body.querySelector(".meta"));
       const actions = document.createElement("div");
       actions.className = "actions";
       const copyButton = document.createElement("button");
       copyButton.type = "button";
       copyButton.className = "btn action-link-btn";
-      copyButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.CLIPBOARD + '</svg><span class="btn-label">Copy image</span>';
+      copyButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.CLIPBOARD + '</svg><span class="btn-label">' + kind.copyLabel + '</span>';
       copyButton.addEventListener("click", event => { event.stopPropagation(); copy(row, copyButton); });
       actions.appendChild(copyButton);
       card.append(picture, body, actions);
@@ -217,7 +271,7 @@ window.RKScreenshots = {
       if (options.relabel) options.relabel(card);
       const menu = body.querySelector(".menu-dropdown");
       const revealItem = menu.querySelector('[data-act="reveal"]');
-    if (window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(() => row, true, options.closeMenus));
+      if (kind.games && window.RKClipGames && revealItem) revealItem.after(RKClipGames.menuAction(() => row, true, options.closeMenus));
       const closeMenu = () => { menu.classList.remove("is-open"); card.classList.remove("menu-open"); };
       async function remove(trigger, inMenu) {
         // the same two clicks as a clip: the first arms the button, the second deletes
@@ -240,12 +294,12 @@ window.RKScreenshots = {
         if (button.classList.contains("menu-btn")) { options.openMenu(card, menu, event); return; }
         if (button.classList.contains("edit-btn")) { rename(card, row); return; }
         if (button.matches(".title-actions > .delete-btn")) { remove(button, false); return; }
-        const kind = button.dataset.act;
-        if (kind === "delete") { remove(button, true); return; }
+        const action = button.dataset.act;
+        if (action === "delete") { remove(button, true); return; }
         closeMenu();
-        if (kind === "rename") rename(card, row);
-        else if (kind === "copy") copy(row);
-        else if (kind === "reveal") act(row, "reveal").catch(error => options.notify(error.message));
+        if (action === "rename") rename(card, row);
+        else if (action === "copy") copy(row);
+        else if (action === "reveal") act(row, "reveal").catch(error => options.notify(error.message));
       });
       card.addEventListener("contextmenu", event => {
         if (event.target.closest("input")) return;
@@ -280,7 +334,7 @@ window.RKScreenshots = {
         cards.forEach((card, id) => { if (!keep.has(id)) { card.remove(); cards.delete(id); } });
       }
       empty.hidden = collapsed || shown.length > 0;
-      empty.textContent = !loaded ? "Loading screenshots..." : rows.length ? (query.trim() ? "No screenshots match your search." : "No screenshots match these filters.") : "No screenshots yet. Save a frame with the screenshot button in the editor.";
+      empty.textContent = !loaded ? "Loading " + kind.plural + "..." : rows.length ? (query.trim() ? "No " + kind.plural + " match your search." : "No " + kind.plural + " match these filters.") : kind.none;
       if (dialog.open) {
         const row = shown.find(item => item.name === selected);
         if (!row) dialog.close();
@@ -291,12 +345,12 @@ window.RKScreenshots = {
       refreshedAt = Date.now();
       const run = ++epoch;
       try {
-        const response = await fetch(options.helper + "/screenshots?t=" + Date.now(), {cache:"no-store"});
-        if (!response.ok) throw new Error("Could not load screenshots");
+        const response = await fetch(options.helper + kind.base + "?t=" + Date.now(), {cache:"no-store"});
+        if (!response.ok) throw new Error("Could not load " + kind.plural);
         const data = await response.json();
-        if (!Array.isArray(data.screenshots)) throw new Error("Invalid screenshot list");
+        if (!Array.isArray(data[kind.list])) throw new Error("Invalid " + kind.noun + " list");
         if (run !== epoch) return;
-        const next = data.screenshots.filter(row => row && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.mtime));
+        const next = data[kind.list].filter(row => row && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.mtime));
         // the clips page draws itself again only when the list or its count changed, not on every read
         const listed = JSON.stringify(next);
         if (loaded && listed === rowsSignature) return;
@@ -312,11 +366,11 @@ window.RKScreenshots = {
         if (dialog.open) dialog.close();
         area.hidden = !active || mode === "all";
         empty.hidden = options.collapsed();
-        empty.textContent = "The screenshots could not be loaded.";
+        empty.textContent = "The " + kind.plural + " could not be loaded.";
         options.changed();
       }
     }
-    document.getElementById("screenshot-close").addEventListener("click", () => dialog.close());
+    closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
     fullscreen.addEventListener("click", toggleFullscreen);
     image.addEventListener("dblclick", toggleFullscreen);
@@ -336,7 +390,7 @@ window.RKScreenshots = {
       if (event.key === "Escape" && isFullscreen()) { event.preventDefault(); toggleFullscreen(); }
       event.stopPropagation();
     });
-    window.addEventListener("replaykit:screenshot-saved", refresh);
+    window.addEventListener(kind.saved, refresh);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
     setInterval(() => { if (active || Date.now() - refreshedAt >= IDLE_REFRESH_MS) refresh(); }, 5000);
     return {
@@ -352,10 +406,10 @@ window.RKScreenshots = {
       count: () => loaded ? rows.filter(row => !options.filter || options.filter(row)).length : undefined,
       update: function (search, order) { if (search !== query || order !== sort) { query = search; sort = order; if (active) paint(); } },
       show: function (value) {
-        document.body.classList.toggle("is-screenshots", value === "screenshots");
+        document.body.classList.toggle(kind.body, value === kind.filter);
         if (mode === value) return;
         mode = value;
-        active = value === "all" || value === "screenshots";
+        active = value === "all" || value === kind.filter;
         if (dialog.open) dialog.close();
         if (active) { paint(); refresh(); }
         else area.hidden = true;

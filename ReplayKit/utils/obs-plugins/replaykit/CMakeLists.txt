@@ -20,6 +20,7 @@ set(REPLAYKIT_SOURCES
     src/app/main_window_filter.cpp
     src/app/clip_buffer.cpp
     src/app/capture_context.cpp
+    src/app/encoder_guard.cpp
     src/app/obs_actions.cpp
     src/app/obs_menu.cpp
     src/app/sdk_commands.cpp
@@ -76,6 +77,7 @@ set(REPLAYKIT_SOURCES
     src/shell/shell_storage_modal.cpp
     src/shell/shell_modal_card.cpp
     src/shell/shell_notify_reader.cpp
+    src/shell/shell_done_popup.cpp
     src/shell/shell_title_bar.cpp
     src/shell/shell_title_button.cpp
     src/shell/shell_views.cpp

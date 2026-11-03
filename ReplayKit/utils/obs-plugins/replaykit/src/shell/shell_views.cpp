@@ -20,6 +20,7 @@
 #include "shell/shell_rail.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_title_bar.hpp"
@@ -660,6 +661,7 @@ bool ShellActivate(ShellView view)
 	// the storage card and the notification reader are drawn over the view they were opened on, so they go with any change of view, keybind or click
 	StorageModalClose();
 	NotifyReaderClose();
+	DonePopupClose();
 	// the place is noted now and not when the change lands, since a dip may take a moment to come about
 	ShellHistoryNote(view);
 	if (view != ShellView::Clips)
@@ -843,6 +845,7 @@ void ShellToggleClips()
 	const bool cardWasOpen = StorageModalIsOpen();
 	StorageModalClose();
 	NotifyReaderClose();
+	DonePopupClose();
 	if (onScreen && g_shellView == ShellView::Clips) {
 		if (cardWasOpen || !ShellMainWindowIsForeground())
 			ShellForegroundMainWindow();

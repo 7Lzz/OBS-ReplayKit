@@ -333,8 +333,8 @@ if (location.protocol === "file:") {
     user-select: none;
     transition: transform var(--anim_press) var(--ease_pop), background-color 90ms linear;
   }
-  .auth-menu .item:hover { background: var(--button_bg_hover); transform: translateX(3px); }
-  .auth-menu .item:active { transform: translateX(3px) scale(var(--press_shrink)); }
+  .auth-menu .item:hover { background: var(--button_bg_hover); transform: translateX(1.5px); }
+  .auth-menu .item:active { transform: translateX(1.5px) scale(var(--press_shrink)); }
 
   /* one-time cascade as the dock view loads. backwards fill so the rows sit hidden through their
      stagger delay, then settle -- and dont keep a transform that would fight the :hover pop. */
@@ -558,14 +558,14 @@ if (location.protocol === "file:") {
       <button class="btn" id="clip-toggle-btn">Start Clipping</button>
       <button class="btn icon-btn" id="save-clip-btn" type="button" title="Save Clip" aria-label="Save Clip">
         <!-- OBS's own replay-buffer save icon (data/obs-studio/themes/Dark/save.svg), fill -> currentColor -->
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:controls-app-1}}</svg>
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:quick/save-clip}}</svg>
       </button>
     </div>
     <button class="btn" id="record-btn">Start Recording</button>
     <div class="split-row">
       <button class="btn" id="view-clips-btn">View Clips</button>
       <button class="btn icon-btn" id="open-folder-btn" type="button" title="Open clips folder" aria-label="Open clips folder">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:controls-app-2}}</svg>
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:action/folder}}</svg>
       </button>
     </div>
     <div class="auth-wrap" id="auth-wrap">

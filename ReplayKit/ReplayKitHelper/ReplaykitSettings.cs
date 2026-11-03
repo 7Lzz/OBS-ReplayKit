@@ -136,6 +136,7 @@ namespace ReplayKitHelper
                 ["editorAutoplay"] = false,
                 ["editorLoopPreview"] = false,
                 ["editorSeekStep"] = 5,
+                ["gifFrameDelay"] = 3,
                 ["editorWheelZoom"] = true,
                 ["editorZoomScaling"] = "smooth",
                 // how a clip is smoothed while it plays large in the theater view, full screen and the editor: none, msaa or fxaa
@@ -358,6 +359,18 @@ namespace ReplayKitHelper
             return settings;
         }
 
+        // the capture method a Display Capture that was never given one gets (see CaptureMethod); empty when it has one, or when obs cannot be asked, so nothing someone picked is overwritten
+        private static JObject DisplayCaptureMethodSettings()
+        {
+            if (!CaptureMethod.PreferWgc) return new JObject();
+            var input = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = "Display Capture" }, 3000);
+            JObject current = input.Ok ? input.Data?["inputSettings"] as JObject : null;
+            // a source that does not exist yet is made with the method; one obs could not be asked about is left as it is
+            if (!input.Ok && input.Code != 600) return new JObject();
+            int? method = CaptureMethod.DisplayDefault(current);
+            return method.HasValue ? new JObject { [CaptureMethod.Key] = method.Value } : new JObject();
+        }
+
         // the capture script switches only once a change has held for a couple of checks, so this sets both keys itself and the new display shows at once
         private static JObject ApplyCaptureDisplayLive(JObject settings)
         {
@@ -564,6 +577,7 @@ namespace ReplayKitHelper
                 ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
                 ["editorLoopPreview"] = GetBoolSetting(data, "editorLoopPreview", defaults["editorLoopPreview"].Value<bool>()),
                 ["editorSeekStep"] = GetIntSetting(data, "editorSeekStep", defaults["editorSeekStep"].Value<int>(), 1, 60),
+                ["gifFrameDelay"] = int.Parse(GetEnumSetting(data, "gifFrameDelay", defaults["gifFrameDelay"].Value<int>().ToString(CultureInfo.InvariantCulture), GifFrameDelays), CultureInfo.InvariantCulture),
                 ["editorWheelZoom"] = GetBoolSetting(data, "editorWheelZoom", defaults["editorWheelZoom"].Value<bool>()),
                 ["editorZoomScaling"] = GetEnumSetting(data, "editorZoomScaling", defaults["editorZoomScaling"].Value<string>(), new[] { "smooth", "sharp" }),
                 ["clipAntialiasing"] = GetEnumSetting(data, "clipAntialiasing", defaults["clipAntialiasing"].Value<string>(), new[] { "none", "msaa", "fxaa" }),
@@ -862,6 +876,19 @@ namespace ReplayKitHelper
         }
 
         public static string GetStorageCompressionType() => ReadSettings()["storageCompressionType"].Value<string>();
+
+        // the time each gif frame shows, in hundredths of a second: a gif stores frame times in whole hundredths, so only rates that divide 100 evenly play at an even pace (2 = 50 fps, 3 = 33 fps, 4 = 25 fps, 5 = 20 fps, 10 = 10 fps)
+        private static readonly string[] GifFrameDelays = { "2", "3", "4", "5", "10" };
+
+        public static int GetGifFrameDelay()
+        {
+            try
+            {
+                string v = ReadSettings()["gifFrameDelay"]?.ToString() ?? "3";
+                return GifFrameDelays.Contains(v) ? int.Parse(v, CultureInfo.InvariantCulture) : 3;
+            }
+            catch (InvalidOperationException) { return 3; }
+        }
 
         // the days deleted clips and screenshots are kept, 0 when deleted history is off; a settings file that cannot be read keeps the default, so a delete is never made final by a read error
         public static int GetDeletedHistoryDays()
@@ -2592,7 +2619,7 @@ namespace ReplayKitHelper
             var items = itemsResult["items"] as JArray;
 
             var gameInputSettings = GetGameCaptureInputSettings(settings);
-            var displayEnsure = EnsureInputSceneItem(sceneName, "Display Capture", "monitor_capture", new JObject(), useDesktop);
+            var displayEnsure = EnsureInputSceneItem(sceneName, "Display Capture", "monitor_capture", DisplayCaptureMethodSettings(), useDesktop);
             if (displayEnsure["ok"]?.Value<bool>() != true) warnings.Add("Could not prepare Display Capture: " + displayEnsure["message"]);
             var display = displayEnsure["ok"]?.Value<bool>() == true ? (JObject)displayEnsure["item"] : FindSceneItem(items, "Display Capture");
             var gameEnsure = EnsureInputSceneItem(sceneName, "Game Capture", "game_capture", gameInputSettings, useGameCapture);
@@ -3515,6 +3542,26 @@ namespace ReplayKitHelper
             int cqp = preset["cqp"]?.Value<int>() ?? 22;
             string compressionMode = settings["compressionMode"]?.Value<string>() ?? "balanced";
             var choice = Encoder.PickEncoder(gpu, codecPreference, cqp, compressionMode);
+            string unloaded = null;
+            // an encoder obs could not load this session (an outdated driver) is never written to the profile: the best one that did load takes its place, another gpu's first, then the processor
+            if (!GpuDrivers.IsAvailable(choice.ObsEncoderId))
+            {
+                unloaded = choice.Label;
+                EncoderChoice alternative = null;
+                var gpus = new List<GpuInfo>();
+                if (gpu != null) gpus.Add(gpu);
+                gpus.AddRange(Gpu.ListGpus().Where(g => g != null && !ReferenceEquals(g, gpu) && g.Name != gpu?.Name));
+                foreach (var candidateGpu in gpus)
+                {
+                    foreach (var codec in new[] { codecPreference, "h264" })
+                    {
+                        var candidate = Encoder.PickEncoder(candidateGpu, codec, cqp, compressionMode);
+                        if (candidate.IsHardware && GpuDrivers.IsAvailable(candidate.ObsEncoderId)) { alternative = candidate; break; }
+                    }
+                    if (alternative != null) break;
+                }
+                choice = alternative ?? Encoder.PickEncoder(null, "auto", cqp, compressionMode);
+            }
 
             var result = new JObject
             {
@@ -3524,7 +3571,9 @@ namespace ReplayKitHelper
                 ["settings"] = JObject.FromObject(choice.Settings),
             };
             string pref = (codecPreference ?? "").Trim().ToLowerInvariant();
-            if (pref != "" && pref != "auto" && choice.Codec != pref)
+            if (unloaded != null)
+                result["warning"] = unloaded + " did not load in OBS (usually an outdated graphics driver), so ReplayKit records with " + choice.Label + " until it does.";
+            else if (pref != "" && pref != "auto" && choice.Codec != pref)
                 result["warning"] = "Requested codec '" + pref + "' is not supported by the detected GPU, so ReplayKit selected " + choice.Label + ".";
             return result;
         }
@@ -6576,7 +6625,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         private static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
+            { "autoCopyLink", "linkNotificationEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "gifFrameDelay", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch" };
 
         private static readonly string[] StartupKeys = { "obsStartupEnabled" };
 

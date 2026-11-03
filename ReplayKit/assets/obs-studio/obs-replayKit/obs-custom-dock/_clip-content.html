@@ -16,7 +16,7 @@
     </div>
     <!-- favorites sub-section, only rendered when the all filter is active and the user has at least one favorite -- the grid below (id="grid") is the virtualized list of non-favorites in that case, otherwise the full filtered list; both grids live inside the same scroll-area so they scroll together. rest-headings icon/label are rewritten per tab in render() (FILTER_SECTION_HEADING) -- "all clips" is only paired with this favorites split, the other three tabs get their own heading standalone. -->
     <div class="section-heading" id="favorites-heading">
-      <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-2}}</svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:toggle/star}}</svg>
       <span>Favorites</span>
       <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
@@ -41,8 +41,12 @@
       <div class="empty" id="screenshots-empty" role="status">Loading screenshots...</div>
     </section>
     <section id="gifs-area" hidden>
-      <div class="section-heading is-shown" id="gifs-heading"><span>GIFs</span><input id="gif-filter" class="combo-search" type="search" placeholder="Filter GIFs" aria-label="Filter GIFs"></div>
-      <div id="gifs-grid"></div>
+      <div class="section-heading is-shown" id="gifs-heading">
+        <svg data-i="nav/gifs" viewBox="0 0 24 24" aria-hidden="true"></svg><span>GIFs</span>
+        <button class="icon-mini-btn section-toggle" type="button" data-section="gifs" aria-label="Collapse GIFs" aria-expanded="true" aria-controls="gifs-grid gifs-empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      </div>
+      <div class="grid" id="gifs-grid"></div>
+      <div class="empty" id="gifs-empty" role="status">Loading GIFs...</div>
     </section>
     <div class="section-heading" id="rest-heading">
       <svg data-i="nav/clips" viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"></svg>
@@ -59,7 +63,7 @@
   <div class="modal-veil popup-veil" id="popup-veil">
     <div class="modal popup-card" id="popup-card" role="alertdialog" aria-modal="true" aria-labelledby="popup-title" aria-describedby="popup-body">
       <div class="popup-head">
-        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-3}}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/warning-outline}}</svg>
         <h2 id="popup-title"></h2>
       </div>
       <div class="body popup-body" id="popup-body"></div>

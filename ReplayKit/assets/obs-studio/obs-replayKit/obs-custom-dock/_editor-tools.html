@@ -1046,10 +1046,10 @@
     var LIB_SORT_GROUPS = { length: { base: "Length", members: ["shortest", "longest"] }, filesize: { base: "File size", members: ["smallest", "biggest"] } };
     var LIB_SORT_LABELS = { newest: "Newest", oldest: "Oldest", longest: "Longest", shortest: "Shortest", biggest: "Biggest", smallest: "Smallest" };
     var LIB_SORT_ICON = "<svg class=\"clip-sort-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-clip-sort-icon}}</svg>";
-    var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-games-game-picker-caret}}</svg>";
-    var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-clip-sort-check}}</svg>";
-    var LIB_SORT_CARET = "<svg class=\"clip-sort-caret\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-games-game-picker-caret}}</svg>";
-    var LIB_FOLDER_ICON = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-3}}</svg>";
+    var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:nav/caret-down}}</svg>";
+    var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:action/check}}</svg>";
+    var LIB_SORT_CARET = "<svg class=\"clip-sort-caret\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:nav/caret-down}}</svg>";
+    var LIB_FOLDER_ICON = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:action/folder-open}}</svg>";
 
     // the sort of the clips page, the same trigger and menu: newest and oldest, and length and file size that each open to their two ways
     function buildLibrarySort() {
@@ -1167,7 +1167,7 @@
       var sort = buildLibrarySort();
       head.appendChild(sort);
       var search = el("label", "ed-fx-search");
-      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-4}}</svg>';
+      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>';
       var input = el("input");
       input.type = "text";
       input.placeholder = "Search";
@@ -1326,7 +1326,7 @@
     // elements: shapes drawn in a colour, stickers, and gifs or pictures from the computer; each goes over the video at the playhead for five seconds
     function buildElements(pane) {
       var search = el("label", "ed-fx-search");
-      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-tools-4}}</svg>';
+      search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>';
       var input = el("input");
       input.type = "text";
       input.placeholder = "Search elements";

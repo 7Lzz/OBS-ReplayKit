@@ -23,6 +23,13 @@ namespace ReplayKitHelper
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
+        // what an item is: a clip, a screenshot of the Screenshots folder or a gif of the GIFs folder; the last two sit one folder below the library and keep no row of the clips db
+        private static string KindOf(JObject entry)
+        {
+            string kind = entry?["kind"]?.Value<string>();
+            return kind == "screenshot" || kind == "gif" ? kind : "clip";
+        }
+
         // a record that cannot be read turned every delete away; it is kept aside, and the files of the hidden folder come back as recovered items, so they can still be restored and still expire. runs under Gate
         private static void Heal()
         {
@@ -42,11 +49,12 @@ namespace ReplayKitHelper
                     string id = Path.GetFileNameWithoutExtension(file.Name);
                     if (!ValidId(id) || (file.Attributes & FileAttributes.ReparsePoint) != 0) continue;
                     bool shot = file.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase);
+                    bool gif = file.Extension.Equals(".gif", StringComparison.OrdinalIgnoreCase);
                     recovered[id] = new JObject
                     {
-                        ["kind"] = shot ? "screenshot" : "clip",
+                        ["kind"] = shot ? "screenshot" : gif ? "gif" : "clip",
                         ["name"] = "Recovered " + (recovered.Count + 1) + file.Extension.ToLowerInvariant(),
-                        ["folder"] = Path.Combine(root, shot ? "Screenshots" : "Unassigned"),
+                        ["folder"] = Path.Combine(root, shot ? "Screenshots" : gif ? "GIFs" : "Unassigned"),
                         ["stored"] = file.FullName,
                         ["size"] = file.Length,
                         ["deletedAt"] = Now(),
@@ -120,9 +128,9 @@ namespace ReplayKitHelper
                 long deletedAt = entry["deletedAt"]?.Value<long>() ?? 0;
                 long size = entry["size"]?.Value<long>() ?? 0;
                 total += size;
-                string kind = entry["kind"]?.Value<string>() == "screenshot" ? "screenshot" : "clip";
+                string kind = KindOf(entry);
                 var record = entry["record"] as JObject;
-                var capture = kind == "clip" ? record?["capture"] as JObject : record;
+                var capture = kind == "clip" ? record?["capture"] as JObject : kind == "screenshot" ? record : null;
                 items.Add(new JObject
                 {
                     ["id"] = prop.Name,
@@ -147,7 +155,7 @@ namespace ReplayKitHelper
             lock (Gate) entry = ClipStore.Read(StorePath(), db => (db[id] as JObject)?.DeepClone() as JObject);
             string stored = entry?["stored"]?.Value<string>();
             if (string.IsNullOrEmpty(stored) || !File.Exists(stored)) return null;
-            kind = entry["kind"]?.Value<string>() == "screenshot" ? "screenshot" : "clip";
+            kind = KindOf(entry);
             return stored;
         }
 
@@ -167,10 +175,14 @@ namespace ReplayKitHelper
                     if (entry != null) Forget(id);
                     return Fail("That deleted item is no longer there.");
                 }
-                bool screenshot = entry["kind"]?.Value<string>() == "screenshot";
+                string kind = KindOf(entry);
+                bool gif = kind == "gif";
+                // a screenshot and a gif live in a folder of their own under the library, and both are restored the same way
+                bool screenshot = kind == "screenshot" || gif;
                 string folder = entry["folder"]?.Value<string>() ?? "";
                 string name = entry["name"]?.Value<string>() ?? "";
-                if (!Path.IsPathRooted(folder) || (screenshot ? !Screenshots.ValidName(name) : Clips.GetSafeFilename(name) == null)) return Fail("Where that item came from is unknown.");
+                bool validName = gif ? GifExports.ValidName(name) : screenshot ? Screenshots.ValidName(name) : Clips.GetSafeFilename(name) != null;
+                if (!Path.IsPathRooted(folder) || !validName) return Fail("Where that item came from is unknown.");
                 Directory.CreateDirectory(folder);
                 if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) return Fail("The folder it came from is a link now.");
                 string root = screenshot ? Path.GetDirectoryName(folder) : Clips.LibraryRoot(folder);
@@ -185,13 +197,14 @@ namespace ReplayKitHelper
                 catch (IOException) when (File.Exists(target)) { return Fail("Another clip just took that name. Try restoring it again."); }
                 Forget(id);
                 var record = entry["record"] as JObject;
-                if (screenshot)
+                if (gif) { }
+                else if (screenshot)
                 {
                     if (record != null) ClipGames.Write(target, record);
                 }
                 else if (record != null) Clips.UpdateDb(db => { db[restored] = record; return true; }, folder);
                 else AppConfig.ClearClipsCache();
-                return new JObject { ["ok"] = true, ["name"] = restored, ["kind"] = screenshot ? "screenshot" : "clip" };
+                return new JObject { ["ok"] = true, ["name"] = restored, ["kind"] = kind };
             }
         }
 

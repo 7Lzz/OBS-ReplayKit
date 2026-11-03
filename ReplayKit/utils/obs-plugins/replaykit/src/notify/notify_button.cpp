@@ -198,20 +198,17 @@ void NotifyButton::paintEvent(QPaintEvent *)
 	const qreal midY = height() / 2.0;
 	// the caption bell is always white, the shell one takes the theme text colour so it reads on a light chrome too
 	auto renderGlyph = [&](QSvgRenderer &svg, const QRectF &box) {
-		if (!m_embedded) {
-			svg.render(&p, box);
-			return;
-		}
-		p.drawPixmap(box.topLeft(), TintedSvgPixmap(svg, box.size(), devicePixelRatioF(), g_notifyTipFg));
+		// the shared icons are drawn in the theme colour (currentColor), so the bells of the classic layout tint them white the way their own white icons used to be
+		p.drawPixmap(box.topLeft(), TintedSvgPixmap(svg, box.size(), devicePixelRatioF(), m_embedded ? g_notifyTipFg : QColor(Qt::white)));
 	};
-	static QSvgRenderer bellSvg{IconPath(QStringLiteral("nav/notification-bell.svg"))};
+	static QSvgRenderer bellSvg{IconPath(QStringLiteral("nav/bell-outline.svg"))};
 	if (bellSvg.isValid()) {
 		p.save();
 		p.setOpacity(m_hover || open ? 1.0 : 0.8);
 		renderGlyph(bellSvg, QRectF(6.0, midY - 8.0, 16.0, 16.0));
 		p.restore();
 	}
-	static QSvgRenderer chevronSvg{IconPath(QStringLiteral("nav/notification-chevron.svg"))};
+	static QSvgRenderer chevronSvg{IconPath(QStringLiteral("nav/caret-down.svg"))};
 	if (chevronSvg.isValid()) {
 		QRectF box(25.0, midY - 6.0, 12.0, 12.0);
 		p.save();

@@ -344,7 +344,7 @@ namespace ReplayKitSetup
             // the hero art + brand icon are the same files the update window fetches over http; there is no helper here, so pull them straight out of the embedded asset bundle and inline them as data uris.
             html = html.Replace("{{HERO_ART}}", BundledDataUri("obs-studio/obs-replayKit/obs-custom-dock/update-art.png", "image/png"));
             html = html.Replace("{{BRAND_ICON}}", BundledDataUri("obs-studio/obs-replayKit/scripts/helper/obs-replaykit.ico", "image/x-icon"));
-            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/obs-replayKit/icons/ui/setup-check.svg", "image/svg+xml"));
+            html = html.Replace("{{SETUP_CHECK}}", BundledDataUri("obs-studio/obs-replayKit/icons/action/check.svg", "image/svg+xml"));
             html = html.Replace("{{SETUP_STATE}}", DetectSetupState());
             return html;
         }
@@ -479,26 +479,23 @@ namespace ReplayKitSetup
                               + (string.IsNullOrEmpty(detail) ? "" : " - " + detail));
             }
 
-            private static readonly string[] IssueWords = { "warn", "failed", "missing", "not found", "skipped", "timed out", "permission denied" };
-
             public void LogLine(string message)
             {
                 string text = (message ?? "").Trim();
                 if (text.Length == 0) return;
                 SetupLog.Line(text);
                 _w.PostToPage(new JObject { ["type"] = "log", ["line"] = text });
-                string low = text.ToLowerInvariant();
-                foreach (var word in IssueWords)
-                {
-                    if (low.Contains(word)) { AddIssue(text); break; }
-                }
+                if (Apply.LooksLikeIssue(text)) AddIssue(text);
             }
 
             public void AddIssue(string message)
             {
                 string cleaned = string.Join(" ", (message ?? "").Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
                 if (cleaned.Length > 160) cleaned = cleaned.Substring(0, 157) + "...";
-                if (cleaned.Length > 0 && !Issues.Contains(cleaned)) Issues.Add(cleaned);
+                if (cleaned.Length == 0 || Issues.Contains(cleaned)) return;
+                Issues.Add(cleaned);
+                // what made the run incomplete is in the log, not only in the count at its end
+                SetupLog.Line("issue: " + cleaned);
             }
 
             public void SubProgress(double fraction, string detail)

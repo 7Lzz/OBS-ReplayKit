@@ -6,6 +6,7 @@
 
 #include "shell/shell_modal_card.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
 #include "shell/shell_storage.hpp"
 
 namespace rk {
@@ -59,6 +60,7 @@ void StorageModalOpen()
 {
 	// one card at a time over the window
 	NotifyReaderClose();
+	DonePopupClose();
 	Card().Open();
 }
 

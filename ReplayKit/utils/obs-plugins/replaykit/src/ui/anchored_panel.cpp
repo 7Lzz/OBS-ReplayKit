@@ -25,6 +25,8 @@ constexpr int kUnrollMs = 190;
 constexpr int kRollUpMs = 150;
 // a step every few milliseconds, each one cheap, so the roll keeps up with a display that refreshes faster than the 60 of a plain animation timer
 constexpr int kRollTickMs = 4;
+// the least a panel is made in a short window, about a header and two rows; below that it runs past the window rather than becoming useless
+constexpr int kMinFitHeight = 160;
 
 // the unroll uses the curve the dock menus open on (--ease_smooth). the roll up accelerates instead: that same curve run backwards spends its last 100ms or so as a bar a few pixels tall under the button, a tail the clips sort menu hides by fading and this window does not
 QEasingCurve RollCurve(bool up)
@@ -296,20 +298,40 @@ bool AnchoredPanel::PlaceFromWindowRect(const QRect &tab)
 	const int panelWidth = qRound(panel->width() * panelDpr);
 	const int panelHeight = qRound(panel->height() * panelDpr);
 	int x = m_anchor.edge == Edge::Right ? tabLeft + tabWidth - panelWidth : tabLeft;
-	int y = tabTop + tabHeight - qRound(m_anchor.seam * dpr);
+	const int y = tabTop + tabHeight - qRound(m_anchor.seam * dpr);
+	// the panel stays on its button and inside the obs window: it is never moved up off the button to clear the taskbar or the bottom of the window, it is made shorter instead and its page scrolls, and it keeps between the sides of the window. the part of the screen the taskbar leaves is a limit as well, for a window that runs under it
+	const int gap = qRound(4 * dpr);
+	int left = int(wr.left) + gap, right = int(wr.right) - gap, bottom = int(wr.bottom) - gap;
 	MONITORINFO info = {};
 	info.cbSize = sizeof(info);
 	const POINT middle = {tabLeft + tabWidth / 2, tabTop + tabHeight / 2};
 	if (GetMonitorInfoW(MonitorFromPoint(middle, MONITOR_DEFAULTTONEAREST), &info)) {
-		const int gap = qRound(4 * dpr);
-		x = qMax(int(info.rcWork.left) + gap, qMin(x, int(info.rcWork.right) - panelWidth - gap));
-		y = qMax(int(info.rcWork.top) + gap, qMin(y, int(info.rcWork.bottom) - panelHeight - gap));
+		left = qMax(left, int(info.rcWork.left) + gap);
+		right = qMin(right, int(info.rcWork.right) - gap);
+		bottom = qMin(bottom, int(info.rcWork.bottom) - gap);
 	}
+	x = qMax(left, qMin(x, right - panelWidth));
+	FitHeight(qRound(qMax(qreal(kMinFitHeight) * panelDpr, qreal(bottom - y)) / panelDpr));
 	SetWindowPos((HWND)panel->winId(), nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 	return true;
 }
 
 // flush under the button with the edge on the side its tab sits on. the button is positioned in screen coordinates already, which mapToGlobal on a caption tool window mixes with client coordinates and left the panel visibly detached on some caption configurations
+// the height the panel opens with when there is room for it, else the room under its button; the page fills the window and scrolls what does not fit
+void AnchoredPanel::FitHeight(int room)
+{
+	QWidget *panel = m_window;
+	if (!panel || !PopupHost::Owns(this))
+		return;
+	const int height = qMax(1, qMin(m_size.height(), room));
+	if (panel->height() == height)
+		return;
+	panel->resize(panel->width(), height);
+	// a panel that is still rolling open rolls to the height it has now
+	if (m_rollTimer && m_rollTimer->isActive() && m_rollTo > m_rollFrom)
+		m_rollTo = height;
+}
+
 void AnchoredPanel::Follow()
 {
 	QWidget *panel = m_window;
@@ -320,14 +342,17 @@ void AnchoredPanel::Follow()
 		return;
 	if (!PlaceFromWindowRect(tab)) {
 		int x = m_anchor.edge == Edge::Right ? tab.left() + tab.width() - panel->width() : tab.left();
-		int y = tab.bottom() + 1 - m_anchor.seam;
+		const int y = tab.bottom() + 1 - m_anchor.seam;
+		// the same rule as above, in the coordinates qt holds: on the button, inside the window it hangs off and the part of the screen the taskbar leaves, shorter rather than moved
+		QRect area = m_owner ? m_owner->window()->frameGeometry().adjusted(4, 4, -4, -4) : QRect();
 		QScreen *screen = QGuiApplication::screenAt(tab.center());
 		if (!screen)
 			screen = QGuiApplication::primaryScreen();
-		if (screen) {
-			const QRect avail = screen->availableGeometry();
-			x = qMax(avail.left() + 4, qMin(x, avail.right() - panel->width() - 4));
-			y = qMax(avail.top() + 4, qMin(y, avail.bottom() - panel->height() - 4));
+		if (screen)
+			area = area.isValid() ? area.intersected(screen->availableGeometry().adjusted(4, 4, -4, -4)) : screen->availableGeometry().adjusted(4, 4, -4, -4);
+		if (area.isValid()) {
+			x = qMax(area.left(), qMin(x, area.right() - panel->width()));
+			FitHeight(qMax(kMinFitHeight, area.bottom() - y));
 		}
 		panel->move(x, y);
 	}

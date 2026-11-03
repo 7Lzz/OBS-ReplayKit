@@ -4,6 +4,7 @@
 
 #include "shell/shell_modal_card.hpp"
 #include "shell/shell_storage_modal.hpp"
+#include "shell/shell_done_popup.hpp"
 
 namespace rk {
 
@@ -31,6 +32,7 @@ void NotifyReaderOpen(const std::string &id)
 {
 	// one card at a time over the window
 	StorageModalClose();
+	DonePopupClose();
 	Card().Open("window.__replaykitShowReader && window.__replaykitShowReader('" + id + "');");
 }
 

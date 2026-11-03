@@ -388,7 +388,11 @@
     const m = window.RK_ICONS || {};
     document.querySelectorAll("svg[data-i]").forEach((el) => {
       const full = m[el.dataset.i];
-      if (full) el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+      if (!full) return;
+      // the viewBox comes with the icon, so a page never draws an icon on the grid of another one
+      const box = /^<svg[^>]*\sviewBox="([^"]+)"/i.exec(full);
+      if (box) el.setAttribute("viewBox", box[1]);
+      el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
     });
   })();
 

@@ -7,6 +7,7 @@
 #include "core/theme.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_title_bar.hpp"
 #include "shell/shell_types.hpp"
@@ -507,6 +508,7 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		AnchoredPanel::FollowAll();
 		StorageModalFollow();
 		NotifyReaderFollow();
+		DonePopupFollow();
 		ConfirmDialogFollow();
 		return false;
 	case WM_NCLBUTTONDOWN:

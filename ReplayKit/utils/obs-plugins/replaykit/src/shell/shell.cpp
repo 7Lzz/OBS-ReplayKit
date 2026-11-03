@@ -21,6 +21,7 @@
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "shell/shell_title_bar.hpp"
 #include "shell/shell_types.hpp"
@@ -68,7 +69,7 @@ void ShellWarmStep()
 	// the page of the shell has the browser to itself for a moment first
 	if (g_warmSince.elapsed() < 600)
 		return;
-	if (g_shellTitle->WarmNext() || StorageModalWarmNext() || NotifyReaderWarmNext())
+	if (g_shellTitle->WarmNext() || StorageModalWarmNext() || NotifyReaderWarmNext() || DonePopupWarmNext())
 		return;
 	g_warmDone = true;
 	blog(LOG_INFO, "[replaykit] the menus and the storage card have their pages up");

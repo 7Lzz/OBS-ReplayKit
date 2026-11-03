@@ -7,6 +7,24 @@ namespace ReplayKitHelper
 {
     internal static class ClipFiles
     {
+        // windows will not rename a file that is still open somewhere, and right after a clip was previewed the stream that sent it, a thumbnail or a probe can hold it for a moment; the move is tried again for a short while before it fails, and then says so in words
+        internal static void MoveWhenFree(string from, string to)
+        {
+            bool caseOnly = string.Equals(from, to, StringComparison.OrdinalIgnoreCase);
+            for (int attempt = 0; ; attempt++)
+            {
+                try { File.Move(from, to); return; }
+                catch (IOException ex) when (InUse(ex) && File.Exists(from) && (caseOnly || !File.Exists(to)))
+                {
+                    if (attempt >= 6) throw new IOException("The file is in use by another program. Close anything that is playing it and try again.", ex);
+                    System.Threading.Thread.Sleep(120 + attempt * 60);
+                }
+            }
+        }
+
+        // a sharing or lock violation
+        private static bool InUse(IOException ex) { int code = ex.HResult & 0xFFFF; return code == 32 || code == 33; }
+
         internal static string AvailableName(string requested, Func<string, bool> taken)
         {
             if (!taken(requested)) return requested;

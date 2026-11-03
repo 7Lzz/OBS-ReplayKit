@@ -445,26 +445,23 @@ namespace ReplayKitSetup
                               + (string.IsNullOrEmpty(detail) ? "" : " - " + detail));
             }
 
-            private static readonly string[] IssueWords = { "warn", "failed", "missing", "not found", "skipped", "timed out", "permission denied" };
-
             public void LogLine(string message)
             {
                 string text = (message ?? "").Trim();
                 if (text.Length == 0) return;
                 SetupLog.Line(text);
                 _w.PostToPage(new JObject { ["type"] = "log", ["line"] = text });
-                string low = text.ToLowerInvariant();
-                foreach (var word in IssueWords)
-                {
-                    if (low.Contains(word)) { AddIssue(text); break; }
-                }
+                if (Apply.LooksLikeIssue(text)) AddIssue(text);
             }
 
             public void AddIssue(string message)
             {
                 string cleaned = string.Join(" ", (message ?? "").Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
                 if (cleaned.Length > 160) cleaned = cleaned.Substring(0, 157) + "...";
-                if (cleaned.Length > 0 && !Issues.Contains(cleaned)) Issues.Add(cleaned);
+                if (cleaned.Length == 0 || Issues.Contains(cleaned)) return;
+                Issues.Add(cleaned);
+                // what made the run incomplete is in the log, not only in the count at its end
+                SetupLog.Line("issue: " + cleaned);
             }
 
             public void SubProgress(double fraction, string detail)

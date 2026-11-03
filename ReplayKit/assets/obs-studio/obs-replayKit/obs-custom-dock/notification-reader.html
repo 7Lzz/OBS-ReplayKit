@@ -81,7 +81,7 @@
     <h1 id="title">&nbsp;</h1>
     <p class="sub" id="when">&nbsp;</p>
     <button class="x" type="button" id="close" aria-label="Close">
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:notification-reader-1}}</svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:editor/close}}</svg>
     </button>
   </header>
   <div class="body" id="body"></div>
@@ -146,6 +146,7 @@
     els.body.scrollTop = 0;
     url = item.url || "";
     els.link.hidden = !url;
+    els.link.textContent = item.linkLabel || "Open release page";
   };
 
   // the next open must not show this notification for a frame before its own arrives

@@ -152,7 +152,7 @@ namespace ReplayKitHelper
         }
 
         private static readonly Regex GlyphReference = new Regex(
-            @"\{\{glyph(-quoted)?:([a-z0-9-]+)\}\}", RegexOptions.Compiled);
+            @"\{\{glyph(-quoted)?:((?:[a-z0-9-]+/)?[a-z0-9-]+)\}\}", RegexOptions.Compiled);
 
         private static string ExpandGlyphs(string markup)
         {
@@ -162,7 +162,8 @@ namespace ReplayKitHelper
                 string name = match.Groups[2].Value;
                 if (!glyphs.TryGetValue(name, out string body))
                 {
-                    string svg = File.ReadAllText(Path.Combine(Constants.APP_ICONS_DIR, "glyph", name + ".svg"));
+                    // a bare name is one of the glyph folder; folder/name is any icon of the set, so a page can inline the one shared icon instead of a copy of its own
+                    string svg = File.ReadAllText(Path.Combine(Constants.APP_ICONS_DIR, name.Contains("/") ? name.Replace('/', Path.DirectorySeparatorChar) + ".svg" : Path.Combine("glyph", name + ".svg")));
                     int start = svg.IndexOf('>') + 1;
                     int end = svg.LastIndexOf("</svg>", StringComparison.Ordinal);
                     if (start == 0 || end < start) throw new InvalidDataException("Invalid SVG glyph: " + name);

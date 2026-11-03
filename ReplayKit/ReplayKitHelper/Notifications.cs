@@ -53,7 +53,7 @@ namespace ReplayKitHelper
         }
 
         // key identifies the thing being announced (an update version, say) so re-announcing it refreshes the existing row. a refresh deliberately leaves `read` alone -- re-checking for an update the user already dismissed must not light the badge up again. url is optional (a github release page, say) and only used to offer an "open release page" action -- items without one just skip that menu entry.
-        public static JObject Add(string kind, string key, string title, string body, string url = "")
+        public static JObject Add(string kind, string key, string title, string body, string url = "", string linkLabel = null)
         {
             if (string.IsNullOrWhiteSpace(title)) return new JObject { ["ok"] = false, ["message"] = "Notification needs a title." };
             lock (Gate)
@@ -67,24 +67,60 @@ namespace ReplayKitHelper
                         existing["title"] = title;
                         existing["body"] = body ?? "";
                         existing["url"] = url ?? "";
+                        if (!string.IsNullOrEmpty(linkLabel)) existing["linkLabel"] = linkLabel;
                         WriteItems(items);
                         return Snapshot(items);
                     }
                 }
-                items.Insert(0, new JObject
-                {
-                    ["id"] = Guid.NewGuid().ToString("N"),
-                    ["kind"] = kind ?? "info",
-                    ["key"] = key ?? "",
-                    ["title"] = title,
-                    ["body"] = body ?? "",
-                    ["url"] = url ?? "",
-                    ["createdUtc"] = DateTime.UtcNow.ToString("o"),
-                    ["read"] = false,
-                });
+                items.Insert(0, NewItem(kind, key, title, body, url, linkLabel));
                 while (items.Count > MaxStored) items.RemoveAt(items.Count - 1);
                 WriteItems(items);
                 return Snapshot(items);
+            }
+        }
+
+        private static JObject NewItem(string kind, string key, string title, string body, string url, string linkLabel)
+        {
+            var item = new JObject
+            {
+                ["id"] = Guid.NewGuid().ToString("N"),
+                ["kind"] = kind ?? "info",
+                ["key"] = key ?? "",
+                ["title"] = title,
+                ["body"] = body ?? "",
+                ["url"] = url ?? "",
+                ["createdUtc"] = DateTime.UtcNow.ToString("o"),
+                ["read"] = false,
+            };
+            // the words of the link button, for a link that is not a release page
+            if (!string.IsNullOrEmpty(linkLabel)) item["linkLabel"] = linkLabel;
+            return item;
+        }
+
+        // a notice that is both in the bell and shown at once in the popup over the obs window (a driver to update); a fresh row at the top of the list replaces an older one of the same key. the popup itself is not part of the list (see DonePopups)
+        public static bool Announce(string kind, string key, string title, string body, JObject popup, string url = "", string linkLabel = null)
+        {
+            if (string.IsNullOrWhiteSpace(title)) return false;
+            lock (Gate)
+            {
+                var items = ReadItems();
+                var keep = new JArray(items.OfType<JObject>().Where(i => string.IsNullOrEmpty(key) || i["key"]?.Value<string>() != key));
+                keep.Insert(0, NewItem(kind, key, title, body, url, linkLabel));
+                while (keep.Count > MaxStored) keep.RemoveAt(keep.Count - 1);
+                WriteItems(keep);
+            }
+            return DonePopups.Show(kind, title, popup);
+        }
+
+        // takes away the row of a key, for a notice that only meant something until the next start
+        public static void Forget(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            lock (Gate)
+            {
+                var items = ReadItems();
+                var keep = new JArray(items.OfType<JObject>().Where(i => i["key"]?.Value<string>() != key));
+                if (keep.Count != items.Count) WriteItems(keep);
             }
         }
 

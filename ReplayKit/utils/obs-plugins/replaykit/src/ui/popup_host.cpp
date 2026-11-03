@@ -36,7 +36,7 @@ QString Page(const QString &url)
 		return {};
 	const QString path = parsed.path();
 	if (path == QLatin1String("/hotkey-menu") || path == QLatin1String("/notifications-view") || path == QLatin1String("/account-menu") || path == QLatin1String("/quick-actions-view") ||
-	    path == QLatin1String("/storage-view") || path == QLatin1String("/notification-reader-view"))
+	    path == QLatin1String("/storage-view") || path == QLatin1String("/notification-reader-view") || path == QLatin1String("/done-popup-view"))
 		return path;
 	return {};
 }

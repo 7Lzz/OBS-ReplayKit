@@ -99,6 +99,8 @@ private:
 	void Finish();
 	// puts the panel under its tab from the rectangle windows reports for the obs window; false when the panel does not hang off that window
 	bool PlaceFromWindowRect(const QRect &tab);
+	// the height the panel takes in the room under its button: what it opens with when that fits, else the room
+	void FitHeight(int room);
 	void Roll(int toHeight, std::function<void()> done);
 	void StopRoll();
 	void RollTick();

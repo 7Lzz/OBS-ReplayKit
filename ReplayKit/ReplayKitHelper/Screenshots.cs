@@ -39,11 +39,11 @@ namespace ReplayKitHelper
             return path;
         }
 
-        // a small jpeg of the screenshot for the cards of the grid, made once for each state of the file and kept in the clip cache, so the grid never decodes the full png; the viewer still shows the png itself
-        public static string Thumb(string path)
+        // a small jpeg of the screenshot (or the first frame of a gif) for the cards of the grid, made once for each state of the file and kept in the clip cache, so the grid never decodes the full png; the viewer still shows the png itself
+        public static string Thumb(string path, string cacheKind = "shots", string what = "screenshot")
         {
             var info = new FileInfo(path);
-            string dir = ClipCache.KindDir("shots");
+            string dir = ClipCache.KindDir(cacheKind);
             string thumb = Path.Combine(dir, ClipCache.KeyFor(info.Name, info, "thumb" + ThumbWidth) + ".jpg");
             lock (ThumbGate)
             {
@@ -83,7 +83,7 @@ namespace ReplayKitHelper
                     File.Move(temp, thumb);
                 }
                 // gdi+ reports a file it cannot read as a picture this way, not as a bad format
-                catch (OutOfMemoryException) { throw new IOException("The screenshot could not be read as a picture"); }
+                catch (OutOfMemoryException) { throw new IOException("The " + what + " could not be read as a picture"); }
                 finally
                 {
                     try { if (File.Exists(temp)) File.Delete(temp); }
@@ -113,7 +113,7 @@ namespace ReplayKitHelper
             // a change of case only is the same file to windows, so it is moved on its own
             if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException("A screenshot with that name already exists");
             var capture = ClipGames.Read(path);
-            File.Move(path, target);
+            ClipFiles.MoveWhenFree(path, target);
             ClipGames.Write(target, capture);
             ClipGames.Forget(path);
             return to;

@@ -30,6 +30,8 @@
 #include "shell/shell.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
+#include "app/encoder_guard.hpp"
 #include "shell/shell_storage_modal.hpp"
 #include "tray/tray_menu.hpp"
 
@@ -44,6 +46,7 @@ void CloseCefWidgetsBeforeShutdown()
 	AnchoredPanel::DestroyAll();
 	StorageModalDestroy();
 	NotifyReaderDestroy();
+	DonePopupDestroy();
 	PopupHost::Destroy();
 	if (g_shellTimer)
 		g_shellTimer->stop();
@@ -163,6 +166,7 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 		return;
 
 	PrewarmCefBrowser();
+	ReportEncoders();
 	CaptureContextStart();
 	PublishMainWindow();
 	InstallMainWindowCloseFilter();

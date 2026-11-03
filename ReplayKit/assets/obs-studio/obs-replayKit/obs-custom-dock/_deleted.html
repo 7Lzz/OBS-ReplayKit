@@ -58,14 +58,15 @@ window.RKDeleted = {
       size.className = "size";
       size.textContent = options.formatSize(row.size);
       const kind = document.createElement("span");
-      kind.textContent = row.kind === "screenshot" ? "Screenshot" : "Clip";
+      kind.textContent = row.kind === "screenshot" ? "Screenshot" : row.kind === "gif" ? "GIF" : "Clip";
       const left = document.createElement("span");
       const n = daysLeft(row);
       left.className = "left" + (n <= 1 ? " is-soon" : "");
       left.textContent = n <= 0 ? "Deleted for good soon" : n === 1 ? "1 day left" : n + " days left";
       const dot = () => { const d = document.createElement("span"); d.className = "dot"; return d; };
       target.append(size, dot(), kind, dot(), left);
-      if (window.RKClipGames) RKClipGames.badge(target, row, {});
+      // a gif belongs to no game, as on its card in the GIFs section
+      if (window.RKClipGames && row.kind !== "gif") RKClipGames.badge(target, row, {});
     }
     async function act(kind, id) {
       const response = await fetch(options.helper + "/deleted/" + kind + (id ? "?id=" + encodeURIComponent(id) + "&t=" : "?t=") + Date.now(), {method:"POST", cache:"no-store"});
@@ -188,7 +189,7 @@ window.RKDeleted = {
       }
       empty.hidden = rows.length > 0;
       empty.textContent = !loaded ? "Loading deleted clips..."
-        : "Nothing here. Clips and screenshots you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good.";
+        : "Nothing here. Clips, screenshots and GIFs you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good.";
     }
     // the page asks for the list from several places as it starts and as things change, so asks that come while a read is out are folded into one more read after it
     let reading = null, readAgain = false;

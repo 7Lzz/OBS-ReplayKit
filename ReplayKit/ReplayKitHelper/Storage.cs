@@ -613,12 +613,18 @@ namespace ReplayKitHelper
                 string error;
                 lock (CompressGate) { done = batch.Done; failed = batch.Failed; saved = batch.SavedBytes; cancelled = batch.Cancelled; error = batch.Error; }
                 string clipsText = done + " clip" + (done == 1 ? "" : "s");
-                if (done == 0 && failed > 0)
-                    Notifications.Add("warning", "compress-batch", "Compression did not finish", string.IsNullOrEmpty(error) ? "The clips could not be compressed." : error);
-                else if (cancelled)
-                    Notifications.Add("info", "compress-batch", "Compression stopped", "Compressed " + clipsText + " and freed " + FormatBytes(saved) + " before it was stopped.");
-                else
-                    Notifications.Add("info", "compress-batch", "Compression finished", "Compressed " + clipsText + " and freed " + FormatBytes(saved) + "." + (failed > 0 ? " " + failed + " could not be compressed." : ""));
+                string failedText = failed > 0 ? failed + " could not be compressed" + (string.IsNullOrEmpty(error) ? "" : " (" + error + ")") + "." : "";
+                // the same popup as an exported gif, over the obs window from any view, with what was freed in large
+                bool nothing = done == 0 && failed > 0;
+                string title = nothing ? "Compression did not finish" : cancelled ? "Compression stopped" : "Compression finished";
+                string body = nothing ? (string.IsNullOrEmpty(error) ? "The clips could not be compressed." : error)
+                    : "Compressed " + clipsText + " and freed " + FormatBytes(saved) + (cancelled ? " before it was stopped." : ".") + (failedText.Length > 0 ? " " + failedText : "");
+                var popup = nothing
+                    ? new JObject { ["icon"] = "warning", ["text"] = "Nothing was compressed.", ["detail"] = body }
+                    : new JObject { ["icon"] = "check", ["text"] = "Space freed", ["big"] = FormatBytes(saved), ["detail"] = ("Compressed " + clipsText + ". " + failedText).Trim() };
+                // the result is told in the popup, not the bell; only when the plugin cannot be reached is it left in the bell so it is not lost
+                if (!DonePopups.Show(nothing ? "warning" : "done", title, popup))
+                    Notifications.Add(nothing ? "warning" : "info", "compress-batch", title, body);
             }
             catch (Exception ex) { Log.Write("Storage.AnnounceCompress: " + ex.Message); }
         }

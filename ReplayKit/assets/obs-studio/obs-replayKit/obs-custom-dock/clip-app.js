@@ -146,13 +146,16 @@ const CLIP_HOVER_PROFILES = {
     EDIT: _svgInner(_RKI["action/edit"]),
     LINK: _svgInner(_RKI["action/link"]),
     LINKED: _svgInner(_RKI["nav/linked"]),
+    GIFS: _svgInner(_RKI["nav/gifs"]),
+    SCREENSHOT: _svgInner(_RKI["quick/screenshot"]),
     TRASH: _svgInner(_RKI["action/trash"]),
     RESTORE: _svgInner(_RKI["editor/undo"]),
     STAR: _svgInner(_RKI["toggle/star"]),
     STAR_BORDER: _svgInner(_RKI["toggle/star-border"]),
     GRID: _svgInner(_RKI["toggle/grid"]),
     CLIPS: _svgInner(_RKI["nav/clips"]),
-    CONTENT_CUT: _svgInner(_RKI["action/content-cut"]),
+    // the card menu's scissors have red handles; the editor toolbar and the rest keep the plain action/content-cut
+    CONTENT_CUT: _svgInner(_RKI["action/content-cut-color"]),
     CONTENT_COPY: _svgInner(_RKI["action/content-copy"]),
     COMPRESS: _svgInner(_RKI["action/compress"]),
     DUPLICATE: _svgInner(_RKI["action/duplicate"]),
@@ -172,10 +175,18 @@ const CLIP_HOVER_PROFILES = {
     RESET: _svgInner(_RKI["action/reset"]),
   };
   // fill the <svg data-i="..."> placeholders from the same icon map, the way settings.html does
-  document.querySelectorAll("svg[data-i]").forEach((el) => { el.innerHTML = _svgInner(_RKI[el.dataset.i]); });
+  // an svg[data-i] takes the inner markup and the viewBox of its icon, so a page never draws an icon on the grid of another one
+  const _fillIcon = (el) => {
+    const full = _RKI[el.dataset.i] || "";
+    const box = /^<svg[^>]*\sviewBox="([^"]+)"/i.exec(full);
+    if (box) el.setAttribute("viewBox", box[1]);
+    el.innerHTML = _svgInner(full);
+  };
+  document.querySelectorAll("svg[data-i]").forEach(_fillIcon);
 
   const COPY_ICON = _svgInner(_RKI["action/copy"]);
-  const CANCEL_ICON = _svgInner(_RKI["action/cancel-x"]);
+  // the shared close x; the remove buttons draw it cropped to its drawing (viewBox 5 5 14 14), the size the x they had before it
+  const CANCEL_ICON = _svgInner(_RKI["editor/close"]);
 
   // one static volume icon: the fixed speaker body plus every wave arc and the mute X, all present at once. syncVolumeUi never rebuilds it -- it just sets data-level on the button and css fades/scales the individual arcs (or the X) in and out, so raising 24%->50% animates only the 2nd wave appearing, not a full redraw.
   const _volMuteParts = ICON.VOL_MUTED.match(/<path[^>]*\/>/g) || [];
@@ -332,14 +343,13 @@ const CLIP_HOVER_PROFILES = {
   let favoriteResolveInFlight = false;
   let favoriteResolveTimer = 0;
   let activeFilter = "all";
-  let syncGifs = () => {};
   let gameFilters = null;
   let clipSearchQuery = "";
   // never persisted (session-only, unlike favorites) -- always starts fresh at newest so a closed-and-reopened clips window or an obs restart never comes back to whatever sort was last picked.
   let activeSort = "newest";
   let loadedClips = [];
   const COLLAPSED_SECTIONS_KEY = "replaykit.collapsedSections.v1";
-  const SECTION_KEYS = new Set(["favorites", "screenshots", "clips", "linked", "local", "drafts"]);
+  const SECTION_KEYS = new Set(["favorites", "screenshots", "gifs", "clips", "linked", "local", "drafts"]);
   const collapsedSections = new Set();
   if (!HOME_MODE) {
     try {
@@ -348,15 +358,20 @@ const CLIP_HOVER_PROFILES = {
         if (saved.length > 256) throw new Error("Invalid section preferences");
         const sections = JSON.parse(saved);
         if (!Array.isArray(sections) || sections.length > SECTION_KEYS.size || sections.some(key => !SECTION_KEYS.has(key))) throw new Error("Invalid section preferences");
-        sections.filter(key => ["favorites", "linked", "drafts", "screenshots", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
+        sections.filter(key => ["favorites", "linked", "drafts", "screenshots", "gifs", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
       }
     } catch {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
   const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  // the gifs exported from the clip menu: the same gallery as the screenshots, over the GIFs folder
+  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("gifs"), notify:message => showToast(escapeHtml(message), "bad", "GIFs"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const mediaGalleries = [screenshotGallery, gifGallery].filter(Boolean);
+  // the gallery that is the whole view of a filter, for the screenshots and gifs filters
+  const galleryFor = (filter) => filter === "screenshots" ? screenshotGallery : filter === "gifs" ? gifGallery : null;
   // what was deleted, in the popup of the trash button by the folder button: restoring a clip brings the list back at once, and a screenshot the screenshots list
-  const deletedGallery = !HOME_MODE && window.RKDeleted ? RKDeleted.create({helper:HELPER, formatSize, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
+  const deletedGallery = !HOME_MODE && window.RKDeleted ? RKDeleted.create({helper:HELPER, formatSize, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -1130,13 +1145,14 @@ const CLIP_HOVER_PROFILES = {
     const favoritesKnown = !favoriteNamesList().length || favoriteResolveKey === currentFavoriteResolveKey();
     const videoCount = total;
     const counts = {
-      all: videoCount === undefined ? undefined : videoCount + (screenshotGallery ? screenshotGallery.count() || 0 : 0),
+      all: videoCount === undefined ? undefined : videoCount + mediaGalleries.reduce((sum, gallery) => sum + (gallery.count() || 0), 0),
       favorites: favoritesKnown ? resolvedFavoriteClips.filter(c => !gameFilters || gameFilters.matchesGame(c)).length : undefined,
       linked: linkedTotal,
       local: known ? Math.max(0, total - linkedTotal) : undefined,
       // the same for drafts: the ones whose clip is in this folder
       drafts: draftsLoaded && draftResolveKey === currentDraftResolveKey() ? Array.from(resolvedDraftClips.values()).filter(c => !gameFilters || gameFilters.matchesGame(c)).length : undefined,
       screenshots: screenshotGallery ? screenshotGallery.count() : undefined,
+      gifs: gifGallery ? gifGallery.count() : undefined,
     };
     if (gameFilters) gameFilters.counts({...counts, clips:videoCount});
   }
@@ -1247,9 +1263,9 @@ const CLIP_HOVER_PROFILES = {
     if (pendingClipSave && pendingClipSave.name && loadedClips.some((c) => c && c.name === pendingClipSave.name)) endClipSave(pendingClipSave);
     updateTabs(loadedClips);
     syncClipView();
-    if (activeFilter === "gifs") return;
-    if (activeFilter === "screenshots") {
-      screenshotGallery.update(clipSearchQuery, activeSort);
+    const gallery = galleryFor(activeFilter);
+    if (gallery) {
+      gallery.update(clipSearchQuery, activeSort);
       setClipSortLoading(false);
       updateClipSortControl();
       return;
@@ -1280,11 +1296,9 @@ const CLIP_HOVER_PROFILES = {
 
   function syncClipView() {
     if (HOME_MODE) return;
-    document.body.classList.toggle("is-gifs", activeFilter === "gifs");
-    syncGifs();
-    if (screenshotGallery) {
-      screenshotGallery.show(activeFilter);
-      screenshotGallery.update(clipSearchQuery, activeSort);
+    for (const gallery of mediaGalleries) {
+      gallery.show(activeFilter);
+      gallery.update(clipSearchQuery, activeSort);
     }
     document.body.classList.toggle("clips-collapsed", activeFilter === "all" && collapsedSections.has("clips"));
     favoritesGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("favorites"));
@@ -1299,10 +1313,10 @@ const CLIP_HOVER_PROFILES = {
       button.setAttribute("aria-expanded", String(expanded));
       button.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + label);
     });
-    if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? "Search screenshots" : "Search clips");
+    if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? "Search screenshots" : activeFilter === "gifs" ? "Search GIFs" : "Search clips");
     const folder = document.getElementById("clip-folder-btn");
     if (folder) {
-      const label = activeFilter === "screenshots" ? "Open screenshots folder" : "Open clips folder";
+      const label = activeFilter === "screenshots" ? "Open screenshots folder" : activeFilter === "gifs" ? "Open GIFs folder" : "Open clips folder";
       folder.setAttribute("aria-label", label);
       folder.dataset.tooltip = label;
     }
@@ -1320,7 +1334,7 @@ const CLIP_HOVER_PROFILES = {
       collapsedSections.clear();
       next.forEach(section => collapsedSections.add(section));
       stopActivePreviewForScroll();
-      if (screenshotGallery) screenshotGallery.paint();
+      mediaGalleries.forEach(gallery => gallery.paint());
       renderLoadedClips(loadedClips);
       queueVirtualRender(true);
     });
@@ -1493,6 +1507,16 @@ const CLIP_HOVER_PROFILES = {
 
   let toastTimer = 0;
   const TOAST_ERROR_MS = 4000;
+  // in fullscreen only the fullscreen element is drawn, so the toast goes inside it for as long as it lasts (the screenshot button of the fullscreen player says it saved there), and back to the page after
+  const toastHome = toastEl ? toastEl.parentNode : null;
+  function placeToast() {
+    if (!toastEl || !toastHome) return;
+    const full = document.fullscreenElement || document.webkitFullscreenElement;
+    const host = full && full.nodeType === 1 && full.tagName !== "VIDEO" ? full : toastHome;
+    if (toastEl.parentNode !== host) host.appendChild(toastEl);
+  }
+  document.addEventListener("fullscreenchange", placeToast);
+  document.addEventListener("webkitfullscreenchange", placeToast);
   function showToast(html, kind, title) {
     if (kind !== "info") { showErrorPopup(html, title); return; }
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = 0; }
@@ -1793,7 +1817,7 @@ const CLIP_HOVER_PROFILES = {
 
   // the columns of the list are the ones the css grid works out (.grid, with the chosen card size when there is one): the used track sizes are read back from the list itself or, when it is hidden, from the favorites above it, so every card of every tab stands on the same columns
   function computeVirtualLayout() {
-    const source = activeFilter === "screenshots" ? document.getElementById("screenshots-grid") : gridEl.style.display === "none" ? (rowGridEls.find((grid) => grid.classList.contains("is-shown")) || favoritesGridEl) : gridEl;
+    const source = galleryFor(activeFilter) ? document.getElementById(activeFilter + "-grid") : gridEl.style.display === "none" ? (rowGridEls.find((grid) => grid.classList.contains("is-shown")) || favoritesGridEl) : gridEl;
     const tracks = getComputedStyle(source).gridTemplateColumns.split(" ").map(parseFloat).filter((px) => px > 0);
     return tracks.length ? { columns: tracks.length, cardWidth: tracks[0] } : { columns: virtualColumns, cardWidth: virtualCardWidth };
   }
@@ -2172,7 +2196,7 @@ const CLIP_HOVER_PROFILES = {
 
   function renderVirtualWindow(force) {
     virtualRenderQueued = false;
-    if (!HOME_MODE && (activeFilter === "screenshots" || (activeFilter === "all" && collapsedSections.has("clips")))) return;
+    if (!HOME_MODE && (galleryFor(activeFilter) || (activeFilter === "all" && collapsedSections.has("clips")))) return;
     if (isClipRenameActive()) {
       pendingLoadedRenderAfterRename = true;
       return;
@@ -2419,7 +2443,7 @@ const CLIP_HOVER_PROFILES = {
 
   // the clip folder was switched: nothing read from the old one may stay, neither the loaded clips nor the favorites and drafts found in it nor the counts of the tabs, which come back from the new folder
   function forgetFolderState() {
-    if (screenshotGallery) screenshotGallery.reset();
+    mediaGalleries.forEach(gallery => gallery.reset());
     if (deletedGallery) deletedGallery.reset();
     clipsPageVersion = "";
     clipsTotal = 0;
@@ -2903,7 +2927,7 @@ const CLIP_HOVER_PROFILES = {
   function deleteLabelFor(btn) {
     if (btn.dataset.deleteLabel) return btn.dataset.deleteLabel;
     if (trashOn) return "Move to trash";
-    return btn.dataset.deleteKind === "screenshot" ? "Delete screenshot" : "Delete clip";
+    return btn.dataset.deleteKind === "screenshot" ? "Delete screenshot" : btn.dataset.deleteKind === "gif" ? "Delete GIF" : "Delete clip";
   }
   function relabelDeleteButtons(root) {
     (root || document).querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
@@ -2969,7 +2993,7 @@ const CLIP_HOVER_PROFILES = {
         </div>
         <div class="draft-mark" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON.OPEN_EDITOR}</svg></div>
         <button class="locate-btn" type="button" data-tooltip="Show in Clips" aria-label="Show in Clips">
-          <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-app-2}}</svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/open-external}}</svg>
         </button>
         <div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div>
         <button class="select-clip-btn" type="button" data-tooltip="Select clip" aria-label="Select clip" aria-pressed="false">
@@ -3024,10 +3048,6 @@ const CLIP_HOVER_PROFILES = {
                   <span>Copy to clipboard</span>
                 </div>
                 <div class="menu-heading">Edit</div>
-                <div class="menu-item export-gif-item" role="menuitem">
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.PLAY}</svg>
-                  <span class="menu-item-label">Export GIF</span>
-                </div>
                 <div class="menu-item trim-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
                   <span>Edit clip</span>
@@ -3039,6 +3059,10 @@ const CLIP_HOVER_PROFILES = {
                 <div class="menu-item rename-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
                   <span>Edit name</span>
+                </div>
+                <div class="menu-item export-gif-item" role="menuitem">
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.GIFS}</svg>
+                  <span class="menu-item-label">Export GIF</span>
                 </div>
                 <div class="menu-item compress-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
@@ -3092,6 +3116,7 @@ const CLIP_HOVER_PROFILES = {
     const volumeBtn    = card.querySelector(".volume-btn");
     const volumeSlider = card.querySelector(".volume-slider");
     const theaterBtn   = card.querySelector(".theater-btn");
+    const snapBtn      = card.querySelector(".snap-btn");
     const fullscreenBtn= card.querySelector(".fullscreen-btn");
     const favoriteBtn  = card.querySelector(".favorite-btn");
     const selectBtn    = card.querySelector(".select-clip-btn");
@@ -3621,6 +3646,11 @@ const CLIP_HOVER_PROFILES = {
     bindCardResize(card);
 
     syncTheaterButton(preview);
+    // the frame on screen, saved the way the screenshot button of the editor saves one: a png in the screenshots folder, named after the clip and tagged with its game
+    if (snapBtn) snapBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      saveFrameScreenshot(card, video, snapBtn);
+    });
     theaterBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isTheaterPreview(preview)) {
@@ -3781,8 +3811,9 @@ const CLIP_HOVER_PROFILES = {
         const data = await response.json();
         if (!response.ok || !data.ok) throw Error(data.message || "GIF export failed");
         window.dispatchEvent(new Event("replaykit:gif-saved"));
-        showToast("Saved to the GIFs section.", "info", "GIF saved");
-        scheduleToastHide(2400);
+        // the helper shows the result in the popup over the obs window, from any view; a toast stands in only where that popup cannot show (the classic layout)
+        if (data.popup) hideToast();
+        else { showToast("Saved to the GIFs section.", "info", "GIF exported"); scheduleToastHide(2400); }
       } catch (error) {
         showToast(escapeHtml(error.message), "bad", "GIF export failed");
         scheduleToastHide(TOAST_ERROR_MS);
@@ -3898,6 +3929,45 @@ const CLIP_HOVER_PROFILES = {
     }
   }
 
+  // what a name box takes: the characters windows cannot have in a file name never get in (typed or pasted), with a shake and, once per rename, a word on why; clicks in the box stay in it instead of reaching the card under it
+  const BAD_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/g;
+  const RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+  function guardNameInput(input) {
+    let told = false;
+    input.addEventListener("input", () => {
+      const clean = input.value.replace(BAD_NAME_CHARS, "");
+      if (clean === input.value) return;
+      const caret = Math.max(0, (input.selectionStart || 0) - (input.value.length - clean.length));
+      input.value = clean;
+      try { input.setSelectionRange(caret, caret); } catch (_) {}
+      input.classList.remove("is-rejected");
+      void input.offsetWidth;
+      input.classList.add("is-rejected");
+      if (!told) {
+        told = true;
+        showToast(escapeHtml("Names can’t contain \\ / : * ? \" < > |"), "info");
+        scheduleToastHide(2600);
+      }
+    });
+    for (const type of ["click", "dblclick", "mousedown", "pointerdown", "contextmenu"]) input.addEventListener(type, (e) => e.stopPropagation());
+  }
+  // the part of a typed name that is kept (windows drops trailing dots and spaces), and what is wrong with it when something is
+  function cleanTypedName(value) { return String(value || "").trim().replace(/[. ]+$/, ""); }
+  function nameProblem(base) {
+    if (RESERVED_NAME.test(base)) return "“" + base + "” is a name Windows keeps for itself.";
+    if (base.length > 180) return "That name is too long.";
+    return "";
+  }
+  // a name that cannot be used is said in a toast that leaves the typing alone (an error popup would take the keys and the focus from the box) and the box is outlined until it is typed in again
+  function rejectName(input, message) {
+    showToast(escapeHtml(message), "info");
+    scheduleToastHide(TOAST_ERROR_MS);
+    if (!input || !input.isConnected) return;
+    input.classList.add("is-invalid");
+    input.addEventListener("input", () => input.classList.remove("is-invalid"), { once: true });
+  }
+  window.RKNameInput = { guard: guardNameInput, clean: cleanTypedName, problem: nameProblem, reject: rejectName };
+
   // inline rename replace the .name span with an input, commit on enter / blur, revert on escape. server is asked via post /rename; on success the next poll picks up the new card identity, on failure we restore.
   function isClipRenameActive() {
     const input = document.querySelector(".name-edit-input");
@@ -3925,9 +3995,14 @@ const CLIP_HOVER_PROFILES = {
       media.load.call(video);
     }
     let finalName = name;
+    // a helper that does not answer never leaves the name box waiting for good
+    const abort = new AbortController();
+    const abortTimer = setTimeout(() => abort.abort(), 20000);
     try {
-      const res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(name) + "&to=" + encodeURIComponent(to) + (view ? "&view=" + encodeURIComponent(view) : ""), { method:"POST", cache:"no-store" });
-      const data = await res.json();
+      let res;
+      try { res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(name) + "&to=" + encodeURIComponent(to) + (view ? "&view=" + encodeURIComponent(view) : ""), { method:"POST", cache:"no-store", signal:abort.signal }); }
+      catch (e) { throw new Error(e && e.name === "AbortError" ? "ReplayKit took too long to answer. The list will show the clip’s name once it does." : "ReplayKit could not be reached."); }
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       finalName = data.name || to;
       renameClipIdentity(name, finalName);
@@ -3937,6 +4012,7 @@ const CLIP_HOVER_PROFILES = {
       }
       return finalName;
     } finally {
+      clearTimeout(abortTimer);
       for (const source of sources) {
         const { video, url, at, playing, active, preload } = source;
         if (!video.isConnected || video.getAttribute("src")) continue;
@@ -3998,6 +4074,9 @@ const CLIP_HOVER_PROFILES = {
     input.type = "text";
     input.className = "name-edit-input";
     input.value = baseName;
+    input.spellcheck = false;
+    input.setAttribute("aria-label", "Clip name");
+    guardNameInput(input);
 
     let extSpan = null;
     if (hasExt) {
@@ -4015,6 +4094,7 @@ const CLIP_HOVER_PROFILES = {
     input.select();
 
     let settled = false;
+    let saving = false;
     function swapBackToNameSpan() {
       rkFlip(flipTargets, () => {
         if (input.parentNode) input.parentNode.replaceChild(nameSpan, input);
@@ -4028,14 +4108,24 @@ const CLIP_HOVER_PROFILES = {
       swapBackToNameSpan();
       flushRenderAfterRename();
     }
-    async function commit() {
-      if (settled) return;
-      const newBase = input.value.trim();
+    // enter keeps the box open when the name cannot be used, so it can be fixed; leaving the box (a click elsewhere) puts the old name back
+    async function commit(viaEnter) {
+      if (settled || saving) return;
+      const newBase = cleanTypedName(input.value);
       const newName = newBase + ext;
       if (!newBase || newName === currentName) { restore(); return; }
-      settled = true;
+      const problem = nameProblem(newBase);
+      if (problem) {
+        rejectName(input, problem);
+        if (viaEnter) { input.focus(); input.select(); } else restore();
+        return;
+      }
+      saving = true;
+      input.readOnly = true;
+      input.classList.add("is-saving");
       try {
         const finalName = await renameClipFile(currentName, newName);
+        settled = true;
         // optimistically update the card so we dont wait for the next /clips poll to relabel. the next poll will reconcile.
         transferFavorite(currentName, finalName);
         card.dataset.name = finalName;
@@ -4045,22 +4135,96 @@ const CLIP_HOVER_PROFILES = {
         flushRenderAfterRename();
         scheduleNextPoll(500);
       } catch (e) {
+        saving = false;
+        input.readOnly = false;
+        input.classList.remove("is-saving");
+        rejectName(input, "Couldn’t rename: " + (e.message || e));
+        if (viaEnter && input.isConnected) { input.focus(); input.select(); return; }
+        settled = true;
         swapBackToNameSpan();
-        showToast("Rename failed: " + (e.message || e));
-        scheduleToastHide(TOAST_ERROR_MS);
         flushRenderAfterRename();
       }
     }
-    input.addEventListener("blur", commit);
+    input.addEventListener("blur", () => commit(false));
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter")  { e.preventDefault(); input.blur(); }
-      if (e.key === "Escape") { e.preventDefault(); input.removeEventListener("blur", commit); restore(); }
+      if (e.key === "Enter")  { e.preventDefault(); commit(true); }
+      if (e.key === "Escape") { e.preventDefault(); if (!saving) restore(); }
     });
   }
 
   // close any open 3-dot menu. three triggers, becuase no single one catches every "the user is interacting with something else now" case: mousedown on the document: in-page clicks. inspects e.target with .closest() directly so it doesnt matter if some handler in the click path calls stoppropagation. mouseleave on <html>: cursor left the viewport -- this is the one that catches a click on the os window title bar, becuase the cursor has to cross the document edge to get up there and the title bar doesnt dispatch any dom event to the page. window blur: the popup lost focus (alt-tab, another window clicked). belt-and-braces backup for the title-bar case on browsers where mouseleave doesnt fire reliably.
   // opens the menu of a card, a clip or a screenshot, with its top-left corner at the pointer, clamped to the visible scroll area so every item stays reachable
+  // the screenshot button of the theater and fullscreen player: the whole clip is the one piece of video, and the frame at the playhead is rendered by the editor's own screenshot path
+  async function saveFrameScreenshot(card, video, button) {
+    const name = card.dataset.name;
+    const duration = (video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0) || Number(card.dataset.duration) || durationCache.get(name) || 0;
+    if (!name || !video || button.classList.contains("is-busy")) return;
+    if (duration < 0.5) { showToast("This clip is too short for a screenshot.", "info"); scheduleToastHide(2600); return; }
+    const time = Math.max(0, Math.min(duration - 0.001, video.currentTime || 0));
+    button.classList.add("is-busy");
+    button.disabled = true;
+    try {
+      const plan = { video: { window: { start: 0, end: duration }, pieces: [{ at: 0, srcStart: 0, srcEnd: duration }] } };
+      const url = HELPER + "/trim?file=" + encodeURIComponent(name) + "&start=0&end=" + duration.toFixed(3) +
+        "&mode=screenshot&precise=1&removeAudio=1&aspect=original&time=" + time.toFixed(6) + "&t=" + Date.now();
+      const res = await fetch(url, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(plan) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
+      window.dispatchEvent(new Event("replaykit:screenshot-saved"));
+      showToast("Screenshot saved in Screenshots as " + escapeHtml(data.name || ""), "info");
+      scheduleToastHide(3000);
+    } catch (error) {
+      showToast("Couldn’t save the screenshot: " + escapeHtml(error.message || error), "info");
+      scheduleToastHide(TOAST_ERROR_MS);
+    } finally {
+      button.classList.remove("is-busy");
+      button.disabled = false;
+    }
+  }
+
   const gifExports = new Set();
+  // the gifs are put where the card can be seen (the gifs section of everything, or the gifs view), scrolled to, and the card lights up like a clip the home view points at
+  let gifRevealTimer = 0;
+  async function goToGif(file) {
+    if (!gifGallery) return;
+    clearTimeout(gifRevealTimer);
+    if (activeFilter !== "all" && activeFilter !== "gifs") selectClipFilter("gifs");
+    if (activeFilter === "all" && collapsedSections.has("gifs")) document.querySelector('.section-toggle[data-section="gifs"]').click();
+    if (clipSearchQuery) {
+      clipSearchQuery = "";
+      if (clipSearchInput) clipSearchInput.value = "";
+      renderLoadedClips(loadedClips);
+    }
+    await gifGallery.refresh();
+    const cardFor = () => Array.from(document.querySelectorAll("#gifs-grid .screenshot-card")).find(card => card.dataset.shot === file);
+    // a game picked in the filters hides the gifs, which belong to no game, so the gifs view is shown for every game
+    if (!cardFor() && gameFilters && gameFilters.state.game !== "all") { gameFilters.reset(); selectClipFilter("gifs"); await gifGallery.refresh(); }
+    const started = Date.now();
+    let lastTop = -1, settled = 0;
+    const step = () => {
+      const card = cardFor();
+      if (card && card.offsetParent) {
+        const bounds = card.getBoundingClientRect(), area = scrollAreaEl.getBoundingClientRect();
+        const centered = bounds.top >= area.top && bounds.bottom <= area.bottom;
+        if (!centered) card.scrollIntoView({ block: "center", behavior: "smooth" });
+        settled = Math.abs(scrollAreaEl.scrollTop - lastTop) < 1 ? settled + 1 : 0;
+        lastTop = scrollAreaEl.scrollTop;
+        if (settled >= 2 && centered) {
+          card.classList.remove("is-located");
+          void card.offsetWidth;
+          card.classList.add("is-located");
+          setTimeout(() => card.classList.remove("is-located"), 2600);
+          return;
+        }
+      }
+      if (Date.now() - started > 4000) {
+        if (!card) { showToast("That GIF is no longer in the GIFs folder.", "bad", "GIFs"); scheduleToastHide(TOAST_ERROR_MS); }
+        return;
+      }
+      gifRevealTimer = setTimeout(step, 120);
+    };
+    step();
+  }
   function gifUnavailable(card) {
     const name = card.dataset.name;
     if (gifExports.has(name)) return "GIF export is in progress.";
@@ -4169,8 +4333,9 @@ const CLIP_HOVER_PROFILES = {
   });
 
   function previewToFullscreen() {
-    const screenshot = document.querySelector(".screenshot-card:hover");
-    if (screenshot && screenshotGallery) return screenshotGallery.fullscreen(screenshot.dataset.shot);
+    const screenshot = document.querySelector(".screenshot-card[data-gallery]:hover");
+    const hoveredGallery = screenshot && galleryFor(screenshot.dataset.gallery);
+    if (hoveredGallery) return hoveredGallery.fullscreen(screenshot.dataset.shot);
     let preview = null;
     if (activePreview) {
       preview = activePreview.closest && activePreview.closest(".preview");
@@ -4552,7 +4717,7 @@ const CLIP_HOVER_PROFILES = {
         btn.innerHTML =
           '<span class="progress-track"><span class="progress-fill"></span></span><span class="progress-phase"></span>' +
           '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel">' +
-          '<svg viewBox="0 0 320.591 320.591" aria-hidden="true">' + CANCEL_ICON + '</svg></button>';
+          '<svg viewBox="5 5 14 14" aria-hidden="true">' + CANCEL_ICON + '</svg></button>';
         // resolve the clip + its live job at click time from the card -- a recycled card node can outlive the clip this listener was built for.
         const xBtn = btn.querySelector(".progress-cancel");
         xBtn.addEventListener("click", () => {
@@ -4593,7 +4758,7 @@ const CLIP_HOVER_PROFILES = {
         x.className = "link-remove-btn";
         x.title = "Remove link";
         x.setAttribute("aria-label", "Remove link");
-        x.innerHTML = '<svg viewBox="0 0 320.591 320.591" aria-hidden="true">' + CANCEL_ICON + '</svg>';
+        x.innerHTML = '<svg viewBox="5 5 14 14" aria-hidden="true">' + CANCEL_ICON + '</svg>';
         x.addEventListener("click", async (e) => {
           e.stopPropagation();
           x.disabled = true;
@@ -4791,7 +4956,7 @@ const CLIP_HOVER_PROFILES = {
       ? FILTER_SECTION_HEADING.all
       : FILTER_SECTION_HEADING[activeFilter];
     restHeadingEl.classList.toggle("is-shown", !!restHeadingContent);
-    restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showRowSections || !!(screenshotGallery && screenshotGallery.count())));
+    restHeadingEl.classList.toggle("section-heading-rest", allFilterActive && (showRowSections || mediaGalleries.some(gallery => gallery.count())));
     if (restHeadingContent) {
       restHeadingIconEl.innerHTML = restHeadingContent.icon;
       restHeadingIconEl.classList.toggle("is-favorite", restHeadingContent === FILTER_SECTION_HEADING.favorites);
@@ -5123,7 +5288,7 @@ const CLIP_HOVER_PROFILES = {
       try {
         const area = scrollAreaEl.getBoundingClientRect();
         const shown = [];
-        for (const el of scrollAreaEl.querySelectorAll(".card, .screenshot-card, .section-heading.is-shown, #empty, #screenshots-empty")) {
+        for (const el of scrollAreaEl.querySelectorAll(".card, .screenshot-card, .section-heading.is-shown, #empty, #screenshots-empty, #gifs-empty")) {
           if (el.offsetParent === null) continue;
           const r = el.getBoundingClientRect();
           if (r.bottom < area.top || r.top > area.bottom) continue;
@@ -5164,10 +5329,10 @@ const CLIP_HOVER_PROFILES = {
   }
 
   function selectClipFilter(next) {
-    if (gameFilters && ["all","clips","favorites","linked","screenshots","drafts"].includes(next)) gameFilters.setType(next);
+    if (gameFilters && ["all","clips","favorites","linked","screenshots","gifs","drafts"].includes(next)) gameFilters.setType(next);
     if (next === activeFilter) { renderLoadedClips(loadedClips); return; }
     activeFilter = next;
-    if (next === "screenshots") {
+    if (galleryFor(next)) {
       clearClipSelection();
       stopActivePreviewForScroll();
       if (activeSort === "longest" || activeSort === "shortest") activeSort = "newest";
@@ -5186,7 +5351,7 @@ const CLIP_HOVER_PROFILES = {
     clipsTotalKnown = false;
     loadedClips = [];
     selectClipFilter(state.type);
-    if (screenshotGallery) screenshotGallery.paint();
+    mediaGalleries.forEach(gallery => gallery.paint());
     poll();
   });
   window.addEventListener("replaykit:game-tags-changed", () => {
@@ -5258,6 +5423,8 @@ const CLIP_HOVER_PROFILES = {
   }
 
   // a see all on a shelf of the home view, or a show in clips on one clip, leaves a note in storage, since the clips view is another page; it is read when this view shows, and a note older than a few seconds is a leftover that is dropped
+  // the popup over the obs window is another browser of the same site, so a note it leaves while this view already shows arrives as a storage event
+  if (!HOME_MODE) window.addEventListener("storage", (e) => { if (e.key === OPEN_FILTER_KEY && e.newValue) applyPendingClipsFilter(); });
   function applyPendingClipsFilter() {
     let pending = null;
     try {
@@ -5265,6 +5432,8 @@ const CLIP_HOVER_PROFILES = {
       localStorage.removeItem(OPEN_FILTER_KEY);
     } catch {}
     if (!pending || !(Date.now() - Number(pending.at) < 5000)) return;
+    // go to gif of the popup over the obs window
+    if (pending.revealGif) { goToGif(String(pending.revealGif)); return; }
     if (pending.reveal) { revealClip(String(pending.reveal)); return; }
     if (pending.filter === "favorites") selectClipFilter("favorites");
   }
@@ -5291,8 +5460,8 @@ const CLIP_HOVER_PROFILES = {
         closeClipSortMenu();
         if (next === activeSort) return;
         activeSort = next;
-        if (activeFilter === "screenshots") {
-          screenshotGallery.update(clipSearchQuery, activeSort);
+        if (galleryFor(activeFilter)) {
+          galleryFor(activeFilter).update(clipSearchQuery, activeSort);
           updateClipSortControl();
           return;
         }
@@ -5409,7 +5578,7 @@ const CLIP_HOVER_PROFILES = {
     // the type dropdown keeps what it was left on, the way a fresh window restores it, so the view follows it instead of showing everything under another label
     activeFilter = gameFilters ? gameFilters.state.type : "all";
     syncClipView();
-    if (screenshotGallery) screenshotGallery.refresh();
+    mediaGalleries.forEach(gallery => gallery.refresh());
     if (deletedGallery) deletedGallery.refresh();
     updateTabs(loadedClips);
 
@@ -5746,7 +5915,7 @@ const CLIP_HOVER_PROFILES = {
   // compress all: bulk fast-compress of every clip that isnt already marked. client-side queue with busy-retry so the servers concurrency limiter (steady-state + cpu-gated burst) does the actual scheduling without us having to mirror its state. fast mode only -- bulk compress on smaller would take hours on a typical folder; users who want max compression on a specific clip still have the per-card 3-dot menu.
   const clipFolderBtn = document.getElementById("clip-folder-btn");
   if (clipFolderBtn) clipFolderBtn.addEventListener("click", () => {
-    fetch(HELPER + (activeFilter === "screenshots" ? "/open-screenshot-folder" : "/open-clip-folder"), { method: "POST", cache: "no-store" }).catch(() => {});
+    fetch(HELPER + (activeFilter === "screenshots" ? "/open-screenshot-folder" : activeFilter === "gifs" ? "/open-gif-folder" : "/open-clip-folder"), { method: "POST", cache: "no-store" }).catch(() => {});
   });
 
   const compressAllBtn        = document.getElementById("compress-all-btn");
@@ -6344,7 +6513,7 @@ const CLIP_HOVER_PROFILES = {
       trimVeil.replaceChildren(...Array.from(editor.childNodes));
       saveVeil.replaceChildren(...Array.from(saving.childNodes));
       // the icons of the editor come after the ones of the page were filled, so they are filled the same way here
-      for (const el of [...trimVeil.querySelectorAll("svg[data-i]"), ...saveVeil.querySelectorAll("svg[data-i]")]) el.innerHTML = _svgInner(_RKI[el.dataset.i]);
+      for (const el of [...trimVeil.querySelectorAll("svg[data-i]"), ...saveVeil.querySelectorAll("svg[data-i]")]) _fillIcon(el);
       for (const node of doc.querySelectorAll("style, script")) {
         const copy = document.createElement(node.localName);
         copy.textContent = node.textContent;
@@ -6480,7 +6649,7 @@ const CLIP_HOVER_PROFILES = {
 
   hydrateClipUiState();
   refreshDrafts();
-  if (screenshotGallery) screenshotGallery.refresh();
+  mediaGalleries.forEach(gallery => gallery.refresh());
   if (deletedGallery) deletedGallery.refresh();
   // the caps gate Create Link, so fetch them before the first paint and repaint once they land; re-fetched on re-show because signing in or out between sessions changes what Streamable will accept.
   refreshUploadLimits().then(() => queueVirtualRender(true));
@@ -6512,7 +6681,7 @@ const CLIP_HOVER_PROFILES = {
       clips: ["rest-heading", "top-spacer", "grid", "bottom-spacer", "empty"],
     };
     const key = "rk-library-section-order";
-    let order = Object.keys(sections), dragging = null;
+    let order = Object.keys(sections);
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "[]");
       if (Array.isArray(saved)) order = [...new Set([...saved.filter(id => Object.hasOwn(sections,id)), ...order])];
@@ -6529,89 +6698,133 @@ const CLIP_HOVER_PROFILES = {
       try { localStorage.setItem(key, JSON.stringify(order)); }
       catch (error) { console.warn("Library section order could not be saved", error); }
     }
-    for (const [id, nodes] of Object.entries(sections)) {
-      const section = document.getElementById(nodes[0]);
-      const heading = section.matches(".section-heading") ? section : section.querySelector(".section-heading");
+    const headingOf = id => {
+      const first = document.getElementById(sections[id][0]);
+      return first.matches(".section-heading") ? first : first.querySelector(".section-heading");
+    };
+    // the sections on screen now, in their order; a section with nothing to show (no linked clips, no gifs) keeps its place in the order but is not one of them
+    const shownSections = () => order.filter(id => headingOf(id).offsetParent !== null);
+    // puts a section at a place among the shown ones: before the shown section at that index of the others, or after the last of them
+    function place(id, to) {
+      const others = shownSections().filter(item => item !== id);
+      const rest = order.filter(item => item !== id);
+      const index = to < others.length ? rest.indexOf(others[to]) : others.length ? rest.indexOf(others[others.length - 1]) + 1 : rest.length;
+      if (rest[index] === id || order.indexOf(id) === index) return false;
+      move(id, index);
+      return true;
+    }
+    // a section is carried by its handle the way a track is in the editor: the sections fold to their headings, the carried heading follows the pointer and the others glide aside to show where it will land. the drag is read from the pointer, not from what lies under it, so a tooltip or a menu over a heading never blocks a drop
+    const SORT_LIFT_PX = 4;
+    let sorting = null;
+    function liftSection(drag) {
+      const heading = headingOf(drag.id);
+      const before = heading.getBoundingClientRect().top;
+      // where on the heading it was taken hold of, so it stays under the pointer by that spot even when the folded list cannot scroll to keep it in place
+      drag.grab = drag.y - before;
+      if (window.RKTooltip) RKTooltip.hide();
+      drag.tip = drag.handle.dataset.tooltip;
+      delete drag.handle.dataset.tooltip;
+      stopActivePreviewForScroll();
+      document.body.classList.add("is-section-sorting");
+      // the folded list keeps the carried heading where it was on the screen: by scrolling, and when the folded list is too short to scroll that far, with room held open above it
+      scrollAreaEl.scrollTop += heading.getBoundingClientRect().top - before;
+      const short = before - heading.getBoundingClientRect().top;
+      if (short > 1) {
+        drag.pad = document.createElement("div");
+        drag.pad.className = "section-sort-pad";
+        drag.pad.style.height = short + "px";
+        scrollAreaEl.prepend(drag.pad);
+      }
+      const areaTop = scrollAreaEl.getBoundingClientRect().top - scrollAreaEl.scrollTop;
+      drag.rows = shownSections().map(id => {
+        const el = headingOf(id), rect = el.getBoundingClientRect();
+        return { id, el, top: rect.top - areaTop, h: rect.height };
+      });
+      drag.index = drag.rows.findIndex(row => row.id === drag.id);
+      const self = drag.rows[drag.index], next = drag.rows[drag.index + 1], prev = drag.rows[drag.index - 1];
+      drag.slot = next ? next.top - self.top : prev ? self.top - prev.top : self.h;
+      drag.target = drag.index;
+      heading.classList.add("is-floating");
+      drag.live = true;
+    }
+    function steerSection(drag, clientY) {
+      const self = drag.rows[drag.index];
+      const first = drag.rows[0], last = drag.rows[drag.rows.length - 1];
+      const pointer = clientY - scrollAreaEl.getBoundingClientRect().top + scrollAreaEl.scrollTop;
+      // it can be carried half a heading past the first and the last, which is how it asks for the top or the bottom
+      const top = Math.min(Math.max(pointer - drag.grab, first.top - self.h / 2), last.top + last.h - self.h / 2);
+      const dy = top - self.top;
+      self.el.style.transform = "translateY(" + dy + "px)";
+      const centre = self.top + dy + self.h / 2;
+      const others = drag.rows.filter(row => row !== self);
+      let target = others.findIndex(row => centre < row.top + row.h / 2);
+      if (target < 0) target = others.length;
+      drag.target = target;
+      others.forEach((row, i) => {
+        const shift = i >= target && i < drag.index ? drag.slot : i >= drag.index && i < target ? -drag.slot : 0;
+        row.el.style.transform = shift ? "translateY(" + shift + "px)" : "";
+      });
+    }
+    function settleSection(cancelled) {
+      const drag = sorting;
+      sorting = null;
+      if (!drag) return;
+      if (drag.handle.hasPointerCapture && drag.handle.hasPointerCapture(drag.pointer)) drag.handle.releasePointerCapture(drag.pointer);
+      if (!drag.live) return;
+      const heading = headingOf(drag.id);
+      const landed = heading.getBoundingClientRect().top;
+      for (const row of drag.rows) row.el.style.transform = "";
+      heading.classList.remove("is-floating");
+      if (drag.pad) drag.pad.remove();
+      if (!cancelled && drag.target !== drag.index) place(drag.id, drag.target);
+      document.body.classList.remove("is-section-sorting");
+      // the unfolded list keeps the heading where it was let go of
+      scrollAreaEl.scrollTop += heading.getBoundingClientRect().top - landed;
+      if (drag.tip) drag.handle.dataset.tooltip = drag.tip;
+      queueVirtualRender(true);
+      heading.classList.remove("is-landed");
+      void heading.offsetWidth;
+      heading.classList.add("is-landed");
+      heading.addEventListener("animationend", () => heading.classList.remove("is-landed"), { once: true });
+    }
+    window.addEventListener("blur", () => settleSection(true));
+    for (const [id] of Object.entries(sections)) {
+      const heading = headingOf(id);
       const handle = document.createElement("button");
       handle.type = "button";
       handle.className = "icon-mini-btn section-drag";
-      handle.draggable = true;
       handle.setAttribute("aria-label", "Reorder " + heading.querySelector("span").textContent);
       handle.dataset.tooltip = "Drag to reorder, or use Up and Down.";
       heading.prepend(handle);
-      handle.addEventListener("dragstart", event => {
-        dragging = id;
-        event.dataTransfer.setData("text/plain", id);
-        event.dataTransfer.effectAllowed = "move";
+      handle.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || sorting) return;
+        event.preventDefault();
+        if (window.RKTooltip) RKTooltip.hide();
+        sorting = { id, handle, pointer: event.pointerId, y: event.clientY, live: false };
+        handle.setPointerCapture(event.pointerId);
       });
-      handle.addEventListener("dragend", () => { dragging = null; });
+      handle.addEventListener("pointermove", event => {
+        if (!sorting || sorting.handle !== handle || sorting.pointer !== event.pointerId) return;
+        if (!sorting.live) {
+          if (Math.abs(event.clientY - sorting.y) < SORT_LIFT_PX) return;
+          liftSection(sorting);
+        }
+        steerSection(sorting, event.clientY);
+      });
+      handle.addEventListener("pointerup", event => { if (sorting && sorting.handle === handle) settleSection(false); });
+      handle.addEventListener("pointercancel", () => { if (sorting && sorting.handle === handle) settleSection(true); });
+      handle.addEventListener("lostpointercapture", () => { if (sorting && sorting.handle === handle) settleSection(false); });
       handle.addEventListener("keydown", event => {
+        if (sorting && event.key === "Escape") { event.preventDefault(); settleSection(true); return; }
         if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
         event.preventDefault();
-        const index = order.indexOf(id) + (event.key === "ArrowUp" ? -1 : 1);
-        if (index >= 0 && index < order.length) { move(id, index); handle.focus(); }
-      });
-      heading.addEventListener("dragover", event => {
-        if (dragging && dragging !== id) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }
-      });
-      heading.addEventListener("drop", event => {
-        if (!dragging || dragging === id) return;
-        event.preventDefault();
-        const source = dragging;
-        dragging = null;
-        const rect = heading.getBoundingClientRect();
-        const index = order.filter(item => item !== source).indexOf(id);
-        move(source, index + (event.clientY > rect.top + rect.height / 2 ? 1 : 0));
+        // up and down step past the sections that are not on screen, so every press visibly moves the section
+        const shown = shownSections(), at = shown.indexOf(id);
+        const to = event.key === "ArrowUp" ? at - 1 : at + 1;
+        if (at < 0 || to < 0 || to >= shown.length) return;
+        if (place(id, to)) handle.focus();
       });
     }
     arrange();
-    const gifSection = document.getElementById("gifs-area");
-    const gifGrid = document.getElementById("gifs-grid");
-    const gifFilter = document.getElementById("gif-filter");
-    let gifs = [], gifRequest = false;
-    function paintGifs() {
-      syncGifs();
-      const search = gifFilter.value.trim().toLowerCase();
-      const fragment = document.createDocumentFragment();
-      for (const name of gifs.filter(name => name.toLowerCase().includes(search)).slice(0,60)) {
-        const link = document.createElement("a");
-        link.className = "gif-card";
-        link.href = HELPER + "/gifs/media?file=" + encodeURIComponent(name);
-        link.download = name;
-        const image = document.createElement("img");
-        image.loading = "lazy";
-        image.src = link.href;
-        image.alt = "";
-        const title = document.createElement("span");
-        title.textContent = name;
-        link.append(image, title);
-        fragment.append(link);
-      }
-      if (!fragment.childNodes.length) {
-        const empty = document.createElement("p");
-        empty.textContent = search ? "No GIFs match." : "Export a short selection from the editor to create a GIF.";
-        fragment.append(empty);
-      }
-      gifGrid.replaceChildren(fragment);
-    }
-    async function refreshGifs() {
-      if (gifRequest) return;
-      gifRequest = true;
-      try {
-        const response = await fetch(HELPER + "/gifs", {cache:"no-store"});
-        if (!response.ok) return;
-        const result = await response.json();
-        if (Array.isArray(result.gifs) && JSON.stringify(gifs) !== JSON.stringify(result.gifs)) {
-          gifs = result.gifs; paintGifs();
-        }
-      } catch (error) { console.warn("GIF list could not be loaded", error); }
-      finally { gifRequest = false; }
-    }
-    gifFilter.addEventListener("input", paintGifs);
-    syncGifs = () => { gifSection.hidden = activeFilter !== "gifs" && (activeFilter !== "all" || !gifs.length); };
-    window.addEventListener("focus", refreshGifs);
-    window.addEventListener("replaykit:gif-saved", refreshGifs);
-    paintGifs();
-    refreshGifs();
   }
   poll();

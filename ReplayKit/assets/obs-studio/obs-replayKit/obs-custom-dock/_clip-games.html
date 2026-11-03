@@ -15,7 +15,7 @@
   .clip-game-icon svg, .clip-game-icon img { width:100%; height:100%; object-fit:contain; fill:currentColor; }
   .clip-game-icon img { position:absolute; inset:0; }
   .clip-game-icon > img[data-artwork] { visibility:hidden; }
-  #clip-type-filter .clip-type-icon[data-type="favorites"], #clip-type-filter .combo-option[data-value="favorites"] .combo-option-icon { color:var(--amber); }
+  #clip-type-filter .clip-type-icon[data-type="favorites"], #clip-type-filter .combo-option[data-value="favorites"] .combo-option-icon { color:var(--favorite, #facc15); }
   .clip-game-icon.is-ready > svg { visibility:hidden; }
   .clip-game-icon > .processing-spinner {
     display:none; position:absolute; inset:0; margin:auto;
@@ -84,6 +84,9 @@
   @media(max-width:650px) { .clip-filter-caption { display:none; } .clip-filter { min-width:90px; max-width:150px; } }
   /* game recognition is off: no game filter, no sorting by game, and no game icon or change game row on the cards */
   html.rk-games-off #clip-game-filter, html.rk-games-off .group-games, html.rk-games-off .clip-game-badge, html.rk-games-off .change-game-item { display:none !important; }
+  /* the game and type filters of the clips page take the hover and selection of the buttons of the side rail (ShellRail::paintEvent): the text colour of the theme at 8% for a hover and 16% for the one picked, in full text colour; every other dropdown keeps the accent */
+  :is(#clip-game-filter, #clip-type-filter) .combo-option:hover, :is(#clip-game-filter, #clip-type-filter) .combo-option:focus-visible { background:rgba(var(--text-rgb,255,255,255),.08); }
+  :is(#clip-game-filter, #clip-type-filter) .combo-option.is-selected, :is(#clip-game-filter, #clip-type-filter) .combo-option.is-selected:hover, :is(#clip-game-filter, #clip-type-filter) .combo-option.is-selected:focus-visible { background:rgba(var(--text-rgb,255,255,255),.16); color:var(--text); }
 </style>
 <script>
 window.RKClipGames = (function () {
@@ -289,7 +292,7 @@ window.RKClipGames = (function () {
       const button = document.createElement("button"); button.type = "button"; button.className = "game-picker-choice";
       const isCurrent = !custom && id === selectedId && (experience ? item.capture?.experience?.universe === experience.universe : !item.capture?.experience?.universe);
       if (isCurrent) button.setAttribute("aria-current", "true");
-      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-check}}</svg>' : "");
+      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>' : "");
       button.querySelector(".game-picker-name").textContent = name;
       if (target === list && owned.some(game => game.id === id)) {
         const entry = document.createElement("div"); entry.className = "game-picker-entry";
@@ -302,7 +305,7 @@ window.RKClipGames = (function () {
       if (children?.length) {
         const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", name + " experiences");
         sublist.hidden = !search.value.trim(); button.setAttribute("aria-expanded", String(!sublist.hidden));
-        button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-caret}}</svg>');
+        button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>');
         const expand = on => { sublist.hidden = !on; button.setAttribute("aria-expanded", String(on)); };
         button.addEventListener("click", () => expand(sublist.hidden));
         button.addEventListener("keydown", event => {
@@ -375,7 +378,7 @@ window.RKClipGames = (function () {
     if (!gamesEl || !typesEl) return null;
     let state = {game:"all",type:"all",favorites:false,linked:false}, folder = "", counts = {}, gameRows = [], libraryCounts = {}, refreshAt = 0, libraryReady = false, refreshGeneration = 0;
     const typeNames = {all:"All types",clips:"Clips",favorites:"Favorites",linked:"Linked",screenshots:"Screenshots",gifs:"GIFs",drafts:"Drafts"};
-    const typeIcons = {all:"nav/all-types",clips:"nav/clips",favorites:"toggle/star",linked:"nav/linked",screenshots:"nav/screenshots",gifs:"nav/screenshots",drafts:"action/open-editor"};
+    const typeIcons = {all:"nav/all-types",clips:"nav/clips",favorites:"toggle/star",linked:"nav/linked",screenshots:"nav/screenshots",gifs:"nav/gifs",drafts:"action/open-editor"};
     const games = RKCombo.bind(gamesEl, value => {state.game = value; paintGameIcon(); notify();}, {menuKeys:true,live:true,search:"Search games",beforeOpen:()=>paintGames()});
     const types = RKCombo.bind(typesEl, value => {setType(value); notify();}, {menuKeys:true,beforeOpen:()=>paintTypes()});
     function paintGameIcon() {
@@ -404,7 +407,7 @@ window.RKClipGames = (function () {
     function paintTypes() {
       const scope = state.game === "all" ? libraryCounts : gameRows.find(row => row.id === state.game) || {};
       const next = {...counts};
-      if (Number.isFinite(scope.clips) && Number.isFinite(scope.screenshots)) Object.assign(next,{clips:scope.clips,screenshots:scope.screenshots,all:scope.clips + scope.screenshots});
+      if (Number.isFinite(scope.clips) && Number.isFinite(scope.screenshots)) Object.assign(next,{clips:scope.clips,screenshots:scope.screenshots,all:scope.clips + scope.screenshots + (next.gifs || 0)});
       types.setOptions(Object.keys(typeNames).map(value => ({value,label:typeNames[value],icon:icon(typeIcons[value]),detail:next[value] === undefined ? "" : String(next[value])})));
       types.value = state.type;
       markTypes();
@@ -466,7 +469,7 @@ window.RKClipGames = (function () {
   // a row of the organize part of a card menu, built like the rows around it
   function menuAction(current, screenshot, closeMenus) {
     const row = document.createElement("div"); row.className = "menu-item change-game-item";
-    row.innerHTML = symbol("game");
+    row.innerHTML = symbol("all");
     const svg = row.querySelector("svg"); if (svg) svg.classList.add("menu-item-icon");
     const label = document.createElement("span"); label.textContent = "Change game"; row.append(label);
     row.addEventListener("click", event => {

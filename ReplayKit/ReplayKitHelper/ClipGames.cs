@@ -57,19 +57,22 @@ namespace ReplayKitHelper
                 if (title.Length > 256) title = "";
                 bool launched = raw["minecraft"]?.Type == JTokenType.Boolean && raw["minecraft"].Value<bool>();
                 GameCatalog.Game game = null;
+                bool fullscreen = raw["fullscreen"]?.Type == JTokenType.Boolean && raw["fullscreen"].Value<bool>();
+                // a program obs's game capture hooked, or one that fills its display, is plainly a game, so any installed program can name it; a window or the foreground app of a display capture is named only from a launcher's own record
+                bool plainlyGame = kind == "game" || fullscreen && (kind == "window" || kind == "display");
                 if ((kind == "game" || kind == "window" || kind == "display") && path.Length > 0 && path.Length < 32768)
                 {
                     lock (Gate)
                     {
                         // an app that is no game is looked up again only once a minute, as the steam library is read again; until that first read is done a fresh game may still turn up, so it is asked every two seconds
-                        string lookup = title.Length > 0 || launched ? path + "|" + title + (launched ? "|minecraft" : "") : path;
-                        if (!string.Equals(lookup, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled ? 60000 : 2000))
+                        string lookup = (title.Length > 0 || launched ? path + "|" + title + (launched ? "|minecraft" : "") : path) + (plainlyGame ? "|game" : "");
+                        if (!string.Equals(lookup, lastPath, StringComparison.OrdinalIgnoreCase) || lastGame == null && at - resolvedAt >= (SteamGames.Settled && LauncherGames.Settled ? 60000 : 2000))
                         {
                             lastGame = null;
                             lastPath = lookup;
                             resolvedAt = at;
                             var minecraft = GameCatalog.MinecraftJava(path, title, launched);
-                            lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path));
+                            lastGame = minecraft ?? (DesktopApps.Contains(Path.GetFileName(path)) ? null : GameCatalog.Find(path, plainlyGame));
                             if (minecraft != null) { if (GameCatalog.MinecraftIcon() is string icon) GameCatalog.CacheIcon(minecraft, icon); }
                             else if (lastGame != null) GameCatalog.CacheIcon(lastGame, path);
                         }
@@ -77,7 +80,6 @@ namespace ReplayKitHelper
                     }
                 }
                 // a display capture of anything but a known game is the desktop; an app nobody knows that fills its display may be a game the catalog is missing, so it stays unassigned
-                bool fullscreen = raw["fullscreen"]?.Type == JTokenType.Boolean && raw["fullscreen"].Value<bool>();
                 string state = game != null ? "game" : kind == "display" && (path.Length == 0 || DesktopApps.Contains(Path.GetFileName(path)) || !fullscreen) ? "desktop" : "unknown";
                 // the plugin says why a sample shows no capture; a capture of a program this catalog does not know is not recognised
                 string reason = raw["reason"]?.Type == JTokenType.String ? raw["reason"].Value<string>() : "";
@@ -104,7 +106,7 @@ namespace ReplayKitHelper
         internal static JObject Status()
         {
             lock (Gate) return new JObject { ["ok"] = true, ["peer"] = PipeClient.CapturePeer, ["samples"] = acceptedSamples, ["kind"] = acceptedKind,
-                ["ageMs"] = acceptedAt > 0 ? (JToken)((long)GetTickCount64() - acceptedAt) : JValue.CreateNull(), ["historyEntries"] = CaptureTimeline.Count, ["pendingSaves"] = Saves.Count, ["steam"] = SteamGames.Status() };
+                ["ageMs"] = acceptedAt > 0 ? (JToken)((long)GetTickCount64() - acceptedAt) : JValue.CreateNull(), ["historyEntries"] = CaptureTimeline.Count, ["pendingSaves"] = Saves.Count, ["steam"] = SteamGames.Status(), ["launchers"] = LauncherGames.Status() };
         }
 
         private static bool InScreenshots(string file) => string.Equals(Path.GetFileName(Path.GetDirectoryName(file)), "Screenshots", StringComparison.OrdinalIgnoreCase);

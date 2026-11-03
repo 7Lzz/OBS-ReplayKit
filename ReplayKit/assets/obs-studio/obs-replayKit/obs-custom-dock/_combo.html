@@ -133,7 +133,7 @@
   .combo-option:hover, .combo-option:focus-visible { background:var(--button_bg_hover); outline:none; }
   .combo-option.is-selected { position:relative; padding-right:30px; background:var(--selected,var(--primary)); color:var(--on-accent); }
   .combo-option.is-selected:hover, .combo-option.is-selected:focus-visible { background:var(--selected,var(--primary)); color:var(--on-accent); }
-  .combo-option.is-selected::after { content:""; position:absolute; right:13px; top:50%; width:4px; height:8px; margin-top:-6px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .combo-option.is-selected::after { content:""; position:absolute; right:10px; top:50%; width:14px; height:14px; margin-top:-7px; background:currentColor; -webkit-mask:url(/icons/action/check.svg) center / contain no-repeat; mask:url(/icons/action/check.svg) center / contain no-repeat; }
   .combo-option.is-disabled {
     color:var(--muted);
     cursor:default;

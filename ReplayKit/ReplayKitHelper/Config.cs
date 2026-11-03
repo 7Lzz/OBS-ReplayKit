@@ -51,9 +51,14 @@ namespace ReplayKitHelper
                 var settings = ReplaykitSettings.ReadSettings();
                 var flag = settings?["autoDeleteLogsOnLaunch"];
                 if (flag == null || !flag.Value<bool>()) return;
+                // the option sits under debug logging in the settings and is greyed out while that is off, so it only acts while debug logging is on
+                var debug = settings?["debugLoggingEnabled"];
+                if (debug == null || !debug.Value<bool>()) return;
                 if (!Directory.Exists(Constants.LOG_DIR)) return;
                 foreach (var file in Directory.GetFiles(Constants.LOG_DIR, "*.log"))
                 {
+                    // the logs of the installer are not helper logs: the installer starts obs as its last step, so deleting them here lost the one record of what the install did. they go once they are a week old instead
+                    if (Path.GetFileName(file).StartsWith("setup_", StringComparison.OrdinalIgnoreCase) && File.GetLastWriteTimeUtc(file) > DateTime.UtcNow.AddDays(-7)) continue;
                     try { File.Delete(file); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
             }

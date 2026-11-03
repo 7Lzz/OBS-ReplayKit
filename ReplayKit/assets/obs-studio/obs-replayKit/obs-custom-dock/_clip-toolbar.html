@@ -1,13 +1,13 @@
   <div class="tabs" id="clip-tabs" role="toolbar" aria-label="Clip filters">
     <div class="bulk-actions" id="bulk-actions" hidden>
       <button class="bulk-icon-btn" type="button" id="bulk-upload" data-tooltip="Upload" aria-label="Upload selected clips">
-        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-1}}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/link}}</svg>
       </button>
       <button class="bulk-icon-btn" type="button" id="bulk-compress" data-tooltip="Compress" aria-label="Compress selected clips">
         <svg viewBox="0 0 24 24" id="bulk-compress-icon" aria-hidden="true"></svg>
       </button>
       <button class="bulk-icon-btn bulk-delete" type="button" id="bulk-delete" data-tooltip="Delete" aria-label="Delete selected clips">
-        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-2}}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/trash}}</svg>
       </button>
     </div>
     <div class="clip-filters"><span class="clip-filter-caption">Filters</span>
@@ -26,53 +26,53 @@
         <svg data-i="action/trash" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="clip-deleted-count" id="clip-deleted-count" hidden></span>
       </button>
       <button class="clip-sort-trigger clip-folder-btn" type="button" id="clip-folder-btn" data-tooltip="Open clips folder" aria-label="Open clips folder">
-        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-3}}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/folder-open}}</svg>
       </button>
       <div class="clip-sort-wrap" id="clip-sort">
       <button class="clip-sort-trigger" type="button" id="clip-sort-button"
               aria-haspopup="menu" aria-expanded="false" aria-label="Sort by" data-tooltip="Sort by">
         <svg class="clip-sort-icon" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-icon}}</svg>
-        <svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-caret}}</svg>
+        <svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>
         <span class="clip-sort-spinner" aria-hidden="true"></span>
       </button>
       <div class="clip-sort-menu" id="clip-sort-menu" role="menu" aria-label="Sort clips">
         <div class="clip-sort-heading">Sort by</div>
         <button class="clip-sort-item" type="button" data-sort="newest" role="menuitemradio" aria-checked="false">
-          <span class="clip-sort-label">Newest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+          <span class="clip-sort-label">Newest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
         </button>
         <button class="clip-sort-item" type="button" data-sort="oldest" role="menuitemradio" aria-checked="false">
-          <span class="clip-sort-label">Oldest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+          <span class="clip-sort-label">Oldest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
         </button>
         <div class="clip-sort-group" data-group="length">
           <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
-            <span class="clip-sort-label">Length</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-caret}}</svg>
+            <span class="clip-sort-label">Length</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>
           </button>
           <div class="clip-sort-sub" role="group">
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="longest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Longest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+              <span class="clip-sort-label">Longest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
             </button>
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="shortest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+              <span class="clip-sort-label">Shortest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
             </button>
           </div>
         </div>
         <div class="clip-sort-group" data-group="filesize">
           <button class="clip-sort-item clip-sort-grouprow" type="button" aria-haspopup="true" aria-expanded="false">
-            <span class="clip-sort-label">File size</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-caret}}</svg>
+            <span class="clip-sort-label">File size</span><svg class="clip-sort-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>
           </button>
           <div class="clip-sort-sub" role="group">
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="biggest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Biggest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+              <span class="clip-sort-label">Biggest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
             </button>
             <button class="clip-sort-item clip-sort-subitem" type="button" data-sort="smallest" role="menuitemradio" aria-checked="false">
-              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-clip-sort-check}}</svg>
+              <span class="clip-sort-label">Smallest</span><svg class="clip-sort-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>
             </button>
           </div>
         </div>
        </div>
        </div>
        <label class="clip-search" for="clip-search-input">
-         <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-6}}</svg>
+         <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>
          <input class="clip-search-input" id="clip-search-input" type="text" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search clips">
        </label>
        <button class="tab-action" type="button" id="compress-all-btn" hidden

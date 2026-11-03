@@ -16,13 +16,13 @@
   :is(.check-row, .action-row, .combo-toggle, .trim-mode-row, .compress-downsample-row, .switch, .ed-switchrow, .ed-check, [data-control-row]):not(.is-disabled):not([aria-disabled="true"]):has(:is(input[type="checkbox"], button, a.btn, [role="button"]):not(:disabled):not([aria-disabled="true"])) { cursor:pointer; }
 
   .rk-hover-row { transition: background-color 90ms linear, color 90ms linear, padding-left var(--anim_press, 120ms) var(--ease_pop, ease); }
-  .rk-hover-row:not(.is-disabled):hover { background: var(--button_bg_hover); padding-left: calc(var(--rk-row-padding, 14px) + 2px); }
+  .rk-hover-row:not(.is-disabled):hover { background: var(--button_bg_hover); padding-left: calc(var(--rk-row-padding, 14px) + 1px); }
   .rk-hover-accent:hover { background: rgba(var(--accent-rgb), .13); }
   .rk-hover-danger:hover { background: rgba(227, 59, 87, .16); color: var(--red); }
   .rk-hover-danger.is-armed:hover { background: var(--red); color: var(--text); padding-left: var(--rk-row-padding, 14px); }
   .rk-hover-nav { transition: transform var(--anim_press, 120ms) var(--ease_pop, ease), background-color 90ms linear, border-color 90ms linear; }
-  .rk-hover-nav:hover { transform: translateX(var(--rk-nav-hover-x, 3px)); }
-  .rk-hover-nav:active { transform: translateX(var(--rk-nav-hover-x, 3px)) scale(var(--press_shrink, .97)); }
+  .rk-hover-nav:hover { transform: translateX(var(--rk-nav-hover-x, 1.5px)); }
+  .rk-hover-nav:active { transform: translateX(var(--rk-nav-hover-x, 1.5px)) scale(var(--press_shrink, .97)); }
 
   .rk-hover-card {
     transition: translate 160ms var(--ease_smooth, ease), box-shadow 200ms var(--ease_smooth, ease),

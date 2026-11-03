@@ -19,6 +19,21 @@ namespace ReplayKitSetup
     // headless installer flow: make sure OBS is present, write the ReplayKit setup, launch OBS. the only interactive choice, discord screenshare, comes from the setup window.
     public static class Apply
     {
+        private static readonly System.Text.RegularExpressions.Regex IssueWords = new System.Text.RegularExpressions.Regex(
+            @"\b(?:warn\w*|failed|missing|not found|skipped|timed out|permission denied)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+        // a path or a file name is never a problem by itself: the list of copied files ("-> icons/action/warning.svg") used to count as two failed steps and left setup "incomplete" when everything had worked
+        private static readonly System.Text.RegularExpressions.Regex PathToken = new System.Text.RegularExpressions.Regex(
+            @"(?:[A-Za-z]:)?[^\s""']*[\\/][^\s""']*|\S+\.[A-Za-z0-9]{1,5}\b", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        // whether a log line of a step says something went wrong; shared by the install, uninstall and cleanup runs
+        public static bool LooksLikeIssue(string line)
+        {
+            string text = (line ?? "").Trim();
+            if (text.Length == 0 || text.StartsWith("->", StringComparison.Ordinal)) return false;
+            return IssueWords.IsMatch(PathToken.Replace(text, " "));
+        }
+
         // Exceptions stop the flow; false results are reported as incomplete steps.
         public static void RunApplyStep(IInstallProgress progress, int index, string title, string detail, Func<object> action)
         {

@@ -199,7 +199,7 @@
     <header class="top">
       <h1>Free-up Space</h1>
       <button class="x" type="button" id="close" aria-label="Close">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:notification-reader-1}}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:editor/close}}</svg>
       </button>
       <p class="sub" id="sub">&nbsp;</p>
     </header>
@@ -312,7 +312,10 @@
   // the arrow of the shared dropdown is one of the icons the helper hands every page as RK_ICONS
   document.querySelectorAll("svg[data-i]").forEach((el) => {
     const full = (window.RK_ICONS || {})[el.dataset.i];
-    if (full) el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+    if (!full) return;
+    const box = /^<svg[^>]*\sviewBox="([^"]+)"/i.exec(full);
+    if (box) el.setAttribute("viewBox", box[1]);
+    el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
   });
   const els = {
     card:$("card"), sub:$("sub"), bar:$("bar"), legend:$("legend"), library:$("library"), close:$("close"),
@@ -671,7 +674,8 @@
     try { await helperJson("/storage/compress-cancel", { method:"POST" }); } catch (_) {}
   });
 
-  els.ok.addEventListener("click", () => {
+  function acknowledgeDone() {
+    if (cmp.phase !== "done") return;
     cmp.ackedId = cmp.lastId;
     // the clips that were compressed are smaller now, so the list starts over with the biggest ones again
     cmp.limit = CMP_PAGE;
@@ -680,7 +684,8 @@
     showPhase("pick");
     refresh(true);
     loadCandidates();
-  });
+  }
+  els.ok.addEventListener("click", acknowledgeDone);
 
   function paintRun(st) {
     if (st.mode) showCompressionType(st.mode);

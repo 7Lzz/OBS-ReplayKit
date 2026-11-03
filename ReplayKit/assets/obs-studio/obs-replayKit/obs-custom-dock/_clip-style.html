@@ -15,6 +15,8 @@
     --green: #37D247;
     --red: #E33B57;
     --amber: #E2A33B;
+    /* the filled favourite star */
+    --favorite: #FACC15;
     --white1: #FFFFFF;
     --white5: #969696;
     --bg_window: var(--grey7);
@@ -475,6 +477,10 @@
   body.is-clip-theater .favorites-grid .card:not(.is-theater-card) {
     visibility: hidden;
   }
+  /* a toast that is up is still read in theater mode and fullscreen (a screenshot of the player says it saved); only the idle one stays out of the repaint */
+  body:is(.is-clip-theater, .is-clip-fullscreen) #toast.is-shown { visibility: visible; }
+  /* inside a fullscreen player it sits above the control bar instead of over its buttons */
+  :fullscreen > #toast, :-webkit-full-screen > #toast { bottom: 60px; }
   body.is-clip-theater .scroll-area { overflow: hidden; }
   body.is-clip-theater #grid { contain: none; }
   .card.is-theater-card {
@@ -588,16 +594,18 @@
   }
   .section-heading.is-shown { display: flex; animation: rk-fade-in 240ms var(--ease_smooth) backwards; }
   .section-heading svg { width: 16px; height: 16px; fill: currentColor; display: block; flex-shrink: 0; }
-  #favorites-heading > svg, #rest-heading-icon.is-favorite { color: var(--amber); }
+  #favorites-heading > svg, #rest-heading-icon.is-favorite { color: var(--favorite); }
   .section-heading .section-toggle { margin-left:2px; }
   .section-toggle[hidden] { display:none; }
   .section-heading .section-toggle svg { width:14px; height:14px; transition:transform var(--anim_press) var(--ease_smooth); }
   .section-toggle[aria-expanded="false"] svg { transform:rotate(-90deg); }
-  #screenshots-area { margin-bottom:18px; }
-  #screenshots-area[hidden], #screenshots-grid[hidden], .favorites-grid.section-collapsed,
+  #screenshots-area, #gifs-area { margin-bottom:18px; }
+  #screenshots-area[hidden], #screenshots-grid[hidden], #gifs-area[hidden], #gifs-grid[hidden], .favorites-grid.section-collapsed,
   body.clips-collapsed #grid, body.clips-collapsed .virtual-spacer, body.clips-collapsed #empty,
   body.is-screenshots #favorites-heading, body.is-screenshots #linked-heading, body.is-screenshots #drafts-heading, body.is-screenshots .favorites-grid, body.is-screenshots #rest-heading,
-  body.is-screenshots #grid, body.is-screenshots .virtual-spacer, body.is-screenshots #empty { display:none !important; }
+  body.is-screenshots #grid, body.is-screenshots .virtual-spacer, body.is-screenshots #empty,
+  body.is-gifs #favorites-heading, body.is-gifs #linked-heading, body.is-gifs #drafts-heading, body.is-gifs .favorites-grid, body.is-gifs #rest-heading,
+  body.is-gifs #grid, body.is-gifs .virtual-spacer, body.is-gifs #empty { display:none !important; }
   /* divider above "all clips" so the favorites-vs-rest boundary reads clearly even with both headings now sharing the same bold white style. same border colour as every other hairline in this file (inputs, cards, toasts) for consistency. */
   .section-heading-rest {
     margin-top: 6px;
@@ -780,7 +788,7 @@
   }
   .favorite-btn:hover { background: rgba(0, 0, 0, 0.85); }
   /* filled star (favorited) renders in youtube-/imdb-style gold so it reads at a glance against the dark card; outline state keeps the white-on-translucent look so its visible without competing for attention with the play button. */
-  .favorite-btn.is-favorite { color: var(--amber); }
+  .favorite-btn.is-favorite { color: var(--favorite); }
   .favorite-btn svg {
     width: 22px;
     height: 22px;
@@ -843,7 +851,7 @@
     70% { box-shadow: 0 0 0 3px rgba(var(--text-rgb), .4), 0 0 18px 3px rgba(var(--text-rgb), .12), inset 0 0 0 999px rgba(var(--text-rgb), .12); }
     100% { box-shadow: 0 0 0 0 rgba(var(--text-rgb), 0), 0 0 0 0 rgba(var(--text-rgb), 0), inset 0 0 0 999px rgba(var(--text-rgb), 0); }
   }
-  .card.is-located { animation: rk-locate 2400ms var(--ease_smooth) 1 both; }
+  .card.is-located, .screenshot-card.is-located { animation: rk-locate 2400ms var(--ease_smooth) 1 both; }
   /* multi-select lives on the opposite corner from Favorite: a quiet empty circle becomes a checked blue control, then the toolbar exposes the bulk operations. */
   .select-clip-btn {
     position: absolute;
@@ -1086,6 +1094,11 @@
   .preview .play-toggle-btn,
   .preview .time-display,
   .preview .settings-wrap { display: none; }
+  /* the screenshot button is for a clip watched big: theater mode, next to the theater button, and fullscreen, next to the settings */
+  .preview .snap-btn { display: none; }
+  .card.is-theater-card .preview .snap-btn, .preview:is(:fullscreen, .rk-fs) .snap-btn, .preview:-webkit-full-screen .snap-btn { display: inline-flex; }
+  .snap-btn.is-busy { opacity: .55; cursor: progress; }
+  .icon-btn.snap-btn svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .preview:is(:fullscreen, .rk-fs) .settings-wrap,
   .preview:-webkit-full-screen .settings-wrap {
     display: inline-flex;
@@ -1727,10 +1740,12 @@
   }
   .menu-item:hover { background: var(--button_bg_hover); }
   .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
-  /* the share group (Create Link, Copy to clipboard) carries the blue accent on its icons only, the row text stays white like every other row */
+  /* the share group carries the blue accent on its icons only (Copy to clipboard has its own colours drawn in, so only Create Link shows it), the row text stays white like every other row */
   .menu-item.share-menu-item .menu-item-icon { color: var(--link_accent); }
   .menu-item.share-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
-  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--amber); }
+  .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--favorite); }
+  /* Select: the corners take the link blue and the check stays white; only the direct paths of the icon, so the outlined Deselect icon that replaces it keeps its own look */
+  .menu-item.select-menu-item .menu-item-icon > path:first-child { fill: var(--link_accent); }
   .menu-separator {
     height: 1px;
     margin: 4px 0;
@@ -2915,16 +2930,22 @@
   .section-heading .section-drag { position:absolute; left:-17px; width:16px; margin:0; cursor:grab; }
   .export-gif-item[aria-disabled="true"] { opacity:.5; cursor:default; background:transparent; }
   .section-heading .section-drag:active { cursor:grabbing; }
+  .section-heading .section-drag { touch-action:none; }
+  /* a name box that is being saved holds still and says so; a character that cannot be in a file name gives it a small shake */
+  .name-edit-input.is-saving { opacity:.6; cursor:progress; }
+  .name-edit-input.is-invalid { outline:1px solid var(--red); outline-offset:-1px; }
+  .name-edit-input.is-rejected { animation:rk-name-reject 260ms ease-out; }
+  @keyframes rk-name-reject { 20% { transform:translateX(-3px); } 45% { transform:translateX(3px); } 70% { transform:translateX(-2px); } 100% { transform:none; } }
+  /* while a section is carried every section folds to its heading, the carried heading floats over the others and they glide aside, the same motion as a track carried in the editor */
+  body.is-section-sorting :is(#favorites-grid,#linked-grid,#drafts-grid,#top-spacer,#grid,#bottom-spacer,#empty,#screenshots-grid,#screenshots-empty,#gifs-grid,#gifs-empty) { display:none !important; }
+  body.is-section-sorting, body.is-section-sorting * { cursor:grabbing !important; user-select:none; }
+  body.is-section-sorting .section-heading:not(.is-floating) { transition:transform 170ms cubic-bezier(.2,.7,.2,1); }
+  .section-heading.is-landed { animation:rk-section-land 420ms ease-out; border-radius:6px; }
+  @keyframes rk-section-land { from { background:rgba(var(--text-rgb),.10); } to { background:transparent; } }
+  .section-heading.is-floating { z-index:30; background:var(--bg_window); border-radius:6px; box-shadow:0 8px 18px rgba(0,0,0,.45); }
   .section-drag::before { content:""; width:14px; height:14px; background:currentColor; mask:url(/icons/ui/section-grip.svg) center / contain no-repeat; }
   .trim-video-wrap:has(.main-picture-handles:not([hidden])) { overflow:visible; }
   .trim-video-wrap .main-picture-handles { position:absolute; left:50%; top:50%; z-index:6; border:1px solid var(--selected2); pointer-events:none; }
   .main-picture-handles[hidden] { display:none; }
   .main-picture-handles :is(.lay-grip,.lay-rot) { pointer-events:auto; touch-action:none; }
-  #gifs-area { margin-bottom:18px; }
-  body.is-gifs .scroll-area > :is(.section-heading,.favorites-grid,.virtual-spacer,#grid,#empty,#screenshots-area) { display:none !important; }
-  #gif-filter { width:160px; margin:0 0 0 8px; text-transform:none; }
-  #gifs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
-  .gif-card { display:grid; gap:6px; min-width:0; overflow:hidden; border-radius:6px; background:var(--bg_card); color:var(--text); text-decoration:none; }
-  .gif-card img { width:100%; aspect-ratio:16/9; object-fit:contain; }
-  .gif-card span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 8px 8px; }
 </style>

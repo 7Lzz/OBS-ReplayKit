@@ -12,6 +12,7 @@
 #include "app/settings_poll.hpp"
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
+#include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
@@ -19,6 +20,7 @@
 #include "shell/shell_grip.hpp"
 #include "shell/shell_history.hpp"
 #include "shell/shell_notify_reader.hpp"
+#include "shell/shell_done_popup.hpp"
 #include "shell/shell_page.hpp"
 #include "shell/shell_quick_menu.hpp"
 #include "shell/shell_state.hpp"
@@ -159,6 +161,15 @@ void PipeDispatchLine(const std::string &line)
 		}
 	} else if (line == "NOTIFYREADERCLOSE") {
 		QMetaObject::invokeMethod(g_callbacks, []() { NotifyReaderClose(); }, Qt::QueuedConnection);
+	} else if (line.rfind("DONEPOPUP ", 0) == 0) {
+		// the helper made the id itself; it is checked again before it goes into a script of the card
+		const std::string id = line.substr(10);
+		const bool safe = !id.empty() && id.size() <= 64 && std::all_of(id.begin(), id.end(), [](char c) { return std::isalnum((unsigned char)c); });
+		if (safe) {
+			QMetaObject::invokeMethod(g_callbacks, [id]() { DonePopupRequest(id); }, Qt::QueuedConnection);
+		}
+	} else if (line == "DONEPOPUPCLOSE") {
+		QMetaObject::invokeMethod(g_callbacks, []() { DonePopupClose(); }, Qt::QueuedConnection);
 	} else if (line.rfind("SETTINGSDIRTY ", 0) == 0) {
 		const bool dirty = line.substr(14) == "1";
 		QMetaObject::invokeMethod(g_callbacks, [dirty]() { g_settingsDirty = dirty; }, Qt::QueuedConnection);

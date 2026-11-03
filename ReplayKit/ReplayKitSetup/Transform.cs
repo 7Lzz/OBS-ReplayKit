@@ -1491,6 +1491,8 @@ namespace ReplayKitSetup
                     monSettings["monitor_id"] = chosen?.DeviceId ?? primary.DeviceId;
                     monSettings["replaykit_wanted_monitor_id"] = wanted;
                     monSettings["capture_cursor"] = CursorSetting("showCursorDisplayCapture");
+                    int? method = ReplayKitShared.CaptureMethod.DisplayDefault(monSettings);
+                    if (method.HasValue) monSettings[ReplayKitShared.CaptureMethod.Key] = method.Value;
                 }
 
                 ApplyGameCaptureDefaults(src, prefs);

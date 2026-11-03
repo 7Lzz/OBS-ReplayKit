@@ -61,7 +61,7 @@
   }
   .ed-fx-tile:hover .ed-fx-star, .ed-fx-star:focus-visible, .ed-fx-tile.is-favorite .ed-fx-star { opacity: 1; }
   .ed-fx-star:hover { background: rgba(0, 0, 0, .85); }
-  .ed-fx-tile.is-favorite .ed-fx-star { color: var(--amber, #f5b301); }
+  .ed-fx-tile.is-favorite .ed-fx-star { color: var(--favorite, #facc15); }
   .ed-fx-star svg { width: 13px; height: 13px; fill: currentColor; }
   /* the favorites come first under a heading of their own, the way the clips page splits its grid */
   .ed-fx-group-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text); margin: 2px 0 -4px; }
@@ -795,7 +795,7 @@
     };
   }
 
-  var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-toolbar-6}}</svg>';
+  var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>';
   var BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-1}}</svg>';
   var TAB_ICONS = {
     general: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-2}}</svg>',

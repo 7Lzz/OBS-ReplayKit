@@ -88,7 +88,8 @@ namespace ReplayKitHelper
             return index;
         }
 
-        internal static Game Find(string path)
+        // anyProgram lets a program of the windows list of installed programs count as a game, which only a capture that is plainly a game asks for (see LauncherGames.Find)
+        internal static Game Find(string path, bool anyProgram = false)
         {
             if (string.IsNullOrWhiteSpace(path) || path.Length > 32768) return null;
             string normalized = path.Replace('\\', '/').ToLowerInvariant(), exe = normalized.Substring(normalized.LastIndexOf('/') + 1);
@@ -99,7 +100,8 @@ namespace ReplayKitHelper
             var explicitGames = ReplaykitSettings.ReadSettings()["screenshareGameOverrides"] as JArray;
             if (explicitGames != null && explicitGames.Any(g => string.Equals(g["exeName"]?.Value<string>(), exe, StringComparison.OrdinalIgnoreCase)))
                 return Custom(Path.GetFileNameWithoutExtension(exe));
-            var installed = SteamGames.Find(path);
+            // installed through steam, else through another launcher (epic, gog, ubisoft, ea, battle.net, riot, rockstar, itch.io, xbox)
+            var installed = SteamGames.Find(path) ?? LauncherGames.Find(path, anyProgram);
             if (installed != null) Remember(installed);
             return installed;
         }
@@ -150,11 +152,17 @@ namespace ReplayKitHelper
         {
             name = (name ?? "").Trim();
             if (name.Length == 0 || name.Length > 100 || name.Any(char.IsControl)) throw new ArgumentException("Enter a game name of 1–100 characters.");
-            string id;
-            using (var hash = SHA256.Create()) id = "custom-" + BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(name.ToUpperInvariant()))).Replace("-", "").ToLowerInvariant().Substring(0, 32);
-            var game = new Game { Id = id, Name = name };
+            var game = CustomGame(name);
             Remember(game);
             return game;
+        }
+
+        // the saved game a name stands for, the same one whether the name was typed in the game picker or read from a launcher; not saved until it is used
+        internal static Game CustomGame(string name)
+        {
+            string id;
+            using (var hash = SHA256.Create()) id = "custom-" + BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(name.ToUpperInvariant()))).Replace("-", "").ToLowerInvariant().Substring(0, 32);
+            return new Game { Id = id, Name = name };
         }
 
         private static void Remember(Game game) => ClipStore.Update(CustomFile, db =>

@@ -284,7 +284,8 @@
   }
 
   // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
-  const APPICON_X_SVG = (window.RK_ICONS || {})["action/cancel-x"] || "";
+  // the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
+  const APPICON_X_SVG = ((window.RK_ICONS || {})["editor/close"] || "").replace(/viewBox="[^"]*"/, 'viewBox="5 5 14 14"');
   const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
   // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
   let themesCache = [];

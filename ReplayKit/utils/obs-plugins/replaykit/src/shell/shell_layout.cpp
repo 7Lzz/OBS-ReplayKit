@@ -51,7 +51,9 @@ QString SourceResizeStyle()
 		}
 		images.append(QDir::fromNativeSeparators(path));
 	}
-	return QStringLiteral("QMainWindow#OBSBasic::separator { width:10px; height:10px; background:%1; }"
+	// only the pill of the bar changes under the pointer, as on the resizer of the editor timeline (.tl-resizer); the obs theme outlines the whole separator and moves it by a margin on hover, which looked like a button
+	return QStringLiteral("QMainWindow#OBSBasic::separator { width:10px; height:10px; background:%1; border:none; margin:0px; }"
+			      "QMainWindow#OBSBasic::separator:hover { background:%1; border:none; margin:0px; }"
 			      "QMainWindow#OBSBasic::separator:horizontal { image:url(\"%2\"); image-position:center; }"
 			      "QMainWindow#OBSBasic::separator:horizontal:hover { image:url(\"%3\"); }")
 		.arg(g_chromeBg.name(), images[0], images[1]);
@@ -109,6 +111,46 @@ void InkSourceIcon(QLabel *label, bool on)
 }
 
 // the eye and the lock of a row are images of the obs theme, which no style can recolour, so copies in the ink of the accent are written to the scratch folder of replaykit and the selected rows point at those; made again only when the ink changes
+// the arrow of the dropdowns of the pages (nav/combo-arrow), in a colour of the theme and turned over for an open dropdown, written to the scratch folder of replaykit, since a qss image cannot be recoloured; made again only when the colour changes. empty when it cannot be written, and the dropdown then keeps the arrow of the obs theme
+QString TintedComboArrow(const QColor &ink, bool open)
+{
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/combo-arrow");
+	const QString path = dir + QStringLiteral("/%1-%2.svg").arg(ink.name().mid(1), open ? QStringLiteral("up") : QStringLiteral("down"));
+	if (QFile::exists(path))
+		return path;
+	QFile in(IconPath(QStringLiteral("nav/combo-arrow.svg")));
+	if (!QDir().mkpath(dir) || !in.open(QIODevice::ReadOnly))
+		return {};
+	QString svg = QString::fromUtf8(in.readAll()).replace(QStringLiteral("currentColor"), ink.name());
+	if (open)
+		svg.replace(QRegularExpression(QStringLiteral("(<path )")), QStringLiteral("<path transform=\"rotate(180 8 8)\" "));
+	QSaveFile out(path);
+	const QByteArray bytes = svg.toUtf8();
+	if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit())
+		return {};
+	return path;
+}
+
+// the shared checkmark (action/check) in a colour of the theme, for the picked row of a dropdown, the way the dropdowns of the pages mark it; empty when it cannot be written
+QString TintedCheck(const QColor &ink)
+{
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/combo-arrow");
+	const QString path = dir + QStringLiteral("/check-%1.svg").arg(ink.name().mid(1));
+	if (QFile::exists(path))
+		return path;
+	QFile in(IconPath(QStringLiteral("action/check.svg")));
+	if (!QDir().mkpath(dir) || !in.open(QIODevice::ReadOnly))
+		return {};
+	// a 24 by 14 strip with a 14 px check at its left and 10 px of nothing after it, so a row that puts it at its right edge shows the check where the dropdowns of the pages do (14 px, 10 px in from the right)
+	QString body = QString::fromUtf8(in.readAll()).replace(QStringLiteral("currentColor"), ink.name());
+	body.replace(QRegularExpression(QStringLiteral("<svg[^>]*>")), QStringLiteral("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"14\" viewBox=\"0 0 41.14 24\" fill=\"%1\">").arg(ink.name()));
+	QSaveFile out(path);
+	const QByteArray bytes = body.toUtf8();
+	if (!out.open(QIODevice::WriteOnly) || out.write(bytes) != bytes.size() || !out.commit())
+		return {};
+	return path;
+}
+
 QString InkedIndicatorRules(const QColor &ink)
 {
 	static QString madeFor;
@@ -265,6 +307,7 @@ void ShellTintPreview()
 		"QDockWidget::title { background:%1; color:%3; border:none; padding-left:12px; }"
 		"#sourcesFrame { border:none; border-radius:8px; }"
 		"#sourcesToolbar { background:transparent; color:%3; border:none; padding:4px 6px; }"
+		// the + - and gear take the hover of the buttons of the editor toolbar (.tl-btn: the text colour at 10%)
 		"#sourcesToolbar QToolButton:hover { background:%2; border-radius:6px; }"
 		"SourceTree { border:none; border-radius:8px; padding:6px 14px; alternate-background-color:%1; selection-background-color:%4; selection-color:%5; }"
 		"SourceTree QScrollBar:vertical { background:transparent; border:none; width:8px; margin:0px; }"
@@ -275,9 +318,12 @@ void ShellTintPreview()
 		"SourceTreeItem { background:transparent; color:%3; }"
 		// the last rows stop above the resize corner, which sits over the bottom right of the window
 		"SourceTree { padding-bottom:%6px; }"
+		// a row lights up under the pointer the way a row of a list of the editor does (.ed-preset: the text colour at 6%)
+		"SourceTree::item:hover:!selected { background:%9; border-radius:5px; }"
 		"SourceTree::item:selected { background:%4; border-radius:5px; }"
 		"SourceTreeItem[rkSelected=\"true\"], SourceTreeItem[rkSelected=\"true\"] QLabel { color:%5; }")
-		.arg(g_chromeBg.name(), g_menuPanel.name(), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name(), QString::number(kShellGrip), ChromeInk(0.26).name(QColor::HexArgb), ChromeInk(0.46).name(QColor::HexArgb))
+		// qt fills the lowest placeholder present with the first value whatever its number, so every number from 1 to 9 is used here
+		.arg(g_chromeBg.name(), ChromeInk(0.10).name(QColor::HexArgb), g_notifyTipFg.name(), g_menuAccent.name(), g_menuOnAccent.name(), QString::number(kShellGrip), ChromeInk(0.26).name(QColor::HexArgb), ChromeInk(0.46).name(QColor::HexArgb), ChromeInk(0.06).name(QColor::HexArgb))
 		+ InkedIndicatorRules(g_menuOnAccent);
 	if (QWidget *sources = mw->findChild<QWidget *>(QStringLiteral("sourcesDock"))) {
 		if (sources->styleSheet() != sourcesStyle)
@@ -300,12 +346,43 @@ void ShellTintPreview()
 			central->setPalette(palette);
 		}
 	}
-	const QString contextStyle = QStringLiteral(
+	// the buttons are the .btn of the editor (--button_bg with a border of the same colour, --button_bg_hover with the stronger border under the pointer, the window ground while pressed, 30 px tall, 4 px corners, 12 px text) and the dropdown is the .combo-button of the pages (32 px, a divider before the arrow, the accent around it while open, the list on the panel colour)
+	const QString arrowDown = TintedComboArrow(g_notifyTipFg, false);
+	const QString arrowUp = TintedComboArrow(g_notifyTipFg, true);
+	QString contextStyle = QStringLiteral(
 		"#contextContainer { background:%1; color:%2; margin:0px; border:1px solid %3; border-radius:8px; }"
 		"#contextSubContainer { background:transparent; color:%2; border:none; }"
-		"QLabel { color:%2; } QPushButton { background:%3; color:%2; border:1px solid %4; }"
-		"QPushButton:hover { background:%4; } QPushButton:disabled { color:%5; }")
-		.arg(editorPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name());
+		"QLabel { color:%2; font-size:12px; }"
+		// the dividers of the bar are one line of the border colour; obs draws them as a sunken groove, two lines of two colours
+		"QFrame#line, QFrame#line_3 { border:none; background:%3; min-width:1px; max-width:1px; margin:6px 4px; }"
+		// the theme of obs gives a button a fixed height of its own and margins above and below it, which pushed the 30 px button of the editor off the middle of the bar; height and margins are set here outright
+		"QPushButton { background:%3; color:%2; border:1px solid %3; border-radius:4px; height:28px; min-height:28px; max-height:28px; margin:0px; padding:0px 12px; font-size:12px; }"
+		"QPushButton:hover { background:%6; border-color:%4; } QPushButton:pressed { background:%7; } QPushButton:disabled { color:%5; }"
+		"QComboBox { background:%3; color:%2; border:1px solid %3; border-radius:4px; height:30px; min-height:30px; max-height:30px; margin:0px; padding:0px 37px 0px 9px; font-size:12px; }"
+		"QComboBox:hover { border-color:%4; }"
+		"QComboBox:on { background:%7; border-color:%8; }"
+		"QComboBox::drop-down { subcontrol-origin:border; subcontrol-position:top right; width:28px; border:none; border-left:1px solid %9; }"
+		"QComboBox QAbstractItemView { background:%9; color:%2; border:1px solid %3; padding:3px; outline:0px; selection-background-color:%8; selection-color:%10; }"
+		// the rows of the list: the 28 px rows of the dropdowns of the pages, the accent for the picked one and the hover colour of a button for the one under the pointer, set outright since the obs theme paints both its own way and outlines the picked row
+		"QComboBox QAbstractItemView::item { min-height:28px; padding:0px 30px 0px 10px; border:none; border-radius:3px; margin:0px; color:%2; background:transparent; }"
+		"QComboBox QAbstractItemView::item:hover { background:%6; color:%2; border:none; }"
+		"QComboBox QAbstractItemView::item:selected { background:%8; color:%10; border:none; }")
+		.arg(editorPanel.name(), g_notifyTipFg.name(), g_menuField.name(), g_menuBorderStrong.name(), g_menuMuted.name(), g_notifyBorder.name(), g_chromeBg.name(), g_menuAccent.name(), g_menuPanel.name())
+		.arg(g_menuOnAccent.name());
+	const QString check = TintedCheck(g_menuOnAccent);
+	if (!check.isEmpty())
+		contextStyle += QStringLiteral("QComboBox QAbstractItemView::item:selected { background-image:url(%1); background-repeat:no-repeat; background-position:right center; background-origin:border; background-clip:border; }").arg(QDir::fromNativeSeparators(check));
+	if (!arrowDown.isEmpty() && !arrowUp.isEmpty())
+		contextStyle += QStringLiteral("QComboBox::down-arrow { image:url(%1); width:16px; height:16px; } QComboBox::down-arrow:on { image:url(%2); }")
+			.arg(QDir::fromNativeSeparators(arrowDown), QDir::fromNativeSeparators(arrowUp));
+	// obs fixes the name of the selected source at 160 px and cuts a longer one off; it takes the width of its name instead
+	if (QLabel *name = mw->findChild<QLabel *>(QStringLiteral("contextSourceLabel"))) {
+		if (name->maximumWidth() != QWIDGETSIZE_MAX) {
+			name->setMinimumWidth(0);
+			name->setMaximumWidth(QWIDGETSIZE_MAX);
+			name->setSizePolicy(QSizePolicy::Preferred, name->sizePolicy().verticalPolicy());
+		}
+	}
 	if (QWidget *context = mw->findChild<QWidget *>(QStringLiteral("contextContainer"))) {
 		QWidget *host = context->parentWidget();
 		if (host && host->objectName() == QLatin1String("sourceSettingsHost") && host->layout())

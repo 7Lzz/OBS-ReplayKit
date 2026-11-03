@@ -184,7 +184,7 @@
   /* the chevron is stroked like the one on the way back of the obs settings: thin, round ends, pointing on */
   html.rk-embedded .nav-chev { display:block; width:10px; height:12px; flex:0 0 auto; fill:none; stroke:rgba(var(--text-rgb),.62); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
   html.rk-embedded .sidebar-footer { padding:0 10px 6px; }
-  /* the shared hover nudge of a tab button is 3px sideways; here it is 1px, and the press shrinks less, so it reads as a hint rather than a slide */
+  /* the shared hover nudge of a tab button is 1.5px sideways; here it is 1px, and the press shrinks less, so it reads as a hint rather than a slide */
   html.rk-embedded .rk-hover-nav:hover { transform:translateX(1px); }
   html.rk-embedded .rk-hover-nav:active { transform:translateX(1px) scale(.985); }
   .box {
@@ -894,7 +894,7 @@
       <span>Video Editor</span>
     </button>
     <button class="nav-btn" type="button" data-page="notifications">
-      <svg data-i="nav/tab-notifications" viewBox="0 0 16 16" aria-hidden="true"></svg>
+      <svg data-i="nav/bell" viewBox="0 0 24 24" aria-hidden="true"></svg>
       <span>Notifications</span>
     </button>
     <button class="nav-btn" type="button" data-page="appearance">
@@ -1554,6 +1554,13 @@
         </div>
       </div>
       <div class="box">
+        <div class="box-title">GIF export</div>
+        <div class="form-row">
+          <div class="label">Frame rate <span class="control-note">How smooth exported GIFs play. Higher looks smoother but makes bigger files that take longer to export. Every choice plays at an even pace.</span></div>
+          <div class="field-wrap"><div class="combo" id="gifFrameDelay" tabindex="0" role="combobox" aria-expanded="false" aria-label="GIF frame rate"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
+      </div>
+      <div class="box">
         <div class="box-title">Preview</div>
         <div class="form-row tight">
           <div></div>
@@ -2181,7 +2188,11 @@
     const m = window.RK_ICONS || {};
     document.querySelectorAll("svg[data-i]").forEach((el) => {
       const full = m[el.dataset.i];
-      if (full) el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+      if (!full) return;
+      // the viewBox comes with the icon, so a page never draws an icon on the grid of another one
+      const box = /^<svg[^>]*\sviewBox="([^"]+)"/i.exec(full);
+      if (box) el.setAttribute("viewBox", box[1]);
+      el.innerHTML = full.replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
     });
   })();
   (function lockdown() {
@@ -2400,6 +2411,7 @@
     editorAutoplay: document.getElementById("editorAutoplay"),
     editorLoopPreview: document.getElementById("editorLoopPreview"),
     editorSeekStep: document.getElementById("editorSeekStep"),
+    gifFrameDelay: document.getElementById("gifFrameDelay"),
     editorWheelZoom: document.getElementById("editorWheelZoom"),
     editorZoomScaling: document.getElementById("editorZoomScaling"),
     clipAntialiasing: document.getElementById("clipAntialiasing"),
@@ -2458,6 +2470,7 @@
   fillCombo(els.storageLimit, STORAGE_LIMITS);
   fillCombo(els.storageCompressionType, [{ value:"fast", label:"Fast" }, { value:"smaller", label:"Smaller" }]);
   fillCombo(els.deletedHistoryDays, [{ value:"0", label:"Off" }, { value:"1", label:"1 day" }, { value:"3", label:"3 days" }, { value:"7", label:"7 days" }, { value:"14", label:"14 days" }, { value:"30", label:"30 days" }]);
+  fillCombo(els.gifFrameDelay, [{ value:"10", label:"10 fps (smallest)" }, { value:"5", label:"20 fps" }, { value:"4", label:"25 fps" }, { value:"3", label:"33 fps (recommended)" }, { value:"2", label:"50 fps (smoothest, largest)" }]);
   fillCombo(els.editorSeekStep, [{ value:"1", label:"1 second" }, { value:"2", label:"2 seconds" }, { value:"5", label:"5 seconds" }, { value:"10", label:"10 seconds" }, { value:"15", label:"15 seconds" }, { value:"30", label:"30 seconds" }]);
   fillCombo(els.editorZoomScaling, [
     { value:"smooth", label:"Smooth", blurb:"Blend pixels for smoother zoomed-in video." },
@@ -3801,6 +3814,7 @@
     els.editorAutoplay.checked = !!state.editorAutoplay;
     els.editorLoopPreview.checked = !!state.editorLoopPreview;
     setComboValue(els.editorSeekStep, String(state.editorSeekStep || 5), false);
+    setComboValue(els.gifFrameDelay, ["2", "3", "4", "5", "10"].includes(String(state.gifFrameDelay)) ? String(state.gifFrameDelay) : "3", false);
     els.editorWheelZoom.checked = state.editorWheelZoom !== false;
     setComboValue(els.editorZoomScaling, state.editorZoomScaling === "sharp" ? "sharp" : "smooth", false);
     setComboValue(els.clipAntialiasing, state.clipAntialiasing === "msaa" || state.clipAntialiasing === "fxaa" ? state.clipAntialiasing : "none", false);
@@ -3899,6 +3913,7 @@
     state.editorAutoplay = els.editorAutoplay.checked;
     state.editorLoopPreview = els.editorLoopPreview.checked;
     state.editorSeekStep = parseInt(comboValue(els.editorSeekStep), 10) || 5;
+    state.gifFrameDelay = [2, 3, 4, 5, 10].includes(parseInt(comboValue(els.gifFrameDelay), 10)) ? parseInt(comboValue(els.gifFrameDelay), 10) : 3;
     state.editorWheelZoom = els.editorWheelZoom.checked;
     state.editorZoomScaling = comboValue(els.editorZoomScaling) === "sharp" ? "sharp" : "smooth";
     state.clipAntialiasing = ["msaa", "fxaa"].includes(comboValue(els.clipAntialiasing)) ? comboValue(els.clipAntialiasing) : "none";
@@ -4015,7 +4030,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.deletedHistoryDays, els.editorSeekStep, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.deletedHistoryDays, els.editorSeekStep, els.gifFrameDelay, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {
@@ -4894,7 +4909,8 @@
   });
 
   // -- Appearance tab: theme picker -- ReplayKit surfaces preview live here; OBS gets it on the restart that Apply triggers.
-  const APPICON_X_SVG = (window.RK_ICONS || {})["action/cancel-x"] || "";
+  // the shared close x, cropped to its drawing so the remove button keeps the size of the x it had
+  const APPICON_X_SVG = ((window.RK_ICONS || {})["editor/close"] || "").replace(/viewBox="[^"]*"/, 'viewBox="5 5 14 14"');
   const THEME_EDIT_SVG = (window.RK_ICONS || {})["action/edit"] || "";
   // last /appearance/themes payload -- lets selectTheme seed the custom editor from whatever preset the user was on
   let themesCache = [];

@@ -81,7 +81,7 @@
     padding:9px 24px 10px 24px; position:relative; cursor:pointer;
     transition:background-color 90ms linear, padding-left var(--anim_press) var(--ease_pop);
   }
-  .item:hover { background:var(--button_bg_hover); padding-left:26px; }
+  .item:hover { background:var(--button_bg_hover); padding-left:25px; }
   .item.is-open { background:var(--grey6); }
   .item.is-open:hover { padding-left:24px; }
   .item:focus-visible { outline:2px solid var(--primary_light); outline-offset:-2px; }
@@ -255,15 +255,15 @@
   const ctxMenu = document.getElementById("ctxMenu");
   const HOVER_PROFILES = { control: ".foot-btn, .item-icon-btn" };
   function applyHovers(root) { if (window.RKHover) RKHover.apply(root, HOVER_PROFILES); }
-  const CHEVRON = '<svg class="item-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-games-game-picker-caret}}</svg>';
+  const CHEVRON = '<svg class="item-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>';
   // pulls the real trash/more glyphs off window.RK_ICONS (see the ICON block in clips.html) instead of a hand-copied path, so this stays the same icon if that set ever changes
   const _RKI = window.RK_ICONS || {};
   const _svgInner = (s) => (s || "").replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
   const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + _svgInner(_RKI["action/trash"]) + '</svg>';
   const MORE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + _svgInner(_RKI["action/more"]) + '</svg>';
-  const READ_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:notifications-1}}</svg>';
+  const READ_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>';
   const UNREAD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:notifications-2}}</svg>';
-  const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:notifications-3}}</svg>';
+  const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/open-external}}</svg>';
   let items = [];
   let openId = "";
   let ctxTargetId = "";
@@ -305,7 +305,7 @@
     renderCounts();
     if (!items.length) {
       listEl.innerHTML = '<div class="empty">' +
-        '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:notifications-4}}</svg>' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/bell}}</svg>' +
         "Nothing new.<br>Update notices show up here.</div>";
       return;
     }
@@ -412,7 +412,7 @@
     const parts = [item.read
       ? '<div class="ctx-item" data-action="unread">' + UNREAD_ICON + "<span>Mark as unread</span></div>"
       : '<div class="ctx-item" data-action="read">' + READ_ICON + "<span>Mark as read</span></div>"];
-    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>Open release page</span></div>");
+    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>" + escapeHtml(item.linkLabel || "Open release page") + "</span></div>");
     parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete">' + TRASH_ICON + "<span>Delete</span></div>");
     ctxMenu.innerHTML = parts.join("");
     ctxMenu.classList.add("is-open");

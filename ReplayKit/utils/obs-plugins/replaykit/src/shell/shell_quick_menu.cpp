@@ -59,7 +59,7 @@ QJsonArray ViewActions(const QString &view, const std::string &pageList)
 	QJsonArray out;
 	if (view == QLatin1String("projector")) {
 		out.append(Action(QStringLiteral("preview"), ShellPreviewTarget() ? QStringLiteral("Turn preview off") : QStringLiteral("Turn preview on"),
-				  ShellPreviewTarget() ? QStringLiteral("quick/eye-off") : QStringLiteral("quick/eye")));
+				  ShellPreviewTarget() ? QStringLiteral("nav/projector-eye-off") : QStringLiteral("nav/projector-eye")));
 		return out;
 	}
 	if (view == QLatin1String("obs-settings")) {

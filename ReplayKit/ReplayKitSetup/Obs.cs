@@ -94,7 +94,8 @@ namespace ReplayKitSetup
                                 throw new IOException("The running ReplayKit helper does not support graceful-only shutdown.");
                         }
                     }
-                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "http://127.0.0.1:" + port + "/exit-obs"))
+                    // the reason lets the helper stop obs itself if a normal close stalls, instead of leaving it running with a notice in the bell
+                    using (var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "http://127.0.0.1:" + port + "/exit-obs?reason=update"))
                     {
                         // the helper only takes calls that come from its own page
                         request.Headers.Add("Origin", "http://127.0.0.1:" + port);
