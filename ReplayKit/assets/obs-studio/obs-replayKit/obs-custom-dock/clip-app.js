@@ -2898,7 +2898,7 @@ const CLIP_HOVER_PROFILES = {
     if (bulkCount) bulkCount.textContent = count + " clip" + (count === 1 ? "" : "s") + " selected";
     if (bulkSize) bulkSize.textContent = formatSize(totalBytes);
     document.body.classList.toggle("is-selection-mode", count > 0);
-    if (count > 0 && activePreview && !isVideoFullscreen(activePreview)) {
+    if (count > 0 && activePreview && activePreview.closest(".card") && !isVideoFullscreen(activePreview)) {
       const preview = activePreview;
       activePreview = null;
       abortVideoLoad(preview);

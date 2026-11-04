@@ -899,8 +899,8 @@
   .card.is-selected .select-clip-btn { background: transparent; }
   .card.is-selected .select-clip-btn .select-ring { display: block; fill: var(--primary); stroke: var(--primary); }
   .card.is-selected .select-clip-btn .select-check { stroke: var(--on-accent); stroke-width: 1.55; opacity: 1; scale: 1; }
-  body.is-selection-mode .card:not(.is-selected) { opacity: .58; }
-  body.is-selection-mode .card:not(.is-selected):hover { opacity: .78; }
+  body.is-selection-mode .card:not(.is-selected):not(.menu-open) { opacity: .58; }
+  body.is-selection-mode .card:not(.is-selected):not(.menu-open):hover { opacity: .78; }
   body.is-selection-mode .card { cursor: pointer; }
 
   /* volume "pill": icon and slider live inside one rounded container that expands on hover. no gap, no absolute positioning, no dead zone -- moving the cursor from the icon to the slider keeps the pill hovered the whole way. */
