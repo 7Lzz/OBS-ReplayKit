@@ -378,7 +378,7 @@ window.RKClipGames = (function () {
     if (!gamesEl || !typesEl) return null;
     let state = {game:"all",type:"all",favorites:false,linked:false}, folder = "", counts = {}, gameRows = [], libraryCounts = {}, refreshAt = 0, libraryReady = false, refreshGeneration = 0;
     const typeNames = {all:"All types",clips:"Clips",favorites:"Favorites",linked:"Linked",screenshots:"Screenshots",gifs:"GIFs",drafts:"Drafts"};
-    const typeIcons = {all:"nav/all-types",clips:"nav/clips",favorites:"toggle/star",linked:"nav/linked",screenshots:"nav/screenshots",gifs:"nav/gifs",drafts:"action/open-editor"};
+    const typeIcons = {all:"toggle/grid",clips:"nav/clips",favorites:"toggle/star",linked:"nav/linked",screenshots:"nav/screenshots",gifs:"nav/gifs",drafts:"action/open-editor"};
     const games = RKCombo.bind(gamesEl, value => {state.game = value; paintGameIcon(); notify();}, {menuKeys:true,live:true,search:"Search games",beforeOpen:()=>paintGames()});
     const types = RKCombo.bind(typesEl, value => {setType(value); notify();}, {menuKeys:true,beforeOpen:()=>paintTypes()});
     function paintGameIcon() {

@@ -10,6 +10,7 @@
           <span class="time-display"><span class="time-current">0:00</span> / <span class="time-total">0:00</span></span>
         </div>
         <div class="controls-right">
+          <button class="icon-btn snap-btn" type="button" data-tooltip="Screenshot this frame" aria-label="Screenshot this frame"><svg viewBox="0 0 24 24">${icons.SCREENSHOT || ""}</svg></button>
           <div class="settings-wrap">
             <button class="icon-btn settings-btn" type="button" data-tooltip="Playback settings" aria-label="Playback settings"><svg viewBox="0 0 24 24">${icons.SETTINGS}</svg></button>
             <div class="settings-menu" role="menu">
@@ -19,7 +20,6 @@
               <div class="speed-pills"><button class="speed-pill" data-speed="0.25">0.25</button><button class="speed-pill" data-speed="0.5">0.5</button><button class="speed-pill is-active" data-speed="1">1.0</button><button class="speed-pill" data-speed="1.5">1.5</button><button class="speed-pill" data-speed="2">2.0</button><button class="speed-pill" data-speed="10">10.0</button></div>
             </div>
           </div>
-          <button class="icon-btn snap-btn" type="button" data-tooltip="Screenshot this frame" aria-label="Screenshot this frame"><svg viewBox="0 0 24 24">${icons.SCREENSHOT || ""}</svg></button>
           <button class="icon-btn theater-btn" type="button" data-tooltip="Theater mode" aria-label="Theater mode"><svg viewBox="0 0 24 24" class="theater-enter-icon">${icons.THEATER}</svg><svg viewBox="0 0 24 24" class="theater-exit-icon" style="display:none">${icons.THEATER_EXIT}</svg></button>
           <button class="icon-btn fullscreen-btn" type="button" data-tooltip="Fullscreen (F)" aria-label="Toggle fullscreen"><svg viewBox="0 0 24 24" class="fs-enter-icon">${icons.FULLSCREEN}</svg><svg viewBox="0 0 24 24" class="fs-exit-icon" style="display:none">${icons.FULLSCREEN_EXIT}</svg></button>
         </div>

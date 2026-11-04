@@ -46,9 +46,9 @@ namespace ReplayKitHelper
             stream.Flush();
         }
 
-        public static void SendFile(Stream stream, int status, string statusText, Dictionary<string, string> headers, string path)
+        public static void SendFile(Stream stream, int status, string statusText, Dictionary<string, string> headers, string path, FileShare share = FileShare.Read)
         {
-            using (var fs = File.OpenRead(path))
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, share))
             {
                 var head = FormatHttpResponse(status, statusText, headers, fs.Length);
                 stream.Write(head, 0, head.Length);
@@ -294,15 +294,16 @@ namespace ReplayKitHelper
         }
 
         // serves one range chunk of a clip and reports whether the connection is worth keeping open -- playback at high speed multipliers needs a new chunk far more often than realtime, and a fresh tcp handshake per chunk (plain connection:close) couldnt keep up and showed up as buffering; returning true lets Connection.HandleConnection reuse the socket for the next range request.
-        public static bool ServePreview(Stream stream, HttpRequest req, string rawName)
+        public static bool ServePreview(Stream stream, HttpRequest req, string rawName) => ServePreview(stream, req, Clips.GetEditorSource(rawName));
+
+        public static bool ServePreview(Stream stream, HttpRequest req, Clips.SafeClipPath selected)
         {
             // reqId lets start/end/error log lines for the same call be matched up -- this function otherwise writes nothing on a fast/happy path, so a stuck or failed preview would leave no trace at all.
             string reqId = Guid.NewGuid().ToString("N").Substring(0, 8);
             var sw = Stopwatch.StartNew();
-            var selected = Clips.GetEditorSource(rawName);
             if (selected == null)
             {
-                Log.Write("Serve-Preview[" + reqId + "] BAD-FILENAME raw=" + rawName);
+                Log.Write("Serve-Preview[" + reqId + "] BAD-FILENAME");
                 SendText(stream, 400, "Bad Request", "Bad filename");
                 return false;
             }

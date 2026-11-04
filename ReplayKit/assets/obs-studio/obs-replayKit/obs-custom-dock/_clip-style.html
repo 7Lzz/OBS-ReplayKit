@@ -1398,6 +1398,8 @@
   .preview:-webkit-full-screen .play-toggle-btn svg {
     width: 22px; height: 22px; fill: currentColor;
   }
+  .preview:is(:fullscreen, .rk-fs) .preview-controls .snap-btn svg,
+  .preview:-webkit-full-screen .preview-controls .snap-btn svg { fill: none; }
   .play-toggle-btn {
     display: inline-flex;
     align-items: center;
@@ -1740,12 +1742,10 @@
   }
   .menu-item:hover { background: var(--button_bg_hover); }
   .menu-item.is-disabled { opacity: .5; cursor: default; pointer-events: none; }
-  /* the share group carries the blue accent on its icons only (Copy to clipboard has its own colours drawn in, so only Create Link shows it), the row text stays white like every other row */
+  /* the share icons keep their blue accent */
   .menu-item.share-menu-item .menu-item-icon { color: var(--link_accent); }
   .menu-item.share-menu-item:hover { background: rgba(var(--accent-rgb), .13); }
   .menu-item.favorite-menu-item.is-favorite .menu-item-icon { color: var(--favorite); }
-  /* Select: the corners take the link blue and the check stays white; only the direct paths of the icon, so the outlined Deselect icon that replaces it keeps its own look */
-  .menu-item.select-menu-item .menu-item-icon > path:first-child { fill: var(--link_accent); }
   .menu-separator {
     height: 1px;
     margin: 4px 0;

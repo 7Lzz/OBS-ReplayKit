@@ -146,7 +146,7 @@ const CLIP_HOVER_PROFILES = {
     EDIT: _svgInner(_RKI["action/edit"]),
     LINK: _svgInner(_RKI["action/link"]),
     LINKED: _svgInner(_RKI["nav/linked"]),
-    GIFS: _svgInner(_RKI["nav/gifs"]),
+    EXPORT_GIF: _svgInner(_RKI["nav/gifs"]),
     SCREENSHOT: _svgInner(_RKI["quick/screenshot"]),
     TRASH: _svgInner(_RKI["action/trash"]),
     RESTORE: _svgInner(_RKI["editor/undo"]),
@@ -154,8 +154,7 @@ const CLIP_HOVER_PROFILES = {
     STAR_BORDER: _svgInner(_RKI["toggle/star-border"]),
     GRID: _svgInner(_RKI["toggle/grid"]),
     CLIPS: _svgInner(_RKI["nav/clips"]),
-    // the card menu's scissors have red handles; the editor toolbar and the rest keep the plain action/content-cut
-    CONTENT_CUT: _svgInner(_RKI["action/content-cut-color"]),
+    CONTENT_CUT: _svgInner(_RKI["action/content-cut"]),
     CONTENT_COPY: _svgInner(_RKI["action/content-copy"]),
     COMPRESS: _svgInner(_RKI["action/compress"]),
     DUPLICATE: _svgInner(_RKI["action/duplicate"]),
@@ -229,7 +228,7 @@ const CLIP_HOVER_PROFILES = {
   }
   // broadcast: rewrite every cards volume ui + push the new volume to the currently-playing preview (if any). this is what makes the "global volume" ux work -- toggle mute on one card and every other card shows the unmuted icon too.
   function notifyVolumeSync() {
-    document.querySelectorAll(".card").forEach((c) => {
+    document.querySelectorAll(".card, .deleted-card").forEach((c) => {
       syncVolumeUi(c.querySelector(".volume-btn"), c.querySelector(".volume-slider"));
     });
     syncVolumeUi(document.getElementById("trim-volume-btn"),
@@ -241,6 +240,17 @@ const CLIP_HOVER_PROFILES = {
     }
   }
   // the volume buttons of the cards and of the editor and the m key all flip the same switch; a slider that was dragged to the bottom would stay silent after an unmute, so the volume comes back to the default one
+  function bindVolumeControls(card) {
+    const button = card.querySelector(".volume-btn");
+    const slider = card.querySelector(".volume-slider");
+    syncVolumeUi(button, slider);
+    button.addEventListener("click", event => { event.stopPropagation(); toggleMute(); });
+    slider.addEventListener("input", () => {
+      VolumeState.volume = Math.max(0, Math.min(1, slider.value / 100));
+      VolumeState.muted = VolumeState.volume === 0;
+      notifyVolumeSync();
+    });
+  }
   function toggleMute() {
     VolumeState.muted = !VolumeState.muted;
     if (!VolumeState.muted && VolumeState.volume <= 0) VolumeState.volume = DEFAULT_VOLUME;
@@ -371,7 +381,19 @@ const CLIP_HOVER_PROFILES = {
   // the gallery that is the whole view of a filter, for the screenshots and gifs filters
   const galleryFor = (filter) => filter === "screenshots" ? screenshotGallery : filter === "gifs" ? gifGallery : null;
   // what was deleted, in the popup of the trash button by the folder button: restoring a clip brings the list back at once, and a screenshot the screenshots list
-  const deletedGallery = !HOME_MODE && window.RKDeleted ? RKDeleted.create({helper:HELPER, formatSize, icons:ICON, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
+  const deletedGallery = !HOME_MODE && window.RKDeleted ? RKDeleted.create({helper:HELPER, formatSize, icons:ICON, player:{
+    controls:() => RKClipPlayer.controlsHtml(ICON, VOLUME_ICON),
+    volume:bindVolumeControls,
+    start:video => {
+      if (activePreview && activePreview !== video) abortVideoLoad(activePreview);
+      activePreview = video;
+      applyVolume(video);
+    },
+    stop:video => {
+      if (activePreview === video) activePreview = null;
+      abortVideoLoad(video);
+    },
+  }, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
   let allClips = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
@@ -2325,7 +2347,7 @@ const CLIP_HOVER_PROFILES = {
     // the active preview belongs to the users current hover or a fullscreened card; abort only when it is no longer in the virtual window or favorites.
     if (activePreview &&
         !gridEl.contains(activePreview) &&
-        !inRowGrid(activePreview)) {
+        !inRowGrid(activePreview) && !activePreview.closest(".deleted-card")) {
       abortVideoLoad(activePreview);
       activePreview = null;
     }
@@ -3061,7 +3083,7 @@ const CLIP_HOVER_PROFILES = {
                   <span>Edit name</span>
                 </div>
                 <div class="menu-item export-gif-item" role="menuitem">
-                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.GIFS}</svg>
+                  <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EXPORT_GIF}</svg>
                   <span class="menu-item-label">Export GIF</span>
                 </div>
                 <div class="menu-item compress-clip-item">
@@ -3113,8 +3135,6 @@ const CLIP_HOVER_PROFILES = {
     const video        = card.querySelector("video");
     const preview      = card.querySelector(".preview");
     const progressFill = card.querySelector(".progress-fill");
-    const volumeBtn    = card.querySelector(".volume-btn");
-    const volumeSlider = card.querySelector(".volume-slider");
     const theaterBtn   = card.querySelector(".theater-btn");
     const snapBtn      = card.querySelector(".snap-btn");
     const fullscreenBtn= card.querySelector(".fullscreen-btn");
@@ -3630,17 +3650,7 @@ const CLIP_HOVER_PROFILES = {
     });
 
     // volume + slider local ui updates immediately, then notifyvolumesync rewrites every other cards icon + slider so volume is truly global.
-    syncVolumeUi(volumeBtn, volumeSlider);
-    volumeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleMute();
-    });
-    volumeSlider.addEventListener("input", () => {
-      VolumeState.volume = Math.max(0, Math.min(1, volumeSlider.value / 100));
-      // dragging the slider implies "i want to hear sound" -- unmute. dropping to 0 implies mute.
-      VolumeState.muted = (VolumeState.volume === 0);
-      notifyVolumeSync();
-    });
+    bindVolumeControls(card);
 
     // the dotted corner resizes every card, and a double click on it takes the choice back
     bindCardResize(card);

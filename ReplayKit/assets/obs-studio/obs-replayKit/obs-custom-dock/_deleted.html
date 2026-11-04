@@ -11,9 +11,12 @@
   .deleted-body { flex:1; min-height:0; overflow-y:auto; scrollbar-gutter:stable; padding:16px 10px 16px 16px; margin-right:6px; --sb-start:8px; --sb-end:8px; }
   #deleted-grid { grid-template-columns:repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
   #deleted-grid:empty { display:none; }
-  /* a deleted card is a screenshot card without the viewer: its picture is only a picture */
-  .deleted-card .preview { position:relative; }
+  .deleted-card .preview { position:relative; overflow:clip; }
   .deleted-card .preview img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; }
+  .deleted-card .preview video { object-fit:contain; }
+  .deleted-card:hover .preview-controls, .deleted-card:focus-within .preview-controls { opacity:1; pointer-events:auto; }
+  .deleted-card .preview:focus-visible { outline:2px solid var(--selected-solid); outline-offset:-2px; }
+  .deleted-card .preview:fullscreen, .deleted-card .preview:-webkit-full-screen { width:100vw; height:100vh; border-radius:0; }
   .deleted-card .meta .left.is-soon { color:var(--warning, var(--muted)); }
   .deleted-card .action-link-btn:disabled { opacity:.6; cursor:default; }
   /* the count of the trash button in the toolbar, so a delete shows where it went */
@@ -49,6 +52,7 @@ window.RKDeleted = {
     const IDLE_REFRESH_MS = 30000;
     let refreshedAt = 0;
     const cards = new Map();
+    let activeCard = null;
     const svg = (inner) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + inner + "</svg>";
     const baseName = (name) => name.replace(/\.[^.]+$/, "");
     function daysLeft(row) { return Math.max(0, Math.ceil((row.expiresAt * 1000 - Date.now()) / 86400000)); }
@@ -68,6 +72,159 @@ window.RKDeleted = {
       // a gif belongs to no game, as on its card in the GIFs section
       if (window.RKClipGames && row.kind !== "gif") RKClipGames.badge(target, row, {});
     }
+    function stopPreviews() {
+      cards.forEach(card => { if (card.stopPreview) card.stopPreview(true); });
+    }
+    function bindPreview(card, row, picture, thumb) {
+      const url = options.helper + "/deleted/media?id=" + encodeURIComponent(row.id);
+      if (row.kind === "gif") {
+        card.addEventListener("mouseenter", () => { thumb.src = url; });
+        card.stopPreview = () => { thumb.src = options.helper + "/deleted/thumb?id=" + encodeURIComponent(row.id); };
+        card.addEventListener("mouseleave", card.stopPreview);
+        return;
+      }
+      if (row.kind !== "clip") return;
+      const media = document.createElement("div");
+      media.className = "preview-media";
+      media.appendChild(thumb);
+      const video = document.createElement("video");
+      video.preload = "none";
+      video.muted = true;
+      video.loop = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("controlsList", "nodownload noplaybackrate noremoteplayback");
+      video.disablePictureInPicture = true;
+      media.appendChild(video);
+      picture.appendChild(media);
+      picture.insertAdjacentHTML("beforeend", '<div class="play-overlay"></div><div class="player-shade"></div>' + options.player.controls() + '<div class="progress-bar"><div class="progress-fill"><div class="progress-scrub-dot"></div></div></div>');
+      picture.querySelectorAll(".settings-wrap, .snap-btn, .theater-btn").forEach(control => control.remove());
+      picture.tabIndex = 0;
+      picture.setAttribute("role", "group");
+      picture.setAttribute("aria-label", "Playback preview: " + row.name);
+      options.player.volume(card);
+      const bar = picture.querySelector(".progress-bar");
+      const fill = picture.querySelector(".progress-fill");
+      const play = picture.querySelector(".play-toggle-btn");
+      const fullscreen = picture.querySelector(".fullscreen-btn");
+      let timer = 0, frame = 0, scrubbing = false, resume = false;
+      const isFullscreen = () => (document.fullscreenElement || document.webkitFullscreenElement) === picture;
+      const time = value => Math.floor(value / 60) + ":" + String(Math.floor(value % 60)).padStart(2, "0");
+      function update() {
+        const duration = video.duration;
+        if (Number.isFinite(duration) && duration > 0) {
+          fill.style.width = video.currentTime / duration * 100 + "%";
+          picture.querySelector(".time-current").textContent = time(video.currentTime);
+          picture.querySelector(".time-total").textContent = time(duration);
+        }
+        play.querySelector(".pt-play").style.display = video.paused ? "" : "none";
+        play.querySelector(".pt-pause").style.display = video.paused ? "none" : "";
+        play.dataset.tooltip = video.paused ? "Play" : "Pause";
+      }
+      function tick() { update(); frame = video.paused ? 0 : requestAnimationFrame(tick); }
+      function start() {
+        clearTimeout(timer);
+        timer = 0;
+        if (!dialog.open || document.hidden) return;
+        if (activeCard && activeCard !== card) activeCard.stopPreview(true);
+        activeCard = card;
+        options.player.start(video);
+        if (video.getAttribute("src") !== url) video.src = url;
+        picture.classList.add("is-playing");
+        if (video.readyState >= 2) picture.classList.add("is-video-ready");
+        video.play().catch(() => { if (video.paused) picture.classList.remove("is-playing"); });
+      }
+      card.stopPreview = (force) => {
+        clearTimeout(timer);
+        timer = 0;
+        if (!force && isFullscreen()) return;
+        if (isFullscreen()) {
+          const exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exit) { const result = exit.call(document); if (result && result.catch) result.catch(() => {}); }
+        }
+        scrubbing = resume = false;
+        bar.classList.remove("is-scrubbing");
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
+        options.player.stop(video);
+        picture.classList.remove("is-playing", "is-video-ready");
+        fill.style.width = "0%";
+        if (activeCard === card) activeCard = null;
+      };
+      card.addEventListener("mouseenter", () => {
+        if (document.fullscreenElement || document.webkitFullscreenElement) return;
+        clearTimeout(timer);
+        timer = setTimeout(start, 120);
+      });
+      card.addEventListener("mouseleave", () => { if (!scrubbing) card.stopPreview(false); });
+      video.addEventListener("loadeddata", () => { if (video.hasAttribute("src")) picture.classList.add("is-video-ready"); });
+      video.addEventListener("loadedmetadata", update);
+      video.addEventListener("timeupdate", update);
+      video.addEventListener("seeked", update);
+      video.addEventListener("play", () => { update(); if (!frame) frame = requestAnimationFrame(tick); });
+      video.addEventListener("pause", () => { if (frame) cancelAnimationFrame(frame); frame = 0; update(); });
+      video.addEventListener("error", () => { card.stopPreview(true); options.notify("This deleted clip could not be played."); });
+      function toggle() { if (!video.hasAttribute("src") || video.paused) start(); else video.pause(); }
+      play.addEventListener("click", event => { event.stopPropagation(); toggle(); });
+      picture.addEventListener("click", event => {
+        if (event.button === 0 && !event.target.closest("button, input, .progress-bar, .volume-slider-wrap")) toggle();
+      });
+      fullscreen.addEventListener("click", event => {
+        event.stopPropagation();
+        const operation = isFullscreen() ? document.exitFullscreen || document.webkitExitFullscreen : picture.requestFullscreen || picture.webkitRequestFullscreen;
+        if (!operation) { options.notify("Fullscreen is unavailable."); return; }
+        const entering = !isFullscreen();
+        try {
+          const result = operation.call(entering ? picture : document);
+          if (result && result.catch) result.catch(() => options.notify("Fullscreen could not be changed."));
+        } catch (error) { options.notify("Fullscreen could not be changed."); return; }
+        fullscreen.blur();
+        picture.focus({preventScroll:true});
+        if (entering) start();
+      });
+      function updateFullscreen() {
+        const active = isFullscreen();
+        fullscreen.querySelector(".fs-enter-icon").style.display = active ? "none" : "";
+        fullscreen.querySelector(".fs-exit-icon").style.display = active ? "" : "none";
+        fullscreen.dataset.tooltip = active ? "Exit fullscreen (F)" : "Fullscreen (F)";
+        fullscreen.setAttribute("aria-label", fullscreen.dataset.tooltip);
+        if (!active && !card.matches(":hover")) card.stopPreview(false);
+      }
+      picture.addEventListener("fullscreenchange", updateFullscreen);
+      picture.addEventListener("webkitfullscreenchange", updateFullscreen);
+      function seek(event) {
+        if (!(video.duration > 0) || !Number.isFinite(video.duration)) return;
+        const rect = bar.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        video.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * video.duration;
+        update();
+      }
+      bar.addEventListener("pointerdown", event => {
+        if (event.button !== 0) return;
+        event.preventDefault(); event.stopPropagation();
+        scrubbing = true; resume = !video.paused;
+        video.pause();
+        bar.classList.add("is-scrubbing");
+        bar.setPointerCapture(event.pointerId);
+        seek(event);
+      });
+      bar.addEventListener("pointermove", event => { if (scrubbing) seek(event); });
+      function endScrub() {
+        if (!scrubbing) return;
+        scrubbing = false;
+        bar.classList.remove("is-scrubbing");
+        if (resume) start();
+        resume = false;
+        if (!card.matches(":hover") && !isFullscreen()) card.stopPreview(false);
+      }
+      bar.addEventListener("pointerup", endScrub);
+      bar.addEventListener("pointercancel", endScrub);
+      picture.addEventListener("keydown", event => {
+        if (event.target.closest("button, input") || event.repeat) return;
+        if (event.key === " " || event.key === "Enter") { event.preventDefault(); toggle(); }
+        else if (event.key.toLowerCase() === "f") { event.preventDefault(); fullscreen.click(); }
+        else if (event.key.toLowerCase() === "m") { event.preventDefault(); picture.querySelector(".volume-btn").click(); }
+      });
+    }
     async function act(kind, id) {
       const response = await fetch(options.helper + "/deleted/" + kind + (id ? "?id=" + encodeURIComponent(id) + "&t=" : "?t=") + Date.now(), {method:"POST", cache:"no-store"});
       const data = await response.json().catch(() => ({}));
@@ -75,6 +232,8 @@ window.RKDeleted = {
       return data;
     }
     async function restore(row, button) {
+      const card = cards.get(row.id);
+      if (card && card.stopPreview) card.stopPreview(true);
       if (button) button.disabled = true;
       try {
         const done = await act("restore", row.id);
@@ -89,7 +248,7 @@ window.RKDeleted = {
       const card = document.createElement("div");
       card.className = "screenshot-card deleted-card rk-hover-card";
       card.dataset.deleted = row.id;
-      const picture = document.createElement("span");
+      const picture = document.createElement("div");
       picture.className = "preview";
       const thumb = document.createElement("img");
       thumb.loading = "lazy";
@@ -122,6 +281,7 @@ window.RKDeleted = {
       restoreButton.addEventListener("click", event => { event.stopPropagation(); restore(row, restoreButton); });
       actions.appendChild(restoreButton);
       card.append(picture, body, actions);
+      bindPreview(card, row, picture, thumb);
       const menu = body.querySelector(".menu-dropdown");
       async function remove(trigger, inMenu) {
         // the same two clicks as every delete: the first arms the button, the second deletes for good
@@ -134,6 +294,7 @@ window.RKDeleted = {
         }
         options.resetDeletes();
         options.closeMenus();
+        if (card.stopPreview) card.stopPreview(true);
         try { await act("remove", row.id); refresh(); }
         catch (error) { options.notify(error.message); }
       }
@@ -185,7 +346,7 @@ window.RKDeleted = {
           else details(row, card.querySelector(".meta"));
           if (grid.children[index] !== card) grid.insertBefore(card, grid.children[index] || null);
         });
-        cards.forEach((card, id) => { if (!keep.has(id)) { card.remove(); cards.delete(id); } });
+        cards.forEach((card, id) => { if (!keep.has(id)) { if (card.stopPreview) card.stopPreview(true); card.remove(); cards.delete(id); } });
       }
       empty.hidden = rows.length > 0;
       empty.textContent = !loaded ? "Loading deleted clips..."
@@ -221,7 +382,7 @@ window.RKDeleted = {
       } catch (error) {
         if (run !== epoch) return;
         rows = []; loaded = false; signature = ""; rowsSignature = "";
-        grid.replaceChildren(); cards.clear();
+        stopPreviews(); grid.replaceChildren(); cards.clear();
         paintButton();
         empty.hidden = false;
         empty.textContent = "The deleted items could not be loaded.";
@@ -244,6 +405,7 @@ window.RKDeleted = {
         return;
       }
       disarmEmpty();
+      stopPreviews();
       emptyAll.disabled = true;
       try { await act("empty"); refresh(); }
       catch (error) { options.notify(error.message); }
@@ -251,7 +413,10 @@ window.RKDeleted = {
     });
     disarmEmpty();
     window.addEventListener("replaykit:deleted-changed", refresh);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) stopPreviews(); else refresh(); });
+    dialog.querySelector(".deleted-body").addEventListener("scroll", () => {
+      cards.forEach(card => { if (card.stopPreview) card.stopPreview(false); });
+    }, {passive:true});
     function open() {
       if (loaded && days <= 0) return;
       if (!dialog.open) { dialog.showModal(); dialog.focus({preventScroll:true}); }
@@ -262,14 +427,14 @@ window.RKDeleted = {
     if (button) button.addEventListener("click", event => { event.stopPropagation(); open(); });
     document.getElementById("deleted-close").addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
-    dialog.addEventListener("close", () => { options.resetDeletes(); options.closeMenus(); disarmEmpty(); });
+    dialog.addEventListener("close", () => { stopPreviews(); options.resetDeletes(); options.closeMenus(); disarmEmpty(); });
     dialog.addEventListener("keydown", event => event.stopPropagation());
     setInterval(() => { if (dialog.open || Date.now() - refreshedAt >= IDLE_REFRESH_MS) refresh(); }, 5000);
     return {
       refresh: refresh,
       open: open,
       reset: function () {
-        ++epoch; rows = []; loaded = false; signature = ""; rowsSignature = ""; grid.replaceChildren(); cards.clear();
+        stopPreviews(); ++epoch; rows = []; loaded = false; signature = ""; rowsSignature = ""; grid.replaceChildren(); cards.clear();
         if (dialog.open) dialog.close();
         paint(); refresh();
       },

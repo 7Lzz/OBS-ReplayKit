@@ -161,6 +161,18 @@ namespace ReplayKitHelper
 
         private static bool ValidId(string id) => !string.IsNullOrEmpty(id) && id.Length == 32 && id.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
 
+        public static Clips.SafeClipPath PreviewFile(string id)
+        {
+            string stored = StoredFile(id, out string kind);
+            if (stored == null || !Path.IsPathRooted(stored)) return null;
+            string ext = Path.GetExtension(stored).ToLowerInvariant();
+            if (kind == "clip" ? Clips.GetSafeFilename(Path.GetFileName(stored)) == null : kind != "gif" || ext != ".gif") return null;
+            if (!string.Equals(Path.GetFileName(stored), id + ext, StringComparison.Ordinal)) return null;
+            var dir = new DirectoryInfo(Path.GetDirectoryName(stored));
+            if (dir.Name != FolderName || (dir.Attributes & FileAttributes.ReparsePoint) != 0 || (File.GetAttributes(stored) & FileAttributes.ReparsePoint) != 0) return null;
+            return new Clips.SafeClipPath { Name = Path.GetFileName(stored), Full = Path.GetFullPath(stored) };
+        }
+
         // puts the file back where it was deleted from, under its own name unless another file took it since, with its row of the clips db
         public static JObject Restore(string id)
         {

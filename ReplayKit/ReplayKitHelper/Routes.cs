@@ -2673,6 +2673,21 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/deleted/media")
+            {
+                if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
+                Clips.SafeClipPath selected;
+                try { selected = DeletedHistory.PreviewFile(Q("id")); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is Newtonsoft.Json.JsonException)
+                {
+                    selected = null;
+                }
+                if (selected == null) { HttpResponse.SendText(stream, 404, "Not Found", "Deleted item not found"); return false; }
+                if (Path.GetExtension(selected.Name) != ".gif") return HttpResponse.ServePreview(stream, req, selected);
+                HttpResponse.SendFile(stream, 200, "OK", HttpResponse.GetNoStoreHeaders(new Dictionary<string, string> { ["Content-Type"] = "image/gif" }), selected.Full, FileShare.Read | FileShare.Delete);
+                return false;
+            }
+
             // what the deleted view of the clips page lists and does: restore an item, delete one for good, or empty the whole history
             if (path == "/deleted" || path == "/deleted/thumb" || path == "/deleted/restore" || path == "/deleted/remove" || path == "/deleted/empty")
             {
