@@ -57,10 +57,9 @@ void ShellRail::PlaceStorage()
 		m_storage->hide();
 		return;
 	}
-	const int y = int(ItemRect(firstBottom).top()) - ShellStorage::kHeight - 2;
-	const bool fits = y >= int(ItemRect(lastTop).bottom()) + 6;
-	// one pixel short of the right edge, which is the hairline of the rail
-	m_storage->setGeometry(0, y, width() - 1, ShellStorage::kHeight);
+	const int y = int(ItemRect(firstBottom).top()) - ShellStorage::kHeight - RailButtonGap;
+	const bool fits = y >= int(ItemRect(lastTop).bottom()) + RailButtonGap;
+	m_storage->setGeometry(0, y, width(), ShellStorage::kHeight);
 	m_storage->setVisible(m_storage->GetInfo().known && fits);
 }
 
@@ -160,8 +159,8 @@ void ShellRail::paintEvent(QPaintEvent *)
 
 QRectF ShellRail::ItemRect(int index) const
 {
-	const qreal d = 40.0;
-	const qreal pitch = 48.0;
+	const qreal d = RailButtonSize;
+	const qreal pitch = RailButtonSize + RailButtonGap;
 	int bottomCount = 0;
 	int slot = 0;
 	for (int i = 0; i < m_items.size(); ++i)

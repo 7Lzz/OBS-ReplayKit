@@ -13,7 +13,7 @@ namespace rk {
 // a small ring that fills with the size of the library, with the size and the limit under it, the way the storage figure of medal sits in its rail. a click opens the card that frees up space
 class ShellStorage : public QWidget {
 public:
-	static constexpr int kHeight = 70;
+	static constexpr int kHeight = 76;
 
 	// what the helper said about the library; the texts arrive formatted, so this widget only draws them
 	struct Info {

@@ -8,6 +8,8 @@ enum class ShellView { Home, Projector, Clips, Settings, Setup, ObsSettings };
 // the title bar is as tall as the rail is wide, so the two frame the stage as one even L
 inline constexpr int kShellTitleH = 56;
 inline constexpr int kShellRailW = kShellTitleH;
+inline constexpr int RailButtonSize = 40;
+inline constexpr int RailButtonGap = 8;
 // the strip along the top of the projector view is as tall as the tab bar of the clips view, hairline included
 inline constexpr int kShellBarH = 51;
 // radius of the rounded top left corner of the stage, where the title bar meets the rail

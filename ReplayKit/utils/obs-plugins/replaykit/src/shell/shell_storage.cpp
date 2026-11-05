@@ -11,6 +11,8 @@
 #include "notify/notify_tip.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
+#include "shell/shell_title_button.hpp"
+#include "shell/shell_types.hpp"
 
 namespace rk {
 
@@ -19,7 +21,7 @@ namespace {
 bool g_pollInFlight = false;
 
 constexpr qreal kRingD = 26.0;
-constexpr qreal kRingTop = 5.0;
+constexpr qreal kRingTop = (RailButtonSize - kRingD) / 2.0;
 constexpr qreal kRingStroke = 3.0;
 // the hairlines that bring the outline fill of small text to the ink the css text has in the browser, the same idea as the labels of the native list
 constexpr qreal kTextStroke = 0.2;
@@ -62,7 +64,6 @@ QFont LimitFont()
 	QFont f("Segoe UI");
 	f.setPixelSize(10);
 	f.setWeight(QFont::Medium);
-	f.setUnderline(true);
 	return f;
 }
 
@@ -94,8 +95,9 @@ void ShellStorage::enterEvent(QEnterEvent *event)
 	StorageModalPrepare();
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
+	const QRect anchor((width() - RailButtonSize) / 2, 0, RailButtonSize, RailButtonSize);
 	g_notifyTip->ShowFor(m_info.compressing ? QStringLiteral("Compressing clips %1, %2%").arg(m_info.compressText).arg(m_info.compressPercent) : QStringLiteral("Storage"),
-			     QRect(mapToGlobal(QPoint(0, 0)), size()), NotifyTip::Side::Right);
+			     QRect(mapToGlobal(anchor.topLeft()), anchor.size()), NotifyTip::Side::Right);
 }
 
 void ShellStorage::leaveEvent(QEvent *event)
@@ -140,8 +142,9 @@ void ShellStorage::paintEvent(QPaintEvent *)
 	const bool full = !busy && (m_info.state == QLatin1String("over") || m_info.state == QLatin1String("low") || m_info.fraction >= 0.995);
 	if (m_hover || m_down) {
 		p.setPen(Qt::NoPen);
-		p.setBrush(ChromeInk(m_down ? 0.12 : 0.07));
-		p.drawRoundedRect(QRectF(rect()).adjusted(4, 1, -4, -1), 10, 10);
+		p.setBrush(ChromeInk(m_down ? 0.13 : 0.08));
+		const QRectF frame(width() / 2.0 - RailButtonSize / 2.0, 0, RailButtonSize, RailButtonSize);
+		p.drawRoundedRect(frame, ShellTitleButton::kRadius, ShellTitleButton::kRadius);
 	}
 
 	// the ring: a track all the way round and the share of the library on top of it, from twelve o clock clockwise
@@ -165,7 +168,7 @@ void ShellStorage::paintEvent(QPaintEvent *)
 	}
 
 	const qreal ink = m_hover || m_down ? 1.0 : 0.66;
-	const QRectF usedBox(0, kRingTop + kRingD + 5, width(), 15);
+	const QRectF usedBox(0, RailButtonSize + 4, width(), 15);
 	DrawPageText(p, usedBox, Qt::AlignHCenter | Qt::AlignVCenter, busy ? QStringLiteral("%1%").arg(m_info.compressPercent) : m_info.used, UsedFont(), busy ? QColor(g_menuAccentLight) : full ? g_menuDanger : ChromeInk(ink), kTextStroke);
 	const QRectF limitBox(0, usedBox.bottom() - 1, width(), 14);
 	DrawPageText(p, limitBox, Qt::AlignHCenter | Qt::AlignVCenter, busy ? m_info.compressText : m_info.limit, busy ? CompressFont() : LimitFont(), ChromeInk(ink * 0.85), kTextStroke);
