@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace ReplayKitSetup
 {
-    // pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon.
+    // pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files/tiniest). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon.
     public enum CodecPreference
     {
         Auto,
@@ -56,13 +56,15 @@ namespace ReplayKitSetup
 
         private static readonly HashSet<IntelGen> IntelHevcOk = new HashSet<IntelGen> { IntelGen.Skylake, IntelGen.KabyLake, IntelGen.IceLake, IntelGen.TigerLake, IntelGen.AlderLake, IntelGen.Arc };
 
-        // compression-mode effort tables. balanced is the validated default (~10-11% gpu on a 3060 ti at 1080p60 hevc, vs the previous heavyweight config which sat near 30%). lower_gpu trades file size for less encoder work; smaller_files does the opposite. cqp stays the same across modes -- only encoder effort changes, so visual quality is held constant while gpu/filesize move opposite directions.
-        private sealed class NvencEffort { public string Preset; public string Multipass; public bool Lookahead; public int Bf; }
+        // compression-mode effort tables. balanced is the validated default (~10-11% gpu on a 3060 ti at 1080p60 hevc, vs the previous heavyweight config which sat near 30%). lower_gpu trades file size for less encoder work; smaller_files does the opposite, and tiniest goes all the way (nvenc p7 with two full resolution passes). cqp stays the same across modes -- only encoder effort changes, so visual quality is held constant while gpu/filesize move opposite directions.
+        // nvenc keeps max(4, (bf + 1) * 4) bitstream buffers (obs-nvenc), each about 23 MB of system memory at 1440p, so b-frames cost obs about 90 MB apiece; balanced drops them and moves its qp up by QpOffset, which held the same psnr on 1440p60 game footage for 7% (h.264) to 13% (hevc) bigger files and about 185 MB less memory
+        private sealed class NvencEffort { public string Preset; public string Multipass; public bool Lookahead; public int Bf; public int QpOffset; }
         private static readonly Dictionary<string, NvencEffort> NvencEffortTable = new Dictionary<string, NvencEffort>
         {
             ["lower_gpu"] = new NvencEffort { Preset = "p1", Multipass = "disabled", Lookahead = false, Bf = 0 },
-            ["balanced"] = new NvencEffort { Preset = "p2", Multipass = "disabled", Lookahead = false, Bf = 2 },
+            ["balanced"] = new NvencEffort { Preset = "p2", Multipass = "disabled", Lookahead = false, Bf = 0, QpOffset = 2 },
             ["smaller_files"] = new NvencEffort { Preset = "p5", Multipass = "qres", Lookahead = true, Bf = 3 },
+            ["tiniest"] = new NvencEffort { Preset = "p7", Multipass = "fullres", Lookahead = true, Bf = 3 },
         };
 
         private sealed class AmfEffort { public string Preset; public int Bf; }
@@ -71,6 +73,7 @@ namespace ReplayKitSetup
             ["lower_gpu"] = new AmfEffort { Preset = "speed", Bf = 0 },
             ["balanced"] = new AmfEffort { Preset = "balanced", Bf = 2 },
             ["smaller_files"] = new AmfEffort { Preset = "quality", Bf = 3 },
+            ["tiniest"] = new AmfEffort { Preset = "quality", Bf = 3 },
         };
 
         // quick sync speaks in target usages, TU1 the slowest and best to TU7 the fastest
@@ -79,6 +82,7 @@ namespace ReplayKitSetup
             ["lower_gpu"] = "TU7",
             ["balanced"] = "TU4",
             ["smaller_files"] = "TU2",
+            ["tiniest"] = "TU1",
         };
 
         private static readonly Dictionary<string, string> X264EffortTable = new Dictionary<string, string>
@@ -86,6 +90,7 @@ namespace ReplayKitSetup
             ["lower_gpu"] = "superfast",
             ["balanced"] = "veryfast",
             ["smaller_files"] = "medium",
+            ["tiniest"] = "slow",
         };
 
         // look up the requested effort tier; fall back to balanced for unknown modes (forwards-compat with future values).
@@ -104,7 +109,7 @@ namespace ReplayKitSetup
             var s = new Dictionary<string, object>
             {
                 ["rate_control"] = "CQP",
-                ["cqp"] = cqp,
+                ["cqp"] = cqp + effort.QpOffset,
                 ["keyint_sec"] = 2,
                 ["preset"] = effort.Preset,
                 ["multipass"] = effort.Multipass,
@@ -125,7 +130,7 @@ namespace ReplayKitSetup
             {
                 ["rate_control"] = "CQP",
                 // hevc is ~30-50% more efficient than h.264 at the same perceived quality, so we use a slightly higher cqp for the same look.
-                ["cqp"] = cqp + 2,
+                ["cqp"] = cqp + 2 + effort.QpOffset,
                 ["keyint_sec"] = 2,
                 ["preset"] = effort.Preset,
                 ["multipass"] = effort.Multipass,
@@ -253,7 +258,7 @@ namespace ReplayKitSetup
                     ObsEncoderId = "obs_nvenc_hevc_tex",
                     Codec = "h265",
                     Backend = "nvenc",
-                    Label = $"NVENC HEVC ({GenLabel(genStr)})",
+                    Label = $"NVENC HEVC / H.265 ({GenLabel(genStr)})",
                     Description = "NVIDIA hardware HEVC - ~half the file size of H.264 at the same quality.",
                     Builder = (cqp, mode) => BuildNvencHevc(cqp, gen, mode),
                 };
@@ -284,7 +289,7 @@ namespace ReplayKitSetup
                     ObsEncoderId = "h265_texture_amf",
                     Codec = "h265",
                     Backend = "amf",
-                    Label = $"AMF HEVC ({genStr.ToUpperInvariant()})",
+                    Label = $"AMF HEVC / H.265 ({genStr.ToUpperInvariant()})",
                     Description = "AMD hardware HEVC - significantly smaller files than H.264.",
                     Builder = (cqp, mode) => BuildAmfHevc(cqp, gen, mode),
                 };
@@ -315,7 +320,7 @@ namespace ReplayKitSetup
                     ObsEncoderId = "obs_qsv11_hevc",
                     Codec = "h265",
                     Backend = "qsv",
-                    Label = $"Quick Sync HEVC ({GenLabel(genStr)})",
+                    Label = $"Quick Sync HEVC / H.265 ({GenLabel(genStr)})",
                     Description = "Intel iGPU HEVC - smaller files, low overhead.",
                     Builder = (cqp, mode) => BuildQsvHevc(cqp, mode),
                 };
@@ -363,15 +368,15 @@ namespace ReplayKitSetup
             return candidates;
         }
 
-        // preferred-codec fallback order.
+        // preferred-codec fallback order. auto means h.264, which plays everywhere; hevc is only used when it is picked, since some phones, browsers and apps cannot play it
         private static readonly Dictionary<CodecPreference, string[]> FallbackOrder = new Dictionary<CodecPreference, string[]>
         {
             [CodecPreference.H265] = new[] { "h265", "h264", "software" },
             [CodecPreference.H264] = new[] { "h264", "software" },
-            [CodecPreference.Auto] = new[] { "h265", "h264", "software" },
+            [CodecPreference.Auto] = new[] { "h264", "software" },
         };
 
-        // resolve codec preference + gpu + compression_mode into a concrete encoder choice. cqp is on the nvenc scale (0-51, lower = better); the chosen builder translates as needed (crf for x264, icq for qsv, etc.). compression_mode controls encoder effort (lower_gpu/balanced/smaller_files).
+        // resolve codec preference + gpu + compression_mode into a concrete encoder choice. cqp is on the nvenc scale (0-51, lower = better); the chosen builder translates as needed (crf for x264, icq for qsv, etc.). compression_mode controls encoder effort (lower_gpu/balanced/smaller_files/tiniest).
         public static EncoderChoice PickEncoder(GpuInfo gpu, string codecPreference, int cqp, string compressionMode = "balanced")
         {
             var pref = CodecPreferenceExt.Parse(codecPreference);

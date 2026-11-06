@@ -245,8 +245,8 @@ namespace ReplayKitHelper
             return null;
         }
 
-        // leave obs and the helper running if a normal close cannot finish; an update is the exception, since the installer cannot replace the files of a running obs and closes it anyway, so for an update obs is made to stop and nothing is left in the bell about it
-        private static void StopObsForRestart(string reason, bool forUpdate = false)
+        // a plain exit leaves obs and the helper running when a normal close cannot finish; a restart someone pressed and an update have to happen (the installer cannot replace the files of a running obs either), so for those obs is made to stop once the normal close has had its time, and the armed relauncher brings it back
+        private static void StopObsForRestart(string reason, bool mustStop)
         {
             Thread.Sleep(300);
             try
@@ -275,14 +275,14 @@ namespace ReplayKitHelper
                 }
                 finally { p.Dispose(); }
             }
-            if (!stopped && forUpdate)
+            if (!stopped && mustStop)
             {
-                Log.Write(reason + ": OBS did not close within 15 s for the update, stopping it");
+                Log.Write(reason + ": OBS did not close within 15 s, stopping it");
                 foreach (var p in GetProcessesByNames("obs64", "obs32", "obs"))
                 {
                     try { if (!Constants.IsRoleHost(p) && !p.HasExited) { p.Kill(); p.WaitForExit(5000); } }
                     catch (InvalidOperationException) { }
-                    catch (Win32Exception ex) { Log.Write(reason + ": could not stop OBS for the update: " + ex.Message); }
+                    catch (Win32Exception ex) { Log.Write(reason + ": could not stop OBS: " + ex.Message); }
                     finally { p.Dispose(); }
                 }
                 Server.State.Shutdown = true;
@@ -734,7 +734,7 @@ namespace ReplayKitHelper
                             }
                             ArmRelaunchAndCloseObs(obsPath, "/settings");
                             HttpResponse.SendJson(stream, 200, result);
-                            StopObsForRestart("/settings");
+                            StopObsForRestart("/settings", true);
                             return false;
                         }
                         HttpResponse.SendJson(stream, 200, result);
@@ -3107,7 +3107,7 @@ namespace ReplayKitHelper
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
                 ArmRelaunchAndCloseObs(obsPath, "/restart-obs");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is restarting." });
-                StopObsForRestart("/restart-obs");
+                StopObsForRestart("/restart-obs", true);
                 return false;
             }
 
@@ -3142,7 +3142,7 @@ namespace ReplayKitHelper
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
 
                 // allow the response to flush before closing obs
-                StopObsForRestart("/restart-obs-clean");
+                StopObsForRestart("/restart-obs-clean", true);
                 return false;
             }
 

@@ -16,8 +16,8 @@ function Wait-ObsExit([int]$obsPid, [int]$timeoutMs) {
     return $false
 }
 
-# a relaunch must never terminate a process that still owns graphics or output resources
-if ($ObsPid -le 0 -or -not (Wait-ObsExit -obsPid $ObsPid -timeoutMs 15000)) {
+# a relaunch must never terminate a process that still owns graphics or output resources; the wait covers the 15 s normal close of the helper plus the stop it makes after that for a restart
+if ($ObsPid -le 0 -or -not (Wait-ObsExit -obsPid $ObsPid -timeoutMs 40000)) {
     $logPath = Join-Path $env:TEMP 'ReplayKit\logs\restart_obs.log'
     Add-Content -LiteralPath $logPath -Value "[$([DateTime]::Now.ToString('s'))] Restart stopped: OBS did not exit safely."
     exit 3

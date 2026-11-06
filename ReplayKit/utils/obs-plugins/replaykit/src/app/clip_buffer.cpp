@@ -68,6 +68,9 @@ void CapturePacket(obs_output_t *, encoder_packet *packet, encoder_packet_time *
 }
 std::vector<std::string> g_doomed;
 QPointer<QTimer> g_purgeTimer;
+QPointer<QTimer> g_splitTimer;
+// a split was asked for and the muxer has not moved to the next piece yet
+bool g_splitAsked = false;
 int g_clipSeconds = 20;
 bool g_saving = false;
 bool g_awaitingSplit = false;
@@ -157,6 +160,17 @@ void Purge()
 	}
 }
 
+// the time split of the obs mp4 writer only fires on a keyframe that lands within a millisecond of the piece length, so one frame the encoder drops moves every later keyframe off that grid and the writer never splits by time again, leaving one piece that grows for as long as clipping runs; the pieces are split from here instead, on the first keyframe after the piece length
+void SplitWhenDue()
+{
+	if (!DiskActive() || g_splitAsked || g_current.path.empty() || NowMs() - g_current.startMs < qint64(kPieceSeconds) * 1000)
+		return;
+	g_splitAsked = true;
+	calldata_t cd = {};
+	proc_handler_call(obs_output_get_proc_handler(g_out), "split_file", &cd);
+	calldata_free(&cd);
+}
+
 void ReleaseEncoders()
 {
 	if (g_video)
@@ -200,10 +214,13 @@ void DiskStopped()
 	}
 	if (g_purgeTimer)
 		g_purgeTimer->stop();
+	if (g_splitTimer)
+		g_splitTimer->stop();
 	g_pieces.clear();
 	g_current = Piece();
 	g_saving = false;
 	g_awaitingSplit = false;
+	g_splitAsked = false;
 	// the muxer lets go of its last file a moment after it reports the stop
 	QTimer::singleShot(1500, g_callbacks, []() {
 		if (!DiskActive())
@@ -220,6 +237,7 @@ void SendSave();
 void PieceChanged(const std::string &next, qint64 captureAt)
 {
 	const qint64 now = NowMs();
+	g_splitAsked = false;
 	if (!g_current.path.empty()) {
 		g_current.endMs = now;
 		if (g_current.captureStartMs == 0) g_current.captureStartMs = firstFrameAt.load();
@@ -446,7 +464,8 @@ void StartDisk(bool keepPieces)
 	obs_data_set_bool(settings, "allow_spaces", true);
 	obs_data_set_bool(settings, "allow_overwrite", false);
 	obs_data_set_bool(settings, "split_file", true);
-	obs_data_set_int(settings, "max_time_sec", kPieceSeconds);
+	// splits come from SplitWhenDue, not from the time limit of the writer
+	obs_data_set_int(settings, "max_time_sec", 0);
 	obs_data_set_int(settings, "max_size_mb", 0);
 	// the mp4 writer of obs runs inside obs, so the buffer needs no muxer process of its own
 	g_out = obs_output_create("mp4_output", "replaykit_clip_buffer", settings, nullptr);
@@ -486,6 +505,12 @@ void StartDisk(bool keepPieces)
 	if (!keepPieces)
 		CaptureContextResetBuffer();
 	g_purgeTimer->start(5000);
+	g_splitAsked = false;
+	if (!g_splitTimer) {
+		g_splitTimer = new QTimer(g_callbacks);
+		QObject::connect(g_splitTimer, &QTimer::timeout, g_callbacks, []() { SplitWhenDue(); });
+	}
+	g_splitTimer->start(1000);
 	blog(LOG_INFO, "[replaykit] disk clip buffer started: %d s clips in %d s pieces, %zu audio track(s), %s encoders%s", g_clipSeconds, kPieceSeconds, g_audio.size(),
 	     g_sharedEncoders ? "the recording" : "its own", keepPieces ? ", pieces kept" : "");
 	ReportState();
@@ -749,6 +774,8 @@ void ClipBufferShutdown()
 	g_restartShared = false;
 	if (g_purgeTimer)
 		g_purgeTimer->stop();
+	if (g_splitTimer)
+		g_splitTimer->stop();
 	signal_handler_disconnect(obs_get_signal_handler(), "hotkey_bindings_changed", OnHotkeyBindingsChanged, nullptr);
 	if (g_saveHotkey != OBS_INVALID_HOTKEY_ID)
 		obs_hotkey_unregister(g_saveHotkey);

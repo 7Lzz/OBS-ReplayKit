@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "app/main_window_filter.hpp"
 
+#include <QApplication>
 #include <QScopedValueRollback>
 #include <QScopeGuard>
 #include <QWindowStateChangeEvent>
@@ -87,6 +88,11 @@ protected:
 		// an obs settings dialog folded into this window would be destroyed mid-exec by the close, exactly what its modal form prevents by blocking the window, so the dialog is asked to close first and the window stays put
 		if (type == QEvent::Close && g_shellOn && g_obsSettingsDialog) {
 			event->ignore();
+			// a restart or exit that replaykit asked for has to go thru: the dialog is dropped with its cancel button, which asks nothing, and the close is made again once obs has let go of the dialog
+			if (GetTickCount64() < g_allowCloseUntilMs.load()) {
+				CloseAfterObsSettings();
+				return true;
+			}
 			ShellActivate(ShellView::ObsSettings);
 			if (g_obsSettingsDialog)
 				g_obsSettingsDialog->close();
@@ -121,6 +127,37 @@ protected:
 	}
 
 private:
+	void CloseAfterObsSettings()
+	{
+		if (closeAfterSettings)
+			return;
+		closeAfterSettings = true;
+		QPointer<QDialog> dialog = g_obsSettingsDialog;
+		QDialogButtonBox *buttons = dialog->findChild<QDialogButtonBox *>();
+		if (QAbstractButton *cancel = buttons ? buttons->button(QDialogButtonBox::Cancel) : nullptr) {
+			cancel->click();
+		} else {
+			blog(LOG_WARNING, "[replaykit] the obs settings dialog has no cancel button, closing it the normal way before the restart");
+			dialog->close();
+		}
+		QTimer::singleShot(100, this, [this, dialog]() { CloseOnceSettingsGone(dialog); });
+	}
+	// obs frees the dialog right after its exec() returns and may ask about a restart of its own then, so the window waits for both
+	void CloseOnceSettingsGone(QPointer<QDialog> dialog)
+	{
+		if (!dialog && !QApplication::activeModalWidget()) {
+			closeAfterSettings = false;
+			m_mw->close();
+			return;
+		}
+		if (GetTickCount64() >= g_allowCloseUntilMs.load()) {
+			closeAfterSettings = false;
+			blog(LOG_WARNING, "[replaykit] close cancelled: the obs settings dialog did not go away");
+			return;
+		}
+		QTimer::singleShot(100, this, [this, dialog]() { CloseOnceSettingsGone(dialog); });
+	}
+	bool closeAfterSettings = false;
 	void WaitForBuffer()
 	{
 		if (ClipBufferPrepareClose()) {

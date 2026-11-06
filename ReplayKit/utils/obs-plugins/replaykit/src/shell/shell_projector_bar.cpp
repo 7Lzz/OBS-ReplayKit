@@ -280,6 +280,7 @@ private:
 
 ShellProjectorBar::ShellProjectorBar(QWidget *parent) : QWidget(parent)
 {
+	setAttribute(Qt::WA_OpaquePaintEvent, true);
 	m_preview = new ShellBarToggle(ShellBarToggle::Kind::Preview, this);
 	m_preview->onPress = [this]() {
 		if (ShellStudioModeOn())

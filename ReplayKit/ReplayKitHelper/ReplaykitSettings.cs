@@ -36,7 +36,7 @@ namespace ReplayKitHelper
             {
                 ["recordingPreset"] = "balanced",
                 ["compressionMode"] = "balanced",
-                ["codecPreference"] = "auto",
+                ["codecPreference"] = "h264",
                 ["replaySeconds"] = 90,
                 ["fps"] = 60,
                 ["fpsNumerator"] = 60,
@@ -463,7 +463,7 @@ namespace ReplayKitHelper
 
             string preset = GetEnumSetting(data, "recordingPreset", defaults["recordingPreset"].Value<string>(), new[] { "performance", "balanced", "quality" });
             string compressionDefault = preset == "performance" ? "lower_gpu" : preset == "quality" ? "smaller_files" : "balanced";
-            string compression = GetEnumSetting(data, "compressionMode", compressionDefault, new[] { "lower_gpu", "balanced", "smaller_files" });
+            string compression = GetEnumSetting(data, "compressionMode", compressionDefault, new[] { "lower_gpu", "balanced", "smaller_files", "tiniest" });
 
             string clipDir = ResolveClipDirSetting(data["clipDir"]?.ToString());
             int replaySeconds = GetIntSetting(data, "replaySeconds", defaults["replaySeconds"].Value<int>(), 5, 1200);
@@ -6160,12 +6160,13 @@ namespace ReplayKitHelper
                         ["compressionModes"] = new JArray(
                             new JObject { ["value"] = "lower_gpu", ["label"] = "Lowest GPU use", ["blurb"] = "Least encoder work. Larger clips." },
                             new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "Good file size with modest encoder load." },
-                            new JObject { ["value"] = "smaller_files", ["label"] = "Smallest clips", ["blurb"] = "More encoder work for tighter files." }
+                            new JObject { ["value"] = "smaller_files", ["label"] = "Smallest clips", ["blurb"] = "More encoder work for tighter files." },
+                            new JObject { ["value"] = "tiniest", ["label"] = "Microscopic GPU Cooker", ["blurb"] = "Preset P7 with two full resolution passes. The tiniest clips, and the most work your GPU can do for them." }
                         ),
                         ["codecs"] = new JArray(
-                            new JObject { ["value"] = "auto", ["label"] = "Auto", ["blurb"] = "ReplayKit picks the best supported encoder." },
-                            new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Largest files, broadest playback support." },
-                            new JObject { ["value"] = "h265", ["label"] = "HEVC", ["blurb"] = "Smaller files on modern GPUs." }
+                            new JObject { ["value"] = "auto", ["label"] = "Auto", ["blurb"] = "ReplayKit picks the best H.264 encoder your PC has." },
+                            new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Recommended. Plays everywhere: phones, browsers, Discord and editors." },
+                            new JObject { ["value"] = "h265", ["label"] = "HEVC / H.265", ["blurb"] = "Smaller files, but HEVC / H.265 clips may not play for some people, on some phones, browsers and apps." }
                         ),
                         ["recordingScaleModes"] = new JArray(
                             new JObject { ["value"] = "native", ["label"] = "Native", ["blurb"] = "Record at your monitor's full resolution. Sharpest image, but more GPU load and bigger files." },

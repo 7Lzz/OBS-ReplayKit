@@ -167,6 +167,7 @@ QFont ShellUpdateButton::LabelFont()
 ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	: QWidget(mw), m_mw(mw)
 {
+	setAttribute(Qt::WA_OpaquePaintEvent, true);
 	QObject::connect(qGuiApp, &QGuiApplication::focusWindowChanged, this, [this](QWindow *) { update(); });
 	m_originalTitle = mw->windowTitle();
 	QObject::connect(mw, &QWidget::windowTitleChanged, this, [this](const QString &title) {

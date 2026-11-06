@@ -227,7 +227,11 @@ namespace ReplayKitHelper
                 string target = UniquePath(Path.Combine(targetDir, name));
                 part = target + ".rkpart";
                 bool mp4Family = ext == ".mp4" || ext == ".mov";
-                var argv = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", list, "-map", "0", "-c", "copy", "-avoid_negative_ts", "make_zero" };
+                // a copied stream can only start on a keyframe, so the inpoint brings in up to a keyframe interval of frames before the cut; mp4 and mov keep those frames before time zero behind an edit list, so players start right at the cut and the clip is as long as asked, while matroska has no edit list and plays them
+                var argv = new List<string> { "-y", "-hide_banner", "-loglevel", "error" };
+                if (mp4Family) argv.Add("-copyts");
+                argv.AddRange(new[] { "-f", "concat", "-safe", "0", "-i", list, "-map", "0", "-c", "copy" });
+                if (!mp4Family) argv.AddRange(new[] { "-avoid_negative_ts", "make_zero" });
                 // the same tag the hevc fix-up gives a saved replay, so phones and editors that only read hvc1 play it
                 if (mp4Family && codec == "hevc") argv.AddRange(new[] { "-tag:v", "hvc1" });
                 if (mp4Family) argv.AddRange(new[] { "-movflags", "+faststart" });

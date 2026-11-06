@@ -1,7 +1,7 @@
 {
   "recordingPreset": "balanced",
   "compressionMode": "balanced",
-  "codecPreference": "auto",
+  "codecPreference": "h264",
   "replaySeconds": 90,
   "fps": 60,
   "fpsNumerator": 60,

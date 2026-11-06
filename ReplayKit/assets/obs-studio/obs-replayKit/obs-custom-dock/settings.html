@@ -232,6 +232,9 @@
   #storageCompressionType.is-smaller .combo-label,
   .storage-compression-warning { color:var(--danger); }
   #storageCompressionType .combo-option[data-value="smaller"].is-selected { background:var(--danger); color:var(--on-accent); }
+  #compressionMode .combo-option[data-value="tiniest"],
+  #compressionMode[data-value="tiniest"] .combo-label { color:var(--danger); }
+  #compressionMode .combo-option[data-value="tiniest"].is-selected { background:var(--danger); color:var(--on-accent); }
   .storage-compression-warning { line-height:1.5; }
   .form-row.is-disabled .label,
   .form-row.is-disabled .hint {
@@ -3724,7 +3727,7 @@
     state.discord_projector_hide_taskbar = true;
     setComboValue(els.recordingPreset, state.recordingPreset || "balanced", false);
     setComboValue(els.compressionMode, state.compressionMode || "balanced", false);
-    setComboValue(els.codecPreference, state.codecPreference || "auto", false);
+    setComboValue(els.codecPreference, state.codecPreference || "h264", false);
     setComboValue(els.recordingScaleMode, state.recordingScaleMode || "native", false);
     setComboValue(els.recordingBuffer, state.recordingBuffer || "disk", false);
     setComboValue(els.captureDisplay, state.captureDisplay || "primary", false);

@@ -15,6 +15,7 @@ namespace rk {
 ShellRail::ShellRail(QWidget *parent)
 	: QWidget(parent)
 {
+	setAttribute(Qt::WA_OpaquePaintEvent, true);
 	setMouseTracking(true);
 	m_items = {
 		{Home, "rail-home.svg", QStringLiteral("Home"), false},

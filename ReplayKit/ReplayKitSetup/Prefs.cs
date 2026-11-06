@@ -143,13 +143,13 @@ namespace ReplayKitSetup
         public const double MOTION_BLUR_STRENGTH_MIN = 0.0;
         public const double MOTION_BLUR_STRENGTH_MAX = 1.0;
 
-        // "auto" picks the best hevc/h.264 combo the users gpu can run, or the user can force h.264 for maximum playback support -- av1 is deliberately not offered since most iphones and plenty of android devices have no av1 decoder at all, and unlike a container-tag issue theres no fix for missing silicon.
-        public const string DEFAULT_CODEC_PREFERENCE = "auto";
+        // h.264 is the default since it plays everywhere; hevc stays a choice for smaller files that some phones, browsers and apps cannot play, and "auto" picks the best h.264 encoder the gpu has -- av1 is deliberately not offered since most iphones and plenty of android devices have no av1 decoder at all, and unlike a container-tag issue theres no fix for missing silicon.
+        public const string DEFAULT_CODEC_PREFERENCE = "h264";
         public static readonly string[] ALLOWED_CODEC_PREFERENCES = { "auto", "h264", "h265" };
 
         // compression mode trades gpu cost against file size at the same visual quality. balanced is the validated default (~10-11% gpu on a 3060 ti at 1080p60 hevc). lower_gpu uses a faster nvenc preset + no lookahead + no b-frames (bigger files); smaller_files uses a slower preset + multipass + lookahead + more b-frames (more gpu, tighter files).
         public const string DEFAULT_COMPRESSION_MODE = "balanced";
-        public static readonly string[] ALLOWED_COMPRESSION_MODES = { "lower_gpu", "balanced", "smaller_files" };
+        public static readonly string[] ALLOWED_COMPRESSION_MODES = { "lower_gpu", "balanced", "smaller_files", "tiniest" };
 
         public static readonly Dictionary<string, string> PRESET_COMPRESSION_DEFAULTS = new Dictionary<string, string>
         {

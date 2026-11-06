@@ -12,6 +12,7 @@ namespace rk {
 namespace {
 
 QString g_appVersionText;
+QString g_obsVersionText;
 bool g_appVersionInFlight = false;
 
 } // namespace
@@ -21,6 +22,11 @@ QString AppVersionText()
 	return g_appVersionText;
 }
 
+QString ObsVersionText()
+{
+	return g_obsVersionText;
+}
+
 // same shape as the notification poll: one small request, skipped while one is already in flight, and a helper that is down or answers something else leaves the last known text alone
 void RefreshAppVersion(std::function<void()> changed)
 {
@@ -28,17 +34,21 @@ void RefreshAppVersion(std::function<void()> changed)
 		return;
 	g_appVersionInFlight = true;
 	RunAsync([changed]() {
-		const std::string version = ExtractJsonStringField(HttpRequest("GET", "/version", 8767, nullptr, 2500), "version");
+		const std::string body = HttpRequest("GET", "/version", 8767, nullptr, 2500);
+		const std::string version = ExtractJsonStringField(body, "version");
+		const std::string obsVersion = ExtractJsonStringField(body, "obsVersion");
 		QMetaObject::invokeMethod(
 			g_callbacks,
-			[changed, version]() {
+			[changed, version, obsVersion]() {
 				g_appVersionInFlight = false;
 				if (version.empty())
 					return;
-				const QString text = QStringLiteral("v") + QString::fromStdString(version);
-				if (text == g_appVersionText)
+				const QString text = QStringLiteral("ReplayKit ") + QString::fromStdString(version);
+				const QString obsText = obsVersion.empty() ? QString() : QStringLiteral("OBS ") + QString::fromStdString(obsVersion);
+				if (text == g_appVersionText && obsText == g_obsVersionText)
 					return;
 				g_appVersionText = text;
+				g_obsVersionText = obsText;
 				if (changed)
 					changed();
 			},

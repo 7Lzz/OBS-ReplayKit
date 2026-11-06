@@ -33,10 +33,21 @@ void ObsSettingsGuard(bool on)
 	s_settingsGuard = guard;
 }
 
+// what obs greys out while any output runs (OBSBasicSettings load code); it reads that state once, when it builds the dialog
+const char *const kLockedWhileOutputsRun[] = {"language", "videoPage", "outputMode", "outputModeLabel", "simpleOutStrEncoderLabel", "simpleOutStrEncoder", "simpleOutStrAEncoderLabel", "simpleOutStrAEncoder", "simpleRecordingGroupBox", "advOutTopContainer", "advOutRecTopContainer", "advOutRecTypeContainer", "advOutputAudioTracksTab", "advNetworkGroupBox", "sampleRate", "channelSetup", "advancedVideoContainer"};
+
 // watches the reparented dialog so the rail goes back to Home when it closes (its own OK / Cancel / X all end in hide)
 class ObsSettingsWatch : public QObject {
 public:
-	explicit ObsSettingsWatch(QDialog *dlg) : QObject(dlg) {}
+	explicit ObsSettingsWatch(QDialog *dlg) : QObject(dlg), m_dlg(dlg)
+	{
+		QWidget *page = dlg->findChild<QWidget *>(QStringLiteral("videoPage"));
+		m_outputsRun = page && !page->isEnabled();
+		// clipping can be turned off or on from the window while the dialog stays open, and the disk buffer is an output of its own that sends no frontend event, so the state is polled
+		QTimer *poll = new QTimer(this);
+		QObject::connect(poll, &QTimer::timeout, this, [this]() { FollowOutputs(); });
+		poll->start(500);
+	}
 
 protected:
 	bool eventFilter(QObject *, QEvent *event) override
@@ -71,7 +82,33 @@ protected:
 	}
 
 private:
+	void FollowOutputs()
+	{
+		const bool run = obs_video_active();
+		if (run == m_outputsRun)
+			return;
+		m_outputsRun = run;
+		for (const char *name : kLockedWhileOutputsRun)
+			if (QWidget *widget = m_dlg->findChild<QWidget *>(QString::fromLatin1(name)))
+				widget->setEnabled(!run);
+		// the note obs puts on the video page while outputs run; any other note there (an invalid resolution) is left alone
+		if (QLabel *note = m_dlg->findChild<QLabel *>(QStringLiteral("videoMsg"))) {
+			const QString busy = QString::fromUtf8(obs_frontend_get_locale_string("Basic.Settings.Video.CurrentlyActive"));
+			if (!run && note->text() == busy)
+				note->clear();
+			else if (run && note->text().isEmpty())
+				note->setText(busy);
+		}
+		blog(LOG_INFO, "[replaykit] obs settings follow the outputs: %s", run ? "running, output settings locked" : "stopped, output settings unlocked");
+	}
+	QDialog *m_dlg;
+	bool m_outputsRun = false;
 	bool m_painted = false;
+};
+
+// QWidget::create is protected, and a pointer to it taken thru a subclass is the way c++ allows calling it on another widget; for a plain child it only marks the widget created, the same step a show of its parent takes
+struct WidgetCreateAccess : QWidget {
+	static void Create(QWidget *widget) { (widget->*&WidgetCreateAccess::create)(0, true, true); }
 };
 
 // runs synchronously from the first polish of the dialog, which qt sends from inside its show() after the window is created but before it counts as visible. that is the one moment a dialog can change parent without qt hiding it, and a hide would end the exec() loop obs is sitting in (the dialog would be gone the instant it appeared)
@@ -113,6 +150,10 @@ void ShellEmbedObsSettings(QDialog *dlg)
 		handle->setModality(Qt::NonModal);
 	// without this the showEvent of the dialog centres it over its parent, which for a child means an offset the host layout never asked for
 	dlg->setAttribute(Qt::WA_Moved, true);
+	// qt clears the created state of a top level that becomes a child, and the show this runs inside never sets it again while the host is hidden; a widget that is not created only stores a new geometry and gets no resize event, so the dialog kept the layout it opened with however the window was resized, until a park and return showed the host again
+	WidgetCreateAccess::Create(dlg);
+	// the corner grip of the window does the resizing; the grip of the dialog sat on top of it in the same corner
+	dlg->setSizeGripEnabled(false);
 	QHBoxLayout *row = static_cast<QHBoxLayout *>(g_viewObsHost->layout());
 	// the list of pages is replaced by the nav column, drawn like the replaykit settings and leading back to them. the dialog keeps its own list, hidden, and keeps deciding which page shows
 	if (QListWidget *pages = dlg->findChild<QListWidget *>(QStringLiteral("listWidget"))) {

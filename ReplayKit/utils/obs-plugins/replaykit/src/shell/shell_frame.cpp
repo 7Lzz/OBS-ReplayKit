@@ -444,8 +444,13 @@ bool ShellFrameFilter::nativeEventFilter(const QByteArray &, void *message, qint
 		return false;
 	if (msg->message == WM_ERASEBKGND) {
 		QWidget *surface = QWidget::find(reinterpret_cast<WId>(msg->hwnd));
-		const bool chrome = surface && (surface == g_shellTitle || surface == g_shellRail || surface == g_shellCorner);
-		if (msg->hwnd != g_shellHwnd && !chrome && (!surface || surface != g_shellBar))
+		if (surface && (surface == g_shellTitle || surface == g_shellRail || surface == g_shellBar)) {
+			// qt flushes the background and buttons together; erasing here exposes an empty bar during resize
+			*result = 1;
+			return true;
+		}
+		const bool chrome = surface && surface == g_shellCorner;
+		if (msg->hwnd != g_shellHwnd && !chrome)
 			return false;
 		const QColor &color = chrome ? g_chromeBar : g_chromeBg;
 		RECT rc;

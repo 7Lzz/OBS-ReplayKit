@@ -157,7 +157,19 @@ void ShellObsNav::paintEvent(QPaintEvent *)
 			// the version on the left and the github mark on the right, standing on the rule like the ones in the sidebar of the replaykit settings
 			const QRectF box = GithubRect();
 			const qreal left = panel.left() + 16;
-			DrawPageText(p, QRectF(left, box.top(), box.left() - 6 - left, box.height()), Qt::AlignLeft, AppVersionText(), VersionFont(), g_menuMuted, kVersionStroke);
+			const QFont font = VersionFont();
+			const QString appText = AppVersionText();
+			DrawPageText(p, QRectF(left, box.top(), box.left() - 6 - left, box.height()), Qt::AlignLeft, appText, font, g_menuMuted, kVersionStroke);
+			const QString obsText = ObsVersionText();
+			if (!appText.isEmpty() && !obsText.isEmpty()) {
+				// the settings page uses a 3 px circle with a 5 px gap on each side
+				const qreal dotLeft = left + QFontMetricsF(font).horizontalAdvance(appText) + 5;
+				p.setPen(Qt::NoPen);
+				p.setBrush(g_menuMuted);
+				p.drawEllipse(QRectF(dotLeft, box.center().y() - 1.5, 3, 3));
+				const qreal obsLeft = dotLeft + 3 + 5;
+				DrawPageText(p, QRectF(obsLeft, box.top(), box.left() - 6 - obsLeft, box.height()), Qt::AlignLeft, obsText, font, g_menuMuted, kVersionStroke);
+			}
 			const qreal t = m_hoverT.value(kGithub, 0.0);
 			if (t > 0.0) {
 				QColor wash = g_menuBorderStrong;
