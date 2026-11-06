@@ -36,19 +36,13 @@ namespace ReplayKitHelper
             return unique;
         }
 
-        private static List<double> ConvertPacketOutputToKeyframes(List<string> output)
+        private static void AddPacketKeyframeTime(List<double> times, string line)
         {
-            var times = new List<double>();
-            foreach (var line in output)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var parts = line.Split(',');
-                if (parts.Length < 2) continue;
-                string flags = parts[parts.Length - 1];
-                if (!flags.Contains("K")) continue;
-                AddKeyframeTime(times, parts[0]);
-            }
-            return CompleteKeyframeTimes(times);
+            if (string.IsNullOrWhiteSpace(line)) return;
+            int lastComma = line.LastIndexOf(',');
+            if (lastComma < 0 || line.IndexOf('K', lastComma + 1) < 0) return;
+            var parts = line.Split(',');
+            AddKeyframeTime(times, parts[0]);
         }
 
         private static List<double> ConvertFrameJsonToKeyframes(string json)
@@ -67,9 +61,8 @@ namespace ReplayKitHelper
             return CompleteKeyframeTimes(times);
         }
 
-        private static string ShortOutput(List<string> output)
+        private static string ShortOutput(string combined)
         {
-            string combined = string.Join("\n", output);
             return combined.Length > 300 ? combined.Substring(0, 300) + "..." : combined;
         }
 
@@ -82,13 +75,24 @@ namespace ReplayKitHelper
                 if (!File.Exists(sourcePath)) return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
 
                 var sw = Stopwatch.StartNew();
+                var packetTimes = new List<double>();
+                var packetOutput = new System.Text.StringBuilder(301);
                 var packetResult = Compression.InvokeNativeCapture(ffprobe, new[]
                 {
                     "-v", "error", "-select_streams", "v:0", "-show_packets",
                     "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0", sourcePath,
-                }, cancellationToken);
+                }, cancellationToken, onStdoutLine: line =>
+                {
+                    AddPacketKeyframeTime(packetTimes, line);
+                    if (packetOutput.Length < 301)
+                    {
+                        packetOutput.Append(line, 0, Math.Min(line.Length, 301 - packetOutput.Length));
+                        if (packetOutput.Length < 301) packetOutput.Append('\n');
+                    }
+                });
                 string method = "packets";
-                var unique = packetResult.ExitCode == 0 ? ConvertPacketOutputToKeyframes(packetResult.Output) : new List<double>();
+                foreach (var line in packetResult.Output) AddPacketKeyframeTime(packetTimes, line);
+                var unique = packetResult.ExitCode == 0 ? CompleteKeyframeTimes(packetTimes) : new List<double>();
 
                 if (packetResult.ExitCode != 0 || unique.Count <= 1)
                 {
@@ -100,8 +104,8 @@ namespace ReplayKitHelper
                     method = "frames";
                     if (frameResult.ExitCode != 0)
                     {
-                        string packetMsg = packetResult.ExitCode != 0 ? ShortOutput(packetResult.Output) : "packet probe returned no keyframe packet data";
-                        string frameMsg = ShortOutput(frameResult.Output);
+                        string packetMsg = packetResult.ExitCode != 0 ? ShortOutput(packetOutput + string.Join("\n", packetResult.Output)) : "packet probe returned no keyframe packet data";
+                        string frameMsg = ShortOutput(string.Join("\n", frameResult.Output));
                         sw.Stop();
                         return new KeyframeScanResult
                         {

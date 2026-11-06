@@ -1042,6 +1042,7 @@ namespace ReplayKitHelper
 
         private static Snapshot cached;
         private static long generation;
+        private static readonly object SnapshotGate = new object();
 
         internal static void InvalidateCache()
         {
@@ -1050,21 +1051,25 @@ namespace ReplayKitHelper
 
         private static Snapshot GetSnapshot()
         {
-            string clipDir = AppConfig.GetClipDir();
-            string signature = GetClipsCacheSignature(clipDir);
-            long observed;
-            lock (Server.State.ClipsMetaLock)
+            // only readers take this gate; invalidation can hold ClipsMetaLock without waiting for a build
+            lock (SnapshotGate)
             {
-                if (cached != null && cached.Signature == signature &&
-                    (DateTime.UtcNow - cached.Created).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS) return cached;
-                observed = generation;
+                string clipDir = AppConfig.GetClipDir();
+                string signature = GetClipsCacheSignature(clipDir);
+                long observed;
+                lock (Server.State.ClipsMetaLock)
+                {
+                    if (cached != null && cached.Signature == signature &&
+                        (DateTime.UtcNow - cached.Created).TotalMilliseconds < Constants.CLIPS_CACHE_MAX_AGE_MS) return cached;
+                    observed = generation;
+                }
+                var snapshot = new Snapshot(GetClipsListUncached(), signature, FolderId(clipDir));
+                lock (Server.State.ClipsMetaLock)
+                {
+                    if (observed == generation) cached = snapshot;
+                }
+                return snapshot;
             }
-            var snapshot = new Snapshot(GetClipsListUncached(), signature, FolderId(clipDir));
-            lock (Server.State.ClipsMetaLock)
-            {
-                if (observed == generation) cached = snapshot;
-            }
-            return snapshot;
         }
 
         // which clip folder a list was read from, so a page that keeps clips between polls drops all of them (favorites, drafts, counts) when the folder is switched; a hash, so the path itself is not handed out

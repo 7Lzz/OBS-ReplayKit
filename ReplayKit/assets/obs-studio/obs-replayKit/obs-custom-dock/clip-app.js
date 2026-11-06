@@ -2014,7 +2014,7 @@ const CLIP_HOVER_PROFILES = {
     return card ? bindCardToClip(card, clip) : buildCard(clip);
   }
 
-  function releaseCard(card) {
+  function releaseCard(card, recycle = true) {
     if (!card) return;
     clearTransientCardState(card);
     const thumb = card.querySelector(".thumb");
@@ -2022,13 +2022,14 @@ const CLIP_HOVER_PROFILES = {
       if (thumbObserver) thumbObserver.unobserve(thumb);
       delete thumb.dataset.loaded;
       delete thumb.dataset.loadingSrc;
+      if (recycle === false) delete thumb.dataset.src;
       thumb.src = EMPTY_THUMB;
     }
     card.remove();
     card.style.removeProperty("--virtual-card-x");
     card.style.removeProperty("--virtual-card-y");
     card.style.removeProperty("--virtual-card-width");
-    if (recycledCards.length < MAX_RECYCLED_CARDS) recycledCards.push(card);
+    if (recycle !== false && recycledCards.length < MAX_RECYCLED_CARDS) recycledCards.push(card);
   }
 
   function isFullscreenOrHostTransition() {
@@ -4953,12 +4954,12 @@ const CLIP_HOVER_PROFILES = {
     favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
     favoritesGridEl.classList.toggle("is-shown", showFavSection);
     if (showFavSection && !collapsedSections.has("favorites")) renderFavoritesGrid(favClips);
-    else favoritesGridEl.replaceChildren();
+    else renderCardRow(favoritesGridEl, []);
     for (const [headingEl, sectionGridEl, key, rows] of [[linkedHeadingEl, linkedGridEl, "linked", linkedClips], [draftsHeadingEl, draftsGridEl, "drafts", draftClips]]) {
       headingEl.classList.toggle("is-shown", rows.length > 0);
       sectionGridEl.classList.toggle("is-shown", rows.length > 0);
       if (rows.length && !collapsedSections.has(key)) renderCardRow(sectionGridEl, rows);
-      else sectionGridEl.replaceChildren();
+      else renderCardRow(sectionGridEl, []);
     }
     const showRowSections = showFavSection || linkedClips.length > 0 || draftClips.length > 0;
     // every section keeps its heading available while its contents are collapsed.
@@ -5141,7 +5142,7 @@ const CLIP_HOVER_PROFILES = {
         container.insertBefore(card, cursor);
       }
     }
-    for (const leftover of existing.values()) leftover.remove();
+    for (const leftover of existing.values()) releaseCard(leftover, false);
   }
   function renderFavoritesGrid(favClips) { renderCardRow(favoritesGridEl, favClips); }
 

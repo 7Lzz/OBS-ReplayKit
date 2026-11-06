@@ -283,7 +283,7 @@ namespace ReplayKitHelper
         }
 
         // reads both streams concurrently before WaitForExit so a chatty child cant deadlock on a full pipe buffer, then joins stdout and stderr for the line scans the callers do; the optional token kills the child outright
-        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000, bool lowPriority = false)
+        public static NativeCaptureResult InvokeNativeCapture(string exe, IEnumerable<string> arguments, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), int timeoutMs = 30000, bool lowPriority = false, Action<string> onStdoutLine = null)
         {
             var psi = new ProcessStartInfo
             {
@@ -310,10 +310,48 @@ namespace ReplayKitHelper
                     try { proc.PriorityClass = ProcessPriorityClass.BelowNormal; }
                     catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception) { }
                 }
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                // a consumer receives complete stdout lines; stderr is drained concurrently and joined with the final fragment
+                var stdoutTask = onStdoutLine == null ? proc.StandardOutput.ReadToEndAsync() : null;
                 var stderrTask = proc.StandardError.ReadToEndAsync();
+                string stdoutRemainder = "";
+                if (onStdoutLine != null)
+                {
+                    try
+                    {
+                        var line = new System.Text.StringBuilder();
+                        var buffer = new char[4096];
+                        int count;
+                        while ((count = proc.StandardOutput.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            int offset = 0;
+                            while (offset < count)
+                            {
+                                int end = Array.IndexOf(buffer, '\n', offset, count - offset);
+                                if (end < 0)
+                                {
+                                    line.Append(buffer, offset, count - offset);
+                                    break;
+                                }
+                                line.Append(buffer, offset, end - offset);
+                                int length = line.Length;
+                                if (length > 0 && line[length - 1] == '\r') length--;
+                                onStdoutLine(line.ToString(0, length));
+                                line.Clear();
+                                offset = end + 1;
+                            }
+                        }
+                        // the final fragment belongs to stderr's first line when stdout has no trailing newline
+                        stdoutRemainder = line.ToString();
+                    }
+                    catch
+                    {
+                        try { if (!proc.HasExited) proc.Kill(); }
+                        catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+                        throw;
+                    }
+                }
                 proc.WaitForExit();
-                string combined = stdoutTask.Result + stderrTask.Result;
+                string combined = (stdoutTask?.Result ?? stdoutRemainder) + stderrTask.Result;
                 cancellationToken.ThrowIfCancellationRequested();
                 if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
                 return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = combined.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };

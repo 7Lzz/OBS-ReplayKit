@@ -190,7 +190,7 @@ namespace ReplayKitHelper
         }
 
         // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one" one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never both see "no job yet" and each start their own ffprobe for the same file.
-        private static TrimKeyframeJob StartTrimKeyframeWorkerLocked(Clips.SafeClipPath source, string ffprobe, string jobKey, string cacheSig)
+        private static TrimKeyframeJob StartTrimKeyframeWorkerLocked(Clips.SafeClipPath source, string ffprobe, string jobKey, string cacheKey, string cacheSig)
         {
             var cts = new CancellationTokenSource(TrimKeyframeWorkerTimeoutMs);
             var job = new TrimKeyframeJob { Key = jobKey, Sig = cacheSig, StartedAt = DateTime.UtcNow, Cts = cts };
@@ -198,7 +198,7 @@ namespace ReplayKitHelper
             {
                 var result = TrimKeyframesWorker.Run(ffprobe, source.Full, source.Name, cts.Token);
                 if (string.IsNullOrWhiteSpace(result.Name)) result.Name = source.Name;
-                SaveTrimKeyframeCache(source.Full.ToLowerInvariant(), cacheSig, result);
+                SaveTrimKeyframeCache(cacheKey, cacheSig, result);
                 return result;
             });
             Server.State.TrimKeyframeJobs[jobKey] = job;
@@ -242,7 +242,7 @@ namespace ReplayKitHelper
                     string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
                         return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
-                    job = StartTrimKeyframeWorkerLocked(source, ffprobe, jobKey, cacheSig);
+                    job = StartTrimKeyframeWorkerLocked(source, ffprobe, jobKey, cacheKey, cacheSig);
                     startedNew = true;
                 }
             }
