@@ -32,6 +32,37 @@ local function log_error(message)
     obs.script_log(obs.LOG_ERROR, "[ReplayKit] " .. tostring(message))
 end
 
+-- the values shared/ owns (the helper address and the folder of the saved state), written by scripts/sync_shared.ps1 on every build; without them no module can find its settings or the helper, so they are checked once here
+local SHARED = (function()
+    local chunk = loadfile(SCRIPT_ROOT .. "shared_values.lua")
+    if not chunk then return nil end
+    local ok, values = pcall(chunk)
+    if ok and type(values) == "table" and type(values.host) == "string" and type(values.port) == "number" and type(values.origin) == "string" and type(values.state_folder) == "string" then return values end
+    return nil
+end)()
+if not SHARED then log_error("shared_values.lua is missing, so the settings and the helper cannot be found") end
+
+local REPLAYKIT_ROOT = SCRIPT_ROOT .. "../"
+
+local function file_exists(path)
+    local file = io.open(path, "rb")
+    if not file then return false end
+    file:close()
+    return true
+end
+
+-- where a saved state file is right now, by the rule of shared/StateLayout.cs Resolve: the state folder, or an older place (the replaykit folder itself, scripts, scripts/helper) only while the file is still there and has not been moved yet
+local function state_file(name)
+    -- without the shared values only the old place is known, and a module that reads nothing there keeps its own defaults
+    if not SHARED then return REPLAYKIT_ROOT .. name end
+    local current = REPLAYKIT_ROOT .. SHARED.state_folder .. "/" .. name
+    if file_exists(current) then return current end
+    for _, legacy in ipairs({ REPLAYKIT_ROOT .. name, SCRIPT_ROOT .. name, SCRIPT_ROOT .. "helper/" .. name }) do
+        if file_exists(legacy) then return legacy end
+    end
+    return current
+end
+
 local function load_chunk(path, env)
     if setfenv then
         local chunk, err = loadfile(path)
@@ -50,6 +81,8 @@ local function load_feature(spec)
         script_path = function()
             return module_dir
         end,
+        replaykit_shared = SHARED,
+        replaykit_state_file = state_file,
     }
     setmetatable(env, { __index = _G })
 
@@ -104,9 +137,8 @@ local function read_text(path)
     return text
 end
 
--- the settings file sits in the replaykit folder, one level above this script; an install from before that move keeps it beside the script until the helper has moved it
 local function read_runtime_settings_text()
-    return read_text(SCRIPT_ROOT .. "../replaykit_settings.json") or read_text(SCRIPT_ROOT .. "replaykit_settings.json")
+    return read_text(state_file("replaykit_settings.json"))
 end
 
 local function read_disable_obs_close_warning()

@@ -4,34 +4,59 @@ using System.Threading;
 
 namespace ReplayKitShared
 {
-    // where the settings and the saved state of replaykit live: plain files straight in the obs-replayKit folder, next to version.json. installs from before that kept them under scripts\ and scripts\helper\; Run moves those over once, and until a file has been moved Resolve keeps pointing at the old copy, so real data is never shadowed by an empty file in the new place. this file is compiled into both the setup and the helper, which is why it has a namespace of its own
+    // where the settings and the saved state of replaykit live: the user-data folder inside obs-replayKit, so the files of the user are apart from what replaykit ships. older installs kept them straight in obs-replayKit, and before that under scripts\ and scripts\helper\; Run moves them over once, and until a file has been moved Resolve keeps pointing at the old copy, so real data is never shadowed by an empty file in the new place. compiled into both the setup and the helper, and scripts/sync_shared.ps1 writes Folder out for the plugin and the lua scripts
     public static class StateLayout
     {
+        public const string Folder = "user-data";
+
         public const string SettingsFile = "replaykit_settings.json";
         public const string HotkeySignalFile = "hotkey_capture_signal.json";
         public const string HelperConfigFile = "helper_config.json";
         public const string ClipsDbFile = "clips_db.json";
         public const string ClipsIndexFile = "clips_index.json";
+        public const string ClipsIndexErrorFile = "clips_index.json.error.txt";
         public const string CompressionHistoryFile = "compression_history.json";
         public const string GameMappingsFile = "game_mappings.json";
-        public const string UpdatePendingFile = "update_pending.json";
         public const string ProfilePictureFile = "profile_picture.png";
+        public const string DeletedHistoryFile = "deleted_history.json";
+        public const string EditDraftsFile = "edit_drafts.json";
+        public const string EditorPresetsFile = "editor_presets.json";
+        public const string NotificationsFile = "notifications.json";
+        public const string DefaultsAppliedFile = "defaults_applied.json";
+        public const string WindowStateFile = "window_state.ini";
+        // the hand-off between the installer and a helper that can still be the one of the release before, so it keeps its place in the folder root
+        public const string UpdatePendingFile = "update_pending.json";
 
         private sealed class Entry
         {
             public string File;
-            public string OldFolder;
+            // the places the file lived before, newest first; the root of obs-replayKit is the one every install from before the move has
+            public string[] OldFolders;
             // the owner writes the file again from scratch whenever it starts, so an old copy that is left over is deleted and not kept
             public bool Regenerated;
         }
 
+        private static readonly string Root = "";
+        private static readonly string Scripts = "scripts";
+        private static readonly string ScriptsHelper = Path.Combine("scripts", "helper");
+
         private static readonly Entry[] Entries =
         {
-            new Entry { File = SettingsFile, OldFolder = "scripts" },
-            new Entry { File = HotkeySignalFile, OldFolder = "scripts", Regenerated = true },
-            new Entry { File = HelperConfigFile, OldFolder = Path.Combine("scripts", "helper"), Regenerated = true },
-            new Entry { File = ClipsDbFile, OldFolder = Path.Combine("scripts", "helper") },
-            new Entry { File = ClipsIndexFile, OldFolder = Path.Combine("scripts", "helper") },
+            new Entry { File = SettingsFile, OldFolders = new[] { Root, Scripts } },
+            new Entry { File = HotkeySignalFile, OldFolders = new[] { Root, Scripts }, Regenerated = true },
+            new Entry { File = HelperConfigFile, OldFolders = new[] { Root, ScriptsHelper }, Regenerated = true },
+            new Entry { File = ClipsDbFile, OldFolders = new[] { Root, ScriptsHelper } },
+            new Entry { File = ClipsIndexFile, OldFolders = new[] { Root, ScriptsHelper } },
+            new Entry { File = ClipsIndexErrorFile, OldFolders = new[] { Root }, Regenerated = true },
+            new Entry { File = CompressionHistoryFile, OldFolders = new[] { Root } },
+            new Entry { File = GameMappingsFile, OldFolders = new[] { Root } },
+            new Entry { File = ProfilePictureFile, OldFolders = new[] { Root } },
+            new Entry { File = DeletedHistoryFile, OldFolders = new[] { Root } },
+            new Entry { File = EditDraftsFile, OldFolders = new[] { Root } },
+            new Entry { File = EditorPresetsFile, OldFolders = new[] { Root } },
+            new Entry { File = NotificationsFile, OldFolders = new[] { Root } },
+            new Entry { File = DefaultsAppliedFile, OldFolders = new[] { Root } },
+            new Entry { File = WindowStateFile, OldFolders = new[] { Root } },
         };
 
         // written by the helper for diagnosis only and not read by anything; it lives with the logs now
@@ -47,62 +72,72 @@ namespace ReplayKitShared
             public int Left;
         }
 
-        public static string PathFor(string root, string file) => Path.Combine(root, file);
+        public static string FolderPath(string root) => Path.Combine(root, Folder);
 
-        // the place the file lived before the move, or null for a file that never lived anywhere else
-        public static string LegacyPath(string root, string file)
+        // where the file belongs; files that are not part of the move (the update hand-off) stay in the root
+        public static string PathFor(string root, string file)
         {
-            foreach (var entry in Entries)
-                if (string.Equals(entry.File, file, StringComparison.OrdinalIgnoreCase)) return Path.Combine(root, entry.OldFolder, entry.File);
-            return null;
+            return Find(file) == null ? Path.Combine(root, file) : Path.Combine(root, Folder, file);
         }
 
-        // the path to read and write right now: the new place, or the old one only while the file exists there and has not been moved yet. nothing creates the file in the new place while the old copy is still the real one
+        // the path to read and write right now: the new place, or an old one only while the file exists there and has not been moved yet. nothing creates the file in the new place while an old copy is still the real one
         public static string Resolve(string root, string file)
         {
-            string current = Path.Combine(root, file);
+            string current = PathFor(root, file);
             if (File.Exists(current)) return current;
-            string legacy = LegacyPath(root, file);
-            return legacy != null && File.Exists(legacy) ? legacy : current;
+            var entry = Find(file);
+            if (entry == null) return current;
+            foreach (var old in entry.OldFolders)
+            {
+                string legacy = Path.Combine(root, old, file);
+                if (File.Exists(legacy)) return legacy;
+            }
+            return current;
         }
 
-        // moves what is still in the old places into the folder root; safe to run any number of times and never overwrites a file that is already in the new place
+        // moves what is still in the old places into the user-data folder; safe to run any number of times and never overwrites a file that is already in the new place
         public static Result Run(string root, Action<string> log = null)
         {
             var result = new Result();
             if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return result;
+            // made even when there is nothing to move, so every writer finds its folder, the plugin included
+            Directory.CreateDirectory(FolderPath(root));
 
             foreach (var entry in Entries)
             {
-                string old = Path.Combine(root, entry.OldFolder, entry.File);
-                string current = Path.Combine(root, entry.File);
-                if (!File.Exists(old)) continue;
-
-                if (File.Exists(current))
+                string current = Path.Combine(root, Folder, entry.File);
+                foreach (var oldFolder in entry.OldFolders)
                 {
-                    if (entry.Regenerated && TryDelete(old))
+                    string old = Path.Combine(root, oldFolder, entry.File);
+                    string where = oldFolder.Length == 0 ? "the replaykit folder" : oldFolder.Replace('\\', '/');
+                    if (!File.Exists(old)) continue;
+
+                    if (File.Exists(current))
                     {
-                        result.Removed++;
-                        log?.Invoke("removed the old copy of " + entry.File + " (" + entry.OldFolder.Replace('\\', '/') + ")");
+                        if (entry.Regenerated && TryDelete(old))
+                        {
+                            result.Removed++;
+                            log?.Invoke("removed the old copy of " + entry.File + " (" + where + ")");
+                        }
+                        else
+                        {
+                            result.Left++;
+                            log?.Invoke("warn: " + entry.File + " exists in the old and in the new place; the new one is used and the old one stays at " + old);
+                        }
+                        continue;
+                    }
+
+                    string failure = TryMove(old, current);
+                    if (failure == null)
+                    {
+                        result.Moved++;
+                        log?.Invoke("moved " + entry.File + " from " + where + " to " + Folder);
                     }
                     else
                     {
                         result.Left++;
-                        log?.Invoke("warn: " + entry.File + " exists in the old and in the new place; the new one is used and the old one stays at " + old);
+                        log?.Invoke("warn: could not move " + entry.File + " yet, the old copy keeps being used: " + failure);
                     }
-                    continue;
-                }
-
-                string failure = TryMove(old, current);
-                if (failure == null)
-                {
-                    result.Moved++;
-                    log?.Invoke("moved " + entry.OldFolder.Replace('\\', '/') + "/" + entry.File + " to the replaykit folder");
-                }
-                else
-                {
-                    result.Left++;
-                    log?.Invoke("warn: could not move " + entry.File + " yet, the old copy keeps being used: " + failure);
                 }
             }
 
@@ -113,10 +148,18 @@ namespace ReplayKitShared
             }
             result.Removed += SweepReplaceLeftovers(Path.Combine(root, "scripts", "helper"), log);
             result.Removed += SweepReplaceLeftovers(root, log);
+            result.Removed += SweepReplaceLeftovers(FolderPath(root), log);
             return result;
         }
 
-        // file.Replace makes a ~RF<hex>.TMP backup beside the file it replaces and leaves it behind when another process still holds the old file; the clip database was saved that way in scripts\helper and then in the root. only old ones go, so a replace that is running now is left alone
+        private static Entry Find(string file)
+        {
+            foreach (var entry in Entries)
+                if (string.Equals(entry.File, file, StringComparison.OrdinalIgnoreCase)) return entry;
+            return null;
+        }
+
+        // file.Replace makes a ~RF<hex>.TMP backup beside the file it replaces and leaves it behind when another process still holds the old file; the clip database was saved that way in scripts\helper, then in the root, now in user-data. only old ones go, so a replace that is running now is left alone
         private static int SweepReplaceLeftovers(string folder, Action<string> log)
         {
             if (!Directory.Exists(folder)) return 0;

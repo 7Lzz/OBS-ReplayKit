@@ -3,7 +3,7 @@ param(
     [ValidateRange(1, 1200)][int]$Seconds = 90,
     [ValidateRange(500, 10000)][int]$DurationMs = 3200,
     [ValidateRange(0, 1)][int]$HideFromCapture = 1,
-    # handed over by clip_saved_notification.lua from the generated helper_endpoint.lua; empty keeps the built-in colours
+    # handed over by clip_saved_notification.lua from the generated shared_values.lua; empty keeps the built-in colours
     [ValidatePattern('^(http://127\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{4,5})?$')][string]$HelperOrigin = ''
 )
 

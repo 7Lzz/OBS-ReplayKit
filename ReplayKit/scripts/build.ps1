@@ -15,7 +15,7 @@ function ClearPublishDirectory {
 
 Write-Host '[1/4] Syncing version...'
 & (Join-Path $PSScriptRoot 'sync_version.ps1')
-& (Join-Path $PSScriptRoot 'sync_endpoint.ps1')
+& (Join-Path $PSScriptRoot 'sync_shared.ps1')
 Write-Host '[2/4] Building helper...'
 & powershell -NoProfile -File (Join-Path $PSScriptRoot 'build_helper.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Helper build failed.' }

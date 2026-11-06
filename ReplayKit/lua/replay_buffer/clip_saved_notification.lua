@@ -159,22 +159,13 @@ local function popup_script_path()
     return join_path(script_path(), "clip_saved_notification.ps1")
 end
 
--- the helper address, written from shared/HelperEndpoint.cs by scripts/sync_endpoint.ps1; the popup only reads its theme colours there, so without it the popup keeps its own colours
+-- the popup only reads its theme colours from the helper, so without the shared values it keeps its own colours
 local function helper_origin()
-    local chunk = loadfile(join_path(join_path(parent_dir(script_path()), "helper"), "helper_endpoint.lua"))
-    if not chunk then return nil end
-    local ok, endpoint = pcall(chunk)
-    if ok and type(endpoint) == "table" and type(endpoint.origin) == "string" then return endpoint.origin end
-    return nil
+    return replaykit_shared and replaykit_shared.origin
 end
 
--- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it
 local function runtime_settings_path()
-    local scripts_dir = parent_dir(script_path())
-    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
-    local f = io.open(current, "rb")
-    if f then f:close() return current end
-    return join_path(scripts_dir, "replaykit_settings.json")
+    return replaykit_state_file("replaykit_settings.json")
 end
 
 local function load_runtime_settings()

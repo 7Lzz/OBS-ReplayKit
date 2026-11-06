@@ -7,21 +7,20 @@ namespace ReplayKitHelper
     // pick the right obs recording encoder + settings for the users gpu. inputs: detected gpu (vendor+gen), codec preference (auto/h264/h265), preset cqp target, compression_mode (lower_gpu/balanced/smaller_files/tiniest). outputs an EncoderChoice with the obs encoder id, encoder json, and human-readable label. fallback chain: user-preferred codec -> next-best hardware codec on this gpu -> software x264 (always available). av1 is deliberately not offered -- most iphones and plenty of android devices have no av1 decoder, and unlike a container-tag issue theres no fix for missing silicon. identical to apps/setup/Encoder.cs (the fresh-install path), so both agree on the same tuning tables. that ps code still has unreachable nvenc_av1/amf_av1/qsv_av1 branches left over from before av1 was dropped (Get-ReplayKitEncoderSpec never builds an "av1" candidate, so those cases are never selected) -- this port already omits them, matching how ReplayKitSetup was cleaned up.
     public enum CodecPreference
     {
-        Auto,
         H264,
         H265,
     }
 
     public static class CodecPreferenceExt
     {
-        // user-facing codec preference string -> enum. anything unrecognized falls back to auto.
+        // user-facing codec preference string -> enum. anything unrecognized falls back to h264, the codec every device plays.
         public static CodecPreference Parse(string raw)
         {
             switch ((raw ?? "").Trim().ToLowerInvariant())
             {
                 case "h264": return CodecPreference.H264;
                 case "h265": return CodecPreference.H265;
-                default: return CodecPreference.Auto;
+                default: return CodecPreference.H264;
             }
         }
     }
@@ -373,7 +372,6 @@ namespace ReplayKitHelper
         {
             [CodecPreference.H265] = new[] { "h265", "h264", "software" },
             [CodecPreference.H264] = new[] { "h264", "software" },
-            [CodecPreference.Auto] = new[] { "h264", "software" },
         };
 
         // resolve codec preference + gpu + compression_mode into a concrete encoder choice. cqp is on the nvenc scale (0-51, lower = better); the chosen builder translates as needed (crf for x264, icq for qsv, etc.). compression_mode controls encoder effort (lower_gpu/balanced/smaller_files/tiniest).
@@ -409,14 +407,5 @@ namespace ReplayKitHelper
             };
         }
 
-        // codec slug -> short label for the codecs this gpu can actualy run. "auto" is always included.
-        public static Dictionary<string, string> AvailableCodecs(GpuInfo gpu)
-        {
-            var cand = AvailableCandidates(gpu);
-            var labels = new Dictionary<string, string> { ["auto"] = "Auto (pick best for this GPU)" };
-            if (cand.TryGetValue("h264", out var h264)) labels["h264"] = h264.Label;
-            if (cand.TryGetValue("h265", out var h265)) labels["h265"] = h265.Label;
-            return labels;
-        }
     }
 }

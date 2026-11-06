@@ -20,7 +20,7 @@ namespace ReplayKitSetup
         private const string NoiseFilterName = "ReplayKit Noise Suppression";
         private const string NoiseFilterKindPrefix = "noise_suppress_filter";
 
-        public static string MarkerPath => Path.Combine(Config.REPLAYKIT_CONFIG, "defaults_applied.json");
+        public static string MarkerPath => ReplayKitShared.StateLayout.Resolve(Config.REPLAYKIT_CONFIG, ReplayKitShared.StateLayout.DefaultsAppliedFile);
 
         private static string ScenePath => Path.Combine(Config.OBS_CONFIG, "basic", "scenes", "Untitled.json");
         private static string BasicIniPath => Path.Combine(Config.OBS_CONFIG, "basic", "profiles", "Untitled", "basic.ini");

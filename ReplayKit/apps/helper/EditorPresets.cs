@@ -12,14 +12,13 @@ namespace ReplayKitHelper
     // looks saved in the clip editor apart from any clip, the style of a subtitle row and the look of the video, each a list the user names and orders; the editor checks a look again before using it, so this keeps only the shape and size of each in bounds
     internal static class EditorPresets
     {
-        private const string FileName = "editor_presets.json";
         private const int MaxPresets = 100;
         private const int MaxNameLength = 40;
         private const int MaxDataBytes = 16 * 1024;
         private static readonly string[] Kinds = { "subtitle", "video" };
         private static readonly Regex Id = new Regex("^[A-Za-z0-9_-]{1,40}$", RegexOptions.CultureInvariant);
 
-        private static string StorePath() => Path.Combine(AppConfig.GetReplayKitRoot(), FileName);
+        private static string StorePath() => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.EditorPresetsFile);
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 

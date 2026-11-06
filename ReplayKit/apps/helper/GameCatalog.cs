@@ -36,7 +36,7 @@ namespace ReplayKitHelper
         private static readonly Lazy<Index> Catalog = new Lazy<Index>(Load, LazyThreadSafetyMode.PublicationOnly);
         private static readonly object Gate = new object();
         private static int iconJobs;
-        internal static string CustomFile => Path.Combine(AppConfig.GetReplayKitRoot(), "game_mappings.json");
+        internal static string CustomFile => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.GameMappingsFile);
         internal static string IconDir => Path.Combine(AppConfig.GetReplayKitRoot(), "game-icons");
         internal static bool ValidId(string id) => id != null && Regex.IsMatch(id, @"\A(?:[0-9]{1,24}|steam-[0-9]{1,10}|custom-[a-f0-9]{32})\z");
         // the icon of a roblox experience sits beside the game icons, though an experience is no game of its own

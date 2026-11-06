@@ -11,7 +11,7 @@ namespace ReplayKitHelper
     {
         private const int MaxEntries = 50;
         private const int MaxBytes = 64 * 1024;
-        private static string StorePath() => Path.Combine(AppConfig.GetReplayKitRoot(), StateLayout.CompressionHistoryFile);
+        private static string StorePath() => StateLayout.Resolve(AppConfig.GetReplayKitRoot(), StateLayout.CompressionHistoryFile);
 
         internal sealed class Estimate
         {

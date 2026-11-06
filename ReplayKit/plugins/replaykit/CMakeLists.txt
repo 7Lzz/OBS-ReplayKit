@@ -45,6 +45,7 @@ set(REPLAYKIT_SOURCES
     src/core/open_clips_hotkey.cpp
     src/core/process_group.cpp
     src/core/state.cpp
+    src/core/state_files.cpp
     src/core/theme.cpp
     src/core/window_state.cpp
 

@@ -29,6 +29,7 @@ namespace ReplayKitHelper
         public static string GetSettingsPath() => StateLayout.Resolve(AppConfig.GetReplayKitRoot(), StateLayout.SettingsFile);
 
         private const bool DefaultSeparateAudioTracks = true;
+        private const string DefaultCodecPreference = "h264";
 
         public static JObject GetDefaultSettings()
         {
@@ -36,7 +37,7 @@ namespace ReplayKitHelper
             {
                 ["recordingPreset"] = "balanced",
                 ["compressionMode"] = "balanced",
-                ["codecPreference"] = "h264",
+                ["codecPreference"] = DefaultCodecPreference,
                 ["replaySeconds"] = 90,
                 ["fps"] = 60,
                 ["fpsNumerator"] = 60,
@@ -483,13 +484,9 @@ namespace ReplayKitHelper
                 discordOutputMode = "projector";
             }
 
-            // av1 stays in the allowed list so existing settings.json values dont throw on load, but its no longer offered -- most iphones and plenty of android devices have no av1 decoder at all, and unlike the hevc hev1/hvc1 tag that can be fixed with a remux, theres no fix for missing silicon.
-            string codecPreference = GetEnumSetting(data, "codecPreference", defaults["codecPreference"].Value<string>(), new[] { "auto", "h264", "h265", "av1" });
-            if (codecPreference == "av1")
-            {
-                Log.Write("Recording codec 'av1' is no longer offered (playback compatibility); falling back to auto.");
-                codecPreference = "auto";
-            }
+            // auto and av1 stay readable so older settings files do not throw on load, but neither is offered: auto always picked the h264 encoder anyway, and av1 has no decoder on most iphones and plenty of android devices, which unlike the hevc hev1/hvc1 tag no remux can fix. both read as h264
+            string codecPreference = GetEnumSetting(data, "codecPreference", defaults["codecPreference"].Value<string>(), new[] { "h264", "h265", "auto", "av1" });
+            if (codecPreference == "auto" || codecPreference == "av1") codecPreference = DefaultCodecPreference;
 
             // logging used to be a plain setting of the advanced tab and lives under development mode now, so a settings file that has it on and never heard of development mode keeps its logging
             bool developmentMode = raw != null && raw["developmentMode"] == null && GetBoolSetting(data, "debugLoggingEnabled", false)
@@ -910,8 +907,8 @@ namespace ReplayKitHelper
         // the recording codec the saves follow: auto, h264 or h265
         public static string GetCodecPreference()
         {
-            try { return ReadSettings()["codecPreference"]?.Value<string>() ?? "auto"; }
-            catch (InvalidOperationException) { return "auto"; }
+            try { return ReadSettings()["codecPreference"]?.Value<string>() ?? DefaultCodecPreference; }
+            catch (InvalidOperationException) { return DefaultCodecPreference; }
         }
 
         // development mode is what lets the development settings do anything, so logging needs both
@@ -3549,7 +3546,7 @@ namespace ReplayKitHelper
         private static JObject GetEncoderSpec(JObject settings, JObject preset)
         {
             var gpu = Gpu.PrimaryGpu();
-            string codecPreference = settings["codecPreference"]?.Value<string>() ?? "auto";
+            string codecPreference = settings["codecPreference"]?.Value<string>() ?? DefaultCodecPreference;
             int cqp = preset["cqp"]?.Value<int>() ?? 22;
             string compressionMode = settings["compressionMode"]?.Value<string>() ?? "balanced";
             var choice = Encoder.PickEncoder(gpu, codecPreference, cqp, compressionMode);
@@ -3584,7 +3581,7 @@ namespace ReplayKitHelper
             string pref = (codecPreference ?? "").Trim().ToLowerInvariant();
             if (unloaded != null)
                 result["warning"] = unloaded + " did not load in OBS (usually an outdated graphics driver), so ReplayKit records with " + choice.Label + " until it does.";
-            else if (pref != "" && pref != "auto" && choice.Codec != pref)
+            else if (pref != "" && choice.Codec != pref)
                 result["warning"] = "Requested codec '" + pref + "' is not supported by the detected GPU, so ReplayKit selected " + choice.Label + ".";
             return result;
         }
@@ -6167,7 +6164,6 @@ namespace ReplayKitHelper
                             new JObject { ["value"] = "tiniest", ["label"] = "Microscopic GPU Cooker", ["blurb"] = "Preset P7 with two full resolution passes. The tiniest clips, and the most work your GPU can do for them." }
                         ),
                         ["codecs"] = new JArray(
-                            new JObject { ["value"] = "auto", ["label"] = "Auto", ["blurb"] = "ReplayKit picks the best H.264 encoder your PC has." },
                             new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Recommended. Plays everywhere: phones, browsers, Discord and editors." },
                             new JObject { ["value"] = "h265", ["label"] = "HEVC / H.265", ["blurb"] = "Smaller files, but HEVC / H.265 clips may not play for some people, on some phones, browsers and apps." }
                         ),

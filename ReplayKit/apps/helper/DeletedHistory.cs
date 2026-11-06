@@ -11,14 +11,13 @@ namespace ReplayKitHelper
     // deleted clips and screenshots wait here for the days the storage settings keep them, so a delete can be taken back; the file moves into a hidden folder of its own clip folder (the same drive, so the move is instant) under an id, and where it came from, with its row of the clips db, lives in deleted_history.json
     internal static class DeletedHistory
     {
-        private const string FileName = "deleted_history.json";
         // a name no game folder can be adopted by, since the files in it go by ids the clips db does not know
         private const string FolderName = ".replaykit-deleted";
         private const int PurgeMs = 60 * 60 * 1000;
         private static readonly object Gate = new object();
         private static bool started;
 
-        private static string StorePath() => Path.Combine(AppConfig.GetReplayKitRoot(), FileName);
+        private static string StorePath() => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.DeletedHistoryFile);
         private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };

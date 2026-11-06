@@ -4,8 +4,8 @@
 #include <QString>
 #include <string>
 
-// kHelperHost and kHelperPort, written from shared/HelperEndpoint.cs by scripts/sync_endpoint.ps1
-#include "core/helper_endpoint.hpp"
+// kHelperHost, kHelperPort and kStateFolder, written from shared/ by scripts/sync_shared.ps1
+#include "core/shared_values.hpp"
 
 namespace rk {
 

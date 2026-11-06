@@ -12,9 +12,8 @@ namespace ReplayKitHelper
     internal static class EditDrafts
     {
         public const int MaxEditBytes = 512 * 1024;
-        private const string FileName = "edit_drafts.json";
 
-        private static string StorePath() => Path.Combine(AppConfig.GetReplayKitRoot(), FileName);
+        private static string StorePath() => ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.EditDraftsFile);
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 

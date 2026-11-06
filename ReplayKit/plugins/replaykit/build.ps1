@@ -10,8 +10,8 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot '..\..\scripts\obs_versions.ps1')
-# src/core/helper_endpoint.hpp is generated, so a build started on its own makes it first
-& (Join-Path $PSScriptRoot '..\..\scripts\sync_endpoint.ps1')
+# src/core/shared_values.hpp is generated, so a build started on its own makes it first
+& (Join-Path $PSScriptRoot '..\..\scripts\sync_shared.ps1')
 
 if (-not $OutPath) {
     $OutPath = Join-Path $PSScriptRoot '..\..\dist\replaykit.dll'

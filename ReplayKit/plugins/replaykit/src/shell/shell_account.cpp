@@ -6,6 +6,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
+#include "core/state_files.hpp"
 #include "core/theme.hpp"
 #include "shell/shell_state.hpp"
 #include "ui/anchored_panel.hpp"
@@ -56,11 +57,11 @@ void ShellAccountButton::SetAccount(const Account &account)
 	if (account.signedIn == m_account.signedIn && account.name == m_account.name && account.picture == m_account.picture)
 		return;
 	if (account.picture != m_account.picture) {
-		// the helper saves it in the obs-replayKit folder, which the plugin reads straight from disk like window_state.ini
+		// the helper saves it with the saved state of replaykit, which the plugin reads straight from disk like window_state.ini
 		m_picture = QPixmap();
 		m_pictureScaled = QPixmap();
 		if (!account.picture.isEmpty())
-			m_picture.load(qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit/profile_picture.png"), "PNG");
+			m_picture.load(StateFilePath(QStringLiteral("profile_picture.png")), "PNG");
 	}
 	m_account = account;
 	SetTip(account.signedIn ? QStringLiteral("Streamable: %1").arg(account.name.isEmpty() ? QStringLiteral("signed in") : account.name) : QStringLiteral("Streamable: anonymous"));

@@ -14,7 +14,7 @@ namespace ReplayKitHelper
 
         // kept next to the other per-user replaykit state rather than under %TEMP%, which gets swept
         private static string StorePath() =>
-            Path.Combine(Constants.OBS_CONFIG_DIR, "obs-replayKit", "notifications.json");
+            ReplayKitShared.StateLayout.Resolve(AppConfig.GetReplayKitRoot(), ReplayKitShared.StateLayout.NotificationsFile);
 
         private static JArray ReadItems()
         {

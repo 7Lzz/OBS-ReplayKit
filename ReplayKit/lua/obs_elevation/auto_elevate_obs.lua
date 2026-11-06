@@ -1,4 +1,4 @@
-﻿obs = obslua
+obs = obslua
 ffi = require("ffi")
 
 local advapi32 = ffi.load("Advapi32")
@@ -64,15 +64,8 @@ local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
 -- same cap the other settings readers use; a json bigger than this is corrupt
 local MAX_SETTINGS_BYTES = 65536
 
--- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it
 local function settings_json_path()
-    local dir = (script_path() or ""):gsub("\\", "/"):gsub("/+$", "")
-    local scripts_dir = dir:match("^(.*)/[^/]+$") or dir
-    local root = scripts_dir:match("^(.*)/[^/]+$") or scripts_dir
-    local current = root .. "/replaykit_settings.json"
-    local file = io.open(current, "rb")
-    if file then file:close() return current end
-    return scripts_dir .. "/replaykit_settings.json"
+    return replaykit_state_file("replaykit_settings.json")
 end
 
 -- run-as-admin is opt-in thru the replaykit settings ui (windows tab). a missing file or key reads as off, so a fresh or corrupt settings file never elevates on its own.

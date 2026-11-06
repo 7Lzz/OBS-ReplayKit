@@ -21,6 +21,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
+#include "core/state_files.hpp"
 #include "core/win32.hpp"
 #include "shell/shell_views.hpp"
 #include "windows/clips_window.hpp"
@@ -106,10 +107,7 @@ const char *ModeName(Mode mode)
 // the mode is known before the helper is up, since obs starts the buffer while it loads: the setting is read straight from the settings file, and anything but memory is disk the way the helper reads it
 Mode ModeFromSettingsFile()
 {
-	const QString folder = qEnvironmentVariable("APPDATA") + QStringLiteral("/obs-studio/obs-replayKit/");
-	QFile file(folder + QStringLiteral("replaykit_settings.json"));
-	if (!file.exists())
-		file.setFileName(folder + QStringLiteral("scripts/replaykit_settings.json"));
+	QFile file(StateFilePath(QStringLiteral("replaykit_settings.json")));
 	QString chosen;
 	if (file.open(QIODevice::ReadOnly) && file.size() < 4 * 1024 * 1024)
 		chosen = QJsonDocument::fromJson(file.readAll()).object().value(QStringLiteral("recordingBuffer")).toString();

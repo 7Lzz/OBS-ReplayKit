@@ -14,9 +14,9 @@ ReplayKit/publish_tmp/
 /ReplayKit/dist/version.json
 # same regeneration, feeds the win32 version resource of both csproj files
 /ReplayKit/Version.props
-# written from ReplayKit/shared/HelperEndpoint.cs by scripts/sync_endpoint.ps1 on every build, so the helper address is only ever edited there
-/ReplayKit/plugins/replaykit/src/core/helper_endpoint.hpp
-/ReplayKit/lua/helper/helper_endpoint.lua
+# written from ReplayKit/shared/HelperEndpoint.cs and StateLayout.cs by scripts/sync_shared.ps1 on every build, so those values are only ever edited there
+/ReplayKit/plugins/replaykit/src/core/shared_values.hpp
+/ReplayKit/lua/shared_values.lua
 /ReplayKit/ui/helper-endpoint.js
 
 # runtime state the installer and helper write into the users appdata; ignored in case a live folder is ever copied into the repo, so credentials, cookies and per-user paths can never be committed

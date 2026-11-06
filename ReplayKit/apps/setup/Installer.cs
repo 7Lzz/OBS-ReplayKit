@@ -163,7 +163,7 @@ namespace ReplayKitSetup
             foreach (var src in Directory.EnumerateFiles(Config.OBS_ASSETS_DIR, "*", SearchOption.AllDirectories))
             {
                 string rel = src.Substring(Config.OBS_ASSETS_DIR.Length).TrimStart('\\', '/');
-                string dst = Path.Combine(Config.OBS_CONFIG, rel);
+                string dst = InstallTarget(rel);
                 InstallFile(src, rel, dst, prefs);
                 log?.Invoke("-> " + rel.Replace('\\', '/'));
                 count++;
@@ -189,6 +189,7 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "scripts", "replay_buffer", "obs-replaykit.ico"),
             Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
             Path.Combine("obs-replayKit", "scripts", "helper", "replaykit_update_bootstrap.ps1"),
+            Path.Combine("obs-replayKit", "scripts", "helper", "helper_endpoint.lua"),
             Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
         };
 
@@ -204,13 +205,20 @@ namespace ReplayKitSetup
             [StateLayout.HelperConfigFile] = Path.Combine("obs-replayKit", StateLayout.HelperConfigFile),
         };
 
-        // the settings and the saved state moved out of scripts\ and scripts\helper\ into the replaykit folder itself; this moves what an older install still has in the old places, and a file that cannot be moved yet stays where it is and keeps being used
+        // the starter settings ship at their old place inside the bundle, the path the transform of the settings is keyed on; on the disk they belong in the user-data folder with the rest of the state
+        private static string InstallTarget(string rel)
+        {
+            if (string.Equals(rel, Path.Combine("obs-replayKit", StateLayout.SettingsFile), StringComparison.OrdinalIgnoreCase))
+                return StateLayout.PathFor(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile);
+            return Path.Combine(Config.OBS_CONFIG, rel);
+        }
+        // the settings and the saved state moved out of scripts\ and scripts\helper\, then out of the replaykit folder root, into its user-data folder; this moves what an older install still has in the old places, and a file that cannot be moved yet stays where it is and keeps being used
         private static void MigrateStateLayout(Action<string> log)
         {
             try
             {
                 var result = StateLayout.Run(Config.REPLAYKIT_CONFIG, log);
-                if (result.Moved > 0) log?.Invoke($"state files moved into the replaykit folder: {result.Moved}");
+                if (result.Moved > 0) log?.Invoke($"state files moved into {StateLayout.Folder}: {result.Moved}");
             }
             catch (Exception ex)
             {
@@ -533,7 +541,7 @@ namespace ReplayKitSetup
                     string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
                     string rel = Path.Combine("obs-replayKit", fileRel);
                     string staged = Path.Combine(stageRoot, fileRel);
-                    string dst = Path.Combine(Config.OBS_CONFIG, rel);
+                    string dst = InstallTarget(rel);
                     // a file that is still in its old place counts as present: the copy in the bundle must not become a second, empty settings file next to real data that has not been moved yet
                     if (RuntimePreserveRels.Contains(rel) && File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, Path.GetFileName(rel))))
                     {

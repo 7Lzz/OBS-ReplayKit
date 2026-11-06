@@ -149,15 +149,8 @@ local function script_dir()
     return (src:match("^(.*[\\/])") or "")
 end
 
--- the helper address, written from shared/HelperEndpoint.cs by scripts/sync_endpoint.ps1; without it the helper is never started, since a guess could point the whole app at the wrong place
-local HELPER = (function()
-    local chunk = loadfile(script_dir() .. "helper_endpoint.lua")
-    if not chunk then return nil end
-    local ok, endpoint = pcall(chunk)
-    if ok and type(endpoint) == "table" and type(endpoint.host) == "string" and type(endpoint.port) == "number" and type(endpoint.origin) == "string" then return endpoint end
-    return nil
-end)()
-if not HELPER then obs.script_log(obs.LOG_ERROR, "ReplayKit helper address is missing (helper_endpoint.lua), so the helper is not started") end
+-- the helper address, from the shared values replaykit.lua checked; without it the helper is never started, since a guess could point the whole app at the wrong place
+local HELPER = replaykit_shared
 local HTTP_PORT = HELPER and HELPER.port
 local HELPER_HOST = HELPER and HELPER.host
 local HELPER_ORIGIN = HELPER and HELPER.origin
@@ -344,17 +337,9 @@ local function read_text(path)
     return text
 end
 
--- the replaykit folder, two levels above this script; the settings and the saved state are plain files straight in it
-local function replaykit_dir()
-    local dir = script_dir():gsub("[\\/]+$", "")
-    local scripts_dir = dir:match("^(.*)[\\/][^\\/]+$") or dir
-    local root = scripts_dir:match("^(.*)[\\/][^\\/]+$") or scripts_dir
-    return root .. "\\"
-end
-
--- the settings.html "Enable debug logging" toggle writes into replaykit_settings.json (in the replaykit folder), not into helper_config.json directly -- orred with REPLAYKIT_LOGGING_ENABLED below so a users toggle and a devs hardcoded override both work independently. an install from before the settings moved there keeps the file in scripts until the helper has moved it
+-- the settings.html "Enable debug logging" toggle writes into replaykit_settings.json, not into helper_config.json directly -- orred with REPLAYKIT_LOGGING_ENABLED below so a users toggle and a devs hardcoded override both work independently
 local function read_debug_logging_enabled()
-    local text = read_text(replaykit_dir() .. "replaykit_settings.json") or read_text(script_dir() .. "../replaykit_settings.json")
+    local text = read_text(replaykit_state_file("replaykit_settings.json"))
     if not text or text == "" then return false end
     if not text:find('"debugLoggingEnabled"%s*:') then return false end
     local data = obs.obs_data_create_from_json(text)
@@ -367,7 +352,7 @@ local function read_debug_logging_enabled()
 end
 
 local function helper_config_path()
-    return replaykit_dir() .. "helper_config.json"
+    return replaykit_state_file("helper_config.json")
 end
 
 local function helper_path()

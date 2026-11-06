@@ -219,7 +219,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
         // the items of deleted history live in a hidden folder of the clip folder, which the config wipe never reaches, so they would stay hidden on the disk for good; only the files the history recorded, inside a folder of that name, are removed
         public static bool EmptyDeletedHistory(Action<string> log = null)
         {
-            string store = Path.Combine(Config.REPLAYKIT_CONFIG, "deleted_history.json");
+            string store = StateLayout.Resolve(Config.REPLAYKIT_CONFIG, StateLayout.DeletedHistoryFile);
             if (!File.Exists(store)) return true;
             JObject db;
             try { db = JObject.Parse(File.ReadAllText(store)); }

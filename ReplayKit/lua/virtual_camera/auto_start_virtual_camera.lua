@@ -1,4 +1,4 @@
-﻿-- Discord output startup. default path is an OBS Windowed Projector that Discord can select as a window share. OBS Virtual Camera is legacy/manual only and is not started unless replaykit_settings.json explicitly sets discord_output_mode="virtual_camera_legacy".
+-- Discord output startup. default path is an OBS Windowed Projector that Discord can select as a window share. OBS Virtual Camera is legacy/manual only and is not started unless replaykit_settings.json explicitly sets discord_output_mode="virtual_camera_legacy".
 
 obs = obslua
 
@@ -65,14 +65,8 @@ local function strip_utf8_bom(text)
     return text
 end
 
--- the settings file sits in the replaykit folder, one level above scripts; an install from before that move keeps it in scripts until the helper has moved it, so the new place is tried first
 local function runtime_settings_paths()
-    local scriptDir = parent_dir(script_path())
-    local parentDir = parent_dir(scriptDir)
-    return {
-        join_path(parentDir, "replaykit_settings.json"),
-        join_path(scriptDir, "replaykit_settings.json"),
-    }
+    return { replaykit_state_file("replaykit_settings.json") }
 end
 
 local function read_runtime_settings_text()

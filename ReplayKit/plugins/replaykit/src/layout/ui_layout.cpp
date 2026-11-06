@@ -9,6 +9,7 @@
 #include "core/json_lite.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
+#include "core/state_files.hpp"
 #include "core/theme.hpp"
 #include "core/window_state.hpp"
 
@@ -30,13 +31,10 @@ UiLayout LayoutFromString(const QString &value)
 	return value == QLatin1String("classic") ? UiLayout::Classic : UiLayout::Clean;
 }
 
-// reads interfaceLayout straight out of the helper settings file, so a layout picked while obs was closing is already known at startup instead of waiting on the helper. the file is pretty-printed json, so the value is found by key rather than by the compact-shape helpers above. it sits in the replaykit folder; an install from before it moved there keeps it in scripts until the helper has moved it
+// reads interfaceLayout straight out of the helper settings file, so a layout picked while obs was closing is already known at startup instead of waiting on the helper. the file is pretty-printed json, so the value is found by key rather than by the compact-shape helpers above
 QString ReadLayoutFromSettingsFile()
 {
-	const QString folder = qEnvironmentVariable("APPDATA") + "/obs-studio/obs-replayKit/";
-	QFile f(folder + "replaykit_settings.json");
-	if (!f.exists())
-		f.setFileName(folder + "scripts/replaykit_settings.json");
+	QFile f(StateFilePath(QStringLiteral("replaykit_settings.json")));
 	if (!f.open(QIODevice::ReadOnly) || f.size() > 4 * 1024 * 1024)
 		return QString();
 	const QByteArray data = f.readAll();

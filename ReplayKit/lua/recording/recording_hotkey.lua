@@ -83,17 +83,12 @@ local function read_text(path)
     return text
 end
 
--- the settings file and the capture signal sit in the replaykit folder, one level above scripts; an install from before that move keeps the settings in scripts until the helper has moved them
 local function runtime_settings_path()
-    local scripts_dir = parent_dir(script_path())
-    local current = join_path(parent_dir(scripts_dir), "replaykit_settings.json")
-    local f = io.open(current, "rb")
-    if f then f:close() return current end
-    return join_path(scripts_dir, "replaykit_settings.json")
+    return replaykit_state_file("replaykit_settings.json")
 end
 
 local function capture_signal_path()
-    return join_path(parent_dir(parent_dir(script_path())), "hotkey_capture_signal.json")
+    return replaykit_state_file("hotkey_capture_signal.json")
 end
 
 local function valid_obs_key(key)
