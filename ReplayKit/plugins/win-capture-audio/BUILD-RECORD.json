@@ -1,0 +1,30 @@
+{
+    "plugin":  "win-capture-audio 2.3.4",
+    "upstream":  "https://github.com/Ayrton09/win-capture-audio",
+    "upstreamCommit":  "d11b381d41333964735a57d60bda54747f2232d9",
+    "manifestSha256":  "8d3310e7b644b27831f1dde805511e33517f9ffc471006e2ea533542df4273da",
+    "patchesSha256":  "2762a5428799b83e71087ae884fbd42d305aa27fe535007e8daec680036eb2c2",
+    "obsHeaders":  "obs-studio 28.0.0 (09da3ac4397ee9b1431c9c97cd2c71484b240382)",
+    "wil":  "microsoft/wil f02a61c68590c22de2efeeaf881032419f6fef54",
+    "compiler":  "msvc 14.44.35207",
+    "dllSha256":  "d5cd6c73cef51592c4181d749904e5cd383f5fbc134bdffa6352ca65ecb3e1f9",
+    "dllBytes":  390656,
+    "zipSha256":  "f82edf35d9afef8dcf217b1768d3db5ef950b0a979d886cb7cc8ff865aa70eff",
+    "imports":  [
+                    "api-ms-win-crt-heap-l1-1-0.dll",
+                    "api-ms-win-crt-locale-l1-1-0.dll",
+                    "api-ms-win-crt-math-l1-1-0.dll",
+                    "api-ms-win-crt-runtime-l1-1-0.dll",
+                    "api-ms-win-crt-stdio-l1-1-0.dll",
+                    "api-ms-win-crt-string-l1-1-0.dll",
+                    "avrt.dll",
+                    "kernel32.dll",
+                    "mmdevapi.dll",
+                    "msvcp140.dll",
+                    "obs.dll",
+                    "ole32.dll",
+                    "user32.dll",
+                    "vcruntime140.dll",
+                    "vcruntime140_1.dll"
+                ]
+}

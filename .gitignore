@@ -1,8 +1,8 @@
 # dotnet build outputs
-ReplayKit/ReplayKitSetup/bin/
-ReplayKit/ReplayKitSetup/obj/
-ReplayKit/ReplayKitHelper/bin/
-ReplayKit/ReplayKitHelper/obj/
+ReplayKit/apps/setup/bin/
+ReplayKit/apps/setup/obj/
+ReplayKit/apps/helper/bin/
+ReplayKit/apps/helper/obj/
 
 # build.bat output: the release exe and its checksum land in build/, publish_tmp is its scratch folder (self-cleaned, ignored in case a build fails partway)
 build/
@@ -10,16 +10,20 @@ ReplayKit/publish_tmp/
 # prefs the installer writes next to itself when it runs from a checkout
 /prefs.json
 
-# regenerated from ReplayKitSetup/VersionInfo.cs by build.bat and by the installer at apply time, so a version bump only ever touches VersionInfo.cs
-/ReplayKit/assets/obs-studio/obs-replayKit/version.json
+# regenerated from apps/setup/VersionInfo.cs by build.bat and by the installer at apply time, so a version bump only ever touches VersionInfo.cs
+/ReplayKit/dist/version.json
 # same regeneration, feeds the win32 version resource of both csproj files
 /ReplayKit/Version.props
+# written from ReplayKit/shared/HelperEndpoint.cs by scripts/sync_endpoint.ps1 on every build, so the helper address is only ever edited there
+/ReplayKit/plugins/replaykit/src/core/helper_endpoint.hpp
+/ReplayKit/lua/helper/helper_endpoint.lua
+/ReplayKit/ui/helper-endpoint.js
 
 # runtime state the installer and helper write into the users appdata; ignored in case a live folder is ever copied into the repo, so credentials, cookies and per-user paths can never be committed
 helper_config.json
 clips_db.json
 game_mappings.json
-ReplayKit/assets/obs-studio/obs-replayKit/game-icons/
+ReplayKit/resources/game-icons/
 clips_index.json
 compression_history.json
 edit_drafts.json
@@ -37,11 +41,11 @@ cookies.txt
 .env.local
 
 # custom app icons the user imports at runtime (converted .ico), written under the live icons/ folder
-ReplayKit/assets/obs-studio/obs-replayKit/icons/user/
+ReplayKit/resources/icons/user/
 # custom themes the user saves at runtime
-ReplayKit/assets/obs-studio/obs-replayKit/themes-user/
+ReplayKit/resources/themes-user/
 # theme stylesheet the helper generates for the file:// dock
-ReplayKit/assets/obs-studio/obs-replayKit/obs-custom-dock/rk-theme.css
+ReplayKit/ui/rk-theme.css
 
 # backups created by the installer + cleanup
 obs-studio.bak.*/

@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# third-party plugin files repacked into zips at build time: kept byte for byte so every install gets exactly what the vendor shipped
+ReplayKit/plugins/bango-cat/** -text
+ReplayKit/vendor/input-overlay-presets/** -text
+ReplayKit/dist/win-capture-audio/** -text
+ReplayKit/dist/input-overlay/** -text

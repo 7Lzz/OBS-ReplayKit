@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>ReplayKit Notifications</title>
+<style>
+  /* fallbacks only -- the helper injects the real theme tokens above this block */
+  :root {
+    --window:#1D1F26;
+    --panel:#272A33;
+    --grey3:#464B59;
+    --grey5:#2F323C;
+    --grey6:#272A33;
+    --grey8:#13141A;
+    --field:#3C404D;
+    --line:#3C404D;
+    --line2:#5B6273;
+    --primary:#284CB8;
+    --primary_light:#476BD7;
+    --selected2:#476BD7;
+    --text:#ffffff;
+    --text_muted:#969696;
+    --red:#e33b57;
+    --on-accent:#ffffff;
+    --button_bg_hover:#464B59;
+    --text-rgb:255, 255, 255;
+    --accent-rgb:40, 76, 184;
+    --font:"Segoe UI",system-ui,sans-serif;
+    --ease_smooth:cubic-bezier(.16, 1, .3, 1);
+    --ease_pop:cubic-bezier(.2, .7, .3, 1);
+    --anim_press:130ms;
+    --anim_menu:200ms;
+  }
+  * { box-sizing:border-box; }
+  html,body {
+    width:100%; height:100%; margin:0; overflow:hidden;
+    background:transparent; color:var(--text); font:13px var(--font);
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; }
+
+  .panel {
+    position:absolute; inset:0;
+    background:var(--grey5); border:1px solid var(--grey3);
+    border-radius:4px; border-top-right-radius:0;
+  }
+  /* the bell above is drawn as the open tab of this panel, and the window starts on its last row. --tab-width is the width of the bell, set by the plugin; the strip paints over the top border under it in the header colour, so the tab and the header row read as one shape, while the two border columns of the tab stay and run into the border of the panel */
+  .panel::after {
+    content:""; position:absolute; z-index:3; top:-1px; right:0;
+    width:calc(var(--tab-width, 43px) - 2px); max-width:calc(100% - 2px); height:1px;
+    background:var(--grey6);
+  }
+  /* the rows keep their square corners inside the round ones of the panel; it is a layer of its own so the strip above can sit outside the padding box of the panel */
+  .clip { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; border-radius:3px; border-top-right-radius:0; }
+  /* replayable rather than a load-time one-shot: the host reuses this window, so the class is re-added on each open */
+  .clip.is-opening { animation:rk-unroll 190ms var(--ease_smooth); }
+  @keyframes rk-unroll { from { clip-path:inset(0 0 100% 0); } to { clip-path:inset(0 0 0 0); } }
+
+  .head {
+    flex:none; display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px 9px; border-bottom:1px solid var(--grey3); background:var(--grey6);
+  }
+  .head-title { font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--text_muted); text-transform:uppercase; }
+  .head-count {
+    min-width:18px; height:18px; padding:0 6px; border-radius:9px;
+    background:var(--primary); color:var(--on-accent);
+    font-size:10.5px; font-weight:700; line-height:18px; text-align:center;
+    animation:rk-pop 200ms var(--ease_pop) both;
+  }
+  .head-count[hidden] { display:none; }
+  @keyframes rk-pop { from { opacity:0; transform:scale(.6); } to { opacity:1; transform:none; } }
+
+  .list { flex:1; min-height:0; overflow-y:auto; padding:4px 0; }
+  .empty { padding:38px 20px; text-align:center; color:var(--text_muted); font-size:12px; line-height:1.65; }
+  .empty svg { width:26px; height:26px; fill:currentColor; opacity:.35; margin-bottom:9px; }
+
+  /* row motion copies .rk-hover-row: a surface plus a small sideways nudge, never a transform on the whole row */
+  .item {
+    width:100%; display:block; text-align:left; border:0; background:transparent; color:var(--text);
+    padding:9px 24px 10px 24px; position:relative; cursor:pointer;
+    transition:background-color 90ms linear, padding-left var(--anim_press) var(--ease_pop);
+  }
+  .item:hover { background:var(--button_bg_hover); padding-left:25px; }
+  .item.is-open { background:var(--grey6); }
+  .item.is-open:hover { padding-left:24px; }
+  .item:focus-visible { outline:2px solid var(--primary_light); outline-offset:-2px; }
+  /* unread marker in the left gutter, so the title text stays aligned whether read or not */
+  .item.is-unread::before {
+    content:""; position:absolute; left:11px; top:14px; width:6px; height:6px; border-radius:50%;
+    background:var(--primary_light);
+    animation:rk-pop 220ms var(--ease_pop) both;
+  }
+  .item-head { display:flex; align-items:center; gap:8px; }
+  .item-title { flex:1; min-width:0; font-size:12.5px; font-weight:600; line-height:1.35; }
+  .item.is-read .item-title { color:var(--text_muted); font-weight:500; }
+  /* trash + timestamp + more-options clustered tighter than the item-head gap, same idea as clips.html .title-actions grouping its own icon row */
+  .item-actions { flex:none; display:flex; align-items:center; gap:4px; }
+  /* one width for every row, so a shorter or longer time never pushes the buttons out of line */
+  .item-time { flex:none; width:56px; text-align:right; white-space:nowrap; font-size:10.5px; color:var(--text_muted); }
+  .item-chevron {
+    flex:none; width:12px; height:12px; fill:currentColor; color:var(--text_muted); opacity:.7;
+    transition:transform var(--anim_menu) var(--ease_smooth);
+  }
+  .item.is-open .item-chevron { transform:rotate(180deg); }
+  /* a row without notes keeps the place of the chevron, so its buttons line up with the rows that have one */
+  .item-chevron-gap { flex:none; width:12px; }
+  /* the same hairline settings draws between its rows, kept off the edges of the panel */
+  .item + .item::after {
+    content:""; position:absolute; top:0; left:12px; right:12px; height:1px;
+    background:var(--hairline, rgba(255, 255, 255, .08));
+  }
+
+  /* the notes roll down and back up: a one-row grid going from 0fr to 1fr animates to the height of whatever is inside */
+  .item-drop {
+    display:grid; grid-template-rows:0fr;
+    transition:grid-template-rows var(--anim_menu) var(--ease_smooth);
+  }
+  .item.is-open .item-drop { grid-template-rows:1fr; }
+  .item-drop-inner { min-height:0; overflow:hidden; visibility:hidden; transition:visibility 0s linear var(--anim_menu); }
+  .item.is-open .item-drop-inner { visibility:visible; transition:none; }
+
+  /* release notes sit one step below the row, the same relationship a clip card body has to its card */
+  .item-body {
+    margin-top:9px; padding:10px 12px; border-radius:4px;
+    background:var(--window); border:1px solid var(--grey3);
+    font-size:12px; line-height:1.55; color:var(--text);
+    max-height:210px; overflow-y:auto; user-select:text; -webkit-user-select:text;
+  }
+  .item-body h3,.item-body h4,.item-body h5 { margin:9px 0 4px; font-size:12.5px; color:var(--text); }
+  .item-body h3:first-child,.item-body h4:first-child,.item-body h5:first-child { margin-top:0; }
+  .item-body p { margin:5px 0; color:var(--text_muted); }
+  .item-body ul,.item-body ol { margin:5px 0; padding-left:18px; color:var(--text_muted); }
+  .item-body li { margin:3px 0; }
+  .item-body b { color:var(--text); }
+  .item-body code { background:var(--field); border-radius:3px; padding:1px 4px; font-size:11.5px; color:var(--text); }
+  .item-body pre { background:var(--field); border-radius:4px; padding:8px 10px; overflow-x:auto; margin:6px 0; }
+  .item-body pre code { background:transparent; padding:0; }
+  .item-body a { color:var(--primary_light); }
+  .item-body hr { border:0; border-top:1px solid var(--grey3); margin:9px 0; }
+
+  /* footer mirrors the clip-card footer: its own surface, one hairline above it, quiet text actions */
+  .foot {
+    flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:7px 8px 7px 12px; border-top:1px solid var(--grey3); background:var(--grey6);
+  }
+  .foot-note { font-size:11px; color:var(--text_muted); }
+  .foot-actions { display:flex; gap:2px; }
+  .foot-btn {
+    height:26px; padding:0 9px; border:0; border-radius:4px;
+    background:transparent; color:var(--text_muted); font-size:11.5px; cursor:pointer;
+    transition:background-color 90ms linear, color 90ms linear, transform var(--anim_press) var(--ease_pop);
+  }
+  .foot-btn:hover { background:var(--button_bg_hover); color:var(--text); }
+  .foot-btn:active { transform:scale(.96); }
+  .foot-btn.is-danger:hover { background:rgba(227, 59, 87, .16); color:var(--red); }
+  .foot-btn:disabled { opacity:.4; cursor:default; background:transparent; color:var(--text_muted); transform:none; }
+
+  /* trash + more sit inline next to the timestamp, always visible like clips.html title-row icons rather than a hover reveal -- a right-click menu is not discoverable on its own, so the more-options trigger needs to always be there */
+  .item-icon-btn {
+    flex:none; width:22px; height:22px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    border:0; border-radius:4px; background:transparent; color:var(--text_muted); cursor:pointer;
+    transition:background-color 90ms linear, color 90ms linear, width 140ms ease;
+  }
+  .item-icon-btn svg { width:14px; height:14px; fill:currentColor; flex:none; transition:width 140ms ease, opacity 80ms linear; }
+  /* --line2, not --button_bg_hover -- the row underneath is already button_bg_hover on hover, so using the same token here made the buttons own hover invisible against it */
+  .item-icon-btn:hover { background:var(--line2); color:var(--text); }
+  .item-icon-btn.item-delete-btn:hover { background:rgba(227, 59, 87, .16); color:var(--red); }
+  /* two-click delete, same recipe as clips.html icon-mini-btn.delete-btn: first click arms it (widens, swaps in "Delete?"), a second click within the window actually deletes. auto-disarms after 3s so an armed button doesnt sit there forever. */
+  .item-icon-btn.item-delete-btn { overflow:hidden; white-space:nowrap; box-sizing:border-box; }
+  .item-icon-btn.item-delete-btn.is-armed { width:64px; background:var(--red); color:#fff; }
+  .item-icon-btn.item-delete-btn.is-armed:hover { background:var(--red); color:#fff; }
+  .item-icon-btn.item-delete-btn.is-armed svg { width:0; opacity:0; }
+  .delete-confirm-text {
+    display:inline-block; max-width:0; opacity:0; overflow:hidden;
+    font-size:11px; font-weight:600; line-height:1; white-space:nowrap;
+    transform:translateX(-4px);
+    transition:max-width 140ms ease, opacity 80ms linear, transform 140ms ease;
+  }
+  .item-icon-btn.item-delete-btn.is-armed .delete-confirm-text { max-width:48px; opacity:1; transform:translateX(0); }
+
+  /* right-click menu, same recipe as clips.html .menu-dropdown so the two panels read identically -- one shared instance repositioned per row instead of one per row, since the list itself is rebuilt on most changes anyway */
+  .ctx-menu {
+    position:fixed; top:0; left:0; min-width:180px; background:var(--grey5); border:1px solid var(--grey3);
+    border-radius:4px; padding:4px 0; box-shadow:0 6px 16px rgba(0, 0, 0, .5); z-index:1000;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transform:translateY(-10px) scale(.96); transform-origin:top left;
+    transition:opacity 160ms ease, transform var(--anim_menu) var(--ease_smooth), visibility 0s linear var(--anim_menu);
+  }
+  .ctx-menu.is-open {
+    opacity:1; visibility:visible; pointer-events:auto; transform:translateY(0) scale(1);
+    transition:opacity 130ms ease, transform var(--anim_menu) var(--ease_smooth);
+  }
+  .ctx-item {
+    display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:12px; color:var(--text);
+    cursor:pointer; white-space:nowrap; user-select:none;
+  }
+  .ctx-item svg { width:16px; height:16px; fill:currentColor; flex-shrink:0; }
+  .ctx-item:hover { background:var(--button_bg_hover); }
+  .ctx-item.is-danger { color:var(--red); }
+  .ctx-item.is-danger:hover { background:rgba(227, 59, 87, .16); color:var(--red); }
+  .ctx-separator { height:1px; margin:4px 0; background:var(--grey3); }
+</style>
+<!--#include scrollbar-->
+<style>
+  /* the panel is narrow and a body sits in a bordered box of its own, so the outlined track of the shared bar doubled every edge there; here a bar is only a slim thumb */
+  .list::-webkit-scrollbar, .item-body::-webkit-scrollbar { width:8px; }
+  .list::-webkit-scrollbar-track, .item-body::-webkit-scrollbar-track { border:0; background:transparent; }
+  .list::-webkit-scrollbar-thumb, .item-body::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:4px; min-height:24px; background-color:var(--grey3); }
+  .list::-webkit-scrollbar-thumb:hover, .item-body::-webkit-scrollbar-thumb:hover { background-color:var(--line2); }
+  .item-body::-webkit-scrollbar-button:vertical:start:decrement, .item-body::-webkit-scrollbar-button:vertical:end:increment { height:3px; }
+</style>
+</head>
+<body>
+<div class="panel">
+ <div class="clip is-opening">
+  <div class="head">
+    <span class="head-title">Notifications</span>
+    <span class="head-count" id="unreadCount" hidden>0</span>
+  </div>
+  <div class="list" id="list"><div class="empty">Loading&hellip;</div></div>
+  <div class="foot">
+    <span class="foot-note" id="footNote"></span>
+    <div class="foot-actions">
+      <button class="foot-btn" type="button" id="whatsNew">What's new</button>
+      <button class="foot-btn" type="button" id="markAll">Mark all read</button>
+      <button class="foot-btn is-danger" type="button" id="clearAll">Clear</button>
+    </div>
+  </div>
+ </div>
+</div>
+<div class="ctx-menu" id="ctxMenu"></div>
+<!--#include interaction-states-->
+<!--#include tooltip-->
+<!--#include theme-preview-->
+<!--#include markdown-->
+<script>
+  (function lockdown() {
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), true);
+    document.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive:false, capture:true });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "F5" || e.key === "F12") { e.preventDefault(); return; }
+      if ((e.ctrlKey || e.metaKey) && ["r","R","p","P","s","S","f","F","0","+","-","="].includes(e.key)) e.preventDefault();
+    }, true);
+  })();
+
+  const HELPER = location.origin;
+  const listEl = document.getElementById("list");
+  const whatsNewEl = document.getElementById("whatsNew");
+  const markAllEl = document.getElementById("markAll");
+  const clearAllEl = document.getElementById("clearAll");
+  const countEl = document.getElementById("unreadCount");
+  const noteEl = document.getElementById("footNote");
+  const ctxMenu = document.getElementById("ctxMenu");
+  const HOVER_PROFILES = { control: ".foot-btn, .item-icon-btn" };
+  function applyHovers(root) { if (window.RKHover) RKHover.apply(root, HOVER_PROFILES); }
+  const CHEVRON = '<svg class="item-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>';
+  // pulls the real trash/more glyphs off window.RK_ICONS (see the ICON block in clips.html) instead of a hand-copied path, so this stays the same icon if that set ever changes
+  const _RKI = window.RK_ICONS || {};
+  const _svgInner = (s) => (s || "").replace(/^<svg[^>]*>/i, "").replace(/<\/svg>\s*$/i, "");
+  const TRASH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + _svgInner(_RKI["action/trash"]) + '</svg>';
+  const MORE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">' + _svgInner(_RKI["action/more"]) + '</svg>';
+  const READ_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>';
+  const UNREAD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:notifications-2}}</svg>';
+  const LINK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/open-external}}</svg>';
+  let items = [];
+  let openId = "";
+  let ctxTargetId = "";
+
+  async function helperJson(path, options) {
+    const res = await fetch(HELPER + "/" + path, { cache:"no-store", ...(options || {}) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) throw new Error(body.message || ("HTTP " + res.status));
+    return body;
+  }
+
+  function escapeHtml(s) { return window.RKMarkdown ? RKMarkdown.escapeHtml(s) : String(s); }
+
+  function relativeTime(iso) {
+    const then = Date.parse(iso);
+    if (!Number.isFinite(then)) return "";
+    const secs = Math.max(0, (Date.now() - then) / 1000);
+    if (secs < 60) return "just now";
+    if (secs < 3600) return Math.floor(secs / 60) + "m ago";
+    if (secs < 86400) return Math.floor(secs / 3600) + "h ago";
+    const d = Math.floor(secs / 86400);
+    if (d < 30) return d + "d ago";
+    return new Date(then).toLocaleDateString();
+  }
+
+  function rowFor(id) { return listEl.querySelector('.item[data-id="' + CSS.escape(id) + '"]'); }
+
+  // just the counts/footer, not the list -- kept separate from render() so an in-place read/open toggle on one row does not need to rebuild every other row along with it
+  function renderCounts() {
+    const unread = items.filter((i) => !i.read).length;
+    countEl.hidden = unread === 0;
+    countEl.textContent = String(unread);
+    markAllEl.disabled = unread === 0;
+    clearAllEl.disabled = items.length === 0;
+    noteEl.textContent = items.length ? items.length + (items.length === 1 ? " notification" : " notifications") : "";
+  }
+
+  function render() {
+    renderCounts();
+    if (!items.length) {
+      listEl.innerHTML = '<div class="empty">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/bell}}</svg>' +
+        "Nothing new.<br>Update notices show up here.</div>";
+      return;
+    }
+    listEl.innerHTML = items.map((item) => {
+      const open = item.id === openId;
+      const notes = item.body ? (window.RKMarkdown ? RKMarkdown.render(item.body) : escapeHtml(item.body)) : "";
+      // a div, not a button -- a delete button has to nest inside each row, and a button cannot legally contain another one. role/tabindex replace what the native button gave up.
+      return '<div class="item ' + (item.read ? "is-read" : "is-unread") + (open ? " is-open" : "") +
+        '" data-id="' + escapeHtml(item.id) + '" tabindex="0" role="button" aria-expanded="' + (open ? "true" : "false") + '">' +
+        '<div class="item-head">' +
+          '<span class="item-title">' + escapeHtml(item.title || "") + "</span>" +
+          '<div class="item-actions">' +
+            '<button class="item-icon-btn item-delete-btn" type="button" data-tooltip="Delete" aria-label="Delete notification">' + TRASH_ICON + '<span class="delete-confirm-text">Delete?</span></button>' +
+            '<button class="item-icon-btn item-menu-btn" type="button" data-tooltip="More options" aria-label="More options">' + MORE_ICON + "</button>" +
+            '<span class="item-time">' + escapeHtml(relativeTime(item.createdUtc)) + "</span>" +
+          "</div>" +
+          (notes ? CHEVRON : '<span class="item-chevron-gap"></span>') +
+        "</div>" +
+        (notes ? '<div class="item-drop"><div class="item-drop-inner"><div class="item-body">' + notes + "</div></div></div>" : "") +
+        "</div>";
+    }).join("");
+    applyHovers(listEl);
+  }
+
+  async function load() {
+    try {
+      const data = await helperJson("notifications?t=" + Date.now());
+      items = Array.isArray(data.items) ? data.items : [];
+      render();
+    } catch (e) {
+      listEl.innerHTML = '<div class="empty">Could not load notifications.</div>';
+    }
+  }
+
+  // toggles which row is expanded in place so the chevron and aria state stay in sync
+  function setItemOpen(row, id, opening) {
+    if (openId && openId !== id) {
+      const prevRow = rowFor(openId);
+      if (prevRow) { prevRow.classList.remove("is-open"); prevRow.setAttribute("aria-expanded", "false"); }
+    }
+    openId = opening ? id : "";
+    row.classList.toggle("is-open", opening);
+    row.setAttribute("aria-expanded", opening ? "true" : "false");
+  }
+
+  // same in-place reasoning as setItemOpen -- also used by the right-click menu, so both entry points animate and update the unread badge identically instead of one of them forcing a full rebuild
+  function setItemReadState(id, read) {
+    const item = items.find((i) => i.id === id);
+    if (!item || item.read === read) return;
+    item.read = read;
+    const row = rowFor(id);
+    if (row) { row.classList.toggle("is-read", read); row.classList.toggle("is-unread", !read); }
+    renderCounts();
+    helperJson("notifications/" + (read ? "read" : "unread") + "?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => {});
+  }
+
+  function deleteItem(id) {
+    items = items.filter((i) => i.id !== id);
+    if (openId === id) openId = "";
+    render();
+    helperJson("notifications/dismiss?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => {});
+  }
+
+  // two-click delete, same pattern as clips.html armDeleteButton/resetDeleteButton -- first click arms (widens to show "Delete?"), a second click while armed actually deletes, and an unattended arm disarms itself after 3s
+  function resetDeleteButton(btn) {
+    if (!btn) return;
+    if (btn._deleteArmTimer) { clearTimeout(btn._deleteArmTimer); btn._deleteArmTimer = 0; }
+    btn.classList.remove("is-armed");
+    btn.dataset.tooltip = "Delete";
+    btn.setAttribute("aria-label", "Delete notification");
+  }
+
+  function resetAllArmedDeleteButtons(exceptBtn) {
+    listEl.querySelectorAll(".item-delete-btn.is-armed").forEach((btn) => { if (btn !== exceptBtn) resetDeleteButton(btn); });
+  }
+
+  function armDeleteButton(btn) {
+    resetDeleteButton(btn);
+    btn.classList.add("is-armed");
+    btn.dataset.tooltip = "Click again to delete";
+    btn.setAttribute("aria-label", "Click again to delete");
+    btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
+  }
+
+  // shared by the icon button and the right-click menus Delete entry, so both arm/confirm identically
+  function triggerDelete(btn, id) {
+    if (!btn) { deleteItem(id); return; }
+    resetAllArmedDeleteButtons(btn);
+    if (!btn.classList.contains("is-armed")) { armDeleteButton(btn); return; }
+    resetDeleteButton(btn);
+    deleteItem(id);
+  }
+
+  function closeCtxMenu() {
+    ctxMenu.classList.remove("is-open");
+    ctxTargetId = "";
+  }
+
+  function openCtxMenuFor(id, clientX, clientY) {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    resetAllArmedDeleteButtons();
+    ctxTargetId = id;
+    const parts = [item.read
+      ? '<div class="ctx-item" data-action="unread">' + UNREAD_ICON + "<span>Mark as unread</span></div>"
+      : '<div class="ctx-item" data-action="read">' + READ_ICON + "<span>Mark as read</span></div>"];
+    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>" + escapeHtml(item.linkLabel || "Open release page") + "</span></div>");
+    parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete">' + TRASH_ICON + "<span>Delete</span></div>");
+    ctxMenu.innerHTML = parts.join("");
+    ctxMenu.classList.add("is-open");
+    const width = ctxMenu.offsetWidth || 180;
+    const height = ctxMenu.offsetHeight || 120;
+    ctxMenu.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, clientX)) + "px";
+    ctxMenu.style.top = Math.max(8, Math.min(window.innerHeight - height - 8, clientY)) + "px";
+  }
+
+  // opening a row is what marks it read -- that is the whole point of the badge count
+  listEl.addEventListener("click", (e) => {
+    const menuBtn = e.target.closest(".item-menu-btn");
+    if (menuBtn) {
+      e.stopPropagation();
+      const menuRow = menuBtn.closest(".item");
+      if (menuRow) openCtxMenuFor(menuRow.dataset.id, e.clientX, e.clientY);
+      return;
+    }
+    const deleteBtn = e.target.closest(".item-delete-btn");
+    if (deleteBtn) {
+      e.stopPropagation();
+      const row = deleteBtn.closest(".item");
+      if (row) triggerDelete(deleteBtn, row.dataset.id);
+      return;
+    }
+    const row = e.target.closest(".item");
+    if (!row) return;
+    const id = row.dataset.id;
+    const opening = openId !== id;
+    setItemReadState(id, true);
+    // notes too long for the row go straight to the card over the obs window, so the row never starts to roll open under it
+    if (opening && notesTooLong(row)) {
+      helperJson("notifications/reader?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => openInPlace(id));
+      return;
+    }
+    setItemOpen(row, id, opening);
+  });
+
+  // the notes are laid out while the row is closed (only clipped), so their real height is known before anything opens
+  function notesTooLong(row) {
+    const body = row.querySelector(".item-body");
+    return !!body && body.scrollHeight > body.clientHeight + 2;
+  }
+
+  function openInPlace(id) {
+    const row = rowFor(id);
+    if (row && openId !== id) setItemOpen(row, id, true);
+  }
+
+  // the plugin calls this when the obs window cannot show the card (the preview or the obs settings are over it), and the notes open here instead
+  window.__replaykitReaderUnavailable = openInPlace;
+
+  // the row is a div now, not a button, so Enter/Space no longer trigger a click natively -- .click() re-enters the same handler above rather than duplicating its logic
+  listEl.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const row = e.target.closest(".item");
+    if (!row || e.target.closest(".item-body, .item-delete-btn, .item-menu-btn")) return;
+    e.preventDefault();
+    row.click();
+  });
+
+  // the global lockdown below only preventDefaults the native menu, it does not stop the event from reaching this listener too -- same two-listener split clips.html uses for its own card right-click
+  listEl.addEventListener("contextmenu", (e) => {
+    const row = e.target.closest(".item");
+    if (!row) return;
+    e.preventDefault();
+    openCtxMenuFor(row.dataset.id, e.clientX, e.clientY);
+  });
+
+  ctxMenu.addEventListener("click", (e) => {
+    const actionEl = e.target.closest(".ctx-item");
+    if (!actionEl) return;
+    const id = ctxTargetId;
+    const action = actionEl.dataset.action;
+    closeCtxMenu();
+    if (action === "read") setItemReadState(id, true);
+    else if (action === "unread") setItemReadState(id, false);
+    else if (action === "delete") {
+      const row = rowFor(id);
+      triggerDelete(row ? row.querySelector(".item-delete-btn") : null, id);
+    }
+    else if (action === "open-link") {
+      const item = items.find((i) => i.id === id);
+      if (item && item.url) helperJson("notifications/open-link?url=" + encodeURIComponent(item.url), { method:"POST" }).catch(() => {});
+    }
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".ctx-menu")) closeCtxMenu(); }, true);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCtxMenu(); });
+
+  // pulls the installed versions own release from github (not just the latest one), so this still works after the update notice for it has been read, cleared, or was never announced in the first place. a real persisted notification now (see /update/notes), not a client-side-only one -- closing the panel used to lose it entirely
+  whatsNewEl.addEventListener("click", async () => {
+    whatsNewEl.disabled = true;
+    try {
+      const data = await helperJson("update/notes?t=" + Date.now());
+      items = Array.isArray(data.items) ? data.items : items;
+      // render closed first so the row actually exists closed before opening it -- setting openId before render() used to bake the row in already-open, which is a freshly-inserted node with no prior frame to transition from, so it just snapped open instead of animating
+      openId = "";
+      render();
+      const row = data.id ? rowFor(data.id) : null;
+      if (row && notesTooLong(row)) {
+        helperJson("notifications/reader?id=" + encodeURIComponent(data.id), { method:"POST" }).catch(() => openInPlace(data.id));
+      } else if (row) {
+        void row.offsetWidth; // reflow, or the closed state above never actually commits before setItemOpen changes it
+        setItemOpen(row, data.id, true);
+      }
+    } catch (e) {
+      noteEl.textContent = "Could not load release notes for the installed version.";
+    } finally {
+      whatsNewEl.disabled = false;
+    }
+  });
+
+  markAllEl.addEventListener("click", () => {
+    items.forEach((i) => { i.read = true; });
+    render();
+    helperJson("notifications/read-all", { method:"POST" }).catch(() => {});
+  });
+
+  clearAllEl.addEventListener("click", () => {
+    items = [];
+    openId = "";
+    render();
+    helperJson("notifications/clear", { method:"POST" }).catch(() => {});
+  });
+
+  // called by the native plugin every time the panel is shown -- the window is reused, so a fresh open has to re-read the list and restart the drop-open itself rather than relying on a page load.
+  window.__replaykitShowNotifications = function () {
+    openId = "";
+    const panel = document.querySelector(".clip");
+    if (panel) {
+      panel.classList.remove("is-opening");
+      void panel.offsetWidth; // reflow, or re-adding the class in the same frame does not restart the animation
+      panel.classList.add("is-opening");
+    }
+    load();
+  };
+
+  applyHovers(document);
+  load();
+</script>
+</body>
+</html>

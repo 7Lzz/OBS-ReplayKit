@@ -1,0 +1,366 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using Microsoft.Win32;
+
+namespace ReplayKitSetup
+{
+    // constants + resolved paths derived from env vars and the local obs install
+    public static class Config
+    {
+        public static readonly string USERNAME;
+        public static readonly string USERPROFILE;
+        public static readonly string APPDATA;
+        public static readonly string LOCALAPPDATA;
+        public static readonly string PROGRAMDATA;
+
+        public static readonly string OBS_CONFIG;
+
+        // consolidated runtime root for everything obs replaykit installs (lua scripts, dock html, input-overlay presets). keeps the obs-studio tree easy to reason about and lets cleanup remove replaykit-owned config without touching obs scenes/profiles.
+        public static readonly string REPLAYKIT_CONFIG;
+        public static readonly string REPLAYKIT_SETUP_CACHE;
+        public static readonly string REPLAYKIT_SETUP_EXE;
+        public static readonly string REPLAYKIT_USER_STATE_CACHE;
+
+        // dock html the local helper serves (HelperEndpoint).
+        public static readonly string DOCK_TARGET;
+
+        public static readonly string[] OBS_PROCESSES = { "obs64.exe", "obs32.exe", "obs.exe" };
+
+        private static readonly string _DEFAULT_OBS_DIR;
+
+        public static readonly string[] OBS_EXE_CANDIDATES;
+
+        // bundled assets root. BUNDLE_ROOT is the app base directory, which for the single-file exe is the temp extraction folder and not the folder the exe was started from (Environment.ProcessPath is that); ASSETS_DIR is the copy unpacked from the embedded bundle, or a sibling assets\ folder for a build without one.
+        public static readonly string BUNDLE_ROOT;
+        public static readonly string ASSETS_DIR;
+        public static readonly string OBS_ASSETS_DIR;
+
+        public static readonly string OBS_INSTALL_DIR;
+        public static readonly string PROGRAMFILES_OBS_DIR;
+
+        // input-overlay ships as its own raw plugin files (dll + data), extracted once and checked into input-overlay-plugin.zip (built from source by plugins/input-overlay so one build loads in every obs line) -- not an embedded, silently-executed third-party installer. an embedded-and-executed installer is exactly the shape av "application bundler" heuristics exist to catch, and BongoCat.cs already proved the raw-files-plus-safe-extract approach works. vc++ is the one real prerequisite still downloaded (from microsoft only when missing, signature-checked before running).
+        public static readonly string INPUT_OVERLAY_PLUGIN_ZIP;
+        public const string VCPP_REDIST_DOWNLOAD_URL = "https://aka.ms/vc14/vc_redist.x64.exe";
+        public const long VCPP_REDIST_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
+
+        // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord. still shipped via installers.zips VBCABLE_Driver_Pack45.zip and its own setup exe.
+        public static readonly string INPUT_OVERLAY_INSTALLERS_ZIP;
+        public const string VBCABLE_DRIVER_PACK_NAME = "VBCABLE_Driver_Pack45.zip";
+        public const string VBCABLE_SETUP_EXE_NAME = "VBCABLE_Setup_x64.exe";
+
+        // input-overlay preset pack -- extracted under replaykit_config so all replaykit-managed assets live under one umbrella.
+        public static readonly string INPUT_OVERLAY_ZIP;
+        public static readonly string INPUT_OVERLAY_TARGET;
+
+        // win-capture-audio plugin powers the "desktop audio (excl. discord)" source via windows 10+ per-process loopback. the bundled zip is the replaykit build of the maintained fork https://github.com/Ayrton09/win-capture-audio, see plugins/win-capture-audio/PROVENANCE.md
+        public static readonly string WIN_CAPTURE_AUDIO_ZIP;
+        public const string WIN_CAPTURE_AUDIO_DLL_REL = "obs-plugins/64bit/win-capture-audio.dll";
+
+        // the Bango Cat folder (modes, pictures, live2d models) from the bongobs-cat project, laid out as an obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
+        public static readonly string BONGO_CAT_ZIP;
+
+        // obs shaderfilter plugin -- replaykit uses its bundled motion_blur.shader when the optional motion blur setting is enabled. the archive is the upstream 2.6.1 windows release cut down to the 64-bit plugin, its locale and internal effect and motion_blur.shader, since replaykit uses nothing else of it.
+        public static readonly string SHADERFILTER_ZIP;
+        public const string SHADERFILTER_ZIP_SHA256 = "9ef94f7656c4dc1d5fa7f076a2d96b5c25fa1d0d4c172a09837309665ba4858f";
+
+        // replaykits own obs plugin (window chrome, tray menu, notifications, hotkeys) -- compiled from source at release time and bundled straight into assets/, installed under %programdata%\obs-studio\plugins\ (obss no-admin plugin search path).
+        public static readonly string REPLAYKIT_PLUGIN_DLL_BUNDLED;
+        public static readonly string REPLAYKIT_PLUGIN_DIR;
+
+        // pre-unification plugin locations. obs loads every dll it finds under plugins\<name>\bin\64bit\, so an old replaykit-tray left sitting beside the current replaykit\ is loaded alongside it and injects a second copy of every tray menu item.
+        public static readonly string REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR;
+        public static readonly string REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR;
+
+        // file extensions the installer treats as text (PathRewrite + Prefs.ApplyPreferences).
+        public static readonly HashSet<string> TEXT_EXTS = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".ini", ".json", ".bak", ".lua", ".ps1", ".txt",
+        };
+
+        static Config()
+        {
+            USERNAME = Environment.GetEnvironmentVariable("USERNAME") ?? Environment.GetEnvironmentVariable("USER") ?? "User";
+            USERPROFILE = Environment.GetEnvironmentVariable("USERPROFILE") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            APPDATA = Environment.GetEnvironmentVariable("APPDATA") ?? Path.Combine(USERPROFILE, "AppData", "Roaming");
+            LOCALAPPDATA = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Path.Combine(USERPROFILE, "AppData", "Local");
+            PROGRAMDATA = Environment.GetEnvironmentVariable("ProgramData") ?? @"C:\ProgramData";
+
+            OBS_CONFIG = Path.Combine(APPDATA, "obs-studio");
+            REPLAYKIT_CONFIG = Path.Combine(OBS_CONFIG, "obs-replayKit");
+            REPLAYKIT_SETUP_CACHE = Path.Combine(LOCALAPPDATA, "OBS ReplayKit");
+            REPLAYKIT_SETUP_EXE = Path.Combine(REPLAYKIT_SETUP_CACHE, "OBSReplayKitSetup.exe");
+            REPLAYKIT_USER_STATE_CACHE = Path.Combine(REPLAYKIT_SETUP_CACHE, "state");
+            DOCK_TARGET = Path.Combine(REPLAYKIT_CONFIG, "obs-custom-dock");
+
+            _DEFAULT_OBS_DIR = Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles") ?? @"C:\Program Files", "obs-studio");
+
+            OBS_EXE_CANDIDATES = UniquePaths(
+                EnvObsCandidates()
+                    .Concat(RunningObsCandidates())
+                    .Concat(RegistryObsCandidates())
+                    .Concat(PathObsCandidates())
+                    .Concat(DefaultObsCandidates()));
+
+            BUNDLE_ROOT = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+            ASSETS_DIR = ResolveAssetsDir(BUNDLE_ROOT);
+            OBS_ASSETS_DIR = Path.Combine(ASSETS_DIR, "obs-studio");
+
+            OBS_INSTALL_DIR = FindObsInstallDir() ?? _DEFAULT_OBS_DIR;
+            PROGRAMFILES_OBS_DIR = OBS_INSTALL_DIR;
+
+            INPUT_OVERLAY_INSTALLERS_ZIP = Path.Combine(ASSETS_DIR, "installers.zip");
+            INPUT_OVERLAY_PLUGIN_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-plugin.zip");
+            INPUT_OVERLAY_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-presets.zip");
+            INPUT_OVERLAY_TARGET = Path.Combine(REPLAYKIT_CONFIG, "input-overlay-presets");
+            WIN_CAPTURE_AUDIO_ZIP = Path.Combine(ASSETS_DIR, "win-capture-audio.zip");
+            BONGO_CAT_ZIP = Path.Combine(ASSETS_DIR, "Bango Cat.zip");
+            SHADERFILTER_ZIP = Path.Combine(ASSETS_DIR, "obs-shaderfilter.zip");
+
+            REPLAYKIT_PLUGIN_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
+            REPLAYKIT_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");
+            REPLAYKIT_TRAY_LEGACY_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit-tray");
+            REPLAYKIT_TRAY_LEGACY_DLL_IN_CURRENT_DIR = Path.Combine(REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit-tray.dll");
+        }
+
+        // release builds use their embedded payload. Debug builds can use sibling assets.
+        private static string ResolveAssetsDir(string bundleRoot)
+        {
+            string sibling = Path.Combine(bundleRoot, "assets");
+            string extracted = AssetBundle.TryExtract();
+            if (extracted != null) return extracted;
+            if (AssetBundle.LastError != null) throw new IOException(AssetBundle.LastError);
+            return sibling;
+        }
+
+        private static bool IsValidObsExe(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            string name = Path.GetFileName(path).ToLowerInvariant();
+            // the obs64.exe copy in bin\64bit\replaykit-host runs the browser pages and the helper so they show as obs, but it is never obs itself
+            if (string.Equals(Path.GetFileName(Path.GetDirectoryName(path) ?? ""), "replaykit-host", StringComparison.OrdinalIgnoreCase)) return false;
+            return OBS_PROCESSES.Contains(name) && File.Exists(path);
+        }
+
+        private static string ObsExeFromRoot(string root)
+        {
+            return Path.Combine(root, "bin", "64bit", "obs64.exe");
+        }
+
+        private static string ObsRootFromExe(string path)
+        {
+            try
+            {
+                string full = Path.GetFullPath(path);
+                string bitDir = Path.GetDirectoryName(full);
+                string binDir = bitDir == null ? null : Path.GetDirectoryName(bitDir);
+                if (bitDir != null && binDir != null &&
+                    string.Equals(Path.GetFileName(bitDir), "64bit", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(Path.GetFileName(binDir), "bin", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Path.GetDirectoryName(binDir);
+                }
+            }
+            catch (ArgumentException) { }
+            catch (PathTooLongException) { }
+            catch (NotSupportedException) { }
+            return null;
+        }
+
+        private static IEnumerable<string> EnvObsCandidates()
+        {
+            var result = new List<string>();
+            string exe = (Environment.GetEnvironmentVariable("OBS_REPLAYKIT_OBS_EXE") ?? "").Trim().Trim('"');
+            if (!string.IsNullOrEmpty(exe)) result.Add(exe);
+            string root = (Environment.GetEnvironmentVariable("OBS_REPLAYKIT_OBS_DIR") ?? "").Trim().Trim('"');
+            if (!string.IsNullOrEmpty(root)) result.Add(ObsExeFromRoot(root));
+            return result;
+        }
+
+        // full exe path of any running obs process. was a Win32_Process wmi query; System.Management is not trim-safe and this project publishes trimmed, so it walks the process list directly now. this setup exe runs elevated (app.manifest), so MainModule is readable even for an elevated obs.
+        private static IEnumerable<string> RunningObsCandidates()
+        {
+            var result = new List<string>();
+            foreach (string name in OBS_PROCESSES.Select(n => Path.GetFileNameWithoutExtension(n)).Distinct())
+            {
+                Process[] procs;
+                try { procs = Process.GetProcessesByName(name); }
+                catch (InvalidOperationException) { continue; }
+                foreach (var p in procs)
+                {
+                    try
+                    {
+                        string path = p.MainModule?.FileName;
+                        if (!string.IsNullOrEmpty(path)) result.Add(path);
+                    }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is NotSupportedException) { }
+                    finally { p.Dispose(); }
+                }
+            }
+            return result.Distinct();
+        }
+
+        private static IEnumerable<string> RegistryObsCandidates()
+        {
+            var result = new List<string>();
+
+            Action<string> addRoot = value =>
+            {
+                if (!string.IsNullOrEmpty(value)) result.Add(ObsExeFromRoot(value.Trim().Trim('"')));
+            };
+            Action<string> addExe = value =>
+            {
+                if (string.IsNullOrEmpty(value)) return;
+                string raw = value.Trim().Trim('"');
+                int comma = raw.IndexOf(',');
+                if (comma >= 0) raw = raw.Substring(0, comma).Trim().Trim('"');
+                result.Add(raw);
+            };
+
+            var hives = new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine };
+            var views = new[] { RegistryView.Default, RegistryView.Registry64, RegistryView.Registry32 };
+
+            foreach (var hive in hives)
+            {
+                foreach (var view in views)
+                {
+                    RegistryKey baseKey;
+                    try { baseKey = RegistryKey.OpenBaseKey(hive, view); }
+                    catch { continue; }
+
+                    using (baseKey)
+                    {
+                        try
+                        {
+                            using (var key = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\obs64.exe"))
+                            {
+                                if (key != null) addExe(key.GetValue("") as string);
+                            }
+                        }
+                        catch (System.Security.SecurityException) { }
+                        catch (UnauthorizedAccessException) { }
+                        catch (IOException) { }
+
+                        foreach (var rootKeyPath in new[]
+                        {
+                            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                            @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+                        })
+                        {
+                            try
+                            {
+                                using (var root = baseKey.OpenSubKey(rootKeyPath))
+                                {
+                                    if (root == null) continue;
+                                    foreach (var subName in root.GetSubKeyNames())
+                                    {
+                                        try
+                                        {
+                                            using (var sub = root.OpenSubKey(subName))
+                                            {
+                                                if (sub == null) continue;
+                                                var display = sub.GetValue("DisplayName") as string;
+                                                if (display == null || !display.ToLowerInvariant().StartsWith("obs studio")) continue;
+                                                addRoot(sub.GetValue("InstallLocation") as string);
+                                                addExe(sub.GetValue("DisplayIcon") as string);
+                                            }
+                                        }
+                                        catch (System.Security.SecurityException) { continue; }
+                                        catch (UnauthorizedAccessException) { continue; }
+                                        catch (IOException) { continue; }
+                                    }
+                                }
+                            }
+                            catch (System.Security.SecurityException) { }
+                            catch (UnauthorizedAccessException) { }
+                            catch (IOException) { }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        private static IEnumerable<string> PathObsCandidates()
+        {
+            var result = new List<string>();
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var name in OBS_PROCESSES)
+            {
+                foreach (var dir in pathEnv.Split(';'))
+                {
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    string candidate;
+                    try { candidate = Path.Combine(dir.Trim(), name); }
+                    catch { continue; }
+                    if (File.Exists(candidate))
+                    {
+                        result.Add(candidate);
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        private static IEnumerable<string> DefaultObsCandidates()
+        {
+            var roots = new[]
+            {
+                Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles") ?? @"C:\Program Files", "obs-studio"),
+                Path.Combine(Environment.GetEnvironmentVariable("ProgramW6432") ?? @"C:\Program Files", "obs-studio"),
+                Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? @"C:\Program Files (x86)", "obs-studio"),
+            };
+            return roots.Select(ObsExeFromRoot);
+        }
+
+        private static string[] UniquePaths(IEnumerable<string> paths)
+        {
+            var result = new List<string>();
+            var seen = new HashSet<string>();
+            foreach (var path in paths)
+            {
+                if (path == null) continue;
+                string key;
+                try { key = Path.GetFullPath(path).ToLowerInvariant(); }
+                catch { key = path.ToLowerInvariant(); }
+                if (!seen.Add(key)) continue;
+                result.Add(path);
+            }
+            return result.ToArray();
+        }
+
+        public static string FindObsExeCandidate()
+        {
+            foreach (var candidate in OBS_EXE_CANDIDATES)
+            {
+                if (IsValidObsExe(candidate)) return candidate;
+            }
+            return null;
+        }
+
+        public static string FindObsInstallDir()
+        {
+            string exe = FindObsExeCandidate();
+            return exe == null ? null : ObsRootFromExe(exe);
+        }
+
+        // strict utf-8 first and latin-1 as the fallback, which can never fail since every byte is valid latin-1; File.ReadAllText would silently replace invalid bytes and strip a leading bom instead
+        private static readonly System.Text.Encoding StrictUtf8NoBom = new System.Text.UTF8Encoding(false, true);
+
+        public static string ReadTextFileFlexible(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            try
+            {
+                return StrictUtf8NoBom.GetString(bytes);
+            }
+            catch (System.Text.DecoderFallbackException)
+            {
+                return System.Text.Encoding.GetEncoding("ISO-8859-1").GetString(bytes);
+            }
+        }
+    }
+}

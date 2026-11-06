@@ -1,0 +1,774 @@
+#include "prelude.hpp"
+#include "overlays/bongo.hpp"
+#include "overlays/bongo_animation.hpp"
+#include "overlays/bongo_input.hpp"
+#include "overlays/bongo_model.hpp"
+
+#include <array>
+#include <cmath>
+#include <memory>
+#include <QCryptographicHash>
+#include <QFileInfo>
+#include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
+namespace rk {
+namespace {
+
+// Bongobs-Cat redrawn through obs graphics: the same Bango Cat folder, modes, sprites and live2d models, every property of its source, and View::Render layer for layer, without its own opengl window
+
+// the opengl window of the plugin is 1280x768 and it reads the source size out of its bottom left corner, so everything is laid out in that frame
+constexpr float FrameWidth = 1280, FrameHeight = 768;
+
+// Define.cpp KeyDefine, the names mode configs use, with the virtual key Hook.cpp HookCode reads for each; HookCode gives VK_RIGHT to left and VK_LEFT to right, and that swap is kept
+struct KeyName {
+	const char *name;
+	int vk;
+};
+constexpr std::array<KeyName, 61> KeyDefine = {{
+	{"a", 'A'}, {"b", 'B'}, {"c", 'C'}, {"d", 'D'}, {"e", 'E'}, {"f", 'F'}, {"g", 'G'}, {"h", 'H'}, {"i", 'I'}, {"j", 'J'}, {"k", 'K'}, {"l", 'L'},
+	{"m", 'M'}, {"n", 'N'}, {"o", 'O'}, {"p", 'P'}, {"q", 'Q'}, {"r", 'R'}, {"s", 'S'}, {"t", 'T'}, {"u", 'U'}, {"v", 'V'}, {"w", 'W'}, {"x", 'X'},
+	{"y", 'Y'}, {"z", 'Z'}, {"0", '0'}, {"1", '1'}, {"2", '2'}, {"3", '3'}, {"4", '4'}, {"5", '5'}, {"6", '6'}, {"7", '7'}, {"8", '8'}, {"9", '9'},
+	{"space", VK_SPACE}, {"lshift", VK_LSHIFT}, {"lctrl", VK_LCONTROL},
+	{"f1", VK_F1}, {"f2", VK_F2}, {"f3", VK_F3}, {"f4", VK_F4}, {"f5", VK_F5}, {"f6", VK_F6}, {"f7", VK_F7}, {"f8", VK_F8}, {"f9", VK_F9}, {"f10", VK_F10}, {"f11", VK_F11}, {"f12", VK_F12},
+	{"up", VK_UP}, {"down", VK_DOWN}, {"left", VK_RIGHT}, {"right", VK_LEFT}, {"<", VK_OEM_COMMA}, {">", VK_OEM_PERIOD}, {"[", VK_OEM_4}, {"]", VK_OEM_6},
+	{"rshift", VK_RSHIFT}, {"rctrl", VK_RCONTROL},
+}};
+
+int KeyIndex(const QString &name)
+{
+	for (size_t i = 0; i < KeyDefine.size(); ++i) {
+		if (name == QLatin1String(KeyDefine[i].name))
+			return int(i);
+	}
+	return -1;
+}
+
+// premultiplication stays off like the plugins sprite and cubism shaders; opacity carries the fade of a drawable
+const char *EffectSource = R"(
+uniform float4x4 ViewProj;
+uniform texture2d image;
+uniform float opacity;
+sampler_state textureSampler { Filter = Linear; AddressU = Clamp; AddressV = Clamp; };
+struct VertData { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+VertData VSDraw(VertData v_in) { VertData v_out; v_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj); v_out.uv = v_in.uv; return v_out; }
+float4 PSDraw(VertData v_in) : TARGET { float4 color = image.Sample(textureSampler, v_in.uv); color.a *= opacity; return color; }
+technique Draw { pass { vertex_shader = VSDraw(v_in); pixel_shader = PSDraw(v_in); } }
+)";
+
+struct Image {
+	gs_texture_t *texture = nullptr;
+	bool Load(const QString &path)
+	{
+		texture = BongoTexture(path);
+		return texture != nullptr;
+	}
+	~Image()
+	{
+		if (texture)
+			gs_texture_destroy(texture);
+	}
+};
+
+struct ModelSlot {
+	BongoModel model;
+	QStringList blinkIds;
+	BongoAnimation animation;
+	~ModelSlot() { model.Free(); }
+};
+
+// one entry of mode/config.json, read like InfoReader::ModeFromConfig
+struct Mode {
+	QString name;
+	// the files its background, cat background and keys are read from, to draw them again with other labels on the keys
+	QString backFile, catBackFile;
+	QStringList keyFiles;
+	// the keys whose labels are drawn now (the bongoKeys codes of this mode), and the md5 of each file looked at
+	QStringList labelled;
+	QHash<QString, QString> md5;
+	std::unique_ptr<Image> back, catBack, leftUp, rightUp;
+	std::vector<std::unique_ptr<Image>> keys, leftHands, rightHands;
+	std::vector<int> keyUse;
+	bool hasModel = false, hasLeftHandModel = false, hasRightHandModel = false;
+	std::unique_ptr<ModelSlot> cat, leftModel, rightModel;
+};
+
+struct Settings {
+	QString mode;
+	double x = 0, y = 0.02, scale = 1.83, delay = 1;
+	int width = 1280, height = 768;
+	bool breath = true, eyeBlink = true, track = true, live2d = true, relative = false, horizontalFlip = true, verticalFlip = true, mask = false;
+	// the virtual key of each key slot of the mode, 0 where the mode keeps its own; ReplayKit writes them as a comma list in keys
+	std::vector<int> keys;
+	// the same keys as the KeyboardEvent codes of the bongoKeys setting (key_codes), which name the labels drawn on them
+	QStringList codes;
+};
+
+std::vector<int> ParseKeys(const char *text)
+{
+	std::vector<int> out;
+	for (const QString &part : QString::fromUtf8(text ? text : "").split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+		bool ok = false;
+		const int vk = part.trimmed().toInt(&ok);
+		// a key past what windows numbers, or any slot past what a mode could have, is left at the default of the mode
+		out.push_back(ok && vk > 0 && vk < 256 ? vk : 0);
+		if (out.size() >= 32)
+			break;
+	}
+	return out;
+}
+
+QString BangoCatFolder()
+{
+	return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("Bango Cat"));
+}
+
+QJsonObject ReadJson(const QString &path)
+{
+	QFile file(path);
+	if (!file.open(QIODevice::ReadOnly) || file.size() > 1024 * 1024)
+		return QJsonObject();
+	return QJsonDocument::fromJson(file.readAll()).object();
+}
+
+QStringList Strings(const QJsonValue &value)
+{
+	QStringList out;
+	for (const auto &entry : value.toArray())
+		out.append(entry.toString());
+	return out;
+}
+
+// a model folder of a mode: its first *.model3.json (Pal::GetModelName), the moc3 and texture it names, and its EyeBlink group
+std::unique_ptr<ModelSlot> LoadModel(const QString &folder, const QString &bakes)
+{
+	const QStringList found = QDir(folder).entryList({QStringLiteral("*.model3.json")}, QDir::Files, QDir::Name);
+	if (found.isEmpty())
+		return nullptr;
+	const QJsonObject setting = ReadJson(QDir(folder).filePath(found.first()));
+	const QJsonObject files = setting["FileReferences"].toObject();
+	const QStringList textures = Strings(files["Textures"]);
+	if (files["Moc"].toString().isEmpty() || textures.isEmpty())
+		return nullptr;
+	auto slot = std::make_unique<ModelSlot>();
+	for (const auto &group : setting["Groups"].toArray()) {
+		const QJsonObject object = group.toObject();
+		if (object["Target"].toString() == QLatin1String("Parameter") && object["Name"].toString() == QLatin1String("EyeBlink"))
+			slot->blinkIds = Strings(object["Ids"]);
+	}
+	if (!slot->model.Load(QDir(folder).filePath(files["Moc"].toString()), QDir(folder).filePath(textures.first()), bakes)) {
+		blog(LOG_WARNING, "[replaykit] bongo cat: no matching baked model for %s", QDir(folder).filePath(files["Moc"].toString()).toUtf8().constData());
+		return nullptr;
+	}
+	return slot;
+}
+
+std::unique_ptr<Image> LoadImage(const QString &path)
+{
+	auto image = std::make_unique<Image>();
+	if (!image->Load(path)) {
+		blog(LOG_WARNING, "[replaykit] bongo cat: missing picture %s", path.toUtf8().constData());
+		return nullptr;
+	}
+	return image;
+}
+
+std::unique_ptr<Mode> LoadMode(const QString &root, const QString &name, const QString &bakes)
+{
+	const QString dir = QDir(root).filePath(QStringLiteral("mode/") + name);
+	const QJsonObject config = ReadJson(QDir(dir).filePath(QStringLiteral("config.json")));
+	if (config.isEmpty())
+		return nullptr;
+	auto mode = std::make_unique<Mode>();
+	mode->name = name;
+	auto at = [&](const QString &folder, const QString &file) { return QDir(QDir(dir).filePath(folder)).filePath(file); };
+	if (!config["BackgroundImageName"].toString().isEmpty()) {
+		mode->backFile = QDir(dir).filePath(config["BackgroundImageName"].toString());
+		mode->back = LoadImage(mode->backFile);
+	}
+	if (!config["CatBackgroundImageName"].toString().isEmpty()) {
+		mode->catBackFile = QDir(dir).filePath(config["CatBackgroundImageName"].toString());
+		mode->catBack = LoadImage(mode->catBackFile);
+	}
+
+	// KeysCount is the shorter of the two lists
+	const QStringList keyImages = Strings(config["KeysImageName"]), keyUse = Strings(config["KeyUse"]);
+	const int keysCount = int(std::min(keyImages.size(), keyUse.size()));
+	for (int i = 0; i < keysCount; ++i) {
+		mode->keyFiles.append(at(config["KeysImagePath"].toString(), keyImages[i]));
+		mode->keys.push_back(LoadImage(mode->keyFiles.back()));
+		mode->keyUse.push_back(KeyIndex(keyUse[i]));
+	}
+
+	const QString leftFolder = config["LeftHandImagePath"].toString(), rightFolder = config["RightHandImagePath"].toString();
+	if (!leftFolder.isEmpty()) {
+		if (!config["LeftHandUpImageName"].toString().isEmpty())
+			mode->leftUp = LoadImage(at(leftFolder, config["LeftHandUpImageName"].toString()));
+		for (const QString &file : Strings(config["LeftHandImageName"]))
+			mode->leftHands.push_back(LoadImage(at(leftFolder, file)));
+	}
+	if (!rightFolder.isEmpty()) {
+		if (!config["RightHandUpImageName"].toString().isEmpty())
+			mode->rightUp = LoadImage(at(rightFolder, config["RightHandUpImageName"].toString()));
+		for (const QString &file : Strings(config["RightHandImageName"]))
+			mode->rightHands.push_back(LoadImage(at(rightFolder, file)));
+	}
+
+	mode->hasModel = config["HasModel"].toBool();
+	mode->hasLeftHandModel = config["ModelHasLeftHandModel"].toBool();
+	mode->hasRightHandModel = config["ModelHasRightHandModel"].toBool();
+	if (!config["CatModelPath"].toString().isEmpty())
+		mode->cat = LoadModel(QDir(dir).filePath(config["CatModelPath"].toString()), bakes);
+	if (!config["ModelLeftHandModelPath"].toString().isEmpty())
+		mode->leftModel = LoadModel(QDir(dir).filePath(config["ModelLeftHandModelPath"].toString()), bakes);
+	if (!config["ModelRightHandModelPath"].toString().isEmpty())
+		mode->rightModel = LoadModel(QDir(dir).filePath(config["ModelRightHandModelPath"].toString()), bakes);
+	return mode;
+}
+
+// which form of a label fits a key (the long one, "short" or "tiny") and how much it is shrunk from its natural size, as
+// tools/bongo-keys/render.py choose()
+QJsonObject ChooseLabel(const QJsonObject &entry, const QJsonObject &slot, double &f)
+{
+	const QJsonArray room = slot["room"].toArray(), matrix = slot["matrix"].toArray();
+	auto fit = [&](const QJsonObject &e) {
+		return std::min({1.0, room[0].toDouble() / std::max(1.0, e["w"].toDouble()), room[1].toDouble() / std::max(1.0, e["h"].toDouble())});
+	};
+	const double down = std::hypot(matrix[2].toDouble(), matrix[3].toDouble());
+	f = fit(entry);
+	if (entry.contains("short") && (f < 0.55 || entry["smallCap"].toDouble(1e9) * f * down < 8.0)) {
+		const QJsonObject shorter = entry["short"].toObject();
+		f = fit(shorter);
+		if (entry.contains("tiny") && f < 0.55) {
+			f = fit(entry["tiny"].toObject());
+			return entry["tiny"].toObject();
+		}
+		return shorter;
+	}
+	if (entry.contains("tiny") && f < 0.55) {
+		f = fit(entry["tiny"].toObject());
+		return entry["tiny"].toObject();
+	}
+	return entry;
+}
+
+// the white label tinted to colour and laid on its key: sprite pixel (u, v) lands at anchor + f * matrix @ (u - w/2, v - h/2)
+void DrawLabel(QPainter &painter, const QImage &sprite, const QColor &colour, const QJsonObject &slot, double f)
+{
+	if (sprite.isNull())
+		return;
+	QImage tinted(sprite.size(), QImage::Format_ARGB32_Premultiplied);
+	tinted.fill(colour);
+	{
+		QPainter tint(&tinted);
+		tint.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+		tint.drawImage(0, 0, sprite);
+	}
+	const QJsonArray matrix = slot["matrix"].toArray(), anchor = slot["anchor"].toArray();
+	double m11 = matrix[0].toDouble() * f, m12 = matrix[1].toDouble() * f, m21 = matrix[2].toDouble() * f, m22 = matrix[3].toDouble() * f;
+	// a label drawn at under half its size is shrunk smoothly first, or the one-step resample leaves it jagged
+	const double k = std::min(1.0, 2.0 * std::sqrt(std::abs(m11 * m22 - m12 * m21)));
+	if (k < 1.0) {
+		const QImage smaller = tinted.scaled(std::max(1, int(std::lround(tinted.width() * k))), std::max(1, int(std::lround(tinted.height() * k))),
+						     Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		const double kx = double(smaller.width()) / tinted.width(), ky = double(smaller.height()) / tinted.height();
+		m11 /= kx;
+		m12 /= kx;
+		m21 /= ky;
+		m22 /= ky;
+		tinted = smaller;
+	}
+	painter.save();
+	painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+	// the manifest counts pixels from their middles and qt from their corners: half a pixel each way
+	painter.setTransform(QTransform(m11, m12, m21, m22, anchor[0].toDouble() + 0.5, anchor[1].toDouble() + 0.5));
+	painter.drawImage(QPointF(-tinted.width() / 2.0 - 0.5, -tinted.height() / 2.0 - 0.5), tinted);
+	painter.restore();
+}
+
+struct Bongo {
+	obs_source_t *source;
+	gs_effect_t *effect = nullptr;
+	std::vector<std::unique_ptr<Mode>> modes;
+	std::vector<std::unique_ptr<Image>> faces;
+	std::vector<int> faceKeys;
+	std::unique_ptr<BongoInput> input;
+	// overlay-preview/bongo-keys: the labels of other keys, the blank faces they go on and where (tools/bongo-keys/README.md)
+	QString labelsDir;
+	QJsonObject labels;
+
+	std::mutex settingsLock;
+	Settings settings;
+
+	// graphics thread only from here
+	size_t current = 0;
+	size_t currentFace = 0;
+	std::array<bool, KeyDefine.size()> pressed{};
+	// whether each key slot of the current mode is held, for the slots bound to a key of their own; their order is the order of KeyDefine, the virtual key after it for keys it does not name
+	std::vector<bool> slotDown;
+	std::vector<int> slotOrder;
+	// relative mouse is the plugins window of one screen around the accumulated raw motion, which is the same as a position clamped to the screen that starts in the middle
+	float mouseX = 0.5f, mouseY = 0.5f;
+	bool relativeBefore = false;
+	bool left = false, right = false;
+
+	explicit Bongo(obs_data_t *data, obs_source_t *owner) : source(owner)
+	{
+		const QString replaykit = qEnvironmentVariable("APPDATA") + "/obs-studio/obs-replayKit/";
+		input = std::make_unique<BongoInput>();
+		const QString bakes = replaykit + "obs-custom-dock/overlay-preview/bongo-models";
+		const QString root = BangoCatFolder();
+		labelsDir = replaykit + "obs-custom-dock/overlay-preview/bongo-keys";
+		labels = ReadJson(QDir(labelsDir).filePath(QStringLiteral("manifest.json")));
+		if (labels["version"].toInt() != 2)
+			labels = QJsonObject();
+		ReadSettings(data, "delaytime");
+
+		obs_enter_graphics();
+		char *errors = nullptr;
+		effect = gs_effect_create(EffectSource, "replaykit-bongo.effect", &errors);
+		if (!effect)
+			blog(LOG_ERROR, "[replaykit] bongo cat: effect failed: %s", errors ? errors : "");
+		bfree(errors);
+		// InfoReader::InitFromConfig: a listed mode whose config cannot be read is skipped
+		for (const QString &name : Strings(ReadJson(QDir(root).filePath(QStringLiteral("mode/config.json")))["ModelPath"])) {
+			if (auto mode = LoadMode(root, name, bakes))
+				modes.push_back(std::move(mode));
+		}
+		const QJsonObject face = ReadJson(QDir(root).filePath(QStringLiteral("face/config.json")));
+		const QStringList hotKeys = Strings(face["HotKey"]), faceImages = Strings(face["FaceImageName"]);
+		for (int i = 0; i < std::min(hotKeys.size(), faceImages.size()); ++i) {
+			faces.push_back(LoadImage(QDir(root).filePath(QStringLiteral("face/") + faceImages[i])));
+			faceKeys.push_back(KeyIndex(hotKeys[i]));
+		}
+		obs_leave_graphics();
+		if (modes.empty())
+			blog(LOG_ERROR, "[replaykit] bongo cat: no mode could be read from %s", root.toUtf8().constData());
+	}
+
+	~Bongo()
+	{
+		input.reset();
+		obs_enter_graphics();
+		modes.clear();
+		faces.clear();
+		if (effect)
+			gs_effect_destroy(effect);
+		obs_leave_graphics();
+	}
+
+	// VtuberCreate reads the speed from delaytime and Vtuber_update from delay, and both are kept
+	void ReadSettings(obs_data_t *data, const char *speedKey)
+	{
+		Settings next;
+		next.mode = QString::fromUtf8(obs_data_get_string(data, "mode"));
+		next.x = obs_data_get_double(data, "x");
+		next.y = obs_data_get_double(data, "y");
+		next.scale = obs_data_get_double(data, "scale");
+		next.delay = obs_data_get_double(data, speedKey);
+		next.width = int(obs_data_get_int(data, "width")) / 32 * 32;
+		next.height = int(obs_data_get_int(data, "height"));
+		next.breath = obs_data_get_bool(data, "breath");
+		next.eyeBlink = obs_data_get_bool(data, "eyeblink");
+		next.track = obs_data_get_bool(data, "track");
+		next.live2d = obs_data_get_bool(data, "live2d");
+		next.relative = obs_data_get_bool(data, "relative_mouse");
+		next.horizontalFlip = obs_data_get_bool(data, "mouse_horizontal_flip");
+		next.verticalFlip = obs_data_get_bool(data, "mouse_vertical_flip");
+		next.mask = obs_data_get_bool(data, "mask");
+		next.keys = ParseKeys(obs_data_get_string(data, "keys"));
+		next.codes = QString::fromUtf8(obs_data_get_string(data, "key_codes")).split(QLatin1Char(','));
+		while (!next.codes.isEmpty() && next.codes.back().isEmpty())
+			next.codes.removeLast();
+		if (next.codes.size() > 32)
+			next.codes = next.codes.mid(0, 32);
+		std::lock_guard<std::mutex> guard(settingsLock);
+		settings = next;
+	}
+
+	Settings Current()
+	{
+		std::lock_guard<std::mutex> guard(settingsLock);
+		return settings;
+	}
+
+	// the key slots that are held, in the order View::Render visits them: KeyDefine order, which is View::TranslateKey run over every KeyDefine key when no slot has a key of its own
+	std::vector<int> HeldSlots() const
+	{
+		std::vector<int> held;
+		for (int slot : slotOrder) {
+			if (slot < int(slotDown.size()) && slotDown[slot])
+				held.push_back(slot);
+		}
+		return held;
+	}
+
+	// the virtual key of each slot and where it falls in KeyDefine order; a slot bound to a key KeyDefine does not name sorts after all of them by its virtual key
+	void ReadSlots(const Mode &mode, const Settings &now)
+	{
+		const size_t count = mode.keyUse.size();
+		std::vector<std::pair<int, int>> order;
+		slotDown.assign(count, false);
+		for (size_t j = 0; j < count; ++j) {
+			const int custom = j < now.keys.size() ? now.keys[j] : 0;
+			int vk = 0, rank = -1;
+			if (custom > 0) {
+				vk = custom;
+				for (size_t i = 0; i < KeyDefine.size() && rank < 0; ++i) {
+					if (KeyDefine[i].vk == custom)
+						rank = int(i);
+				}
+				if (rank < 0)
+					rank = int(KeyDefine.size()) + custom;
+			} else if (mode.keyUse[j] >= 0) {
+				vk = KeyDefine[size_t(mode.keyUse[j])].vk;
+				rank = mode.keyUse[j];
+			}
+			if (vk == 0)
+				continue;
+			slotDown[j] = (GetAsyncKeyState(vk) & 0x8000) != 0;
+			order.emplace_back(rank, int(j));
+		}
+		std::stable_sort(order.begin(), order.end());
+		slotOrder.clear();
+		for (const auto &entry : order)
+			slotOrder.push_back(entry.second);
+	}
+
+	void Tick(float seconds)
+	{
+		const Settings now = Current();
+		// a mode name that matches nothing keeps the mode that was picked before, like VtuberDelegate::ChangeMode
+		for (size_t i = 0; i < modes.size(); ++i) {
+			if (modes[i]->name == now.mode)
+				current = i;
+		}
+		const bool showing = obs_source_showing(source) && !modes.empty();
+		input->SetActive(showing && now.relative);
+		if (!showing)
+			return;
+
+		for (size_t i = 0; i < KeyDefine.size(); ++i)
+			pressed[i] = (GetAsyncKeyState(KeyDefine[i].vk) & 0x8000) != 0;
+		// GetAsyncKeyState reads the physical buttons while the plugins mouse hook saw the logical ones
+		const bool physicalLeft = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0, physicalRight = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		const bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+		left = swapped ? physicalRight : physicalLeft;
+		right = swapped ? physicalLeft : physicalRight;
+
+		// Pal::GetDesktopResolution is the desktop window, the primary screen
+		RECT desktop;
+		GetWindowRect(GetDesktopWindow(), &desktop);
+		const float width = float(desktop.right), height = float(desktop.bottom);
+		int64_t dx, dy;
+		input->Take(dx, dy);
+		if (now.relative && !relativeBefore) {
+			mouseX = 0.5f;
+			mouseY = 0.5f;
+		}
+		relativeBefore = now.relative;
+		if (width > 0 && height > 0) {
+			if (now.relative) {
+				mouseX = std::clamp(mouseX + float(dx) / width, 0.0f, 1.0f);
+				mouseY = std::clamp(mouseY + float(dy) / height, 0.0f, 1.0f);
+			} else {
+				POINT cursor;
+				if (GetCursorPos(&cursor)) {
+					mouseX = float(cursor.x) / width;
+					mouseY = float(cursor.y) / height;
+				}
+			}
+		}
+
+		// View::ReanderMask: the first held face hotkey in KeyDefine order picks the face, and it stays picked
+		for (size_t i = 0; i < KeyDefine.size(); ++i) {
+			if (!pressed[i])
+				continue;
+			const auto it = std::find(faceKeys.begin(), faceKeys.end(), int(i));
+			if (it != faceKeys.end()) {
+				currentFace = size_t(it - faceKeys.begin());
+				break;
+			}
+		}
+
+		// Model::Update runs its clocks at delta * speed and only for the models that are drawn
+		Mode &mode = *modes[current];
+		ReadSlots(mode, now);
+		const double delta = double(seconds) * now.delay;
+		if (now.live2d && mode.hasModel && mode.cat)
+			mode.cat->animation.Tick(delta);
+		if (!now.live2d && mode.leftHands.empty() && mode.hasLeftHandModel && mode.leftModel)
+			mode.leftModel->animation.Tick(delta);
+		if (!now.live2d && mode.rightHands.empty() && mode.hasRightHandModel && mode.rightModel)
+			mode.rightModel->animation.Tick(delta);
+	}
+
+	void Draw(gs_eparam_t *image, gs_eparam_t *opacity, Image *picture)
+	{
+		if (!picture)
+			return;
+		gs_effect_set_texture(image, picture->texture);
+		gs_effect_set_float(opacity, 1.0f);
+		while (gs_effect_loop(effect, "Draw"))
+			gs_draw_sprite(picture->texture, 0, uint32_t(FrameWidth), uint32_t(FrameHeight));
+	}
+
+	void DrawModel(ModelSlot *slot, const Settings &now)
+	{
+		if (!slot)
+			return;
+		BongoMotionInput motion;
+		motion.mouseX = mouseX;
+		motion.mouseY = mouseY;
+		motion.left = left;
+		motion.right = right;
+		motion.breath = now.breath;
+		motion.eyeBlink = now.eyeBlink;
+		motion.track = now.track;
+		motion.horizontalFlip = now.horizontalFlip;
+		motion.verticalFlip = now.verticalFlip;
+		// View::UpdataViewData: scale 0.615 / 1.1 times the source scale, moved by x, y and by how much smaller the source is than the frame
+		BongoModel::Camera camera;
+		camera.scaleX = float(0.615 * now.scale);
+		camera.scaleY = float(1.1 * now.scale);
+		camera.offsetX = float(now.x - (FrameWidth - now.width) / FrameWidth);
+		camera.offsetY = float(now.y - (FrameHeight - now.height) / FrameHeight);
+		camera.width = FrameWidth;
+		camera.height = FrameHeight;
+		slot->model.Render(effect, slot->animation.Values(slot->model, slot->blinkIds, motion), camera);
+	}
+
+	QString Md5(Mode &mode, const QString &path)
+	{
+		auto it = mode.md5.find(path);
+		if (it != mode.md5.end())
+			return it.value();
+		QFile file(path);
+		QString sum;
+		if (file.open(QIODevice::ReadOnly) && file.size() <= 16 * 1024 * 1024)
+			sum = QString::fromLatin1(QCryptographicHash::hash(file.readAll(), QCryptographicHash::Md5).toHex());
+		mode.md5.insert(path, sum);
+		return sum;
+	}
+
+	// the mode's background, cat background and pressed keys read again from their files, with the label of the key given to each
+	// key that has one drawn over its blank face; a key given its own key, a key the labels do not know, and a picture that is not the
+	// one the faces were cut from (the Bango Cat folder was changed by hand) keep the picture as it is. Runs on the graphics thread.
+	void Relabel(Mode &mode, const QStringList &codes)
+	{
+		mode.labelled = codes;
+		const QJsonObject m = labels["modes"].toObject()[mode.name].toObject();
+		const QJsonObject style = labels["styles"].toObject()[m["style"].toString()].toObject();
+		const QJsonArray keySlots = m["slots"].toArray();
+		struct Change {
+			QJsonObject slot, form;
+			double f;
+		};
+		std::vector<std::pair<int, Change>> changes;
+		for (int i = 0; i < int(keySlots.size()) && i < int(codes.size()) && i < int(mode.keyFiles.size()); ++i) {
+			const QJsonObject slot = keySlots[i].toObject();
+			const QString &code = codes[i];
+			if (code.isEmpty() || code == slot["label"].toString() || !style.contains(code))
+				continue;
+			if (Md5(mode, mode.keyFiles[i]) != slot["pressed"].toObject()["md5"].toString())
+				continue;
+			Change change{slot, QJsonObject(), 1.0};
+			change.form = ChooseLabel(style[code].toObject(), slot, change.f);
+			changes.emplace_back(i, change);
+		}
+		auto picture = [&](const QString &name) { return QImage(QDir(labelsDir).filePath(name)); };
+		auto rebuild = [&](const QString &path, std::unique_ptr<Image> &target, bool rest, int only) {
+			if (path.isEmpty())
+				return;
+			QImage image(path);
+			if (image.isNull())
+				return;
+			// painted as straight alpha: a round trip through premultiplied would darken the nearly clear pixels at the keys' soft edges,
+			// and qt only converts the pixels a draw touches, all of them inside the keys
+			image = image.convertToFormat(QImage::Format_ARGB32);
+			const bool touched = std::any_of(changes.begin(), changes.end(), [&](const auto &change) { return only < 0 || change.first == only; });
+			if (touched) {
+				QPainter painter(&image);
+				// every blank face first, then the labels, so no face covers a label already drawn
+				for (const auto &[i, change] : changes) {
+					if (only >= 0 && i != only)
+						continue;
+					const QJsonObject side = change.slot[rest ? "rest" : "pressed"].toObject();
+					const QJsonArray at = side["at"].toArray();
+					if (!side["patch"].toString().isEmpty())
+						painter.drawImage(QPointF(at[0].toDouble(), at[1].toDouble()), picture(side["patch"].toString()));
+				}
+				for (const auto &[i, change] : changes) {
+					if (only >= 0 && i != only)
+						continue;
+					const QJsonObject side = change.slot[rest ? "rest" : "pressed"].toObject();
+					DrawLabel(painter, picture(change.form["file"].toString()), QColor(side["color"].toString()), change.slot, change.f);
+				}
+			}
+			auto rebuilt = std::make_unique<Image>();
+			rebuilt->texture = BongoTexture(std::move(image));
+			if (rebuilt->texture)
+				target = std::move(rebuilt);
+		};
+		const QJsonObject backgrounds = m["backgrounds"].toObject();
+		for (auto [path, target] : {std::pair<const QString *, std::unique_ptr<Image> *>{&mode.backFile, &mode.back},
+					    std::pair<const QString *, std::unique_ptr<Image> *>{&mode.catBackFile, &mode.catBack}}) {
+			const QString file = QFileInfo(*path).fileName();
+			const bool cut = backgrounds.contains(file) && backgrounds[file].toString() == Md5(mode, *path);
+			// a background the faces were not cut from is drawn as it is
+			const auto keep = changes;
+			if (!cut)
+				changes.clear();
+			rebuild(*path, *target, true, -1);
+			changes = keep;
+		}
+		for (int i = 0; i < int(mode.keyFiles.size()) && i < int(mode.keys.size()); ++i)
+			rebuild(mode.keyFiles[i], mode.keys[size_t(i)], false, i);
+	}
+
+	// View::Render with live2d as the source asks: background, held keys, the cat, the hands or hand models, the face, then the raised hands
+	void Render()
+	{
+		const Settings now = Current();
+		if (!effect || modes.empty() || now.width <= 0 || now.height <= 0)
+			return;
+		Mode &mode = *modes[current];
+		// the codes are those of the mode the settings name; a mode name that matched nothing keeps its own keys
+		const QStringList codes = mode.name == now.mode ? now.codes : QStringList();
+		if (mode.labelled != codes)
+			Relabel(mode, codes);
+		gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
+		gs_eparam_t *opacity = gs_effect_get_param_by_name(effect, "opacity");
+		gs_blend_state_push();
+		gs_enable_blending(true);
+		gs_blend_function_separate(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA, GS_BLEND_ONE, GS_BLEND_INVSRCALPHA);
+		// the source is the bottom left width x height of the frame
+		gs_matrix_push();
+		gs_matrix_translate3f(0.0f, float(now.height) - FrameHeight, 0.0f);
+
+		Draw(image, opacity, now.live2d && mode.hasModel ? mode.back.get() : mode.catBack.get());
+		const std::vector<int> held = HeldSlots();
+		for (int key : held)
+			Draw(image, opacity, mode.keys[size_t(key)].get());
+		if (now.live2d && mode.hasModel)
+			DrawModel(mode.cat.get(), now);
+
+		bool leftUp = true, rightUp = true;
+		if (!mode.leftHands.empty()) {
+			for (int key : held) {
+				if (key < int(mode.leftHands.size())) {
+					Draw(image, opacity, mode.leftHands[key].get());
+					leftUp = false;
+					break;
+				}
+			}
+		} else if (mode.hasLeftHandModel) {
+			if (!now.live2d)
+				DrawModel(mode.leftModel.get(), now);
+			leftUp = false;
+		} else if (now.live2d) {
+			leftUp = false;
+		}
+		if (!mode.rightHands.empty()) {
+			for (int slot : held) {
+				const int key = slot - int(mode.leftHands.size());
+				if (key >= 0 && key < int(mode.rightHands.size())) {
+					Draw(image, opacity, mode.rightHands[key].get());
+					rightUp = false;
+					break;
+				}
+			}
+		} else if (mode.hasRightHandModel) {
+			if (!now.live2d)
+				DrawModel(mode.rightModel.get(), now);
+			rightUp = false;
+		} else if (now.live2d) {
+			rightUp = false;
+		}
+		if (now.mask && currentFace < faces.size())
+			Draw(image, opacity, faces[currentFace].get());
+		if (leftUp)
+			Draw(image, opacity, mode.leftUp.get());
+		if (rightUp)
+			Draw(image, opacity, mode.rightUp.get());
+
+		gs_matrix_pop();
+		gs_blend_state_pop();
+	}
+
+};
+
+// the properties of VtuberGetProperties in its order; the mode list is the readable modes of the config, so it also works when obs asks without a source
+obs_properties_t *Properties()
+{
+	obs_properties_t *props = obs_properties_create();
+	obs_property_t *list = obs_properties_add_list(props, "mode", "Mode", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	const QString root = BangoCatFolder();
+	for (const QString &name : Strings(ReadJson(QDir(root).filePath(QStringLiteral("mode/config.json")))["ModelPath"])) {
+		if (ReadJson(QDir(root).filePath(QStringLiteral("mode/") + name + QStringLiteral("/config.json"))).isEmpty())
+			continue;
+		const QByteArray utf8 = name.toUtf8();
+		obs_property_list_add_string(list, utf8.constData(), utf8.constData());
+	}
+	obs_properties_add_bool(props, "relative_mouse", "Relative Mouse Movement");
+	obs_properties_add_bool(props, "mouse_horizontal_flip", "Mouse Horizontal Flip");
+	obs_properties_add_bool(props, "mouse_vertical_flip", "Mouse Vertical Flip");
+	obs_properties_add_bool(props, "mask", "Use Mask");
+	obs_properties_add_bool(props, "live2d", "Live2D");
+	obs_properties_add_float_slider(props, "delay", "Speed", 0.0, 10.0, 0.1);
+	// kept for the same settings, but no Bango Cat model ships motions, so it changes nothing in the plugin either
+	obs_properties_add_bool(props, "random_motion", "Random Motion");
+	obs_properties_add_bool(props, "breath", "Breath");
+	obs_properties_add_bool(props, "eyeblink", "Eye Blink");
+	obs_properties_add_bool(props, "track", "Mouse Tracking");
+	return props;
+}
+
+} // namespace
+
+void RegisterBongo()
+{
+	obs_source_info info{};
+	info.id = "replaykit-bongo";
+	info.type = OBS_SOURCE_TYPE_INPUT;
+	info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW;
+	info.get_name = [](void *) { return "Bongo Cat"; };
+	info.create = [](obs_data_t *settings, obs_source_t *source) -> void * { return new Bongo(settings, source); };
+	info.destroy = [](void *data) { delete static_cast<Bongo *>(data); };
+	info.update = [](void *data, obs_data_t *settings) { static_cast<Bongo *>(data)->ReadSettings(settings, "delay"); };
+	// Vtuber_defaults, including its capital Mode next to the lowercase mode it actually reads
+	info.get_defaults = [](obs_data_t *settings) {
+		obs_data_set_default_int(settings, "width", 1280);
+		obs_data_set_default_int(settings, "height", 768);
+		obs_data_set_default_double(settings, "x", 0);
+		obs_data_set_default_double(settings, "y", 0.02);
+		obs_data_set_default_double(settings, "scale", 1.83);
+		obs_data_set_default_double(settings, "delaytime", 1.0);
+		obs_data_set_default_bool(settings, "random_motion", true);
+		obs_data_set_default_bool(settings, "breath", true);
+		obs_data_set_default_bool(settings, "eyeblink", true);
+		obs_data_set_default_bool(settings, "track", true);
+		obs_data_set_default_string(settings, "Mode", "standard");
+		obs_data_set_default_bool(settings, "live2d", true);
+		obs_data_set_default_bool(settings, "relative_mouse", false);
+		obs_data_set_default_bool(settings, "mouse_horizontal_flip", true);
+		obs_data_set_default_bool(settings, "mouse_vertical_flip", true);
+		obs_data_set_default_bool(settings, "mask", false);
+	};
+	info.get_properties = [](void *) { return Properties(); };
+	info.get_width = [](void *data) {
+		const Settings now = static_cast<Bongo *>(data)->Current();
+		return uint32_t(std::max(0, now.width));
+	};
+	info.get_height = [](void *data) {
+		const Settings now = static_cast<Bongo *>(data)->Current();
+		return uint32_t(std::max(0, now.height));
+	};
+	info.video_tick = [](void *data, float seconds) { static_cast<Bongo *>(data)->Tick(seconds); };
+	info.video_render = [](void *data, gs_effect_t *) { static_cast<Bongo *>(data)->Render(); };
+	obs_register_source(&info);
+}
+
+} // namespace rk
