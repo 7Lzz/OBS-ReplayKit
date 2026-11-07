@@ -3025,6 +3025,8 @@
     function makeLaneRec(lane) {
       var rec = { el: el("div", "tl-lane"), canvas: el("canvas", "tl-wave"), from: 0, to: 0 };
       rec.el.dataset.lane = lane.id;
+      // one bar in the loading placeholder of the editor (_skeleton.html), as a lane reads
+      rec.el.setAttribute("data-skel", "");
       rec.el.appendChild(rec.canvas);
       return rec;
     }

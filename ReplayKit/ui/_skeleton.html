@@ -1,0 +1,263 @@
+<!-- shared partial (helper #include target: skeleton). the loading placeholder of a view, measured from the real layout of the page instead of drawn by hand, so a layout that changes takes its placeholder with it. RKSkeleton.measure(root) turns what shows under root into a map of blocks (every line of text, image, icon and control, and the panels under them), draw(layer, map) paints a map, cover(root, { view, stage }) / uncover(root) hold a part of the page under its placeholder while its first data loads, and save / load keep the map of a view for when it has nothing on screen to measure yet (the shell before a page loads, the editor before its markup is in) -->
+<style>
+  /* a wave that runs left to right across every block at once, slow and steady, which reads as a shorter wait than a pulse; each block moves its own highlight on the compositor by where the block sits (--x), so the blocks show one wave between them, and draw() sets its length and its phase from the clock, so the placeholders of the shell and of a page line up as one wave */
+  .rk-skel-layer, .rk-skel-wave { --rk-skel-band:360px; }
+  .rk-skel-layer { position:fixed; inset:0; z-index:30; pointer-events:none; animation:rk-skel-in 160ms var(--ease_smooth, ease) backwards; }
+  /* opacity and not visibility, since a card or a menu that sets its own visibility would show thru a hidden parent */
+  .rk-skel-hidden { opacity:0 !important; pointer-events:none !important; }
+  /* the blocks are one svg and not boxes: an svg counts as content to the browser and coloured boxes do not, and a page that has painted no content yet is held off the screen for about half a second after it loads (the shell page after a sleep), so a placeholder made of boxes never showed. only the wave over each block is a box */
+  .rk-skel-shapes { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+  .rk-skel-shapes .rk-skel-surface { fill:rgba(var(--text-rgb), .035); }
+  .rk-skel-shapes .rk-skel-block { fill:rgba(var(--text-rgb), .07); }
+  .rk-skel-bone { position:absolute; overflow:hidden; }
+  .rk-skel-bone::after {
+    content:""; position:absolute; top:0; bottom:0; left:0; width:var(--rk-skel-band);
+    background:linear-gradient(90deg, transparent, rgba(var(--text-rgb), .07) 50%, transparent);
+    animation:rk-skel-wave var(--rk-skel-wave-ms) linear var(--rk-skel-phase) infinite;
+  }
+  @keyframes rk-skel-in { from { opacity:0; } }
+  @keyframes rk-skel-wave {
+    from { transform:translateX(calc(0px - var(--rk-skel-band) - var(--x, 0px))); }
+    to { transform:translateX(calc(var(--rk-skel-span, 100vw) - var(--x, 0px))); }
+  }
+</style>
+<script>
+(function () {
+  "use strict";
+
+  // a page with more on screen than this still reads as itself, and the map stays small enough to keep
+  var MAX_BLOCKS = 400;
+  // a placeholder comes up only once a wait has gone past a tenth of a second, the point where a click no longer feels answered, and one that came up stays long enough to be seen and not flicker
+  var SHOW_DELAY_MS = 90;
+  var MIN_SHOWN_MS = 300;
+  var FADE_MS = 200;
+  var WAVE_MS = 1600;
+  // a control this small reads as one block whether or not its state gives it a ground right now, so a row of icon buttons stays even
+  var SMALL_CONTROL = 48;
+  var STORE = "rk-skeleton:";
+  // raised whenever what measure() turns a page into changes, so a shape kept by an older release is never drawn
+  var MAP_VERSION = 2;
+  var SURFACE = 1, BLOCK = 2, LINE = 3;
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var MEDIA = { img:1, video:1, canvas:1, svg:1, picture:1, iframe:1 };
+  var FIELDS = { input:1, select:1, textarea:1 };
+  // a slider or a box to tick is drawn by its parts and is often laid see-through over something else, so it counts as a control and not as a field
+  var SEE_THROUGH_INPUTS = { range:1, checkbox:1, radio:1 };
+  var CONTROLS = { button:1 };
+  var ROLES = { button:1, combobox:1, "switch":1, slider:1, checkbox:1, radio:1 };
+
+  function alpha(color) {
+    var m = /rgba?\(([^)]*)\)/.exec(color || "");
+    if (!m) return 0;
+    var parts = m[1].split(",");
+    return parts.length < 4 ? 1 : parseFloat(parts[3]) || 0;
+  }
+
+  function cut(r, clip) {
+    var left = Math.max(r.left, clip.left), top = Math.max(r.top, clip.top);
+    var right = Math.min(r.right, clip.right), bottom = Math.min(r.bottom, clip.bottom);
+    return right - left >= 2 && bottom - top >= 2 ? { left:left, top:top, right:right, bottom:bottom } : null;
+  }
+
+  // the blocks of what shows under root, in the coordinates of its window; panels with a colour of their own come before what sits on them
+  function measure(root) {
+    var doc = root.ownerDocument, win = doc.defaultView;
+    var blocks = [];
+    var map = { v:MAP_VERSION, w:win.innerWidth, h:win.innerHeight, bg:win.getComputedStyle(doc.body).backgroundColor, b:blocks };
+    // a part of the page that is laid out out of sight (the editor while it loads) is hidden itself, and what is in it is then measured as if it showed
+    var hiddenRoot = win.getComputedStyle(root).visibility === "hidden";
+    var range = doc.createRange();
+
+    function add(kind, rect, clip, radius, color) {
+      var c = cut(rect, clip);
+      if (!c || blocks.length >= MAX_BLOCKS) return;
+      var block = [kind, Math.round(c.left), Math.round(c.top), Math.round(c.right - c.left), Math.round(c.bottom - c.top), radius];
+      if (color) block.push(color);
+      // a panel that a block fills all of (the black ground of a video under its picture) would only darken it
+      var last = blocks[blocks.length - 1];
+      if (kind === BLOCK && last && last[0] === SURFACE && Math.abs(last[1] - block[1]) <= 1 && Math.abs(last[2] - block[2]) <= 1 && Math.abs(last[3] - block[3]) <= 1 && Math.abs(last[4] - block[4]) <= 1) blocks.pop();
+      blocks.push(block);
+    }
+
+    function lines(node, clip) {
+      range.selectNodeContents(node);
+      var rects = range.getClientRects();
+      for (var i = 0; i < rects.length; i++) {
+        var r = rects[i];
+        var h = Math.max(6, Math.round(r.height * .62));
+        var top = r.top + (r.height - h) / 2;
+        add(LINE, { left:r.left, top:top, right:r.right, bottom:top + h }, clip, 4);
+      }
+    }
+
+    function walk(el, clip) {
+      if (blocks.length >= MAX_BLOCKS || el.getAttribute("data-skel") === "skip") return;
+      var cs = win.getComputedStyle(el);
+      if (cs.display === "none" || (el !== root && parseFloat(cs.opacity) === 0)) return;
+      if (cs.visibility === "hidden" && !hiddenRoot) return;
+      if (el.localName === "input" && el.type === "hidden") return;
+      var rect = el.getBoundingClientRect();
+      var clips = cs.overflowX !== "visible" || cs.overflowY !== "visible";
+      if ((!rect.width || !rect.height) && clips) return;
+      var radius = Math.round(parseFloat(cs.borderTopLeftRadius) || 0);
+      var tag = el.localName;
+      // a hover or a selected wash is a state, not a box of its own
+      var solid = alpha(cs.backgroundColor) >= .5;
+      var framed = solid || (parseFloat(cs.borderTopWidth) > 0 && alpha(cs.borderTopColor) >= .5);
+      var field = FIELDS[tag] && !(tag === "input" && SEE_THROUGH_INPUTS[el.type]);
+      var control = CONTROLS[tag] || ROLES[el.getAttribute("role")] || (tag === "input" && SEE_THROUGH_INPUTS[el.type]);
+      var small = rect.width <= SMALL_CONTROL && rect.height <= SMALL_CONTROL;
+      // a control that draws a box of its own, or a small one, is one block; a bigger one that is only an icon and a label, like a tab of a sidebar, shows those
+      var whole = el.hasAttribute("data-skel") || MEDIA[tag] || field || cs.backgroundImage.indexOf("url(") >= 0 || (control && (framed || small));
+      if (whole) {
+        if (el !== root) add(BLOCK, rect, clip, Math.min(Math.max(radius, 3), Math.round(rect.height / 2)));
+        return;
+      }
+      // a dot, a thin line or a chip (a badge, a tag) with a colour of its own is a part of what shows and not a panel under it
+      if (el !== root && solid) {
+        if (rect.width < 8 || rect.height < 8 || small) { add(BLOCK, rect, clip, Math.min(Math.max(radius, 3), Math.round(rect.height / 2))); return; }
+        add(SURFACE, rect, clip, radius, cs.backgroundColor);
+      }
+      var inner = clips ? cut(rect, clip) : clip;
+      if (!inner) return;
+      for (var n = el.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 1) walk(n, inner);
+        else if (n.nodeType === 3 && /\S/.test(n.nodeValue)) lines(n, inner);
+      }
+    }
+
+    var view = { left:0, top:0, right:win.innerWidth, bottom:win.innerHeight };
+    var start = cut(root.getBoundingClientRect(), view);
+    if (start) walk(root, start);
+    return map;
+  }
+
+  // paints a map into layer, which sits at the top left of its window; a window that got wider or narrower since the map was taken stretches it sideways, and clip, when given, keeps it to that part of the window. false when there was nothing to paint
+  function draw(layer, map, clip) {
+    layer.textContent = "";
+    if (!map || !Array.isArray(map.b) || !map.b.length || !(map.w > 0) || !(map.h > 0)) return false;
+    var doc = layer.ownerDocument, win = doc.defaultView;
+    var sx = win.innerWidth / map.w;
+    var area = clip || { left:0, top:0, right:win.innerWidth, bottom:win.innerHeight };
+    // the panels keep their own colour while the theme is the one they were measured in
+    var sameTheme = map.bg === win.getComputedStyle(doc.body).backgroundColor;
+    layer.classList.add("rk-skel-wave");
+    layer.style.setProperty("--rk-skel-span", win.innerWidth + "px");
+    layer.style.setProperty("--rk-skel-wave-ms", WAVE_MS + "ms");
+    layer.style.setProperty("--rk-skel-phase", -(Date.now() % WAVE_MS) + "ms");
+    var svg = doc.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "rk-skel-shapes");
+    svg.setAttribute("width", win.innerWidth);
+    svg.setAttribute("height", win.innerHeight);
+    svg.setAttribute("aria-hidden", "true");
+    var waves = doc.createDocumentFragment();
+    map.b.forEach(function (b) {
+      if (!Array.isArray(b) || b.length < 6) return;
+      var at = cut({ left:b[1] * sx, top:b[2], right:(b[1] + b[3]) * sx, bottom:b[2] + b[4] }, area);
+      if (!at) return;
+      var left = Math.round(at.left), top = Math.round(at.top);
+      var width = Math.round(at.right - at.left), height = Math.round(at.bottom - at.top), radius = Math.round(b[5]);
+      var rect = doc.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("class", b[0] === SURFACE ? "rk-skel-surface" : "rk-skel-block");
+      rect.setAttribute("x", left);
+      rect.setAttribute("y", top);
+      rect.setAttribute("width", width);
+      rect.setAttribute("height", height);
+      rect.setAttribute("rx", radius);
+      if (b[0] === SURFACE && sameTheme && typeof b[6] === "string") rect.style.fill = b[6];
+      svg.appendChild(rect);
+      if (b[0] === SURFACE) return;
+      var wave = doc.createElement("div");
+      wave.className = "rk-skel-bone";
+      wave.style.left = left + "px";
+      wave.style.top = top + "px";
+      wave.style.width = width + "px";
+      wave.style.height = height + "px";
+      wave.style.borderRadius = radius + "px";
+      wave.style.setProperty("--x", left + "px");
+      waves.appendChild(wave);
+    });
+    layer.appendChild(svg);
+    layer.appendChild(waves);
+    return true;
+  }
+
+  var covers = [];
+  function coverOf(root) {
+    for (var i = 0; i < covers.length; i++) if (covers[i].root === root) return covers[i];
+    return null;
+  }
+  // the key the shape of a view of the obs window is kept under: the shell keeps it, and the page of that view takes it over from the shell
+  function viewKey(name) { return "view:" + name; }
+
+  // what goes over root: inside the obs window the shape the shell keeps for this view when it was taken at this very size, so the placeholder does not move when the page takes over from the shell; otherwise root measured with the stand-ins of stage, which puts content that is not there yet into the page and returns how to take it out again (measured and gone before anything else on the page runs)
+  function drawCover(c) {
+    var win = c.root.ownerDocument.defaultView;
+    var kept = c.embedded && c.view ? load(viewKey(c.view)) : null;
+    if (kept && kept.w === win.innerWidth && kept.h === win.innerHeight) {
+      var r = c.root.getBoundingClientRect();
+      draw(c.layer, kept, { left:r.left, top:r.top, right:r.right, bottom:r.bottom });
+      return;
+    }
+    var undo = c.stage ? c.stage() : null;
+    try { draw(c.layer, measure(c.root)); }
+    finally { if (typeof undo === "function") undo(); }
+  }
+
+  // the part of the page under root stays laid out but out of sight, with its placeholder over it. inside the obs window the shell has already shown the placeholder of the view while the page loaded, so this one takes over at once; in a window of its own it waits SHOW_DELAY_MS, so data that is quick never shows it. options: view (the view of the obs window the page is) and stage
+  function cover(root, options) {
+    if (!root || coverOf(root)) return;
+    var doc = root.ownerDocument;
+    var c = { root:root, view:options && options.view, stage:options && options.stage, layer:doc.createElement("div") };
+    c.embedded = doc.documentElement.classList.contains("rk-embedded");
+    c.delay = c.embedded ? 0 : SHOW_DELAY_MS;
+    c.layer.className = "rk-skel-layer";
+    if (c.delay) c.layer.style.animationDelay = c.delay + "ms";
+    else c.layer.style.animation = "none";
+    c.layer.setAttribute("data-skel", "skip");
+    c.layer.setAttribute("aria-hidden", "true");
+    drawCover(c);
+    root.classList.add("rk-skel-hidden");
+    root.setAttribute("aria-busy", "true");
+    doc.body.appendChild(c.layer);
+    c.at = performance.now();
+    covers.push(c);
+  }
+
+  // the page comes back: at once when its placeholder never came up, otherwise after the placeholder has been up for MIN_SHOWN_MS, with the page fading in as the placeholder fades out over it
+  function uncover(root) {
+    var c = coverOf(root);
+    if (!c) return;
+    covers.splice(covers.indexOf(c), 1);
+    var shownAt = c.at + c.delay;
+    var now = performance.now();
+    if (now < shownAt || !c.layer.animate) { reveal(c, false); return; }
+    setTimeout(function () { reveal(c, true); }, Math.max(0, shownAt + MIN_SHOWN_MS - now));
+  }
+
+  function reveal(c, fade) {
+    c.root.classList.remove("rk-skel-hidden");
+    c.root.removeAttribute("aria-busy");
+    if (!fade) { c.layer.remove(); return; }
+    c.root.animate([{ opacity:0 }, { opacity:1 }], { duration:FADE_MS, easing:"ease" });
+    c.layer.animate([{ opacity:1 }, { opacity:0 }], { duration:FADE_MS, easing:"ease", fill:"forwards" }).onfinish = function () { c.layer.remove(); };
+  }
+
+  window.addEventListener("resize", function () {
+    covers.forEach(drawCover);
+  });
+
+  function save(key, map) {
+    if (!map || !map.b || !map.b.length) return;
+    try { localStorage.setItem(STORE + key, JSON.stringify(map)); } catch (_) {}
+  }
+  function load(key) {
+    try {
+      var map = JSON.parse(localStorage.getItem(STORE + key) || "null");
+      return map && map.v === MAP_VERSION && Array.isArray(map.b) ? map : null;
+    } catch (_) { return null; }
+  }
+
+  window.RKSkeleton = { measure:measure, draw:draw, cover:cover, uncover:uncover, save:save, load:load, viewKey:viewKey, MIN_SHOWN_MS:MIN_SHOWN_MS };
+})();
+</script>

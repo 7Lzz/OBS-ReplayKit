@@ -5,7 +5,7 @@
   .ovp-screen {
     position:relative; width:100%; aspect-ratio:16 / 9; overflow:hidden;
     border-radius:4px; background:var(--window); border:1px solid var(--line);
-    /* js sets background-image to the once-per-session desktop grab from /desktop-preview.jpg; var(--window) stays as the colour behind it while it loads or if it fails */
+    /* js sets background-image to the desktop grab from /desktop-preview.jpg, taken again every second while shown; var(--window) stays as the colour behind it while it loads or if it fails */
     background-size:cover; background-position:center; background-repeat:no-repeat;
   }
   .ovp-off {
@@ -85,17 +85,22 @@
   // the size slider range, which is all the helper accepts for overlayScale
   var SCALE_MIN = window.RK_SETTING_LIMITS.overlayScale.min, SCALE_MAX = window.RK_SETTING_LIMITS.overlayScale.max;
 
-  // one desktop grab painted behind the fake screen so the overlay is positioned against the users real screen. the token is fixed per page load, so a fresh settings/setup open refetches but refresh()/start() do not -- the helper serves it no-store and captures just once per obs session anyway. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a failure clears the flag so a later start() retries.
-  var BACKDROP_TOKEN = Date.now();
-  var backdropSet = false;
-  function ensureBackdrop() {
-    if (backdropSet) return;
-    backdropSet = true;
-    var url = HELPER + "/desktop-preview.jpg?rk=" + BACKDROP_TOKEN;
+  // a desktop grab painted behind the fake screen so the overlay is positioned against the users real screen, taken again every second while the section is on screen so it follows what is there now. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a grab that fails leaves the last one up
+  var BACKDROP_MS = 1000;
+  var backdropTimer = 0, backdropLoading = false;
+  function loadBackdrop() {
+    if (backdropLoading) return;
+    backdropLoading = true;
+    var url = HELPER + "/desktop-preview.jpg?rk=" + Date.now();
     var img = new Image();
-    img.onload = function () { screenEl.style.backgroundImage = "url('" + url + "')"; };
-    img.onerror = function () { backdropSet = false; };
+    img.onload = function () { backdropLoading = false; screenEl.style.backgroundImage = "url('" + url + "')"; };
+    img.onerror = function () { backdropLoading = false; };
     img.src = url;
+  }
+  function pollBackdrop(run) {
+    if (!running || run !== posRun) return;
+    if (document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) loadBackdrop();
+    backdropTimer = setTimeout(function () { pollBackdrop(run); }, BACKDROP_MS);
   }
   // the overlays top-left as canvas fractions -- null means "use the corner the helper transforms compute". seeded from obs, updated by dragging. posDirty means the user has dragged since the last apply, so the obs poll must not snap their edit back.
   var posOverride = null, stageRect = null, posTimer = 0, posRun = 0, posDirty = false;
@@ -677,7 +682,7 @@
       if (typeof onMoveFn === "function") onMove = onMoveFn;
       if (typeof onScaleFn === "function") onScale = onScaleFn;
       if (typeof onRotateFn === "function") onRotate = onRotateFn;
-      ensureBackdrop();
+      loadBackdrop();
     },
     // host calls this once the drag has been saved, so the poll can resume following the scene item
     positionApplied: function () { posDirty = false; },
@@ -708,7 +713,8 @@
       running = true;
       var run = ++posRun;
       wire();
-      ensureBackdrop();
+      clearTimeout(backdropTimer);
+      pollBackdrop(run);
       var s = getStyle() || {};
       setMode(s.overlayStyle || "input_overlay");
       applyMode();
@@ -720,6 +726,7 @@
       running = false;
       posRun++;
       clearTimeout(posTimer); posTimer = 0;
+      clearTimeout(backdropTimer); backdropTimer = 0;
       if (window.RKBongo) window.RKBongo.stop();
     },
     refresh: function () {

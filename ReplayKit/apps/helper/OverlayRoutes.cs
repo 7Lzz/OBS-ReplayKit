@@ -28,7 +28,7 @@ namespace ReplayKitHelper
             string Q(string key, string def = "") => r.Q(key, def);
 
 
-            // primary-desktop jpeg for the overlay-preview backdrop; one capture per obs session (see GetDesktopPreviewJpeg), served no-store, and the dock cache-busts per page load so cef never shows a stale one.
+            // primary-desktop jpeg for the overlay-preview backdrop; a grab is shared for a moment (see GetDesktopPreviewJpeg), served no-store, and the page cache-busts each fetch so cef never shows a stale one.
             if (path == "/desktop-preview.jpg")
             {
                 byte[] jpeg = null;

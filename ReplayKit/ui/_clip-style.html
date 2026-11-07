@@ -2302,7 +2302,11 @@
   }
   /* stands in for the edit menu itself (a separate veil/modal, not an overlay on top of it) until the clips real duration is known and the trim bar/handles are set up from it -- the real editor only ever pops up once, already correct, instead of popping up early showing stale slider positions and an unloaded video. */
   #trim-processing-veil { background: var(--grey7); }
+  /* the shape of the editor while it loads (drawEditorSkeleton in clip-app.js); the wave over its blocks already says it is working, so the spinner goes */
+  .trim-processing-bones { position: absolute; inset: 0; }
+  #trim-processing-veil.has-bones .trim-processing-spinner { display: none; }
   .trim-processing-modal {
+    position: relative;
     background: transparent;
     border: 0;
     box-shadow: none;

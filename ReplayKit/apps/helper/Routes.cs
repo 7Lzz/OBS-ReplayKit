@@ -513,17 +513,18 @@ namespace ReplayKitHelper
             return obj;
         }
 
-        // primary-desktop jpeg for the overlay-preview backdrop (setup wizard + settings overlay page); captured the first time it is requested then held for the life of this process, which is the life of this obs session, so the backdrop is one stable shot of the users screen and not a per-frame capture. never written to disk -- a new obs session is a new process and captures fresh, and the response is no-store so cef cannot replay last sessions image.
+        // primary-desktop jpeg for the overlay-preview backdrop (setup wizard + settings overlay page), which asks for a fresh one every second while it is on screen; a grab is shared for a little less than that, so pages that ask in the same moment get one capture between them. never written to disk, and the response is no-store so cef cannot replay an old image.
         internal static byte[] _desktopPreviewJpeg;
+        internal static readonly System.Diagnostics.Stopwatch _desktopPreviewAge = new System.Diagnostics.Stopwatch();
+        internal const int DesktopPreviewMaxAgeMs = 800;
         internal static readonly object _desktopPreviewGate = new object();
 
         // capture + cache the primary screen as a downscaled jpeg; returns null when there is no usable screen, and a near-black grab (secure desktop up) is returned but not cached so the next call retries.
         internal static byte[] GetDesktopPreviewJpeg()
         {
-            if (_desktopPreviewJpeg != null) return _desktopPreviewJpeg;
             lock (_desktopPreviewGate)
             {
-                if (_desktopPreviewJpeg != null) return _desktopPreviewJpeg;
+                if (_desktopPreviewJpeg != null && _desktopPreviewAge.ElapsedMilliseconds < DesktopPreviewMaxAgeMs) return _desktopPreviewJpeg;
                 var bounds = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? System.Drawing.Rectangle.Empty;
                 if (bounds.Width <= 0 || bounds.Height <= 0) return null;
                 const int targetW = 1280;
@@ -535,7 +536,11 @@ namespace ReplayKitHelper
                     using (var g = System.Drawing.Graphics.FromImage(full))
                         g.CopyFromScreen(bounds.Location, System.Drawing.Point.Empty, bounds.Size);
                     byte[] jpeg = EncodeScaledJpeg(full, outW, outH);
-                    if (!IsNearlyBlack(full)) _desktopPreviewJpeg = jpeg;
+                    if (!IsNearlyBlack(full))
+                    {
+                        _desktopPreviewJpeg = jpeg;
+                        _desktopPreviewAge.Restart();
+                    }
                     return jpeg;
                 }
             }

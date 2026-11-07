@@ -18,8 +18,6 @@ namespace ReplayKitSetup
         private const string ClassName = "ReplayKitUninstallWindow";
         private const uint WM_APP_DRAIN = 0x8000 + 1;
 
-        private static readonly uint ColBg = (uint)(0x1D | (0x1F << 8) | (0x26 << 16));
-
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33; // 2 = win11 rounded corners
@@ -36,6 +34,7 @@ namespace ReplayKitSetup
         private IntPtr _hwnd;
         private IntPtr _brushBg;
         private double _scale = 1.0;
+        private WindowTheme _theme;
 
         private CoreWebView2Controller _controller;
         private CoreWebView2 _web;
@@ -58,8 +57,9 @@ namespace ReplayKitSetup
         public int RunModal()
         {
             _scale = SafeDpiScale();
-            _html = LoadHtml();
-            _brushBg = Native.CreateSolidBrush(ColBg);
+            _theme = WindowTheme.Load();
+            _html = _theme.ApplyTo(LoadHtml());
+            _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
 
             _wndProcRef = WndProc;
             IntPtr hInst = Native.GetModuleHandleW(null);
@@ -110,7 +110,7 @@ namespace ReplayKitSetup
                 _controller = await env.CreateCoreWebView2ControllerAsync(_hwnd);
                 _web = _controller.CoreWebView2;
 
-                _controller.DefaultBackgroundColor = Color.FromArgb(0x1D, 0x1F, 0x26);
+                _controller.DefaultBackgroundColor = _theme.Window;
                 LayoutController();
 
                 var s = _web.Settings;

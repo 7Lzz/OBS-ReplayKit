@@ -262,7 +262,7 @@ namespace ReplayKitHelper
             t.Warning = StepColor(t.Warning, t.Offsets, "warning");
         }
 
-        // the :root override the helper splices into every dock page before </head>. covers both var-naming schemes in use across the dock html (settings.html vs clips/controls.html).
+        // the :root override the helper splices into every dock page before </head>. covers both var-naming schemes in use across the dock html (settings.html vs clips/controls.html). the setup windows read --window-solid, --panel-solid, --line, --text and color-scheme back out of it for their frame (apps/setup/WindowTheme.cs).
         public static string DockCss(Tokens t)
         {
             string grey8 = Shift(t.Bg, t.Dark ? -0.28 : -0.06);
@@ -332,6 +332,8 @@ namespace ReplayKitHelper
             sb.Append("--white5:").Append(t.Muted).Append(';');
             sb.Append("--bg_window:").Append(bgPaint).Append(';');
             sb.Append("--bg_card:").Append(grey5).Append(';');
+            // the footer bar of the update and setup windows
+            sb.Append("--card:").Append(grey5).Append(';');
             sb.Append("--bg_dock:").Append(panelPaint).Append(';');
             sb.Append("--text_muted:").Append(t.Muted).Append(';');
             sb.Append("--button_bg:").Append(fieldPaint).Append(';');
@@ -371,7 +373,7 @@ namespace ReplayKitHelper
                 if (string.IsNullOrEmpty(dockDir) || !Directory.Exists(dockDir)) return;
                 string id = settings?["theme"]?.Value<string>() ?? "default";
                 string css = id == "default" ? "/* default theme -- dock uses its own :root */\n" : DockCss(Resolve(settings)) + "\n";
-                File.WriteAllText(Path.Combine(dockDir, "rk-theme.css"), css, new UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(dockDir, ReplayKitShared.ThemeSheet.FileName), css, new UTF8Encoding(false));
             }
             catch (Exception ex) { Log.Write("Themes.WriteDockThemeCss: " + ex.Message); }
         }

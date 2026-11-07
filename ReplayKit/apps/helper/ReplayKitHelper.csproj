@@ -55,6 +55,7 @@
     <Compile Include="..\..\shared\SettingDefaults.cs" Link="SettingDefaults.cs" />
     <Compile Include="..\..\shared\SettingLimits.cs" Link="SettingLimits.cs" />
     <Compile Include="..\..\shared\InputOverlayLayout.cs" Link="InputOverlayLayout.cs" />
+    <Compile Include="..\..\shared\ThemeSheet.cs" Link="ThemeSheet.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

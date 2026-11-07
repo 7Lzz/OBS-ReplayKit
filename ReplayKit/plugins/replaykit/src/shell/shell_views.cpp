@@ -152,6 +152,18 @@ const char *ShellViewName(ShellView view)
 	}
 }
 
+// the page view a fresh shell page starts on: the one that is wanted, or home under a native view
+ShellView ShellBootView()
+{
+	return ShellIsPageView(g_shellView) ? g_shellView : ShellView::Home;
+}
+
+// the shell page is told in its address which view to start on, so a page that loads (at the start, after sleep, after a reload) paints the placeholder of that view at once instead of coming up on home and being switched over; its pages share one thread with it, and a page that started loading first keeps that placeholder from being painted
+std::string ShellPageUrl()
+{
+	return HelperUrl((std::string(kShellPagePath) + "?view=" + ShellViewName(ShellBootView())).c_str());
+}
+
 // the window goes to the tray when the tray icon is there and to the taskbar when it is not. the position is saved first because obs writes its own copy only on exit, which a hide to the tray never reaches, and the menus that hang off the window go with it
 void ShellHideMainWindowToTray()
 {
@@ -275,7 +287,7 @@ void ShellLoadHostWhenHelperUp()
 		else if (waitedMs > 1000)
 			blog(LOG_INFO, "[replaykit] the shell page waited %d ms for the helper", waitedMs);
 		g_hostVisibleTimer.restart();
-		g_shellHost->browser->setURL(HelperUrl(kShellPagePath));
+		g_shellHost->browser->setURL(ShellPageUrl());
 	});
 }
 
@@ -313,7 +325,7 @@ void ShellCreateHost(QMainWindow *mw)
 	QVBoxLayout *layout = new QVBoxLayout(page);
 	layout->setContentsMargins(0, 0, 0, 0);
 	// nullptr cookie manager shares the same cef storage as every other obs-browser page, so the streamable session and favorites are the same ones the popup windows used
-	QCefWidget *browser = g_cef->create_widget(page, HelperUrl(kShellPagePath), nullptr);
+	QCefWidget *browser = g_cef->create_widget(page, ShellPageUrl(), nullptr);
 	layout->addWidget(browser);
 	page->browser = browser;
 	ShellSleepWatch(page, browser);
@@ -327,7 +339,7 @@ void ShellCreateHost(QMainWindow *mw)
 			ShellSetEditor(ShellView::Clips, title.endsWith(QLatin1String(":editor")));
 	});
 	g_shellHost = page;
-	g_hostRequested = ShellView::Home;
+	g_hostRequested = ShellBootView();
 	g_hostLoadRetries = 0;
 	ShellLayoutViews();
 	page->show();
@@ -447,7 +459,7 @@ void ShellRestartHost(bool fromSleep)
 	g_hostReady = false;
 	g_hostOnTop = false;
 	g_hostShown = ShellView::Home;
-	g_hostRequested = ShellView::Home;
+	g_hostRequested = ShellBootView();
 	g_hostPingMisses = 0;
 	++g_hostWaitGen;
 	g_hostVisibleTimer.restart();
@@ -457,7 +469,7 @@ void ShellRestartHost(bool fromSleep)
 	} else {
 		g_hostAwaitingHelper = false;
 		++g_hostLoadGen;
-		g_shellHost->browser->reloadPage();
+		g_shellHost->browser->setURL(ShellPageUrl());
 	}
 	if (ShellIsPageView(g_shellView))
 		ShellSurfacePage();

@@ -721,6 +721,7 @@
 <!--#include combo-->
 <!--#include slider-->
 <!--#include window-state-->
+<!--#include skeleton-->
 <style id="settings-layout">
   .shell { grid-template-columns:222px minmax(0,1fr); padding:10px 10px 0; }
   .sidebar { min-height:0; overflow-y:auto; margin-bottom:10px; border-radius:8px; }
@@ -6061,7 +6062,10 @@
     if (document.getElementById("page-" + name)) activatePage(name);
   };
 
-  loadSettings();
+  // the first load holds the pages under a placeholder measured from their own rows, so no control shows a value before the real one is in
+  const settingsMain = document.querySelector("main.main");
+  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings" });
+  loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsMain); });
   setInterval(refreshExternalSettings, 2000);
 
   // hidden-not-destroyed window: a reopen just re-shows this page, so re-fetch settings and drop any uncommitted edits to behave like a fresh open. mirrors clips.htmls re-show reset (visibilitychange, plus a focus fallback for CEF hosts that dont deliver visibilitychange on their own hide()/show()).

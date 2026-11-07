@@ -2997,6 +2997,8 @@ const CLIP_HOVER_PROFILES = {
     badge.textContent = ready ? String(codec).toUpperCase() : "";
   }
 
+  // the parts of the card below without what is in them, for the loading placeholder (stageGhostCards), so it takes the size the card css gives a real one
+  const GHOST_CARD = '<div class="card"><div class="preview" data-skel></div><div class="body"><div class="title-row"><span class="name">A clip that is loading</span><span class="icon-mini-btn edit-btn"></span></div><div class="meta"><span class="size">00.0 MB</span><span class="dot"></span><span class="age">2 days ago</span></div></div><div class="actions"><span class="action-link-btn">Create Link</span></div></div>';
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card rk-hover-card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
@@ -5108,6 +5110,63 @@ const CLIP_HOVER_PROFILES = {
     if (homeSettled()) resolveFirstRender();
   }
 
+  // until the first list is in, the clip area is held under a placeholder measured from stand-in cards (GHOST_CARD), so it has the shape the cards will have; the stand-ins are taken out again before anything else runs, since every list of this page reads .card
+  const GHOST_CLIP = { name: "The latest clip is loading.mp4", mtime: 0, size: 0, duration: 60, width: 1920, height: 1080, fps: 60 };
+  let clipsLoading = false;
+
+  function stageGhostCards() {
+    const added = [];
+    const put = (parent, html) => {
+      const holder = document.createElement("template");
+      holder.innerHTML = html;
+      added.push(...holder.content.children);
+      parent.appendChild(holder.content);
+    };
+    const emptyDisplay = emptyEl.style.display;
+    emptyEl.style.display = "none";
+    let undoHome = () => {};
+    if (HOME_MODE) {
+      const shelvesShown = homeShelvesEl.classList.contains("is-shown");
+      const infoHtml = homeHeroInfoEl.innerHTML;
+      const columns = homeColumns();
+      homeShelvesEl.classList.add("is-shown");
+      put(homeHeroEl, GHOST_CARD);
+      homeHeroInfoEl.innerHTML = homeHeroInfoHtml(GHOST_CLIP);
+      homeRecentEl.style.setProperty("--home-cols", String(columns));
+      put(homeRecentEl, GHOST_CARD.repeat(columns));
+      undoHome = () => {
+        homeShelvesEl.classList.toggle("is-shown", shelvesShown);
+        homeHeroInfoEl.innerHTML = infoHtml;
+      };
+    } else {
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      scrollAreaEl.appendChild(grid);
+      added.push(grid);
+      put(grid, GHOST_CARD);
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+      const rows = Math.ceil(scrollAreaEl.clientHeight / Math.max(1, grid.firstElementChild.offsetHeight + GRID_GAP));
+      put(grid, GHOST_CARD.repeat(Math.max(0, columns * rows - 1)));
+    }
+    return () => {
+      added.forEach((node) => node.remove());
+      undoHome();
+      emptyEl.style.display = emptyDisplay;
+    };
+  }
+
+  function startClipsLoading() {
+    if (!window.RKSkeleton) return;
+    clipsLoading = true;
+    RKSkeleton.cover(scrollAreaEl, { view: HOME_MODE ? "home" : "clips", stage: stageGhostCards });
+  }
+
+  function endClipsLoading() {
+    if (!clipsLoading) return;
+    clipsLoading = false;
+    RKSkeleton.uncover(scrollAreaEl);
+  }
+
   // see all on a shelf: the clips view comes up, on its favorites tab when it was the shelf of the favorites; the tab is handed over thru storage, which the clips view reads when it shows
   function openClipsFromHome(filter, reveal) {
     try { if (filter === "favorites" || reveal) localStorage.setItem(OPEN_FILTER_KEY, JSON.stringify({ filter, reveal: reveal || "", at: Date.now() })); } catch {}
@@ -5222,12 +5281,15 @@ const CLIP_HOVER_PROFILES = {
         showToast("Upload failed: " + uploadError);
         scheduleToastHide(TOAST_ERROR_MS);
       }
+      // the placeholder goes with the first list and with nothing before it: the drafts, the clip state and the favorites draw the list again as they come in, and an empty list drawn by them is not the library being empty
+      endClipsLoading();
       if (isFullscreenOrHostTransition()) {
         deferVirtualRenderUntilFullscreenSettles(true);
         return;
       }
       renderLoadedClips(clips);
     } catch (e) {
+      endClipsLoading();
       setClipSortLoading(false);
       updateClipSortControl();
       gridEl.style.display = "none";
@@ -6617,9 +6679,32 @@ const CLIP_HOVER_PROFILES = {
     }
   }
 
+  // the editor loads behind a placeholder in its own shape: the one kept from the last time it showed, or the first time the one measured from its markup while that is laid out out of sight
+  const trimProcessingBonesEl = document.getElementById("trim-processing-bones");
+  function drawEditorSkeleton(liveRoot) {
+    if (!window.RKSkeleton) return;
+    const map = RKSkeleton.load("editor") || (liveRoot ? RKSkeleton.measure(liveRoot) : null);
+    trimProcessingVeil.classList.toggle("has-bones", RKSkeleton.draw(trimProcessingBonesEl, map));
+  }
+  let editorShapeTimer = 0;
+  function rememberEditorShape() {
+    clearTimeout(editorShapeTimer);
+    if (!window.RKSkeleton || !trimVeil.classList.contains("is-open")) return;
+    editorShapeTimer = setTimeout(() => {
+      if (!trimVeil.classList.contains("is-open") || trimVeil.querySelector(".modal-veil.is-open") || saveVeil.classList.contains("is-open") || document.fullscreenElement) return;
+      RKSkeleton.save("editor", RKSkeleton.measure(trimVeil));
+    }, 1500);
+  }
+  new MutationObserver(rememberEditorShape).observe(trimVeil, { attributes:true, attributeFilter:["class"] });
+  // with no kept shape yet the editor is measured while it loads, and its parts are made as it goes (the video takes its size from the clip, the tool rail comes in after that), so it is measured again at every step the loading screen names
+  new MutationObserver(() => {
+    if (trimProcessingVeil.classList.contains("is-open") && editorApi() && window.RKSkeleton && !RKSkeleton.load("editor")) drawEditorSkeleton(trimVeil);
+  }).observe(document.getElementById("trim-processing-stage"), { childList:true, characterData:true, subtree:true });
+
   async function openEditor(clip) {
     const request = ++editorRequest;
     trimProcessingVeil.classList.add("is-open");
+    drawEditorSkeleton(null);
     document.getElementById("trim-processing-stage").textContent = "Preparing the editor";
     try {
       await protectEditorSources([clip.name]);
@@ -6629,6 +6714,7 @@ const CLIP_HOVER_PROFILES = {
       const blocked = clipBusyWith(clip.name);
       if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(blocked, "bad", "Editor"); return; }
       editorApi().open(clip);
+      if (!trimProcessingVeil.classList.contains("has-bones")) drawEditorSkeleton(trimVeil);
     } catch (err) {
       if (request !== editorRequest) return;
       trimProcessingVeil.classList.remove("is-open");
@@ -6839,4 +6925,5 @@ const CLIP_HOVER_PROFILES = {
     }
     arrange();
   }
+  startClipsLoading();
   poll();

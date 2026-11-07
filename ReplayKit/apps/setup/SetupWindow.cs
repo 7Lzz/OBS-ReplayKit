@@ -18,20 +18,16 @@ namespace ReplayKitSetup
         private const string ClassName = "ReplayKitSetupWindow";
         private const uint WM_APP_DRAIN = 0x8000 + 1;
 
-        private static readonly uint ColBg = (uint)(0x1D | (0x1F << 8) | (0x26 << 16));
-
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
-        // 20 = immersive dark mode (19 on pre-20H1), 34 = border colour, 35 = caption colour. COLORREF is 0x00bbggrr.
-        private const int DWMWA_DARK = 20, DWMWA_DARK_PRE20H1 = 19, DWMWA_BORDER_COLOR = 34, DWMWA_CAPTION_COLOR = 35;
-        // the helper gives its own windows (Clips, Settings) a caption in the theme PANEL colour, a touch lighter than the window body -- not a flat match. mirror that: panel #272A33, border #3C404D (--line).
-        private const int CaptionColorRef = 0x00332A27; // #272A33 (--panel)
-        private const int BorderColorRef = 0x004D403C;  // #3C404D (--line)
+        // 20 = immersive dark mode (19 on pre-20H1), 34 = border colour, 35 = caption colour, 36 = caption text colour. COLORREF is 0x00bbggrr.
+        private const int DWMWA_DARK = 20, DWMWA_DARK_PRE20H1 = 19, DWMWA_BORDER_COLOR = 34, DWMWA_CAPTION_COLOR = 35, DWMWA_TEXT_COLOR = 36;
 
         private Native.WndProc _wndProcRef;
         private IntPtr _hwnd;
         private IntPtr _brushBg;
         private double _scale = 1.0;
+        private WindowTheme _theme;
 
         private CoreWebView2Controller _controller;
         private CoreWebView2 _web;
@@ -48,8 +44,9 @@ namespace ReplayKitSetup
         public int RunModal()
         {
             _scale = SafeDpiScale();
-            _html = LoadHtml();
-            _brushBg = Native.CreateSolidBrush(ColBg);
+            _theme = WindowTheme.Load();
+            _html = _theme.ApplyTo(LoadHtml());
+            _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
 
             _wndProcRef = WndProc;
             IntPtr hInst = Native.GetModuleHandleW(null);
@@ -73,7 +70,7 @@ namespace ReplayKitSetup
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
             if (_hwnd == IntPtr.Zero) throw new InvalidOperationException("Could not create the setup window.");
 
-            ApplyDarkTitleBar();
+            ApplyTitleBarTheme();
             SetIconFromExe();
             Native.ShowWindow(_hwnd, 5);
             Native.UpdateWindow(_hwnd);
@@ -100,7 +97,7 @@ namespace ReplayKitSetup
                 _controller = await env.CreateCoreWebView2ControllerAsync(_hwnd);
                 _web = _controller.CoreWebView2;
 
-                _controller.DefaultBackgroundColor = Color.FromArgb(0x1D, 0x1F, 0x26);
+                _controller.DefaultBackgroundColor = _theme.Window;
                 LayoutController();
 
                 var s = _web.Settings;
@@ -398,18 +395,20 @@ namespace ReplayKitSetup
             return 1.0;
         }
 
-        // dark caption + themed caption/border colour, same treatment the helper gives its own windows -- otherwise win11 draws a plain light title bar on top of the dark webview content.
-        private void ApplyDarkTitleBar()
+        // the treatment the helper gives its own windows (Clips, Settings): a caption in the panel colour of the theme, a touch lighter than the window body, with its line colour as the border -- otherwise win11 draws a plain system title bar on top of the themed webview content.
+        private void ApplyTitleBarTheme()
         {
             try
             {
-                int on = 1;
-                DwmSetWindowAttribute(_hwnd, DWMWA_DARK, ref on, sizeof(int));
-                DwmSetWindowAttribute(_hwnd, DWMWA_DARK_PRE20H1, ref on, sizeof(int));
-                int caption = CaptionColorRef;
+                int dark = _theme.Dark ? 1 : 0;
+                DwmSetWindowAttribute(_hwnd, DWMWA_DARK, ref dark, sizeof(int));
+                DwmSetWindowAttribute(_hwnd, DWMWA_DARK_PRE20H1, ref dark, sizeof(int));
+                int caption = WindowTheme.ColorRef(_theme.Panel);
                 DwmSetWindowAttribute(_hwnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
-                int border = BorderColorRef;
+                int border = WindowTheme.ColorRef(_theme.Border);
                 DwmSetWindowAttribute(_hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+                int text = WindowTheme.ColorRef(_theme.Text);
+                DwmSetWindowAttribute(_hwnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
             }
             catch (Exception) { }
         }
