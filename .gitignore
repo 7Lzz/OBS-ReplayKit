@@ -10,7 +10,7 @@ ReplayKit/publish_tmp/
 # prefs the installer writes next to itself when it runs from a checkout
 /prefs.json
 
-# regenerated from apps/setup/VersionInfo.cs by build.bat and by the installer at apply time, so a version bump only ever touches VersionInfo.cs
+# regenerated from ReplayKit/version.json by build.bat and by the installer at apply time, so a version bump only ever touches ReplayKit/version.json
 /ReplayKit/dist/version.json
 # same regeneration, feeds the win32 version resource of both csproj files
 /ReplayKit/Version.props
