@@ -863,22 +863,29 @@ namespace ReplayKitHelper
             return GetExistingInputOverlayScaleTargets(items, false);
         }
 
+        // the scene json gives the wasd and mouse members a filter each and the group none, so every source of the style that carries one is a target, and a scene without any gets it on the members
         internal static List<string> GetOverlayOpacitySourceTargets(string overlayStyle)
         {
             var names = GetOrderedOverlayCandidateSourceNames(overlayStyle);
             if (names.Count == 0) return new List<string>();
 
+            var styleNames = GetOverlaySourceNames(overlayStyle);
+            var carrying = new List<string>();
+            string firstCarrying = null;
             foreach (var name in names)
             {
                 var filters = GetSourceFilterListLive(name);
                 if (filters["ok"]?.Value<bool>() != true) continue;
                 var match = GetOverlayOpacityLiveFilterInfo(filters["filters"] as JArray);
-                if (match["found"]?.Value<bool>() == true) return new List<string> { name };
+                if (match["found"]?.Value<bool>() != true) continue;
+                if (firstCarrying == null) firstCarrying = name;
+                if (styleNames.Contains(name)) carrying.Add(name);
             }
+            if (carrying.Count > 0) return carrying;
+            if (firstCarrying != null) return new List<string> { firstCarrying };
 
             if (overlayStyle == "input_overlay")
             {
-                if (TestSourceExistsForFilters("Group")) return new List<string> { "Group" };
                 var fallback = new List<string>();
                 foreach (var name in new[] { "WASD Overlay", "Mouse Overlay" })
                 {

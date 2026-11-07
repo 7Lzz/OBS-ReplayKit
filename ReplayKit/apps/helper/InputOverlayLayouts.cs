@@ -293,7 +293,7 @@ namespace ReplayKitHelper
         // a file of the presets folder for the preview of the settings page; json and png only, and nothing outside it
         public static string ServedFile(string relative)
         {
-            if (string.IsNullOrWhiteSpace(relative) || relative.Length > 200) return null;
+            if (string.IsNullOrWhiteSpace(relative) || relative.Length > 200 || relative.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return null;
             string ext = Path.GetExtension(relative).ToLowerInvariant();
             if (ext != ".json" && ext != ".png") return null;
             string root = Path.GetFullPath(PresetsRoot()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;

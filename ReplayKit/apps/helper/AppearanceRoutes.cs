@@ -105,6 +105,7 @@ namespace ReplayKitHelper
             if (path == "/appearance/icon")
             {
                 string raw = Q("file", "");
+                if (raw.IndexOfAny(Path.GetInvalidPathChars()) >= 0) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false }); return false; }
                 bool isUser = raw.StartsWith("user/", StringComparison.Ordinal);
                 string file = Path.GetFileName(raw);
                 string ext = Path.GetExtension(file).ToLowerInvariant();
