@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Microsoft.Win32;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -48,7 +49,7 @@ namespace ReplayKitSetup
 
         // bundled virtual audio driver -- creates the obs stream audio render endpoint and matching loopback capture endpoint used by discord. still shipped via installers.zips VBCABLE_Driver_Pack45.zip and its own setup exe.
         public static readonly string INPUT_OVERLAY_INSTALLERS_ZIP;
-        public const string VBCABLE_DRIVER_PACK_NAME = "VBCABLE_Driver_Pack45.zip";
+        public const string VBCABLE_DRIVER_PACK_NAME = BundleLayout.VbCablePack;
         public const string VBCABLE_SETUP_EXE_NAME = "VBCABLE_Setup_x64.exe";
 
         // input-overlay preset pack -- extracted under replaykit_config so all replaykit-managed assets live under one umbrella.
@@ -57,7 +58,7 @@ namespace ReplayKitSetup
 
         // win-capture-audio plugin powers the "desktop audio (excl. discord)" source via windows 10+ per-process loopback. the bundled zip is the replaykit build of the maintained fork https://github.com/Ayrton09/win-capture-audio, see plugins/win-capture-audio/PROVENANCE.md
         public static readonly string WIN_CAPTURE_AUDIO_ZIP;
-        public const string WIN_CAPTURE_AUDIO_DLL_REL = "obs-plugins/64bit/win-capture-audio.dll";
+        public const string WIN_CAPTURE_AUDIO_DLL_REL = BundleLayout.WinCaptureAudioDllDir + BundleLayout.WinCaptureAudioDll;
 
         // the Bango Cat folder (modes, pictures, live2d models) from the bongobs-cat project, laid out as an obs-root extract, so installer code strips the top-level folder and writes only safe relative paths into programfiles_obs_dir.
         public static readonly string BONGO_CAT_ZIP;
@@ -111,13 +112,13 @@ namespace ReplayKitSetup
             OBS_INSTALL_DIR = FindObsInstallDir() ?? _DEFAULT_OBS_DIR;
             PROGRAMFILES_OBS_DIR = OBS_INSTALL_DIR;
 
-            INPUT_OVERLAY_INSTALLERS_ZIP = Path.Combine(ASSETS_DIR, "installers.zip");
-            INPUT_OVERLAY_PLUGIN_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-plugin.zip");
-            INPUT_OVERLAY_ZIP = Path.Combine(ASSETS_DIR, "input-overlay-presets.zip");
+            INPUT_OVERLAY_INSTALLERS_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.InstallersZip);
+            INPUT_OVERLAY_PLUGIN_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.InputOverlayZip);
+            INPUT_OVERLAY_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.PresetsZip);
             INPUT_OVERLAY_TARGET = Path.Combine(REPLAYKIT_CONFIG, "input-overlay-presets");
-            WIN_CAPTURE_AUDIO_ZIP = Path.Combine(ASSETS_DIR, "win-capture-audio.zip");
-            BONGO_CAT_ZIP = Path.Combine(ASSETS_DIR, "Bango Cat.zip");
-            SHADERFILTER_ZIP = Path.Combine(ASSETS_DIR, "obs-shaderfilter.zip");
+            WIN_CAPTURE_AUDIO_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.WinCaptureAudioZip);
+            BONGO_CAT_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.BangoCatZip);
+            SHADERFILTER_ZIP = Path.Combine(ASSETS_DIR, BundleLayout.ShaderfilterZip);
 
             REPLAYKIT_PLUGIN_DLL_BUNDLED = Path.Combine(ASSETS_DIR, "obs-plugins", "replaykit", "bin", "64bit", "replaykit.dll");
             REPLAYKIT_PLUGIN_DIR = Path.Combine(PROGRAMDATA, "obs-studio", "plugins", "replaykit");

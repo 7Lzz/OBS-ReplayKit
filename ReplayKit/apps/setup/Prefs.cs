@@ -17,8 +17,8 @@ namespace ReplayKitSetup
         [JsonProperty("overlay_style")] public string OverlayStyle { get; set; } = Prefs.DEFAULT_OVERLAY_STYLE;
         [JsonProperty("overlay_opacity")] public int OverlayOpacity { get; set; } = Prefs.DEFAULT_OVERLAY_OPACITY;
         [JsonProperty("overlay_scale")] public int OverlayScale { get; set; } = Prefs.DEFAULT_OVERLAY_SCALE;
-        [JsonProperty("overlay_rotation")] public int OverlayRotation { get; set; } = 0;
-        [JsonProperty("overlay_flip_h")] public bool OverlayFlipH { get; set; }
+        [JsonProperty("overlay_rotation")] public int OverlayRotation { get; set; } = SettingDefaults.OverlayRotation;
+        [JsonProperty("overlay_flip_h")] public bool OverlayFlipH { get; set; } = SettingDefaults.OverlayFlipH;
         [JsonProperty("overlay_position")] public JObject OverlayPosition { get; set; } = new JObject();
         [JsonProperty("overlay_hue_shift")] public double OverlayHueShift { get; set; } = Prefs.DEFAULT_OVERLAY_HUE_SHIFT;
         [JsonProperty("overlay_color_multiply")] public string OverlayColorMultiply { get; set; } = Prefs.DEFAULT_OVERLAY_COLOR_MULTIPLY;
@@ -84,84 +84,67 @@ namespace ReplayKitSetup
         // the settings file of the helper: straight in the replaykit folder, or in scripts while an install from before that move has not been migrated yet
         public static string RUNTIME_SETTINGS_FILE => StateLayout.Resolve(Config.REPLAYKIT_CONFIG, StateLayout.SettingsFile);
 
-        // defaults match the bundled config so an unconfigured run produces the same install the previous version did.
-        public const string DEFAULT_RECORDING_PRESET = "balanced";
-        // overlay ships off -- the input-overlay + bongo cat plugins still install so Settings can switch to either, the scene just starts clean.
-        public const bool DEFAULT_INPUT_OVERLAY = false;
-        public const string DEFAULT_OVERLAY_STYLE = "off";
-        public const string DEFAULT_BONGO_MODE = "standard";
-        // the modes of the Bango Cat folder, by their folder names
-        public static readonly string[] ALLOWED_BONGO_MODES = { "standard", "keyboard", "feixue", "mania" };
-        public static readonly string[] ALLOWED_OVERLAY_STYLES = { "input_overlay", "bongo_cat", "off" };
-        public const int DEFAULT_OVERLAY_OPACITY = 100;
-        public const int DEFAULT_OVERLAY_SCALE = 100;
-        public const double DEFAULT_OVERLAY_HUE_SHIFT = 0.0;
-        public const string DEFAULT_OVERLAY_COLOR_MULTIPLY = "#ffffff";
-        public const string DEFAULT_OVERLAY_COLOR_ADD = "#000000";
-        public const int OVERLAY_OPACITY_MIN = 0;
-        public const int OVERLAY_OPACITY_MAX = 100;
-        public const int OVERLAY_SCALE_MIN = 50;
-        public const int OVERLAY_SCALE_MAX = 200;
-        public const double OVERLAY_HUE_SHIFT_MIN = -180.0;
-        public const double OVERLAY_HUE_SHIFT_MAX = 180.0;
-        public const int DEFAULT_REPLAY_BUFFER_SECS = 90;
-        public const int REPLAY_BUFFER_MIN = 5;
-        public const int REPLAY_BUFFER_MAX = 1200;
-        public const bool DEFAULT_OBS_STARTUP = true;
-        public const bool DEFAULT_DISABLE_OBS_CLOSE_WARNING = true;
-        public const bool DEFAULT_CLOSE_TO_TRAY = true;
-        public const bool DEFAULT_ALLOW_SLEEP_WHILE_ACTIVE = true;
-        public const bool DEFAULT_PIN_OBS_TRAY_ICON = true;
-        public const bool DEFAULT_DEBUG_LOGGING_ENABLED = false;
-        public const bool DEFAULT_CLIP_NOTIFICATION = true;
-        public const bool DEFAULT_RECORDING_NOTIFICATION = true;
-        public const bool DEFAULT_TRIM_PRECISE = true;
-        // the pc audio, discord and the microphone as tracks of their own in every recording, next to the mixed track 1; on for a new install, and DefaultsMigration turns it on once for an install that existed before
-        public const bool DEFAULT_SEPARATE_AUDIO_TRACKS = true;
-        public const int DEFAULT_CLIP_SOUND_VOLUME = 25;
-        public const int DEFAULT_RECORDING_SOUND_VOLUME = 25;
-        public const string DEFAULT_SHARE_MODE = "projector";
+        // the values come from shared/SettingDefaults.cs, the same ones the helper schema starts from
+        public const string DEFAULT_RECORDING_PRESET = SettingDefaults.RecordingPreset;
+        public const bool DEFAULT_INPUT_OVERLAY = SettingDefaults.OverlayStyle != "off";
+        public const string DEFAULT_OVERLAY_STYLE = SettingDefaults.OverlayStyle;
+        public const string DEFAULT_BONGO_MODE = SettingDefaults.BongoMode;
+        public static readonly string[] ALLOWED_BONGO_MODES = SettingLimits.BongoModes;
+        public static readonly string[] ALLOWED_OVERLAY_STYLES = SettingLimits.OverlayStyles;
+        public const int DEFAULT_OVERLAY_OPACITY = SettingDefaults.OverlayOpacity;
+        public const int DEFAULT_OVERLAY_SCALE = SettingDefaults.OverlayScale;
+        public const double DEFAULT_OVERLAY_HUE_SHIFT = SettingDefaults.OverlayHueShift;
+        public const string DEFAULT_OVERLAY_COLOR_MULTIPLY = SettingDefaults.OverlayColorMultiply;
+        public const string DEFAULT_OVERLAY_COLOR_ADD = SettingDefaults.OverlayColorAdd;
+        public const int OVERLAY_OPACITY_MIN = SettingLimits.OverlayOpacityMin;
+        public const int OVERLAY_OPACITY_MAX = SettingLimits.OverlayOpacityMax;
+        public const int OVERLAY_SCALE_MIN = SettingLimits.OverlayScaleMin;
+        public const int OVERLAY_SCALE_MAX = SettingLimits.OverlayScaleMax;
+        public const double OVERLAY_HUE_SHIFT_MIN = SettingLimits.OverlayHueShiftMin;
+        public const double OVERLAY_HUE_SHIFT_MAX = SettingLimits.OverlayHueShiftMax;
+        public const int DEFAULT_REPLAY_BUFFER_SECS = SettingDefaults.ReplaySeconds;
+        public const bool DEFAULT_OBS_STARTUP = SettingDefaults.ObsStartupEnabled;
+        public const bool DEFAULT_DISABLE_OBS_CLOSE_WARNING = SettingDefaults.DisableObsCloseWarning;
+        public const bool DEFAULT_CLOSE_TO_TRAY = SettingDefaults.CloseToTray;
+        public const bool DEFAULT_ALLOW_SLEEP_WHILE_ACTIVE = SettingDefaults.AllowSleepWhileActive;
+        public const bool DEFAULT_PIN_OBS_TRAY_ICON = SettingDefaults.PinObsTrayIcon;
+        public const bool DEFAULT_DEBUG_LOGGING_ENABLED = SettingDefaults.DebugLoggingEnabled;
+        public const bool DEFAULT_CLIP_NOTIFICATION = SettingDefaults.ClipNotificationEnabled;
+        public const bool DEFAULT_RECORDING_NOTIFICATION = SettingDefaults.RecordingNotificationEnabled;
+        public const bool DEFAULT_TRIM_PRECISE = SettingDefaults.TrimPreciseDefault;
+        public const bool DEFAULT_SEPARATE_AUDIO_TRACKS = SettingDefaults.RecordingSeparateAudioTracks;
+        public const int DEFAULT_CLIP_SOUND_VOLUME = SettingDefaults.ClipSoundVolume;
+        public const int DEFAULT_RECORDING_SOUND_VOLUME = SettingDefaults.RecordingSoundVolume;
+        public const string DEFAULT_SHARE_MODE = SettingDefaults.ShareMode;
         public static readonly string[] ALLOWED_SHARE_MODES = { "projector", "virtual_camera_legacy", "vcam", "screenshare" };
-        public const bool DEFAULT_DISCORD_SCREENSHARE_ENABLED = false;
-        public const string DEFAULT_DISCORD_OUTPUT_MODE = "projector";
+        public const bool DEFAULT_DISCORD_SCREENSHARE_ENABLED = SettingDefaults.DiscordScreenshareEnabled;
+        public const string DEFAULT_DISCORD_OUTPUT_MODE = SettingDefaults.DiscordOutputMode;
         public static readonly string[] ALLOWED_DISCORD_OUTPUT_MODES = { "projector", "virtual_camera_legacy" };
-        public const bool DEFAULT_DISCORD_PROJECTOR_ENABLED = true;
-        public const int DEFAULT_DISCORD_PROJECTOR_WIDTH = 0;
-        public const int DEFAULT_DISCORD_PROJECTOR_HEIGHT = 0;
-        public const int DEFAULT_DISCORD_PROJECTOR_VISIBLE_PIXELS = 1;
-        public const int DEFAULT_DISCORD_PROJECTOR_MONITOR_INDEX = 0;
-        public const string DEFAULT_DISCORD_PROJECTOR_EDGE = "bottom";
-        public static readonly string[] ALLOWED_DISCORD_PROJECTOR_EDGES = { "right", "left", "top", "bottom" };
-        public const string DEFAULT_DISCORD_PROJECTOR_TITLE_HINT = "OBS ReplayKit Discord Share";
-        public const bool DEFAULT_DISCORD_PROJECTOR_HIDE_TASKBAR = true;
-        public const string DEFAULT_SCREENSHARE_CAPTURE_MODE = "hybrid_auto";
-        public static readonly string[] ALLOWED_SCREENSHARE_CAPTURE_MODES = { "hybrid_auto", "desktop", "game_auto", "game_window" };
-        public const string DEFAULT_SCREENSHARE_GAME_WINDOW = "";
-        public const bool DEFAULT_SCREENSHARE_AUTO_GAME_KEEP_FOCUSED = false;
-        public const bool DEFAULT_MOTION_BLUR = false;
-        public const double DEFAULT_MOTION_BLUR_STRENGTH = 0.075;
-        public const double MOTION_BLUR_STRENGTH_MIN = 0.0;
-        public const double MOTION_BLUR_STRENGTH_MAX = 1.0;
+        public const bool DEFAULT_DISCORD_PROJECTOR_ENABLED = SettingDefaults.DiscordProjectorEnabled;
+        public const int DEFAULT_DISCORD_PROJECTOR_WIDTH = SettingDefaults.DiscordProjectorWidth;
+        public const int DEFAULT_DISCORD_PROJECTOR_HEIGHT = SettingDefaults.DiscordProjectorHeight;
+        public const int DEFAULT_DISCORD_PROJECTOR_VISIBLE_PIXELS = SettingDefaults.DiscordProjectorVisiblePixels;
+        public const int DEFAULT_DISCORD_PROJECTOR_MONITOR_INDEX = SettingDefaults.DiscordProjectorMonitorIndex;
+        public const string DEFAULT_DISCORD_PROJECTOR_EDGE = SettingDefaults.DiscordProjectorEdge;
+        public static readonly string[] ALLOWED_DISCORD_PROJECTOR_EDGES = SettingLimits.DiscordProjectorEdges;
+        public const string DEFAULT_DISCORD_PROJECTOR_TITLE_HINT = SettingDefaults.DiscordProjectorTitleHint;
+        public const bool DEFAULT_DISCORD_PROJECTOR_HIDE_TASKBAR = SettingDefaults.DiscordProjectorHideTaskbar;
+        public const string DEFAULT_SCREENSHARE_CAPTURE_MODE = SettingDefaults.ScreenshareCaptureMode;
+        public static readonly string[] ALLOWED_SCREENSHARE_CAPTURE_MODES = SettingLimits.ScreenshareCaptureModes;
+        public const string DEFAULT_SCREENSHARE_GAME_WINDOW = SettingDefaults.ScreenshareGameWindow;
+        public const bool DEFAULT_SCREENSHARE_AUTO_GAME_KEEP_FOCUSED = SettingDefaults.ScreenshareAutoGameKeepFocused;
+        public const bool DEFAULT_MOTION_BLUR = SettingDefaults.MotionBlurEnabled;
+        public const double DEFAULT_MOTION_BLUR_STRENGTH = SettingDefaults.MotionBlurStrength;
+        public const double MOTION_BLUR_STRENGTH_MIN = SettingLimits.MotionBlurStrengthMin;
+        public const double MOTION_BLUR_STRENGTH_MAX = SettingLimits.MotionBlurStrengthMax;
 
-        // h.264 is the default since it plays everywhere; hevc stays a choice for smaller files that some phones, browsers and apps cannot play, and "auto" picks the best h.264 encoder the gpu has -- av1 is deliberately not offered since most iphones and plenty of android devices have no av1 decoder at all, and unlike a container-tag issue theres no fix for missing silicon.
-        public const string DEFAULT_CODEC_PREFERENCE = "h264";
+        // av1 is deliberately not offered since most iphones and plenty of android devices have no av1 decoder at all, and unlike a container-tag issue theres no fix for missing silicon.
+        public const string DEFAULT_CODEC_PREFERENCE = SettingDefaults.CodecPreference;
         public static readonly string[] ALLOWED_CODEC_PREFERENCES = { "h264", "h265" };
 
         // compression mode trades gpu cost against file size at the same visual quality. balanced is the validated default (~10-11% gpu on a 3060 ti at 1080p60 hevc). lower_gpu uses a faster nvenc preset + no lookahead + no b-frames (bigger files); smaller_files uses a slower preset + multipass + lookahead + more b-frames (more gpu, tighter files).
-        public const string DEFAULT_COMPRESSION_MODE = "balanced";
-        public static readonly string[] ALLOWED_COMPRESSION_MODES = { "lower_gpu", "balanced", "smaller_files", "tiniest" };
-
-        public static readonly Dictionary<string, string> PRESET_COMPRESSION_DEFAULTS = new Dictionary<string, string>
-        {
-            ["performance"] = "lower_gpu",
-            ["balanced"] = "balanced",
-            ["quality"] = "smaller_files",
-        };
-
-        public static string DefaultCompressionForPreset(string presetName)
-        {
-            return PRESET_COMPRESSION_DEFAULTS.TryGetValue(presetName, out var v) ? v : DEFAULT_COMPRESSION_MODE;
-        }
+        public const string DEFAULT_COMPRESSION_MODE = SettingDefaults.CompressionMode;
+        public static readonly string[] ALLOWED_COMPRESSION_MODES = SettingLimits.CompressionModes;
 
         // ~/videos forward-slashed -- windows own Videos known folder, and where obs itself defaults its recording path, so nothing has to fight obs to keep them aligned.
         public static string DefaultRecordingPath()
@@ -458,7 +441,7 @@ namespace ReplayKitSetup
             if (!ALLOWED_DISCORD_PROJECTOR_EDGES.Contains(discordProjectorEdge)) discordProjectorEdge = DEFAULT_DISCORD_PROJECTOR_EDGE;
 
             string discordProjectorTitleHint = (Get("discord_projector_title_hint")?.ToString() ?? DEFAULT_DISCORD_PROJECTOR_TITLE_HINT).Trim();
-            if (discordProjectorTitleHint.Length == 0 || discordProjectorTitleHint.Length > 128 || discordProjectorTitleHint.Any(ch => ch < 32))
+            if (discordProjectorTitleHint.Length == 0 || discordProjectorTitleHint.Length > SettingLimits.DiscordProjectorTitleHintMaxLength || discordProjectorTitleHint.Any(ch => ch < 32))
             {
                 discordProjectorTitleHint = DEFAULT_DISCORD_PROJECTOR_TITLE_HINT;
             }
@@ -467,7 +450,7 @@ namespace ReplayKitSetup
             if (!ALLOWED_SCREENSHARE_CAPTURE_MODES.Contains(screenshareCaptureMode)) screenshareCaptureMode = DEFAULT_SCREENSHARE_CAPTURE_MODE;
 
             string screenshareGameWindow = (Get("screenshare_game_window")?.ToString() ?? DEFAULT_SCREENSHARE_GAME_WINDOW).Trim();
-            if (screenshareGameWindow.Length > 512 || screenshareGameWindow.Any(ch => ch < 32)) screenshareGameWindow = DEFAULT_SCREENSHARE_GAME_WINDOW;
+            if (screenshareGameWindow.Length > SettingLimits.ScreenshareGameWindowMaxLength || screenshareGameWindow.Any(ch => ch < 32)) screenshareGameWindow = DEFAULT_SCREENSHARE_GAME_WINDOW;
             var screenshareGameOverrides = CoerceGameOverrides(Get("screenshare_game_overrides"));
 
             return new Preferences
@@ -478,15 +461,15 @@ namespace ReplayKitSetup
                 BongoMode = bongoMode,
                 OverlayOpacity = CoerceIntRange(Get("overlay_opacity"), DEFAULT_OVERLAY_OPACITY, OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 OverlayScale = CoerceIntRange(Get("overlay_scale"), DEFAULT_OVERLAY_SCALE, OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX),
-                OverlayRotation = CoerceIntRange(Get("overlay_rotation"), 0, -180, 180),
-                OverlayFlipH = CoerceBool(Get("overlay_flip_h"), false),
+                OverlayRotation = CoerceIntRange(Get("overlay_rotation"), SettingDefaults.OverlayRotation, SettingLimits.OverlayRotationMin, SettingLimits.OverlayRotationMax),
+                OverlayFlipH = CoerceBool(Get("overlay_flip_h"), SettingDefaults.OverlayFlipH),
                 OverlayPosition = CoerceOverlayPosition(Get("overlay_position")),
                 OverlayHueShift = CoerceFloatRange(Get("overlay_hue_shift"), DEFAULT_OVERLAY_HUE_SHIFT, OVERLAY_HUE_SHIFT_MIN, OVERLAY_HUE_SHIFT_MAX),
                 OverlayColorMultiply = CoerceHexColor(Get("overlay_color_multiply"), DEFAULT_OVERLAY_COLOR_MULTIPLY),
                 OverlayColorAdd = CoerceHexColor(Get("overlay_color_add"), DEFAULT_OVERLAY_COLOR_ADD),
                 MicrophoneDeviceId = GetString("microphone_device_id", Audio.DEFAULT_DEVICE_ID),
                 MicrophoneName = GetString("microphone_name", Audio.DEFAULT_DEVICE_NAME),
-                ReplayBufferSeconds = TryToInt(Get("replay_buffer_seconds"), out int rbs) ? rbs : DEFAULT_REPLAY_BUFFER_SECS,
+                ReplayBufferSeconds = CoerceIntRange(Get("replay_buffer_seconds"), DEFAULT_REPLAY_BUFFER_SECS, SettingLimits.ReplaySecondsMin, SettingLimits.ReplaySecondsMax),
                 RecordingPath = GetString("recording_path", DefaultRecordingPath()),
                 ClipKeybind = CoerceKeybind(Get("clip_keybind")),
                 RecordingKeybind = CoerceOptionalKeybind(Get("recording_keybind")),
@@ -501,16 +484,16 @@ namespace ReplayKitSetup
                 RecordingNotificationEnabled = CoerceBool(Get("recording_notification_enabled"), DEFAULT_RECORDING_NOTIFICATION),
                 TrimPreciseDefault = DEFAULT_TRIM_PRECISE,
                 DebugLoggingEnabled = CoerceBool(Get("debug_logging_enabled"), DEFAULT_DEBUG_LOGGING_ENABLED),
-                ClipSoundVolume = CoerceIntRange(Get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, 0, 100),
-                RecordingSoundVolume = CoerceIntRange(Get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, 0, 100),
+                ClipSoundVolume = CoerceIntRange(Get("clip_sound_volume"), DEFAULT_CLIP_SOUND_VOLUME, SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
+                RecordingSoundVolume = CoerceIntRange(Get("recording_sound_volume"), DEFAULT_RECORDING_SOUND_VOLUME, SettingLimits.SoundVolumeMin, SettingLimits.SoundVolumeMax),
                 ShareMode = shareMode,
                 DiscordScreenshareEnabled = CoerceBool(Get("discord_screenshare_enabled"), DEFAULT_DISCORD_SCREENSHARE_ENABLED),
                 DiscordOutputMode = discordOutputMode,
                 DiscordProjectorEnabled = CoerceBool(Get("discord_projector_enabled"), DEFAULT_DISCORD_PROJECTOR_ENABLED),
-                DiscordProjectorWidth = CoerceIntRange(Get("discord_projector_width"), DEFAULT_DISCORD_PROJECTOR_WIDTH, 0, 7680),
-                DiscordProjectorHeight = CoerceIntRange(Get("discord_projector_height"), DEFAULT_DISCORD_PROJECTOR_HEIGHT, 0, 4320),
-                DiscordProjectorVisiblePixels = CoerceIntRange(Get("discord_projector_visible_pixels"), DEFAULT_DISCORD_PROJECTOR_VISIBLE_PIXELS, 0, 200),
-                DiscordProjectorMonitorIndex = CoerceIntRange(Get("discord_projector_monitor_index"), DEFAULT_DISCORD_PROJECTOR_MONITOR_INDEX, 0, 64),
+                DiscordProjectorWidth = CoerceIntRange(Get("discord_projector_width"), DEFAULT_DISCORD_PROJECTOR_WIDTH, 0, SettingLimits.DiscordProjectorWidthMax),
+                DiscordProjectorHeight = CoerceIntRange(Get("discord_projector_height"), DEFAULT_DISCORD_PROJECTOR_HEIGHT, 0, SettingLimits.DiscordProjectorHeightMax),
+                DiscordProjectorVisiblePixels = CoerceIntRange(Get("discord_projector_visible_pixels"), DEFAULT_DISCORD_PROJECTOR_VISIBLE_PIXELS, 0, SettingLimits.DiscordProjectorVisiblePixelsMax),
+                DiscordProjectorMonitorIndex = CoerceIntRange(Get("discord_projector_monitor_index"), DEFAULT_DISCORD_PROJECTOR_MONITOR_INDEX, 0, SettingLimits.DiscordProjectorMonitorIndexMax),
                 DiscordProjectorEdge = discordProjectorEdge,
                 DiscordProjectorTitleHint = discordProjectorTitleHint,
                 DiscordProjectorHideTaskbar = CoerceBool(Get("discord_projector_hide_taskbar"), DEFAULT_DISCORD_PROJECTOR_HIDE_TASKBAR),

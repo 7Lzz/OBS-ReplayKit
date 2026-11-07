@@ -542,9 +542,8 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) { WriteUpdateDebug("update window probe failed: " + ex.Message); }
 
-            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
             string exe = ProcessHost.HelperExecutable;
-            var argList = new List<string> { "--update-window", "-Port", port.ToString() };
+            var argList = new List<string> { "--update-window" };
             if (!string.IsNullOrWhiteSpace(version)) { argList.Add("-Version"); argList.Add(version); }
             // the window process has no settings loaded -- hand it the active themes window colour so the pre-paint frame (before the page renders) matches the Appearance tab; the border is the dwm system default
             try
@@ -558,7 +557,7 @@ namespace ReplayKitHelper
             {
                 int pid = Native.SpawnDetached(cmdLine, Constants.REPLAYKIT_TEMP_ROOT);
                 if (pid <= 0) throw new InvalidOperationException("SpawnDetached returned 0 for the update window.");
-                WriteUpdateDebug("update window spawned detached pid=" + pid + " port=" + port);
+                WriteUpdateDebug("update window spawned detached pid=" + pid);
                 return new JObject { ["ok"] = true, ["processId"] = pid };
             }
             catch (Exception ex)

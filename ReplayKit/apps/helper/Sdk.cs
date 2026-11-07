@@ -164,7 +164,7 @@ namespace ReplayKitHelper
         {
             var values = args["values"] as JObject;
             if (values == null || !values.HasValues) return Fail("args.values is required.");
-            return ReplaykitSettings.SaveSettingsFromRequest(values.ToString(Formatting.None));
+            return SettingsHttp.SaveSettingsFromRequest(values.ToString(Formatting.None));
         }
 
         private static int LinesOf(JObject args, int fallback)

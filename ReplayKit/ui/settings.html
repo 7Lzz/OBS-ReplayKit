@@ -973,7 +973,7 @@
         <div class="form-row" id="downscaleCustomRow" hidden>
           <div class="label">Custom Height</div>
           <div class="field-wrap is-stacked">
-            <input class="text-input" id="downscaleHeight" type="number" min="240" max="4320" step="1" inputmode="numeric" autocomplete="off">
+            <input class="text-input" id="downscaleHeight" type="number" data-limit="downscaleHeight" step="1" inputmode="numeric" autocomplete="off">
             <div class="hint">Output height in pixels. Width follows the canvas aspect ratio.</div>
           </div>
         </div>
@@ -1000,7 +1000,7 @@
         <div class="form-row">
           <div class="label">Frame Rate</div>
           <div class="field-wrap is-stacked">
-            <input class="text-input" id="fps" type="number" min="1" max="240" step="1" inputmode="numeric" autocomplete="off" aria-describedby="fpsWarning">
+            <input class="text-input" id="fps" type="number" data-limit="fps" step="1" inputmode="numeric" autocomplete="off" aria-describedby="fpsWarning">
             <div class="hint" id="fpsWarning" hidden>Above 60 FPS uses more disk space and GPU resources.</div>
           </div>
         </div>
@@ -1090,7 +1090,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="screenshareSwitchDelayValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Capture switch delay in seconds">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="screenshareSwitchDelay" type="range" min="0.05" max="5" step="0.05" aria-label="Capture switch delay slider">
+                <input class="volume-slider rk-range" id="screenshareSwitchDelay" type="range" data-limit="screenshareSwitchDelaySeconds" step="0.05" aria-label="Capture switch delay slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetScreenshareSwitchDelay" title="Reset to default">
@@ -1136,7 +1136,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="desktopAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="PC audio volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="desktopAudioVolume" type="range" min="0" max="200" step="1" aria-label="PC audio volume slider">
+                <input class="volume-slider rk-range" id="desktopAudioVolume" type="range" data-limit="desktopAudioVolume" step="1" aria-label="PC audio volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetDesktopAudioVolume" title="Reset to default">
@@ -1162,7 +1162,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="discordAudioVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Discord audio volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="discordAudioVolume" type="range" min="0" max="200" step="1" aria-label="Discord audio volume slider">
+                <input class="volume-slider rk-range" id="discordAudioVolume" type="range" data-limit="discordAudioVolume" step="1" aria-label="Discord audio volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetDiscordAudioVolume" title="Reset to default">
@@ -1183,7 +1183,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="clipSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Clipping sound volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="clipSoundVolume" type="range" min="0" max="100" step="1" aria-label="Clipping sound volume slider">
+                <input class="volume-slider rk-range" id="clipSoundVolume" type="range" data-limit="clipSoundVolume" step="1" aria-label="Clipping sound volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetClipSoundVolume" title="Reset to default">
@@ -1197,7 +1197,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="recordingSoundVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Recording sound volume">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="recordingSoundVolume" type="range" min="0" max="100" step="1" aria-label="Recording sound volume slider">
+                <input class="volume-slider rk-range" id="recordingSoundVolume" type="range" data-limit="recordingSoundVolume" step="1" aria-label="Recording sound volume slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetRecordingSoundVolume" title="Reset to default">
@@ -1347,7 +1347,7 @@
           <div class="field-wrap">
             <div class="volume-control">
               <input class="text-input volume-value" id="bongoSpeedValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Bongo Cat speed">
-              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="bongoSpeed" type="range" min="0.1" max="3" step="0.1" aria-label="Bongo Cat speed slider"></div>
+              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="bongoSpeed" type="range" data-limit="bongoSpeed" step="0.1" aria-label="Bongo Cat speed slider"></div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetBongoSpeed" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
@@ -1415,7 +1415,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="overlayOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider">
+                <input class="volume-slider rk-range" id="overlayOpacity" type="range" data-limit="overlayOpacity" step="1" aria-label="Overlay opacity slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayOpacity" title="Reset to default">
@@ -1429,7 +1429,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="overlayScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider">
+                <input class="volume-slider rk-range" id="overlayScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayScale" title="Reset to default">
@@ -1442,7 +1442,7 @@
           <div class="field-wrap">
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees">
-              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="overlayRotation" type="range" min="-180" max="180" step="1" aria-label="Overlay rotation slider"></div>
+              <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="overlayRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider"></div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayRotation" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
@@ -1453,7 +1453,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="overlayHueShiftValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="overlayHueShift" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider">
+                <input class="volume-slider rk-range" id="overlayHueShift" type="range" data-limit="overlayHueShift" step="1" aria-label="Overlay hue shift slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetOverlayHueShift" title="Reset to default">
@@ -1501,7 +1501,7 @@
             <div class="volume-control">
               <input class="text-input volume-value" id="motionBlurStrengthValue" type="text" inputmode="decimal" autocomplete="off" aria-label="Motion blur strength">
               <div class="volume-slider-wrap">
-                <input class="volume-slider rk-range" id="motionBlurStrength" type="range" min="0" max="1" step="0.001" aria-label="Motion blur strength slider">
+                <input class="volume-slider rk-range" id="motionBlurStrength" type="range" data-limit="motionBlurStrength" step="0.001" aria-label="Motion blur strength slider">
               </div>
             </div>
             <button class="icon-btn field-reset" type="button" id="resetMotionBlurStrength" title="Reset to default">
@@ -1604,7 +1604,7 @@
         <div class="form-row" id="storageLimitCustomRow" hidden>
           <div class="label">Custom limit</div>
           <div class="field-wrap is-stacked">
-            <input class="text-input" id="storageLimitGb" type="number" min="1" max="1000000" step="1" inputmode="numeric" autocomplete="off">
+            <input class="text-input" id="storageLimitGb" type="number" min="1" step="1" inputmode="numeric" autocomplete="off">
             <div class="hint">Size in GB.</div>
           </div>
         </div>
@@ -2231,13 +2231,16 @@
 
   const HELPER = location.origin;
   const { comboToLabel, keyLabel, obsKeyFromEvent } = window.RKHotkeys;
-  const REPLAY_SECONDS_MIN = 5;
-  const REPLAY_SECONDS_MAX = 1200;
-  const FPS_MIN = 1;
-  const FPS_MAX = 240;
   // the reset values come from the settings schema of the helper, which writes it into the page as it serves it; a page without it was not served by the helper and refuses to run
   const SETTING_DEFAULTS = window.RK_SETTING_DEFAULTS;
   if (!SETTING_DEFAULTS) throw new Error("The settings defaults were not served with this page.");
+  // the ranges the helper holds each setting to come with the page the same way, so no input offers a value the helper would refuse
+  const SETTING_LIMITS = window.RK_SETTING_LIMITS;
+  if (!SETTING_LIMITS) throw new Error("The settings limits were not served with this page.");
+  const REPLAY_SECONDS_MIN = SETTING_LIMITS.replaySeconds.min;
+  const REPLAY_SECONDS_MAX = SETTING_LIMITS.replaySeconds.max;
+  const FPS_MIN = SETTING_LIMITS.fps.min;
+  const FPS_MAX = SETTING_LIMITS.fps.max;
   // what the page shows for a setting: its saved value, or the default of the schema when the saved file has none
   function settingOr(key) {
     const value = state[key];
@@ -3261,27 +3264,37 @@
 
   function clampVolume(value) {
     const n = parseInt(value, 10);
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.clipSoundVolume.min, Math.min(SETTING_LIMITS.clipSoundVolume.max, n)) : SETTING_DEFAULTS.clipSoundVolume;
+  }
+
+  function clampOverlayOpacity(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.overlayOpacity.min, Math.min(SETTING_LIMITS.overlayOpacity.max, n)) : 100;
   }
 
   function clampAudioVolume(value) {
     const n = parseInt(value, 10);
-    return Number.isFinite(n) ? Math.max(0, Math.min(200, n)) : 100;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.desktopAudioVolume.min, Math.min(SETTING_LIMITS.desktopAudioVolume.max, n)) : 100;
   }
 
   function clampOverlayScale(value) {
     const n = parseInt(value, 10);
-    return Number.isFinite(n) ? Math.max(50, Math.min(200, n)) : 100;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.overlayScale.min, Math.min(SETTING_LIMITS.overlayScale.max, n)) : 100;
   }
 
   function clampHueShift(value) {
     const n = parseInt(value, 10);
-    return Number.isFinite(n) ? Math.max(-180, Math.min(180, n)) : 0;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.overlayHueShift.min, Math.min(SETTING_LIMITS.overlayHueShift.max, n)) : 0;
+  }
+
+  function clampOverlayRotation(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.overlayRotation.min, Math.min(SETTING_LIMITS.overlayRotation.max, n)) : 0;
   }
 
   function clampSwitchDelay(value) {
     const n = parseFloat(value);
-    return Number.isFinite(n) ? Math.max(0.05, Math.min(5, n)) : 1;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.screenshareSwitchDelaySeconds.min, Math.min(SETTING_LIMITS.screenshareSwitchDelaySeconds.max, n)) : 1;
   }
 
   // colour maths + the floating picker now come from the shared _color-picker partial (window.RKColor / window.openColorDialog)
@@ -3290,7 +3303,7 @@
 
   function clampMotionBlurStrength(value) {
     const n = parseFloat(value);
-    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.075;
+    return Number.isFinite(n) ? Math.max(SETTING_LIMITS.motionBlurStrength.min, Math.min(SETTING_LIMITS.motionBlurStrength.max, n)) : 0.075;
   }
 
   function setSliderFill(slider, value, min, max) {
@@ -3504,6 +3517,8 @@
     const limit = Math.max(0, Number(state.storageLimitGb) || 0);
     const step = STORAGE_LIMITS.some((o) => o.value === String(limit));
     setComboValue(els.storageLimit, step ? String(limit) : "custom", false);
+    // a custom limit starts at 1 since 0 is the no limit choice; the top comes from the helper
+    els.storageLimitGb.max = String(SETTING_LIMITS.storageLimitGb.max);
     if (!step) els.storageLimitGb.value = String(limit);
     els.storageLimitCustomRow.hidden = comboValue(els.storageLimit) !== "custom";
   }
@@ -3512,7 +3527,7 @@
     const picked = comboValue(els.storageLimit);
     if (picked !== "custom") return Number(picked) || 0;
     const typed = Math.round(Number(els.storageLimitGb.value));
-    return Number.isFinite(typed) && typed >= 1 ? Math.min(1000000, typed) : Math.max(1, Number(state.storageLimitGb) || 1);
+    return Number.isFinite(typed) && typed >= 1 ? Math.min(SETTING_LIMITS.storageLimitGb.max, typed) : Math.max(1, Number(state.storageLimitGb) || 1);
   }
 
   // the development settings only show while development mode is on
@@ -3529,7 +3544,7 @@
   function clampDownscaleHeight(value) {
     const n = Number.parseInt(value, 10);
     if (!Number.isFinite(n)) return 1080;
-    return Math.max(240, Math.min(4320, n));
+    return Math.max(SETTING_LIMITS.downscaleHeight.min, Math.min(SETTING_LIMITS.downscaleHeight.max, n));
   }
 
   // downscale target + filter stay visible but grey out on Native; the custom-height row only shows when the target dropdown is on "Custom" AND were downscaling.
@@ -3591,7 +3606,7 @@
   }
 
   function syncBongoSpeed() {
-    const speed = Math.max(0.1, Math.min(3, Number(state.bongoSpeed ?? DEFAULT_BONGO_SPEED) || DEFAULT_BONGO_SPEED));
+    const speed = Math.max(SETTING_LIMITS.bongoSpeed.min, Math.min(SETTING_LIMITS.bongoSpeed.max, Number(state.bongoSpeed ?? DEFAULT_BONGO_SPEED) || DEFAULT_BONGO_SPEED));
     els.bongoSpeed.value = String(speed);
     els.bongoSpeedValue.value = speed.toFixed(1) + "x";
     setSliderFill(els.bongoSpeed, speed, 0.1, 3);
@@ -3730,7 +3745,7 @@
     els.bongoSpeed.addEventListener("input", () => { state.bongoSpeed = Math.round(Number(els.bongoSpeed.value) * 10) / 10; syncBongoSpeed(); markDirty(); if (window.RKOverlayPreview) RKOverlayPreview.refresh(); });
     els.bongoSpeedValue.addEventListener("change", () => {
       const v = parseFloat(els.bongoSpeedValue.value);
-      if (Number.isFinite(v)) state.bongoSpeed = Math.round(Math.max(0.1, Math.min(3, v)) * 10) / 10;
+      if (Number.isFinite(v)) state.bongoSpeed = Math.round(Math.max(SETTING_LIMITS.bongoSpeed.min, Math.min(SETTING_LIMITS.bongoSpeed.max, v)) * 10) / 10;
       syncBongoSpeed();
       markDirty();
     });
@@ -3776,9 +3791,9 @@
     syncProjectorToolButtons();
     syncDiscordScreenshareRow();
     setComboValue(els.overlayStyle, settingOr("overlayStyle"), false);
-    syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, settingOr("overlayOpacity"), clampVolume, 0, 100);
-    syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, settingOr("overlayScale"), clampOverlayScale, 50, 200);
-    syncIntegerRangeControl(els.overlayRotation, els.overlayRotationValue, settingOr("overlayRotation"), clampHueShift, -180, 180);
+    syncIntegerRangeControl(els.overlayOpacity, els.overlayOpacityValue, settingOr("overlayOpacity"), clampOverlayOpacity, SETTING_LIMITS.overlayOpacity.min, SETTING_LIMITS.overlayOpacity.max);
+    syncIntegerRangeControl(els.overlayScale, els.overlayScaleValue, settingOr("overlayScale"), clampOverlayScale, SETTING_LIMITS.overlayScale.min, SETTING_LIMITS.overlayScale.max);
+    syncIntegerRangeControl(els.overlayRotation, els.overlayRotationValue, settingOr("overlayRotation"), clampOverlayRotation, SETTING_LIMITS.overlayRotation.min, SETTING_LIMITS.overlayRotation.max);
     els.overlayFlipH.checked = !!state.overlayFlipH;
     setComboValue(els.bongoMode, settingOr("bongoMode"), false);
     setComboValue(els.inputOverlayKeyboard, settingOr("inputOverlayKeyboard"), false);
@@ -3786,7 +3801,7 @@
     [["bongoLive2d", true], ["bongoTrack", true], ["bongoBreath", true], ["bongoBlink", true], ["bongoFaces", false], ["bongoRelativeMouse", true]].forEach(([key, def]) => { els[key].checked = state[key] ?? def; });
     syncBongoSpeed();
     syncOverlayRows();
-    syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, settingOr("overlayHueShift"), clampHueShift, -180, 180);
+    syncIntegerRangeControl(els.overlayHueShift, els.overlayHueShiftValue, settingOr("overlayHueShift"), clampHueShift, SETTING_LIMITS.overlayHueShift.min, SETTING_LIMITS.overlayHueShift.max);
     refreshFieldResetState("overlayOpacity", DEFAULT_OVERLAY_OPACITY);
     refreshFieldResetState("overlayScale", DEFAULT_OVERLAY_SCALE);
     refreshFieldResetState("overlayRotation", DEFAULT_OVERLAY_ROTATION);
@@ -3820,8 +3835,8 @@
     els.hideNotificationsFromCapture.checked = !!settingOr("hideNotificationsFromCapture");
     syncVolumeControl(els.clipSoundVolume, els.clipSoundVolumeValue, settingOr("clipSoundVolume"));
     syncVolumeControl(els.recordingSoundVolume, els.recordingSoundVolumeValue, settingOr("recordingSoundVolume"));
-    syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, state.desktopAudioVolume ?? DEFAULT_DESKTOP_AUDIO_VOLUME, clampAudioVolume, 0, 200);
-    syncIntegerRangeControl(els.discordAudioVolume, els.discordAudioVolumeValue, state.discordAudioVolume ?? DEFAULT_DISCORD_AUDIO_VOLUME, clampAudioVolume, 0, 200);
+    syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, state.desktopAudioVolume ?? DEFAULT_DESKTOP_AUDIO_VOLUME, clampAudioVolume, SETTING_LIMITS.desktopAudioVolume.min, SETTING_LIMITS.desktopAudioVolume.max);
+    syncIntegerRangeControl(els.discordAudioVolume, els.discordAudioVolumeValue, state.discordAudioVolume ?? DEFAULT_DISCORD_AUDIO_VOLUME, clampAudioVolume, SETTING_LIMITS.discordAudioVolume.min, SETTING_LIMITS.discordAudioVolume.max);
     refreshFieldResetState("clipSoundVolume", DEFAULT_CLIP_SOUND_VOLUME);
     refreshFieldResetState("recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME);
     refreshFieldResetState("desktopAudioVolume", DEFAULT_DESKTOP_AUDIO_VOLUME);
@@ -3889,9 +3904,9 @@
     state.screenshareAutoGameKeepFocused = !!els.screenshareAutoGameKeepFocused.checked;
     state.screenshareSwitchDelaySeconds = clampSwitchDelay(els.screenshareSwitchDelay.value);
     state.overlayStyle = comboValue(els.overlayStyle);
-    state.overlayOpacity = clampVolume(els.overlayOpacity.value);
+    state.overlayOpacity = clampOverlayOpacity(els.overlayOpacity.value);
     state.overlayScale = clampOverlayScale(els.overlayScale.value);
-    state.overlayRotation = clampHueShift(els.overlayRotation.value);
+    state.overlayRotation = clampOverlayRotation(els.overlayRotation.value);
     state.overlayFlipH = els.overlayFlipH.checked;
     state.bongoMode = comboValue(els.bongoMode);
     state.inputOverlayKeyboard = comboValue(els.inputOverlayKeyboard) || "wasd-minimal";
@@ -4145,8 +4160,8 @@
   });
 
   [
-    [els.desktopAudioVolume, els.desktopAudioVolumeValue, "desktopAudioVolume", clampAudioVolume, 0, 200, DEFAULT_DESKTOP_AUDIO_VOLUME, "resetDesktopAudioVolume"],
-    [els.discordAudioVolume, els.discordAudioVolumeValue, "discordAudioVolume", clampAudioVolume, 0, 200, DEFAULT_DISCORD_AUDIO_VOLUME, "resetDiscordAudioVolume"],
+    [els.desktopAudioVolume, els.desktopAudioVolumeValue, "desktopAudioVolume", clampAudioVolume, SETTING_LIMITS.desktopAudioVolume.min, SETTING_LIMITS.desktopAudioVolume.max, DEFAULT_DESKTOP_AUDIO_VOLUME, "resetDesktopAudioVolume"],
+    [els.discordAudioVolume, els.discordAudioVolumeValue, "discordAudioVolume", clampAudioVolume, SETTING_LIMITS.discordAudioVolume.min, SETTING_LIMITS.discordAudioVolume.max, DEFAULT_DISCORD_AUDIO_VOLUME, "resetDiscordAudioVolume"],
   ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
     slider.addEventListener("input", () => {
       state[key] = clampFn(slider.value);
@@ -4179,10 +4194,10 @@
   });
 
   [
-    [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampVolume, 0, 100, DEFAULT_OVERLAY_OPACITY, "resetOverlayOpacity"],
-    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, 50, 200, DEFAULT_OVERLAY_SCALE, "resetOverlayScale"],
-    [els.overlayRotation, els.overlayRotationValue, "overlayRotation", clampHueShift, -180, 180, DEFAULT_OVERLAY_ROTATION, "resetOverlayRotation"],
-    [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, -180, 180, DEFAULT_OVERLAY_HUE_SHIFT, "resetOverlayHueShift"],
+    [els.overlayOpacity, els.overlayOpacityValue, "overlayOpacity", clampOverlayOpacity, SETTING_LIMITS.overlayOpacity.min, SETTING_LIMITS.overlayOpacity.max, DEFAULT_OVERLAY_OPACITY, "resetOverlayOpacity"],
+    [els.overlayScale, els.overlayScaleValue, "overlayScale", clampOverlayScale, SETTING_LIMITS.overlayScale.min, SETTING_LIMITS.overlayScale.max, DEFAULT_OVERLAY_SCALE, "resetOverlayScale"],
+    [els.overlayRotation, els.overlayRotationValue, "overlayRotation", clampOverlayRotation, SETTING_LIMITS.overlayRotation.min, SETTING_LIMITS.overlayRotation.max, DEFAULT_OVERLAY_ROTATION, "resetOverlayRotation"],
+    [els.overlayHueShift, els.overlayHueShiftValue, "overlayHueShift", clampHueShift, SETTING_LIMITS.overlayHueShift.min, SETTING_LIMITS.overlayHueShift.max, DEFAULT_OVERLAY_HUE_SHIFT, "resetOverlayHueShift"],
   ].forEach(([slider, input, key, clampFn, min, max, def, resetId]) => {
     slider.addEventListener("input", () => {
       state[key] = clampFn(slider.value);
@@ -5843,7 +5858,7 @@
       if (pct) pct.textContent = value + "%";
       // the same volume in the audio tab
       if (key === "desktopAudioVolume") {
-        syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, value, clampAudioVolume, 0, 200);
+        syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, value, clampAudioVolume, SETTING_LIMITS.desktopAudioVolume.min, SETTING_LIMITS.desktopAudioVolume.max);
         refreshFieldResetState(key, DEFAULT_DESKTOP_AUDIO_VOLUME);
       } else if (key === "micVolume" && window.RKMic) {
         RKMic.refresh();

@@ -49,6 +49,12 @@
     <Compile Include="..\..\shared\OverlayRotation.cs" Link="OverlayRotation.cs" />
     <Compile Include="..\..\shared\AudioVolume.cs" Link="AudioVolume.cs" />
     <Compile Include="..\..\shared\CaptureMethod.cs" Link="CaptureMethod.cs" />
+    <Compile Include="..\..\shared\Encoder.cs" Link="Encoder.cs" />
+    <Compile Include="..\..\shared\Gpu.cs" Link="Gpu.cs" />
+    <Compile Include="..\..\shared\OverlayScene.cs" Link="OverlayScene.cs" />
+    <Compile Include="..\..\shared\SettingDefaults.cs" Link="SettingDefaults.cs" />
+    <Compile Include="..\..\shared\SettingLimits.cs" Link="SettingLimits.cs" />
+    <Compile Include="..\..\shared\InputOverlayLayout.cs" Link="InputOverlayLayout.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

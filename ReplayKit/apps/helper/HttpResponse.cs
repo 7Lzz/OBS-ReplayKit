@@ -226,6 +226,31 @@ namespace ReplayKitHelper
             return html.Insert(i, "<script>window.RK_SETTING_DEFAULTS=" + json + ";</script>");
         }
 
+        private static readonly Regex LimitAttribute = new Regex("data-limit=\"([A-Za-z0-9_]+)\"", RegexOptions.CultureInvariant);
+
+        // the ranges of the settings schema, the same way: the map for pages that clamp with it, and the min and max of the setting on every input that names one with data-limit; a name the schema has no range for fails the page instead of leaving the input unbounded
+        private static string InjectSettingLimits(string html)
+        {
+            bool named = html.IndexOf("RK_SETTING_LIMITS", StringComparison.Ordinal) >= 0;
+            bool marked = html.IndexOf("data-limit=\"", StringComparison.Ordinal) >= 0;
+            if (!named && !marked) return html;
+            var limits = ReplaykitSettings.GetSettingLimits();
+            if (marked)
+            {
+                html = LimitAttribute.Replace(html, m =>
+                {
+                    if (!(limits[m.Groups[1].Value] is JObject range)) throw new InvalidOperationException("No setting limits for " + m.Groups[1].Value + ".");
+                    return m.Value + " min=\"" + LimitText(range["min"]) + "\" max=\"" + LimitText(range["max"]) + "\"";
+                });
+            }
+            if (!named) return html;
+            int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return html;
+            return html.Insert(i, "<script>window.RK_SETTING_LIMITS=" + limits.ToString(Formatting.None) + ";</script>");
+        }
+
+        private static string LimitText(JToken value) => value.Value<double>().ToString(System.Globalization.CultureInfo.InvariantCulture);
+
         public static void ServeHtml(Stream stream, string filename, bool sameOriginFrame = false)
         {
             var candidates = new[]
@@ -240,7 +265,7 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectNoTab(InjectSettingDefaults(InjectDockIcons(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f)))))));
+                        string html = InjectNoTab(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f))))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var hash = SHA256.Create())

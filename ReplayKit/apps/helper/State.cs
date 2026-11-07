@@ -13,7 +13,6 @@ namespace ReplayKitHelper
     internal static class Constants
     {
         public const string HOST_ADDR = ReplayKitShared.HelperEndpoint.Host;
-        public const int DEFAULT_PORT = ReplayKitShared.HelperEndpoint.Port;
         public const int CLIPS_CACHE_MAX_AGE_MS = 60000;
         public const int CLIPS_PAGE_LIMIT_MAX = 500;
         public const int MAX_CLIPS = 0; // 0 = unlimited

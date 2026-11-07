@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -26,7 +27,7 @@ namespace ReplayKitSetup
         private const int MouseLayoutHeight = 421;
 
         // same safe zip-walk shape as BongoCat.cs -- bounds-checks every entry against the folder it extracts into before writing, so a malformed archive path can never escape the install root.
-        private const string PluginZipRoot = "input-overlay/";
+        private const string PluginZipRoot = BundleLayout.InputOverlayZipRoot;
 
         // vc++ 2015-2022 (x64) redistributable -- prerequisite for input-overlay.dll. downloaded from microsoft only when missing.
         private static readonly HashSet<string> VcppAllowedDownloadHosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -330,8 +331,8 @@ $cert = $sig.SignerCertificate
             }
             try
             {
-                if (BundledFiles.IsCurrent(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, "input-overlay-presets/", normalize: PresetBytes)) return true;
-                return BundledFiles.Install(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, log, "input-overlay-presets/", normalize: PresetBytes);
+                if (BundledFiles.IsCurrent(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, BundleLayout.PresetsZipRoot, normalize: PresetBytes)) return true;
+                return BundledFiles.Install(Config.INPUT_OVERLAY_ZIP, Config.INPUT_OVERLAY_TARGET, log, BundleLayout.PresetsZipRoot, normalize: PresetBytes);
             }
             catch (Exception ex)
             {

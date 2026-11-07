@@ -48,7 +48,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="ovcOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcOpacity" type="range" min="0" max="100" step="1" aria-label="Overlay opacity slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcOpacity" type="range" data-limit="overlayOpacity" step="1" aria-label="Overlay opacity slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-reset="overlayOpacity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -58,7 +58,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="ovcScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcScale" type="range" min="50" max="200" step="1" aria-label="Overlay size slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-reset="overlayScale" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -68,7 +68,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="ovcRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" min="-180" max="180" step="1" aria-label="Overlay rotation slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-reset="overlayRotation" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -78,7 +78,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="ovcHueValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcHue" type="range" min="-180" max="180" step="1" aria-label="Overlay hue shift slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcHue" type="range" data-limit="overlayHueShift" step="1" aria-label="Overlay hue shift slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-reset="overlayHueShift" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -105,7 +105,7 @@
 </div>
 <script>
 (function () {
-  var DEF = { overlayStyle:"off", bongoMode:"standard", overlayFlipH:false, overlayOpacity:100, overlayScale:100, overlayRotation:0, overlayHueShift:0, overlayColorMultiply:"#ffffff", overlayColorAdd:"#000000" };
+  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error("The settings defaults and limits were not served with this page."); var DEF = {}; ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd"].forEach(function (k) { DEF[k] = SCHEMA[k]; });
   var STYLES = [
     { value:"input_overlay", label:"WASD / mouse", blurb:"Simple keyboard and mouse overlay." },
     { value:"bongo_cat", label:"Bongo Cat", blurb:"Animated keyboard and mouse overlay." },
@@ -124,10 +124,10 @@
   var flip = document.getElementById("ovcFlip");
   var modeRow = document.getElementById("ovcModeRow");
   var sliders = {
-    overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:0, max:100 },
-    overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:50, max:200 },
-    overlayRotation:{ r:document.getElementById("ovcRotation"), n:document.getElementById("ovcRotationValue"), min:-180, max:180 },
-    overlayHueShift:{ r:document.getElementById("ovcHue"), n:document.getElementById("ovcHueValue"), min:-180, max:180 },
+    overlayOpacity:{ r:document.getElementById("ovcOpacity"), n:document.getElementById("ovcOpacityValue"), min:LIMITS.overlayOpacity.min, max:LIMITS.overlayOpacity.max },
+    overlayScale:{ r:document.getElementById("ovcScale"), n:document.getElementById("ovcScaleValue"), min:LIMITS.overlayScale.min, max:LIMITS.overlayScale.max },
+    overlayRotation:{ r:document.getElementById("ovcRotation"), n:document.getElementById("ovcRotationValue"), min:LIMITS.overlayRotation.min, max:LIMITS.overlayRotation.max },
+    overlayHueShift:{ r:document.getElementById("ovcHue"), n:document.getElementById("ovcHueValue"), min:LIMITS.overlayHueShift.min, max:LIMITS.overlayHueShift.max },
   };
   var colors = {
     overlayColorMultiply:{ b:document.getElementById("ovcMul"), n:document.getElementById("ovcMulValue") },
@@ -266,10 +266,10 @@
       var v = host.get(k);
       if (v !== undefined && v !== null) st[k] = v;
     });
-    st.overlayOpacity = clamp(st.overlayOpacity, 0, 100, 100);
-    st.overlayScale = clamp(st.overlayScale, 50, 200, 100);
-    st.overlayRotation = clamp(st.overlayRotation, -180, 180, 0);
-    st.overlayHueShift = clamp(st.overlayHueShift, -180, 180, 0);
+    st.overlayOpacity = clamp(st.overlayOpacity, sliders.overlayOpacity.min, sliders.overlayOpacity.max, DEF.overlayOpacity);
+    st.overlayScale = clamp(st.overlayScale, sliders.overlayScale.min, sliders.overlayScale.max, DEF.overlayScale);
+    st.overlayRotation = clamp(st.overlayRotation, sliders.overlayRotation.min, sliders.overlayRotation.max, DEF.overlayRotation);
+    st.overlayHueShift = clamp(st.overlayHueShift, sliders.overlayHueShift.min, sliders.overlayHueShift.max, DEF.overlayHueShift);
     st.overlayColorMultiply = normHex(st.overlayColorMultiply, "#ffffff");
     st.overlayColorAdd = normHex(st.overlayColorAdd, "#000000");
   }

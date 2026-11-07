@@ -66,7 +66,7 @@
   <div class="field-wrap">
     <div class="volume-control">
       <input class="text-input volume-value" id="micVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Microphone volume">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="micVolume" type="range" min="0" max="200" step="1" aria-label="Microphone volume slider"></div>
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="micVolume" type="range" data-limit="micVolume" step="1" aria-label="Microphone volume slider"></div>
     </div>
     <button class="icon-btn field-reset" type="button" data-mic-reset="micVolume" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
@@ -91,8 +91,8 @@
 <script>
 (function () {
   var HELPER = location.origin;
-  var DEF = { micDeviceId:"default", micVolume:100, micNoiseSuppression:true, micInputSensitivity:-50 };
-  var VOL_MIN = 0, VOL_MAX = 200, SENS_MIN = -96, SENS_MAX = 0, BAR_WIDTH = 3, BAR_GAP = 3, BARS_MIN = 16, BARS_MAX = 240, POLL_MS = 66, FLOOR_DB = -60;
+  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error("The settings defaults and limits were not served with this page."); var DEF = { micDeviceId:SCHEMA.micDeviceId, micVolume:SCHEMA.micVolume, micNoiseSuppression:SCHEMA.micNoiseSuppression, micInputSensitivity:SCHEMA.micInputSensitivity };
+  var VOL_MIN = LIMITS.micVolume.min, VOL_MAX = LIMITS.micVolume.max, SENS_MIN = LIMITS.micInputSensitivity.min, SENS_MAX = LIMITS.micInputSensitivity.max, BAR_WIDTH = 3, BAR_GAP = 3, BARS_MIN = 16, BARS_MAX = 240, POLL_MS = 66, FLOOR_DB = -60;
   // the real gate range obs supports is -96..0 (matches noise_gate_filters own VOL_MIN/VOL_MAX), which does not put -50 at the middle -- SENS_VMIN only widens where the handle can visually sit, four units of dead zone below the real floor, so the default lands dead center without changing what actually reaches obs
   var SENS_VMIN = -100;
   var host = { get:function (k) { return DEF[k]; }, set:function () {}, onChange:function () {} };

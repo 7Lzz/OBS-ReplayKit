@@ -10,44 +10,13 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static ReplayKitShared.InputOverlayLayout;
 
 namespace ReplayKitHelper
 {
-    // the keyboard and mouse of the wasd overlay: the wasd input-overlay presets ReplayKit ships, a keyboard of picked keys drawn in the look of the default one, and where the two sit in their group. obs sizes a group to what it holds, so the group is as big as the two side by side, fitted into the 628x292 box the first wasd and mouse filled
+    // the keyboard and mouse of the wasd overlay as the helper keeps them: the files of the picked layouts, a keyboard of picked keys drawn in the look of the default one, and what the settings page needs; the layouts and how they fit their group are in shared/InputOverlayLayout.cs
     internal static class InputOverlayLayouts
     {
-        public const string DefaultKeyboard = "wasd-minimal";
-        public const string DefaultMouse = "buttons";
-        public const string Custom = "custom";
-        public const double GroupWidth = 628.0, GroupHeight = 292.0;
-        // the space between the keyboard and the mouse, the one the first group had
-        private const double Gap = 11.0;
-        private const string CustomFile = "input-overlay-custom.json";
-        // the sheet of every custom key, drawn once; the number changes whenever the drawing does
-        private const string CustomSheetFile = "input-overlay-custom-keys-2.png";
-
-        public sealed class Layout
-        {
-            public string Id, Label, Blurb, Json, Sheet;
-        }
-
-        public static readonly Layout[] Keyboards =
-        {
-            new Layout { Id = "wasd-minimal", Label = "WASD", Blurb = "W, A, S and D with Q, E, Shift, Ctrl and Space.", Json = "wasd/wasd-minimal.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-full", Label = "WASD Full", Blurb = "WASD with Tab, R and F as well.", Json = "wasd/wasd-full.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant", Label = "Valorant", Blurb = "WASD with Tab, F, C and 4 for agent abilities.", Json = "wasd/wasd-valorant.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant-micro", Label = "Valorant Small", Blurb = "WASD with Tab and C, and a shorter Space.", Json = "wasd/wasd-valorant-micro.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-numbers", Label = "WASD Numbers", Blurb = "WASD with 1 to 5, Tab, Alt, R, T, F, G, Z, X, C, V and B.", Json = "wasd-extended-numeric/wasd-extended-numeric.json", Sheet = "wasd-extended-numeric/wasd-extended-numeric.png" },
-            new Layout { Id = "wasd-numbers-small", Label = "WASD Numbers Small", Blurb = "WASD with 1 to 4, Tab, Alt, R, Z, X and C.", Json = "wasd-extended-numeric/wasd-extended-numeric-min.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = Custom, Label = "Custom", Blurb = "Any keys you pick, in the look of WASD.", Json = null, Sheet = null },
-        };
-
-        public static readonly Layout[] Mice =
-        {
-            new Layout { Id = "buttons", Label = "Buttons", Blurb = "Left, right and side buttons and the wheel.", Json = "mouse/mouse-no-movement.json", Sheet = "mouse/mouse.png" },
-            new Layout { Id = "off", Label = "Off", Blurb = "Only the keyboard.", Json = null, Sheet = null },
-        };
-
         // a key of the custom keyboard: where it sits (columns 137 apart and rows 133 apart, the pitch of the wasd presets, which line keys up without the stagger of a real keyboard and lean them instead), how wide it is, the key code input-overlay listens for, and an arrow drawn in place of a label
         private sealed class Key
         {
@@ -114,9 +83,6 @@ namespace ReplayKitHelper
         }
 
         public static readonly string[] DefaultCustomKeys = { "q", "w", "e", "shift", "a", "s", "d", "ctrl", "space" };
-
-        public static Layout FindKeyboard(string id) => Keyboards.FirstOrDefault(l => l.Id == id) ?? Keyboards[0];
-        public static Layout FindMouse(string id) => Mice.FirstOrDefault(l => l.Id == id) ?? Mice[0];
 
         public static string PresetsRoot() => Path.Combine(Directory.GetParent(ReplaykitSettings.GetScriptsDir().TrimEnd('\\', '/')).FullName, "input-overlay-presets");
 
@@ -286,27 +252,7 @@ namespace ReplayKitHelper
             path.AddPolygon(up);
         }
 
-        public sealed class Picked
-        {
-            public string Json, Sheet;
-            public double Width, Height;
-        }
-
         private static string Under(string root, string relative) => Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
-
-        // the size input-overlay gives a source is the overlay size its layout names
-        private static bool ReadSize(string json, out double width, out double height)
-        {
-            width = height = 0;
-            try
-            {
-                var layout = JObject.Parse(File.ReadAllText(json));
-                width = layout["overlay_width"]?.Value<double>() ?? 0;
-                height = layout["overlay_height"]?.Value<double>() ?? 0;
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException || ex is FormatException || ex is InvalidCastException) { return false; }
-            return width > 0 && height > 0;
-        }
 
         // the files of the picked keyboard; the custom one is written into the ReplayKit folder whenever its keys change. null when they are missing
         public static Picked Keyboard(JObject settings)
@@ -330,9 +276,7 @@ namespace ReplayKitHelper
             }
             else json = Under(root, layout.Json);
             string sheet = layout.Id == Custom ? CustomSheet() : Under(root, layout.Sheet);
-            if (sheet == null) return null;
-            if (!File.Exists(sheet) || !ReadSize(json, out double w, out double h)) return null;
-            return new Picked { Json = json, Sheet = sheet, Width = w, Height = h };
+            return Pick(json, sheet, File.ReadAllText, File.Exists);
         }
 
         // the files of the picked mouse; null for off, and when they are missing
@@ -341,25 +285,7 @@ namespace ReplayKitHelper
             var layout = FindMouse(settings?["inputOverlayMouse"]?.Value<string>());
             if (layout.Json == null) return null;
             string root = PresetsRoot();
-            string json = Under(root, layout.Json), sheet = Under(root, layout.Sheet);
-            if (!File.Exists(sheet) || !ReadSize(json, out double w, out double h)) return null;
-            return new Picked { Json = json, Sheet = sheet, Width = w, Height = h };
-        }
-
-        public sealed class Fit
-        {
-            public double X, Y, Scale;
-        }
-
-        // the keyboard and the mouse at one height side by side, as tall as the box lets both fit; the mouse is null when it is off, and width x height is the group they make
-        public static void Place(Picked keyboard, Picked mouse, out Fit keys, out Fit pointer, out double width, out double height)
-        {
-            double kw = keyboard?.Width ?? 568, kh = keyboard?.Height ?? 394;
-            double across = kw / kh + (mouse != null ? mouse.Width / mouse.Height : 0);
-            height = Math.Min(GroupHeight, (GroupWidth - (mouse != null ? Gap : 0)) / across);
-            keys = new Fit { X = 0, Y = 0, Scale = height / kh };
-            pointer = mouse == null ? null : new Fit { X = kw * height / kh + Gap, Y = 0, Scale = height / mouse.Height };
-            width = kw * height / kh + (mouse != null ? Gap + mouse.Width * height / mouse.Height : 0);
+            return Pick(Under(root, layout.Json), Under(root, layout.Sheet), File.ReadAllText, File.Exists);
         }
 
         public static void GroupSize(JObject settings, out double width, out double height) => Place(Keyboard(settings), Mouse(settings), out _, out _, out width, out height);

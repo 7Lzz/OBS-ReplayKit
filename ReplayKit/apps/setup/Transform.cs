@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ReplayKitShared;
+using ContentRect = ReplayKitShared.OverlayScene.ContentRect;
 
 namespace ReplayKitSetup
 {
@@ -418,45 +420,22 @@ namespace ReplayKitSetup
         // scenes json editing
 
         private const string InputOverlaySourceId = "input-overlay";
-        private const string InputOverlayWasdName = "WASD Overlay";
-        private const string InputOverlayMouseName = "Mouse Overlay";
-        private const double InputOverlayGroupW = 628.0;
-        private const double InputOverlayGroupH = 292.0;
-        private const double InputOverlayMouseOffsetX = 431.0;
-        private const double InputOverlayWasdSourceW = 568.0;
-        private const double InputOverlayWasdSourceH = 394.0;
-        private const double InputOverlayMouseSourceW = 285.0;
-        private const double InputOverlayMouseSourceH = 421.0;
-        private const double InputOverlayWasdScaleX = 0.7395833134651184;
-        private const double InputOverlayWasdScaleY = 0.7388888597488403;
-        private const double InputOverlayMouseScale = 0.6909722089767456;
-        private const double InputOverlayPosRefH = 1080.0;
-        private const double InputOverlayPosXAtRef = 15.0;
-        private const double InputOverlayBottomMarginAtRef = 16.0;
-        private const string OverlayOpacityFilterName = "ReplayKit Overlay Opacity";
-        private const string OverlayOpacityFilterId = "color_filter";
-        // the bongo cat source of replaykit.dll; bongobs-cat is the opengl plugin older installs used, converted wherever it is found
-        private const string BongoCatSourceId = "replaykit-bongo";
-        private const string LegacyBongoCatSourceId = "bongobs-cat";
-        private const string BongoCatSourceName = "Bongo Cat Overlay";
+        private const string InputOverlayWasdName = OverlayScene.WasdSourceName;
+        private const string InputOverlayMouseName = OverlayScene.MouseSourceName;
+        private const string OverlayOpacityFilterName = OverlayScene.OpacityFilterName;
+        private const string OverlayOpacityFilterId = OverlayScene.OpacityFilterKind;
+        private const string BongoCatSourceId = OverlayScene.BongoSourceKind;
+        private const string LegacyBongoCatSourceId = OverlayScene.LegacyBongoSourceKind;
+        private const string BongoCatSourceName = OverlayScene.BongoSourceName;
         private const string BongoCatSourceUuid = "c93f3934-0dfd-4f4f-96e4-0abf45423f0f";
-        private const double BongoCatSourceW = 1280.0;
-        private const double BongoCatSourceH = 768.0;
-        private const double BongoCatCanvasH = 1080.0;
-        private const double BongoCatScaleX = 0.4892578125;
-        private const double BongoCatScaleY = 0.48828125;
+        private const double BongoCatSourceW = OverlayScene.BongoSourceWidth;
+        private const double BongoCatSourceH = OverlayScene.BongoSourceHeight;
         private const int BongoCatItemId = 13;
-        private static readonly Dictionary<string, string> OverlayOpacityFilterUuids = new Dictionary<string, string>
-        {
-            [InputOverlayWasdName] = "a65fb4f0-a894-463e-9b9b-f0a9d5fb4fa1",
-            [InputOverlayMouseName] = "c097fe72-641f-4da5-94f6-71f7c6353f9f",
-            [BongoCatSourceName] = "4ecb70c4-e8f0-4207-a2cc-0307ff771722",
-        };
         private const string MicSourceId = "wasapi_input_capture";
         private const string MonitorSourceId = "monitor_capture";
-        private const string MotionBlurFilterName = "ReplayKit Motion Blur";
-        private const string MotionBlurFilterId = "shader_filter";
-        private const string RetiredMotionBlurFilterId = "obs_composite_blur";
+        private const string MotionBlurFilterName = OverlayScene.MotionBlurFilterName;
+        private const string MotionBlurFilterId = OverlayScene.MotionBlurFilterKind;
+        private const string RetiredMotionBlurFilterId = OverlayScene.RetiredMotionBlurFilterKind;
         private const string GameCaptureSourceId = "game_capture";
         private const string GameCaptureSourceName = "Game Capture";
         private const int GameCaptureHookRateFast = 2;
@@ -473,12 +452,8 @@ namespace ReplayKitSetup
             // the helper plays the settings mic test back through the speakers, and desktop audio capture would otherwise record that echo into clips.
             "OBSReplayKit.exe",
         };
-        private static readonly Dictionary<string, string> MotionBlurSourceUuids = new Dictionary<string, string>
-        {
-            ["Display Capture"] = "e371efc8-8c99-44cb-95e7-94381d9c9e41",
-            ["Game Capture"] = "26bc5a11-5315-4390-b028-f77667c7fda3",
-            ["Window Capture"] = "9b73d6cb-b65e-44a1-895f-4e2f326a8d77",
-        };
+        private static readonly IReadOnlyDictionary<string, string> MotionBlurSourceUuids = OverlayScene.MotionBlurFilterUuids;
+        private static readonly IReadOnlyDictionary<string, string> OverlayOpacityFilterUuids = OverlayScene.OpacityFilterUuids;
 
         // match an input-overlay preset path and capture the tail so it can be re-rooted.
         private static readonly Regex InputOverlayPathRe = new Regex(@"^.*?-presets[\\/](?<tail>[^\r\n]+)$");
@@ -735,40 +710,13 @@ namespace ReplayKitSetup
 
         private static string MotionBlurShaderPath() => System.IO.Path.Combine(Config.PROGRAMFILES_OBS_DIR, "data", "obs-plugins", "obs-shaderfilter", "examples", "motion_blur.shader").Replace('\\', '/');
 
-        private static JObject MotionBlurFilterSettings(double strength) => new JObject
+        private static JObject NewMotionBlurFilter(string sourceName, bool enabled, double strength)
         {
-            ["from_file"] = true,
-            ["shader_file_name"] = MotionBlurShaderPath(),
-            ["override_entire_effect"] = false,
-            ["strength"] = Math.Max(0.0, Math.Min(1.0, strength)),
-        };
-
-        private static JObject NewMotionBlurFilter(string sourceName, bool enabled, double strength) => new JObject
-        {
-            ["prev_ver"] = 536936450,
-            ["name"] = MotionBlurFilterName,
-            ["uuid"] = MotionBlurSourceUuids[sourceName],
-            ["id"] = MotionBlurFilterId,
-            ["versioned_id"] = MotionBlurFilterId,
-            ["settings"] = MotionBlurFilterSettings(strength),
-            ["mixers"] = 0,
-            ["sync"] = 0,
-            ["flags"] = 0,
-            ["volume"] = 1.0,
-            ["balance"] = 0.5,
-            ["enabled"] = enabled,
-            ["muted"] = false,
-            ["push-to-mute"] = false,
-            ["push-to-mute-delay"] = 0,
-            ["push-to-talk"] = false,
-            ["push-to-talk-delay"] = 0,
-            ["hotkeys"] = new JObject(),
-            ["deinterlace_mode"] = 0,
-            ["deinterlace_field_order"] = 0,
-            ["monitoring_type"] = 0,
-            ["monitoring_enabled"] = false,
-            ["private_settings"] = new JObject(),
-        };
+            var filter = new JObject();
+            OverlayScene.SetSourceFields(filter, MotionBlurFilterName, MotionBlurSourceUuids[sourceName], MotionBlurFilterId, MotionBlurFilterId,
+                OverlayScene.MotionBlurFilterSettings(MotionBlurShaderPath(), strength), enabled);
+            return filter;
+        }
 
         private static bool IsShaderfilterMotionBlur(JObject filterObj)
         {
@@ -821,14 +769,10 @@ namespace ReplayKitSetup
             if (filters.Count == 0) src.Remove("filters");
         }
 
-        private static JObject NewBongoSource(Preferences prefs) => new JObject
+        private static JObject NewBongoSource(Preferences prefs)
         {
-            ["prev_ver"] = 536936450,
-            ["name"] = BongoCatSourceName,
-            ["uuid"] = BongoCatSourceUuid,
-            ["id"] = BongoCatSourceId,
-            ["versioned_id"] = BongoCatSourceId,
-            ["settings"] = new JObject
+            var source = new JObject();
+            OverlayScene.SetSourceFields(source, BongoCatSourceName, BongoCatSourceUuid, BongoCatSourceId, BongoCatSourceId, new JObject
             {
                 ["Mode"] = prefs.BongoMode,
                 ["mode"] = prefs.BongoMode,
@@ -848,25 +792,9 @@ namespace ReplayKitSetup
                 ["mouse_horizontal_flip"] = true,
                 ["mouse_vertical_flip"] = true,
                 ["mask"] = false,
-            },
-            ["mixers"] = 0,
-            ["sync"] = 0,
-            ["flags"] = 0,
-            ["volume"] = 1.0,
-            ["balance"] = 0.5,
-            ["enabled"] = true,
-            ["muted"] = false,
-            ["push-to-mute"] = false,
-            ["push-to-mute-delay"] = 0,
-            ["push-to-talk"] = false,
-            ["push-to-talk-delay"] = 0,
-            ["hotkeys"] = new JObject(),
-            ["deinterlace_mode"] = 0,
-            ["deinterlace_field_order"] = 0,
-            ["monitoring_type"] = 0,
-            ["monitoring_enabled"] = false,
-            ["private_settings"] = new JObject(),
-        };
+            }, true);
+            return source;
+        }
 
         private static string EnsureBongoSource(JArray sources, Preferences prefs)
         {
@@ -956,32 +884,12 @@ namespace ReplayKitSetup
             ["capture_audio"] = false,
         };
 
-        private static JObject NewWindowCaptureSource(Preferences prefs) => new JObject
+        private static JObject NewWindowCaptureSource(Preferences prefs)
         {
-            ["prev_ver"] = 536936450,
-            ["name"] = WindowCaptureSourceName,
-            ["uuid"] = WindowCaptureSourceUuid,
-            ["id"] = WindowCaptureSourceId,
-            ["versioned_id"] = WindowCaptureSourceId,
-            ["settings"] = WindowCaptureInputSettings(prefs),
-            ["mixers"] = 0,
-            ["sync"] = 0,
-            ["flags"] = 0,
-            ["volume"] = 1.0,
-            ["balance"] = 0.5,
-            ["enabled"] = true,
-            ["muted"] = false,
-            ["push-to-mute"] = false,
-            ["push-to-mute-delay"] = 0,
-            ["push-to-talk"] = false,
-            ["push-to-talk-delay"] = 0,
-            ["hotkeys"] = new JObject(),
-            ["deinterlace_mode"] = 0,
-            ["deinterlace_field_order"] = 0,
-            ["monitoring_type"] = 0,
-            ["monitoring_enabled"] = false,
-            ["private_settings"] = new JObject(),
-        };
+            var source = new JObject();
+            OverlayScene.SetSourceFields(source, WindowCaptureSourceName, WindowCaptureSourceUuid, WindowCaptureSourceId, WindowCaptureSourceId, WindowCaptureInputSettings(prefs), true);
+            return source;
+        }
 
         private static void EnsureWindowCaptureSource(JArray sources, Preferences prefs)
         {
@@ -1074,110 +982,33 @@ namespace ReplayKitSetup
             ["y"] = (y - canvasH / 2.0) / (canvasH / 2.0),
         };
 
-        private static double OverlayScaleFactor(Preferences prefs)
+        private static double OverlayScaleFactor(Preferences prefs) => OverlayScene.ScaleFactor(prefs.OverlayScale);
+
+        private static int OverlayOpacityValue(Preferences prefs) => OverlayScene.Opacity(prefs.OverlayOpacity);
+
+        private static double OverlayHueShiftValue(Preferences prefs) => OverlayScene.HueShift(prefs.OverlayHueShift);
+
+        private static string OverlayHexColor(Preferences prefs, string attr, string @default) =>
+            OverlayScene.HexColor(attr == "overlay_color_multiply" ? prefs.OverlayColorMultiply : prefs.OverlayColorAdd, @default);
+
+        private static bool HasOverlayColorAdjustments(Preferences prefs) =>
+            OverlayScene.HasColorAdjustments(OverlayHueShiftValue(prefs), OverlayHexColor(prefs, "overlay_color_multiply", "#ffffff"), OverlayHexColor(prefs, "overlay_color_add", "#000000"));
+
+        private static ContentRect OverlayContentRect(double canvasW, double canvasH, int captureW = 0, int captureH = 0) =>
+            OverlayScene.Content(canvasW, canvasH, captureW, captureH);
+
+        private static JObject OverlayOpacityFilterSettings(Preferences prefs, bool legacyPercent = false) =>
+            OverlayScene.OpacityFilterSettings(OverlayOpacityValue(prefs), OverlayHueShiftValue(prefs),
+                OverlayScene.ColorValue(OverlayHexColor(prefs, "overlay_color_multiply", "#ffffff"), "#ffffff"),
+                OverlayScene.ColorValue(OverlayHexColor(prefs, "overlay_color_add", "#000000"), "#000000"), legacyPercent);
+
+        private static JObject NewOverlayOpacityFilter(string sourceName, Preferences prefs)
         {
-            int scale = prefs.OverlayScale;
-            return Math.Max(50, Math.Min(200, scale)) / 100.0;
+            var filter = new JObject();
+            OverlayScene.SetSourceFields(filter, OverlayOpacityFilterName, OverlayOpacityFilterUuids[sourceName], OverlayOpacityFilterId, OverlayScene.OpacityFilterVersionedKind,
+                OverlayOpacityFilterSettings(prefs), true);
+            return filter;
         }
-
-        private static int OverlayOpacityValue(Preferences prefs) => Math.Max(0, Math.Min(100, prefs.OverlayOpacity));
-
-        private static double OverlayHueShiftValue(Preferences prefs) => Math.Max(-180.0, Math.Min(180.0, prefs.OverlayHueShift));
-
-        private static string OverlayHexColor(Preferences prefs, string attr, string @default)
-        {
-            string value = (attr == "overlay_color_multiply" ? prefs.OverlayColorMultiply : prefs.OverlayColorAdd) ?? "";
-            value = value.Trim().ToLowerInvariant();
-            if (value.Length == 7 && value[0] == '#' && value.Substring(1).All(ch => "0123456789abcdef".IndexOf(ch) >= 0)) return value;
-            return @default;
-        }
-
-        private static int OverlayColorValue(string hexColor)
-        {
-            int red = Convert.ToInt32(hexColor.Substring(1, 2), 16);
-            int green = Convert.ToInt32(hexColor.Substring(3, 2), 16);
-            int blue = Convert.ToInt32(hexColor.Substring(5, 2), 16);
-            return red | (green << 8) | (blue << 16);
-        }
-
-        private static bool HasOverlayColorAdjustments(Preferences prefs)
-        {
-            return Math.Abs(OverlayHueShiftValue(prefs)) >= 0.001 ||
-                   OverlayHexColor(prefs, "overlay_color_multiply", "#ffffff") != "#ffffff" ||
-                   OverlayHexColor(prefs, "overlay_color_add", "#000000") != "#000000";
-        }
-
-        private struct ContentRect { public double X, Y, W, H, Scale; }
-
-        private static ContentRect OverlayContentRect(double canvasW, double canvasH, int captureW = 0, int captureH = 0)
-        {
-            if (canvasW <= 0.0 || canvasH <= 0.0) { canvasW = 1920.0; canvasH = 1080.0; }
-            double sourceW = captureW > 0 ? captureW : canvasW;
-            double sourceH = captureH > 0 ? captureH : canvasH;
-            double scale = Math.Min(canvasW / sourceW, canvasH / sourceH);
-            if (scale <= 0.0) scale = 1.0;
-            double width = sourceW * scale;
-            double height = sourceH * scale;
-            return new ContentRect { X = (canvasW - width) / 2.0, Y = (canvasH - height) / 2.0, W = width, H = height, Scale = scale };
-        }
-
-        private static (double X, double Y) InputOverlayPos(ContentRect content, double sourceW, double sourceH, double scaleX, double scaleY)
-        {
-            double refScale = content.H / InputOverlayPosRefH;
-            double x = content.X + (InputOverlayPosXAtRef * refScale);
-            double y = content.Y + content.H - (sourceH * scaleY) - (InputOverlayBottomMarginAtRef * refScale);
-            return (Math.Max(0.0, x), Math.Max(0.0, y));
-        }
-
-        private static (double X, double Y) BottomLeftCornerOverlayPos(ContentRect content, double sourceW, double sourceH, double scaleX, double scaleY)
-        {
-            double x = content.X;
-            double y = content.Y + content.H - (sourceH * scaleY);
-            return (Math.Max(0.0, x), Math.Max(0.0, y));
-        }
-
-        private static JObject OverlayOpacityFilterSettings(Preferences prefs, bool legacyPercent = false)
-        {
-            int opacity = OverlayOpacityValue(prefs);
-            var settings = new JObject { ["hue_shift"] = OverlayHueShiftValue(prefs) };
-            if (legacyPercent)
-            {
-                settings["opacity"] = opacity;
-                settings["color"] = OverlayColorValue(OverlayHexColor(prefs, "overlay_color_multiply", "#ffffff"));
-                return settings;
-            }
-            settings["opacity"] = Math.Max(0.0, Math.Min(1.0, opacity / 100.0));
-            settings["color_multiply"] = OverlayColorValue(OverlayHexColor(prefs, "overlay_color_multiply", "#ffffff"));
-            settings["color_add"] = OverlayColorValue(OverlayHexColor(prefs, "overlay_color_add", "#000000"));
-            return settings;
-        }
-
-        private static JObject NewOverlayOpacityFilter(string sourceName, Preferences prefs) => new JObject
-        {
-            ["prev_ver"] = 536936450,
-            ["name"] = OverlayOpacityFilterName,
-            ["uuid"] = OverlayOpacityFilterUuids[sourceName],
-            ["id"] = OverlayOpacityFilterId,
-            ["versioned_id"] = "color_filter_v2",
-            ["settings"] = OverlayOpacityFilterSettings(prefs),
-            ["mixers"] = 0,
-            ["sync"] = 0,
-            ["flags"] = 0,
-            ["volume"] = 1.0,
-            ["balance"] = 0.5,
-            ["enabled"] = true,
-            ["muted"] = false,
-            ["push-to-mute"] = false,
-            ["push-to-mute-delay"] = 0,
-            ["push-to-talk"] = false,
-            ["push-to-talk-delay"] = 0,
-            ["hotkeys"] = new JObject(),
-            ["deinterlace_mode"] = 0,
-            ["deinterlace_field_order"] = 0,
-            ["monitoring_type"] = 0,
-            ["monitoring_enabled"] = false,
-            ["private_settings"] = new JObject(),
-        };
 
         private static void ApplyOverlayOpacityFilter(JObject src, Preferences prefs)
         {
@@ -1237,48 +1068,62 @@ namespace ReplayKitSetup
             if (filters.Count == 0) src.Remove("filters");
         }
 
-        // the size the group was saved at: the helper sizes it to the keyboard and mouse picked in the settings, the first one was 628x292
-        private static double inputOverlayGroupW = InputOverlayGroupW, inputOverlayGroupH = InputOverlayGroupH;
+        // the keyboard and mouse picked in the settings of the helper, placed in their group by the rule the helper uses (shared/InputOverlayLayout.cs)
+        private static double inputOverlayGroupW = InputOverlayLayout.GroupWidth, inputOverlayGroupH = InputOverlayLayout.GroupHeight;
+        private static InputOverlayLayout.Fit overlayKeysFit, overlayMouseFit;
+        private static InputOverlayLayout.Picked overlayKeyboardFiles, overlayMouseFiles;
 
-        private static void ReadInputOverlayGroupSize(JArray groups, HashSet<string> names)
+        private static void ReadInputOverlayLayout()
         {
-            inputOverlayGroupW = InputOverlayGroupW;
-            inputOverlayGroupH = InputOverlayGroupH;
-            var group = groups.OfType<JObject>().FirstOrDefault(g => names.Contains(g.Value<string>("name") ?? "\0"));
-            double w = group?["settings"]?["cx"]?.Type == JTokenType.Integer || group?["settings"]?["cx"]?.Type == JTokenType.Float ? group["settings"]["cx"].Value<double>() : 0;
-            double h = group?["settings"]?["cy"]?.Type == JTokenType.Integer || group?["settings"]?["cy"]?.Type == JTokenType.Float ? group["settings"]["cy"].Value<double>() : 0;
-            if (w > 0 && w <= InputOverlayGroupW && h > 0 && h <= InputOverlayGroupH) { inputOverlayGroupW = w; inputOverlayGroupH = h; }
+            var keyboard = InputOverlayLayout.FindKeyboard(RuntimeString("inputOverlayKeyboard", InputOverlayLayout.DefaultKeyboard));
+            var mouse = InputOverlayLayout.FindMouse(RuntimeString("inputOverlayMouse", InputOverlayLayout.DefaultMouse));
+            // a custom keyboard is the file the helper wrote for its keys
+            overlayKeyboardFiles = keyboard.Id == InputOverlayLayout.Custom
+                ? InputOverlayLayout.Pick(Path.Combine(Config.REPLAYKIT_CONFIG, InputOverlayLayout.CustomFile), Path.Combine(Config.REPLAYKIT_CONFIG, InputOverlayLayout.CustomSheetFile), File.ReadAllText, File.Exists)
+                : PickBundledPreset(keyboard);
+            var pointer = PickBundledPreset(mouse);
+            InputOverlayLayout.Place(overlayKeyboardFiles, pointer, out overlayKeysFit, out overlayMouseFit, out inputOverlayGroupW, out inputOverlayGroupH);
+            // a mouse that is off stays in the group hidden as the default mouse, shrunk to a point in its corner, the way the helper keeps it
+            overlayMouseFiles = pointer ?? PickBundledPreset(InputOverlayLayout.FindMouse(InputOverlayLayout.DefaultMouse));
+            overlayMouseFit = overlayMouseFit ?? new InputOverlayLayout.Fit { X = 0.0, Y = 0.0, Scale = 0.001 };
+        }
+
+        // a preset as the bundled presets zip holds it, so a fresh install reads its size before the zip is unpacked into the presets folder
+        private static InputOverlayLayout.Picked PickBundledPreset(InputOverlayLayout.Layout layout)
+        {
+            if (layout.Json == null || !File.Exists(Config.INPUT_OVERLAY_ZIP)) return null;
+            using (var zip = ZipFile.OpenRead(Config.INPUT_OVERLAY_ZIP))
+            {
+                var entries = zip.Entries.GroupBy(e => e.FullName.Replace('\\', '/')).ToDictionary(g => g.Key, g => g.First());
+                ZipArchiveEntry Find(string relative) => entries.TryGetValue(BundleLayout.PresetsZipRoot + relative, out var entry) ? entry : null;
+                string Read(string relative)
+                {
+                    var entry = Find(relative) ?? throw new FileNotFoundException("The presets zip has no " + relative);
+                    using (var reader = new StreamReader(entry.Open())) return reader.ReadToEnd();
+                }
+                return InputOverlayLayout.Pick(layout.Json, layout.Sheet, Read, relative => Find(relative) != null);
+            }
         }
 
         private static (double X, double Y, double Scale) InputOverlayGroupGeometry(double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
         {
             var c = content ?? OverlayContentRect(canvasW, canvasH);
-            double scale = (c.H / 1440.0) * OverlayScaleFactor(prefs);
-            var (x, y) = InputOverlayPos(c, inputOverlayGroupW, inputOverlayGroupH, scale, scale);
+            double scale = OverlayScene.InputOverlayGroupScale(c, OverlayScaleFactor(prefs));
+            OverlayScene.InputOverlayCorner(c, inputOverlayGroupH, scale, out double x, out double y);
             return (x, y, scale);
         }
 
         private static void ApplyInputOverlaySceneItemGeometry(JObject item, string name, double canvasW, double canvasH, Preferences prefs, ContentRect? content = null)
         {
             var (groupX, groupY, groupScale) = InputOverlayGroupGeometry(canvasW, canvasH, prefs, content);
-            double sourceW, sourceH, scaleX, scaleY, x;
-            if (name == InputOverlayMouseName)
-            {
-                sourceW = InputOverlayMouseSourceW;
-                sourceH = InputOverlayMouseSourceH;
-                scaleX = InputOverlayMouseScale * groupScale;
-                scaleY = InputOverlayMouseScale * groupScale;
-                x = groupX + (InputOverlayMouseOffsetX * groupScale);
-            }
-            else
-            {
-                sourceW = InputOverlayWasdSourceW;
-                sourceH = InputOverlayWasdSourceH;
-                scaleX = InputOverlayWasdScaleX * groupScale;
-                scaleY = InputOverlayWasdScaleY * groupScale;
-                x = groupX;
-            }
-            double y = groupY;
+            bool mouse = name == InputOverlayMouseName;
+            var fit = mouse ? overlayMouseFit : overlayKeysFit;
+            var files = mouse ? overlayMouseFiles : overlayKeyboardFiles;
+            double sourceW = files?.Width ?? (mouse ? InputOverlayLayout.DefaultMouseWidth : InputOverlayLayout.DefaultKeyboardWidth);
+            double sourceH = files?.Height ?? (mouse ? InputOverlayLayout.DefaultMouseHeight : InputOverlayLayout.DefaultKeyboardHeight);
+            double scaleX = fit.Scale * groupScale, scaleY = fit.Scale * groupScale;
+            double x = groupX + fit.X * groupScale;
+            double y = groupY + fit.Y * groupScale;
             item["align"] = 5;
             item["pos"] = new JObject { ["x"] = x, ["y"] = y };
             item["pos_rel"] = SceneRelPos(x, y, canvasW, canvasH);
@@ -1333,12 +1178,10 @@ namespace ReplayKitSetup
         private static void ApplyBongoGeometry(JObject item, double canvasW, double canvasH, Preferences prefs, string sourceUuid, ContentRect? content = null)
         {
             var c = content ?? OverlayContentRect(canvasW, canvasH);
-            double scaleRatio = (c.H / BongoCatCanvasH) * OverlayScaleFactor(prefs);
-            double scaleX = BongoCatScaleX * scaleRatio;
-            double scaleY = BongoCatScaleY * scaleRatio;
+            OverlayScene.BongoScale(c, OverlayScaleFactor(prefs), out double scaleX, out double scaleY);
             double scaleRelX = scaleX * BongoCatSourceH / Math.Max(1.0, canvasH);
             double scaleRelY = scaleY * BongoCatSourceH / Math.Max(1.0, canvasH);
-            var (x0, y0) = BottomLeftCornerOverlayPos(c, BongoCatSourceW, BongoCatSourceH, scaleX, scaleY);
+            OverlayScene.BottomLeftCorner(c, BongoCatSourceH, scaleY, out double x0, out double y0);
             double x = Math.Abs(x0) < 0.001 ? 0.0 : x0;
             double y = Math.Abs(y0) < 0.001 ? 0.0 : y0;
 
@@ -1453,7 +1296,7 @@ namespace ReplayKitSetup
             double motionBlurStrength = prefs.MotionBlurStrength;
             var overlayUuids = CollectOverlayUuids(sources);
             var overlayGroupNames = CollectOverlayGroupNames(sources, groups);
-            ReadInputOverlayGroupSize(groups, overlayGroupNames);
+            ReadInputOverlayLayout();
 
             if (!useInputOverlay)
             {

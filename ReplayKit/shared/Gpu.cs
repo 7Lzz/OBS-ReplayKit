@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Management;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 
-namespace ReplayKitHelper
+namespace ReplayKitShared
 {
-    // detect the users gpu(s) and classify them for encoder selection. pulls win32_videocontroller via wmi and parses the adapter name to tag the architecture tier (registry/wmi doesnt expose the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present. this is the exact same detection logic as apps/setup/Gpu.cs (the fresh-install path), so the installer and the live settings agree on the same classification. only real change: QueryVideoControllers queries WMI directly instead of spawning powershell.exe, since this project already references System.Management (ReplayKitSetup didnt, historically).
+    // detect the users gpu(s) and classify them for encoder selection. each app supplies the adapter rows in its own GpuAdapters.cs (the trimmed setup cant use wmi, the helper does) and this parses the adapter name to tag the architecture tier (neither the registry nor wmi exposes the arch as a structured field, but marketing names follow stable patterns). prefers discrete over integrated when both are present.
     public enum Vendor { Nvidia, Amd, Intel, Unknown }
 
     // coarse nvenc capability tiers.
@@ -42,33 +41,8 @@ namespace ReplayKitHelper
         }
     }
 
-    public static class Gpu
+    public static partial class Gpu
     {
-        private static List<JObject> QueryVideoControllers()
-        {
-            var result = new List<JObject>();
-            try
-            {
-                using (var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM, DriverVersion FROM Win32_VideoController"))
-                using (var rows = searcher.Get())
-                {
-                    foreach (ManagementObject row in rows)
-                    {
-                        long? ram = null;
-                        try { if (row["AdapterRAM"] != null) ram = Convert.ToInt64(row["AdapterRAM"]); } catch (Exception ex) when (ex is InvalidCastException || ex is OverflowException) { }
-                        result.Add(new JObject
-                        {
-                            ["Name"] = row["Name"] as string,
-                            ["AdapterRAM"] = ram,
-                            ["DriverVersion"] = row["DriverVersion"] as string,
-                        });
-                    }
-                }
-            }
-            catch (ManagementException) { }
-            return result;
-        }
-
         private static readonly (Regex Pattern, Vendor Vendor)[] VendorPatterns =
         {
             (new Regex(@"\bnvidia\b|\bgeforce\b|\bquadro\b|\brtx\b|\bgtx\b", RegexOptions.IgnoreCase), Vendor.Nvidia),

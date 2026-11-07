@@ -56,7 +56,7 @@ namespace ReplayKitHelper
         // the programs the desktop capture never takes, because they have a source of their own or would record clips played back by obs itself; they are not offered in the list either
         public static bool IsBuiltinExcluded(string exe)
         {
-            return ReplaykitSettings.DesktopAudioExcludeList.Any(e => string.Equals(e, exe, StringComparison.OrdinalIgnoreCase));
+            return SettingsLiveApply.DesktopAudioExcludeList.Any(e => string.Equals(e, exe, StringComparison.OrdinalIgnoreCase));
         }
 
         // the choices the settings carry: valid program names with true or false, nothing else
@@ -101,7 +101,7 @@ namespace ReplayKitHelper
                 return entries;
             }
             exclude = true;
-            foreach (string name in ReplaykitSettings.DesktopAudioExcludeList) entries.Add(new JObject { ["value"] = name });
+            foreach (string name in SettingsLiveApply.DesktopAudioExcludeList) entries.Add(new JObject { ["value"] = name });
             return entries;
         }
 
@@ -149,7 +149,7 @@ namespace ReplayKitHelper
         {
             var found = new List<string>();
             obsAnswered = false;
-            var reply = ObsWebSocket.InvokeRequest("GetInputPropertiesListPropertyItems", new JObject { ["inputName"] = ReplaykitSettings.DesktopAudioInputName, ["propertyName"] = ActiveSessionProperty }, 2500);
+            var reply = ObsWebSocket.InvokeRequest("GetInputPropertiesListPropertyItems", new JObject { ["inputName"] = SettingsLiveApply.DesktopAudioInputName, ["propertyName"] = ActiveSessionProperty }, 2500);
             if (!reply.Ok) return found;
             obsAnswered = true;
             foreach (var item in reply.Data?["propertyItems"] as JArray ?? new JArray())

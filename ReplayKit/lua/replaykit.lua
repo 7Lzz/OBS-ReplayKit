@@ -1,4 +1,4 @@
-﻿-- replaykit.lua single obs-facing entrypoint for obs replaykit. obs only shows this script in tools -> scripts. feature scripts remain split into focused files and are loaded here in isolated environments so their script_load/update/save/unload callbacks do not collide globally.
+-- replaykit.lua single obs-facing entrypoint for obs replaykit. obs only shows this script in tools -> scripts. feature scripts remain split into focused files and are loaded here in isolated environments so their script_load/update/save/unload callbacks do not collide globally.
 
 local obs = obslua
 
@@ -37,7 +37,7 @@ local SHARED = (function()
     local chunk = loadfile(SCRIPT_ROOT .. "shared_values.lua")
     if not chunk then return nil end
     local ok, values = pcall(chunk)
-    if ok and type(values) == "table" and type(values.host) == "string" and type(values.port) == "number" and type(values.origin) == "string" and type(values.state_folder) == "string" then return values end
+    if ok and type(values) == "table" and type(values.host) == "string" and type(values.port) == "number" and type(values.origin) == "string" and type(values.state_folder) == "string" and type(values.old_places) == "table" then return values end
     return nil
 end)()
 if not SHARED then log_error("shared_values.lua is missing, so the settings and the helper cannot be found") end
@@ -51,13 +51,14 @@ local function file_exists(path)
     return true
 end
 
--- where a saved state file is right now, by the rule of shared/StateLayout.cs Resolve: the state folder, or an older place (the replaykit folder itself, scripts, scripts/helper) only while the file is still there and has not been moved yet
+-- where a saved state file is right now, by the rule of shared/StateLayout.cs Resolve: the state folder, or one of the older places its table gives that file (old_places of the shared values) only while the file is still there and has not been moved yet
 local function state_file(name)
     -- without the shared values only the old place is known, and a module that reads nothing there keeps its own defaults
     if not SHARED then return REPLAYKIT_ROOT .. name end
     local current = REPLAYKIT_ROOT .. SHARED.state_folder .. "/" .. name
     if file_exists(current) then return current end
-    for _, legacy in ipairs({ REPLAYKIT_ROOT .. name, SCRIPT_ROOT .. name, SCRIPT_ROOT .. "helper/" .. name }) do
+    for _, place in ipairs(SHARED.old_places[name] or {}) do
+        local legacy = REPLAYKIT_ROOT .. place .. name
         if file_exists(legacy) then return legacy end
     end
     return current

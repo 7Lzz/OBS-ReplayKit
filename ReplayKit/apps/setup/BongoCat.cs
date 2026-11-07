@@ -6,13 +6,14 @@ using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
     // install the Bango Cat folder (modes, pictures, live2d models) that the bongo cat source of replaykit.dll draws, and take away the opengl bongobs-cat plugin older installs put next to it
     public static class BongoCat
     {
-        private const string ZipRoot = "Bango Cat/";
+        private const string ZipRoot = BundleLayout.BangoCatZipRoot;
         private static readonly string PluginData = Path.Combine(Config.PROGRAMFILES_OBS_DIR, "bin", "64bit", "Bango Cat");
         private static readonly string[] LegacyPlugin =
         {

@@ -83,7 +83,7 @@
   var rotateHandle = document.getElementById("ovpRotate");
   var grips = Array.prototype.slice.call(screenEl.querySelectorAll(".ovp-grip"));
   // the size slider range, which is all the helper accepts for overlayScale
-  var SCALE_MIN = 50, SCALE_MAX = 200;
+  var SCALE_MIN = window.RK_SETTING_LIMITS.overlayScale.min, SCALE_MAX = window.RK_SETTING_LIMITS.overlayScale.max;
 
   // one desktop grab painted behind the fake screen so the overlay is positioned against the users real screen. the token is fixed per page load, so a fresh settings/setup open refetches but refresh()/start() do not -- the helper serves it no-store and captures just once per obs session anyway. preloaded via Image() so the css only flips once the bytes are in, no half-paint or broken-image flash; a failure clears the flag so a later start() retries.
   var BACKDROP_TOKEN = Date.now();

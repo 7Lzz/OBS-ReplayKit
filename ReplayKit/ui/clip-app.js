@@ -122,7 +122,7 @@ const CLIP_HOVER_PROFILES = {
         const showCodecTags = !!data.settings.showCodecTags;
         if (showCodecTags !== replayKitSettings.showCodecTags) {
           replayKitSettings.showCodecTags = showCodecTags;
-          if (loadedClips.length) renderLoadedClips(loadedClips);
+          document.querySelectorAll(".card").forEach((card) => syncCodecBadge(card));
         }
       }
     } catch (_) {}
@@ -2982,6 +2982,21 @@ const CLIP_HOVER_PROFILES = {
       if (wrap !== inside) wrap.classList.remove("is-open");
     });
   });
+  // the codec tag of a card follows both its clip and the show codec tags setting, and the setting can change, or arrive after the card was built, while the clip does not, so every build, update and setting change draws it from here; hevc still tagged hev1 has not been through the auto-fix yet and may not play on an iphone, so only that combination gets the warning tint
+  function syncCodecBadge(card, clip) {
+    const badge = card.querySelector(".codec-badge");
+    if (!badge) return;
+    if (clip) {
+      card.dataset.codec = clip.codec || "";
+      card.dataset.codecTag = clip.tag || "";
+    }
+    const codec = card.dataset.codec || "";
+    const tag = card.dataset.codecTag || "";
+    const ready = replayKitSettings.showCodecTags && !!codec;
+    badge.className = "codec-badge" + (ready ? " is-ready" : "") + (codec === "hevc" && !!tag && tag !== "hvc1" ? " is-unfixed" : "");
+    badge.textContent = ready ? String(codec).toUpperCase() : "";
+  }
+
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card rk-hover-card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
@@ -2995,10 +3010,6 @@ const CLIP_HOVER_PROFILES = {
     if (Number(clip.duration) > 0) durationCache.set(clip.name, Number(clip.duration));
     const thumbUrl   = thumbUrlFor(clip);
     const nameEsc    = escapeHtml(displayClipName(clip.name));
-    // hevc still tagged hev1 hasnt been through the auto-fix yet and may not play on an iphone -- every other codec/tag combo is just informational, so only that one gets the warning tint.
-    const codecReady   = replayKitSettings.showCodecTags && !!clip.codec;
-    const codecUnfixed = clip.codec === "hevc" && !!clip.tag && clip.tag !== "hvc1";
-    const codecLabel   = codecReady ? escapeHtml(String(clip.codec).toUpperCase()) : "";
 
     card.innerHTML = `
       <div class="preview">
@@ -3039,7 +3050,7 @@ const CLIP_HOVER_PROFILES = {
           <div class="progress-hover-preview"><canvas class="progress-hover-frame" width="480" height="270"></canvas><span class="progress-hover-label"></span></div>
         </div>
         <span class="duration-badge" data-duration=""></span>
-        <span class="codec-badge${codecReady ? " is-ready" : ""}${codecUnfixed ? " is-unfixed" : ""}">${codecLabel}</span>
+        <span class="codec-badge"></span>
       </div>
       <div class="body">
         <div class="title-row">
@@ -3122,6 +3133,7 @@ const CLIP_HOVER_PROFILES = {
       <div class="actions"></div>
       <div class="card-resize" data-tooltip="Drag to resize clips, double-click to reset">${CARD_GRIP_SVG}</div>
     `;
+    syncCodecBadge(card, clip);
 
     const cardMenu = card.querySelector(".menu-dropdown");
     const revealItem = cardMenu && card.querySelector(".open-folder-item");
@@ -4904,15 +4916,8 @@ const CLIP_HOVER_PROFILES = {
       const thumbUrl = thumbUrlFor(clip);
       if (thumb && thumb.dataset.src !== thumbUrl) setThumbSource(thumb, thumbUrl);
       syncProcessing(card, clip);
-      // the codec badge is otherwise baked into buildCards innerHTML once and never revisited -- a card built before clip_index_worker finishes probing a brand-new file would keep an empty badge forever even once later polls carry the real codec, since clipSig already covers clip.codec/clip.tag and gets us into this block.
-      const codecEl = card.querySelector(".codec-badge");
-      if (codecEl) {
-        const codecReady = replayKitSettings.showCodecTags && !!clip.codec;
-        const codecUnfixed = clip.codec === "hevc" && !!clip.tag && clip.tag !== "hvc1";
-        codecEl.className = "codec-badge" + (codecReady ? " is-ready" : "") + (codecUnfixed ? " is-unfixed" : "");
-        codecEl.textContent = codecReady ? String(clip.codec).toUpperCase() : "";
-      }
     }
+    syncCodecBadge(card, clip);
     syncFavoriteButton(card, clip.name);
     syncClipSelection(card, clip.name);
     const ageEl = card.querySelector(".age");

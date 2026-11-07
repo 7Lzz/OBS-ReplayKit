@@ -371,7 +371,6 @@ local function write_helper_config()
         return false
     end
     f:write("{\n")
-    f:write("  \"port\": " .. HTTP_PORT .. ",\n")
     f:write("  \"scriptDir\": " .. json_escape(helper_runtime_dir()) .. ",\n")
     f:write("  \"clipDir\": " .. json_escape(cfg.clip_dir) .. ",\n")
     f:write("  \"loggingEnabled\": " .. tostring(REPLAYKIT_LOGGING_ENABLED or read_debug_logging_enabled()) .. "\n")
@@ -418,7 +417,7 @@ local function start_update_bootstrap()
     end
     local command, hosted = helper_command()
     if not command then return false end
-    local cmd = command .. ' --update-startup-check -Port ' .. HTTP_PORT
+    local cmd = command .. ' --update-startup-check'
     local ok, err = spawn_hidden(cmd, hosted)
     if not ok then
         log(obs.LOG_ERROR, "Update bootstrap spawn failed. Win32 error: " .. tostring(err))

@@ -62,8 +62,8 @@ namespace ReplayKitHelper
                 return RunUpdateStartupCheck(args);
             if (args.Length > 0 && string.Equals(args[0], "--update-window", StringComparison.OrdinalIgnoreCase))
             {
-                int windowPort = int.TryParse(GetNamedArg(args, "-Port"), out int wp) ? wp : Constants.DEFAULT_PORT;
-                return UpdatePromptWindow.Run(GetNamedArg(args, "-Version"), windowPort, GetNamedArg(args, "-BgColor"));
+                // the port is always the HelperEndpoint one; a helper or lua of an older release still passes -Port here and to --update-startup-check, which is accepted and not read since every release used that same port
+                return UpdatePromptWindow.Run(GetNamedArg(args, "-Version"), ReplayKitShared.HelperEndpoint.Port, GetNamedArg(args, "-BgColor"));
             }
             try { return RunServer(args); }
             catch (Exception ex)
@@ -157,7 +157,8 @@ namespace ReplayKitHelper
             try { UploadState.ClearStaleCompressedTempFiles(); } catch (Exception ex) { Log.Write("ClearStaleCompressedTempFiles: " + ex.Message); }
             try { Update.ClearStaleUpdateFolders(); } catch (Exception ex) { Log.Write("ClearStaleUpdateFolders: " + ex.Message); }
 
-            int port = Server.State.Config?["port"]?.Value<int?>() ?? Constants.DEFAULT_PORT;
+            // the port helper_config.json of an older release still carries is not read, see --update-window above
+            int port = ReplayKitShared.HelperEndpoint.Port;
             _listener = BindListener(port);
             WriteStartupStatus(configPath, "ready", "");
             Log.Write("ReplayKit helper listening on http://" + Constants.HOST_ADDR + ":" + port);
@@ -199,13 +200,13 @@ namespace ReplayKitHelper
 
             try { DiscordProjector.StartAtStartup(); } catch (Exception ex) { Log.Write("warn: Discord projector startup threw: " + ex.Message); }
             try { AuthCore.RestoreAuthAtStartup(); } catch (Exception ex) { Log.Write("RestoreAuthAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.EnsureObsVideoMatchesSettingsAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettingsAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.EnsureRecordingAudioProgramsAtStartup(); } catch (Exception ex) { Log.Write("EnsureRecordingAudioProgramsAtStartup: " + ex.Message); }
-            try { ReplaykitSettings.CheckBongoCatAtStartup(); } catch (Exception ex) { Log.Write("CheckBongoCatAtStartup: " + ex.Message); }
+            try { SettingsHotkeys.ResetHotkeyCaptureSignalAtStartup(); } catch (Exception ex) { Log.Write("ResetHotkeyCaptureSignalAtStartup: " + ex.Message); }
+            try { SettingsOverlayLive.RevertAbandonedOverlayPreviewAtStartup(); } catch (Exception ex) { Log.Write("RevertAbandonedOverlayPreviewAtStartup: " + ex.Message); }
+            try { SettingsHttp.ApplyAppIconAtStartup(); } catch (Exception ex) { Log.Write("ApplyAppIconAtStartup: " + ex.Message); }
+            try { SettingsHttp.EnsureObsRecordingFolderAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsRecordingFolderAtStartup: " + ex.Message); }
+            try { SettingsHttp.EnsureObsVideoMatchesSettingsAtStartup(); } catch (Exception ex) { Log.Write("EnsureObsVideoMatchesSettingsAtStartup: " + ex.Message); }
+            try { SettingsHttp.EnsureRecordingAudioProgramsAtStartup(); } catch (Exception ex) { Log.Write("EnsureRecordingAudioProgramsAtStartup: " + ex.Message); }
+            try { SettingsHttp.CheckBongoCatAtStartup(); } catch (Exception ex) { Log.Write("CheckBongoCatAtStartup: " + ex.Message); }
             try { Upload.ResumeTranscodePollsAtStartup(); } catch (Exception ex) { Log.Write("ResumeTranscodePollsAtStartup: " + ex.Message); }
             try { ToastNotify.EnsureRegistered(Upload.ResolveToastIconPath()); } catch (Exception ex) { Log.Write("ToastNotify.EnsureRegistered: " + ex.Message); }
             try { Themes.EnsureObsInSync(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())); } catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
@@ -396,7 +397,7 @@ namespace ReplayKitHelper
 
         private static int RunUpdateStartupCheck(string[] args)
         {
-            int port = int.TryParse(GetNamedArg(args, "-Port"), out int value) ? value : Constants.DEFAULT_PORT;
+            int port = ReplayKitShared.HelperEndpoint.Port;
             string origin = "http://" + Constants.HOST_ADDR + ":" + port;
             for (int attempt = 0; attempt < 6; attempt++)
             {

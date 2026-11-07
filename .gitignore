@@ -14,6 +14,7 @@ ReplayKit/publish_tmp/
 /ReplayKit/dist/version.json
 # same regeneration, feeds the win32 version resource of both csproj files
 /ReplayKit/Version.props
+/ReplayKit/Bundle.props
 # written from ReplayKit/shared/HelperEndpoint.cs and StateLayout.cs by scripts/sync_shared.ps1 on every build, so those values are only ever edited there
 /ReplayKit/plugins/replaykit/src/core/shared_values.hpp
 /ReplayKit/lua/shared_values.lua

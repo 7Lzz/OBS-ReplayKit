@@ -413,8 +413,10 @@
 
   const HELPER = location.origin;
   const TOTAL_STEPS = 7;
-  const REPLAY_SECONDS_MIN = 5;
-  const REPLAY_SECONDS_MAX = 1200;
+  // the replay range comes from the settings schema of the helper, written into the page as it is served
+  if (!window.RK_SETTING_LIMITS) throw new Error("The settings limits were not served with this page.");
+  const REPLAY_SECONDS_MIN = window.RK_SETTING_LIMITS.replaySeconds.min;
+  const REPLAY_SECONDS_MAX = window.RK_SETTING_LIMITS.replaySeconds.max;
   // the reset value comes from the settings schema of the helper, which writes it into the page as it serves it
   if (!window.RK_SETTING_DEFAULTS) throw new Error("The settings defaults were not served with this page.");
   const DEFAULT_CLIP_KEYBIND = window.RK_SETTING_DEFAULTS.clipKeybind;

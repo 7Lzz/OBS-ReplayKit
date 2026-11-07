@@ -36,9 +36,10 @@ namespace ReplayKitShared
             public bool Regenerated;
         }
 
+        // plain literals, since scripts/sync_shared.ps1 reads them and the table below to give lua and the plugin the same old places
         private static readonly string Root = "";
         private static readonly string Scripts = "scripts";
-        private static readonly string ScriptsHelper = Path.Combine("scripts", "helper");
+        private static readonly string ScriptsHelper = @"scripts\helper";
 
         private static readonly Entry[] Entries =
         {

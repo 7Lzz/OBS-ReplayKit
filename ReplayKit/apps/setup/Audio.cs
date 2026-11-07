@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Win32;
+using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
@@ -18,7 +19,7 @@ namespace ReplayKitSetup
         private const int StateActive = 0x1;
 
         // literal string obs uses for "follow the system defualt device".
-        public const string DEFAULT_DEVICE_ID = "default";
+        public const string DEFAULT_DEVICE_ID = SettingDefaults.MicDeviceId;
         public const string DEFAULT_DEVICE_NAME = "Default (system)";
 
         public sealed class AudioDevice
