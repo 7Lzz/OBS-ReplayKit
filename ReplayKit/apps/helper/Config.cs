@@ -73,7 +73,7 @@ namespace ReplayKitHelper
             string sideTemp = null;
             try
             {
-                File.WriteAllText(tmp, text, Utf8NoBom);
+                WriteFlushed(tmp, text);
                 string destVol = Path.GetPathRoot(Path.GetFullPath(path));
                 string tmpVol = Path.GetPathRoot(tmp);
                 if (string.Equals(destVol, tmpVol, StringComparison.OrdinalIgnoreCase))
@@ -83,7 +83,7 @@ namespace ReplayKitHelper
                 else
                 {
                     sideTemp = Path.Combine(Path.GetDirectoryName(path), "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
-                    File.Copy(tmp, sideTemp, false);
+                    WriteFlushed(sideTemp, text);
                     Native.MoveFileReplace(sideTemp, path);
                 }
             }
@@ -95,6 +95,17 @@ namespace ReplayKitHelper
                     try { File.Delete(temporary); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Temporary write cleanup: " + ex.Message); }
                 }
+            }
+        }
+
+        // the text is on the disk before the rename that puts it in place: a rename can reach the disk ahead of unflushed data, and a power cut then left a file of zeros where the settings were
+        private static void WriteFlushed(string path, string text)
+        {
+            byte[] bytes = Utf8NoBom.GetBytes(text);
+            using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                file.Write(bytes, 0, bytes.Length);
+                file.Flush(true);
             }
         }
 

@@ -19,6 +19,8 @@ public:
 	// a plain message on the ground in place of the spinner, for a stage that has nothing to show on purpose (the preview turned off); empty strings bring the spinner back
 	void SetMessage(const QString &title, const QString &hint);
 	bool HasMessage() const { return !m_title.isEmpty(); }
+	// the title on show, so whoever put a message up takes only its own down
+	const QString &Message() const { return m_title; }
 
 protected:
 	void showEvent(QShowEvent *event) override;

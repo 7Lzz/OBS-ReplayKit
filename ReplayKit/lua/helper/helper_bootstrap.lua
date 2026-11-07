@@ -10,48 +10,6 @@ ffi.cdef[[
     typedef char*         LPSTR;
     typedef const char*   LPCSTR;
 
-    typedef struct {
-        DWORD cb;
-        LPSTR lpReserved;
-        LPSTR lpDesktop;
-        LPSTR lpTitle;
-        DWORD dwX;
-        DWORD dwY;
-        DWORD dwXSize;
-        DWORD dwYSize;
-        DWORD dwXCountChars;
-        DWORD dwYCountChars;
-        DWORD dwFillAttribute;
-        DWORD dwFlags;
-        unsigned short wShowWindow;
-        unsigned short cbReserved2;
-        void* lpReserved2;
-        HANDLE hStdInput;
-        HANDLE hStdOutput;
-        HANDLE hStdError;
-    } STARTUPINFOA;
-
-    typedef struct {
-        HANDLE hProcess;
-        HANDLE hThread;
-        DWORD dwProcessId;
-        DWORD dwThreadId;
-    } PROCESS_INFORMATION;
-
-    BOOL CreateProcessA(
-        LPCSTR lpApplicationName,
-        LPSTR lpCommandLine,
-        void* lpProcessAttributes,
-        void* lpThreadAttributes,
-        BOOL bInheritHandles,
-        DWORD dwCreationFlags,
-        void* lpEnvironment,
-        LPCSTR lpCurrentDirectory,
-        STARTUPINFOA* lpStartupInfo,
-        PROCESS_INFORMATION* lpProcessInformation
-    );
-    BOOL CloseHandle(HANDLE hObject);
-    DWORD GetLastError(void);
     HANDLE GetModuleHandleA(LPCSTR lpModuleName);
     void* GetProcAddress(HANDLE hModule, LPCSTR lpProcName);
     DWORD GetModuleFileNameA(HANDLE hModule, LPSTR lpFilename, DWORD nSize);
@@ -108,8 +66,6 @@ local ws2_32 = ffi.load("ws2_32")
 local CREATE_NO_WINDOW     = 0x08000000
 local CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 local DETACHED_PROCESS     = 0x00000008
-local STARTF_USESHOWWINDOW = 0x00000001
-local SW_HIDE              = 0
 local AF_INET              = 2
 local SOCK_STREAM          = 1
 local IPPROTO_TCP          = 6
@@ -294,29 +250,18 @@ local function win_quote(arg)
     return out .. string.rep("\\", slashes * 2) .. '"'
 end
 
+-- the launch of replaykit.lua hides the window from the first tick and takes a command line outside ascii (the helper path is in the folder of the user); do not add detached_process to a powershell launch, that means no console at all and breaks its startup
 local function spawn_hidden(cmdline, stay_in_job)
-    local si = ffi.new("STARTUPINFOA")
-    si.cb = ffi.sizeof("STARTUPINFOA")
-    -- create_no_window alone allows powershell.exe to briefly flash a console window on some windows builds before it self-hides. the documented "zero flash" pattern is to also set startf_useshowwindow + wshowwindow=sw_hide in startupinfo, which tells the os to hide the window at the kernel level from the very first scheduling tick. note: do not combine with detached_process -- that means "no console at all" and breaks powershells startup (its init queries the console handle).
-    si.dwFlags     = STARTF_USESHOWWINDOW
-    si.wShowWindow = SW_HIDE
-    local pi = ffi.new("PROCESS_INFORMATION")
-    local buf = ffi.new("char[?]", #cmdline + 1)
-    ffi.copy(buf, cmdline)
     local flags = CREATE_NO_WINDOW + CREATE_BREAKAWAY_FROM_JOB + DETACHED_PROCESS
     if stay_in_job then flags = CREATE_NO_WINDOW end
-    local ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, flags, nil, nil, si, pi)
+    local ok, err = replaykit_create_process(cmdline, flags)
     -- some restrictive job policies deny breakaway. The compiled helper still works in that case, so retry with the ordinary launch flags.
-    if ok == 0 and not stay_in_job then
-        buf = ffi.new("char[?]", #cmdline + 1)
-        ffi.copy(buf, cmdline)
-        ok = kernel32.CreateProcessA(nil, buf, nil, nil, 0, CREATE_NO_WINDOW, nil, nil, si, pi)
+    if not ok and not stay_in_job then
+        ok, err = replaykit_create_process(cmdline, CREATE_NO_WINDOW)
     end
-    if ok == 0 then
-        return false, tonumber(kernel32.GetLastError())
+    if not ok then
+        return false, err
     end
-    kernel32.CloseHandle(pi.hProcess)
-    kernel32.CloseHandle(pi.hThread)
     return true
 end
 

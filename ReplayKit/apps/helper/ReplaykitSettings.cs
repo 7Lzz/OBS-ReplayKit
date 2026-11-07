@@ -902,13 +902,36 @@ namespace ReplayKitHelper
                 if (fi.Length > 65536) throw new InvalidOperationException("Settings file is too large.");
                 string json = File.ReadAllText(path);
                 if (string.IsNullOrWhiteSpace(json)) return Normalize(new JObject());
-                return Normalize(JObject.Parse(json));
+                JObject raw;
+                try { raw = JObject.Parse(json); }
+                catch (Newtonsoft.Json.JsonException parse) { return SetAsideUnreadableSettings(path, parse); }
+                return Normalize(raw);
             }
             catch (Exception ex)
             {
                 Log.Write("Read-ReplayKitSettings failed: " + ex.Message);
                 throw new InvalidOperationException("ReplayKit settings file is invalid: " + ex.Message, ex);
             }
+        }
+
+        // a file that is not json at all (cut short, or zeros where the text was after a power cut) left every page and every save refusing until it was found and deleted by hand, so it is kept aside and the defaults take over, and the bell says so; a file that only could not be opened right now is left alone by the caller
+        private static JObject SetAsideUnreadableSettings(string path, Exception error)
+        {
+            string aside = path + ".unreadable";
+            lock (SettingsStore.Gate)
+            {
+                // another request may have set it aside and saved a good file since
+                if (File.Exists(path))
+                {
+                    try { return Normalize(JObject.Parse(File.ReadAllText(path))); }
+                    catch (Newtonsoft.Json.JsonException) { }
+                    Native.MoveFileReplace(path, aside);
+                    Log.Write("Read-ReplayKitSettings: the settings file was not json (" + error.Message + "), kept it as " + aside + " and went back to the defaults.");
+                    try { Notifications.Add("warning", "settings-unreadable", "ReplayKit settings were reset", "The settings file could not be read, so ReplayKit went back to its defaults. The old file was kept as " + Path.GetFileName(aside) + " in the user-data folder of ReplayKit."); }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("settings reset notice: " + ex.Message); }
+                }
+            }
+            return Normalize(new JObject());
         }
 
         // whether the compress list of the storage card starts out without the favorites

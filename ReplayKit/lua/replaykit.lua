@@ -1,6 +1,168 @@
 -- replaykit.lua single obs-facing entrypoint for obs replaykit. obs only shows this script in tools -> scripts. feature scripts remain split into focused files and are loaded here in isolated environments so their script_load/update/save/unload callbacks do not collide globally.
 
 local obs = obslua
+local ffi = require("ffi")
+
+-- obs hands every path to lua as utf-8, but the io library of luajit and the ...A functions of windows read a path in the ansi code page, so a windows user name with a letter outside it (josé, дмитрий) left every module unloaded and the helper never started; a plain ascii path keeps the plain functions, any other goes thru the wide functions of windows
+pcall(ffi.cdef, [[
+    int MultiByteToWideChar(unsigned int CodePage, unsigned long dwFlags, const char *lpMultiByteStr, int cbMultiByte, wchar_t *lpWideCharStr, int cchWideChar);
+    void *CreateFileW(const wchar_t *lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, void *lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void *hTemplateFile);
+    int ReadFile(void *hFile, void *lpBuffer, unsigned long nNumberOfBytesToRead, unsigned long *lpNumberOfBytesRead, void *lpOverlapped);
+    int WriteFile(void *hFile, const char *lpBuffer, unsigned long nNumberOfBytesToWrite, unsigned long *lpNumberOfBytesWritten, void *lpOverlapped);
+    int GetFileSizeEx(void *hFile, int64_t *lpFileSize);
+    int DeleteFileW(const wchar_t *lpFileName);
+]])
+pcall(ffi.cdef, [[
+    typedef struct {
+        unsigned long cb;
+        wchar_t *lpReserved;
+        wchar_t *lpDesktop;
+        wchar_t *lpTitle;
+        unsigned long dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        unsigned short wShowWindow, cbReserved2;
+        void *lpReserved2;
+        void *hStdInput, *hStdOutput, *hStdError;
+    } rk_startupinfo_w;
+    typedef struct { void *hProcess; void *hThread; unsigned long dwProcessId; unsigned long dwThreadId; } rk_process_information;
+    int CreateProcessW(const wchar_t *lpApplicationName, wchar_t *lpCommandLine, void *lpProcessAttributes, void *lpThreadAttributes, int bInheritHandles, unsigned long dwCreationFlags, void *lpEnvironment, const wchar_t *lpCurrentDirectory, rk_startupinfo_w *lpStartupInfo, rk_process_information *lpProcessInformation);
+]])
+-- the modules declare these two as well, so they get blocks of their own that may fail without taking the others along
+pcall(ffi.cdef, [[ int CloseHandle(void *hObject); ]])
+pcall(ffi.cdef, [[ unsigned long GetLastError(void); ]])
+
+local CP_UTF8 = 65001
+local INVALID_HANDLE = ffi.cast("void *", -1)
+
+local function is_ascii(text)
+    return not text:find("[\128-\255]")
+end
+
+-- a nul-terminated utf-16 copy of a utf-8 string, for the wide functions of windows
+local function wide(text)
+    local count = ffi.C.MultiByteToWideChar(CP_UTF8, 0, text, #text, nil, 0)
+    if count <= 0 and #text > 0 then return nil end
+    local buffer = ffi.new("wchar_t[?]", count + 1)
+    if count > 0 then ffi.C.MultiByteToWideChar(CP_UTF8, 0, text, #text, buffer, count) end
+    buffer[count] = 0
+    return buffer
+end
+
+local function wide_read(path)
+    local name = wide(path)
+    if not name then return nil end
+    -- GENERIC_READ, open to readers, writers and deleters the way fopen is, OPEN_EXISTING
+    local handle = ffi.C.CreateFileW(name, 0x80000000, 7, nil, 3, 0x80, nil)
+    if handle == INVALID_HANDLE then return nil end
+    local size = ffi.new("int64_t[1]")
+    local text = nil
+    if ffi.C.GetFileSizeEx(handle, size) ~= 0 then
+        local total = tonumber(size[0])
+        local buffer = ffi.new("char[?]", total + 1)
+        local got = ffi.new("unsigned long[1]")
+        local done = 0
+        while done < total and ffi.C.ReadFile(handle, buffer + done, total - done, got, nil) ~= 0 and got[0] > 0 do
+            done = done + tonumber(got[0])
+        end
+        text = ffi.string(buffer, done)
+    end
+    ffi.C.CloseHandle(handle)
+    return text
+end
+
+local function wide_write(path, text)
+    local name = wide(path)
+    if not name then return false end
+    -- GENERIC_WRITE, open to readers, CREATE_ALWAYS
+    local handle = ffi.C.CreateFileW(name, 0x40000000, 1, nil, 2, 0x80, nil)
+    if handle == INVALID_HANDLE then return false end
+    local wrote = ffi.new("unsigned long[1]")
+    local ok = #text == 0 or (ffi.C.WriteFile(handle, text, #text, wrote, nil) ~= 0 and tonumber(wrote[0]) == #text)
+    ffi.C.CloseHandle(handle)
+    return ok
+end
+
+-- what the modules do with a file: read it whole or up to a size, or write it and close it, which is when the text reaches the disk
+local function wide_open(path, mode)
+    mode = mode or "r"
+    if mode:find("[wa]") then
+        local parts = {}
+        if mode:find("a") then parts[1] = wide_read(path) or "" end
+        local file = {}
+        function file:write(...)
+            for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
+            return self
+        end
+        function file:flush() return self end
+        function file:close()
+            local ok = wide_write(path, table.concat(parts))
+            parts = {}
+            if ok then return true end
+            return nil, path .. ": could not be written"
+        end
+        return file
+    end
+    local text = wide_read(path)
+    if not text then return nil, path .. ": No such file or directory" end
+    local position = 1
+    local file = {}
+    function file:read(format)
+        format = format or "*l"
+        if type(format) == "number" then
+            if position > #text then return nil end
+            local chunk = text:sub(position, position + format - 1)
+            position = position + #chunk
+            return chunk
+        end
+        if format == "*a" or format == "a" then
+            local rest = text:sub(position)
+            position = #text + 1
+            return rest
+        end
+        if position > #text then return nil end
+        local line_end = text:find("\n", position, true) or (#text + 1)
+        local line = text:sub(position, line_end - 1):gsub("\r$", "")
+        position = line_end + 1
+        return line
+    end
+    function file:close() return true end
+    return file
+end
+
+local function utf8_open(path, mode)
+    if type(path) ~= "string" or is_ascii(path) then return io.open(path, mode) end
+    return wide_open(path, mode)
+end
+
+local function utf8_loadfile(path, ...)
+    if type(path) ~= "string" or is_ascii(path) then return loadfile(path, ...) end
+    local text = wide_read(path)
+    if not text then return nil, "cannot open " .. path end
+    return load(text, "@" .. path, ...)
+end
+
+local function utf8_remove(path)
+    if type(path) ~= "string" or is_ascii(path) then return os.remove(path) end
+    local name = wide(path)
+    if name and ffi.C.DeleteFileW(name) ~= 0 then return true end
+    return nil, path .. ": could not be removed"
+end
+
+-- starts a process from a utf-8 command line with its window hidden from the first tick (STARTF_USESHOWWINDOW and SW_HIDE, which keeps powershell from flashing a console); false and the windows error when it cannot
+local function create_process(cmdline, flags)
+    local command = wide(cmdline)
+    if not command then return false, 0 end
+    local si = ffi.new("rk_startupinfo_w")
+    si.cb = ffi.sizeof("rk_startupinfo_w")
+    si.dwFlags = 0x1
+    si.wShowWindow = 0
+    local pi = ffi.new("rk_process_information")
+    if ffi.C.CreateProcessW(nil, command, nil, nil, 0, flags, nil, nil, si, pi) == 0 then
+        return false, tonumber(ffi.C.GetLastError())
+    end
+    ffi.C.CloseHandle(pi.hProcess)
+    ffi.C.CloseHandle(pi.hThread)
+    return true
+end
 
 local SCRIPT_ROOT = (script_path() or ""):gsub("\\", "/")
 if SCRIPT_ROOT ~= "" and SCRIPT_ROOT:sub(-1) ~= "/" then
@@ -34,7 +196,7 @@ end
 
 -- the values shared/ owns (the helper address and the folder of the saved state), written by scripts/sync_shared.ps1 on every build; without them no module can find its settings or the helper, so they are checked once here
 local SHARED = (function()
-    local chunk = loadfile(SCRIPT_ROOT .. "shared_values.lua")
+    local chunk = utf8_loadfile(SCRIPT_ROOT .. "shared_values.lua")
     if not chunk then return nil end
     local ok, values = pcall(chunk)
     if ok and type(values) == "table" and type(values.host) == "string" and type(values.port) == "number" and type(values.origin) == "string" and type(values.state_folder) == "string" and type(values.old_places) == "table" then return values end
@@ -45,7 +207,7 @@ if not SHARED then log_error("shared_values.lua is missing, so the settings and 
 local REPLAYKIT_ROOT = SCRIPT_ROOT .. "../"
 
 local function file_exists(path)
-    local file = io.open(path, "rb")
+    local file = utf8_open(path, "rb")
     if not file then return false end
     file:close()
     return true
@@ -66,12 +228,12 @@ end
 
 local function load_chunk(path, env)
     if setfenv then
-        local chunk, err = loadfile(path)
+        local chunk, err = utf8_loadfile(path)
         if not chunk then return nil, err end
         setfenv(chunk, env)
         return chunk
     end
-    return loadfile(path, "bt", env)
+    return utf8_loadfile(path, "bt", env)
 end
 
 local function load_feature(spec)
@@ -84,6 +246,12 @@ local function load_feature(spec)
         end,
         replaykit_shared = SHARED,
         replaykit_state_file = state_file,
+        -- the io, loadfile and os.remove of the module take utf-8 paths like everything obs gives it
+        io = setmetatable({ open = utf8_open }, { __index = io }),
+        os = setmetatable({ remove = utf8_remove }, { __index = os }),
+        loadfile = utf8_loadfile,
+        replaykit_wide = wide,
+        replaykit_create_process = create_process,
     }
     setmetatable(env, { __index = _G })
 
@@ -131,7 +299,7 @@ local function call_all_reverse(callback, ...)
 end
 
 local function read_text(path)
-    local file = io.open(path, "rb")
+    local file = utf8_open(path, "rb")
     if not file then return nil end
     local text = file:read("*a")
     file:close()

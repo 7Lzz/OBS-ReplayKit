@@ -3,7 +3,7 @@ local ffi = require("ffi")
 local winmm = ffi.load("Winmm")
 
 ffi.cdef[[
-    int mciSendStringA(const char *lpszCommand, char *lpszReturnString, unsigned int cchReturn, void *hwndCallback);
+    int mciSendStringW(const wchar_t *lpszCommand, wchar_t *lpszReturnString, unsigned int cchReturn, void *hwndCallback);
 ]]
 
 local DEFAULT_SOUND_BASENAME = "clipping_saved"
@@ -109,8 +109,11 @@ local function mci_quote(path)
     return '"' .. tostring(path or ""):gsub('"', "") .. '"'
 end
 
+-- the commands carry the path of the sound, which sits in the folder of the user and can be outside ascii, so they go to the wide function
 local function mci(command)
-    return tonumber(winmm.mciSendStringA(command, nil, 0, nil)) or 0
+    local text = replaykit_wide(command)
+    if not text then return -1 end
+    return tonumber(winmm.mciSendStringW(text, nil, 0, nil)) or 0
 end
 
 local function load_runtime_volumes()

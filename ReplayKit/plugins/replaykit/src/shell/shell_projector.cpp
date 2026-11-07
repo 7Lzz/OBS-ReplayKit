@@ -407,11 +407,12 @@ void ShellProjectorApply()
 	const bool on = !WindowOnScreen() || ShellPreviewIsOn();
 	// while the preview is off its window is gone and the page the browser last showed would come through, so the stage is covered with a plain message in its place; the cover is taken away again once the preview is on or the view is another one. the preview windows sit above it
 	if (g_shellCurtain) {
+		static const QString previewOff = QStringLiteral("Preview is off");
 		if (showing && !on) {
-			Cover()->SetMessage(QStringLiteral("Preview is off"), QStringLiteral("Turn it back on with the Preview switch above"));
+			Cover()->SetMessage(previewOff, QStringLiteral("Turn it back on with the Preview switch above"));
 			g_shellCurtain->show();
 			g_shellCurtain->raise();
-		} else if (Cover()->HasMessage()) {
+		} else if (Cover()->Message() == previewOff) {
 			Cover()->SetMessage(QString(), QString());
 			g_shellCurtain->hide();
 		}

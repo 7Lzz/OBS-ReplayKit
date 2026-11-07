@@ -21,6 +21,8 @@ QPointer<QWidget> window;
 QPointer<QCefWidget> browser;
 QSet<QString> ready;
 bool asleep = false;
+// counts the wakes, so a load that waited for the helper is dropped once the browser has gone back to sleep or woken again
+int wakeGen = 0;
 const void *active = nullptr;
 QString activeUrl;
 std::function<void()> suspend;
@@ -62,6 +64,22 @@ void Hold(bool on)
 	DwmSetWindowAttribute((HWND)window->winId(), kDwmCloak, &value, sizeof(value));
 }
 
+// a popup page that never came up at all (its load failed while the helper was down) answers nothing for the rest of the session, so it is loaded again once the helper answers, at most every half minute
+QElapsedTimer reloadedDead;
+void ReloadIfDead()
+{
+	if (!ready.isEmpty() || asleep || !browser || (reloadedDead.isValid() && reloadedDead.elapsed() < 30000))
+		return;
+	reloadedDead.start();
+	const int gen = ++wakeGen;
+	WhenHelperAnswers(120000, [gen](bool, int) {
+		if (gen != wakeGen || asleep || !CefOpen() || !browser || !ready.isEmpty())
+			return;
+		blog(LOG_WARNING, "[replaykit] the popup page never came up, loading it again");
+		browser->setURL(HelperUrl(kPopupPagePath));
+	});
+}
+
 // asks the page for a pick and keeps the window cloaked until the page says that pick is drawn, or the cap runs out
 void Pick(const QString &url)
 {
@@ -73,6 +91,7 @@ void Pick(const QString &url)
 			return;
 		blog(LOG_WARNING, "[replaykit] the popup page did not draw its pick in time, so it is shown as it is");
 		Hold(false);
+		ReloadIfDead();
 	});
 }
 
@@ -221,6 +240,7 @@ void PopupHost::Sleep()
 	if (!CefOpen() || !browser || asleep || active)
 		return;
 	asleep = true;
+	++wakeGen;
 	ready.clear();
 	browser->setURL("about:blank");
 	blog(LOG_INFO, "[replaykit] popup browser asleep");
@@ -232,7 +252,11 @@ void PopupHost::Wake()
 		return;
 	asleep = false;
 	ready.clear();
-	browser->setURL(HelperUrl(kPopupPagePath));
+	const int gen = ++wakeGen;
+	WhenHelperAnswers(120000, [gen](bool, int) {
+		if (gen == wakeGen && !asleep && CefOpen() && browser)
+			browser->setURL(HelperUrl(kPopupPagePath));
+	});
 	blog(LOG_INFO, "[replaykit] popup browser loading again after sleep");
 }
 

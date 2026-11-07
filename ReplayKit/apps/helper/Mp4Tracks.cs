@@ -298,7 +298,7 @@ namespace ReplayKitHelper
                 // a read only file cannot be corrected, and that is not a reason to look at it again
                 return Fix.Nothing;
             }
-            catch (IOException ex) when ((ex.HResult & 0xFFFF) == 32 || (ex.HResult & 0xFFFF) == 33)
+            catch (IOException ex) when (ClipFiles.InUse(ex))
             {
                 // a sharing or lock violation: obs still holds the file open for writing, so the caller looks again later
                 return Fix.Busy;

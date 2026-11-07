@@ -41,6 +41,13 @@ void StopWorkers()
 	}
 }
 
+// a worker that waits in a loop asks this, since the unload waits for every worker to finish
+bool WorkersStopping()
+{
+	std::lock_guard<std::mutex> lock(g_workerMutex);
+	return g_workersStopping;
+}
+
 // lets a freshly loaded module queue work again after an earlier unload stopped the pool
 void StartWorkers()
 {

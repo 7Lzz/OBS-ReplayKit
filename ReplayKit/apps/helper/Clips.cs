@@ -257,12 +257,13 @@ namespace ReplayKitHelper
                         // its row of the clips db goes with it, so a restore gets back its link, game and compression marker
                         var record = keep ? ClipStore.ReadFolder(AppConfig.GetDbPath(), root, db => (db[selected.Name] as JObject)?.DeepClone() as JObject) : null;
                         kept = keep && DeletedHistory.Keep(selected.Full, "clip", root, record);
-                        if (!kept) File.Delete(selected.Full);
+                        if (!kept) ClipFiles.DeleteWhenFree(selected.Full);
                     });
                     UpdateDb(db => db.Remove(selected.Name), Path.GetDirectoryName(selected.Full));
                     EditDrafts.Forget(selected.Full);
                     return new DeleteResult { Status = 200, Name = selected.Name, Kept = kept };
                 }
+                catch (IOException ex) when (ClipFiles.InUse(ex)) { return new DeleteResult { Status = 409, Name = selected.Name, Message = ClipFiles.InUseMessage }; }
                 catch (Exception ex) { return new DeleteResult { Status = 500, Name = selected.Name, Message = ex.Message }; }
             }
         }

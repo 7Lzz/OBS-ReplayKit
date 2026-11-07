@@ -76,6 +76,41 @@ void ShellSetCloak(HWND hwnd, bool on)
 	g_shellCloaked = on;
 }
 
+// a window put away on a monitor that is gone since (unplugged, switched off, dropped while the pc slept) comes back where that monitor was, on no screen at all, and every later show lands there again, so it is moved onto the nearest monitor before it is let out; qt refuses such a saved rectangle when obs starts, which is why a restart of obs used to be the only way back
+void ShellKeepOnScreen(HWND hwnd)
+{
+	RECT now = {};
+	if (!hwnd || IsIconic(hwnd) || g_shellNativeFullscreen || !GetWindowRect(hwnd, &now) || MonitorFromRect(&now, MONITOR_DEFAULTTONULL))
+		return;
+	MONITORINFO target = {};
+	target.cbSize = sizeof(target);
+	if (!GetMonitorInfoW(MonitorFromRect(&now, MONITOR_DEFAULTTONEAREST), &target))
+		return;
+	const RECT work = target.rcWork;
+	if (IsZoomed(hwnd)) {
+		// a maximized window fills the monitor its restored rectangle is on, so that rectangle is what moves; it is kept in workspace coordinates, which start at the work area of the primary monitor
+		WINDOWPLACEMENT wp = {};
+		wp.length = sizeof(wp);
+		MONITORINFO primary = {};
+		primary.cbSize = sizeof(primary);
+		if (!GetWindowPlacement(hwnd, &wp) || !GetMonitorInfoW(MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY), &primary))
+			return;
+		const LONG w = qMin<LONG>(wp.rcNormalPosition.right - wp.rcNormalPosition.left, work.right - work.left);
+		const LONG h = qMin<LONG>(wp.rcNormalPosition.bottom - wp.rcNormalPosition.top, work.bottom - work.top);
+		const LONG left = work.left + (work.right - work.left - w) / 2 - primary.rcWork.left;
+		const LONG top = work.top + (work.bottom - work.top - h) / 2 - primary.rcWork.top;
+		wp.rcNormalPosition = RECT{left, top, left + w, top + h};
+		wp.showCmd = SW_SHOWMAXIMIZED;
+		wp.flags = 0;
+		SetWindowPlacement(hwnd, &wp);
+	} else {
+		const LONG w = qMin<LONG>(now.right - now.left, work.right - work.left);
+		const LONG h = qMin<LONG>(now.bottom - now.top, work.bottom - work.top);
+		SetWindowPos(hwnd, nullptr, work.left + (work.right - work.left - w) / 2, work.top + (work.bottom - work.top - h) / 2, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+	blog(LOG_INFO, "[replaykit] the window was on no monitor (at %ld,%ld), moved onto the nearest one", now.left, now.top);
+}
+
 // the chrome has painted and the compositor has taken it in, so the window can be let out
 void ShellFinishShow()
 {
@@ -83,6 +118,7 @@ void ShellFinishShow()
 		return;
 	QMainWindow *mw = ObsMainWindowQt();
 	if (mw) {
+		ShellKeepOnScreen(g_shellHwnd);
 		ShellEnsureMinimumSize(g_shellHwnd);
 		mw->repaint();
 		for (QWidget *w : {static_cast<QWidget *>(g_shellTitle.data()), static_cast<QWidget *>(g_shellRail.data()), g_shellCurtain.data()}) {

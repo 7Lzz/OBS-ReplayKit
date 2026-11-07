@@ -441,6 +441,7 @@ namespace ReplayKitHelper
                         EditDrafts.Rename(selected.Full, newPath);
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
                     }
+                    catch (IOException ex) when (ClipFiles.InUse(ex)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = ClipFiles.InUseMessage }); }
                     catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                     return false;
                 }

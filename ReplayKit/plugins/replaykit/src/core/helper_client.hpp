@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QString>
+#include <functional>
 #include <string>
 
 // kHelperHost, kHelperPort and kStateFolder, written from shared/ by scripts/sync_shared.ps1
@@ -15,5 +16,6 @@ QString HelperUrl(const QString &path);
 
 bool HttpFocusWindowSucceeded(const char *path, int timeoutMs);
 std::string HttpRequest(const char *method, const char *path, const char *jsonBody, int timeoutMs);
+void WhenHelperAnswers(int limitMs, std::function<void(bool up, int waitedMs)> then);
 
 } // namespace rk

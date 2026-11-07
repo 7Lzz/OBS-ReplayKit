@@ -2,6 +2,9 @@
 #include "prelude.hpp"
 #include "core/helper_client.hpp"
 
+#include "core/async.hpp"
+#include "core/state.hpp"
+
 namespace rk {
 
 namespace {
@@ -21,6 +24,25 @@ std::string HelperUrl(const char *path)
 QString HelperUrl(const QString &path)
 {
 	return QString::fromStdString(HelperOrigin()) + path;
+}
+
+// a page that is asked for while the helper is down (restarting after an update or a crash takes up to half a minute) lands on an error page that nothing loads again, so a browser that loads a helper page later in the session waits here first; the poll runs on a worker and then runs on the ui thread, with up false when limitMs went by without an answer
+void WhenHelperAnswers(int limitMs, std::function<void(bool up, int waitedMs)> then)
+{
+	RunAsync([limitMs, then]() {
+		const auto start = std::chrono::steady_clock::now();
+		const auto until = start + std::chrono::milliseconds(limitMs);
+		bool up = !HttpRequest("GET", "/version", nullptr, 800).empty();
+		// a helper that is not listening refuses at once, so it is asked again soon
+		while (!up && !WorkersStopping() && std::chrono::steady_clock::now() < until) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(250));
+			up = !HttpRequest("GET", "/version", nullptr, 800).empty();
+		}
+		if (WorkersStopping())
+			return;
+		const int waitedMs = int(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+		QMetaObject::invokeMethod(g_callbacks, [then, up, waitedMs]() { then(up, waitedMs); }, Qt::QueuedConnection);
+	});
 }
 
 // worker-thread only, it can hold for up to timeoutMs; /focus-window answers 200 whether or not it found a window, so the json body decides

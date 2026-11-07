@@ -92,7 +92,7 @@ namespace ReplayKitHelper
             lock (Gate)
             {
                 Heal();
-                File.Move(path, stored);
+                ClipFiles.MoveWhenFree(path, stored);
                 try { ClipStore.Update(StorePath(), db => { db[id] = entry; return true; }); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
                 {

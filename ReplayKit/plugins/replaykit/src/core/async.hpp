@@ -8,5 +8,6 @@ namespace rk {
 void RunAsync(std::function<void()> work);
 void StopWorkers();
 void StartWorkers();
+bool WorkersStopping();
 
 } // namespace rk

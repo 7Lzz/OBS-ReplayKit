@@ -13,6 +13,7 @@
 #include "core/window_state.hpp"
 #include "ui/anchored_panel.hpp"
 #include "shell/shell_frame.hpp"
+#include "shell/shell_curtain.hpp"
 #include "shell/shell_history.hpp"
 #include "shell/shell_layout.hpp"
 #include "shell/shell_page.hpp"
@@ -231,13 +232,67 @@ void ShellSurfacePage()
 	});
 }
 
-// a page that never reports (the helper died between the check and the load) must not leave the stage covered forever. the browser only loads while the window is on screen, so the twenty seconds are counted from when it first was
+// set while the shell page waits for the helper before it is loaded
+bool g_hostAwaitingHelper = false;
+int g_hostLoadGen = 0;
+// loads of a page that never came up, tried again once the helper answers before the page is shown as it is
+int g_hostLoadRetries = 0;
+constexpr int kHostLoadRetries = 3;
+
+// a stage that waits on the helper for more than a few seconds says so on its cover, since a helper that does not come back (removed by antivirus, a broken install) otherwise left a blank stage that looked frozen
+constexpr int kHelperNoticeMs = 6000;
+const QString kHelperWaitTitle = QStringLiteral("Waiting for the ReplayKit helper");
+
+void ShellHelperNotice(bool waiting)
+{
+	auto *curtain = static_cast<ShellCurtain *>(g_shellCurtain.data());
+	if (!curtain)
+		return;
+	if (waiting && !curtain->HasMessage())
+		curtain->SetMessage(kHelperWaitTitle, QStringLiteral("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
+	else if (!waiting && curtain->Message() == kHelperWaitTitle)
+		curtain->SetMessage(QString(), QString());
+}
+
+// the browser only loads its page once the window is on screen, which can be long after obs started, and a load while the helper is down (restarting after an update or a crash) lands on an error page that never reports, so the page is asked for once the helper answers
+void ShellLoadHostWhenHelperUp()
+{
+	g_hostAwaitingHelper = true;
+	const int gen = ++g_hostLoadGen;
+	QTimer::singleShot(kHelperNoticeMs, g_callbacks, [gen]() {
+		if (gen == g_hostLoadGen && g_hostAwaitingHelper)
+			ShellHelperNotice(true);
+	});
+	WhenHelperAnswers(120000, [gen](bool up, int waitedMs) {
+		if (gen != g_hostLoadGen || !g_hostAwaitingHelper)
+			return;
+		g_hostAwaitingHelper = false;
+		ShellHelperNotice(false);
+		if (!CefOpen() || !g_shellOn || !g_shellHost || !g_shellHost->browser || ShellAsleep())
+			return;
+		if (!up)
+			blog(LOG_WARNING, "[replaykit] the helper did not answer in %d s, loading the shell page anyway", waitedMs / 1000);
+		else if (waitedMs > 1000)
+			blog(LOG_INFO, "[replaykit] the shell page waited %d ms for the helper", waitedMs);
+		g_hostVisibleTimer.restart();
+		g_shellHost->browser->setURL(HelperUrl(kShellPagePath));
+	});
+}
+
+// a page that never reports (its load failed while the helper was down) must not leave the stage covered forever. the browser only loads while the window is on screen, so the twenty seconds are counted from when it first was, and from the load itself for a page that waited for the helper
 void ShellArmHostBackstop(int delayMs)
 {
 	QTimer::singleShot(delayMs, g_callbacks, []() {
 		if (g_hostReady || !g_shellHost)
 			return;
-		if (!g_hostVisibleTimer.isValid() || g_hostVisibleTimer.elapsed() < 20000) {
+		if (g_hostAwaitingHelper || !g_hostVisibleTimer.isValid() || g_hostVisibleTimer.elapsed() < 20000) {
+			ShellArmHostBackstop(2000);
+			return;
+		}
+		if (g_hostLoadRetries < kHostLoadRetries) {
+			++g_hostLoadRetries;
+			blog(LOG_WARNING, "[replaykit] shell browser never reported its first page; loading it again once the helper answers (%d of %d)", g_hostLoadRetries, kHostLoadRetries);
+			ShellLoadHostWhenHelperUp();
 			ShellArmHostBackstop(2000);
 			return;
 		}
@@ -273,6 +328,7 @@ void ShellCreateHost(QMainWindow *mw)
 	});
 	g_shellHost = page;
 	g_hostRequested = ShellView::Home;
+	g_hostLoadRetries = 0;
 	ShellLayoutViews();
 	page->show();
 	page->lower();
@@ -395,10 +451,14 @@ void ShellRestartHost(bool fromSleep)
 	g_hostPingMisses = 0;
 	++g_hostWaitGen;
 	g_hostVisibleTimer.restart();
-	if (fromSleep)
-		g_shellHost->browser->setURL(HelperUrl(kShellPagePath));
-	else
+	g_hostLoadRetries = 0;
+	if (fromSleep) {
+		ShellLoadHostWhenHelperUp();
+	} else {
+		g_hostAwaitingHelper = false;
+		++g_hostLoadGen;
 		g_shellHost->browser->reloadPage();
+	}
 	if (ShellIsPageView(g_shellView))
 		ShellSurfacePage();
 	ShellArmHostBackstop(5000);
@@ -719,6 +779,7 @@ void ShellHostShown(const std::string &name)
 	g_hostShown = view;
 	const bool first = !g_hostReady;
 	g_hostReady = true;
+	ShellHelperNotice(false);
 	blog(LOG_INFO, "[replaykit] shell page shown: %s%s", name.c_str(), first ? " (first)" : "");
 	if (!g_shellOn)
 		return;
@@ -765,6 +826,10 @@ void ShellEnsureHost()
 	if (!g_shellOn || g_shellHost || g_hostCreating)
 		return;
 	g_hostCreating = true;
+	QTimer::singleShot(kHelperNoticeMs, g_callbacks, []() {
+		if (g_hostCreating && !g_shellHost)
+			ShellHelperNotice(true);
+	});
 	RunAsync([]() {
 		const bool cefReady = EnsureCefReadyBlocking();
 		bool helperUp = false;
@@ -781,8 +846,12 @@ void ShellEnsureHost()
 				QMainWindow *mw = ObsMainWindowQt();
 				if (!cefReady || !helperUp || !CefOpen() || !mw || !g_shellOn || g_shellHost) {
 					blog(LOG_WARNING, "[replaykit] shell browser not created (cef ready: %d, helper up: %d)", cefReady, helperUp);
+					// a page waiting on screen keeps asking for the helper instead of leaving the stage covered until the next change of view
+					if (cefReady && !helperUp && mw && g_shellOn && !g_shellHost && mw->isVisible() && !mw->isMinimized() && ShellIsPageView(g_shellView))
+						QTimer::singleShot(2000, g_callbacks, []() { ShellEnsureHost(); });
 					return;
 				}
+				ShellHelperNotice(false);
 				ShellCreateHost(mw);
 			},
 			Qt::QueuedConnection);

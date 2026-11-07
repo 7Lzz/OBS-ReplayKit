@@ -141,6 +141,8 @@ namespace ReplayKitHelper
             }
         }
 
+        private const string BusyMessage = "A clip is already being saved.";
+
         public static JObject SaveSegments(JObject body)
         {
             long id = body?["id"]?.Value<long?>() ?? 0;
@@ -148,6 +150,12 @@ namespace ReplayKitHelper
             var result = SaveSegmentsCore(body, id);
             // a save that failed ends here; one that worked already ended the moment its file was in place
             MarkSaveEnded(id, "");
+            // the save sound and toast already went out on the press, so a clip that did not make it says so where it stays seen
+            if (result["ok"]?.Value<bool>() != true && result["message"]?.Value<string>() != BusyMessage)
+            {
+                try { Notifications.Add("warning", "clip-save-failed", "A clip was not saved", result["message"]?.Value<string>() ?? "The clip could not be saved."); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("clip save notice: " + ex.Message); }
+            }
             return result;
         }
 
@@ -181,12 +189,18 @@ namespace ReplayKitHelper
             }
 
             string clipDir = AppConfig.GetClipDir();
-            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail("The clip folder was not found.");
+            // a folder that was deleted or moved away is made again, as applying the settings does; only one on a drive that is gone fails
+            if (!string.IsNullOrWhiteSpace(clipDir) && !Directory.Exists(clipDir))
+            {
+                try { Directory.CreateDirectory(clipDir); Log.Write("clip folder was missing, made it again: " + clipDir); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { Log.Write("clip folder could not be made: " + ex.Message); }
+            }
+            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail("The clip folder " + clipDir + " was not found and could not be made, so the clip was lost. Check that its drive is connected, or pick another folder in Settings.");
             string ffmpeg = Compression.FindCompressionFfmpeg();
             string ffprobe = Compression.FindCompressionFfprobe();
             if (!File.Exists(ffmpeg) || !File.Exists(ffprobe)) return Fail("ffmpeg is missing, so the clip could not be saved.");
 
-            if (!Monitor.TryEnter(SaveGate)) return Fail("A clip is already being saved.");
+            if (!Monitor.TryEnter(SaveGate)) return Fail(BusyMessage);
             string list = null;
             string part = null;
             try
