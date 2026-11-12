@@ -1147,7 +1147,7 @@
           </div>
         </div>
       </div>
-      <!-- discord audio is a background input that only keeps the users own voice out of the share preview, so it is never shown; the controls stay in the markup because the page code reads and writes their values -->
+      <!-- the recording audio list uses these controls for the discord volume and mute state -->
       <div class="box" hidden>
         <div class="box-title">Discord</div>
         <div class="form-row tight">
@@ -2277,6 +2277,7 @@
   const RA_DESKTOP = { kind:"desktop", name:"PC Audio", icon:"audio/desktop", volumeKey:"desktopAudioVolume" };
   const RA_GAME = { kind:"desktop", name:"Game Audio", icon:"audio/game", volumeKey:"desktopAudioVolume", section:true };
   const RA_MIC = { kind:"mic", name:"Microphone", icon:"audio/microphone", volumeKey:"micVolume" };
+  const RA_DISCORD = { kind:"discord", name:"Discord", icon:"audio/discord", volumeKey:"discordAudioVolume" };
   const raState = { apps:[], obsAnswered:true, timer:0, html:"", dragging:false, renderAfterDrag:false };
   let activePage = "output";
   const raIcons = new Map();
@@ -3054,13 +3055,12 @@
     const sig = value + "|" + (combo.dataset.options || "");
     if (menu.dataset.sig === sig) return;
     menu.dataset.sig = sig;
-    menu.innerHTML = options.filter((o) => !o.hidden).map((o) => comboOptionHtml(o, value)).join("");
+    menu.innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
   }
 
   function setComboValue(combo, value, notify) {
     const options = comboOptions(combo);
-    const selected = options.find((o) => o.value === value && !o.disabled && (!notify || !o.hidden))
-      || options.find((o) => !o.disabled && !o.hidden);
+    const selected = options.find((o) => o.value === value && !o.disabled) || options.find((o) => !o.disabled);
     combo.dataset.value = selected ? selected.value : "";
     renderCombo(combo);
     if (notify) combo.dispatchEvent(new CustomEvent("combochange", { bubbles:true }));
@@ -4045,7 +4045,7 @@
     });
     combo.addEventListener("keydown", (e) => {
       if (combo.classList.contains("is-disabled")) return;
-      const options = comboOptions(combo).filter((o) => !o.disabled && !o.hidden);
+      const options = comboOptions(combo).filter((o) => !o.disabled);
       if (!options.length) return;
       const current = Math.max(0, options.findIndex((o) => o.value === comboValue(combo)));
       if (e.key === "Enter" || e.key === " ") {
@@ -5760,11 +5760,12 @@
   }
 
   function raBuildHtml() {
-    if (!raSpecific()) return raFixedRowHtml(RA_DESKTOP) + raFixedRowHtml(RA_MIC);
+    const discord = state.recordingAudioMode === "output_device" ? "" : raFixedRowHtml(RA_DISCORD);
+    if (!raSpecific()) return raFixedRowHtml(RA_DESKTOP) + discord + raFixedRowHtml(RA_MIC);
     const apps = raState.apps.length
       ? raState.apps.map(raAppRowHtml).join("")
       : '<div class="ra-empty">Programs that play sound show up here while they play. Tick the ones to record.</div>';
-    return raFixedRowHtml(RA_MIC) + raFixedRowHtml(RA_GAME) + apps;
+    return raFixedRowHtml(RA_MIC) + discord + raFixedRowHtml(RA_GAME) + apps;
   }
 
   function renderRecordingAudio() {
@@ -5779,12 +5780,12 @@
     }
     // The description follows the selected recording mode.
     const info = document.getElementById("raInfo");
-    let text = "Records all the sound your PC plays.";
+    let text = "Records PC audio and Discord. Discord gets its own track when separate audio tracks are enabled.";
     if (state.recordingAudioMode === "output_device") {
       text = "Records everything played through the Windows default output device. Discord is included in PC Audio and Share Preview audio is off.";
     } else if (raSpecific()) {
       text = raState.obsAnswered
-        ? "Only the apps you turn on are recorded. New apps that play sound show up here turned off."
+        ? "PC Audio records the apps you turn on. New apps that play sound show up here turned off."
         : "ReplayKit can't read the list of apps from OBS right now, so it's showing the apps it already knew about.";
     }
     if (info && info.textContent !== text) info.textContent = text;
@@ -5813,9 +5814,9 @@
   }
 
   fillCombo(els.recordingAudioMode, [
-    { value:"all", label:"All PC Audio" },
-    { value:"specific", label:"Specific apps" },
-    { value:"output_device", label:"Default output device", hidden:true }
+    { value:"all", label:"All PC Audio + Discord" },
+    { value:"output_device", label:"All PC Audio" },
+    { value:"specific", label:"Specific apps" }
   ]);
   els.recordingAudioMode.addEventListener("combochange", () => {
     state.recordingAudioMode = comboValue(els.recordingAudioMode);
@@ -5867,9 +5868,10 @@
       const pct = slider.closest(".ra-row").querySelector(".ra-pct");
       if (pct) pct.textContent = value + "%";
       // the same volume in the audio tab
-      if (key === "desktopAudioVolume") {
-        syncIntegerRangeControl(els.desktopAudioVolume, els.desktopAudioVolumeValue, value, clampAudioVolume, SETTING_LIMITS.desktopAudioVolume.min, SETTING_LIMITS.desktopAudioVolume.max);
-        refreshFieldResetState(key, DEFAULT_DESKTOP_AUDIO_VOLUME);
+      if (key === "desktopAudioVolume" || key === "discordAudioVolume") {
+        const limits = SETTING_LIMITS[key];
+        syncIntegerRangeControl(els[key], els[key + "Value"], value, clampAudioVolume, limits.min, limits.max);
+        refreshFieldResetState(key, SETTING_DEFAULTS[key]);
       } else if (key === "micVolume" && window.RKMic) {
         RKMic.refresh();
       }

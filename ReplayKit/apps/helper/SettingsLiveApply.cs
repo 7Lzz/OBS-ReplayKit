@@ -318,7 +318,8 @@ namespace ReplayKitHelper
         }
 
         // obs-browser-page.exe is obss own cef subprocess -- without excluding it, clip audio played back in the dock gets treated as ordinary desktop audio, monitored back out to the discord share, and doubles up with the copy discord already grabs directly from the same process tree.
-        internal static readonly string[] DesktopAudioExcludeExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe", "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe", HelperExeName };
+        internal static readonly string[] DiscordAudioExes = { "Discord.exe", "DiscordSystemHelper.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe" };
+        private static readonly string[] DesktopAudioExcludeExes = DiscordAudioExes.Concat(new[] { "obs64.exe", "obs32.exe", "obs.exe", "obs-browser-page.exe", HelperExeName }).ToArray();
 
         // the programs the desktop capture never takes, whatever the recording audio tab says
         internal static IReadOnlyList<string> DesktopAudioExcludeList => DesktopAudioExcludeExes;

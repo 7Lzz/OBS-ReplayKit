@@ -214,6 +214,13 @@ function Invoke-Sweep([string[]]$dirs) {
 }
 
 if ($Path) {
+    if ([System.IO.Path]::GetExtension($Path) -ieq '.mp4') {
+        $helperExe = Join-Path (Split-Path -Parent $PSScriptRoot) 'helper\OBSReplayKit.exe'
+        if (Test-Path -LiteralPath $helperExe) {
+            & $helperExe --finish-recording-audio $Path 2>$null
+            if ($LASTEXITCODE -ne 0) { Write-FixLog 'recording audio finalize did not finish' }
+        }
+    }
     Repair-WithRetry $Path
 } elseif ($SweepDirs) {
     $dirs = $SweepDirs -split ';' | Where-Object { $_ }

@@ -31,15 +31,22 @@ namespace ReplayKitHelper
         {
             var clip = Clips.GetSafeClipPath(clipName);
             if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
-            int count = Mp4Tracks.CountAudio(clip.Full);
+            var entries = Mp4Tracks.ReadFile(clip.Full);
+            var audio = entries?.Where(t => t.Audio).ToArray();
+            int count = audio?.Length ?? 0;
             int first = count >= 2 ? 1 : 0;
             var tracks = new JArray();
-            for (int i = first; i < count; i++) tracks.Add(new JObject { ["index"] = i, ["label"] = count >= 2 ? Trim.AudioTrackLabel(i) : "Audio" });
+            for (int i = first; i < count; i++)
+            {
+                string label = audio[i].HandlerName;
+                if (!Trim.AudioTrackLabels.Contains(label, StringComparer.Ordinal)) label = count >= 2 ? Trim.AudioTrackLabel(i) : "Audio";
+                tracks.Add(new JObject { ["index"] = i, ["label"] = label });
+            }
             var result = new JObject { ["ok"] = true, ["audioTracks"] = count, ["tracks"] = tracks };
             if (count < 1)
             {
                 // a clip with no audio at all takes audio from outside, but only when its boxes could be read; one that could not may hold audio that is not seen
-                result["readable"] = Mp4Tracks.IsReadable(clip.Full);
+                result["readable"] = entries != null;
                 return result;
             }
 

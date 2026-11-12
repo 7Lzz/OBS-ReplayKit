@@ -27,6 +27,16 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
+            if (args.Length == 2 && args[0] == "--finish-recording-audio")
+            {
+                try
+                {
+                    Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
+                    SavedClipAudio.FinishObsFile(args[1]);
+                    return 0;
+                }
+                catch (Exception ex) { Console.Error.WriteLine("Recording audio finalize failed: " + ex.GetType().Name); return 1; }
+            }
             if (args.Length > 0 && args[0] == "--refresh-game-tag")
             {
                 try

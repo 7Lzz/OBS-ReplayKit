@@ -13,6 +13,7 @@ namespace ReplayKitHelper
             public uint Id;
             public bool Audio;
             public bool Video;
+            public string HandlerName;
             // the 24 bit flags of the tkhd box: 1 enabled, 2 in the movie, 4 in the preview
             public uint Flags;
             public ushort AlternateGroup;
@@ -114,6 +115,17 @@ namespace ReplayKitHelper
                 s.Seek(hdlr.PayloadStart + 8, SeekOrigin.Begin);
                 if (!ReadBytes(s, buf, 4)) continue;
                 string handler = System.Text.Encoding.ASCII.GetString(buf, 0, 4);
+                string handlerName = "";
+                if (handler == "soun" && hdlr.PayloadStart + 24 < hdlr.End)
+                {
+                    s.Seek(hdlr.PayloadStart + 24, SeekOrigin.Begin);
+                    int length = (int)Math.Min(hdlr.End - s.Position, buf.Length);
+                    if (ReadBytes(s, buf, length))
+                    {
+                        int end = Array.IndexOf(buf, (byte)0, 0, length);
+                        handlerName = System.Text.Encoding.UTF8.GetString(buf, 0, end >= 0 ? end : length);
+                    }
+                }
 
                 uint timescale = 0;
                 if (TryFind(s, mdia.PayloadStart, mdia.End, "mdhd", out Box mdhd))
@@ -153,6 +165,7 @@ namespace ReplayKitHelper
                     Id = id,
                     Audio = handler == "soun",
                     Video = handler == "vide",
+                    HandlerName = handlerName,
                     Flags = flags,
                     AlternateGroup = (ushort)((buf[0] << 8) | buf[1]),
                     FlagsOffset = tkhd.PayloadStart,
@@ -165,22 +178,21 @@ namespace ReplayKitHelper
             return tracks;
         }
 
-        // how many audio tracks a file has, 0 when it cannot be read as an mp4 (a file being written, another format)
-        public static int CountAudio(string path)
+        internal static List<Track> ReadFile(string path)
         {
             try
             {
                 using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                {
-                    var tracks = Read(fs);
-                    return tracks == null ? 0 : tracks.Count(t => t.Audio);
-                }
+                    return Read(fs);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                return 0;
+                return null;
             }
         }
+
+        // how many audio tracks a file has, 0 when it cannot be read as an mp4 (a file being written, another format)
+        public static int CountAudio(string path) => ReadFile(path)?.Count(t => t.Audio) ?? 0;
 
         // whether the file is an mp4 whose track boxes can be read; for one that is not, a count of no audio tracks says nothing, since the file may hold audio that is not seen
         public static bool IsReadable(string path)

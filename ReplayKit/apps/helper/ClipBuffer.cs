@@ -170,6 +170,7 @@ namespace ReplayKitHelper
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (name.Length == 0 || name.Length > 200 || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || (ext != ".mp4" && ext != ".mkv" && ext != ".mov"))
                 return Fail("The clip name is not valid.");
+            bool discordClosed = ext == ".mp4" && SavedClipAudio.DiscordClosed();
             // the game folder the clip goes in, empty for the clip folder itself; its name is the one the clip name starts with
             string folder = body?["folder"]?.Value<string>() ?? "";
             if (folder.Length > 0 && (!Clips.IsGameFolderName(folder) || !name.StartsWith(folder + " ", StringComparison.OrdinalIgnoreCase)))
@@ -256,6 +257,7 @@ namespace ReplayKitHelper
                     Log.Write("clip buffer save: ffmpeg exit " + run.ExitCode + ": " + string.Join(" | ", run.Output.Take(5)));
                     return Fail("The clip could not be written.");
                 }
+                SavedClipAudio.RemoveSilentDiscord(part, ffmpeg, discordClosed);
                 File.Move(part, target);
                 part = null;
                 if (folder.Length > 0) Clips.RegisterGameFolder(target);
