@@ -378,12 +378,31 @@ struct Bongo {
 		next.horizontalFlip = obs_data_get_bool(data, "mouse_horizontal_flip");
 		next.verticalFlip = obs_data_get_bool(data, "mouse_vertical_flip");
 		next.mask = obs_data_get_bool(data, "mask");
-		next.keys = ParseKeys(obs_data_get_string(data, "keys"));
-		next.codes = QString::fromUtf8(obs_data_get_string(data, "key_codes")).split(QLatin1Char(','));
-		while (!next.codes.isEmpty() && next.codes.back().isEmpty())
-			next.codes.removeLast();
-		if (next.codes.size() > 32)
-			next.codes = next.codes.mid(0, 32);
+		const QByteArray mode = next.mode.toUtf8();
+		obs_data_t *bindings = obs_data_get_obj(data, "key_bindings");
+		obs_data_t *keySettings = nullptr;
+		if (obs_data_has_user_value(data, "key_bindings")) {
+			if (bindings)
+				keySettings = obs_data_get_obj(bindings, mode.constData());
+		} else {
+			// older scenes stamped the owner of the flat bindings as Mode
+			if (!obs_data_has_user_value(data, "Mode") &&
+			    (*obs_data_get_string(data, "keys") || *obs_data_get_string(data, "key_codes")))
+				obs_data_set_string(data, "Mode", mode.constData());
+			if (mode == obs_data_get_string(data, "Mode"))
+				keySettings = data;
+		}
+		if (keySettings) {
+			next.keys = ParseKeys(obs_data_get_string(keySettings, "keys"));
+			next.codes = QString::fromUtf8(obs_data_get_string(keySettings, "key_codes")).split(QLatin1Char(','));
+			while (!next.codes.isEmpty() && next.codes.back().isEmpty())
+				next.codes.removeLast();
+			if (next.codes.size() > 32)
+				next.codes = next.codes.mid(0, 32);
+		}
+		if (keySettings != data)
+			obs_data_release(keySettings);
+		obs_data_release(bindings);
 		std::lock_guard<std::mutex> guard(settingsLock);
 		settings = next;
 	}
@@ -412,7 +431,7 @@ struct Bongo {
 		std::vector<std::pair<int, int>> order;
 		slotDown.assign(count, false);
 		for (size_t j = 0; j < count; ++j) {
-			const int custom = j < now.keys.size() ? now.keys[j] : 0;
+			const int custom = mode.name == now.mode && j < now.keys.size() ? now.keys[j] : 0;
 			int vk = 0, rank = -1;
 			if (custom > 0) {
 				vk = custom;

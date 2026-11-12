@@ -1,0 +1,31 @@
+ReplayKit patch 6 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+Drop packets flagged with a timestamp error before mixing them. An unreliable timestamp can reset the shared
+mix timeline and make valid packets from every app look late. Release the packet and continue draining WASAPI.
+
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -168,8 +168,10 @@
+ 		if (hr == AUDCLNT_S_BUFFER_EMPTY || num_frames == 0)
+ 			return;
+ 
+-		bool forwarded;
+-		if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
++		bool forwarded = true;
++		if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) {
++			warn("timestamp error flag set - dropping packet");
++		} else if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
+ 			// Forward explicit silence instead of a gap: the mixer keeps a
+ 			// continuous timeline and OBS never sees the stream stall.
+ 			silence_buffer.assign((std::size_t)num_frames * format.nChannels, 0.0f);
+@@ -181,9 +183,6 @@
+ 
+ 		if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
+ 			warn("data discontinuity flag set");
+-
+-		if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)
+-			warn("timestamp error flag set");
+ 
+ 		THROW_IF_FAILED(capture_client->ReleaseBuffer(num_frames));
+ 

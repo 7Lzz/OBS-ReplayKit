@@ -18,6 +18,7 @@ local MAX_SETTINGS_BYTES        = 65536
 local SETTINGS_SYNC_INTERVAL_MS = 500
 local active_discord_output_mode = DEFAULT_DISCORD_OUTPUT_MODE
 local active_projector_enabled  = false
+local active_output_device = false
 local have_discord_output_settings = false
 local last_discord_output_signature = ""
 local stop_vcam_if_active
@@ -86,13 +87,13 @@ local function read_discord_output_settings()
     local text = read_runtime_settings_text()
     if not text or text == "" then
         print("[DiscordProjector] WARN: replaykit_settings.json missing; disabling Discord share monitoring")
-        return FAIL_CLOSED_OUTPUT_MODE, false, false
+        return FAIL_CLOSED_OUTPUT_MODE, false, false, false
     end
 
     local data = obs.obs_data_create_from_json(text)
     if data == nil then
         print("[DiscordProjector] WARN: replaykit_settings.json invalid; disabling Discord share monitoring")
-        return FAIL_CLOSED_OUTPUT_MODE, false, false
+        return FAIL_CLOSED_OUTPUT_MODE, false, false, false
     end
 
     local mode = DEFAULT_DISCORD_OUTPUT_MODE
@@ -108,6 +109,7 @@ local function read_discord_output_settings()
     end
     local screenshare_enabled = _read_bool(data, "discord_screenshare_enabled", true)
     local projector_enabled = screenshare_enabled and _read_bool(data, "discord_projector_enabled", true)
+    local output_device = obs.obs_data_get_string(data, "recordingAudioMode") == "output_device"
     obs.obs_data_release(data)
 
     if mode == MODE_SHARE_BRIDGE then
@@ -118,7 +120,7 @@ local function read_discord_output_settings()
         mode = MODE_PROJECTOR
     end
 
-    return mode, projector_enabled, true
+    return mode, projector_enabled, true, output_device
 end
 
 local function discord_output_uses_legacy_vcam()
@@ -137,6 +139,16 @@ local function _set_monitoring(source_name, target, friendly_target_name, log_mi
             print(string.format("[AutoVirtCam] no '%s' source found - skipping monitoring change", source_name))
         end
         return false
+    end
+    if source_name == DESKTOP_AUDIO_SOURCE_NAME then
+        local settings = obs.obs_source_get_settings(src)
+        local device_capture = active_output_device or (settings and obs.obs_data_get_bool(settings, "output_device"))
+        if settings then obs.obs_data_release(settings) end
+        if device_capture then
+            target = OBS_MONITORING_TYPE_NONE
+            friendly_target_name = "Monitor Off - Output Device Capture"
+            ensure_unmuted = false
+        end
     end
     local monitoring_enabled_api = type(obs.obs_source_get_monitoring_enabled) == "function"
         and type(obs.obs_source_set_monitoring_enabled) == "function"
@@ -203,7 +215,7 @@ local function discord_output_signature(mode, enabled)
 end
 
 local function apply_discord_output_settings(reason, force)
-    local mode, enabled, settings_ok = read_discord_output_settings()
+    local mode, enabled, settings_ok, output_device = read_discord_output_settings()
     if not settings_ok and have_discord_output_settings then
         print(string.format("[DiscordProjector] WARN: settings sync (%s) could not read settings; keeping last mode=%s enabled=%s",
             reason or "poll", tostring(active_discord_output_mode), tostring(active_projector_enabled)))
@@ -211,6 +223,7 @@ local function apply_discord_output_settings(reason, force)
         return
     end
     have_discord_output_settings = settings_ok
+    active_output_device = output_device
     local signature = discord_output_signature(mode, enabled)
     if not force and signature == last_discord_output_signature then
         active_discord_output_mode = mode
@@ -315,7 +328,7 @@ end
 
 local function start_vcam()
     obs.timer_remove(start_vcam)
-    active_discord_output_mode, active_projector_enabled, have_discord_output_settings = read_discord_output_settings()
+    active_discord_output_mode, active_projector_enabled, have_discord_output_settings, active_output_device = read_discord_output_settings()
     if not discord_output_uses_legacy_vcam() then
         if obs.obs_frontend_virtualcam_active() then
             obs.obs_frontend_stop_virtualcam()
@@ -367,7 +380,7 @@ end
 
 function script_load(_settings)
     print("[DiscordProjector] loaded")
-    active_discord_output_mode, active_projector_enabled, have_discord_output_settings = read_discord_output_settings()
+    active_discord_output_mode, active_projector_enabled, have_discord_output_settings, active_output_device = read_discord_output_settings()
     last_discord_output_signature = discord_output_signature(active_discord_output_mode, active_projector_enabled)
     print("[DiscordProjector] discord_output_mode: " .. active_discord_output_mode)
     if active_discord_output_mode == MODE_PROJECTOR and active_projector_enabled then

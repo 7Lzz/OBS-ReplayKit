@@ -400,27 +400,39 @@ namespace ReplayKitHelper
         internal static void ReconcileRecordingAudioPrograms()
         {
             var early = ReadSettings();
-            bool chosen = early["recordingAudioMode"]?.Value<string>() == "specific" || ((early["recordingAudioApps"] as JObject)?.HasValues ?? false);
-            if (!chosen) return;
             ObsWebSocketResult current = null;
             for (int i = 0; i < 45; i++)
             {
-                current = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName }, 3000);
+                current = GetDesktopAudioCaptureSettings();
                 if (current.Ok) break;
                 Thread.Sleep(1000);
             }
-            if (current == null || !current.Ok) return;
+            if (current?.Ok != true)
+            {
+                if (UsesOutputDeviceRecording(early)) Log.Write("EnsureRecordingAudioPrograms: OBS could not apply output device capture: " + current?.Message);
+                return;
+            }
 
             // read again under the settings lock so a save that landed while waiting is respected
             lock (SettingsStore.Gate)
             {
                 var settings = ReadSettings();
-                var wanted = new JObject();
-                SetDesktopAudioCaptureSettingsObject(wanted, settings);
-                var live = current.Data?["inputSettings"] as JObject ?? new JObject();
-                if (live["exclude"]?.Value<bool>() == wanted["exclude"]?.Value<bool>() && SameProgramList(live["executable_list"], wanted["executable_list"])) return;
-                var result = SetDesktopAudioCaptureSettingsLive(DesktopAudioInputName, settings);
-                Log.Write("EnsureRecordingAudioPrograms: the capture list of the desktop audio was put back to the saved choices: " + (result["ok"]?.Value<bool>() == true ? "ok" : result["message"]?.ToString()));
+                current = GetDesktopAudioCaptureSettings();
+                if (!current.Ok)
+                {
+                    Log.Write("EnsureRecordingAudioPrograms: could not read Desktop Audio settings: " + current.Message);
+                    return;
+                }
+                bool chosen = UsesOutputDeviceRecording(settings) || settings["recordingAudioMode"]?.Value<string>() == "specific"
+                    || ((settings["recordingAudioApps"] as JObject)?.HasValues ?? false);
+                if (!chosen && !CapturesOutputDevice(current.Data?["inputSettings"]))
+                {
+                    var discord = RestoreDiscordAudioTracks(settings);
+                    if (!discord.Ok) Log.Write("EnsureRecordingAudioPrograms: could not restore Discord audio tracks: " + discord.Message);
+                    return;
+                }
+                var result = ApplyRecordingAudioLive(settings, current);
+                foreach (var warning in result["warnings"].Values<string>()) Log.Write("EnsureRecordingAudioPrograms: " + warning);
             }
         }
 
@@ -558,7 +570,29 @@ namespace ReplayKitHelper
             bool filesPresent = File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\config.json")) &&
                 File.Exists(Path.Combine(root, "bin\\64bit\\Bango Cat\\mode\\standard\\config.json")) &&
                 Directory.Exists(bakes) && Directory.EnumerateFiles(bakes, "*.json").Any();
-            if (loaded && filesPresent && sourceCurrent) { Notifications.DismissKey(BongoCatNoticeKey); return; }
+            if (loaded && filesPresent && sourceCurrent)
+            {
+                lock (SettingsStore.Gate)
+                {
+                    settings = ReadSettings();
+                    if (settings["overlayStyle"]?.Value<string>() == "bongo_cat")
+                    {
+                        var bindings = BongoSourceBindings(settings);
+                        if (!JToken.DeepEquals(input.Data?["inputSettings"]?["key_bindings"], bindings))
+                        {
+                            var update = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject
+                            {
+                                ["inputName"] = OverlayScene.BongoSourceName,
+                                ["inputSettings"] = new JObject { ["key_bindings"] = bindings },
+                                ["overlay"] = true,
+                            }, 3000);
+                            if (!update.Ok) Log.Write("CheckBongoCat: could not sync key bindings: " + update.Message);
+                        }
+                    }
+                }
+                Notifications.DismissKey(BongoCatNoticeKey);
+                return;
+            }
             Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", source uses ReplayKit renderer: " + sourceCurrent + ", Bango Cat folder and baked models present: " + filesPresent + ".");
             Notifications.Add("warning", BongoCatNoticeKey, "Bongo Cat is not working", !filesPresent
                 ? "The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
@@ -913,7 +947,7 @@ namespace ReplayKitHelper
                     hotkeyRelease["applied"] = ConcatArrays(hotkeyRelease["applied"] as JArray, display["applied"] as JArray);
                     hotkeyRelease["warnings"] = ConcatArrays(hotkeyRelease["warnings"] as JArray, display["warnings"] as JArray);
                 }
-                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), RecordingAudioKeysChanged(previous, settings), inputOverlayLayoutChanged && settings["overlayStyle"]?.Value<string>() == "input_overlay",
+                var liveResult = ApplyLiveSettings(settings, restartObs, applyOverlay, recreateBongo, motionBlurChanged, applyRuntimeOutputs, applyVideoSettings, applyReplayBufferOutput, MicKeysChanged(previous, settings), AudioVolumeKeysChanged(previous, settings), inputOverlayLayoutChanged && settings["overlayStyle"]?.Value<string>() == "input_overlay",
                     previous["allowSleepWhileActive"]?.Value<bool>() != settings["allowSleepWhileActive"]?.Value<bool>());
                 if (previous["appIcon"]?.Value<string>() != settings["appIcon"]?.Value<string>() ||
                     previous["appIconCustomPath"]?.Value<string>() != settings["appIconCustomPath"]?.Value<string>() ||

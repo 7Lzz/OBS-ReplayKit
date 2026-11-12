@@ -1,0 +1,225 @@
+Verify an isolated forward timestamp jump before moving a capture stream's cursor.
+
+Hold one suspect packet until the next packet confirms a gap or places it on the existing timeline. Reject timestamps ahead of the capture clock as anchors, and clear pending audio after stream errors and restarts.
+
+diff --git a/src/packet-timeline.hpp b/src/packet-timeline.hpp
+--- a/src/packet-timeline.hpp
++++ b/src/packet-timeline.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include <algorithm>
+ #include <cstdint>
++#include <optional>
+ 
+ struct PacketPlacement {
+ 	std::uint64_t timestamp;
+@@ -10,21 +11,69 @@
+ 
+ class PacketTimeline {
+ 	static constexpr std::uint64_t ticks_per_second = 10'000'000;
++	static constexpr std::uint64_t max_jitter = 20'000; // 2 ms
+ 	std::uint64_t next_frame = 0;
+ 	bool continuous = false;
+ 
++	static std::uint64_t ToFrame(std::uint64_t timestamp, std::uint32_t rate)
++	{
++		return timestamp / ticks_per_second * rate +
++		       (timestamp % ticks_per_second * rate + ticks_per_second / 2) / ticks_per_second;
++	}
++
++	static std::uint64_t ToTimestamp(std::uint64_t frame, std::uint32_t rate)
++	{
++		return frame / rate * ticks_per_second + frame % rate * ticks_per_second / rate;
++	}
++
++	static std::uint64_t Tolerance(std::uint32_t frames, std::uint32_t rate)
++	{
++		return (std::min)(max_jitter * rate / ticks_per_second,
++				  static_cast<std::uint64_t>((frames - 1) / 2));
++	}
++
++	static bool IsClose(std::uint64_t frame, std::uint64_t expected, std::uint64_t tolerance)
++	{
++		return (frame >= expected ? frame - expected : expected - frame) <= tolerance;
++	}
++
+ public:
++	bool HasAnchor() const { return next_frame != 0; }
+ 	void MarkGap() { continuous = false; }
++
++	static bool IsPlausible(std::uint64_t timestamp, std::uint64_t now)
++	{
++		return timestamp <= now || timestamp - now <= max_jitter;
++	}
++
++	bool IsForwardJump(std::uint64_t timestamp, std::uint32_t frames, std::uint32_t rate) const
++	{
++		auto frame = ToFrame(timestamp, rate);
++		return HasAnchor() && frame > next_frame && frame - next_frame > Tolerance(frames, rate);
++	}
++
++	std::optional<std::uint64_t> ResolvePending(std::optional<std::uint64_t> timestamp,
++						    std::uint32_t frames, std::uint64_t following,
++						    std::uint32_t following_frames, std::uint32_t rate,
++						    bool discontinuity) const
++	{
++		auto frame = ToFrame(following, rate);
++		auto tolerance = Tolerance(following_frames, rate);
++		if (!discontinuity && IsClose(frame, next_frame + frames, tolerance))
++			return ToTimestamp(next_frame, rate);
++
++		if (timestamp && IsClose(frame, ToFrame(*timestamp, rate) + frames, tolerance))
++			return timestamp;
++
++		return std::nullopt;
++	}
+ 
+ 	PacketPlacement Place(std::uint64_t timestamp, std::uint32_t frames, std::uint32_t rate,
+ 			      bool discontinuity)
+ 	{
+ 		// use a common qpc frame grid so independent captures keep the same sample phase
+-		auto frame = timestamp / ticks_per_second * rate +
+-			     (timestamp % ticks_per_second * rate + ticks_per_second / 2) / ticks_per_second;
+-		auto distance = frame >= next_frame ? frame - next_frame : next_frame - frame;
+-		const auto tolerance = (std::min)(rate / 500, (frames - 1) / 2);
+-		if (continuous && !discontinuity && distance <= tolerance)
++		auto frame = ToFrame(timestamp, rate);
++		if (continuous && !discontinuity && IsClose(frame, next_frame, Tolerance(frames, rate)))
+ 			frame = next_frame;
+ 
+ 		std::uint32_t skip = 0;
+@@ -38,6 +87,6 @@
+ 
+ 		next_frame = frame + frames - skip;
+ 		continuous = true;
+-		return {frame / rate * ticks_per_second + frame % rate * ticks_per_second / rate, skip};
++		return {ToTimestamp(frame, rate), skip};
+ 	}
+ };
+diff --git a/src/audio-capture-helper.hpp b/src/audio-capture-helper.hpp
+--- a/src/audio-capture-helper.hpp
++++ b/src/audio-capture-helper.hpp
+@@ -75,6 +75,12 @@
+ 	WAVEFORMATEX format;
+ 	std::vector<float> silence_buffer;
+ 	PacketTimeline packet_timeline;
++	struct PendingPacket {
++		std::optional<UINT64> timestamp;
++		std::vector<float> samples;
++		UINT32 frames = 0;
++		bool discontinuity = false;
++	} pending_packet;
+ 
+ 	// S_OK while the stream is running (or has not failed yet); otherwise the
+ 	// HRESULT of the most recent failed attempt. Read by the properties dialog
+@@ -92,6 +98,7 @@
+ 
+ 	// false when a mixer could not read the packet out of the buffer of the audio engine
+ 	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags);
++	bool SubmitPacket(UINT64 timestamp, float *samples, UINT32 frames, bool discontinuity);
+ 	void ForwardPacket();
+ 
+ 	void Capture();
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -141,18 +141,53 @@
+ 
+ bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags)
+ {
+-	auto placement = packet_timeline.Place(qpc_position, num_frames, format.nSamplesPerSec,
+-					       (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0);
+-	if (placement.skip == num_frames)
++	const auto rate = format.nSamplesPerSec;
++	const bool discontinuity = (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0;
++	const bool plausible = PacketTimeline::IsPlausible(qpc_position, os_gettime_ns() / 100);
++
++	if (pending_packet.frames) {
++		auto frames = pending_packet.frames;
++		pending_packet.frames = 0;
++		if (plausible) {
++			auto timestamp = packet_timeline.ResolvePending(pending_packet.timestamp, frames, qpc_position,
++								       num_frames, rate, pending_packet.discontinuity || discontinuity);
++			if (timestamp && !SubmitPacket(*timestamp, pending_packet.samples.data(), frames, true))
++				return false;
++		}
++	}
++
++	if (!plausible && (!packet_timeline.HasAnchor() || discontinuity)) {
++		packet_timeline.MarkGap();
+ 		return true;
+-
+-	auto *samples = reinterpret_cast<float *>(data) + static_cast<std::size_t>(placement.skip) * format.nChannels;
++	}
++
++	// keep one suspect packet until the following timestamp confirms where it belongs
++	if (!plausible || packet_timeline.IsForwardJump(qpc_position, num_frames, rate)) {
++		pending_packet.samples.resize(static_cast<std::size_t>(num_frames) * format.nChannels);
++		if (!CopyFromEngineBuffer(pending_packet.samples.data(), data, pending_packet.samples.size() * sizeof(float)))
++			return false;
++		pending_packet.timestamp = plausible ? std::optional<UINT64>{qpc_position} : std::nullopt;
++		pending_packet.frames = num_frames;
++		pending_packet.discontinuity = discontinuity;
++		return true;
++	}
++
++	return SubmitPacket(qpc_position, reinterpret_cast<float *>(data), num_frames, discontinuity);
++}
++
++bool AudioCaptureHelper::SubmitPacket(UINT64 timestamp, float *samples, UINT32 frames, bool discontinuity)
++{
++	auto placement = packet_timeline.Place(timestamp, frames, format.nSamplesPerSec, discontinuity);
++	if (placement.skip == frames)
++		return true;
++
++	samples += static_cast<std::size_t>(placement.skip) * format.nChannels;
+ 	auto lock = mixers_section.lock();
+ 
+ 	// every mixer gets its try, even when an earlier one failed
+ 	bool forwarded = true;
+ 	for (auto *mixer : mixers)
+-		forwarded = mixer->SubmitPacket(placement.timestamp, samples, num_frames - placement.skip) && forwarded;
++		forwarded = mixer->SubmitPacket(placement.timestamp, samples, frames - placement.skip) && forwarded;
+ 
+ 	return forwarded;
+ }
+@@ -176,6 +211,7 @@
+ 
+ 		bool forwarded = true;
+ 		if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) {
++			pending_packet.frames = 0;
+ 			packet_timeline.MarkGap();
+ 			warn("timestamp error flag set - dropping packet");
+ 		} else if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
+@@ -206,6 +242,7 @@
+ 	InitCapture();
+ 	THROW_IF_FAILED(client->Start());
+ 	packet_timeline = {};
++	pending_packet.frames = 0;
+ 	last_error = S_OK;
+ 
+ 	bool shutdown = false;
+diff --git a/src/mixer.hpp b/src/mixer.hpp
+--- a/src/mixer.hpp
++++ b/src/mixer.hpp
+@@ -19,6 +19,8 @@
+ 	Tick,
+ };
+ }
++
++bool CopyFromEngineBuffer(void *dst, const void *src, std::size_t bytes);
+ 
+ class Mixer {
+ private:
+diff --git a/src/mixer.cpp b/src/mixer.cpp
+--- a/src/mixer.cpp
++++ b/src/mixer.cpp
+@@ -229,7 +229,7 @@
+ }
+ 
+ // nothing with a destructor may stand between the read and this handler: the plugin is not built with /EHa, so a frame in between would not be unwound
+-static bool CopyFromEngineBuffer(void *dst, const void *src, std::size_t bytes)
++bool CopyFromEngineBuffer(void *dst, const void *src, std::size_t bytes)
+ {
+ 	__try {
+ 		memcpy(dst, src, bytes);

@@ -1,0 +1,184 @@
+ReplayKit patch 8 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+Use OBS output-device capture for the optional compatibility mode. Only the selected capture backend
+owns the desktop source at a time. Device audio never goes through the per-app mixer.
+
+diff --git a/src/audio-capture.hpp b/src/audio-capture.hpp
+--- a/src/audio-capture.hpp
++++ b/src/audio-capture.hpp
+@@ -30,6 +30,7 @@
+ 
+ #define SETTING_EXCLUDE                "exclude"
+ #define SETTING_LATENCY                "latency"
++#define SETTING_OUTPUT_DEVICE          "output_device"
+ #define SETTING_STATUS                 "status"
+ 
+ #define TEXT_NAME                      obs_module_text("Name")
+@@ -77,6 +78,9 @@
+ 	HWND hotkey_window = NULL;
+ 
+ 	bool exclude = false;
++	bool low_latency = false;
++	bool output_device = false;
++	std::string device_id;
+ };
+ 
+ class AudioCapture {
+@@ -92,6 +96,8 @@
+ 	obs_source_t *source;
+ 
+ 	std::optional<Mixer> mixer;
++	obs_source_t *device_source = nullptr;
++	std::string active_device;
+ 
+ 	// Owned by the worker thread; pids_section guards the writes so the UI
+ 	// thread can snapshot it for the status line.
+@@ -104,6 +110,8 @@
+ 
+ 	void StartCapture(const std::set<DWORD> &new_pids, bool exclude);
+ 	void StopCapture();
++	void StartOutputDevice(const std::string &device);
++	void StopOutputDevice();
+ 
+ 	void WorkerUpdate();
+ 
+diff --git a/src/audio-capture.cpp b/src/audio-capture.cpp
+--- a/src/audio-capture.cpp
++++ b/src/audio-capture.cpp
+@@ -232,11 +232,84 @@
+ 	return capture_exclude;
+ }
+ 
++static bool OutputDeviceMonitoringEnabled(const obs_source_t *source)
++{
++	// obs 33 logs a warning on each call to the old monitoring getter
++	using GetMonitoringEnabled = bool (*)(const obs_source_t *);
++	static const auto enabled = reinterpret_cast<GetMonitoringEnabled>(
++		GetProcAddress(GetModuleHandleW(L"obs.dll"), "obs_source_get_monitoring_enabled"));
++	return enabled ? enabled(source)
++		       : obs_source_get_monitoring_type(source) != OBS_MONITORING_TYPE_NONE;
++}
++
++static void ForwardOutputDevice(void *context, obs_source_t *, const struct audio_data *packet, bool muted)
++{
++	auto *target = static_cast<obs_source_t *>(context);
++	// don't let the endpoint mix feed back to speakers or the share cable
++	if (muted || OutputDeviceMonitoringEnabled(target))
++		return;
++
++	obs_audio_info format{};
++	if (!obs_get_audio_info(&format))
++		return;
++
++	obs_source_audio audio{};
++	for (size_t i = 0; i < get_audio_channels(format.speakers); ++i)
++		audio.data[i] = packet->data[i];
++	audio.frames = packet->frames;
++	audio.speakers = format.speakers;
++	audio.format = AUDIO_FORMAT_FLOAT_PLANAR;
++	audio.samples_per_sec = format.samples_per_sec;
++	audio.timestamp = packet->timestamp;
++	obs_source_output_audio(target, &audio);
++}
++
++void AudioCapture::StartOutputDevice(const std::string &device)
++{
++	StopOutputDevice();
++	auto *settings = obs_data_create();
++	obs_data_set_string(settings, "device_id", device.c_str());
++	device_source = obs_source_create_private("wasapi_output_capture", "ReplayKit output device", settings);
++	obs_data_release(settings);
++	if (!device_source) {
++		error("could not create the OBS output device capture");
++		return;
++	}
++
++	active_device = device;
++	obs_source_add_audio_capture_callback(device_source, ForwardOutputDevice, source);
++	obs_source_inc_active(device_source);
++}
++
++void AudioCapture::StopOutputDevice()
++{
++	if (!device_source)
++		return;
++
++	obs_source_remove_audio_capture_callback(device_source, ForwardOutputDevice, source);
++	obs_source_dec_active(device_source);
++	obs_source_release(device_source);
++	device_source = nullptr;
++}
++
+ void AudioCapture::WorkerUpdate()
+ {
+ 	auto config_lock = config_section.lock();
+ 	auto config = this->config;
+ 	config_lock.reset();
++
++	if (config.output_device) {
++		StopCapture();
++		mixer.reset();
++		if (!device_source || active_device != config.device_id)
++			StartOutputDevice(config.device_id);
++		return;
++	}
++
++	StopOutputDevice();
++	if (!mixer)
++		mixer.emplace(source, helper_manager.GetFormat());
++	mixer->SetLowLatency(config.low_latency);
+ 
+ 	if (config.mode == MODE_HOTKEY) {
+ 		if (config.hotkey_window == NULL) {
+@@ -356,6 +429,7 @@
+ 	}
+ 
+ 	StopCapture();
++	StopOutputDevice();
+ }
+ 
+ void AudioCapture::Update(obs_data_t *settings)
+@@ -363,13 +437,17 @@
+ 	AudioCaptureConfig new_config = {
+ 		.mode = (mode)obs_data_get_int(settings, SETTING_MODE),
+ 		.exclude = obs_data_get_bool(settings, SETTING_EXCLUDE),
++		.low_latency = obs_data_get_int(settings, SETTING_LATENCY) == 1,
++		.output_device = obs_data_get_bool(settings, SETTING_OUTPUT_DEVICE),
+ 	};
+ 
+ 	if (new_config.mode == MODE_SESSION)
+ 		new_config.executables = GetExecutables(settings);
+ 
+-	if (mixer)
+-		mixer->SetLowLatency(obs_data_get_int(settings, SETTING_LATENCY) == 1);
++	if (new_config.output_device) {
++		const char *device = obs_data_get_string(settings, "device_id");
++		new_config.device_id = *device ? device : "default";
++	}
+ 
+ 	auto lock = config_section.lock();
+ 	// The captured window is runtime state set by the hotkey, not a setting:
+@@ -475,8 +553,6 @@
+ 
+ AudioCapture::AudioCapture(obs_data_t *settings, obs_source_t *source) : source{source}
+ {
+-	mixer.emplace(source, helper_manager.GetFormat());
+-
+ 	// The worker must exist before Update() posts to it; the old order posted
+ 	// CaptureEvents::Update to an uninitialized thread id.
+ 	worker_thread = std::thread(&AudioCapture::Run, this);
+@@ -757,6 +833,14 @@
+ 	auto *status = obs_properties_get(ps, SETTING_STATUS);
+ 	if (!status)
+ 		return;
++
++	auto lock = config_section.lock();
++	bool output_device = config.output_device;
++	lock.reset();
++	if (output_device) {
++		obs_property_set_description(status, "Windows output device capture selected");
++		return;
++	}
+ 
+ 	auto *monitor = SessionMonitor::Instance();
+ 	auto sessions = monitor ? monitor->GetSessions()

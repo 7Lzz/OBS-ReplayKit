@@ -1,0 +1,23 @@
+ReplayKit patch 7 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+Backport mixer timestamp rounding from upstream commit bfcf2e9b950f86e6a0359bc3265acfa276cfc75a (2.3.5).
+A packet timestamp just below a frame boundary used to put it one frame early, adding two frames together
+and leaving a zero before the next packet. Round to the nearest frame to keep these packets contiguous.
+
+diff --git a/src/mixer.cpp b/src/mixer.cpp
+--- a/src/mixer.cpp
++++ b/src/mixer.cpp
+@@ -24,10 +24,11 @@
+ 
+ // Single-floor 128-bit conversions: the old two-step ns round-trips lost up
+ // to ~100ns per call, and frames * 1e9 overflows UINT64 within days of
+-// accumulated frames.
++// accumulated frames. round to the nearest frame so sub-sample timestamp truncation does not shift a packet.
+ std::size_t Mixer::DurationToFrames(UINT64 duration)
+ {
+-	return (std::size_t)util_mul_div64(duration, format.nSamplesPerSec, 10000000ULL);
++	return (std::size_t)((util_mul_div64(duration, 2ULL * format.nSamplesPerSec, 10000000ULL) + 1) /
++			     2);
+ }
+ 
+ UINT64 Mixer::FramesToDuration(std::size_t frames)

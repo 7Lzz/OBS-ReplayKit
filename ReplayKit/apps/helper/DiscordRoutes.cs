@@ -32,7 +32,13 @@ namespace ReplayKitHelper
             {
                 if (req.Method == "GET")
                 {
-                    try { HttpResponse.SendJson(stream, 200, Q("quick") == "1" ? SettingsLiveApply.GetSharePreviewFlags() : SettingsLiveApply.GetSharePreviewState(true)); }
+                    try
+                    {
+                        JObject state;
+                        if (Q("quick") == "1") state = SettingsLiveApply.GetSharePreviewFlags();
+                        else lock (SettingsStore.Gate) state = SettingsLiveApply.GetSharePreviewState(true);
+                        HttpResponse.SendJson(stream, 200, state);
+                    }
                     catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                     return false;
                 }

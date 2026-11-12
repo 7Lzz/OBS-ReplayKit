@@ -141,7 +141,18 @@ namespace ReplayKitHelper
 
         internal static JObject SetProjectorMonitoringState(JObject settings, bool enabled)
         {
-            string inputName = "Desktop Audio (excl. Discord)";
+            bool deviceCapture = UsesOutputDeviceRecording(settings);
+            if (!deviceCapture)
+            {
+                var current = GetDesktopAudioCaptureSettings();
+                if (!current.Ok) return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = current.Message };
+                if (!(current.Data?["inputSettings"] is JObject inputSettings))
+                    return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = "OBS did not return Desktop Audio settings." };
+                deviceCapture = CapturesOutputDevice(inputSettings);
+            }
+            string inputName = DesktopAudioInputName;
+            if (deviceCapture) return SetDesktopAudioMixerState(inputName, "OBS_MONITORING_TYPE_NONE", false);
+
             string monitorType = enabled ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
 
             if (monitorType == "OBS_MONITORING_TYPE_NONE") return SetDesktopAudioMixerState(inputName, monitorType);
@@ -167,7 +178,7 @@ namespace ReplayKitHelper
 
         // -- desktop audio mixer: retry-with-verification wrappers, since obs does not always apply an audio monitor-type/mute change instantly, plus a deliberate mute-then-unmute "flap" to force the obs mixer icon to visually refresh after a monitor-type change.
 
-        internal static JObject SetDesktopAudioMixerState(string inputName, string monitorType)
+        internal static JObject SetDesktopAudioMixerState(string inputName, string monitorType, bool ensureUnmuted = true)
         {
             var applied = new List<string>();
             bool targetIsOff = monitorType == "OBS_MONITORING_TYPE_NONE";
@@ -197,6 +208,9 @@ namespace ReplayKitHelper
                     : actualAfter["message"]?.Value<string>();
             }
             if (!monitorReady) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = "OBS did not report the requested monitor state after retries. " + lastMonitorMessage };
+
+            if (!ensureUnmuted)
+                return new JObject { ["ok"] = true, ["applied"] = new JArray("desktop audio monitor off"), ["message"] = "" };
 
             var unmute = SetInputMuteState(inputName, false, 6);
             if (unmute["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = "monitor state changed, but Desktop Audio could not be unmuted: " + unmute["message"] };
@@ -309,29 +323,52 @@ namespace ReplayKitHelper
         // the programs the desktop capture never takes, whatever the recording audio tab says
         internal static IReadOnlyList<string> DesktopAudioExcludeList => DesktopAudioExcludeExes;
 
-        // the capture settings of the desktop source: which programs it takes, from the recording audio settings. in the default all apps mode this is the built in exclusion list and nothing else, which is how the source always ran. the settings come in when the caller has them already, and are read from disk otherwise
-        internal static void SetDesktopAudioCaptureSettingsObject(JObject settingsObject, JObject settings = null)
+        // keep the app list ready when switching back from device capture.
+        private static void SetDesktopAudioCaptureSettingsObject(JObject settingsObject, JObject settings)
         {
-            string mode = "all";
-            JObject choices = null;
-            try
-            {
-                settings = settings ?? ReadSettings();
-                mode = settings["recordingAudioMode"]?.Value<string>() == "specific" ? "specific" : "all";
-                choices = settings["recordingAudioApps"] as JObject;
-            }
-            catch (InvalidOperationException) { }
+            string mode = settings["recordingAudioMode"]?.Value<string>() == "specific" ? "specific" : "all";
+            bool outputDevice = UsesOutputDeviceRecording(settings);
             settingsObject["mode"] = "session";
-            settingsObject["executable_list"] = AudioApps.BuildCaptureList(mode, choices, out bool exclude);
+            settingsObject["executable_list"] = AudioApps.BuildCaptureList(mode, settings["recordingAudioApps"] as JObject, out bool exclude);
             settingsObject["exclude"] = exclude;
+            settingsObject["output_device"] = outputDevice;
+            settingsObject["device_id"] = outputDevice ? "default" : "";
         }
 
-        internal static JObject SetDesktopAudioCaptureSettingsLive(string inputName, JObject settings = null)
+        internal static bool CapturesOutputDevice(JToken inputSettings) =>
+            inputSettings?["output_device"]?.Value<bool>() == true;
+
+        internal static ObsWebSocketResult GetDesktopAudioCaptureSettings() =>
+            ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName }, 3000);
+
+        private static ObsWebSocketResult SetDesktopAudioCaptureSettingsLive(JObject settings, ObsWebSocketResult current)
         {
+            if (!current.Ok) return current;
+            var live = current.Data?["inputSettings"] as JObject;
+            if (live == null) return new ObsWebSocketResult { Message = "OBS did not return Desktop Audio settings." };
+            bool outputDevice = UsesOutputDeviceRecording(settings);
+            bool wasOutputDevice = CapturesOutputDevice(live);
+            if (outputDevice)
+            {
+                if (current.Data?["inputKind"]?.Value<string>() != "audio_capture")
+                    return new ObsWebSocketResult { Message = "Desktop Audio is not the ReplayKit audio capture source." };
+                var monitor = SetDesktopAudioMixerState(DesktopAudioInputName, "OBS_MONITORING_TYPE_NONE", false);
+                if (monitor["ok"]?.Value<bool>() != true) return new ObsWebSocketResult { Message = monitor["message"]?.Value<string>() };
+                var discord = SetAudioSourceMixersLive(DiscordAudioInputName, 0);
+                if (!discord.Ok && discord.Code != 600) return discord;
+            }
+
             var inputSettings = new JObject();
             SetDesktopAudioCaptureSettingsObject(inputSettings, settings);
-            var result = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = inputName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
-            return result.Ok ? new JObject { ["ok"] = true, ["message"] = "" } : new JObject { ["ok"] = false, ["message"] = result.Message };
+            if (outputDevice != wasOutputDevice || (live["device_id"]?.Value<string>() ?? "") != inputSettings["device_id"].Value<string>()
+                || live["mode"]?.Value<string>() != "session" || live["exclude"]?.Value<bool>() != inputSettings["exclude"].Value<bool>()
+                || !SameProgramList(live["executable_list"], inputSettings["executable_list"]))
+            {
+                var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = DesktopAudioInputName, ["inputSettings"] = inputSettings, ["overlay"] = true }, 3000);
+                if (!set.Ok) return set;
+            }
+
+            return outputDevice ? new ObsWebSocketResult { Ok = true } : RestoreDiscordAudioTracks(settings, wasOutputDevice);
         }
 
         // keeps the live desktop-audio monitoring/mute change in sync with the on-disk scene file, so a disabled Share Preview cannot silently come back after obs restarts (obs persists audio monitoring in the scene collection, not in a profile setting this file already writes elsewhere).
@@ -348,13 +385,7 @@ namespace ReplayKitHelper
                 foreach (var sourceToken in sources)
                 {
                     var source = (JObject)sourceToken;
-                    if (source["name"]?.Value<string>() != "Desktop Audio (excl. Discord)") continue;
-                    var settingsObject = source["settings"] as JObject;
-                    if (settingsObject == null) { settingsObject = new JObject(); source["settings"] = settingsObject; }
-                    string settingsBefore = settingsObject.ToString(Formatting.None);
-                    SetDesktopAudioCaptureSettingsObject(settingsObject);
-                    string settingsAfter = settingsObject.ToString(Formatting.None);
-                    if (settingsBefore != settingsAfter) changed = true;
+                    if (source["name"]?.Value<string>() != DesktopAudioInputName || CapturesOutputDevice(source["settings"])) continue;
                     int current = source["monitoring_type"]?.Value<int>() ?? -1;
                     if (current != monitoringType) { source["monitoring_type"] = monitoringType; changed = true; }
                     bool monitoringEnabled = monitoringType != 0;
@@ -379,7 +410,7 @@ namespace ReplayKitHelper
             var applied = new List<string>();
             bool ok = true;
             string message = "";
-            string inputName = "Desktop Audio (excl. Discord)";
+            string inputName = DesktopAudioInputName;
             string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
             if (mode != "projector") mode = "projector";
             bool isLegacyVcam = false;
@@ -388,9 +419,9 @@ namespace ReplayKitHelper
             if (!screenshareEnabled) applied.Add("Discord screenshare support disabled");
             string monitorType = shareEnabled ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
 
-            var captureSettings = SetDesktopAudioCaptureSettingsLive(inputName);
-            if (captureSettings["ok"]?.Value<bool>() == true) applied.Add("desktop audio exclusions updated");
-            else warnings.Add("Discord output mode was saved, but Desktop Audio exclusions could not be updated: " + captureSettings["message"]);
+            var capture = ApplyRecordingAudioLive(settings);
+            applied.AddRange(capture["applied"].Values<string>());
+            warnings.AddRange(capture["warnings"].Values<string>());
 
             if (mode == "projector")
             {
@@ -398,15 +429,14 @@ namespace ReplayKitHelper
                 if (mixer["ok"]?.Value<bool>() == true)
                 {
                     applied.AddRange((mixer["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                    int sceneMonitoringType = shareEnabled ? 2 : 0;
-                    var sceneFile = SetShareModeSceneFile(sceneMonitoringType, false);
-                    if (sceneFile["ok"]?.Value<bool>() == true)
+                    if (!UsesOutputDeviceRecording(settings) && capture["liveApplied"]?.Value<bool>() == true)
                     {
-                        if (sceneFile["changed"]?.Value<bool>() == true) applied.Add("desktop audio monitor state saved");
-                    }
-                    else
-                    {
-                        warnings.Add("Desktop Audio monitoring was applied live, but could not be saved for restart: " + sceneFile["message"]);
+                        int sceneMonitoringType = shareEnabled ? 2 : 0;
+                        var sceneFile = SetShareModeSceneFile(sceneMonitoringType, false);
+                        if (sceneFile["ok"]?.Value<bool>() != true)
+                            warnings.Add("Desktop Audio monitoring was applied live, but could not be saved for restart: " + sceneFile["message"]);
+                        else if (sceneFile["changed"]?.Value<bool>() == true)
+                            applied.Add("desktop audio monitor state saved");
                     }
                 }
                 else
@@ -568,9 +598,20 @@ namespace ReplayKitHelper
             var settings = ReadSettings();
             bool available = TestDiscordScreenshareEnabled(settings);
             bool enabled = available && settings["discord_output_mode"]?.Value<string>() == "projector" && (settings["discord_projector_enabled"]?.Value<bool>() ?? false);
-            string inputName = "Desktop Audio (excl. Discord)";
-            string desiredMonitorType = enabled ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
+            string inputName = DesktopAudioInputName;
             var warnings = new List<string>();
+            bool deviceCapture = UsesOutputDeviceRecording(settings);
+            if (!deviceCapture)
+            {
+                var capture = GetDesktopAudioCaptureSettings();
+                if (capture.Data?["inputSettings"] is JObject inputSettings) deviceCapture = CapturesOutputDevice(inputSettings);
+                else
+                {
+                    deviceCapture = true;
+                    warnings.Add("Could not read Desktop Audio capture settings: " + capture.Message);
+                }
+            }
+            string desiredMonitorType = enabled && !deviceCapture ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
             bool repaired = false;
 
             var actual = GetInputMonitorTypeValue(inputName);
@@ -583,8 +624,8 @@ namespace ReplayKitHelper
             if (muteOk) inputMuted = mute.Data?["inputMuted"]?.Value<bool>() ?? false;
             else warnings.Add("Could not read Desktop Audio mute state: " + mute.Message);
 
-            bool synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && muteOk && inputMuted != true;
-            if (enabled && repairMonitoring && DiscordProjector.ClearCableMute() > 0) repaired = true;
+            bool synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && (deviceCapture || (muteOk && inputMuted != true));
+            if (enabled && !deviceCapture && repairMonitoring && DiscordProjector.ClearCableMute() > 0) repaired = true;
             if (repairMonitoring && !synced)
             {
                 var repair = SetProjectorMonitoringState(settings, enabled);
@@ -596,7 +637,7 @@ namespace ReplayKitHelper
                     mute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
                     muteOk = mute.Ok;
                     inputMuted = muteOk ? (mute.Data?["inputMuted"]?.Value<bool>() ?? false) : (bool?)null;
-                    synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && muteOk && inputMuted != true;
+                    synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && (deviceCapture || (muteOk && inputMuted != true));
                 }
                 else
                 {
@@ -842,26 +883,27 @@ namespace ReplayKitHelper
             return RecordingAudioKeysChanged(previous, settings);
         }
 
-        // hands the new choices to the capture source of the desktop sound, live in obs and in the scene file on disk, so they also hold if obs is not shut down cleanly. the source itself is never recreated, only its list changes
-        internal static JObject ApplyRecordingAudioLive(JObject settings)
+        internal static JObject ApplyRecordingAudioLive(JObject settings, ObsWebSocketResult current = null)
         {
             var applied = new List<string>();
             var warnings = new List<string>();
-            var live = SetDesktopAudioCaptureSettingsLive(DesktopAudioInputName, settings);
-            if (live["ok"]?.Value<bool>() == true) applied.Add("recording audio programs");
-            else warnings.Add("The program choices were saved, but OBS could not be updated right now: " + live["message"] + ". They apply the next time OBS starts.");
+            var live = SetDesktopAudioCaptureSettingsLive(settings, current ?? GetDesktopAudioCaptureSettings());
+            if (live.Ok) applied.Add("recording audio");
+            else warnings.Add("OBS could not apply recording audio: " + live.Message);
             var file = SetDesktopAudioCaptureInSceneFile(settings);
             if (file["ok"]?.Value<bool>() != true) warnings.Add("The scene file could not be updated: " + file["message"]);
-            return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
+            return new JObject { ["liveApplied"] = live.Ok, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
         // the tracks of a recording: track 1 is the mix every player plays, and with separate tracks on, the pc audio, discord and the microphone also get track 2, 3 and 4 of their own
         internal static string RecTracksValue(JObject settings) => (settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks) ? "15" : "1";
 
         // the tracks one of the recording audio sources feeds, as obs keeps them in a bit mask; with separate tracks off every source is back on the six tracks obs starts new sources with
-        internal static int AudioSourceMixers(string inputName, bool separate)
+        internal static int AudioSourceMixers(string inputName, JObject settings)
         {
             const int track1 = 1, track2 = 2, track3 = 4, track4 = 8;
+            if (inputName == DiscordAudioInputName && UsesOutputDeviceRecording(settings)) return 0;
+            bool separate = settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks;
             if (!separate) return 63;
             if (inputName == DesktopAudioInputName) return track1 | track2;
             if (inputName == DiscordAudioInputName) return track1 | track3;
@@ -869,18 +911,50 @@ namespace ReplayKitHelper
             return 63;
         }
 
+        private static ObsWebSocketResult SetAudioSourceMixersLive(string inputName, int mixers)
+        {
+            var tracks = new JObject();
+            for (int i = 0; i < 6; i++) tracks[(i + 1).ToString(CultureInfo.InvariantCulture)] = (mixers & (1 << i)) != 0;
+            return ObsWebSocket.InvokeRequest("SetInputAudioTracks", new JObject { ["inputName"] = inputName, ["inputAudioTracks"] = tracks }, 3000);
+        }
+
+        internal static ObsWebSocketResult RestoreDiscordAudioTracks(JObject settings, bool wasOutputDevice = false)
+        {
+            // a failed switch can leave the managed discord source off every track even after device capture has stopped.
+            if (!wasOutputDevice)
+            {
+                var current = ObsWebSocket.InvokeRequest("GetInputAudioTracks", new JObject { ["inputName"] = DiscordAudioInputName }, 3000);
+                if (current.Code == 600) return new ObsWebSocketResult { Ok = true };
+                if (!current.Ok) return current;
+                var tracks = current.Data?["inputAudioTracks"] as JObject;
+                if (tracks == null || tracks.Count != 6)
+                    return new ObsWebSocketResult { Message = "OBS did not return Discord audio tracks." };
+                if (tracks.Values().Any(track => track.Value<bool>())) return new ObsWebSocketResult { Ok = true };
+            }
+
+            var set = SetAudioSourceMixersLive(DiscordAudioInputName, AudioSourceMixers(DiscordAudioInputName, settings));
+            return set.Code == 600 ? new ObsWebSocketResult { Ok = true } : set;
+        }
+
         // puts the recording audio sources on their tracks in the running obs and in the scene file; the recording itself only reads the tracks when obs starts its outputs, which is why changing this restarts obs
         internal static JObject ApplyAudioTracksLive(JObject settings)
         {
-            bool separate = settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks;
             var applied = new List<string>();
             var warnings = new List<string>();
             foreach (var name in new[] { DesktopAudioInputName, DiscordAudioInputName, MicInputName })
             {
-                int mixers = AudioSourceMixers(name, separate);
-                var tracks = new JObject();
-                for (int i = 0; i < 6; i++) tracks[(i + 1).ToString(CultureInfo.InvariantCulture)] = (mixers & (1 << i)) != 0;
-                var set = ObsWebSocket.InvokeRequest("SetInputAudioTracks", new JObject { ["inputName"] = name, ["inputAudioTracks"] = tracks }, 3000);
+                int mixers = AudioSourceMixers(name, settings);
+                if (name == DiscordAudioInputName && mixers != 0)
+                {
+                    var desktop = GetDesktopAudioCaptureSettings();
+                    if (!desktop.Ok && desktop.Code != 600)
+                    {
+                        warnings.Add("Discord audio tracks could not be updated: " + desktop.Message);
+                        continue;
+                    }
+                    if (CapturesOutputDevice(desktop.Data?["inputSettings"])) continue;
+                }
+                var set = SetAudioSourceMixersLive(name, mixers);
                 if (set.Ok) { if (!applied.Contains("audio tracks")) applied.Add("audio tracks"); }
                 else if (set.Unavailable) { warnings.Add("The audio tracks were saved, but OBS could not be reached: " + set.Message + ". They apply the next time OBS starts."); break; }
                 // code 600 is a source that is not in the scene, like discord audio on a machine without it
@@ -900,14 +974,15 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(File.ReadAllText(path));
                 var sources = data["sources"] as JArray;
                 if (sources == null) return new JObject { ["ok"] = true, ["changed"] = false };
-                bool separate = settings["recordingSeparateAudioTracks"]?.Value<bool>() ?? DefaultSeparateAudioTracks;
+                bool outputDevice = sources.OfType<JObject>().Any(source =>
+                    source["name"]?.Value<string>() == DesktopAudioInputName && CapturesOutputDevice(source["settings"]));
                 bool changed = false;
                 foreach (var sourceToken in sources)
                 {
                     var source = (JObject)sourceToken;
                     string name = source["name"]?.Value<string>();
                     if (name != DesktopAudioInputName && name != DiscordAudioInputName && name != MicInputName) continue;
-                    int mixers = AudioSourceMixers(name, separate);
+                    int mixers = name == DiscordAudioInputName && outputDevice ? 0 : AudioSourceMixers(name, settings);
                     if (source["mixers"]?.Value<int>() == mixers) continue;
                     source["mixers"] = mixers;
                     changed = true;
@@ -921,7 +996,7 @@ namespace ReplayKitHelper
             }
         }
 
-        internal static JObject SetDesktopAudioCaptureInSceneFile(JObject settings)
+        private static JObject SetDesktopAudioCaptureInSceneFile(JObject settings)
         {
             try
             {
@@ -930,16 +1005,32 @@ namespace ReplayKitHelper
                 var data = JObject.Parse(File.ReadAllText(path));
                 var sources = data["sources"] as JArray;
                 if (sources == null) return new JObject { ["ok"] = true, ["changed"] = false };
-                bool changed = false;
-                foreach (var sourceToken in sources)
+                var desktop = sources.OfType<JObject>().FirstOrDefault(source => source["name"]?.Value<string>() == DesktopAudioInputName);
+                if (desktop == null) return new JObject { ["ok"] = true, ["changed"] = false };
+                bool outputDevice = UsesOutputDeviceRecording(settings);
+                if (outputDevice && desktop["id"]?.Value<string>() != "audio_capture")
+                    return new JObject { ["ok"] = false, ["changed"] = false, ["message"] = "Desktop Audio is not the ReplayKit audio capture source." };
+                var inputSettings = desktop["settings"] as JObject ?? new JObject();
+                bool wasOutputDevice = CapturesOutputDevice(inputSettings);
+                string before = inputSettings.ToString(Formatting.None);
+                SetDesktopAudioCaptureSettingsObject(inputSettings, settings);
+                desktop["settings"] = inputSettings;
+                bool changed = before != inputSettings.ToString(Formatting.None);
+                if (outputDevice && (desktop["monitoring_type"]?.Value<int>() != 0 || desktop["monitoring_enabled"]?.Value<bool>() == true))
                 {
-                    var source = (JObject)sourceToken;
-                    if (source["name"]?.Value<string>() != DesktopAudioInputName) continue;
-                    var settingsObject = source["settings"] as JObject;
-                    if (settingsObject == null) { settingsObject = new JObject(); source["settings"] = settingsObject; }
-                    string before = settingsObject.ToString(Formatting.None);
-                    SetDesktopAudioCaptureSettingsObject(settingsObject, settings);
-                    if (before != settingsObject.ToString(Formatting.None)) changed = true;
+                    desktop["monitoring_type"] = 0;
+                    desktop["monitoring_enabled"] = false;
+                    changed = true;
+                }
+                var discord = sources.OfType<JObject>().FirstOrDefault(source => source["name"]?.Value<string>() == DiscordAudioInputName);
+                if (discord != null && (outputDevice || wasOutputDevice || discord["mixers"]?.Value<int>() == 0))
+                {
+                    int mixers = AudioSourceMixers(DiscordAudioInputName, settings);
+                    if (discord["mixers"]?.Value<int>() != mixers)
+                    {
+                        discord["mixers"] = mixers;
+                        changed = true;
+                    }
                 }
                 if (changed) AppConfig.WriteUtf8(path, data.ToString(Formatting.Indented));
                 return new JObject { ["ok"] = true, ["changed"] = changed };
@@ -1155,15 +1246,19 @@ namespace ReplayKitHelper
         // the mic test plays from the helper process, which desktop audio capture would otherwise record as an echo in every clip saved during the test -- the exclusion list is normally written on apply, so make sure it is there right before a test plays.
         internal static void EnsureHelperExcludedFromDesktopAudio()
         {
-            const string inputName = "Desktop Audio (excl. Discord)";
-            var current = ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = inputName }, 3000);
-            if (!current.Ok) return;
-            // a list of the programs to take (the specific mode) never holds the helper, since the choices cannot name it
-            if (current.Data?["inputSettings"]?["exclude"]?.Value<bool>() == false) return;
-            var excluded = current.Data?["inputSettings"]?["executable_list"] as JArray;
-            if (excluded != null && excluded.Any(e => string.Equals(e["value"]?.Value<string>(), HelperExeName, StringComparison.OrdinalIgnoreCase))) return;
-            var result = SetDesktopAudioCaptureSettingsLive(inputName);
-            if (result["ok"]?.Value<bool>() != true) Log.Write("EnsureHelperExcludedFromDesktopAudio: " + result["message"]);
+            lock (SettingsStore.Gate)
+            {
+                var current = GetDesktopAudioCaptureSettings();
+                if (!current.Ok) return;
+                var settings = ReadSettings();
+                if (UsesOutputDeviceRecording(settings) || CapturesOutputDevice(current.Data?["inputSettings"])) return;
+                // a list of the programs to take (the specific mode) never holds the helper, since the choices cannot name it
+                if (current.Data?["inputSettings"]?["exclude"]?.Value<bool>() == false) return;
+                var excluded = current.Data?["inputSettings"]?["executable_list"] as JArray;
+                if (excluded != null && excluded.Any(e => string.Equals(e["value"]?.Value<string>(), HelperExeName, StringComparison.OrdinalIgnoreCase))) return;
+                var result = SetDesktopAudioCaptureSettingsLive(settings, current);
+                if (!result.Ok) Log.Write("EnsureHelperExcludedFromDesktopAudio: " + result.Message);
+            }
         }
 
         // -- master orchestrator: given the new settings, do the minimum live work to bring a running obs (and
@@ -1171,7 +1266,7 @@ namespace ReplayKitHelper
         // run unconditionally on every call, not gated behind applyOverlay/restartObs the way overlay and motion
         // blur are -- there is deliberately no "prepare for restart via file edit instead" branch for those two;
         // preserve that asymmetry, it is not an oversight to fix.
-        internal static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool applyRecordingAudio = false, bool rebuildInputOverlay = false, bool applySleep = false)
+        internal static JObject ApplyLiveSettings(JObject settings, bool restartObs = false, bool applyOverlay = true, bool recreateBongo = true, bool applyMotionBlur = true, bool applyRuntimeOutputs = true, bool applyVideoSettings = true, bool applyReplayBufferOutput = true, bool applyMic = false, bool applyAudioVolumes = false, bool rebuildInputOverlay = false, bool applySleep = false)
         {
             var warnings = new List<string>();
             var applied = new List<string>();
@@ -1305,13 +1400,6 @@ namespace ReplayKitHelper
                 var audio = ApplyAudioVolumesLive(settings);
                 applied.AddRange((audio["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((audio["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-            }
-
-            if (applyRecordingAudio)
-            {
-                var recording = ApplyRecordingAudioLive(settings);
-                applied.AddRange((recording["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                warnings.AddRange((recording["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }
 
             string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, or interface layout changes require OBS to restart." : "";

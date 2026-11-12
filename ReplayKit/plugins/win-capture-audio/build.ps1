@@ -1,4 +1,4 @@
-# builds win-capture-audio from the vendored copy of Ayrton09/win-capture-audio at one pinned commit (upstream/) plus the replaykit patches (patches/), against the libobs headers of obs 28.0.0 so the module loads on obs 28 to 32, and packs the dll with its locale files into assets\win-capture-audio.zip. nothing unpinned is trusted: the vendored files, the patches, the obs header checkout and the wil checkout are verified by hash or by commit before a compiler sees them, and the finished dll is checked for the modules it imports
+# builds win-capture-audio from the pinned upstream tree and replaykit patches against the obs 28.0.0 headers. verifies the sources and dll imports, then stages the plugin files for setup to package.
 
 param(
     [string]$WorkDir = (Join-Path $env:LOCALAPPDATA "ReplayKit\plugin-build"),
@@ -258,7 +258,7 @@ foreach ($text in $ascii, $wide) {
 
 # the files: the dll, the locale files, the license and a source note, written fresh each time; the dll goes last, since its date is what tells a later build that the folder is current
 $hash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash.ToLowerInvariant()
-$buildId = if ($Pristine) { "$upstreamCommit (no patch)" } else { "$upstreamCommit + replaykit patches rk2" }
+$buildId = if ($Pristine) { "$upstreamCommit (no patch)" } else { "$upstreamCommit + replaykit patches rk8" }
 $sourceNote = @"
 win-capture-audio 2.3.4, built by OBS ReplayKit.
 

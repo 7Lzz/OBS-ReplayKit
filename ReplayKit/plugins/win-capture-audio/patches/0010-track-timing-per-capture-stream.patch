@@ -1,0 +1,134 @@
+Track packet continuity independently for each WASAPI process-loopback stream.
+
+Align small timestamp deviations to the previous packet's end, keep gaps across real discontinuities, and trim larger overlaps before summing separate streams.
+
+diff --git a/src/packet-timeline.hpp b/src/packet-timeline.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/packet-timeline.hpp
+@@ -0,0 +1,43 @@
++#pragma once
++
++#include <algorithm>
++#include <cstdint>
++
++struct PacketPlacement {
++	std::uint64_t timestamp;
++	std::uint32_t skip;
++};
++
++class PacketTimeline {
++	static constexpr std::uint64_t ticks_per_second = 10'000'000;
++	std::uint64_t next_frame = 0;
++	bool continuous = false;
++
++public:
++	void MarkGap() { continuous = false; }
++
++	PacketPlacement Place(std::uint64_t timestamp, std::uint32_t frames, std::uint32_t rate,
++			      bool discontinuity)
++	{
++		// use a common qpc frame grid so independent captures keep the same sample phase
++		auto frame = timestamp / ticks_per_second * rate +
++			     (timestamp % ticks_per_second * rate + ticks_per_second / 2) / ticks_per_second;
++		auto distance = frame >= next_frame ? frame - next_frame : next_frame - frame;
++		const auto tolerance = (std::min)(rate / 500, (frames - 1) / 2);
++		if (continuous && !discontinuity && distance <= tolerance)
++			frame = next_frame;
++
++		std::uint32_t skip = 0;
++		if (frame < next_frame) {
++			auto overlap = next_frame - frame;
++			if (overlap >= frames)
++				return {timestamp, frames};
++			skip = static_cast<std::uint32_t>(overlap);
++			frame = next_frame;
++		}
++
++		next_frame = frame + frames - skip;
++		continuous = true;
++		return {frame / rate * ticks_per_second + frame % rate * ticks_per_second / rate, skip};
++	}
++};
+diff --git a/src/audio-capture-helper.hpp b/src/audio-capture-helper.hpp
+--- a/src/audio-capture-helper.hpp
++++ b/src/audio-capture-helper.hpp
+@@ -20,6 +20,7 @@
+ #include <wil/com.h>
+ 
+ #include "mixer.hpp"
++#include "packet-timeline.hpp"
+ #include "common.hpp"
+ 
+ using namespace Microsoft::WRL;
+@@ -73,6 +74,7 @@
+ 
+ 	WAVEFORMATEX format;
+ 	std::vector<float> silence_buffer;
++	PacketTimeline packet_timeline;
+ 
+ 	// S_OK while the stream is running (or has not failed yet); otherwise the
+ 	// HRESULT of the most recent failed attempt. Read by the properties dialog
+@@ -89,7 +91,7 @@
+ 	void InitCapture();
+ 
+ 	// false when a mixer could not read the packet out of the buffer of the audio engine
+-	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames);
++	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags);
+ 	void ForwardPacket();
+ 
+ 	void Capture();
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -139,14 +139,20 @@
+ 	return mixers.size() == 0;
+ }
+ 
+-bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames)
+-{
++bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags)
++{
++	auto placement = packet_timeline.Place(qpc_position, num_frames, format.nSamplesPerSec,
++					       (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0);
++	if (placement.skip == num_frames)
++		return true;
++
++	auto *samples = reinterpret_cast<float *>(data) + static_cast<std::size_t>(placement.skip) * format.nChannels;
+ 	auto lock = mixers_section.lock();
+ 
+ 	// every mixer gets its try, even when an earlier one failed
+ 	bool forwarded = true;
+ 	for (auto *mixer : mixers)
+-		forwarded = mixer->SubmitPacket(qpc_position, reinterpret_cast<float *>(data), num_frames) && forwarded;
++		forwarded = mixer->SubmitPacket(placement.timestamp, samples, num_frames - placement.skip) && forwarded;
+ 
+ 	return forwarded;
+ }
+@@ -170,15 +176,16 @@
+ 
+ 		bool forwarded = true;
+ 		if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) {
++			packet_timeline.MarkGap();
+ 			warn("timestamp error flag set - dropping packet");
+ 		} else if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
+ 			// Forward explicit silence instead of a gap: the mixer keeps a
+ 			// continuous timeline and OBS never sees the stream stall.
+ 			silence_buffer.assign((std::size_t)num_frames * format.nChannels, 0.0f);
+ 			forwarded = ForwardToMixers(qpc_position, reinterpret_cast<BYTE *>(silence_buffer.data()),
+-						    num_frames);
++						    num_frames, flags);
+ 		} else {
+-			forwarded = ForwardToMixers(qpc_position, new_data, num_frames);
++			forwarded = ForwardToMixers(qpc_position, new_data, num_frames, flags);
+ 		}
+ 
+ 		if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
+@@ -198,6 +205,7 @@
+ {
+ 	InitCapture();
+ 	THROW_IF_FAILED(client->Start());
++	packet_timeline = {};
+ 	last_error = S_OK;
+ 
+ 	bool shutdown = false;

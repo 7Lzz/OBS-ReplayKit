@@ -38,6 +38,10 @@ namespace ReplayKitHelper
 
         internal const bool DefaultSeparateAudioTracks = SettingDefaults.RecordingSeparateAudioTracks;
         internal const string DefaultCodecPreference = SettingDefaults.CodecPreference;
+        internal const string OutputDeviceRecordingMode = "output_device";
+
+        internal static bool UsesOutputDeviceRecording(JObject settings) =>
+            settings["recordingAudioMode"]?.Value<string>() == OutputDeviceRecordingMode;
 
         public static JObject GetDefaultSettings()
         {
@@ -635,7 +639,7 @@ namespace ReplayKitHelper
                 ["micInputSensitivity"] = GetIntSetting(data, "micInputSensitivity", defaults["micInputSensitivity"].Value<int>(), MicTest.SensitivityMin, MicTest.SensitivityMax),
                 ["desktopAudioVolume"] = GetIntSetting(data, "desktopAudioVolume", defaults["desktopAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
                 ["discordAudioVolume"] = GetIntSetting(data, "discordAudioVolume", defaults["discordAudioVolume"].Value<int>(), 0, MicTest.VolumeMax),
-                ["recordingAudioMode"] = GetEnumSetting(data, "recordingAudioMode", defaults["recordingAudioMode"].Value<string>(), new[] { "all", "specific" }),
+                ["recordingAudioMode"] = GetEnumSetting(data, "recordingAudioMode", defaults["recordingAudioMode"].Value<string>(), new[] { "all", "specific", OutputDeviceRecordingMode }),
                 ["recordingAudioApps"] = AudioApps.NormalizeChoices(data["recordingAudioApps"]),
                 ["recordingSeparateAudioTracks"] = GetBoolSetting(data, "recordingSeparateAudioTracks", defaults["recordingSeparateAudioTracks"].Value<bool>()),
                 ["motionBlurEnabled"] = GetBoolSetting(data, "motionBlurEnabled", defaults["motionBlurEnabled"].Value<bool>()),

@@ -1,2 +1,3 @@
 upstream/** -text
 patches/** -text
+*.sha256 text eol=lf

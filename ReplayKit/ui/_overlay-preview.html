@@ -731,11 +731,12 @@
     },
     refresh: function () {
       var s = getStyle() || {};
-      if (window.RKBongo && window.RKBongo.setKeys) window.RKBongo.setKeys(s.bongoKeys);
-      pushBongoLook();
       if (setMode(s.overlayStyle || "input_overlay")) applyMode();
       else if (mode === "input_overlay") ensureInputOverlay().then(layout);
-      else layout();
+      else {
+        if (mode === "bongo_cat") ensureBongo();
+        layout();
+      }
     },
     // the keyboards and mice the helper offers and how it fits them, options.inputOverlay of the settings
     setLayouts: function (options) {

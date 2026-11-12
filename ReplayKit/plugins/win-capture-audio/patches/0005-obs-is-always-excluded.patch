@@ -1,0 +1,27 @@
+ReplayKit patch 5 for win-capture-audio 2.3.4 (Ayrton09, commit d11b381).
+
+In exclude mode obs itself is always one of the excluded programs, whether or not it has an audio session right now.
+WorkerUpdate skips the sessions of obs, so obs never reached the excluded set, and DeDuplicateCaptureList only keeps the
+ancestors of excluded programs out of the capture. A program that started obs and holds an audio session of its own
+(explorer, which launches obs, or a launcher) then became a capture root, and Windows captures a root together with its
+whole process tree, obs inside it. What obs plays went back into the desktop audio source: the monitoring of desktop
+audio that the share preview turns on (a loop of desktop audio into itself, about a tenth of a second long, that builds
+up), the clip sound, and the sound of its browser pages. Upstream did not hit this because its native exclude client
+leaves out the obs tree directly; patch 1 takes that client out for the reasons given there, which is what left the
+enumeration path without the protection.
+
+diff --git a/src/audio-capture.cpp b/src/audio-capture.cpp
+index 9196ae7..6dfaa1f 100644
+--- a/src/audio-capture.cpp
++++ b/src/audio-capture.cpp
+@@ -283,6 +283,10 @@ void AudioCapture::WorkerUpdate()
+ 		capture_pids.insert(key.pid);
+ 	}
+ 
++	// replaykit: in exclude mode obs itself is always one of the excluded, with or without a session of its own right now. its sessions are skipped above and so never reached exclude_pids, while DeDuplicateCaptureList keeps only the ancestors of the excluded out of the capture: a program that started obs (explorer, a launcher) and holds a session of its own became a capture root, and a root is captured with its whole process tree, obs inside it, so what obs plays (the monitoring of desktop audio for the share preview, its own sounds) went back into desktop audio
++	if (config.exclude)
++		exclude_pids.insert(GetCurrentProcessId());
++
+ 	// replaykit: exclude mode keeps following sessions like 2.2.x did. the native whole-system client can leave out only one process tree, so obs own audio (the monitoring output of the share preview) would be captured again whenever exactly one excluded program has a session, and the capture would restart each time such a program starts or stops playing
+ 
+ 	if (capture_pids.size() == 0) {

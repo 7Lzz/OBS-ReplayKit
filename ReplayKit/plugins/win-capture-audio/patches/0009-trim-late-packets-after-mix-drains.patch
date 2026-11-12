@@ -1,0 +1,16 @@
+Backport the late-packet fix from win-capture-audio 2.3.5 (5aef822).
+
+An empty mix can still have a published timeline. Trim a late packet against that timeline instead of resetting to its older timestamp.
+
+diff --git a/src/mixer.cpp b/src/mixer.cpp
+--- a/src/mixer.cpp
++++ b/src/mixer.cpp
+@@ -48,7 +48,7 @@
+ 
+ void Mixer::ProcessInput(UINT64 input_timestamp, std::vector<float> &input_buffer)
+ {
+-	if (mix.size() == 0) {
++	if (mix.size() == 0 && input_timestamp >= mix_timestamp) {
+ 		AdoptTimeline(input_timestamp);
+ 		mix = std::move(input_buffer);
+ 

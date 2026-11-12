@@ -2564,6 +2564,14 @@
       var pickV = selectedV();
       if (pickV) {
         st.vsegs.splice(pickV.index, 1);
+        var previous = st.vsegs[pickV.index - 1];
+        if (prefs.trimAudioWithVideo && previous && pickV.index === st.vsegs.length) {
+          var cut = boundsT();
+          var end = vEnd(previous);
+          if (pickV.seg.at < cut.end && end < cut.end && (end - cut.start) * st.vspeed >= 0.5) {
+            setBoundsT(cut.start, end);
+          }
+        }
         st.selected = "";
         done();
         return;

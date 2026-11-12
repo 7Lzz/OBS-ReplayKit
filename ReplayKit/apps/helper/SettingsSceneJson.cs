@@ -286,18 +286,20 @@ namespace ReplayKitHelper
             return result;
         }
 
-        // the keys of the mode as the source reads them: one virtual key per key of the mode, 0 where it keeps its own
-        internal static string BongoSourceKeys(JObject settings, string mode)
+        // both forms of the bindings for each mode: the virtual keys to read and the codes for drawing their labels
+        internal static JObject BongoSourceBindings(JObject settings)
         {
-            if (!(settings?["bongoKeys"]?[mode] is JArray list)) return "";
-            return string.Join(",", list.Select(k => k.Type == JTokenType.String && BongoKeyCodes.TryGetValue(k.Value<string>(), out int vk) ? vk : 0));
-        }
-
-        // the same keys as their KeyboardEvent codes, "" where the mode keeps its own: the source draws their labels on the keys (overlay-preview/bongo-keys)
-        internal static string BongoSourceCodes(JObject settings, string mode)
-        {
-            if (!(settings?["bongoKeys"]?[mode] is JArray list)) return "";
-            return string.Join(",", list.Select(k => k.Type == JTokenType.String && BongoKeyCodes.ContainsKey(k.Value<string>()) ? k.Value<string>() : ""));
+            var bindings = new JObject();
+            foreach (var entry in NormalizeBongoKeys(settings?["bongoKeys"]).Properties())
+            {
+                var codes = (JArray)entry.Value;
+                bindings[entry.Name] = new JObject
+                {
+                    ["keys"] = string.Join(",", codes.Values<string>().Select(code => BongoKeyCodes.TryGetValue(code, out int vk) ? vk : 0)),
+                    ["key_codes"] = string.Join(",", codes.Values<string>()),
+                };
+            }
+            return bindings;
         }
 
         internal static bool BongoSettingsChanged(JObject previous, JObject settings) =>
@@ -330,8 +332,7 @@ namespace ReplayKitHelper
             sourceSettings["relative_mouse"] = settings?["bongoRelativeMouse"]?.Value<bool>() ?? true;
             sourceSettings["mouse_horizontal_flip"] = true; sourceSettings["mouse_vertical_flip"] = true;
             sourceSettings["mask"] = settings?["bongoFaces"]?.Value<bool>() ?? false;
-            sourceSettings["keys"] = BongoSourceKeys(settings, mode);
-            sourceSettings["key_codes"] = BongoSourceCodes(settings, mode);
+            sourceSettings["key_bindings"] = BongoSourceBindings(settings);
         }
 
         internal static JObject NewBongoSourceJson(string uuid, JObject settings)

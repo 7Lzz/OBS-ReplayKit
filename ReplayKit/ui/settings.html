@@ -1464,7 +1464,7 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="label">Color Multiply</div>
+          <div class="label">Color Multiply<span class="control-note">Darkens and tints the overlay. White keeps the colors as they are.</span></div>
           <div class="field-wrap">
             <div class="color-control">
               <button class="color-picker" id="overlayColorMultiply" type="button" aria-label="Overlay color multiply"></button>
@@ -1476,7 +1476,7 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="label">Color Add</div>
+          <div class="label">Color Add<span class="control-note">Brightens and tints the overlay. Black keeps the colors as they are.</span></div>
           <div class="field-wrap">
             <div class="color-control">
               <button class="color-picker" id="overlayColorAdd" type="button" aria-label="Overlay color add"></button>
@@ -3054,12 +3054,13 @@
     const sig = value + "|" + (combo.dataset.options || "");
     if (menu.dataset.sig === sig) return;
     menu.dataset.sig = sig;
-    menu.innerHTML = options.map((o) => comboOptionHtml(o, value)).join("");
+    menu.innerHTML = options.filter((o) => !o.hidden).map((o) => comboOptionHtml(o, value)).join("");
   }
 
   function setComboValue(combo, value, notify) {
     const options = comboOptions(combo);
-    const selected = options.find((o) => o.value === value && !o.disabled) || options.find((o) => !o.disabled);
+    const selected = options.find((o) => o.value === value && !o.disabled && (!notify || !o.hidden))
+      || options.find((o) => !o.disabled && !o.hidden);
     combo.dataset.value = selected ? selected.value : "";
     renderCombo(combo);
     if (notify) combo.dispatchEvent(new CustomEvent("combochange", { bubbles:true }));
@@ -3843,7 +3844,7 @@
     refreshFieldResetState("recordingSoundVolume", DEFAULT_RECORDING_SOUND_VOLUME);
     refreshFieldResetState("desktopAudioVolume", DEFAULT_DESKTOP_AUDIO_VOLUME);
     refreshFieldResetState("discordAudioVolume", DEFAULT_DISCORD_AUDIO_VOLUME);
-    setComboValue(els.recordingAudioMode, state.recordingAudioMode === "specific" ? "specific" : "all", false);
+    setComboValue(els.recordingAudioMode, settingOr("recordingAudioMode"), false);
     els.recordingSeparateAudioTracks.checked = !!state.recordingSeparateAudioTracks;
     renderRecordingAudio();
     updateRecordingAudioPolling();
@@ -3947,7 +3948,7 @@
     state.recordingSoundVolume = clampVolume(els.recordingSoundVolume.value);
     state.desktopAudioVolume = clampAudioVolume(els.desktopAudioVolume.value);
     state.discordAudioVolume = clampAudioVolume(els.discordAudioVolume.value);
-    state.recordingAudioMode = comboValue(els.recordingAudioMode) === "specific" ? "specific" : "all";
+    state.recordingAudioMode = comboValue(els.recordingAudioMode);
     state.recordingSeparateAudioTracks = els.recordingSeparateAudioTracks.checked;
     state.motionBlurEnabled = els.motionBlurEnabled.checked;
     state.showCursorDisplayCapture = els.showCursorDisplayCapture.checked;
@@ -4044,7 +4045,7 @@
     });
     combo.addEventListener("keydown", (e) => {
       if (combo.classList.contains("is-disabled")) return;
-      const options = comboOptions(combo).filter((o) => !o.disabled);
+      const options = comboOptions(combo).filter((o) => !o.disabled && !o.hidden);
       if (!options.length) return;
       const current = Math.max(0, options.findIndex((o) => o.value === comboValue(combo)));
       if (e.key === "Enter" || e.key === " ") {
@@ -5778,11 +5779,14 @@
     }
     // The description follows the selected recording mode.
     const info = document.getElementById("raInfo");
-    const text = !raSpecific()
-      ? "Records all the sound your PC plays."
-      : !raState.obsAnswered
-        ? "ReplayKit can't read the list of apps from OBS right now, so it's showing the apps it already knew about."
-        : "Only the apps you turn on are recorded. New apps that play sound show up here turned off.";
+    let text = "Records all the sound your PC plays.";
+    if (state.recordingAudioMode === "output_device") {
+      text = "Records everything played through the Windows default output device. Discord is included in PC Audio and Share Preview audio is off.";
+    } else if (raSpecific()) {
+      text = raState.obsAnswered
+        ? "Only the apps you turn on are recorded. New apps that play sound show up here turned off."
+        : "ReplayKit can't read the list of apps from OBS right now, so it's showing the apps it already knew about.";
+    }
     if (info && info.textContent !== text) info.textContent = text;
   }
 
@@ -5808,9 +5812,13 @@
     setRecordingAudioPolling(activePage === "audio" && raSpecific());
   }
 
-  fillCombo(els.recordingAudioMode, [{ value:"all", label:"All PC Audio" }, { value:"specific", label:"Specific apps" }]);
+  fillCombo(els.recordingAudioMode, [
+    { value:"all", label:"All PC Audio" },
+    { value:"specific", label:"Specific apps" },
+    { value:"output_device", label:"Default output device", hidden:true }
+  ]);
   els.recordingAudioMode.addEventListener("combochange", () => {
-    state.recordingAudioMode = comboValue(els.recordingAudioMode) === "specific" ? "specific" : "all";
+    state.recordingAudioMode = comboValue(els.recordingAudioMode);
     markDirty();
     renderRecordingAudio();
     updateRecordingAudioPolling();
