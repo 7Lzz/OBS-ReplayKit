@@ -573,6 +573,21 @@
   .home-hero-facts dt { color: var(--text_muted); }
   .home-hero-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
   .home-row { display: grid; grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr)); gap: 16px; align-items: start; }
+  /* reserve the border so the shared card hover can color it without shifting the card */
+  .rk-home :where(.home-row) > .card:where(:not(.is-theater-card, .is-fullscreen-card)) {
+    border: 1px solid transparent;
+  }
+  .rk-home .home-row > .card:not(.is-theater-card, .is-fullscreen-card) > .body {
+    border-radius: 0 0 10px 10px;
+    cursor: pointer;
+    transition: background-color var(--anim_press) var(--ease_smooth);
+  }
+  .rk-home .home-row > .card:not(.is-theater-card, .is-fullscreen-card):is(:hover, :focus-within) > .body {
+    background-color: var(--bg_card);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rk-home .home-row > .card:not(.is-theater-card, .is-fullscreen-card) > .body { transition-duration: 0ms; }
+  }
   @media (max-width: 560px) {
     .home-hero { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   }
@@ -2931,7 +2946,12 @@
 
 <style>
   .section-heading:has(> .section-drag) { position:relative; }
-  .section-heading .section-drag { position:absolute; left:-17px; width:16px; margin:0; cursor:grab; }
+  .section-heading .section-drag { position:absolute; left:-17px; width:17px; box-sizing:border-box; padding-right:1px; margin:0; cursor:grab; }
+  @media (hover: hover) {
+    .section-heading > .section-drag { opacity:0; pointer-events:none; }
+    .section-heading:is(:hover, .is-floating) > .section-drag,
+    .section-heading > .section-drag:is(:focus-visible, :active) { opacity:1; pointer-events:auto; }
+  }
   .export-gif-item[aria-disabled="true"] { opacity:.5; cursor:default; background:transparent; }
   .section-heading .section-drag:active { cursor:grabbing; }
   .section-heading .section-drag { touch-action:none; }

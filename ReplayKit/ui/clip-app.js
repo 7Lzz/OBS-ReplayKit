@@ -392,6 +392,7 @@ const CLIP_HOVER_PROFILES = {
     },
   }, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
   let allClips = [];
+  let clipSectionRows = [];
   let allClipsSignature = "";
   let lastClipsByName = new Map();
   let clipIdentityRevision = 0;
@@ -4964,7 +4965,7 @@ const CLIP_HOVER_PROFILES = {
       renderHomeClips(clips);
       return;
     }
-    // on the "all" tab, split favorites into their own sub-section above the main grid. the favorites are rendered as a plain (non-virtualized) grid -- a user typically has at most a few dozen favorites, well below the count where virtualization matters. the main grid still virtualizes the rest of the clips, so its existing math is unchanged: it just operates on the non-favorites array. on any other filter the favorites section is hidden and the main grid renders the full filtered list as before.
+    // on the all tab, the small sections have plain rows and the main grid virtualizes the remaining clips
     const allFilterActive = (activeFilter === "all");
     if (allFilterActive) ensureFavoriteResolve();
     const favClips = allFilterActive ? applyClipFilter(favoriteClipsForRender(loadedClips)) : [];
@@ -4975,18 +4976,17 @@ const CLIP_HOVER_PROFILES = {
     const draftClips = allFilterActive ? applyClipFilter(draftClipsForRender(loadedClips)).filter(c => !shownAbove.has(c.name)) : [];
     draftClips.forEach(c => shownAbove.add(c.name));
     const restClips = allFilterActive ? clips.filter(c => !shownAbove.has(c.name)) : clips;
-    const showFavSection = allFilterActive && favClips.length > 0;
-    favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
-    favoritesGridEl.classList.toggle("is-shown", showFavSection);
-    if (showFavSection && !sectionCollapsed("favorites")) renderFavoritesGrid(favClips);
-    else renderCardRow(favoritesGridEl, []);
-    for (const [headingEl, sectionGridEl, key, rows] of [[linkedHeadingEl, linkedGridEl, "linked", linkedClips], [draftsHeadingEl, draftsGridEl, "drafts", draftClips]]) {
+    clipSectionRows = [
+      { key: "favorites", headingEl: favoritesHeadingEl, grid: favoritesGridEl, rows: favClips },
+      { key: "linked", headingEl: linkedHeadingEl, grid: linkedGridEl, rows: linkedClips },
+      { key: "drafts", headingEl: draftsHeadingEl, grid: draftsGridEl, rows: draftClips },
+    ];
+    for (const { key, headingEl, grid, rows } of clipSectionRows) {
       headingEl.classList.toggle("is-shown", rows.length > 0);
-      sectionGridEl.classList.toggle("is-shown", rows.length > 0);
-      if (rows.length && !sectionCollapsed(key)) renderCardRow(sectionGridEl, rows);
-      else renderCardRow(sectionGridEl, []);
+      grid.classList.toggle("is-shown", rows.length > 0);
+      renderCardRow(grid, sectionCollapsed(key) ? [] : rows);
     }
-    const showRowSections = showFavSection || linkedClips.length > 0 || draftClips.length > 0;
+    const showRowSections = clipSectionRows.some(({ rows }) => rows.length > 0);
     // every section keeps its heading available while its contents are collapsed.
     const restHeadingContent = allFilterActive
       ? FILTER_SECTION_HEADING.all
@@ -5056,6 +5056,20 @@ const CLIP_HOVER_PROFILES = {
   const homeFavsEl = document.getElementById("home-favs");
   const OPEN_FILTER_KEY = "rk-clips-open-filter";
   let homeRenderedOnce = false;
+
+  function showHomeClipFromFooter(event) {
+    const footer = event.target.closest?.(".card > .body");
+    const card = footer?.parentElement;
+    if (event.defaultPrevented || !card || card.parentElement !== event.currentTarget ||
+        card.matches(".is-theater-card, .is-fullscreen-card") ||
+        event.target.closest("button, a, input, select, textarea, [role='button'], [role='menuitem'], .menu-dropdown, [contenteditable]")) return;
+    card.querySelector(".locate-btn")?.click();
+  }
+
+  if (HOME_MODE) {
+    homeRecentEl.addEventListener("click", showHomeClipFromFooter);
+    homeFavsEl.addEventListener("click", showHomeClipFromFooter);
+  }
 
   // how many cards a row holds at the width the page has now
   function homeColumns() {
@@ -5226,7 +5240,6 @@ const CLIP_HOVER_PROFILES = {
     }
     for (const leftover of existing.values()) releaseCard(leftover, false);
   }
-  function renderFavoritesGrid(favClips) { renderCardRow(favoritesGridEl, favClips); }
 
   async function poll() {
     if (document.hidden) return;
@@ -5463,10 +5476,10 @@ const CLIP_HOVER_PROFILES = {
     if (screenshotGallery) screenshotGallery.refresh();
     poll();
   });
-  // the clip the home view asked for: the view is put on everything, then scrolled to the clip, and the card lights up for a moment. the clip is in one of two places, the favorites above the grid or the virtual window of the grid; one that is in neither yet is waited for while the list loads, and one that does not show up in time is searched by its name
+  // open the target's section and game group before scrolling to and highlighting the card
   let revealTimer = 0;
   function revealClip(name) {
-    if (gameFilters) gameFilters.reset();
+    if (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.type !== "all")) gameFilters.reset();
     clearTimeout(revealTimer);
     if (activeFilter !== "all") selectClipFilter("all");
     if (clipSearchQuery) {
@@ -5474,7 +5487,7 @@ const CLIP_HOVER_PROFILES = {
       if (clipSearchInput) clipSearchInput.value = "";
       renderLoadedClips(loadedClips);
     }
-    const cardFor = () => Array.from(document.querySelectorAll(".card")).find((c) => c.dataset.name === name && !c.classList.contains("is-theater-card"));
+    const cardFor = () => Array.from(scrollAreaEl.querySelectorAll(".card")).find((c) => c.dataset.name === name && c.offsetParent !== null && !c.classList.contains("is-theater-card"));
     const light = () => {
       const card = cardFor();
       if (!card) return;
@@ -5500,7 +5513,10 @@ const CLIP_HOVER_PROFILES = {
         if (settled >= 2 && centered) { light(); return; }
       } else {
         const index = allClips.findIndex((c) => c && c.name === name);
-        if (index >= 0) {
+        const section = index >= 0 ? "clips" : clipSectionRows.find(({ rows }) => rows.some(clip => clip.name === name))?.key;
+        if (section && sectionCollapsed(section)) {
+          document.querySelector('.section-toggle[data-section="' + section + '"]')?.click();
+        } else if (index >= 0) {
           const group = virtualGroups.find(group => index >= group.start && index < group.start + group.count);
           if (group && collapsedGameGroups.delete(group.key)) { saveCollapsedGames(); queueVirtualRender(true); }
           const top = (gridEl.offsetTop - scrollAreaEl.offsetTop) + virtualSlotTop(index, Math.max(1, virtualColumns));
@@ -5524,8 +5540,12 @@ const CLIP_HOVER_PROFILES = {
 
   // a see all on a shelf of the home view, or a show in clips on one clip, leaves a note in storage, since the clips view is another page; it is read when this view shows, and a note older than a few seconds is a leftover that is dropped
   // the popup over the obs window is another browser of the same site, so a note it leaves while this view already shows arrives as a storage event
-  if (!HOME_MODE) window.addEventListener("storage", (e) => { if (e.key === OPEN_FILTER_KEY && e.newValue) applyPendingClipsFilter(); });
+  if (!HOME_MODE) {
+    window.addEventListener("storage", (e) => { if (e.key === OPEN_FILTER_KEY && e.newValue) applyPendingClipsFilter(); });
+    window.addEventListener("replaykit-window", (e) => { if (e.detail?.shown) applyPendingClipsFilter(); });
+  }
   function applyPendingClipsFilter() {
+    if (document.hidden) return;
     let pending = null;
     try {
       pending = JSON.parse(localStorage.getItem(OPEN_FILTER_KEY) || "null");
