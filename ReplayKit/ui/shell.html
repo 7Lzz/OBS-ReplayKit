@@ -119,13 +119,20 @@
     el.addEventListener("load", function () {
       f.loaded = true;
       watchEditor(f);
+      var doc = el.contentDocument;
+      if (doc) doc.addEventListener("replaykit-skeleton-layout", function () {
+        if (active === name && frames[name] === f) rememberSoon(name);
+      });
       mark(name + "Loaded");
+      if (skelFor === name) paintSkeleton(name);
       // a page that loaded behind the scenes must not start polling as if it were showing
       dispatch(f);
       f.waiters.splice(0).forEach(function (fn) { fn(); });
       preloadSoon();
     });
-    el.src = VIEWS[name] + (VIEWS[name].indexOf("?") < 0 ? "?" : "&") + "embedded=1";
+    var src = VIEWS[name] + (VIEWS[name].indexOf("?") < 0 ? "?" : "&") + "embedded=1";
+    if (name === "settings" && settingsPage) src += "&page=" + encodeURIComponent(settingsPage);
+    el.src = src;
     document.body.appendChild(el);
     if (document.title === "rk-status:empty") updateStatus();
     return f;
@@ -147,10 +154,11 @@
     setTimeout(send, 150);
   }
 
-  // the placeholder of a view that has never shown: a heading over a grid of tiles
-  function plainMap() {
+  // use a neutral placeholder until the view has measured its own layout
+  function plainMap(name) {
     var w = innerWidth, h = innerHeight, pad = 28, gap = 16;
     var blocks = [[3, pad, 26, 180, 14, 7], [3, pad, 52, 320, 10, 5]];
+    if (name !== "clips") return { w:w, h:h, bg:"", b:blocks };
     var cols = Math.max(1, Math.floor((w - 2 * pad + gap) / (280 + gap)));
     var tileW = (w - 2 * pad - (cols - 1) * gap) / cols, tileH = tileW * 9 / 16;
     for (var y = 88; y < h; y += tileH + gap)
@@ -166,14 +174,28 @@
   // nothing of this page has been on screen yet
   var firstPaint = true;
   // the placeholder goes up at once and painted() runs once it is on screen: two frames later, or after a moment for a browser that is not producing frames while it sits under the preview or the curtain
-  function showSkeleton(map, painted) {
+  function paintSkeleton(name) {
+    var variant = name === "settings" ? settingsPage : "";
+    var map = RKSkeleton.loadView(name, variant);
+    var f = frames[name];
+    if (!map && f && f.loaded) {
+      try {
+        var pageSkeleton = f.el.contentWindow.RKSkeleton;
+        var measured = pageSkeleton && pageSkeleton.loadingMap(name, variant);
+        if (measured && measured.w === innerWidth && measured.h === innerHeight) map = measured;
+      } catch (_) {}
+    }
+    RKSkeleton.draw(document.getElementById("skel-bones"), map || plainMap(name));
+  }
+
+  function showSkeleton(name, painted) {
     var el = document.getElementById("skel");
-    RKSkeleton.draw(document.getElementById("skel-bones"), map || plainMap());
+    paintSkeleton(name);
     el.classList.remove("out");
     el.classList.toggle("instant", firstPaint);
     el.classList.add("on");
     skelOnAt = 0;
-    skelFor = wanted;
+    skelFor = name;
     var gen = ++skelGen;
     var done = false;
     var settle = function () {
@@ -289,14 +311,19 @@
     clearTimeout(rememberTimer);
     rememberTimer = setTimeout(function () {
       var f = frames[name];
-      if (active !== name || !f || !f.loaded) return;
+      if (!windowVisible || active !== name || !f || !f.loaded) return;
       try {
         var doc = f.el.contentDocument;
         if (!doc || !doc.body || doc.querySelector(".rk-skel-layer, .modal-veil.is-open, .modal-backdrop.is-visible")) return;
-        RKSkeleton.save(RKSkeleton.viewKey(name), RKSkeleton.measure(doc.body));
+        RKSkeleton.save(RKSkeleton.viewKey(name, doc.body.dataset.skelPage), RKSkeleton.measure(doc.body));
       } catch (_) {}
     }, 1500);
   }
+
+  window.addEventListener("resize", function () {
+    if (skelFor) paintSkeleton(skelFor);
+    if (active) rememberSoon(active);
+  });
 
   function show(name, page) {
     if (!VIEWS[name]) return;
@@ -305,9 +332,13 @@
     var f = frames[name];
     if (f && f.loaded) { apply(name); return; }
     // asked again while its placeholder is up and its page is on its way: that is already in hand, and only needs saying again once it is on screen
-    if (skelFor === name) { if (skelOnAt) ack(name); return; }
+    if (skelFor === name) {
+      if (name === "settings" && page) paintSkeleton(name);
+      if (skelOnAt) ack(name);
+      return;
+    }
     // the page is still on its way: its placeholder answers the click, and the browser is lifted over the preview or the curtain with it. the page only starts loading once the placeholder has been painted, since the shell and its pages share one thread, and a page that is being parsed and run keeps anything from being painted until it is done
-    showSkeleton(RKSkeleton.load(RKSkeleton.viewKey(name)), function () {
+    showSkeleton(name, function () {
       if (wanted !== name) return;
       ack(name);
       var g = ensure(name);
@@ -377,10 +408,12 @@
   }
 
   function windowShown(up, minimized) {
+    var wasVisible = windowVisible;
     windowVisible = !!up;
     windowUp = windowVisible || !!minimized;
     if (windowVisible) sleepWanted = false;
     dispatchAll();
+    if (windowVisible && !wasVisible && active) rememberSoon(active);
   }
 
   // the plugin asks once the window has been hidden for the time set in the settings: as soon as no view holds unsaved work or a running job the title says so, the plugin puts the whole browser on a blank page so its renderer gives the memory back, and it loads this page again when the window comes back

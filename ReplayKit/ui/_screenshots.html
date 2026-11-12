@@ -244,7 +244,7 @@ window.RKScreenshots = {
         '<div class="title-actions">' +
           '<button class="icon-mini-btn delete-btn" ' + deleteAttrs + ' data-tooltip="Delete ' + kind.noun + '" aria-label="Delete ' + kind.noun + '" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
           '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
-            '<div class="menu-dropdown">' +
+            '<div class="menu-dropdown" data-skel="skip">' +
               '<div class="menu-heading">Share</div>' +
               '<div class="menu-item share-menu-item" data-act="copy">' + svg(icons.CLIPBOARD).replace("<svg", '<svg class="menu-item-icon"') + "<span>Copy to clipboard</span></div>" +
               '<div class="menu-heading">Organize</div>' +

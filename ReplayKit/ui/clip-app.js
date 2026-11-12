@@ -357,6 +357,7 @@ const CLIP_HOVER_PROFILES = {
   const COLLAPSED_SECTIONS_KEY = "replaykit.collapsedSections.v1";
   const SECTION_KEYS = new Set(["favorites", "screenshots", "gifs", "clips", "linked", "local", "drafts"]);
   const collapsedSections = new Set();
+  const filteredCollapse = { game: "all", sections: new Set(), groups: new Set() };
   if (!HOME_MODE) {
     try {
       const saved = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
@@ -370,9 +371,9 @@ const CLIP_HOVER_PROFILES = {
       setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
   // the gifs exported from the clip menu: the same gallery as the screenshots, over the GIFs folder
-  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => activeFilter === "all" && collapsedSections.has("gifs"), notify:message => showToast(escapeHtml(message), "bad", "GIFs"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("gifs"), notify:message => showToast(escapeHtml(message), "bad", "GIFs"), changed:() => renderLoadedClips(loadedClips)}) : null;
   const mediaGalleries = [screenshotGallery, gifGallery].filter(Boolean);
   // the gallery that is the whole view of a filter, for the screenshots and gifs filters
   const galleryFor = (filter) => filter === "screenshots" ? screenshotGallery : filter === "gifs" ? gifGallery : null;
@@ -1311,20 +1312,34 @@ const CLIP_HOVER_PROFILES = {
     render(filtered);
   }
 
+  function gameCollapseState() {
+    const game = gameFilters?.state.game ?? "all";
+    if (game !== filteredCollapse.game) {
+      filteredCollapse.game = game;
+      filteredCollapse.sections.clear();
+      filteredCollapse.groups.clear();
+    }
+    return game === "all" ? null : filteredCollapse;
+  }
+
+  function sectionCollapsed(key) {
+    return activeFilter === "all" && (gameCollapseState()?.sections ?? collapsedSections).has(key);
+  }
+
   function syncClipView() {
     if (HOME_MODE) return;
     for (const gallery of mediaGalleries) {
       gallery.show(activeFilter);
       gallery.update(clipSearchQuery, activeSort);
     }
-    document.body.classList.toggle("clips-collapsed", activeFilter === "all" && collapsedSections.has("clips"));
-    favoritesGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("favorites"));
-    linkedGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("linked"));
-    draftsGridEl.classList.toggle("section-collapsed", activeFilter === "all" && collapsedSections.has("drafts"));
+    document.body.classList.toggle("clips-collapsed", sectionCollapsed("clips"));
+    favoritesGridEl.classList.toggle("section-collapsed", sectionCollapsed("favorites"));
+    linkedGridEl.classList.toggle("section-collapsed", sectionCollapsed("linked"));
+    draftsGridEl.classList.toggle("section-collapsed", sectionCollapsed("drafts"));
     groupGamesEl.hidden = activeFilter !== "all";
     groupGamesSwitchEl.checked = groupByGame;
     document.querySelectorAll(".section-toggle").forEach(button => {
-      const expanded = activeFilter !== "all" || !collapsedSections.has(button.dataset.section);
+      const expanded = !sectionCollapsed(button.dataset.section);
       button.hidden = activeFilter !== "all";
       const label = button.parentElement.querySelector("span").textContent;
       button.setAttribute("aria-expanded", String(expanded));
@@ -1343,13 +1358,17 @@ const CLIP_HOVER_PROFILES = {
     button.addEventListener("click", () => {
       if (activeFilter !== "all") return;
       const key = button.dataset.section;
-      const next = new Set(collapsedSections);
+      const temporary = gameCollapseState();
+      const sections = temporary?.sections ?? collapsedSections;
+      const next = new Set(sections);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      try { localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(Array.from(next))); }
-      catch { showToast("Could not save your section preferences.", "error", "Clips"); return; }
-      collapsedSections.clear();
-      next.forEach(section => collapsedSections.add(section));
+      if (!temporary) {
+        try { localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(Array.from(next))); }
+        catch { showToast("Could not save your section preferences.", "error", "Clips"); return; }
+      }
+      sections.clear();
+      next.forEach(section => sections.add(section));
       stopActivePreviewForScroll();
       mediaGalleries.forEach(gallery => gallery.paint());
       renderLoadedClips(loadedClips);
@@ -1389,8 +1408,9 @@ const CLIP_HOVER_PROFILES = {
   // where every run of a game stands in the virtual list, for the number of columns there is now
   function groupLayout(columns) {
     let top = 0;
+    const groups = gameCollapseState()?.groups ?? collapsedGameGroups;
     return virtualGroups.map((group) => {
-      const collapsed = collapsedGameGroups.has(group.key);
+      const collapsed = groups.has(group.key);
       const placed = { ...group, top, collapsed, rowsTop: top + GROUP_HEAD_HEIGHT, rows: collapsed ? 0 : Math.ceil(group.count / columns) };
       top = placed.rowsTop + placed.rows * virtualRowStride;
       return placed;
@@ -1435,8 +1455,10 @@ const CLIP_HOVER_PROFILES = {
           el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name"></span><span class="game-group-count"></span><span class="icon-mini-btn game-group-caret" aria-hidden="true">' + ((window.RK_ICONS || {})["nav/combo-arrow"] || "") + '</span>';
           applyClipHovers(el);
         el.addEventListener("click", () => {
-          if (collapsedGameGroups.has(group.key)) collapsedGameGroups.delete(group.key); else collapsedGameGroups.add(group.key);
-          saveCollapsedGames();
+          const temporary = gameCollapseState();
+          const groups = temporary?.groups ?? collapsedGameGroups;
+          if (!groups.delete(group.key)) groups.add(group.key);
+          if (!temporary) saveCollapsedGames();
           queueVirtualRender(true);
         });
         gridEl.appendChild(el);
@@ -2214,7 +2236,7 @@ const CLIP_HOVER_PROFILES = {
 
   function renderVirtualWindow(force) {
     virtualRenderQueued = false;
-    if (!HOME_MODE && (galleryFor(activeFilter) || (activeFilter === "all" && collapsedSections.has("clips")))) return;
+    if (!HOME_MODE && (galleryFor(activeFilter) || sectionCollapsed("clips"))) return;
     if (isClipRenameActive()) {
       pendingLoadedRenderAfterRename = true;
       return;
@@ -3068,7 +3090,7 @@ const CLIP_HOVER_PROFILES = {
               <button class="icon-mini-btn menu-btn" data-tooltip="More options" type="button">
                 <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
               </button>
-              <div class="menu-dropdown">
+              <div class="menu-dropdown" data-skel="skip">
                 <div class="menu-heading">Share</div>
                 <div class="menu-item share-menu-item link-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.LINK}</svg>
@@ -4210,7 +4232,7 @@ const CLIP_HOVER_PROFILES = {
     if (!gifGallery) return;
     clearTimeout(gifRevealTimer);
     if (activeFilter !== "all" && activeFilter !== "gifs") selectClipFilter("gifs");
-    if (activeFilter === "all" && collapsedSections.has("gifs")) document.querySelector('.section-toggle[data-section="gifs"]').click();
+    if (sectionCollapsed("gifs")) document.querySelector('.section-toggle[data-section="gifs"]').click();
     if (clipSearchQuery) {
       clipSearchQuery = "";
       if (clipSearchInput) clipSearchInput.value = "";
@@ -4956,12 +4978,12 @@ const CLIP_HOVER_PROFILES = {
     const showFavSection = allFilterActive && favClips.length > 0;
     favoritesHeadingEl.classList.toggle("is-shown", showFavSection);
     favoritesGridEl.classList.toggle("is-shown", showFavSection);
-    if (showFavSection && !collapsedSections.has("favorites")) renderFavoritesGrid(favClips);
+    if (showFavSection && !sectionCollapsed("favorites")) renderFavoritesGrid(favClips);
     else renderCardRow(favoritesGridEl, []);
     for (const [headingEl, sectionGridEl, key, rows] of [[linkedHeadingEl, linkedGridEl, "linked", linkedClips], [draftsHeadingEl, draftsGridEl, "drafts", draftClips]]) {
       headingEl.classList.toggle("is-shown", rows.length > 0);
       sectionGridEl.classList.toggle("is-shown", rows.length > 0);
-      if (rows.length && !collapsedSections.has(key)) renderCardRow(sectionGridEl, rows);
+      if (rows.length && !sectionCollapsed(key)) renderCardRow(sectionGridEl, rows);
       else renderCardRow(sectionGridEl, []);
     }
     const showRowSections = showFavSection || linkedClips.length > 0 || draftClips.length > 0;
@@ -5424,6 +5446,10 @@ const CLIP_HOVER_PROFILES = {
     clipsNextOffset = 0;
     clipsTotalKnown = false;
     loadedClips = [];
+    if (state.game !== filteredCollapse.game && state.type === activeFilter) {
+      scrollAreaEl.scrollTop = 0;
+      resetVirtualWindow();
+    }
     selectClipFilter(state.type);
     mediaGalleries.forEach(gallery => gallery.paint());
     poll();

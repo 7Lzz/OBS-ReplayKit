@@ -835,7 +835,7 @@ void ShellOpenSettingsPage(const QString &page)
 // starts the browser when cef and the helper are both up. the helper is launched beside obs and can still be coming up, so the wait is a bounded poll on a worker thread
 void ShellEnsureHost()
 {
-	if (!g_shellOn || g_shellHost || g_hostCreating)
+	if (!g_shellOn || g_shellHost || g_hostCreating || !CefPrewarmFinished())
 		return;
 	g_hostCreating = true;
 	QTimer::singleShot(kHelperNoticeMs, g_callbacks, []() {

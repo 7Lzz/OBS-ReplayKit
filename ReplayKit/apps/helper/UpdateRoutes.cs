@@ -75,7 +75,7 @@ namespace ReplayKitHelper
             if (path == "/update/apply")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, Update.ApplyUpdate());
+                HttpResponse.SendJson(stream, 200, Update.ApplyUpdate(Q("automatic") == "1"));
                 return false;
             }
 

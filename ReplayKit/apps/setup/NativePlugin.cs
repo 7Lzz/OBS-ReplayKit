@@ -14,7 +14,7 @@ namespace ReplayKitSetup
             modern ? Path.Combine(Config.REPLAYKIT_PLUGIN_DIR, "replaykit.dll") : Path.Combine(Config.REPLAYKIT_PLUGIN_DIR, "bin", "64bit", "replaykit.dll");
 
         // the installed plugin is byte for byte the bundled one
-        public static bool IsCurrent()
+        public static bool IsCurrent(bool requirePlainFile = false)
         {
             try
             {
@@ -22,6 +22,7 @@ namespace ReplayKitSetup
                 if (line == null) return false;
                 string target = TargetPath(line.ModernPlugins);
                 if (!IsBundled() || !File.Exists(target)) return false;
+                if (requirePlainFile && (File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0) return false;
                 return HashOf(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED) == HashOf(target);
             }
             catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException || exc is InvalidDataException)
@@ -53,28 +54,33 @@ namespace ReplayKitSetup
             }
             bool modern = line.ModernPlugins;
             string target = TargetPath(modern);
-            try
+            bool alreadyCurrent = IsCurrent(requirePlainFile: true);
+            if (!alreadyCurrent)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(target));
-                // a virus scanner or the indexer can hold a freshly closed dll for a moment, so the copy is tried again for a while before it counts as failed
-                Installer.WriteWithRetry(() => File.Copy(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED, target, true));
-            }
-            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
-            {
-                log?.Invoke("warn: could not install the replaykit plugin: " + exc.Message);
-                return false;
-            }
-            if (!IsCurrent())
-            {
-                log?.Invoke("warn: the installed replaykit plugin is not the bundled one after the copy");
-                return false;
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    // a virus scanner or the indexer can hold a freshly closed dll for a moment, so the copy is tried again for a while before it counts as failed
+                    Installer.WriteWithRetry(() => File.Copy(Config.REPLAYKIT_PLUGIN_DLL_BUNDLED, target, true));
+                }
+                catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
+                {
+                    log?.Invoke("warn: could not install the replaykit plugin: " + exc.Message);
+                    return false;
+                }
+                if (!IsCurrent())
+                {
+                    log?.Invoke("warn: the installed replaykit plugin is not the bundled one after the copy");
+                    return false;
+                }
             }
 
             RemoveLegacyTrayPlugins(log);
             // a copy in the other layout is from before obs changed line; obs 33 skips it, but an older obs would load it instead of this one
             NeutralizeLegacyDll(TargetPath(!modern), log);
-            log?.Invoke("installed -> " + target);
-            log?.Invoke("    OBS will load it on next launch (the ReplayKit window, notifications and tray menu come from it)");
+            log?.Invoke((alreadyCurrent ? "ReplayKit plugin already current -> " : "installed -> ") + target);
+            if (!alreadyCurrent)
+                log?.Invoke("    OBS will load it on next launch (the ReplayKit window, notifications and tray menu come from it)");
             return true;
         }
 

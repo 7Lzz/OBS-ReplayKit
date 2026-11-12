@@ -401,21 +401,21 @@ namespace ReplayKitHelper
                 };
             }
 
-            // intentionally does NOT consult lastUpdatePromptVersion here -- the popup should show on every launch, since a previous "later" click shouldnt suppress it forever; the admin gate is also dropped since install self-elevates via uac if needed.
+            // a previous "later" choice does not suppress the startup check; the installer can elevate itself
             var status = GetUpdateStatus();
             status["startupCheck"] = true;
             status["admin"] = Elevation.IsAdmin();
             status["prompt"] = (status["ok"]?.Value<bool>() ?? false) && ((status["updateAvailable"]?.Value<bool>() ?? false) || (status["repairRequired"]?.Value<bool>() ?? false)) && !string.IsNullOrWhiteSpace(status["latestVersion"]?.Value<string>());
 
-            // a failed update restarts OBS, which runs this check again -- without these two guards the user gets a fresh update window stacked on the one still showing them why the last attempt failed.
+            // a failed update can relaunch obs, which runs this check again
             if (status["prompt"]?.Value<bool>() ?? false)
             {
-                string suppress = StartupPromptSuppressedBecause(status["latestVersion"]?.Value<string>());
+                string suppress = StartupUpdateSuppressedBecause();
                 if (suppress != null)
                 {
                     status["prompt"] = false;
                     status["message"] = suppress;
-                    WriteUpdateDebug("startup prompt suppressed: " + suppress);
+                    WriteUpdateDebug("automatic startup update suppressed: " + suppress);
                 }
             }
             // the first-run wizard reads this so it can stand aside until the update is done
@@ -424,11 +424,10 @@ namespace ReplayKitHelper
             return status;
         }
 
-        // how long a failed attempt keeps the startup prompt quiet. long enough to cover the restart the failure itself causes, short enough that the next real session still offers the update.
-        private static readonly TimeSpan FailureQuietPeriod = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan FailureQuietPeriod = TimeSpan.FromHours(1);
 
-        // null when the prompt should show. the update window is its own browser process, so it survives the OBS restart a failed update triggers -- opening a second one on top of it is the loop the user sees.
-        private static string StartupPromptSuppressedBecause(string latestVersion)
+        // automatic starts wait after any recorded failure, even if the verdict window never opened
+        private static string StartupUpdateSuppressedBecause()
         {
             try
             {
@@ -442,16 +441,12 @@ namespace ReplayKitHelper
                 string path = InstallResultPath();
                 if (!File.Exists(path)) return null;
                 var data = JObject.Parse(File.ReadAllText(path));
-                if (data["ok"]?.Value<bool>() ?? true) return null;
-                // never suppress a verdict the user has not been shown yet -- the window reopens to report it.
-                if (!(data["seen"]?.Value<bool>() ?? false)) return null;
-                // only for the version that failed -- a newer release should still be offered straight away.
-                string failedVersion = data["version"]?.Value<string>() ?? "";
-                if (!string.IsNullOrEmpty(latestVersion) && !string.Equals(failedVersion, latestVersion, StringComparison.OrdinalIgnoreCase)) return null;
-                var finishedAt = data["finishedAt"]?.Value<DateTime?>();
-                if (finishedAt == null) return null;
-                if (DateTime.UtcNow - finishedAt.Value.ToUniversalTime() > FailureQuietPeriod) return null;
-                return "The last update attempt failed; not prompting again yet.";
+                if (data["ok"]?.Type != JTokenType.Boolean || data.Value<bool>("ok")) return null;
+                DateTime finishedAt = data["finishedAt"]?.Type == JTokenType.Date
+                    ? data.Value<DateTime>("finishedAt").ToUniversalTime()
+                    : File.GetLastWriteTimeUtc(path);
+                if (DateTime.UtcNow - finishedAt >= FailureQuietPeriod) return null;
+                return "Automatic updates are paused for one hour after a failed update. You can still update manually.";
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
@@ -500,7 +495,7 @@ namespace ReplayKitHelper
             return result;
         }
 
-        // stamped by the update window once it has displayed the verdict. until then the verdict counts as unseen and the next startup check reopens the window to show it, rather than the outcome being silently swallowed.
+        // stamped by the update window once it has displayed the verdict
         public static JObject MarkInstallResultSeen()
         {
             try
@@ -518,12 +513,28 @@ namespace ReplayKitHelper
             }
         }
 
-        // cleared before each apply so the popup can never read a previous updates verdict as this ones.
-        private static void ClearInstallResult()
+        // clear the old verdict before launching the installer, and keep it if the launch is cancelled
+        private static string ClearInstallResult()
         {
-            foreach (string path in new[] { InstallResultPath(), InstallPidPath() })
+            string path = InstallResultPath();
+            string previous = File.Exists(path) ? File.ReadAllText(path) : null;
+            File.Delete(InstallPidPath());
+            File.Delete(path);
+            return previous;
+        }
+
+        private static void RestoreInstallResult(string previous)
+        {
+            if (previous == null) return;
+            try
             {
-                File.Delete(path);
+                using (var file = new FileStream(InstallResultPath(), FileMode.CreateNew, FileAccess.Write))
+                using (var writer = new StreamWriter(file, new System.Text.UTF8Encoding(false)))
+                    writer.Write(previous);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                WriteUpdateDebug("previous update verdict could not be restored: " + ex.Message);
             }
         }
 
@@ -853,7 +864,7 @@ namespace ReplayKitHelper
         private static volatile bool installerStarted;
         public static bool InstallerRunning() => installerStarted;
 
-        public static JObject ApplyUpdate()
+        public static JObject ApplyUpdate(bool automatic = false)
         {
             // claim before doing anything else -- a second concurrent call would otherwise race the delete + recreate + download into the same fixed temp dir below.
             bool claimed;
@@ -866,6 +877,11 @@ namespace ReplayKitHelper
             string releaseUrl = ReleasePage;
             try
             {
+                if (automatic)
+                {
+                    string suppress = StartupUpdateSuppressedBecause();
+                    if (suppress != null) return new JObject { ["ok"] = true, ["installing"] = false, ["message"] = suppress };
+                }
                 string installed = NormalizeVersion(GetInstalledVersion());
                 var latest = GetLatestRelease();
                 if (!string.IsNullOrWhiteSpace(latest.HtmlUrl)) releaseUrl = latest.HtmlUrl;
@@ -885,16 +901,18 @@ namespace ReplayKitHelper
 
                 string tempDir = CreateUpdateTemp();
                 JObject started;
+                string previousResult = null;
                 try
                 {
                     string installerPath = DownloadVerifiedInstaller(latest, tempDir, " OBS was left running; try again once a fixed release is out.");
-                    ClearInstallResult();
+                    previousResult = ClearInstallResult();
                     SetProgressStage("install");
                     started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
                     installerStarted = true;
                 }
                 catch
                 {
+                    RestoreInstallResult(previousResult);
                     // the installer never started (a declined uac prompt, a failed spawn), so its download goes
                     try { Directory.Delete(tempDir, true); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     throw;

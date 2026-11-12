@@ -153,7 +153,18 @@ namespace ReplayKitSetup
                     Copy(target, saved, original);
                 }
             }
-            Change(files, file => Copy(PathAt(bundle.Folder, (string)file["Path"]), PathAt(Root, (string)file["Path"]), (string)file["Sha256"]),
+            var needed = files.Where(file =>
+            {
+                string target = PathAt(Root, (string)file["Path"]);
+                return !File.Exists(target) || Hash(target) != (string)file["Sha256"];
+            }).ToArray();
+            if (needed.Length == 0)
+            {
+                if (!JToken.DeepEquals(previous, bundle.Manifest)) Save(record, bundle.Manifest);
+                log?.Invoke("shared OBS " + version + " process host already current");
+                return;
+            }
+            Change(needed, file => Copy(PathAt(bundle.Folder, (string)file["Path"]), PathAt(Root, (string)file["Path"]), (string)file["Sha256"]),
                 () => Save(record, bundle.Manifest));
             log?.Invoke("installed the shared OBS " + version + " process host");
         }

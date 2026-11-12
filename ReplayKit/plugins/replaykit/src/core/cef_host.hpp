@@ -18,6 +18,8 @@ void CefCloseForShutdown();
 void RunBrowserScript(QCefWidget *browser, const std::string &script);
 bool EnsureCefReadyBlocking();
 void PrewarmCefBrowser();
+void AfterCefPrewarm(std::function<void()> ready);
+bool CefPrewarmFinished();
 
 // a window that is shown out of sight for its page to start gets this long to say it is up before the wait is given up on, is left up this long after it did so the page has been drawn once, and gets this long when its widget cannot report its page at all
 constexpr int kCefWarmCapMs = 2500;

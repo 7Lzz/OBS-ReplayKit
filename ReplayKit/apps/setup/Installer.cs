@@ -419,19 +419,25 @@ namespace ReplayKitSetup
             public bool Existed;
         }
 
-        private static void StageRuntimeFile(string src, string dst)
+        private static bool StageRuntimeFile(string src, string staged, string target)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(dst));
+            byte[] text = null;
             if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
             {
                 string content = ReadTextFile(src);
                 string rewritten = PathRewrite.RewriteUserPaths(content, Config.USERNAME);
-                File.WriteAllText(dst, rewritten, new System.Text.UTF8Encoding(false));
+                text = System.Text.Encoding.UTF8.GetBytes(rewritten);
             }
-            else
-            {
-                File.Copy(src, dst, true);
-            }
+            long length = text?.LongLength ?? new FileInfo(src).Length;
+            string hash = text == null ? FileSha256(src) : Convert.ToHexString(SHA256.HashData(text));
+            if (CanSkipRuntimeFile(target, length, hash)) return false;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(staged));
+            if (text == null) File.Copy(src, staged, true);
+            else File.WriteAllBytes(staged, text);
+            if (!FileMatches(staged, length, hash))
+                throw new IOException("Staging verification failed: " + staged);
+            return true;
         }
 
         private static string FileSha256(string path)
@@ -441,11 +447,30 @@ namespace ReplayKitSetup
                 return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "");
         }
 
+        private static bool FileMatches(string path, long length, string hash) =>
+            File.Exists(path) && new FileInfo(path).Length == length && FileSha256(path) == hash;
+
+        private static bool CanSkipRuntimeFile(string target, long length, string hash)
+        {
+            try
+            {
+                return (File.GetAttributes(target) & FileAttributes.ReparsePoint) == 0 && FileMatches(target, length, hash);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
         private static void VerifyFile(string expected, string actual)
         {
-            if (!File.Exists(actual) || new FileInfo(expected).Length != new FileInfo(actual).Length || FileSha256(expected) != FileSha256(actual))
+            if (!FileMatches(actual, new FileInfo(expected).Length, FileSha256(expected)))
                 throw new IOException("File verification failed: " + actual);
         }
+
+        // a copy in an old location still counts as present, so the bundle never seeds a second state file
+        private static bool PreservesRuntimeFile(string relative) =>
+            RuntimePreserveRels.Contains(relative) && File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, Path.GetFileName(relative)));
 
         private static void ReplaceFile(string source, string target, string transactionId)
         {
@@ -480,7 +505,12 @@ namespace ReplayKitSetup
                 RuntimeChange change = changes[i];
                 try
                 {
-                    if (change.Existed) ReplaceFile(change.Backup, change.Target, transactionId + "-rollback");
+                    if (change.Existed)
+                    {
+                        // a failed swap can leave the original intact but still locked
+                        if (!CanSkipRuntimeFile(change.Target, new FileInfo(change.Backup).Length, FileSha256(change.Backup)))
+                            ReplaceFile(change.Backup, change.Target, transactionId + "-rollback");
+                    }
                     else WriteWithRetry(() => { if (File.Exists(change.Target)) File.Delete(change.Target); });
                 }
                 catch (Exception ex)
@@ -496,7 +526,7 @@ namespace ReplayKitSetup
         // the runtime tree an update installs from. exposed so the updater can preflight it before it closes obs, against the same path InstallReplaykitRuntimeUpdate walks.
         public static string GetRuntimeAssetsDir() => Path.Combine(Config.OBS_ASSETS_DIR, "obs-replayKit");
 
-        // refresh only ReplayKit-managed runtime files while preserving user obs config/state: copies everything under obs-replayKit/, preserves replaykit_settings.json, removes retired files, applies SceneSourcePatches to the scene file, and re-runs idempotent tool installs (ffmpeg, elevation task) so existing installs pick up new dependencies. problems, when given, collects the parts that could not be brought up to date (the plugin, the audio plugin), so the caller can put them in the verdict of the update
+        // refresh changed ReplayKit-managed runtime files while preserving user obs config/state, then apply migrations and refresh tools and plugins.
         public static int InstallReplaykitRuntimeUpdate(Action<string> log = null, List<string> problems = null)
         {
             string runtimeSrc = GetRuntimeAssetsDir();
@@ -517,7 +547,8 @@ namespace ReplayKitSetup
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
             if (files.Count == 0) throw new InvalidDataException("The bundled ReplayKit runtime is empty.");
 
-            int count = 0;
+            int count = 0, unchanged = 0;
+            var stagedFiles = new List<(string FileRel, string Rel, string Staged, string Target)>();
             var changes = new List<RuntimeChange>();
             bool recoveryComplete = false;
             try
@@ -526,29 +557,30 @@ namespace ReplayKitSetup
                 foreach (string src in files)
                 {
                     string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
-                    string staged = Path.Combine(stageRoot, fileRel);
-                    StageRuntimeFile(src, staged);
-                    if (Config.TEXT_EXTS.Contains(Path.GetExtension(src)))
-                    {
-                        if (!File.Exists(staged)) throw new IOException("Staging failed: " + fileRel);
-                    }
-                    else VerifyFile(src, staged);
-                }
-                log?.Invoke($"staged and verified {files.Count} runtime file(s)");
-
-                foreach (string src in files)
-                {
-                    string fileRel = src.Substring(runtimeSrc.Length).TrimStart('\\', '/');
                     string rel = Path.Combine("obs-replayKit", fileRel);
-                    string staged = Path.Combine(stageRoot, fileRel);
-                    string dst = InstallTarget(rel);
-                    // a file that is still in its old place counts as present: the copy in the bundle must not become a second, empty settings file next to real data that has not been moved yet
-                    if (RuntimePreserveRels.Contains(rel) && File.Exists(StateLayout.Resolve(Config.REPLAYKIT_CONFIG, Path.GetFileName(rel))))
+                    if (PreservesRuntimeFile(rel))
                     {
                         log?.Invoke("preserve: " + rel.Replace('\\', '/'));
                         continue;
                     }
+                    string staged = Path.Combine(stageRoot, fileRel);
+                    string target = InstallTarget(rel);
+                    if (!StageRuntimeFile(src, staged, target))
+                    {
+                        unchanged++;
+                        continue;
+                    }
+                    stagedFiles.Add((fileRel, rel, staged, target));
+                }
+                log?.Invoke($"staged and verified {stagedFiles.Count} runtime file(s)");
 
+                foreach (var (fileRel, rel, staged, dst) in stagedFiles)
+                {
+                    if (PreservesRuntimeFile(rel))
+                    {
+                        log?.Invoke("preserve: " + rel.Replace('\\', '/'));
+                        continue;
+                    }
                     var change = new RuntimeChange { Target = dst, Existed = File.Exists(dst) };
                     if (change.Existed)
                     {
@@ -574,6 +606,7 @@ namespace ReplayKitSetup
                     count++;
                 }
 
+                log?.Invoke($"skipped {unchanged} unchanged runtime file(s)");
                 WriteReplaykitVersion(log);
                 recoveryComplete = true;
             }

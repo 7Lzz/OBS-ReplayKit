@@ -4,6 +4,7 @@
 
 #include "chrome/title_keybind_badge.hpp"
 #include "core/async.hpp"
+#include "core/cef_host.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/main_window.hpp"
@@ -179,8 +180,7 @@ void ShellStart()
 	ShellProjectorPrepare();
 	ShellProjectorApply();
 	ShellLayout();
-	// after the throwaway browser of PrewarmCefBrowser has taken the first cef surface of the process, which is the one that used to come up half painted
-	QTimer::singleShot(800, g_callbacks, []() { ShellEnsureHost(); });
+	AfterCefPrewarm([]() { ShellEnsureHost(); });
 	if (g_shellPendingSetup) {
 		g_shellPendingSetup = false;
 		QTimer::singleShot(1000, g_callbacks, []() { ShellOpenView(ShellView::Setup, false); });

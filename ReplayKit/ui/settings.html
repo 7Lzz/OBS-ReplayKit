@@ -2280,6 +2280,7 @@
   const RA_DISCORD = { kind:"discord", name:"Discord", icon:"audio/discord", volumeKey:"discordAudioVolume" };
   const raState = { apps:[], obsAnswered:true, timer:0, html:"", dragging:false, renderAfterDrag:false };
   let activePage = "output";
+  const initialSettingsPage = activePage;
   const raIcons = new Map();
   const raIconTried = {};
   // set when the user drags the overlay in the projector; obs owns that position so it is not part of state
@@ -3985,6 +3986,7 @@
     if (name !== "hotkeys") releaseHotkeyCapture();
     if (window.RKMic) RKMic.setVisible(name === "audio");
     activePage = name;
+    document.body.dataset.skelPage = name === initialSettingsPage ? "" : name;
     updateRecordingAudioPolling();
     document.querySelectorAll(".nav-btn").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.page === name);
@@ -3994,6 +3996,7 @@
     });
     // the fake overlay projector only listens to input + renders while the Overlay page is open
     if (window.RKOverlayPreview) { if (name === "overlay") { RKOverlayPreview.refresh(); RKOverlayPreview.start(); } else RKOverlayPreview.stop(); }
+    document.dispatchEvent(new Event("replaykit-skeleton-layout"));
   }
 
   document.querySelectorAll(".nav-btn").forEach((btn) => {
@@ -6073,8 +6076,10 @@
   };
 
   // the first load holds the pages under a placeholder measured from their own rows, so no control shows a value before the real one is in
+  const requestedSettingsPage = new URLSearchParams(location.search).get("page");
+  if (requestedSettingsPage) window.__rkGoToPage(requestedSettingsPage);
   const settingsMain = document.querySelector("main.main");
-  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings" });
+  if (window.RKSkeleton) RKSkeleton.cover(settingsMain, { view: "settings", variant: document.body.dataset.skelPage });
   loadSettings().finally(() => { if (window.RKSkeleton) RKSkeleton.uncover(settingsMain); });
   setInterval(refreshExternalSettings, 2000);
 

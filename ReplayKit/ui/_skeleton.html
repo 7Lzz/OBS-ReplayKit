@@ -36,7 +36,7 @@
   var SMALL_CONTROL = 48;
   var STORE = "rk-skeleton:";
   // raised whenever what measure() turns a page into changes, so a shape kept by an older release is never drawn
-  var MAP_VERSION = 2;
+  var MAP_VERSION = 3;
   var SURFACE = 1, BLOCK = 2, LINE = 3;
   var SVG_NS = "http://www.w3.org/2000/svg";
   var MEDIA = { img:1, video:1, canvas:1, svg:1, picture:1, iframe:1 };
@@ -188,19 +188,32 @@
     return null;
   }
   // the key the shape of a view of the obs window is kept under: the shell keeps it, and the page of that view takes it over from the shell
-  function viewKey(name) { return "view:" + name; }
+  function viewKey(name, variant) { return "view:" + name + (name === "settings" ? ":" + (variant || "") : ""); }
+
+  function loadView(name, variant, win) {
+    win = win || window;
+    var map = load(viewKey(name, variant));
+    return map && map.b.length && map.w === win.innerWidth && map.h === win.innerHeight ? map : null;
+  }
+
+  function loadingMap(name, variant) {
+    var key = viewKey(name, variant);
+    var cover = covers.find(function (item) { return viewKey(item.view, item.variant) === key; });
+    return cover ? cover.map : null;
+  }
 
   // what goes over root: inside the obs window the shape the shell keeps for this view when it was taken at this very size, so the placeholder does not move when the page takes over from the shell; otherwise root measured with the stand-ins of stage, which puts content that is not there yet into the page and returns how to take it out again (measured and gone before anything else on the page runs)
   function drawCover(c) {
     var win = c.root.ownerDocument.defaultView;
-    var kept = c.embedded && c.view ? load(viewKey(c.view)) : null;
-    if (kept && kept.w === win.innerWidth && kept.h === win.innerHeight) {
+    var kept = c.embedded && c.view ? loadView(c.view, c.variant, win) : null;
+    if (kept) {
       var r = c.root.getBoundingClientRect();
+      c.map = kept;
       draw(c.layer, kept, { left:r.left, top:r.top, right:r.right, bottom:r.bottom });
       return;
     }
     var undo = c.stage ? c.stage() : null;
-    try { draw(c.layer, measure(c.root)); }
+    try { c.map = measure(c.root); draw(c.layer, c.map); }
     finally { if (typeof undo === "function") undo(); }
   }
 
@@ -208,7 +221,7 @@
   function cover(root, options) {
     if (!root || coverOf(root)) return;
     var doc = root.ownerDocument;
-    var c = { root:root, view:options && options.view, stage:options && options.stage, layer:doc.createElement("div") };
+    var c = { root:root, view:options && options.view, variant:options && options.variant, stage:options && options.stage, layer:doc.createElement("div") };
     c.embedded = doc.documentElement.classList.contains("rk-embedded");
     c.delay = c.embedded ? 0 : SHOW_DELAY_MS;
     c.layer.className = "rk-skel-layer";
@@ -238,9 +251,14 @@
   function reveal(c, fade) {
     c.root.classList.remove("rk-skel-hidden");
     c.root.removeAttribute("aria-busy");
-    if (!fade) { c.layer.remove(); return; }
+    function finish() {
+      c.layer.remove();
+      c.root.ownerDocument.dispatchEvent(new Event("replaykit-skeleton-layout"));
+    }
+    if (!fade) { finish(); return; }
     c.root.animate([{ opacity:0 }, { opacity:1 }], { duration:FADE_MS, easing:"ease" });
-    c.layer.animate([{ opacity:1 }, { opacity:0 }], { duration:FADE_MS, easing:"ease", fill:"forwards" }).onfinish = function () { c.layer.remove(); };
+    var fadeOut = c.layer.animate([{ opacity:1 }, { opacity:0 }], { duration:FADE_MS, easing:"ease", fill:"forwards" });
+    fadeOut.onfinish = fadeOut.oncancel = finish;
   }
 
   window.addEventListener("resize", function () {
@@ -258,6 +276,6 @@
     } catch (_) { return null; }
   }
 
-  window.RKSkeleton = { measure:measure, draw:draw, cover:cover, uncover:uncover, save:save, load:load, viewKey:viewKey, MIN_SHOWN_MS:MIN_SHOWN_MS };
+  window.RKSkeleton = { measure:measure, draw:draw, cover:cover, uncover:uncover, save:save, load:load, loadView:loadView, loadingMap:loadingMap, viewKey:viewKey, MIN_SHOWN_MS:MIN_SHOWN_MS };
 })();
 </script>

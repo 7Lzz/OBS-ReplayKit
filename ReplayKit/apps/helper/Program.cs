@@ -424,7 +424,7 @@ namespace ReplayKitHelper
                         if (data.Value<bool?>("ok") != true || data.Value<bool?>("prompt") != true) return 0;
                         // The update route retains the download-size, GitHub HTTPS, and SHA-256 verification gates;
                         // the startup worker only removes the old Install/Later prompt before invoking that route.
-                        var apply = (HttpWebRequest)WebRequest.Create(origin + "/update/apply");
+                        var apply = (HttpWebRequest)WebRequest.Create(origin + "/update/apply?automatic=1");
                         apply.Method = "POST";
                         apply.Timeout = 180000;
                         apply.Headers["Origin"] = origin;
