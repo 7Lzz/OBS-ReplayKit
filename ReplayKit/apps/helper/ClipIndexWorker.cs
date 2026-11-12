@@ -186,10 +186,7 @@ namespace ReplayKitHelper
                 int count = 0;
 
                 var files = Clips.LibraryFiles(root)
-                    .Where(f => allowed.Contains(f.Extension) &&
-                                !f.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) &&
-                                !f.Name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) &&
-                                !f.Name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase))
+                    .Where(f => allowed.Contains(f.Extension) && Clips.IsLibraryClip(f))
                     .OrderByDescending(f => f.LastWriteTimeUtc);
 
                 foreach (var file in files)

@@ -215,6 +215,12 @@ namespace ReplayKitHelper
             return files;
         }
 
+        internal static bool IsLibraryClip(FileInfo file) =>
+            Constants.ALLOWED_EXTS.Contains(file.Extension.ToLowerInvariant()) &&
+            !file.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) &&
+            !file.Name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) &&
+            !file.Name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase);
+
         // what the editor reads a clip by: a clip of the folder, or a video picked from outside it; only routes that read go through this, never the ones that delete or rename
         public static SafeClipPath GetEditorSource(string raw) => VideoImports.IsRef(raw) ? VideoImports.Resolve(raw) : GetSafeClipPath(raw);
 
@@ -757,6 +763,21 @@ namespace ReplayKitHelper
             return state;
         }
 
+        internal static void RenameFavorite(string folder, string from, string to)
+        {
+            string path = AppConfig.GetClipUiStatePath();
+            if (!File.Exists(path)) return;
+            ClipStore.UpdateFolder(path, folder, state =>
+            {
+                var names = NormalizeFavoriteClipNames(state["favorites"]);
+                int at = names.FindIndex(name => string.Equals(name, from, StringComparison.OrdinalIgnoreCase));
+                if (at < 0 || names[at] == to) return false;
+                names[at] = to;
+                state["favorites"] = new JArray(names.Distinct(StringComparer.OrdinalIgnoreCase));
+                return true;
+            });
+        }
+
         public static JObject SaveClipUiState(JObject state, string folderKey)
         {
             lock (SettingsStore.Gate)
@@ -936,26 +957,16 @@ namespace ReplayKitHelper
             {
                 string root = AppConfig.GetClipDir();
                 if (!Directory.Exists(root)) return new List<JObject>();
-                var db = ReadClipsDb();
-                index = ReadClipIndex();
                 long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 items = new List<JObject>();
-                eligibleFiles = new List<FileInfo>();
-
-                IEnumerable<FileInfo> files;
-                try { files = LibraryFiles(root); }
+                try { eligibleFiles = LibraryFiles(root).Where(IsLibraryClip).ToList(); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return new List<JObject>(); }
+                ClipRenames.Reconcile(root, eligibleFiles);
+                var db = ReadClipsDb();
+                index = ReadClipIndex();
 
-                foreach (var fi in files)
+                foreach (var fi in eligibleFiles)
                 {
-                    string ext = fi.Extension.ToLowerInvariant();
-                    if (!Constants.ALLOWED_EXTS.Contains(ext)) continue;
-                    // skip in-flight worker temp files. trim/compress workers write under %temp%, but cross-volume finalizes briefly stage a _replaykit_finalize_ sidecar in the clip folder. older _compress_tmp_ / _trim_tmp_ names are filtered too in case a previous version left one behind.
-                    if (fi.Name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) ||
-                        fi.Name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) ||
-                        fi.Name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase)) continue;
-
-                    eligibleFiles.Add(fi);
                     var item = new JObject
                     {
                         ["name"] = fi.Name,

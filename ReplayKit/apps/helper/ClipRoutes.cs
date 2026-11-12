@@ -425,20 +425,18 @@ namespace ReplayKitHelper
                     if (reservation == null) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = busy }); return false; }
                     try
                     {
+                        string fileId = null;
                         JobCoordinator.Commit(requestId, () => JobCoordinator.ChangeSource(selected.Full, () =>
                         {
                             // a restore from deleted history or a save can take the name between the check above and here
                             if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath) || Clips.NameTaken(newName))) throw new IOException("A file with that name already exists");
+                            fileId = ClipRenames.Identity(new FileInfo(selected.Full));
                             ClipFiles.MoveWhenFree(selected.Full, newPath);
                             JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);
                         }));
-                        // preserve the streamable url association across the rename so the clip card still shows "copy link" instead of silently going back to "create link".
-                        Clips.UpdateDb(db =>
-                        {
-                            if (db.ContainsKey(selected.Name)) { db[newName] = db[selected.Name]; db.Remove(selected.Name); }
-                            return true;
-                        }, Path.GetDirectoryName(selected.Full));
-                        EditDrafts.Rename(selected.Full, newPath);
+                        if (!ClipRenames.MoveMetadata(Clips.LibraryRoot(Path.GetDirectoryName(newPath)), selected.Full, newPath, fileId))
+                            ClipFolderWorker.Poke();
+                        AppConfig.ClearClipsCache();
                         HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName });
                     }
                     catch (IOException ex) when (ClipFiles.InUse(ex)) { HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = ClipFiles.InUseMessage }); }

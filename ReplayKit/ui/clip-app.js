@@ -958,7 +958,6 @@ const CLIP_HOVER_PROFILES = {
     favoriteNames.delete(oldName);
     favoriteNames.add(newName);
     resolvedFavoriteClips = resolvedFavoriteClips.filter(clip => clip && clip.name !== oldName);
-    scheduleClipUiStateSave();
     favoriteResolveKey = "";
     scheduleFavoriteResolve(0);
   }
@@ -4027,6 +4026,8 @@ const CLIP_HOVER_PROFILES = {
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       finalName = data.name || to;
       renameClipIdentity(name, finalName);
+      transferFavorite(name, finalName);
+      hydrateClipUiState();
       if (finalName !== to) {
         showToast("A clip named “" + escapeHtml(displayClipName(to)) + "” already exists, so this clip was renamed to “" + escapeHtml(displayClipName(finalName)) + "”.", "info");
         scheduleToastHide(5000);
@@ -4148,7 +4149,6 @@ const CLIP_HOVER_PROFILES = {
         const finalName = await renameClipFile(currentName, newName);
         settled = true;
         // optimistically update the card so we dont wait for the next /clips poll to relabel. the next poll will reconcile.
-        transferFavorite(currentName, finalName);
         card.dataset.name = finalName;
         nameSpan.textContent = displayClipName(card.dataset.name);
         syncFavoriteButton(card, card.dataset.name);

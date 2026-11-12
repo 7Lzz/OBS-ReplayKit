@@ -171,7 +171,7 @@ namespace ReplayKitHelper
         }
 
         // a clip that was renamed keeps its draft under the new name; one that was deleted loses it. both are best effort, since the clip itself is already done with
-        public static void Rename(string from, string to)
+        public static bool Rename(string from, string to)
         {
             try
             {
@@ -187,12 +187,21 @@ namespace ReplayKitHelper
                     if (entry == null) return false;
                     var moved = (JObject)entry.DeepClone();
                     moved["source"] = target;
-                    if (key != Key(target)) db.Remove(key);
-                    db[Key(target)] = moved;
+                    if (!Matches(moved, target)) return false;
+                    string targetKey = Key(target);
+                    if (key != targetKey && Matches(db[targetKey] as JObject, target)) return false;
+                    if (key == targetKey && JToken.DeepEquals(entry, moved)) return false;
+                    if (key != targetKey) db.Remove(key);
+                    db[targetKey] = moved;
                     return true;
                 });
+                return true;
             }
-            catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException) { Log.Write("EditDrafts.Rename: " + ex.Message); }
+            catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
+            {
+                Log.Write("EditDrafts.Rename: " + ex.Message);
+                return false;
+            }
         }
 
         // a clip compressed in place is the same edit on a smaller file, so the draft of the version it replaced moves to the new one; a draft saved for the new file in the meantime is left as it is

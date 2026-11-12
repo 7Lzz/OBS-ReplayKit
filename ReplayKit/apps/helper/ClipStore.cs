@@ -127,15 +127,18 @@ namespace ReplayKitHelper
             return Update(path, db => { var scoped = Folder(db, folder, out bool created); return change(scoped) || created; });
         }
 
-        public static bool SetTranscode(string path, string clip, string shortcode, int status, int percent)
+        public static bool SetTranscode(string path, string shortcode, int status, int percent)
         {
-            return Update(path, db =>
+            if (string.IsNullOrEmpty(shortcode)) return false;
+            bool found = false;
+            Update(path, db =>
             {
                 bool changed = false;
                 var folders = (db["_folders"] as JObject)?.Properties().Select(p => p.Value).OfType<JObject>() ?? Enumerable.Empty<JObject>();
-                foreach (var owner in folders.Concat(new[] { db }))
+                foreach (var entry in folders.Concat(new[] { db }).SelectMany(owner => owner.Properties().Select(p => p.Value)).OfType<JObject>())
                 {
-                    if (!(owner[clip] is JObject entry) || !string.Equals(entry["shortcode"]?.Value<string>(), shortcode, StringComparison.Ordinal)) continue;
+                    if (entry["shortcode"]?.Type != JTokenType.String || entry["shortcode"].Value<string>() != shortcode) continue;
+                    found = true;
                     int currentStatus = entry["transcode_status"]?.Value<int>() ?? 0;
                     if (currentStatus >= 2 && (status < 2 || status == 4)) continue;
                     entry["transcode_status"] = status;
@@ -148,6 +151,7 @@ namespace ReplayKitHelper
                 }
                 return changed;
             });
+            return found;
         }
     }
 }

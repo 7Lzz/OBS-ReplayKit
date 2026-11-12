@@ -131,7 +131,7 @@ namespace ReplayKitHelper
 
                 try
                 {
-                    if (!ClipStore.SetTranscode(dbPath, clipName, shortcode, status.Value, percent))
+                    if (!ClipStore.SetTranscode(dbPath, shortcode, status.Value, percent))
                     {
                         L("upload entry removed or replaced");
                         return 0;
@@ -153,7 +153,7 @@ namespace ReplayKitHelper
             {
                 try
                 {
-                    ClipStore.SetTranscode(dbPath, clipName, shortcode, 4, 0);
+                    ClipStore.SetTranscode(dbPath, shortcode, 4, 0);
                     L("marked status check timed out");
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)

@@ -60,9 +60,6 @@ namespace ReplayKitHelper
             }
         }
 
-        private static bool IsTempName(string name) =>
-            name.StartsWith("_replaykit_", StringComparison.OrdinalIgnoreCase) || name.StartsWith("_compress_tmp_", StringComparison.OrdinalIgnoreCase) || name.StartsWith("_trim_tmp_", StringComparison.OrdinalIgnoreCase);
-
         // the section the clips page sorts a clip into and the folder that section is, from the public summary of its tag
         private static (string Group, string Folder) GroupOf(JObject summary)
         {
@@ -126,7 +123,7 @@ namespace ReplayKitHelper
         // what a pass looks at: the clip folder, its game folders and the db (GetClipsCacheSignature), and the folders straight inside the clip folder that may be adopted
         private static string PassSignature(string root)
         {
-            var parts = new List<string> { Clips.GetClipsCacheSignature(root) };
+            var parts = new List<string> { Clips.GetClipsCacheSignature(root), ClipGames.RecognitionOn().ToString() };
             try { parts.AddRange(new DirectoryInfo(root).EnumerateDirectories().Select(d => d.Name + ":" + d.LastWriteTimeUtc.Ticks)); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { parts.Add("dirs:error"); }
             return string.Join("|", parts);
@@ -153,24 +150,29 @@ namespace ReplayKitHelper
 
         private static void Pass()
         {
-            // with game recognition off clips stay where they are saved, and the game folders that are there are left alone
-            if (!ClipGames.RecognitionOn()) return;
             string root = Path.GetFullPath(AppConfig.GetClipDir()).TrimEnd(Path.DirectorySeparatorChar);
             if (!Directory.Exists(root)) return;
             // nothing changed since the last pass and nothing was waiting to settle: the pass would find what it found then
             string signature = PassSignature(root);
             if (signature == lastSignature && !waiting) return;
-            waiting = RemoveEmptyFolders(root);
-            Clips.PruneFolders(root);
-            var entries = ClipStore.ReadFolder(AppConfig.GetDbPath(), root, data => (JObject)data.DeepClone());
-            Adopt(root, entries);
+            bool recognize = ClipGames.RecognitionOn();
+            waiting = false;
+            if (recognize)
+            {
+                waiting = RemoveEmptyFolders(root);
+                Clips.PruneFolders(root);
+                Adopt(root, ClipStore.ReadFolder(AppConfig.GetDbPath(), root, data => data));
+            }
+            var files = Clips.LibraryFiles(root).Where(Clips.IsLibraryClip).ToList();
+            if (!ClipRenames.Reconcile(root, files)) { waiting = true; return; }
+            if (!recognize) { lastSignature = PassSignature(root); return; }
+            var entries = ClipStore.ReadFolder(AppConfig.GetDbPath(), root, data => data);
 
             var records = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
             var moves = new List<Move>();
             DateTime settled = DateTime.UtcNow - Settle;
-            foreach (var file in Clips.LibraryFiles(root))
+            foreach (var file in files)
             {
-                if (!Constants.ALLOWED_EXTS.Contains(file.Extension.ToLowerInvariant()) || IsTempName(file.Name)) continue;
                 var entry = entries[file.Name] as JObject;
                 var capture = entry?["capture"] as JObject;
                 var filed = entry?["filed"] as JObject;
@@ -224,7 +226,7 @@ namespace ReplayKitHelper
                     }
                     else if (JobCoordinator.TryMove(move.File.FullName, dest))
                     {
-                        EditDrafts.Rename(move.File.FullName, dest);
+                        if (!ClipRenames.MoveMetadata(root, move.File.FullName, dest, ClipRenames.Identity(new FileInfo(dest)))) waiting = true;
                         records[move.File.Name] = Record(move.Folder, move.Group);
                         movedNow++;
                     }
