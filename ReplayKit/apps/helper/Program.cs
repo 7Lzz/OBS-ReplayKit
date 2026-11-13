@@ -11,7 +11,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check and --update-window modes run one job and exit
+    // entry point: a normal launch binds the loopback listener and runs the accept loop, each connection on the thread pool; the hidden --transcode-poll, --update-watchdog, --update-startup-check, --update-window and --relaunch-obs modes run one job and exit
     internal static class Program
     {
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -27,27 +27,6 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException);
             InstallCrashReporter();
-            if (args.Length == 2 && args[0] == "--finish-recording-audio")
-            {
-                try
-                {
-                    Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
-                    SavedClipAudio.FinishObsFile(args[1]);
-                    return 0;
-                }
-                catch (Exception ex) { Console.Error.WriteLine("Recording audio finalize failed: " + ex.GetType().Name); return 1; }
-            }
-            if (args.Length > 0 && args[0] == "--refresh-game-tag")
-            {
-                try
-                {
-                    Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
-                    if (!long.TryParse(GetNamedArg(args, "-Bytes"), out long bytes) || !long.TryParse(GetNamedArg(args, "-Written"), out long written) || !long.TryParse(GetNamedArg(args, "-Created"), out long created)) return 1;
-                    ClipGames.RefreshedRetag(GetNamedArg(args, "-File"), bytes, written, created);
-                    return 0;
-                }
-                catch (Exception ex) { Console.Error.WriteLine("Game tag refresh failed: " + ex.GetType().Name); return 1; }
-            }
             if (args.Length == 1 && args[0] == "--host-info")
             {
                 Console.WriteLine(new JObject { ["hosted"] = ProcessHost.Hosted, ["helperRoot"] = Constants.HelperRoot,
@@ -63,6 +42,11 @@ namespace ReplayKitHelper
                     return 0;
                 }
                 catch (Exception ex) { Console.Error.WriteLine("Theme preparation failed: " + ex.Message); return 1; }
+            }
+            if (args.Length > 0 && args[0] == ObsProcess.RelaunchMode)
+            {
+                Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
+                return ObsProcess.RunRelauncher(GetNamedArg(args, "-ObsPath"), GetNamedArg(args, "-ObsPid"));
             }
             if (args.Length > 0 && string.Equals(args[0], "--transcode-poll", StringComparison.OrdinalIgnoreCase))
                 return RunTranscodePoll(args);
@@ -227,6 +211,7 @@ namespace ReplayKitHelper
             try { ObsUpdate.Start(); } catch (Exception ex) { Log.Write("ObsUpdate.Start: " + ex.Message); }
             try { ClipFolderWorker.Start(); } catch (Exception ex) { Log.Write("ClipFolderWorker.Start: " + ex.Message); }
             try { DeletedHistory.Start(); } catch (Exception ex) { Log.Write("DeletedHistory.Start: " + ex.Message); }
+            try { SavedClipWorker.Start(); } catch (Exception ex) { Log.Write("SavedClipWorker.Start: " + ex.Message); }
             // the probe of the encoders waits until obs and its pages have started, since its test encodes compete with them for the machine and anything that runs the tools only needs their paths (GetToolPaths); a compress or a save that needs the encoders before then runs the probe itself
             var probe = new Thread(() =>
             {
@@ -355,32 +340,13 @@ namespace ReplayKitHelper
         // obss "did not properly shut down" prompt fires from a leftover .sentinel\run_* before any module or this helper loads, so the current launch cant be caught -- but sweeping the file while we run means a hard crash / power loss leaves nothing behind and the NEXT launch is clean. obs writes its sentinel once at startup and never recreates it, so the 30s repeat is just insurance for a helper that started before obs wrote the file.
         private static void StartCrashSentinelSweep()
         {
-            try { if (CrashPopupSuppressed()) ClearObsCrashSentinel(); }
+            try { if (CrashPopupSuppressed()) ObsProcess.ClearCrashSentinel(); }
             catch (Exception ex) { Log.Write("ClearObsCrashSentinel(startup): " + ex.Message); }
             _crashSentinelTimer = new Timer(_ =>
             {
-                try { if (CrashPopupSuppressed()) ClearObsCrashSentinel(); }
+                try { if (CrashPopupSuppressed()) ObsProcess.ClearCrashSentinel(); }
                 catch (Exception ex) { Log.Write("ClearObsCrashSentinel(sweep): " + ex.Message); }
             }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        }
-
-        // obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes every lingering one during its own shutdown handler on a clean exit -- a killed/crashed obs never reaches that code, so the leftover file is what makes the next launch show the "crash detected" prompt. clearing it ourselves the moment we know obs is actually gone heads that off regardless of how obs went down, including a raw task manager "end task" that our own restart flow never gets a chance to see.
-        private static void ClearObsCrashSentinel()
-        {
-            string sentinelDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", ".sentinel");
-            if (!Directory.Exists(sentinelDir)) return;
-            foreach (var file in Directory.GetFiles(sentinelDir, "run_*"))
-            {
-                try
-                {
-                    File.Delete(file);
-                    Log.Write("Clear-ObsCrashSentinel: removed " + Path.GetFileName(file));
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    Log.Write("Clear-ObsCrashSentinel: could not remove " + Path.GetFileName(file) + ": " + ex.Message);
-                }
-            }
         }
 
         private static void WriteStartupStatus(string configPath, string state, string message)
@@ -446,56 +412,6 @@ namespace ReplayKitHelper
             return 1;
         }
 
-        // move any <name>.json.replaykit-pending staged by SetOverlaySceneFile onto the real scene collection. only safe once obs is gone (its own exit-save would clobber it otherwise) -- callers must run this post-exit, pre-relaunch.
-        private static void ApplyPendingOverlayScene()
-        {
-            string scenesDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
-            if (!Directory.Exists(scenesDir)) return;
-            foreach (var staged in Directory.GetFiles(scenesDir, "*.json.replaykit-pending"))
-            {
-                string target = staged.Substring(0, staged.Length - ".replaykit-pending".Length);
-                try
-                {
-                    if (File.Exists(target)) File.Delete(target);
-                    File.Move(staged, target);
-                    Log.Write("ApplyPendingOverlayScene: applied " + Path.GetFileName(target));
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    Log.Write("ApplyPendingOverlayScene: could not apply " + Path.GetFileName(target) + ": " + ex.Message);
-                }
-            }
-        }
-
-        // restart broker: if /restart-obs-clean was the reason we are exiting, relaunch obs now that the streamable cookies are gone. we are admin (restart-obs-clean requires it), so the new obs inherits our admin token with no further uac prompt.
-        private static void RelaunchObsAfterClean(string obsPath)
-        {
-            // same leftover-sentinel problem ClearObsCrashSentinel exists for -- we are about to relaunch right after our own force-kill, which skips obss graceful-shutdown cleanup same as any other force-kill.
-            try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
-            // the same move restart_obs.ps1 does on the detached path: apply a staged overlay scene edit now that obs is gone
-            try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
-            // same, for a staged theme change -- obs clobbered user.ini [Appearance] Theme= on its exit-save.
-            try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
-
-            Log.Write("RestartAfterClean: launching " + obsPath);
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = obsPath,
-                    Arguments = "--background-color=ff272a33 --default-background-color=ff272a33 --disable-direct-composition-video-overlays --process-per-site --js-flags=--optimize-for-size",
-                    WorkingDirectory = Path.GetDirectoryName(obsPath),
-                    UseShellExecute = true,
-                };
-                Process.Start(psi)?.Dispose();
-                Log.Write("RestartAfterClean: launch issued.");
-            }
-            catch (Exception ex)
-            {
-                Log.Write("RestartAfterClean: launch failed: " + ex.Message);
-            }
-        }
-
         private static void Shutdown()
         {
             Update.StopPolling();
@@ -506,13 +422,13 @@ namespace ReplayKitHelper
             try { _listener?.Stop(); } catch (SocketException) { }
             if (ParentWatchdog.ParentDied && CrashPopupSuppressed())
             {
-                try { ClearObsCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
+                try { ObsProcess.ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearObsCrashSentinel: " + ex.Message); }
             }
 
             string restartObsPath = Server.State.RestartAfterCleanObsPath;
             if (!string.IsNullOrEmpty(restartObsPath))
             {
-                RelaunchObsAfterClean(restartObsPath);
+                ObsProcess.Relaunch(restartObsPath);
             }
 
             ReleaseSingleton();

@@ -17,13 +17,6 @@ namespace ReplayKitSetup
     // obs process management: locate obs64.exe, close running instances, clear crash flags, relaunch
     public static class Obs
     {
-        public const string OBS_START_ARGS =
-            "--background-color=ff272a33 " +
-            "--default-background-color=ff272a33 " +
-            "--disable-direct-composition-video-overlays " +
-            // one renderer for every page of the same site and a v8 that favours size over speed, to keep the browser of the window small; obs passes its launch flags on to its browser
-            "--process-per-site --js-flags=--optimize-for-size";
-
         // best detected obs executable path, or null.
         public static string FindObsExe() => Config.FindObsExeCandidate();
 
@@ -193,59 +186,12 @@ namespace ReplayKitSetup
             }
         }
 
-        private static string VbsLiteral(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
-
-        // start obs from a temporary gui-script host so native plugins cannot write to our console.
-        private static bool LaunchObsViaWscript(string obsExe, Action<string> log)
+        // obs started straight from this process keeps its administrator rights; detached, so native plugins cannot write to the console of this exe, and outside its job, so obs outlives it
+        private static bool LaunchObsKeepingRights(string obsExe, Action<string> log)
         {
-            string command = $"\"{obsExe}\" {OBS_START_ARGS}";
-            string obsDir = Path.GetDirectoryName(obsExe);
-            string script =
-                "Option Explicit\r\n" +
-                "On Error Resume Next\r\n\r\n" +
-                "Dim shell, fso, scriptPath, rc\r\n" +
-                "Set shell = CreateObject(\"WScript.Shell\")\r\n" +
-                "shell.CurrentDirectory = " + VbsLiteral(obsDir) + "\r\n" +
-                "rc = 0\r\n" +
-                "shell.Run " + VbsLiteral(command) + ", 1, False\r\n" +
-                "If Err.Number <> 0 Then rc = 1\r\n\r\n" +
-                "scriptPath = WScript.ScriptFullName\r\n" +
-                "Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n" +
-                "fso.DeleteFile scriptPath, True\r\n\r\n" +
-                "WScript.Quit rc\r\n";
-
-            string scriptPath = Path.Combine(Path.GetTempPath(), "obsreplaykit_launch_" + Guid.NewGuid().ToString("N") + ".vbs");
-            try
-            {
-                File.WriteAllText(scriptPath, script, Encoding.Unicode);
-            }
-            catch (Exception exc) when (exc is IOException || exc is UnauthorizedAccessException)
-            {
-                log?.Invoke("failed to prepare OBS launcher: " + exc.Message);
-                return false;
-            }
-
-            try
-            {
-                var psi = new ProcessStartInfo("wscript.exe", Win32Args.Build("//B", scriptPath))
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WorkingDirectory = Path.GetTempPath(),
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = false,
-                    RedirectStandardInput = false,
-                };
-                Process.Start(psi)?.Dispose();
-                return true;
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                try { File.Delete(scriptPath); }
-                catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                log?.Invoke("failed to launch OBS through detached helper: " + exc.Message);
-                return false;
-            }
+            if (DetachedSpawn.Start(obsExe, ObsLaunch.Arguments) > 0) return true;
+            log?.Invoke("failed to launch OBS: " + obsExe);
+            return false;
         }
 
         // a child of this exe inherits its administrator token and hands it on through every relaunch after it, so obs started here would stay elevated; a missing or unreadable settings file reads as off, the same rule the lua script that elevates obs follows
@@ -279,7 +225,7 @@ namespace ReplayKitSetup
                 shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { link });
                 Type shortcutType = shortcut.GetType();
                 shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe });
-                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { OBS_START_ARGS });
+                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { ObsLaunch.Arguments });
                 shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(obsExe) });
                 shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
             }
@@ -313,7 +259,7 @@ namespace ReplayKitSetup
             if (RunObsAsAdminEnabled())
             {
                 log?.Invoke("the run as administrator setting is on, obs keeps the administrator rights of this process");
-                return LaunchObsViaWscript(obsExe, log);
+                return LaunchObsKeepingRights(obsExe, log);
             }
             return LaunchObsViaShell(obsExe, log);
         }

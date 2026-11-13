@@ -23,6 +23,7 @@
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
+#include "notify/clip_toast.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_frame.hpp"
 #include "shell/shell_projector.hpp"
@@ -237,7 +238,24 @@ QWidget *WidgetNamed(const QString &name)
 		return g_shellBar && g_shellBar->isVisible() ? g_shellBar.data() : nullptr;
 	if (name == "tip")
 		return g_notifyTip && g_notifyTip->isVisible() ? g_notifyTip : nullptr;
+	if (name == "toast")
+		return ClipToastWidget();
 	return nullptr;
+}
+
+// the card of a saved clip or a recording, shown the way the event shows it, so it can be looked at without saving anything
+QJsonObject UiToast(const QJsonObject &args)
+{
+	const QString kind = args.value("kind").toString(QStringLiteral("clip"));
+	if (kind == QLatin1String("clip"))
+		ClipToastShow(ClipToastKind::Clip);
+	else if (kind == QLatin1String("recording-started"))
+		ClipToastShow(ClipToastKind::RecordingStarted);
+	else if (kind == QLatin1String("recording-stopped"))
+		ClipToastShow(ClipToastKind::RecordingStopped);
+	else
+		return Fail(QStringLiteral("args.kind is clip, recording-started or recording-stopped."));
+	return QJsonObject{{"ok", true}};
 }
 
 // the tip of the title bar and the rail, shown the way a hover shows it, so it can be looked at beside the tip of a page: the anchor is a rectangle on the screen
@@ -366,7 +384,7 @@ QJsonObject UiSnapshot(const QJsonObject &args)
 	QJsonArray trayRows;
 	QWidget *widget = target == QLatin1String("tray") ? TrayMenuForPicture(args.value("hover").toInt(-1), &trayRows) : WidgetNamed(target);
 	if (!widget)
-		return Fail(QStringLiteral("args.target is window, title, rail, bar, tip (while it shows) or tray."));
+		return Fail(QStringLiteral("args.target is window, title, rail, bar, tip or toast (while they show) or tray."));
 	const QString name = args.value("name").toString(target);
 	if (!QRegularExpression(QStringLiteral("^[A-Za-z0-9_-]{1,40}$")).match(name).hasMatch())
 		return Fail(QStringLiteral("args.name is letters, digits, - and _, up to 40 of them."));
@@ -469,6 +487,7 @@ void RegisterBuiltins()
 	SdkRegister("ui.lock", "locks or unlocks the scene in the preview: args.on", UiLock);
 	SdkRegister("ui.storage", "opens or closes the storage card: args.open", UiStorage);
 	SdkRegister("ui.storage-probe", "says whether the open storage card shows nothing, and how many times it was built again for that", UiStorageProbe);
+	SdkRegister("ui.toast", "shows the card of a saved clip or a recording the way the event does, when its setting is on: args.kind is clip, recording-started or recording-stopped", UiToast);
 	SdkRegister("ui.tip", "shows the tip of the title bar and the rail: args.text, the anchor as args.x, args.y, args.width and args.height on the screen, args.side below or right; args.hide takes it away, and with args.leave it goes the way it does when the pointer leaves", UiTip);
 	SdkRegister("ui.focus", "says where the keyboard is: whether obs is in front, which window has the focus and whether it is the browser of the shell; args.apply puts it on the browser first", UiFocus);
 	SdkRegister("ui.focus-trace", "writes every change of the keyboard focus inside obs and of the window in front to the obs log: args.on, true when left out, false turns it off", UiFocusTrace);

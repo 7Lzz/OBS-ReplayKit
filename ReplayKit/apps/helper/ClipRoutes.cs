@@ -30,6 +30,20 @@ namespace ReplayKitHelper
             bool QFlag(string key) => r.QFlag(key);
 
 
+            // the plugin tells of a clip or recording obs has finished writing
+            if (path == "/clips/saved")
+            {
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                try
+                {
+                    string file = JObject.Parse(req.Body)["path"]?.Value<string>();
+                    bool queued = !string.IsNullOrWhiteSpace(file) && Path.IsPathRooted(file) && SavedClipWorker.Enqueue(file);
+                    HttpResponse.SendJson(stream, queued ? 200 : 400, new JObject { ["ok"] = queued });
+                }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false }); }
+                return false;
+            }
+
             if (path == "/clips/state")
             {
                 try

@@ -59,10 +59,14 @@ ffi.cdef[[
         long tv_usec;
     };
     int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timeval *timeout);
+    int shutdown(SOCKET s, int how);
 ]]
+-- a module of its own may declare it as well
+pcall(ffi.cdef, [[ void *ShellExecuteW(void *hwnd, const wchar_t *lpOperation, const wchar_t *lpFile, const wchar_t *lpParameters, const wchar_t *lpDirectory, int nShowCmd); ]])
 
 local kernel32 = ffi.load("kernel32")
 local ws2_32 = ffi.load("ws2_32")
+local shell32 = ffi.load("shell32")
 local CREATE_NO_WINDOW     = 0x08000000
 local CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 local DETACHED_PROCESS     = 0x00000008
@@ -490,27 +494,78 @@ local function start_helper_watchdog()
     obs.timer_add(helper_watchdog, HELPER_WATCHDOG_MS)
 end
 
+-- a post the helper acts on by itself: the request goes out on a socket that connected within limit_ms, and its answer is read and dropped by a short timer, so the helper never writes into a closed socket and nothing here waits for it
+local POST_CONNECT_MS = 250
+local POST_ANSWER_MS = 3000
+local SD_SEND = 1
+local pending_posts = {}
+
+local function drain_posts()
+    local buf = ffi.new("char[512]")
+    for i = #pending_posts, 1, -1 do
+        local post = pending_posts[i]
+        local done = now_ms() - post.started > POST_ANSWER_MS
+        local state = socket_state(post.sock, false)
+        if state == "error" then
+            done = true
+        elseif state == "ready" and ws2_32.recv(post.sock, buf, 512, 0) <= 0 then
+            done = true
+        end
+        if done then
+            ws2_32.closesocket(post.sock)
+            table.remove(pending_posts, i)
+        end
+    end
+    if #pending_posts == 0 then obs.remove_current_callback() end
+end
+
+local function post_helper(path)
+    if not HELPER or not ensure_winsock() then return false end
+    local s = ws2_32.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+    if s == INVALID_SOCKET then return false end
+    local nonblocking = ffi.new("unsigned long[1]", 1)
+    local addr = ffi.new("struct sockaddr_in")
+    addr.sin_family = AF_INET
+    addr.sin_port = ws2_32.htons(HTTP_PORT)
+    addr.sin_addr.s_addr = ws2_32.inet_addr(HELPER_HOST)
+    local started = now_ms()
+    local connected = ws2_32.ioctlsocket(s, FIONBIO, nonblocking) == 0 and
+        (ws2_32.connect(s, ffi.cast("const struct sockaddr*", addr), ffi.sizeof(addr)) == 0 or ws2_32.WSAGetLastError() == WSAEWOULDBLOCK)
+    local state = connected and "pending" or "error"
+    while state == "pending" and now_ms() - started < POST_CONNECT_MS do
+        state = socket_state(s, true)
+        if state == "pending" then kernel32.Sleep(5) end
+    end
+    local req = "POST " .. path .. " HTTP/1.1\r\nHost: " .. HELPER_HOST .. ":" .. HTTP_PORT .. "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    if state ~= "ready" or ws2_32.send(s, req, #req, 0) ~= #req then
+        ws2_32.closesocket(s)
+        return false
+    end
+    ws2_32.shutdown(s, SD_SEND)
+    pending_posts[#pending_posts + 1] = { sock = s, started = now_ms() }
+    if #pending_posts == 1 then obs.timer_add(drain_posts, 50) end
+    return true
+end
+
 local function helper_request(path)
     if not start_helper() then return false end
     if not wait_for_helper_port(2000) then return false end
-    local url = HELPER_ORIGIN .. path
-    local cmd = "curl.exe -s -S --max-time 2 -X POST " .. win_quote(url)
-    local ok, err = spawn_hidden(cmd)
-    if not ok then
-        log(obs.LOG_ERROR, "Could not contact ReplayKit helper. Win32 error: " .. tostring(err))
+    if not post_helper(path) then
+        log(obs.LOG_ERROR, "Could not contact the ReplayKit helper for " .. path)
         return false
     end
     return true
 end
 
+-- opens the page in the default browser through the shell, the same handler a link click uses
 local function open_url(path)
     if not start_helper() then return false end
     wait_for_helper_port(2000)
-    local url = HELPER_ORIGIN .. path
-    local cmd = "rundll32.exe url.dll,FileProtocolHandler " .. win_quote(url)
-    local ok, err = spawn_hidden(cmd)
-    if not ok then
-        log(obs.LOG_ERROR, "Could not open ReplayKit page. Win32 error: " .. tostring(err))
+    local url = replaykit_wide(HELPER_ORIGIN .. path)
+    local result = url and tonumber(ffi.cast("intptr_t", shell32.ShellExecuteW(nil, replaykit_wide("open"), url, nil, nil, 1))) or 0
+    -- shellexecute reports success as a value above 32
+    if result <= 32 then
+        log(obs.LOG_ERROR, "Could not open ReplayKit page. ShellExecute returned " .. tostring(result))
         return false
     end
     return true
@@ -637,8 +692,12 @@ function script_unload()
         obs.timer_remove(helper_probe_poll)
         finish_probe()
     end
-    if HELPER then
-        spawn_hidden("curl.exe -s --max-time 1 -X POST " .. win_quote(HELPER_ORIGIN .. "/shutdown"))
+    if HELPER then post_helper("/shutdown") end
+    -- nothing may run after the unload, so the answers still on their way are not waited for
+    if #pending_posts > 0 then
+        obs.timer_remove(drain_posts)
+        for _, post in ipairs(pending_posts) do ws2_32.closesocket(post.sock) end
+        pending_posts = {}
     end
     if winsock_started then
         ws2_32.WSACleanup()

@@ -55,6 +55,7 @@ set(REPLAYKIT_SOURCES
     src/notify/notify_button.cpp
     src/notify/notify_panel.cpp
     src/notify/notify_tip.cpp
+    src/notify/clip_toast.cpp
 
     src/shell/shell.cpp
     src/shell/shell_account.cpp

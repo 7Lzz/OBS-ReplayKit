@@ -390,7 +390,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.DockStyleTag: " + ex.Message); return ""; }
         }
 
-        // where the target obs theme id is staged between "Apply" and the post-exit relaunch. obs rewrites the whole user.ini from memory on a graceful close, so a key written now gets clobbered -- restart_obs.ps1 / ApplyPendingTheme re-splice it once obs is actually gone.
+        // where the target obs theme id is staged between "Apply" and the post-exit relaunch. obs rewrites the whole user.ini from memory on a graceful close, so a key written now gets clobbered -- ApplyPendingTheme re-splices it once obs is actually gone (ObsProcess.Relaunch).
         public static readonly string PendingThemeMarker = Path.Combine(Constants.OBS_CONFIG_DIR, ".replaykit-theme-pending");
 
         // writes %APPDATA%\obs-studio\themes\rk_<slug>.ovt (a Yami variant) for non-default themes, sets user.ini now AND stages the id so the relaunch path can put it back after obss exit-save clobbers user.ini. returns the restart-reason token, or "" on failure.
@@ -419,7 +419,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.ApplyToObs: " + ex.Message); return ""; }
         }
 
-        // consume the staged marker: re-write user.ini [Appearance] Theme= from it (obs just clobbered it on exit). safe only once obs is gone; called by restart_obs.ps1's twin path in Program.RelaunchObsAfterClean.
+        // consume the staged marker: re-write user.ini [Appearance] Theme= from it (obs just clobbered it on exit). safe only once obs is gone; called by ObsProcess.Relaunch.
         public static void ApplyPendingTheme()
         {
             try

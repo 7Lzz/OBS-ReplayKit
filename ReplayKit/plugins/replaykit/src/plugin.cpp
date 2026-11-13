@@ -16,6 +16,7 @@
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "layout/ui_layout.hpp"
+#include "notify/clip_toast.hpp"
 #include "overlays/bongo.hpp"
 #include "shell/shell.hpp"
 
@@ -60,6 +61,7 @@ void obs_module_unload(void)
 	StopPipeServer();
 	IdleMemory::Stop();
 	StopWorkers();
+	ClipToastDestroy();
 	// destroy queued callbacks before their code is unloaded with this module.
 	delete g_callbacks;
 	g_callbacks = nullptr;

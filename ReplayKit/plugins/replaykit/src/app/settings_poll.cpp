@@ -16,6 +16,7 @@
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/window_state.hpp"
+#include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
@@ -219,6 +220,7 @@ void PollHelperSettings()
 			SyncStartMinimized(settingsBody);
 			RegisterOpenClipsHotkey(settingsBody);
 			ApplyNotifyThemeColors(settingsBody);
+			ClipToastApplySettings(settingsBody);
 			RefreshTitleKeybindBadges(settingsBody);
 			ShellApplySettings(settingsBody);
 			ShellSleepApplySettings(settingsBody);

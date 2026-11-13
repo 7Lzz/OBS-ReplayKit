@@ -83,7 +83,7 @@ namespace ReplayKitSetup
                 shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
                 Type shortcutType = shortcut.GetType();
                 shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe });
-                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { Obs.OBS_START_ARGS });
+                shortcutType.InvokeMember("Arguments", BindingFlags.SetProperty, null, shortcut, new object[] { ReplayKitShared.ObsLaunch.Arguments });
                 shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(obsExe) });
                 shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { obsExe + ",0" });
                 shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Start OBS ReplayKit when Windows signs in." });

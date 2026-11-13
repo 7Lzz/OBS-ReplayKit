@@ -269,64 +269,14 @@ namespace ReplayKitSetup
             catch (UnauthorizedAccessException) { return true; }
         }
 
-        // shells out to Get-AuthenticodeSignature -- same reasoning as InputOverlay.IsMicrosoftSigned: the os cmdlet is a safer bet than a hand-rolled WinVerifyTrust p/invoke for a security-critical check before running the exe.
+        // "Valid" means the authenticode signature is intact and chains to a trusted root; the subject check is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected
         private static bool IsObsSigned(string path, Action<string> log)
         {
-            const string script = @"
-$sig = Get-AuthenticodeSignature -LiteralPath $env:OBSREPLAYKIT_OBS_INSTALLER
-$cert = $sig.SignerCertificate
-[pscustomobject]@{
-  Status = [string]$sig.Status
-  Subject = if ($cert) { [string]$cert.Subject } else { """" }
-} | ConvertTo-Json -Compress
-";
-            string stdout, stderr;
-            try
-            {
-                string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-                var psi = new ProcessStartInfo(powershell, Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
-                {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                psi.EnvironmentVariables["PSModulePath"] = Path.Combine(Path.GetDirectoryName(powershell), "Modules");
-                psi.EnvironmentVariables["OBSREPLAYKIT_OBS_INSTALLER"] = path;
-                using var proc = new Process { StartInfo = psi };
-                proc.Start();
-                var outTask = proc.StandardOutput.ReadToEndAsync();
-                var errTask = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit(30000))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log("OBS installer signature check timed out");
-                    return false;
-                }
-                stdout = outTask.GetAwaiter().GetResult();
-                stderr = errTask.GetAwaiter().GetResult();
-                if (proc.ExitCode != 0)
-                {
-                    log("OBS installer signature check failed: " + stderr.Trim());
-                    return false;
-                }
-            }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException)
-            {
-                log("OBS installer signature check could not run: " + ex.Message);
-                return false;
-            }
-
-            JObject info;
-            try { info = JObject.Parse(stdout); }
-            catch (Newtonsoft.Json.JsonException) { log("OBS installer signature check returned unreadable data"); return false; }
-            string status = info.Value<string>("Status") ?? "";
-            string subject = info.Value<string>("Subject") ?? "";
-            // "Valid" already means the authenticode signature is intact and chains to a trusted root; the subject check is a sanity guard so a differently-signed exe swapped in over a hijacked link still gets rejected.
-            bool ok = status == "Valid" &&
-                      (subject.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                       subject.IndexOf("Hugh Bailey", StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!ok) log($"OBS installer signature rejected: status={status} subject={subject}");
+            var signature = Authenticode.Check(path);
+            bool ok = signature.Valid &&
+                      (signature.Subject.IndexOf("OBS", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       signature.Subject.IndexOf("Hugh Bailey", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!ok) log($"OBS installer signature rejected: status={signature.Status} subject={signature.Subject}");
             return ok;
         }
 

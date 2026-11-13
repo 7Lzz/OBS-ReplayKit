@@ -117,47 +117,6 @@ namespace ReplayKitSetup
             }
         }
 
-        private static string SafeCleanupDir(string path)
-        {
-            if (string.IsNullOrEmpty(path)) return null;
-            string tempRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\', '/');
-            string target;
-            try { target = Path.GetFullPath(path); }
-            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return null; }
-
-            // the helper downloads into %temp%\ReplayKit\update-<guid>, and only that shape is accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder
-            var dir = new DirectoryInfo(target);
-            string name = dir.Name ?? "";
-            bool uniqueUpdate = name.StartsWith(TempLayout.UpdateFolderPrefix, StringComparison.OrdinalIgnoreCase) &&
-                                Guid.TryParseExact(name.Substring(TempLayout.UpdateFolderPrefix.Length), "N", out _);
-            if (!uniqueUpdate || !string.Equals(dir.Parent?.Name, TempLayout.Folder, StringComparison.Ordinal)) return null;
-            if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
-            return target;
-        }
-
-        // cant rmdir this update dir while this exe is still running from inside it, so hand the delete to a detached cmd that outlives us by a few seconds -- used to copy this exe under a new name and launch that copy with --cleanup-update-dir instead, but a self-duplicating renamed executable is exactly the shape av heuristics flag as a dropper, and it was doing that on every single update; target only ever comes from SafeCleanupDir, which limits it to our own temp-path shapes, so plain quoting is safe here since windows paths cannot contain a literal quote character.
-        private static void ScheduleCleanup(string path)
-        {
-            string target = SafeCleanupDir(path);
-            if (target == null) return;
-            try
-            {
-                // ping as the delay instead of timeout.exe -- timeout refuses to run when stdin isnt a real console handle, which is exactly the case for a process launched with UseShellExecute=false from another non-interactive process.
-                string cmdLine = "/d /v:off /c ping 127.0.0.1 -n 4 >nul & rmdir /s /q \"%OBSREPLAYKIT_CLEANUP%\"";
-                var psi = new ProcessStartInfo("cmd.exe", cmdLine)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-                psi.EnvironmentVariables["OBSREPLAYKIT_CLEANUP"] = target;
-                Process.Start(psi)?.Dispose();
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                Log("cleanup launch failed: " + exc.Message);
-            }
-        }
-
         private static bool LaunchObsPath(string obsPath, Action<string> log)
         {
             string obs = !string.IsNullOrEmpty(obsPath) ? obsPath : Obs.FindObsExe();
@@ -172,7 +131,7 @@ namespace ReplayKitSetup
         }
 
         // run a non-interactive repair/update install from a downloaded release exe.
-        public static int RunUpdateMode(string cleanupDir = null, string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage)
+        public static int RunUpdateMode(string relaunchObs = null, int waitPid = 0, int startDelayMs = 0, bool relaunch = true, string releaseUrl = ReleasePage)
         {
             void LogBoth(string message)
             {
@@ -271,7 +230,6 @@ namespace ReplayKitSetup
                 }
                 if (updateGateHeld) updateGate.ReleaseMutex();
                 updateGate?.Dispose();
-                ScheduleCleanup(cleanupDir);
             }
         }
 
@@ -435,7 +393,7 @@ namespace ReplayKitSetup
                 DetachedSpawn.WriteOwnPid();
             }
 
-            string cleanupDir = StringArg(argv, "--cleanup-dir", "");
+            // the download folder this exe runs from is left to the helper that made it (Update.ClearStaleUpdateFolders); an older helper still passes --cleanup-dir, which is not read
             string relaunchObs = StringArg(argv, "--relaunch-obs", "");
             bool noRelaunch = argv.Contains("--no-relaunch-obs");
             int waitPid = IntArg(argv, "--wait-pid", 0);
@@ -443,7 +401,7 @@ namespace ReplayKitSetup
             string releaseUrl = StringArg(argv, "--release-url", ReleasePage);
             if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out Uri releaseUri) || releaseUri.Scheme != Uri.UriSchemeHttps)
                 releaseUrl = ReleasePage;
-            return RunUpdateMode(cleanupDir, relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl);
+            return RunUpdateMode(relaunchObs, waitPid, startDelayMs, !noRelaunch, releaseUrl);
         }
 
         private static string StringArg(string[] argv, string name, string @default)

@@ -190,6 +190,13 @@ namespace ReplayKitSetup
             Path.Combine("obs-replayKit", "scripts", "audio", "auto_pick_monitor_device.lua"),
             Path.Combine("obs-replayKit", "scripts", "helper", "replaykit_update_bootstrap.ps1"),
             Path.Combine("obs-replayKit", "scripts", "helper", "helper_endpoint.lua"),
+            // the script jobs that moved into the helper, the plugin and lua itself
+            Path.Combine("obs-replayKit", "scripts", "helper", "restart_obs.ps1"),
+            Path.Combine("obs-replayKit", "scripts", "hevc_compat", "fix_hevc_tag.ps1"),
+            Path.Combine("obs-replayKit", "scripts", "hevc_compat", "auto_fix_hevc_tag.lua"),
+            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "clip_saved_notification.ps1"),
+            Path.Combine("obs-replayKit", "scripts", "replay_buffer", "clip_saved_notification.lua"),
+            Path.Combine("obs-replayKit", "scripts", "obs_elevation", "hidden_relauncher.vbs"),
             Path.Combine("obs-replayKit", "icons", "nav", "tab-general.svg"),
         };
 

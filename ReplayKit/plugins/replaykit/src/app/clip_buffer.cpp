@@ -22,6 +22,7 @@
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/win32.hpp"
+#include "notify/clip_toast.hpp"
 #include "shell/shell_views.hpp"
 #include "windows/clips_window.hpp"
 
@@ -614,7 +615,8 @@ void SaveDisk()
 	g_awaitingSplit = true;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
-	// the scripts that beep and show the clip toast hear this on the press, since joining the pieces takes long enough to notice
+	// the card and the beep script come on the press, since joining the pieces takes long enough to notice
+	ClipToastShow(ClipToastKind::Clip);
 	calldata_t saving = {};
 	signal_handler_signal(obs_get_signal_handler(), "replaykit_clip_saving", &saving);
 	calldata_free(&saving);

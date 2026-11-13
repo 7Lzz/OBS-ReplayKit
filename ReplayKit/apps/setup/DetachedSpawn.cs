@@ -66,6 +66,15 @@ namespace ReplayKitSetup
             return pid;
         }
 
+        // starts another program the same detached way, with the rights of this process; 0 when it could not be started
+        public static int Start(string exe, string arguments)
+        {
+            string commandLine = Win32Args.Build(exe) + (string.IsNullOrEmpty(arguments) ? "" : " " + arguments);
+            int pid = Spawn(commandLine, exe, DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_NEW_PROCESS_GROUP);
+            if (pid == 0) pid = Spawn(commandLine, exe, DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+            return pid;
+        }
+
         private static int Spawn(string commandLine, string exePath, uint flags)
         {
             var si = new STARTUPINFO { cb = Marshal.SizeOf(typeof(STARTUPINFO)) };

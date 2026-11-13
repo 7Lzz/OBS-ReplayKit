@@ -19,28 +19,6 @@ namespace ReplayKitSetup
         // the clip state that is kept across an uninstall; it is looked up with StateLayout.Resolve, so an install that has not been moved to the new layout yet is kept too
         private static readonly string[] ReplaykitRuntimeStateFiles = { StateLayout.ClipsDbFile, StateLayout.ClipsIndexFile };
 
-        private static (int ExitCode, string Stdout, string Stderr) RunHidden(string fileName, string arguments, int timeoutMs = 30000)
-        {
-            var psi = new ProcessStartInfo(fileName, arguments)
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            };
-            using (var proc = Process.Start(psi))
-            {
-                var stdout = proc.StandardOutput.ReadToEndAsync();
-                var stderr = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit(timeoutMs))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    throw new TimeoutException(fileName + " timed out");
-                }
-                return (proc.ExitCode, stdout.GetAwaiter().GetResult(), stderr.GetAwaiter().GetResult());
-            }
-        }
-
         [StructLayout(LayoutKind.Sequential)]
         private struct PROCESS_BASIC_INFORMATION
         {
@@ -86,24 +64,27 @@ namespace ReplayKitSetup
             var keep = new HashSet<int> { Process.GetCurrentProcess().Id };
             var parent = CurrentParentPid();
             if (parent.HasValue) keep.Add(parent.Value);
-            string keepCsv = string.Join(",", keep);
-            string script =
-                $"$keep = @({keepCsv})\r\n" +
-                "Get-CimInstance Win32_Process |\r\n" +
-                "  Where-Object { $_.Name -in @('OBSReplayKit.exe','OBSReplayKit-Encoder.exe') -and $keep -notcontains [int]$_.ProcessId } |\r\n" +
-                "  ForEach-Object {\r\n" +
-                "    try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { }\r\n" +
-                "  }\r\n";
-            try
+            // the helper of an older release and the encoder of one ran as OBSReplayKit*.exe, the same name as this setup exe, so this process and the one that started it are kept
+            bool stopped = true;
+            foreach (string name in new[] { "OBSReplayKit", "OBSReplayKit-Encoder" })
             {
-                RunHidden("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script));
+                foreach (var process in Process.GetProcessesByName(name))
+                {
+                    using (process)
+                    {
+                        if (keep.Contains(process.Id)) continue;
+                        try { process.Kill(); }
+                        // a process that ended on its own in the meantime is what was wanted
+                        catch (InvalidOperationException) { }
+                        catch (System.ComponentModel.Win32Exception exc)
+                        {
+                            log?.Invoke("warn: helper stop failed for pid " + process.Id + ": " + exc.Message);
+                            stopped = false;
+                        }
+                    }
+                }
             }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is TimeoutException)
-            {
-                log?.Invoke("warn: helper stop failed: " + exc.Message);
-                return false;
-            }
-            return true;
+            return stopped;
         }
 
         public static bool RemoveReplaykitPlugins(Action<string> log = null)
@@ -175,45 +156,6 @@ namespace ReplayKitSetup
                 log?.Invoke("warn: could not remove " + dir + ": " + ex.Message + " (a file may be locked; a reboot will clear it)");
                 return false;
             }
-        }
-
-        public static bool RemoveVirtualDisplayDriver(Action<string> log = null)
-        {
-            const string script = @"
-$ErrorActionPreference = 'Continue'
-$vddDevice = Get-PnpDevice -ErrorAction SilentlyContinue |
-    Where-Object { $_.FriendlyName -eq 'Virtual Display Driver' } |
-    Select-Object -First 1
-if ($vddDevice) {
-    Disable-PnpDevice -InstanceId $vddDevice.InstanceId -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-    pnputil.exe /remove-device $vddDevice.InstanceId | Out-Null
-}
-$drivers = pnputil.exe /enum-drivers | Out-String
-$matches = [regex]::Matches($drivers, ""Published Name:\s+(oem\d+\.inf)\s+Original Name:\s+MttVDD\.inf"", ""IgnoreCase"")
-foreach ($m in $matches) {
-    pnputil.exe /delete-driver $m.Groups[1].Value /uninstall /force | Out-Null
-}
-if (Test-Path ""C:\IddSampleDriver"") {
-    Remove-Item -Recurse -Force ""C:\IddSampleDriver"" -ErrorAction SilentlyContinue
-}
-";
-            (int ExitCode, string Stdout, string Stderr) result;
-            try
-            {
-                result = RunHidden("powershell.exe", Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script), 60000);
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is TimeoutException)
-            {
-                log?.Invoke("warn: virtual display cleanup failed: " + exc.Message);
-                return false;
-            }
-            if (result.ExitCode != 0)
-            {
-                string message = !string.IsNullOrEmpty(result.Stderr) ? result.Stderr : result.Stdout;
-                string firstLine = string.IsNullOrWhiteSpace(message) ? "" : message.Trim().Split('\n')[0];
-                log?.Invoke("warn: virtual display cleanup returned " + result.ExitCode + ": " + firstLine);
-            }
-            return result.ExitCode == 0;
         }
 
         // the items of deleted history live in a hidden folder of the clip folder, which the config wipe never reaches, so they would stay hidden on the disk for good; only the files the history recorded, inside a folder of that name, are removed
@@ -858,7 +800,7 @@ if (Test-Path ""C:\IddSampleDriver"") {
                 ("Remove ReplayKit from OBS", "Removes the ReplayKit scene, sources, Custom Controls dock, script entry and generated theme from OBS's own config.", () => RemoveReplaykitFromObsConfig(progress.LogLine)),
                 ("Remove clip notifications", "Removes the Start Menu shortcut and header registration used for clip-ready notifications.", () => RemoveClipNotificationShortcut(progress.LogLine)),
                 ("Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", () => VbCable.UninstallVbcable(progress.LogLine)),
-                ("Remove virtual display driver", "Deletes the optional virtual display driver if it exists.", () => RemoveVirtualDisplayDriver(progress.LogLine)),
+                ("Remove virtual display driver", "Deletes the optional virtual display driver if it exists.", () => VirtualDisplayDriver.Remove(progress.LogLine)),
             };
             if (keepUserSettings)
                 steps.Add(("Keep ReplayKit settings", "Saves current ReplayKit settings for the next install.", () => SaveUserSettings(progress.LogLine)));

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -115,26 +116,13 @@ namespace ReplayKitHelper
             Server.State.Shutdown = true;
         }
 
-        // spawn restart_obs.ps1 outside our kill-on-close job so it lives past helper exit. an in-process relaunch is unreliable -- by the time obs is dead and any cleanup completes, this process has often already been torn down (parent-process watchdog exit, abandoned-mutex on takeover, etc.) and never reaches the launch line. doing the relaunch from a sibling process owned by the os instead of by us is the only way to make it survive every shutdown path.
+        // starts this program again in its --relaunch-obs mode, outside our kill-on-close job so it lives past helper exit. an in-process relaunch is unreliable -- by the time obs is dead and any cleanup completes, this process has often already been torn down (parent-process watchdog exit, abandoned-mutex on takeover, etc.) and never reaches the launch line. doing the relaunch from a sibling process owned by the os instead of by us is the only way to make it survive every shutdown path.
         internal static bool StartDetachedObsRelauncher(string obsPath, int obsPid)
         {
-            string scriptDir = AppConfig.GetScriptDir();
-            if (string.IsNullOrWhiteSpace(scriptDir)) return false;
-            string scriptPath = Path.Combine(scriptDir, "restart_obs.ps1");
-            if (!File.Exists(scriptPath))
-            {
-                Log.Write("Start-DetachedObsRelauncher: missing " + scriptPath);
-                return false;
-            }
-            string psExe = Path.Combine(Environment.GetEnvironmentVariable("WINDIR") ?? "", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-            if (!File.Exists(psExe)) psExe = "powershell.exe";
-            string cmd = ProcessArgs.Quote(psExe) +
-                " -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " + ProcessArgs.Quote(scriptPath) +
-                " -ObsPath " + ProcessArgs.Quote(obsPath) +
-                " -ObsPid " + obsPid;
+            string cmd = ProcessHost.CommandLine(new[] { RelaunchMode, "-ObsPath", obsPath, "-ObsPid", obsPid.ToString(CultureInfo.InvariantCulture) });
             try
             {
-                int relauncherPid = Native.SpawnDetached(cmd, scriptDir);
+                int relauncherPid = Native.SpawnDetached(cmd, Constants.HelperRoot);
                 if (relauncherPid <= 0)
                 {
                     Log.Write("Start-DetachedObsRelauncher: SpawnDetached returned 0");
@@ -174,6 +162,112 @@ namespace ReplayKitHelper
             else
             {
                 Log.Write(routeName + ": detached relauncher armed for '" + obsPath + "' (target PID " + obsTargetPid + ").");
+            }
+        }
+
+        internal const string RelaunchMode = "--relaunch-obs";
+        // the close of obs is given its own 15 s and then the stop the helper makes after that for a restart, so the relauncher waits a little longer than both
+        private const int RelaunchExitWaitMs = 40000;
+
+        // the --relaunch-obs mode: waits for the obs that is closing, then puts the staged files in place and starts obs again. a relaunch never stops a process that still owns graphics or output resources, so an obs that does not exit leaves the restart undone
+        internal static int RunRelauncher(string obsPath, string obsPidText)
+        {
+            if (!int.TryParse(obsPidText, NumberStyles.None, CultureInfo.InvariantCulture, out int obsPid) || obsPid <= 0 || !WaitForExit(obsPid, RelaunchExitWaitMs))
+            {
+                LogRestartStopped("OBS did not exit safely.");
+                return 3;
+            }
+            if (Relaunch(obsPath)) return 0;
+            LogRestartStopped("OBS could not be started from '" + obsPath + "'.");
+            return 2;
+        }
+
+        // written whether or not logging is on, since nothing else records why a restart left obs closed
+        private static void LogRestartStopped(string why) =>
+            Log.AppendCapped(Path.Combine(Constants.LOG_DIR, "restart_obs.log"), "[" + DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "] Restart stopped: " + why);
+
+        private static bool WaitForExit(int pid, int timeoutMs)
+        {
+            Process process;
+            try { process = Process.GetProcessById(pid); }
+            catch (ArgumentException) { return true; }
+            using (process)
+            {
+                try { return process.WaitForExit(timeoutMs); }
+                catch (InvalidOperationException) { return true; }
+                catch (Win32Exception) { return false; }
+            }
+        }
+
+        // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene and theme edits staged for after its exit-save are put in place
+        internal static bool Relaunch(string obsPath)
+        {
+            try { ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearCrashSentinel: " + ex.Message); }
+            try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
+            try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
+            if (string.IsNullOrEmpty(obsPath) || !File.Exists(obsPath))
+            {
+                Log.Write("Relaunch: OBS not found at '" + obsPath + "'");
+                return false;
+            }
+            Log.Write("Relaunch: launching " + obsPath);
+            try
+            {
+                // through the shell, which hands obs none of the handles of this short-lived process; obs keeps the rights this process has
+                var psi = new ProcessStartInfo
+                {
+                    FileName = obsPath,
+                    Arguments = ReplayKitShared.ObsLaunch.Arguments,
+                    WorkingDirectory = Path.GetDirectoryName(obsPath),
+                    UseShellExecute = true,
+                };
+                Process.Start(psi)?.Dispose();
+                return true;
+            }
+            catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException)
+            {
+                Log.Write("Relaunch: launch failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        // obs writes a run_<uuid> file under %appdata%\obs-studio\.sentinel on launch and deletes every lingering one during its own shutdown handler on a clean exit -- a killed/crashed obs never reaches that code, so the leftover file is what makes the next launch show the "crash detected" prompt
+        internal static void ClearCrashSentinel()
+        {
+            string sentinelDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", ".sentinel");
+            if (!Directory.Exists(sentinelDir)) return;
+            foreach (var file in Directory.GetFiles(sentinelDir, "run_*"))
+            {
+                try
+                {
+                    File.Delete(file);
+                    Log.Write("Clear-ObsCrashSentinel: removed " + Path.GetFileName(file));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("Clear-ObsCrashSentinel: could not remove " + Path.GetFileName(file) + ": " + ex.Message);
+                }
+            }
+        }
+
+        // move any <name>.json.replaykit-pending staged by SetOverlaySceneFile onto the real scene collection. only safe once obs is gone (its own exit-save would clobber it otherwise)
+        private static void ApplyPendingOverlayScene()
+        {
+            string scenesDir = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "basic", "scenes");
+            if (!Directory.Exists(scenesDir)) return;
+            foreach (var staged in Directory.GetFiles(scenesDir, "*.json.replaykit-pending"))
+            {
+                string target = staged.Substring(0, staged.Length - ".replaykit-pending".Length);
+                try
+                {
+                    if (File.Exists(target)) File.Delete(target);
+                    File.Move(staged, target);
+                    Log.Write("ApplyPendingOverlayScene: applied " + Path.GetFileName(target));
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("ApplyPendingOverlayScene: could not apply " + Path.GetFileName(target) + ": " + ex.Message);
+                }
             }
         }
     }

@@ -40,6 +40,7 @@ namespace ReplayKitHelper
                 {
                     Process.Start(new ProcessStartInfo(obsPath)
                     {
+                        Arguments = ReplayKitShared.ObsLaunch.Arguments,
                         UseShellExecute = true,
                         WorkingDirectory = Path.GetDirectoryName(obsPath),
                     })?.Dispose();

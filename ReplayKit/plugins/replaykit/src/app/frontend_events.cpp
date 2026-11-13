@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "app/clip_buffer.hpp"
 #include "app/capture_context.hpp"
@@ -15,7 +17,9 @@
 #include "chrome/caption_track_filter.hpp"
 #include "chrome/title_keybind_badge.hpp"
 #include "core/app_icon.hpp"
+#include "core/async.hpp"
 #include "core/cef_host.hpp"
+#include "core/helper_client.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
@@ -23,6 +27,7 @@
 #include "core/window_state.hpp"
 #include "layout/controls_dock.hpp"
 #include "layout/ui_layout.hpp"
+#include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
@@ -96,6 +101,16 @@ QTimer *g_projectorPublishTimer = nullptr;
 QTimer *g_notifyTimer = nullptr;
 NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 
+// the helper finishes a file obs has just written (the silent discord track, the hevc tag); a helper that is down at that moment finds the clip on its next pass through the library
+void TellHelperFileSaved(const char *path)
+{
+	const QString file = QString::fromUtf8(path ? path : "");
+	if (file.isEmpty())
+		return;
+	const std::string body = QJsonDocument(QJsonObject{{"path", QDir::toNativeSeparators(file)}}).toJson(QJsonDocument::Compact).toStdString();
+	RunAsync([body]() { HttpRequest("POST", "/clips/saved", body.c_str(), 3000); });
+}
+
 } // namespace
 
 void OnFrontendEvent(enum obs_frontend_event event, void *)
@@ -138,6 +153,16 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
 		char *path = obs_frontend_get_last_replay();
 		CaptureContextReplayFile(path ? path : "");
+		TellHelperFileSaved(path);
+		bfree(path);
+		ClipToastShow(ClipToastKind::Clip);
+	}
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED)
+		ClipToastShow(ClipToastKind::RecordingStarted);
+	if (event == OBS_FRONTEND_EVENT_RECORDING_STOPPED) {
+		ClipToastShow(ClipToastKind::RecordingStopped);
+		char *path = obs_frontend_get_last_recording();
+		TellHelperFileSaved(path);
 		bfree(path);
 	}
 	if (event == OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN) {

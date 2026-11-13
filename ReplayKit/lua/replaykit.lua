@@ -174,12 +174,10 @@ local MODULES = {
     { id = "capture",       path = "capture/auto_capture_switch.lua" },
     { id = "replay_start",  path = "replay_buffer/auto_start_replay_buffer.lua" },
     { id = "replay_sound",  path = "replay_buffer/replay_buffer_save_beep.lua" },
-    { id = "replay_popup",  path = "replay_buffer/clip_saved_notification.lua" },
     { id = "recording_hotkey", path = "recording/recording_hotkey.lua" },
     { id = "helper",        path = "helper/helper_bootstrap.lua" },
     { id = "discord_projector", path = "virtual_camera/auto_start_virtual_camera.lua" },
     { id = "popup_shield",  path = "popup_shield/popup_capture_shield.lua" },
-    { id = "hevc_tag_fix",  path = "hevc_compat/auto_fix_hevc_tag.lua" },
 }
 
 local loaded = {}
@@ -376,9 +374,6 @@ function script_defaults(settings)
     obs.obs_data_set_default_string(settings, "recording_start_audio_file", "")
     obs.obs_data_set_default_string(settings, "recording_stop_audio_file", "")
     obs.obs_data_set_default_string(settings, "clip_dir", "")
-    obs.obs_data_set_default_bool(settings, "clip_notification_enabled", true)
-    obs.obs_data_set_default_bool(settings, "recording_notification_enabled", true)
-    obs.obs_data_set_default_int(settings, "clip_notification_seconds", 90)
     call_all("script_defaults", settings)
 end
 

@@ -734,7 +734,7 @@ namespace ReplayKitHelper
                 data["groups"] = groups;
                 string json = data.ToString(Formatting.None);
                 AppConfig.WriteUtf8(path, json);
-                // the restart flow gracefully closes OBS so it can save window geometry -- but that exit-save also writes OBSs stale in-memory scene collection back over the edit just made here. stage a copy with a non-.json extension (OBSs scene scan ignores it); restart_obs.ps1 / ApplyPendingOverlayScene move it onto the real file after OBS is fully gone, right before the relaunch.
+                // the restart flow gracefully closes OBS so it can save window geometry -- but that exit-save also writes OBSs stale in-memory scene collection back over the edit just made here. stage a copy with a non-.json extension (OBSs scene scan ignores it); ObsProcess.Relaunch moves it onto the real file after OBS is fully gone, right before the relaunch.
                 try { AppConfig.WriteUtf8(path + ".replaykit-pending", json); }
                 catch (Exception ex) { Log.Write("SetOverlaySceneFile: could not stage pending scene: " + ex.Message); }
                 return new JObject { ["ok"] = true, ["path"] = path };

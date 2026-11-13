@@ -350,6 +350,7 @@ namespace ReplayKitHelper
                 }
                 // only the check at startup updates by itself; one found while obs is open is shown as the badge
                 ShowBadge(status);
+                ClearStaleUpdateFolders();
             }
             catch (Exception ex) { WriteUpdateDebug("periodic update check failed: " + ex.Message); }
             finally { Interlocked.Exchange(ref pollRunning, 0); }
@@ -591,21 +592,39 @@ namespace ReplayKitHelper
                 throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
         }
 
-        // an update that was cut short, or whose cleanup ran while a process still used its folder, leaves the download folder and the watchdog copy behind in %TEMP%\ReplayKit; anything younger than a day may still belong to an update in progress
+        // the names of the folders this process made in %TEMP%\ReplayKit, read and written under UpdateCheckLock
+        private static readonly HashSet<string> ownTempFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // the download folder of an update and the watchdog copy stay in %TEMP%\ReplayKit once the update is over, since the installer cannot delete the folder it runs from; the helper removes what an earlier helper left, at its start and with each update check. a folder this process made is left to the code that made it, which may still be downloading into it, and so is one a program still runs from
         public static void ClearStaleUpdateFolders()
         {
             string root = Constants.REPLAYKIT_TEMP_ROOT;
             if (!Directory.Exists(root)) return;
-            DateTime cutoff = DateTime.UtcNow.AddDays(-1);
-            foreach (string dir in Directory.GetDirectories(root))
+            // held for the whole pass, so a folder made meanwhile is not there yet when the pass lists them
+            lock (Server.State.UpdateCheckLock)
             {
-                if (!Regex.IsMatch(Path.GetFileName(dir), "^(" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "|watchdog-)[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
-                try
+                foreach (string dir in Directory.GetDirectories(root))
                 {
-                    if (Directory.GetLastWriteTimeUtc(dir) > cutoff) continue;
-                    Directory.Delete(dir, true);
+                    string name = Path.GetFileName(dir);
+                    if (ownTempFolders.Contains(name) || !Regex.IsMatch(name, "^(" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "|watchdog-)[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
+                    try
+                    {
+                        // windows refuses to delete a program that is running, so the folder of an installer or a watchdog still at work stays whole
+                        foreach (string exe in Directory.GetFiles(dir, "*.exe")) File.Delete(exe);
+                        Directory.Delete(dir, true);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                 }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            }
+        }
+
+        // makes a folder of this process in %TEMP%\ReplayKit that ClearStaleUpdateFolders leaves alone
+        private static void CreateOwnTempFolder(string path)
+        {
+            lock (Server.State.UpdateCheckLock)
+            {
+                Directory.CreateDirectory(path);
+                ownTempFolders.Add(Path.GetFileName(path));
             }
         }
 
@@ -614,7 +633,7 @@ namespace ReplayKitHelper
             Directory.CreateDirectory(Constants.REPLAYKIT_TEMP_ROOT);
             string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, ReplayKitShared.TempLayout.UpdateFolderPrefix + Guid.NewGuid().ToString("N"));
             AssertSafeUpdateTemp(path);
-            Directory.CreateDirectory(path);
+            CreateOwnTempFolder(path);
             return path;
         }
 
@@ -767,7 +786,7 @@ namespace ReplayKitHelper
             string watchdogExe = Path.Combine(watchdogDir, "OBSReplayKit-watchdog.exe");
             try
             {
-                Directory.CreateDirectory(watchdogDir);
+                CreateOwnTempFolder(watchdogDir);
                 File.Copy(source, watchdogExe, true);
             }
             catch (Exception ex)
@@ -792,7 +811,7 @@ namespace ReplayKitHelper
             string obsPath = GetUpdateObsPath();
             // wait on this helpers own pid, not obs -- obs is already confirmed dead synchronously before the installer even reaches this wait, but this helper process (which holds the lock on its own exe under scripts/helper/) only exits afterward, asynchronously, once its parent-watchdog notices obs is gone. waiting on obs pid here races the copy step against that and loses.
             int waitPid = Process.GetCurrentProcess().Id;
-            var argList = new List<string> { "--update", "--cleanup-dir", tempDir, "--start-delay-ms", "1200" };
+            var argList = new List<string> { "--update", "--start-delay-ms", "1200" };
             argList.Add("--release-url");
             argList.Add(releaseUrl ?? ReleasePage);
             if (!string.IsNullOrWhiteSpace(obsPath)) { argList.Add("--relaunch-obs"); argList.Add(obsPath); }

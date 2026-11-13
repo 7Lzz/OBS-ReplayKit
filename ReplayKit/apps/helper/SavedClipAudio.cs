@@ -35,9 +35,9 @@ namespace ReplayKitHelper
             }
         }
 
-        internal static void FinishObsFile(string path)
+        internal static void FinishObsFile(string path, bool discordClosedAtSave)
         {
-            if (!Path.IsPathRooted(path) || !string.Equals(Path.GetExtension(path), ".mp4", StringComparison.OrdinalIgnoreCase) || !DiscordClosed()) return;
+            if (!discordClosedAtSave || !Path.IsPathRooted(path) || !string.Equals(Path.GetExtension(path), ".mp4", StringComparison.OrdinalIgnoreCase)) return;
             var before = new FileInfo(path);
             if (!before.Exists) return;
             long bytes = before.Length, written = before.LastWriteTimeUtc.Ticks, created = before.CreationTimeUtc.Ticks;
@@ -91,21 +91,7 @@ namespace ReplayKitHelper
                     var normalized = Mp4Tracks.NormalizeAudio(temporary);
                     if (normalized == Mp4Tracks.Fix.Busy || normalized == Mp4Tracks.Fix.Failed) return false;
                 }
-                var current = new FileInfo(path);
-                if (!current.Exists || (current.Attributes & FileAttributes.ReparsePoint) != 0 ||
-                    current.Length != original.Length || current.LastWriteTimeUtc != original.LastWriteTimeUtc ||
-                    current.CreationTimeUtc != original.CreationTimeUtc || !DiscordClosed()) return false;
-                File.Replace(temporary, path, null);
-                try
-                {
-                    File.SetCreationTimeUtc(path, original.CreationTimeUtc);
-                    File.SetLastWriteTimeUtc(path, original.LastWriteTimeUtc);
-                }
-                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-                {
-                    Log.Write("Clip audio finalize could not restore the file timestamps: " + ex.GetType().Name);
-                }
-                return true;
+                return ClipFiles.ReplaceKeepingDates(path, temporary, original, DiscordClosed);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException ||
                 ex is Win32Exception || ex is TimeoutException)

@@ -86,68 +86,12 @@ namespace ReplayKitSetup
             }
         }
 
-        // shells out to windows own Get-AuthenticodeSignature rather than reimplementing authenticode verification natively -- this is a security-critical check (confirms the downloaded exe is genuinely microsoft-signed before running it), and the well-tested os cmdlet is a safer bet here than a hand-rolled WinVerifyTrust p/invoke.
+        // the downloaded installer runs only when windows confirms it is intact and microsoft signed it
         internal static bool IsMicrosoftSigned(string path, Action<string> log = null)
         {
-            const string script = @"
-$sig = Get-AuthenticodeSignature -LiteralPath $env:OBSREPLAYKIT_REDIST_PATH
-$cert = $sig.SignerCertificate
-[pscustomobject]@{
-  Status = [string]$sig.Status
-  Subject = if ($cert) { [string]$cert.Subject } else { """" }
-  Issuer = if ($cert) { [string]$cert.Issuer } else { """" }
-} | ConvertTo-Json -Compress
-";
-            using var proc = new Process();
-            string stdout, stderr;
-            try
-            {
-                string powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-                var psi = new ProcessStartInfo(powershell, Win32Args.Build("-NoProfile", "-NonInteractive", "-Command", script))
-                {
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                };
-                psi.EnvironmentVariables["PSModulePath"] = Path.Combine(Path.GetDirectoryName(powershell), "Modules");
-                psi.EnvironmentVariables["OBSREPLAYKIT_REDIST_PATH"] = path;
-                proc.StartInfo = psi;
-                proc.Start();
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-                if (!proc.WaitForExit(30000))
-                {
-                    try { proc.Kill(); } catch (InvalidOperationException) { }
-                    log?.Invoke("Microsoft installer signature check failed to run: timed out");
-                    return false;
-                }
-                stdout = stdoutTask.GetAwaiter().GetResult();
-                stderr = stderrTask.GetAwaiter().GetResult();
-            }
-            catch (Exception exc) when (exc is System.ComponentModel.Win32Exception || exc is InvalidOperationException)
-            {
-                log?.Invoke("Microsoft installer signature check failed to run: " + exc.Message);
-                return false;
-            }
-            if (proc.ExitCode != 0)
-            {
-                log?.Invoke("Microsoft installer signature check failed: " + Truncate(stderr.Trim(), 160));
-                return false;
-            }
-
-            JObject info;
-            try { info = JObject.Parse(stdout); }
-            catch (Newtonsoft.Json.JsonException)
-            {
-                log?.Invoke("Microsoft installer signature check returned invalid data");
-                return false;
-            }
-            string status = info.Value<string>("Status") ?? "";
-            string subject = info.Value<string>("Subject") ?? "";
-            string issuer = info.Value<string>("Issuer") ?? "";
-            bool ok = status == "Valid" && subject.Contains("Microsoft Corporation") && issuer.Contains("Microsoft");
-            if (!ok) log?.Invoke($"Microsoft installer signature rejected: status={status} subject={Truncate(subject, 80)}");
+            var signature = Authenticode.Check(path);
+            bool ok = signature.Valid && signature.Subject.Contains("Microsoft Corporation") && signature.Issuer.Contains("Microsoft");
+            if (!ok) log?.Invoke($"Microsoft installer signature rejected: status={signature.Status} subject={Truncate(signature.Subject, 80)}");
             return ok;
         }
 

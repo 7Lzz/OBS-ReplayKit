@@ -16,6 +16,32 @@ namespace ReplayKitHelper
 
         internal static void DeleteWhenFree(string path) => WhenFree(() => File.Delete(path), () => File.Exists(path));
 
+        // puts a remuxed copy in place of the clip it was made from and gives it back the dates of the clip, so it keeps its place in the list; false when the clip changed or went away while the copy was made, which leaves the clip as it is. readers of the clip finish first (JobCoordinator.ChangeSource)
+        internal static bool ReplaceKeepingDates(string path, string replacement, FileInfo original, Func<bool> stillWanted = null)
+        {
+            bool replaced = false;
+            JobCoordinator.ChangeSource(path, () =>
+            {
+                var current = new FileInfo(path);
+                if (!current.Exists || (current.Attributes & FileAttributes.ReparsePoint) != 0 ||
+                    current.Length != original.Length || current.LastWriteTimeUtc != original.LastWriteTimeUtc ||
+                    current.CreationTimeUtc != original.CreationTimeUtc || (stillWanted != null && !stillWanted())) return;
+                File.Replace(replacement, path, null);
+                replaced = true;
+            });
+            if (!replaced) return false;
+            try
+            {
+                File.SetCreationTimeUtc(path, original.CreationTimeUtc);
+                File.SetLastWriteTimeUtc(path, original.LastWriteTimeUtc);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Log.Write("Clip replace could not restore the file dates: " + ex.GetType().Name);
+            }
+            return true;
+        }
+
         // the failure keeps the in-use code, so a caller tells it apart with InUse like the first one
         private static void WhenFree(Action change, Func<bool> worthWaiting)
         {

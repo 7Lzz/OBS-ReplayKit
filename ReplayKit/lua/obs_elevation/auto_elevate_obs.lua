@@ -18,7 +18,8 @@ ffi.cdef[[
     HANDLE GetCurrentProcess();
     DWORD  GetCurrentProcessId();
     const char* GetCommandLineA();
-    DWORD  GetModuleFileNameA(void* hModule, char* lpFilename, DWORD nSize);
+    DWORD  GetModuleFileNameW(void* hModule, wchar_t* lpFilename, DWORD nSize);
+    BOOL   TerminateProcess(HANDLE hProcess, UINT uExitCode);
     BOOL   CloseHandle(HANDLE hObject);
 
     HWND GetForegroundWindow();
@@ -33,33 +34,32 @@ ffi.cdef[[
     );
 
     typedef struct {
-        DWORD       cbSize;
-        ULONG       fMask;
-        HWND        hwnd;
-        const char* lpVerb;
-        const char* lpFile;
-        const char* lpParameters;
-        const char* lpDirectory;
-        int         nShow;
-        void*       hInstApp;
-        void*       lpIDList;
-        const char* lpClass;
-        void*       hkeyClass;
-        DWORD       dwHotKey;
-        HANDLE      hIcon;
-        HANDLE      hProcess;
-    } SHELLEXECUTEINFOA;
+        DWORD          cbSize;
+        ULONG          fMask;
+        HWND           hwnd;
+        const wchar_t* lpVerb;
+        const wchar_t* lpFile;
+        const wchar_t* lpParameters;
+        const wchar_t* lpDirectory;
+        int            nShow;
+        void*          hInstApp;
+        void*          lpIDList;
+        const wchar_t* lpClass;
+        void*          hkeyClass;
+        DWORD          dwHotKey;
+        HANDLE         hIcon;
+        HANDLE         hProcess;
+    } SHELLEXECUTEINFOW;
 
-    BOOL ShellExecuteExA(SHELLEXECUTEINFOA* pExecInfo);
+    BOOL ShellExecuteExW(SHELLEXECUTEINFOW* pExecInfo);
+
+    int    WideCharToMultiByte(UINT CodePage, DWORD dwFlags, const wchar_t* lpWideCharStr, int cchWideChar, char* lpMultiByteStr, int cbMultiByte, const char* lpDefaultChar, BOOL* lpUsedDefaultChar);
 ]]
 
-local TOKEN_QUERY             = 0x0008
-local TokenElevation          = 20
-local SW_HIDE                 = 0
-local SEE_MASK_NOCLOSEPROCESS = 0x00000040
-
-local DEFAULT_OBS_EXE = "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"
-local REQUIRED_OBS_FLAG = "--disable-direct-composition-video-overlays"
+local TOKEN_QUERY        = 0x0008
+local TokenElevation     = 20
+local SW_SHOWNORMAL      = 1
+local CP_UTF8            = 65001
 
 -- same cap the other settings readers use; a json bigger than this is corrupt
 local MAX_SETTINGS_BYTES = 65536
@@ -83,24 +83,6 @@ local function run_as_admin_enabled()
     return enabled
 end
 
-local function get_current_obs_exe()
-    local buf = ffi.new("char[?]", 32768)
-    local len = kernel32.GetModuleFileNameA(nil, buf, 32768)
-    if len > 0 and len < 32768 then
-        return ffi.string(buf, len)
-    end
-    return DEFAULT_OBS_EXE
-end
-
-local OBS_EXE = get_current_obs_exe()
-
-local function get_helper_path()
-    -- script_path() returns the current script directory with a trailing slash.
-    local dir = script_path()
-    dir = dir:gsub("/", "\\")
-    return dir .. "hidden_relauncher.vbs"
-end
-
 local function is_elevated()
     local proc  = kernel32.GetCurrentProcess()
     local token = ffi.new("void*[1]")
@@ -117,42 +99,69 @@ local function is_elevated()
     return elevation[0] ~= 0
 end
 
-local function has_required_obs_flag()
+-- every launch of obs by replaykit carries the same switches (shared/ObsLaunch.cs), so an obs without all of them was started some other way
+local function has_obs_launch_args(obs_args)
     local cmd = kernel32.GetCommandLineA()
     if cmd == nil then return false end
-    return ffi.string(cmd):lower():find(REQUIRED_OBS_FLAG, 1, true) ~= nil
+    local line = ffi.string(cmd):lower()
+    for switch in obs_args:lower():gmatch("%S+") do
+        if not line:find(switch, 1, true) then return false end
+    end
+    return true
 end
 
--- relaunch obs elevated via a uac prompt on wscript.exe running hidden_relauncher.vbs. used to try a hidden, highest-privilege scheduled task first so this ran silently -- removed becuase that task was installed unconditionally on every apply regardless of whether run-as-admin was even on, and a hidden auto-elevating task is exactly the shape av heuristics flag as a persistence mechanism.
-local function launch_helper_uac(helper_path, obs_pid)
-    local params = string.format(
-        '"%s" "%s" %u',
-        helper_path, OBS_EXE, obs_pid
-    )
+local function utf8_of(wide_text)
+    local count = kernel32.WideCharToMultiByte(CP_UTF8, 0, wide_text, -1, nil, 0, nil, nil)
+    if count <= 1 then return "" end
+    local buffer = ffi.new("char[?]", count)
+    kernel32.WideCharToMultiByte(CP_UTF8, 0, wide_text, -1, buffer, count, nil, nil)
+    return ffi.string(buffer, count - 1)
+end
 
-    local info = ffi.new("SHELLEXECUTEINFOA")
-    ffi.fill(info, ffi.sizeof("SHELLEXECUTEINFOA"), 0)
+-- the helper beside the scripts, which has the mode that starts obs again (ObsProcess.RunRelauncher)
+local function helper_exe()
+    local scripts = script_path():gsub("/", "\\"):match("^(.*\\)[^\\]+\\?$")
+    return scripts and (scripts .. "helper\\OBSReplayKit.exe")
+end
 
-    info.cbSize       = ffi.sizeof("SHELLEXECUTEINFOA")
-    info.fMask        = SEE_MASK_NOCLOSEPROCESS
+-- starts the relaunch mode of the helper with administrator rights through the uac prompt and stops this obs at once; the relauncher waits until this process is gone, clears its crash marker and starts obs with the replaykit switches, and obs takes over its administrator rights. obs is not started from here, becuase it refuses a second instance and reaches that check before this copy is gone. a declined prompt leaves this obs running as it is
+local function relaunch_elevated()
+    local exe = ffi.new("wchar_t[32768]")
+    local length = kernel32.GetModuleFileNameW(nil, exe, 32768)
+    if length == 0 or length >= 32768 then
+        print("[ElevateOBS] ERROR: the path of obs could not be read")
+        return false
+    end
+    local helper = helper_exe()
+    local probe = helper and io.open(helper, "rb")
+    if not probe then
+        print("[ElevateOBS] ERROR: the ReplayKit helper is missing, so OBS cannot be started again: " .. tostring(helper))
+        return false
+    end
+    probe:close()
+
+    -- a windows path cannot hold a quote, so plain quotes are enough around it
+    local file = replaykit_wide(helper)
+    local dir = replaykit_wide(helper:match("^(.*)\\[^\\]+$"))
+    local verb = replaykit_wide("runas")
+    local params = replaykit_wide(string.format('--relaunch-obs -ObsPath "%s" -ObsPid %d', utf8_of(exe), tonumber(kernel32.GetCurrentProcessId())))
+
+    local info = ffi.new("SHELLEXECUTEINFOW")
+    info.cbSize       = ffi.sizeof("SHELLEXECUTEINFOW")
     info.hwnd         = user32.GetForegroundWindow()
-    info.lpVerb       = "runas"
-    info.lpFile       = "wscript.exe"
+    info.lpVerb       = verb
+    info.lpFile       = file
     info.lpParameters = params
-    info.nShow        = SW_HIDE
+    info.lpDirectory  = dir
+    info.nShow        = SW_SHOWNORMAL
 
-    local ok = shell32.ShellExecuteExA(info)
-
-    if ok == 0 then
+    if shell32.ShellExecuteExW(info) == 0 then
         print("[ElevateOBS] ShellExecuteEx failed - UAC denied or cancelled")
         return false
     end
 
-    if info.hProcess ~= nil then
-        kernel32.CloseHandle(info.hProcess)
-    end
-
-    print("[ElevateOBS] UAC fallback path - helper launched")
+    print("[ElevateOBS] elevated relauncher started - stopping this copy")
+    kernel32.TerminateProcess(kernel32.GetCurrentProcess(), 0)
     return true
 end
 
@@ -162,44 +171,34 @@ function script_load(settings)
         return
     end
 
-    local elevated = is_elevated()
-    local has_flag = has_required_obs_flag()
+    local obs_args = replaykit_shared and replaykit_shared.obs_args
+    if type(obs_args) ~= "string" or obs_args == "" then
+        print("[ElevateOBS] ERROR: shared_values.lua has no OBS launch arguments - skipping elevation.")
+        return
+    end
 
-    if elevated and has_flag then
+    local elevated = is_elevated()
+    if elevated and has_obs_launch_args(obs_args) then
         print("[ElevateOBS] Already elevated with ReplayKit OBS flags - nothing to do.")
         return
     end
-
-    local helper_path = get_helper_path()
-    print("[ElevateOBS] Looking for helper at: " .. helper_path)
-
-    local f = io.open(helper_path, "r")
-    if not f then
-        print("[ElevateOBS] ERROR: Helper script not found at: " .. helper_path)
-        print("[ElevateOBS] Place hidden_relauncher.vbs beside this Lua script.")
-        return
-    end
-    f:close()
-
-    local obs_pid = tonumber(kernel32.GetCurrentProcessId()) or 0
 
     if not elevated then
         print("[ElevateOBS] Not elevated - relaunching via UAC...")
     else
         print("[ElevateOBS] Missing required OBS launch flag - relaunching with ReplayKit flags...")
     end
-    launch_helper_uac(helper_path, obs_pid)
+    relaunch_elevated()
 end
 
 function script_description()
     return [[<b>Auto-Elevate OBS to Administrator</b><br><br>
-Launches an elevated hidden WSH helper from the same folder that:<br>
-1. Closes the current OBS instance from outside<br>
-2. Deletes the <b>safe_mode</b> crash flag<br>
-3. Relaunches OBS already elevated<br><br>
-- No "OBS already running" popup<br>
-- No safe mode / crash popup<br><br>
-<b>Requires:</b> <code>hidden_relauncher.vbs</code> beside this .lua file.<br><br>
+Starts OBS again with administrator rights through the Windows UAC prompt:<br>
+1. Starts the ReplayKit helper elevated in its relaunch mode<br>
+2. Stops the running copy<br>
+3. The helper waits until that copy is gone, deletes its crash marker and
+starts OBS with the ReplayKit launch flags, so there is no "OBS already
+running" popup<br><br>
 Only runs when <b>Run OBS and ReplayKit as administrator</b> is enabled in
 ReplayKit Settings (Windows tab). Default is off.]]
 end
