@@ -3,13 +3,12 @@
 
 #include <QDockWidget>
 #include <QMainWindow>
-#include <string>
 
 namespace rk {
 
 enum class UiLayout { Classic, Clean };
 
-// the layout the helper settings ask for, re-read from the settings file at startup and cached in window_state.ini. it only takes effect on the next obs launch, see g_shellOn
+// the layout selected at startup, see g_shellOn for whether the shell actually loaded
 extern UiLayout g_wantedLayout;
 QDockWidget *FindSidebarDock(QMainWindow *mw);
 void ApplyLayoutChrome(bool clean);
@@ -22,7 +21,5 @@ void ApplyLayout();
 extern bool g_shellBootSkipped;
 void InitLayoutAtStartup();
 void ClearShellBootMark();
-void ApplyLayoutSetting(const std::string &settingsBody);
-void RestartIntoLayout(const char *layout);
 
 } // namespace rk

@@ -26,12 +26,25 @@ function Write-FixLog([string]$msg) {
     } catch {}
 }
 
+$runtimeSettings = $null
+$settingsRead = $true
+if ($SettingsFile -and (Test-Path -LiteralPath $SettingsFile -PathType Leaf)) {
+    try { $runtimeSettings = Get-Content -LiteralPath $SettingsFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+    catch {
+        $settingsRead = $false
+        Write-FixLog 'could not read the settings for HEVC repair'
+    }
+}
+$fixEnabled = $settingsRead -and ($null -eq $runtimeSettings.hevcFixEnabled -or
+    [string]$runtimeSettings.hevcFixEnabled -in @('true', '1', 'yes', 'on'))
+
 function Get-ClipDir {
     # the order of the helper (AppConfig.GetClipDir): the folder picked in the settings, then the one helper_config.json carries, then Videos. lua hands over both files, since the saved state has moved before and this script cannot know where it is
-    foreach ($file in @($SettingsFile, $ConfigFile)) {
-        if (-not $file -or -not (Test-Path -LiteralPath $file)) { continue }
+    $dir = [string]$runtimeSettings.clipDir
+    if ($dir -and (Test-Path -LiteralPath $dir)) { return $dir }
+    if ($ConfigFile -and (Test-Path -LiteralPath $ConfigFile)) {
         try {
-            $dir = [string](Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json).clipDir
+            $dir = [string](Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json).clipDir
             if ($dir -and (Test-Path -LiteralPath $dir)) { return $dir }
         } catch {}
     }
@@ -228,6 +241,10 @@ if ($Path) {
             if ($LASTEXITCODE -ne 0) { Write-FixLog 'recording audio finalize did not finish' }
         }
     }
+}
+
+if (-not $fixEnabled) { return }
+if ($Path) {
     Repair-WithRetry $Path
 } elseif ($SweepDirs) {
     $dirs = $SweepDirs -split ';' | Where-Object { $_ }

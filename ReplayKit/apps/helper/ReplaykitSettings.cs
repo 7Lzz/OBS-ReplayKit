@@ -125,6 +125,7 @@ namespace ReplayKitHelper
                 ["hideNotificationsFromCapture"] = true,
                 // copy the streamable link to the clipboard once the uploaded video is watchable
                 ["autoCopyLink"] = true,
+                ["hevcFixEnabled"] = true,
                 // the clip uploaded notification that goes with it
                 ["linkNotificationEnabled"] = true,
                 // obs starts in the tray instead of showing its window; the native plugin keeps this equal to the start minimized switch in the system tray settings of obs
@@ -540,6 +541,8 @@ namespace ReplayKitHelper
                 ? true
                 : GetBoolSetting(data, "developmentMode", defaults["developmentMode"].Value<bool>());
 
+            string interfaceLayout = GetEnumSetting(data, "interfaceLayout", defaults["interfaceLayout"].Value<string>(), new[] { "clean", "classic" });
+
             // obs keeps its own start-minimized switch, so a settings file that never saved this choice takes the one obs has
             bool startMinimized = raw != null && raw["startMinimized"] == null
                 ? ReadObsStartMinimized() ?? defaults["startMinimized"].Value<bool>()
@@ -609,6 +612,7 @@ namespace ReplayKitHelper
                 ["clipNotificationSeconds"] = GetIntSetting(data, "clipNotificationSeconds", replaySeconds, 1, 1200),
                 ["hideNotificationsFromCapture"] = GetBoolSetting(data, "hideNotificationsFromCapture", defaults["hideNotificationsFromCapture"].Value<bool>()),
                 ["autoCopyLink"] = GetBoolSetting(data, "autoCopyLink", defaults["autoCopyLink"].Value<bool>()),
+                ["hevcFixEnabled"] = GetBoolSetting(data, "hevcFixEnabled", defaults["hevcFixEnabled"].Value<bool>()),
                 ["linkNotificationEnabled"] = GetBoolSetting(data, "linkNotificationEnabled", defaults["linkNotificationEnabled"].Value<bool>()),
                 ["startMinimized"] = startMinimized,
                 ["compressSkipFavorites"] = GetBoolSetting(data, "compressSkipFavorites", defaults["compressSkipFavorites"].Value<bool>()),
@@ -665,7 +669,7 @@ namespace ReplayKitHelper
                 ["appIconRecordingDot"] = GetBoolSetting(data, "appIconRecordingDot", defaults["appIconRecordingDot"].Value<bool>()),
                 ["theme"] = NormalizeTheme(data["theme"]?.ToString()),
                 ["themeCustom"] = NormalizeThemeCustom(data["themeCustom"], (JObject)defaults["themeCustom"]),
-                ["interfaceLayout"] = GetEnumSetting(data, "interfaceLayout", defaults["interfaceLayout"].Value<string>(), new[] { "clean", "classic" }),
+                ["interfaceLayout"] = developmentMode ? interfaceLayout : defaults["interfaceLayout"].Value<string>(),
                 ["setupWizardPending"] = GetBoolSetting(data, "setupWizardPending", defaults["setupWizardPending"].Value<bool>()),
             };
         }

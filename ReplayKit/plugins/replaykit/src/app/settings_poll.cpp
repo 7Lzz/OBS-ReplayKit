@@ -16,7 +16,6 @@
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/window_state.hpp"
-#include "layout/ui_layout.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
 #include "ui/anchored_panel.hpp"
@@ -223,7 +222,6 @@ void PollHelperSettings()
 			RefreshTitleKeybindBadges(settingsBody);
 			ShellApplySettings(settingsBody);
 			ShellSleepApplySettings(settingsBody);
-			ApplyLayoutSetting(settingsBody);
 			ClipBufferApplySettings(settingsBody);
 		}, Qt::QueuedConnection);
 	});

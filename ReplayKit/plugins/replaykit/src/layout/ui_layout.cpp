@@ -2,11 +2,10 @@
 #include "prelude.hpp"
 #include "layout/ui_layout.hpp"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSaveFile>
 
-#include "core/async.hpp"
-#include "core/helper_client.hpp"
-#include "core/json_lite.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
@@ -31,26 +30,16 @@ UiLayout LayoutFromString(const QString &value)
 	return value == QLatin1String("classic") ? UiLayout::Classic : UiLayout::Clean;
 }
 
-// reads interfaceLayout straight out of the helper settings file, so a layout picked while obs was closing is already known at startup instead of waiting on the helper. the file is pretty-printed json, so the value is found by key rather than by the compact-shape helpers above
-QString ReadLayoutFromSettingsFile()
+// the frame is chosen before the helper starts, so read the developer override from disk
+UiLayout ReadLayoutFromSettingsFile()
 {
 	QFile f(StateFilePath(QStringLiteral("replaykit_settings.json")));
 	if (!f.open(QIODevice::ReadOnly) || f.size() > 4 * 1024 * 1024)
-		return QString();
-	const QByteArray data = f.readAll();
-	qsizetype at = data.indexOf("\"interfaceLayout\"");
-	if (at < 0)
-		return QString();
-	at = data.indexOf(':', at);
-	if (at < 0)
-		return QString();
-	at = data.indexOf('"', at);
-	if (at < 0)
-		return QString();
-	const qsizetype end = data.indexOf('"', at + 1);
-	if (end < 0)
-		return QString();
-	return QString::fromUtf8(data.mid(at + 1, end - at - 1));
+		return UiLayout::Clean;
+	const auto settings = QJsonDocument::fromJson(f.readAll()).object();
+	return settings.value("developmentMode").toBool()
+		       ? LayoutFromString(settings.value("interfaceLayout").toString())
+		       : UiLayout::Clean;
 }
 
 // the panels the clean layout folds away, by the object names obs gives them: the browser dock is its title plus _extraBrowser, and the title was Custom Controls before it was renamed
@@ -229,10 +218,7 @@ void ApplyLayoutDocks(UiLayout wanted)
 // obs restores its dock state while it starts, long before the plugin can act, so the panels of the layout being left showed for the seconds until the plugin loaded. the exit event fires after obs saved user.ini, and the state it wrote can still be turned into the arrangement the next launch wants: the panels folded away for the clean layout, the saved classic arrangement for the way back. obs has already destroyed the browser dock by then, so this works on the saved bytes and not on the live docks; layoutDocksApplied only moves once the file really changed, so a failed write leaves the switch to the runtime path
 void PrepareDocksForNextLaunch()
 {
-	QString value = ReadLayoutFromSettingsFile();
-	if (value != QLatin1String("clean") && value != QLatin1String("classic"))
-		value = g_wantedLayout == UiLayout::Classic ? QStringLiteral("classic") : QStringLiteral("clean");
-	const UiLayout wanted = LayoutFromString(value);
+	const UiLayout wanted = ReadLayoutFromSettingsFile();
 	// this session already runs the layout the next one wants, so obs saved exactly that, except that the sources panel is open while the projector view shows and would come up in every view of the next launch
 	const bool sameLayout = wanted == (g_shellOn ? UiLayout::Clean : UiLayout::Classic);
 	if (sameLayout && !g_shellOn)
@@ -336,15 +322,10 @@ bool g_shellBootSkipped = false;
 // unfinished clean starts in a row that send the next launch to the classic layout
 constexpr int kShellBootLimit = 2;
 
-// the settings file wins, the ini copy is only the fallback for a file that cannot be read yet (fresh install, helper never ran)
 void InitLayoutAtStartup()
 {
 	QSettings ini(WindowStateIniPath(), QSettings::IniFormat);
-	QString value = ReadLayoutFromSettingsFile();
-	if (value != QLatin1String("clean") && value != QLatin1String("classic"))
-		value = ini.value("interfaceLayout", "clean").toString();
-	g_wantedLayout = LayoutFromString(value);
-	ini.setValue("interfaceLayout", g_wantedLayout == UiLayout::Classic ? "classic" : "clean");
+	g_wantedLayout = ReadLayoutFromSettingsFile();
 	const QColor cachedBg(ini.value("chromeBg").toString());
 	const QColor cachedBar(ini.value("chromeBar").toString());
 	const QColor cachedInk(ini.value("chromeInk").toString());
@@ -374,28 +355,6 @@ void ClearShellBootMark()
 	QSettings ini(WindowStateIniPath(), QSettings::IniFormat);
 	ini.setValue("shellBootPending", false);
 	ini.setValue("shellBootUnfinished", 0);
-}
-
-// the helper settings are the source of truth; a value that is missing or unrecognised (helper down, an older helper) is ignored. nothing is re-laid live: the frame the clean shell needs is fixed for the life of the process, so the new layout waits for the restart the settings page asks for
-void ApplyLayoutSetting(const std::string &settingsBody)
-{
-	const std::string value = ExtractJsonStringField(settingsBody, "interfaceLayout");
-	if (value != "clean" && value != "classic")
-		return;
-	const UiLayout wanted = value == "classic" ? UiLayout::Classic : UiLayout::Clean;
-	if (wanted == g_wantedLayout)
-		return;
-	g_wantedLayout = wanted;
-	QSettings ini(WindowStateIniPath(), QSettings::IniFormat);
-	ini.setValue("interfaceLayout", value.c_str());
-	blog(LOG_INFO, "[replaykit] interface layout will be %s from the next launch", value.c_str());
-}
-
-// a layout change swaps the window frame, which qt only does cleanly before the native window exists, so it goes through the same save-and-restart path the theme setting uses
-void RestartIntoLayout(const char *layout)
-{
-	const std::string body = std::string("{\"interfaceLayout\":\"") + layout + "\"}";
-	RunAsync([body]() { HttpRequest("POST", "/settings?restart=1", body.c_str(), 15000); });
 }
 
 } // namespace rk

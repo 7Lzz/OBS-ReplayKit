@@ -540,12 +540,6 @@
   .icon-tile-edit:hover { background:var(--field-dark); color:var(--text); }
   .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
   .icon-tile-del svg { width:8px; height:8px; fill:currentColor; }
-  /* layout picker: each tile draws a tiny wireframe of the main window in that layout */
-  .layout-tile { width:120px; padding:9px 6px 8px; }
-  .layout-sw { position:relative; display:block; width:100px; height:62px; overflow:hidden; border-radius:5px; background:var(--field-dark); border:1px solid var(--line); }
-  .layout-sw i { position:absolute; display:block; border-radius:2px; background:rgba(var(--text-rgb),.28); }
-  .layout-sw i.pv { background:rgba(var(--text-rgb),.12); }
-  .layout-sw i.ac { background:var(--selected2); }
   /* theme tile swatch */
   .theme-sw { width:40px; height:40px; border-radius:6px; overflow:hidden; position:relative; border:1px solid var(--line); }
   .theme-sw i { position:absolute; left:0; right:0; bottom:0; height:42%; display:block; }
@@ -1652,9 +1646,16 @@
           <div></div>
           <div class="check-row">
 <input aria-label="Show a notification when a link is ready" id="linkNotificationEnabled" type="checkbox"/>
-<span>Show a notification when a link is ready<span class="control-note">Shows a Windows notification when a clip you shared is ready to watch. The link is copied by the Automatically copy link setting.</span></span>
+<span>Show a notification when a link is ready<span class="control-note">Shows a Windows notification when a clip you shared is ready to watch.</span></span>
 
 </div>
+        </div>
+        <div class="form-row tight">
+          <div></div>
+          <div class="check-row">
+            <input aria-label="Automatically copy link" id="autoCopyLink" type="checkbox"/>
+            <span>Automatically copy link<span class="control-note">Copies the Streamable link when your shared clip is ready to watch.</span></span>
+          </div>
         </div>
       </div>
     </section>
@@ -1786,10 +1787,9 @@
         <div class="form-row tight">
           <div></div>
           <div class="check-row">
-<input aria-label="Automatically copy link" id="autoCopyLink" type="checkbox"/>
-<span>Automatically copy link<span class="control-note">Copies the Streamable link for you as soon as your clip is ready to watch. Turn it off if you'd rather copy the link yourself.</span></span>
-
-</div>
+            <input type="checkbox" id="hevcFixEnabled" aria-label="Fix HEVC playback compatibility">
+            <span>Fix HEVC playback compatibility<span class="control-note">Repairs the video tag on HEVC clips and recordings so they can play on devices such as iPhones. It keeps the original video quality.</span></span>
+          </div>
         </div>
         <div class="form-row tight">
           <div></div>
@@ -1849,6 +1849,13 @@
 </div>
         </div>
         <div id="developmentSettings" hidden>
+          <div class="form-row tight">
+            <div></div>
+            <div class="check-row">
+              <input type="checkbox" id="classicLayout" aria-label="Use classic OBS layout">
+              <span>Use classic OBS layout<span class="control-note">Shows the standard OBS interface. Changing this restarts OBS.</span></span>
+            </div>
+          </div>
           <div class="form-row tight">
             <div></div>
             <div class="check-row">
@@ -2013,35 +2020,6 @@
       </div>
       <div class="box">
         <div class="box-title">Interface</div>
-        <div class="form-row">
-          <div class="label">Layout</div>
-          <div class="field-wrap is-stacked">
-            <div class="icon-grid" id="layoutGrid">
-              <button class="icon-tile layout-tile" type="button" data-id="clean">
-                <span class="layout-sw" aria-hidden="true">
-                  <i style="left:4px;top:4px;bottom:4px;width:24px"></i>
-                  <i class="ac" style="left:7px;top:11px;width:18px;height:5px"></i>
-                  <i class="pv" style="left:7px;top:20px;width:18px;height:5px"></i>
-                  <i class="pv" style="left:7px;top:30px;width:18px;height:3px"></i>
-                  <i class="pv" style="left:7px;top:36px;width:18px;height:3px"></i>
-                  <i class="pv" style="left:7px;top:42px;width:18px;height:3px"></i>
-                  <i class="pv" style="left:32px;top:4px;right:4px;bottom:4px"></i>
-                </span>
-                <span class="icon-tile-label">Clean</span>
-              </button>
-              <button class="icon-tile layout-tile" type="button" data-id="classic">
-                <span class="layout-sw" aria-hidden="true">
-                  <i class="pv" style="left:4px;top:4px;right:4px;height:34px"></i>
-                  <i style="left:4px;top:42px;width:22px;height:16px"></i>
-                  <i style="left:28px;top:42px;width:22px;height:16px"></i>
-                  <i style="left:52px;top:42px;width:22px;height:16px"></i>
-                  <i class="ac" style="left:76px;top:42px;width:20px;height:16px"></i>
-                </span>
-                <span class="icon-tile-label">Classic</span>
-              </button>
-            </div>
-          </div>
-        </div>
         <div class="form-row" data-search="date format time ago days ago clip cards screenshots">
           <div class="label">Card Dates</div>
           <div class="field-wrap"><div class="combo" id="cardDateFormat" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
@@ -2125,7 +2103,7 @@
       overlay:"Customize the input overlay and effects in your recordings.",
       editor:"Choose how clips play, look, and save in the video editor.",
       notifications:"Choose which recording and sharing notifications you see.",
-      appearance:"Make ReplayKit your own with themes, icons, and layouts.",
+      appearance:"Customize ReplayKit’s theme, icons, and clip dates.",
       storage:"Manage clip storage and free up space on your drive.",
       windows:"Choose how ReplayKit starts and behaves in Windows.",
       account:"Manage your connected account for clip uploads and sharing.",
@@ -2364,7 +2342,7 @@
     appIconCustomRow: document.getElementById("appIconCustomRow"),
     appIconCustomPath: document.getElementById("appIconCustomPath"),
     appIconRecordingDot: document.getElementById("appIconRecordingDot"),
-    layoutGrid: document.getElementById("layoutGrid"),
+    classicLayout: document.getElementById("classicLayout"),
     themeGrid: document.getElementById("themeGrid"),
     themeCustomRow: document.getElementById("themeCustomRow"),
     themeEditor: document.getElementById("themeEditor"),
@@ -2401,6 +2379,7 @@
     startMinimized: document.getElementById("startMinimized"),
     autoCopyLink: document.getElementById("autoCopyLink"),
     linkNotificationEnabled: document.getElementById("linkNotificationEnabled"),
+    hevcFixEnabled: document.getElementById("hevcFixEnabled"),
     compressSkipFavorites: document.getElementById("compressSkipFavorites"),
     storageCompressionType: document.getElementById("storageCompressionType"),
     storageCompressionWarning: document.getElementById("storageCompressionWarning"),
@@ -3820,7 +3799,6 @@
     els.appIconCustomPath.value = settingOr("appIconCustomPath");
     els.appIconRecordingDot.checked = !!settingOr("appIconRecordingDot");
     paintAppIconSelection();
-    paintLayoutSelection();
     if (state.themeCustom) fillThemeEditor(state.themeCustom);
     paintThemeSelection();
     applyThemePreview();
@@ -3872,12 +3850,14 @@
     syncDebugLoggingFields();
     els.autoCopyLink.checked = !!settingOr("autoCopyLink");
     els.linkNotificationEnabled.checked = !!settingOr("linkNotificationEnabled");
+    els.hevcFixEnabled.checked = !!settingOr("hevcFixEnabled");
     els.compressSkipFavorites.checked = !!settingOr("compressSkipFavorites");
     setComboValue(els.storageCompressionType, settingOr("storageCompressionType"), false);
     syncStorageCompression();
     // a number the list does not offer shows the default, never Off, so saving the page cannot turn the history off by itself
     setComboValue(els.deletedHistoryDays, String([0, 1, 3, 7, 14, 30].includes(state.deletedHistoryDays) ? state.deletedHistoryDays : SETTING_DEFAULTS.deletedHistoryDays), false);
     els.developmentMode.checked = !!state.developmentMode;
+    els.classicLayout.checked = state.interfaceLayout === "classic";
     els.sdkMode.checked = !!state.sdkMode;
     els.checkObsUpdates.checked = !!state.checkObsUpdates;
     els.logInterfaceEvents.checked = !!state.logInterfaceEvents;
@@ -3971,11 +3951,13 @@
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
     state.autoCopyLink = els.autoCopyLink.checked;
     state.linkNotificationEnabled = els.linkNotificationEnabled.checked;
+    state.hevcFixEnabled = els.hevcFixEnabled.checked;
     state.compressSkipFavorites = els.compressSkipFavorites.checked;
     state.storageCompressionType = comboValue(els.storageCompressionType);
     syncStorageCompression();
     state.deletedHistoryDays = Number(comboValue(els.deletedHistoryDays)) || 0;
     state.developmentMode = els.developmentMode.checked;
+    state.interfaceLayout = state.developmentMode && els.classicLayout.checked ? "classic" : "clean";
     state.sdkMode = els.sdkMode.checked;
     state.checkObsUpdates = els.checkObsUpdates.checked;
     state.logInterfaceEvents = els.logInterfaceEvents.checked;
@@ -4372,6 +4354,12 @@
   }, { passive: false });
 
   [els.obsStartupEnabled, els.runObsAsAdmin, els.disableObsCloseWarning, els.disableObsCrashPopup, els.quitOnClose, els.disableSleeping, els.startMinimized, els.pinObsTrayIcon, els.clipNotificationEnabled, els.recordingNotificationEnabled, els.linkNotificationEnabled, els.autoCopyLink, els.compressSkipFavorites, els.developmentMode, els.sdkMode, els.checkObsUpdates, els.logInterfaceEvents, els.overlayFlipH, els.motionBlurEnabled, els.trimGpuEncode, els.showCodecTags, els.gameRecognition, els.recordingSeparateAudioTracks, els.editorAutoplay, els.editorLoopPreview, els.editorWheelZoom, els.hideNotificationsFromCapture, els.showCursorDisplayCapture, els.showCursorGameCapture, els.showCursorWindowCapture, els.debugLoggingEnabled, els.autoDeleteLogsOnLaunch, els.screenshareAutoGameKeepFocused, els.appIconRecordingDot, els.bongoLive2d, els.bongoTrack, els.bongoBreath, els.bongoBlink, els.bongoFaces, els.bongoRelativeMouse].forEach((input) => {
+    input.addEventListener("change", () => {
+      readUi();
+      markDirty();
+    });
+  });
+  [els.hevcFixEnabled, els.classicLayout].forEach((input) => {
     input.addEventListener("change", () => {
       readUi();
       markDirty();
@@ -5560,17 +5548,6 @@
     setObsSwitchIcon(saved && saved.url ? saved.url : "/obs-icon.svg?v=4");
   }
   renderAppIconGrid();
-
-  // appearance tab: interface layout picker, saved with Apply like everything else; the native plugin builds the window once per launch, so a change restarts obs
-  function paintLayoutSelection() {
-    const sel = state.interfaceLayout === "classic" ? "classic" : "clean";
-    els.layoutGrid.querySelectorAll(".icon-tile").forEach((t) => t.classList.toggle("is-selected", t.dataset.id === sel));
-  }
-  els.layoutGrid.querySelectorAll(".icon-tile").forEach((t) => t.addEventListener("click", () => {
-    state.interfaceLayout = t.dataset.id;
-    paintLayoutSelection();
-    markDirty();
-  }));
 
   els.appIconCustomPath.addEventListener("input", () => {
     state.appIconCustomPath = unquote(els.appIconCustomPath.value);
