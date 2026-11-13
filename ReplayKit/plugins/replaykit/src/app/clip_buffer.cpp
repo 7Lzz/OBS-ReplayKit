@@ -8,7 +8,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QStandardPaths>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -96,7 +95,7 @@ qint64 NowMs()
 
 QString PieceDir()
 {
-	return QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/scratch/clip-buffer");
+	return TempScratchPath() + QLatin1Char('/') + QString::fromLatin1(kTempClipBufferFolder);
 }
 
 const char *ModeName(Mode mode)

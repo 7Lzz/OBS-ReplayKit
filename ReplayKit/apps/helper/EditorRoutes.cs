@@ -169,7 +169,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 int.TryParse(Q("max"), NumberStyles.None, CultureInfo.InvariantCulture, out int room);
                 if (room < 1 || room > 8) room = 8;
-                string[] picked = PickAudioFiles();
+                string[] picked = FilePickers.PickAudioFiles();
                 if (picked.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
                 var started = new JArray();
                 foreach (string file in picked.Take(room)) started.Add(AudioImports.BeginFromPath(file));
@@ -217,7 +217,7 @@ namespace ReplayKitHelper
             if (path == "/import-video/pick")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string[] pickedVideo = PickFiles(VideoPickerTitle, VideoFilter);
+                string[] pickedVideo = FilePickers.PickFiles(FilePickers.VideoPickerTitle, FilePickers.VideoFilter);
                 if (pickedVideo.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
                 HttpResponse.SendJson(stream, 200, VideoImports.FromPath(pickedVideo[0]));
                 return false;
@@ -235,7 +235,7 @@ namespace ReplayKitHelper
             if (path == "/import-media/pick")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string[] pickedMedia = PickFiles(MediaPickerTitle, MediaFilter);
+                string[] pickedMedia = FilePickers.PickFiles(FilePickers.MediaPickerTitle, FilePickers.MediaFilter);
                 if (pickedMedia.Length == 0) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["cancelled"] = true }); return false; }
                 var added = new JArray();
                 foreach (string file in pickedMedia.Take(8)) added.Add(MediaImports.FromPath(file));

@@ -37,7 +37,7 @@ namespace ReplayKitHelper
         // a save nobody ever ends stops counting as running, the longest a join may take and then some
         private const long SaveForgetMs = 150000;
 
-        public static string DiskDir => Path.Combine(Constants.SCRATCH_DIR, "clip-buffer");
+        public static string DiskDir => Path.Combine(Constants.SCRATCH_DIR, ReplayKitShared.TempLayout.ClipBufferFolder);
 
         // the memory sticks that are in the machine, not what windows has left after reserving some, so a 16 gb machine reads as 16
         private static int ReadInstalledGb()

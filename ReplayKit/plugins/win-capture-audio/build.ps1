@@ -258,7 +258,7 @@ foreach ($text in $ascii, $wide) {
 
 # the files: the dll, the locale files, the license and a source note, written fresh each time; the dll goes last, since its date is what tells a later build that the folder is current
 $hash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash.ToLowerInvariant()
-$buildId = if ($Pristine) { "$upstreamCommit (no patch)" } else { "$upstreamCommit + replaykit patches rk8" }
+$buildId = if ($Pristine) { "$upstreamCommit (no patch)" } else { "$upstreamCommit + replaykit patches rk12" }
 $sourceNote = @"
 win-capture-audio 2.3.4, built by OBS ReplayKit.
 

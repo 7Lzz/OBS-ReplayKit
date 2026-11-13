@@ -44,6 +44,7 @@
   <ItemGroup>
     <!-- one source file for where the settings and the saved state live, shared with the setup so the two can never disagree about it. -->
     <Compile Include="..\..\shared\StateLayout.cs" Link="StateLayout.cs" />
+    <Compile Include="..\..\shared\TempLayout.cs" Link="TempLayout.cs" />
     <Compile Include="..\..\shared\HelperEndpoint.cs" Link="HelperEndpoint.cs" />
     <Compile Include="..\..\shared\VideoTools.cs" Link="VideoTools.cs" />
     <Compile Include="..\..\shared\OverlayRotation.cs" Link="OverlayRotation.cs" />

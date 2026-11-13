@@ -35,7 +35,7 @@ namespace ReplayKitSetup
         private static string LogFile() => Path.Combine(Path.GetTempPath(), "OBSReplayKitUpdate.log");
 
         // the helper serves this back over /update/install-result so the update popup can say what actually happened. it lives beside the helper logs, not in the update temp dir, which ScheduleCleanup wipes right after this process exits.
-        private static string ResultFile() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_result.json");
+        private static string ResultFile() => Path.Combine(TempLayout.Logs, TempLayout.UpdateResultFile);
 
         private static string PendingFile() => Path.Combine(Config.REPLAYKIT_CONFIG, StateLayout.UpdatePendingFile);
 
@@ -128,9 +128,9 @@ namespace ReplayKitSetup
             // the helper downloads into %temp%\ReplayKit\update-<guid>, and only that shape is accepted, so a bad --cleanup-dir can never point a recursive delete at a real folder
             var dir = new DirectoryInfo(target);
             string name = dir.Name ?? "";
-            bool uniqueUpdate = name.StartsWith("update-", StringComparison.OrdinalIgnoreCase) &&
-                                Guid.TryParseExact(name.Substring(7), "N", out _);
-            if (!uniqueUpdate || !string.Equals(dir.Parent?.Name, "ReplayKit", StringComparison.Ordinal)) return null;
+            bool uniqueUpdate = name.StartsWith(TempLayout.UpdateFolderPrefix, StringComparison.OrdinalIgnoreCase) &&
+                                Guid.TryParseExact(name.Substring(TempLayout.UpdateFolderPrefix.Length), "N", out _);
+            if (!uniqueUpdate || !string.Equals(dir.Parent?.Name, TempLayout.Folder, StringComparison.Ordinal)) return null;
             if (!target.StartsWith(tempRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return null;
             return target;
         }

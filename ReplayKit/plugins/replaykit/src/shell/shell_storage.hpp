@@ -10,7 +10,7 @@
 
 namespace rk {
 
-// a small ring that fills with the size of the library, with the size and the limit under it, the way the storage figure of medal sits in its rail. a click opens the card that frees up space
+// a small ring that fills with the size of the library, with the size and the limit under it. a click opens the card that frees up space
 class ShellStorage : public QWidget {
 public:
 	static constexpr int kHeight = 76;

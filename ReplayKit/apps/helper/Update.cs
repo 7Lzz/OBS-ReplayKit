@@ -34,18 +34,13 @@ namespace ReplayKitHelper
             return client;
         }
 
-        // temp debug log, always written regardless of the logging-enabled flag, so a "popup didnt appear" report can be diagnosed without turning logging on first.
-        private static readonly string UpdateDebugLog = Path.Combine(Constants.LOG_DIR, "replaykit_update_debug.log");
+        // always written regardless of the logging-enabled flag, so a "popup didnt appear" report can be diagnosed without turning logging on first.
         private static void WriteUpdateDebug(string msg)
         {
             try
             {
                 string line = string.Format("[{0}] PID={1} helper {2}", DateTime.Now.ToString("o"), Process.GetCurrentProcess().Id, msg);
-                lock (Server.State.LogLock)
-                {
-                    try { File.AppendAllText(UpdateDebugLog, line + Environment.NewLine); }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                }
+                lock (Server.State.LogLock) Log.AppendCapped(Constants.UPDATE_DEBUG_LOG_PATH, line);
             }
             catch { }
         }
@@ -420,7 +415,14 @@ namespace ReplayKitHelper
             }
             // the first-run wizard reads this so it can stand aside until the update is done
             lock (Server.State.UpdateCheckLock) Server.State.StartupUpdatePending = status["prompt"]?.Value<bool>() ?? false;
-            try { WriteUpdateDebug("startup-check result: " + status.ToString(Formatting.None)); } catch (Exception) { }
+            // without the release notes, which are the whole text of a release and went into this log on every start of obs
+            try
+            {
+                var brief = (JObject)status.DeepClone();
+                brief.Remove("releaseNotes");
+                WriteUpdateDebug("startup-check result: " + brief.ToString(Formatting.None));
+            }
+            catch (Exception) { }
             return status;
         }
 
@@ -463,10 +465,10 @@ namespace ReplayKitHelper
         }
 
         // written by the detached installer on its way out (apps/setup/Update.cs WriteResult). the popup polls this so a failed install shows its real reason instead of sitting on its last progress stage until the watchdog gives up.
-        private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, "update_result.json");
+        private static string InstallResultPath() => Path.Combine(Constants.LOG_DIR, ReplayKitShared.TempLayout.UpdateResultFile);
 
         // the detached installer records its own pid here (ReplayKitSetup DetachedSpawn.WriteOwnPid) -- the process the helper starts is only a launcher and exits immediately, so watching that pid would read as "died".
-        private static string InstallPidPath() => Path.Combine(Constants.LOG_DIR, "update_pid");
+        private static string InstallPidPath() => Path.Combine(Constants.LOG_DIR, ReplayKitShared.TempLayout.UpdatePidFile);
 
         public static JObject GetInstallResult()
         {
@@ -583,7 +585,7 @@ namespace ReplayKitHelper
             string root = Path.GetFullPath(Constants.REPLAYKIT_TEMP_ROOT).TrimEnd('\\');
             string full = Path.GetFullPath(path).TrimEnd('\\');
             string name = Path.GetFileName(full);
-            if (!Regex.IsMatch(name ?? "", @"^update-[a-f0-9]{32}$", RegexOptions.IgnoreCase))
+            if (!Regex.IsMatch(name ?? "", "^" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "[a-f0-9]{32}$", RegexOptions.IgnoreCase))
                 throw new InvalidOperationException("Update temp folder name is invalid.");
             if (!full.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
@@ -597,7 +599,7 @@ namespace ReplayKitHelper
             DateTime cutoff = DateTime.UtcNow.AddDays(-1);
             foreach (string dir in Directory.GetDirectories(root))
             {
-                if (!Regex.IsMatch(Path.GetFileName(dir), @"^(update|watchdog)-[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
+                if (!Regex.IsMatch(Path.GetFileName(dir), "^(" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "|watchdog-)[a-f0-9]{32}$", RegexOptions.IgnoreCase)) continue;
                 try
                 {
                     if (Directory.GetLastWriteTimeUtc(dir) > cutoff) continue;
@@ -610,7 +612,7 @@ namespace ReplayKitHelper
         internal static string CreateUpdateTemp()
         {
             Directory.CreateDirectory(Constants.REPLAYKIT_TEMP_ROOT);
-            string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, "update-" + Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(Constants.REPLAYKIT_TEMP_ROOT, ReplayKitShared.TempLayout.UpdateFolderPrefix + Guid.NewGuid().ToString("N"));
             AssertSafeUpdateTemp(path);
             Directory.CreateDirectory(path);
             return path;

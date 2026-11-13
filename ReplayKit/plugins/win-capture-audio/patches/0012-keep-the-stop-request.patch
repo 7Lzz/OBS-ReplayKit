@@ -1,0 +1,19 @@
+Backport the lost stop request fix from win-capture-audio 2.3.5.
+
+The shutdown event was auto-reset and is waited on in three places. A capture destroyed while it was still connecting to the audio service had its stop request taken by the activation wait, so the retry loop never saw it and the destructor joined a thread that never ended, which froze OBS. A manual-reset event stays set for every wait.
+
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -332,8 +332,9 @@ void AudioCaptureHelper::CaptureSafe()
+ AudioCaptureHelper::AudioCaptureHelper(Mixer *mixer, WAVEFORMATEX format, DWORD pid, bool exclude)
+ 	: pid{pid}, exclude{exclude}, mixers{mixer}, format{format}
+ {
+-	for (auto &event : events)
+-		event.create();
++	// shutdown is waited on by the activation, the capture loop and the retry delay; an auto-reset event taken by one of them left the others and the join in the destructor waiting for good
++	events[HelperEvents::PacketReady].create();
++	events[HelperEvents::Shutdown].create(wil::EventOptions::ManualReset);
+ 
+ 	capture_thread = std::thread(&AudioCaptureHelper::CaptureSafe, this);
+ }

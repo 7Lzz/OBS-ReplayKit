@@ -7,7 +7,7 @@
     max-height: 48vh;
     padding: 0 12px 12px;
   }
-  /* as medal draws it: the toolbar is a long rounded bar of its own across the editor, the panels of the editor come down onto its top edge, and the ruler and the tracks lie under it apart from it. the drag handle sits on that edge and takes no room, its grab area reaching a little above and below it */
+  /* the toolbar is a long rounded bar of its own across the editor, the panels of the editor come down onto its top edge, and the ruler and the tracks lie under it apart from it. the drag handle sits on that edge and takes no room, its grab area reaching a little above and below it */
   .tl-card {
     flex: 1 1 auto;
     min-height: 0;
@@ -410,7 +410,7 @@
   .trim-timeline .trim-bar input[type=range]::-webkit-slider-thumb { opacity: 0; pointer-events: none; }
   .trim-timeline.cut-l #trim-start::-webkit-slider-thumb, .trim-timeline.cut-r #trim-end::-webkit-slider-thumb { opacity: 1; pointer-events: auto; }
 
-  /* the properties of the selected track, drawn the way medal draws them: the name over the control, a slider with a round knob, and the value in a box on its right */
+  /* the properties of the selected track: the name over the control, a slider with a round knob, and the value in a box on its right */
   .tl-props[hidden] { display: none; }
   .tl-props-head { display: flex; align-items: center; gap: 8px; height: 38px; }
   .tl-props-head .editor-card-title { height: auto; flex: 0 0 auto; }
@@ -481,7 +481,7 @@
   var EDGE = 0.0101;
   var BAR_PX = 3;
   var CANVAS_MARGIN = 320;
-  // the empty room past the end of everything, as a share of the width of the view, so a piece can be carried out there and worked on the way medal lets it
+  // the empty room past the end of everything, as a share of the width of the view, so a piece can be carried out there and worked on the way
   var BLANK_ROOM = 0.3;
   // the colours an added clip and its sound share, so it reads which sound belongs to which video; the clip itself keeps the accent
   var LINK_RGB = ["88, 166, 255", "76, 201, 140", "190, 120, 255", "255, 166, 64", "64, 200, 210", "255, 110, 170"];

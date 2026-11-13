@@ -1,6 +1,6 @@
 win-capture-audio 2.3.4, built by OBS ReplayKit.
 
 Upstream: https://github.com/Ayrton09/win-capture-audio, commit d11b381d41333964735a57d60bda54747f2232d9 (a modernized fork of https://github.com/bozbez/win-capture-audio).
-Built from: d11b381d41333964735a57d60bda54747f2232d9 + replaykit patches rk8
+Built from: d11b381d41333964735a57d60bda54747f2232d9 + replaykit patches rk12
 The unmodified upstream files, the patches and the build script are in https://github.com/7Lzz/OBS-ReplayKit under ReplayKit/plugins/win-capture-audio/.
 Licensed GPL-2.0, see LICENSE. Copyright of the original plugin: bozbez; maintained fork: Ayrton09.

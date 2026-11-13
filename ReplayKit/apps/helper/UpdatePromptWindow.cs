@@ -241,12 +241,7 @@ namespace ReplayKitHelper
         // always-on, flag-independent -- same reasoning as Update.WriteUpdateDebug: a "window never showed" report has to be diagnosable without turning logging on first. this process has no config loaded.
         private static void WriteDebug(string message)
         {
-            try
-            {
-                Directory.CreateDirectory(Constants.LOG_DIR);
-                string line = "[" + DateTime.Now.ToString("o") + "] update-window " + message + Environment.NewLine;
-                File.AppendAllText(Path.Combine(Constants.LOG_DIR, "replaykit_update_debug.log"), line);
-            }
+            try { Log.AppendCapped(Constants.UPDATE_DEBUG_LOG_PATH, "[" + DateTime.Now.ToString("o") + "] update-window " + message); }
             catch { }
         }
     }

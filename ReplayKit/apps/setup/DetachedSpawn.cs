@@ -41,7 +41,7 @@ namespace ReplayKitSetup
         public const string DetachedFlag = "--detached";
 
         // where the detached copy records its own pid. the helper watches THIS rather than the process it started, because the process it started is only the launcher and exits within a second of handing off.
-        public static string PidFilePath() => Path.Combine(Path.GetTempPath(), "ReplayKit", "logs", "update_pid");
+        public static string PidFilePath() => Path.Combine(ReplayKitShared.TempLayout.Logs, ReplayKitShared.TempLayout.UpdatePidFile);
 
         public static void WriteOwnPid()
         {

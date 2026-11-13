@@ -62,7 +62,7 @@ namespace ReplayKitHelper
             if (path == "/browse-file" || path == "/browse-folder")
             {
                 bool folder = path == "/browse-folder";
-                string picked = PickPath(folder, Q("filter", "Images (*.ico;*.png;*.jpg;*.bmp)|*.ico;*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*"), Q("initial", ""));
+                string picked = FilePickers.PickPath(folder, Q("filter", "Images (*.ico;*.png;*.jpg;*.bmp)|*.ico;*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*"), Q("initial", ""));
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = !string.IsNullOrEmpty(picked), ["path"] = picked });
                 return false;
             }

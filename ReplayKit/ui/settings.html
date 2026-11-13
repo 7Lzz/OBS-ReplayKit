@@ -763,7 +763,7 @@
   .page .field-wrap > .text-input, .page .field-wrap > .spin { min-width:0; }
   .page .hint { margin-left:0; line-height:1.5; }
   .page .volume-control { grid-template-columns:60px minmax(0,1fr); min-width:0; }
-  /* a slider runs the full width of its row under the name, the way Medal lays them out; the value box and the reset button stay on the line of the name */
+  /* a slider runs the full width of its row under the name; the value box and the reset button stay on the line of the name */
   .page .box .form-row:has(> .field-wrap > .volume-control) { grid-template-columns:minmax(0,1fr) 64px auto; grid-template-areas:"label value reset" "slider slider slider"; gap:10px 8px; }
   .page .form-row:has(> .field-wrap > .volume-control) > .label { grid-area:label; }
   .page .form-row:has(> .field-wrap > .volume-control) > .field-wrap,

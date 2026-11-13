@@ -37,6 +37,28 @@ namespace ReplayKitHelper
             }
             catch { }
         }
+
+        private const long CappedLogBytes = 512 * 1024;
+
+        // for a log that is written whether or not logging is on: past its limit the older half goes, so it cannot grow for as long as the install lives
+        public static void AppendCapped(string path, string line)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                var info = new FileInfo(path);
+                if (info.Exists && info.Length > CappedLogBytes)
+                {
+                    byte[] all = File.ReadAllBytes(path);
+                    int from = Array.IndexOf(all, (byte)10, all.Length - (int)(CappedLogBytes / 2));
+                    from = from < 0 ? all.Length : from + 1;
+                    using (var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read))
+                        file.Write(all, from, all.Length - from);
+                }
+                File.AppendAllText(path, line + Environment.NewLine);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+        }
     }
 
     internal static class AppConfig

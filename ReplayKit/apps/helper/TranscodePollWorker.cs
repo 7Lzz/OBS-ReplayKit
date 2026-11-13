@@ -67,7 +67,7 @@ namespace ReplayKitHelper
             }
 
             DateTime deadline = DateTime.Now.AddMinutes(30);
-            string scratchDir = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch");
+            string scratchDir = Constants.SCRATCH_DIR;
             try { Directory.CreateDirectory(scratchDir); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
 
             string lastWritten = "";

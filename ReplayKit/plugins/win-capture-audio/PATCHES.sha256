@@ -1,5 +1,5 @@
 a9a370b315b2f682568e0e7b090cde8a4f68b53e58646dda8924bcf7b60b76cb  0001-keep-exclude-mode-on-per-app-capture.patch
-4d6c812bd4b4a6824d5baf6bf84ab4ca9f57ec81297bc38757bf56e042e79eaf  0002-build-id.patch
+f20796d4ae8f7e0d29d2f9b59c50b82bca78d01cc96a96977387532748b1f68f  0002-build-id.patch
 970ba7da7c63b96a04a7468069c8100889ceb65b3e42fed9f9aacc93d2f6a5ed  0003-guard-the-capture-buffer-read.patch
 3c8da447997fab8be11e4e35897fa20a508c3425f7a6e31525286adf579efa86  0004-heap-allocated-wasapi-callbacks.patch
 068e9fe9d4856982e2976ae0e7d46597229ed533feaa601026ea27ef13d9f08a  0005-obs-is-always-excluded.patch
@@ -9,3 +9,5 @@ ee4661bd142137f52ab86861ea45c149af8b2490843a6bb64228d6c53afe8b68  0006-drop-pack
 b0fbb09ee2de3a2d502d13ebe8be932b3c11935f53ffc5cf4fa4f54e332b15e8  0009-trim-late-packets-after-mix-drains.patch
 37e7a79f0f3c110ad0978d17745b9eee49fe189da67eccefab0859f95aff6dc2  0010-track-timing-per-capture-stream.patch
 d66f6e630205796640586b340dd630ff5612c5b3ea2034711c133fc249d6d180  0011-verify-capture-timestamp-jumps.patch
+9a98eb547f149667b62b6b3848c9011f45a77bee9c5c083e710f51c5ed43e607  0012-keep-the-stop-request.patch
+ec2a2e3b50ba8d8971335768bab948f8230a32c6e265b74d51b9b7fd37b8d1f5  0013-report-timing-and-recover-from-early-timestamps.patch

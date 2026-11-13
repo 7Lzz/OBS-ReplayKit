@@ -45,7 +45,7 @@ namespace ReplayKitHelper
                 if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Log folder not found" }); return false; }
                 try
                 {
-                    var existing = GetExplorerHwndForPath(root);
+                    var existing = Explorer.GetExplorerHwndForPath(root);
                     if (existing != IntPtr.Zero)
                     {
                         bool focused2 = Native.FocusHwnd(existing);
@@ -72,11 +72,11 @@ namespace ReplayKitHelper
             {
                 // the detached relauncher starts obs only after the original process exits normally
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string obsPath = GetRunningObsPath();
+                string obsPath = ObsProcess.GetRunningObsPath();
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
-                ArmRelaunchAndCloseObs(obsPath, "/restart-obs");
+                ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/restart-obs");
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is restarting." });
-                StopObsForRestart("/restart-obs", true);
+                ObsProcess.StopObsForRestart("/restart-obs", true);
                 return false;
             }
 
@@ -93,7 +93,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is closing." });
                 // the installer says when the close is for an update
-                StopObsForRestart("/exit-obs", Q("reason") == "update" || Update.InstallerRunning());
+                ObsProcess.StopObsForRestart("/exit-obs", Q("reason") == "update" || Update.InstallerRunning());
                 return false;
             }
 
@@ -101,7 +101,7 @@ namespace ReplayKitHelper
             {
                 // clears the sign-in state and requests a normal restart before the unlocked profile is cleaned
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                string obsPath = GetRunningObsPath();
+                string obsPath = ObsProcess.GetRunningObsPath();
                 if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
                 try { AuthCore.ClearAuthBlob(); } catch { }
                 try { AuthCore.ClearAuth(); } catch { }
@@ -111,7 +111,7 @@ namespace ReplayKitHelper
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
 
                 // allow the response to flush before closing obs
-                StopObsForRestart("/restart-obs-clean", true);
+                ObsProcess.StopObsForRestart("/restart-obs-clean", true);
                 return false;
             }
 

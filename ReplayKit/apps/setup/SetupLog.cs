@@ -20,7 +20,7 @@ namespace ReplayKitSetup
                 {
                     if (_path == null)
                     {
-                        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ReplayKit", "logs");
+                        string dir = ReplayKitShared.TempLayout.Logs;
                         try { Directory.CreateDirectory(dir); } catch (Exception) { }
                         _path = System.IO.Path.Combine(dir, "setup_" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".log");
                     }

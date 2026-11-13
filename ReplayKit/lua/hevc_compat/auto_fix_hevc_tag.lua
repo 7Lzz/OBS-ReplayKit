@@ -57,8 +57,11 @@ local function run_worker(argLine)
         log(obs.LOG_WARNING, "missing worker script: " .. script)
         return
     end
+    -- the script cannot know where the saved state lives, so the two files that name the clip folder are handed to it
     local cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " ..
-        win_quote(script) .. argLine
+        win_quote(script) .. argLine ..
+        " -SettingsFile " .. win_quote(replaykit_state_file("replaykit_settings.json")) ..
+        " -ConfigFile " .. win_quote(replaykit_state_file("helper_config.json"))
     local ok, err = spawn_hidden(cmd)
     if not ok then
         log(obs.LOG_WARNING, "could not start fix worker. Win32 error: " .. tostring(err))

@@ -34,7 +34,7 @@
   .ed-x, .tl-x { width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--border_radius); background: transparent; color: var(--text_muted); display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
   .ed-x:hover, .tl-x:hover { background: var(--button_bg_hover); color: var(--text); }
   .ed-x svg, .tl-x svg { width: 14px; height: 14px; fill: currentColor; }
-  /* the panels scroll without a bar, as medal does */
+  /* the panels scroll without a bar*/
   .ed-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 14px 14px; }
   .ed-scroll::-webkit-scrollbar { display: none; }
   .ed-pane { display: flex; flex-direction: column; gap: 22px; }
@@ -160,7 +160,7 @@
   .ed-el-tile svg, .ed-el-tile img { width: 64%; height: 64%; object-fit: contain; display: block; pointer-events: none; }
   .ed-el-tile.is-busy { opacity: .45; pointer-events: none; }
   .ed-el-credit { font-size: 11px; color: var(--text_muted); margin: 8px 0 0; line-height: 1.4; }
-  /* the stickers, the way medal shows them: three to a row on dark tiles, the first few on the elements page and the rest behind see all */
+  /* the stickers: three to a row on dark tiles, the first few on the elements page and the rest behind see all */
   .ed-st-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .ed-st-tile { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 8px; background: var(--grey8); display: grid; place-items: center; cursor: pointer; transition: box-shadow 90ms linear; }
   .ed-st-tile[hidden] { display: none; }
@@ -175,7 +175,7 @@
   .ed-el-page, .ed-el-home { display: flex; flex-direction: column; gap: 22px; }
   .ed-sec[hidden] { display: none; }
 
-  /* the voiceover, laid out like the recorder of medal: the microphone, the time, the level, then the button */
+  /* the voiceover: the microphone, the time, the level, then the button */
   .ed-rec { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .ed-rec .combo { width:100%; flex:none; }
   .ed-mic-note { align-self: stretch; font-size: 12px; color: var(--text_muted); margin:0; min-height:2.8em; line-height:1.4; }
@@ -635,7 +635,7 @@
       return s;
     }
 
-    // a big choice of the subtitles tab, the way medal offers them: an icon, a name and a line under it
+    // a big choice of the subtitles tab: an icon, a name and a line under it
     function bigButton(svg, title, blurb, onClick) {
       var b = el("button", "ed-big");
       b.type = "button";

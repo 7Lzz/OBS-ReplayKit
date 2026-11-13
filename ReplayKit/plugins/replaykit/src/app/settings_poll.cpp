@@ -210,10 +210,11 @@ void PollHelperSettings()
 			const bool setupPending = JsonBoolField(settingsBody, "setupWizardPending", g_setupPending);
 			if (setupPending != g_setupPending)
 				SetupPendingChanged(setupPending);
-			// development mode is what lets the two development settings do anything
-			const bool development = JsonBoolField(settingsBody, "developmentMode", false);
-			DevLogSetEnabled(development && JsonBoolField(settingsBody, "logInterfaceEvents", false));
-			SdkSetEnabled(development && JsonBoolField(settingsBody, "sdkMode", false));
+			// development mode is what lets the two development settings do anything; a helper that did not answer leaves both as they were, or the interface log went quiet for as long as the helper was restarting
+			if (const auto development = JsonBoolIfPresent(settingsBody, "developmentMode")) {
+				DevLogSetEnabled(*development && JsonBoolField(settingsBody, "logInterfaceEvents", false));
+				SdkSetEnabled(*development && JsonBoolField(settingsBody, "sdkMode", false));
+			}
 			if (const auto recognition = JsonBoolIfPresent(settingsBody, "gameRecognition"))
 				CaptureContextSetRecognition(*recognition);
 			SyncStartMinimized(settingsBody);

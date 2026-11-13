@@ -540,7 +540,7 @@ namespace ReplayKitSetup
                 throw new IOException("ReplayKit " + VersionInfo.Version + " needs OBS " + ObsVersions.Install.Tested + " and OBS could not be updated to it, so nothing was changed. Install OBS " + ObsVersions.Install.Tested + " from obsproject.com, then run the ReplayKit installer.");
 
             string transactionId = Guid.NewGuid().ToString("N");
-            string transactionRoot = Path.Combine(Path.GetTempPath(), "ReplayKit", "runtime-update-" + transactionId);
+            string transactionRoot = Path.Combine(TempLayout.Root, "runtime-update-" + transactionId);
             string stageRoot = Path.Combine(transactionRoot, "stage");
             string backupRoot = Path.Combine(transactionRoot, "backup");
             var files = Directory.EnumerateFiles(runtimeSrc, "*", SearchOption.AllDirectories)

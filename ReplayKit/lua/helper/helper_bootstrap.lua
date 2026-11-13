@@ -417,6 +417,7 @@ local function on_helper_health(ok)
     if ok then
         helper_started = true
         helper_consecutive_fails = 0
+        start_update_bootstrap()
         return
     end
     helper_consecutive_fails = helper_consecutive_fails + 1
@@ -445,8 +446,37 @@ local function helper_probe_poll()
     on_helper_health(result)
 end
 
+-- the start at load does not wait for the port: obs loads its scripts on its main thread, and a connect to a port nobody listens on yet took windows half a second to refuse, on every start of obs. a short timer asks with the probe that never waits, and the watchdog takes over once the helper answers or the time is up
+local HELPER_STARTUP_POLL_MS = 100
+local HELPER_STARTUP_LIMIT_MS = 5000
+local startup_poll_until = nil
+
+local function helper_startup_poll()
+    if not probe then
+        if now_ms() >= startup_poll_until or not start_probe() then
+            startup_poll_until = nil
+            obs.remove_current_callback()
+        end
+        return
+    end
+    local result = step_probe()
+    if result == nil then return end
+    finish_probe()
+    if not result then return end
+    startup_poll_until = nil
+    obs.remove_current_callback()
+    on_helper_health(true)
+    log(obs.LOG_INFO, "ReplayKit helper launched outside OBS on " .. HELPER_ORIGIN)
+end
+
+local function start_helper_at_load()
+    if not HELPER or not spawn_helper() then return end
+    startup_poll_until = now_ms() + HELPER_STARTUP_LIMIT_MS
+    obs.timer_add(helper_startup_poll, HELPER_STARTUP_POLL_MS)
+end
+
 local function helper_watchdog()
-    if probe then return end
+    if probe or startup_poll_until then return end
     if not start_probe() then
         on_helper_health(false)
         return
@@ -584,9 +614,7 @@ function script_load(settings)
         )
     end
 
-    if start_helper() then
-        log(obs.LOG_INFO, "ReplayKit helper launched outside OBS on " .. HELPER_ORIGIN)
-    end
+    start_helper_at_load()
     start_helper_watchdog()
 end
 
@@ -600,6 +628,10 @@ function script_unload()
     if helper_watchdog_started then
         obs.timer_remove(helper_watchdog)
         helper_watchdog_started = false
+    end
+    if startup_poll_until then
+        obs.timer_remove(helper_startup_poll)
+        startup_poll_until = nil
     end
     if probe then
         obs.timer_remove(helper_probe_poll)

@@ -456,7 +456,7 @@ void ShellTitleBar::paintEvent(QPaintEvent *)
 {
 	QPainter p(this);
 	p.fillRect(rect(), g_chromeBar);
-	// a short vertical hairline sets the window controls apart from the bell, the way medal separates its own; centred between the circle of the account and the minimize glyph, and the edge of the wash of the minimize button, see kDividerGap
+	// a short vertical hairline sets the window controls apart from the bell; centred between the circle of the account and the minimize glyph, and the edge of the wash of the minimize button, see kDividerGap
 	p.fillRect(QRect(width() - kShellCtlW * 3 - kDividerGap, (height() - kDividerH) / 2, 1, kDividerH), ChromeInk(0.13));
 
 	// the name of the page keeps its colour when the window is not in front, so nothing in the bar greys out

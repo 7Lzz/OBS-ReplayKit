@@ -44,13 +44,39 @@ Patch 9 backports [the second mixer timing fix in 2.3.5](https://github.com/Ayrt
 
 A single forward timestamp outlier could move a capture's cursor ahead and cause the next valid packets to be trimmed. Patch 11 holds one suspect packet and checks its timing against the next packet. A confirmed gap stays in the mix. If the next packet confirms the existing timeline, the suspect packet can be placed there instead. A timestamp more than 2 ms ahead of the capture clock cannot become an anchor. The output-device path bypasses this logic.
 
+## Why rk9
+
+A review of rk8 on 2026-11-13 ran the capture timing through a model: the real `packet-timeline.hpp` with the mixer and helper logic around it, fed ten minutes of packets per case (exact timestamps, jitter, clock drift, single outliers, pauses, two programs). rk8 was at least as good as rk6 in every case but one. Three things came out of it.
+
+The timeline left no trace. Holding, correcting, trimming and dropping a packet all happened without a log line, so a log could not say whether timestamps had anything to do with a noise report. Patch 13 counts them per capture and writes one line a minute, and one when the capture ends, while any count is not zero. A gap is only counted when it is shorter than a tenth of a second, since a pause between two sounds is a gap as well.
+
+A capture whose timestamps stay more than 2 ms ahead of the clock lost every packet: each one was held, then dropped when the next one was no better. In the model, timestamps that count samples at the nominal rate on a device running 100 ppm fast crossed that line after about two minutes and the capture stayed silent from there (22% of ten minutes came out; rk6 played all of it). No machine is known to do this. Patch 13 times such a capture by arrival after 100 such packets in a row, with one warning, and goes back to the timestamps when one is plausible again. The model then loses the first second and keeps the rest.
+
+The stop request of a capture could be lost. The shutdown event was auto-reset and three waits read it: the activation, the capture loop and the retry delay. A capture destroyed while it was still connecting had the event taken by the activation wait, the retry loop went on, and the destructor waited on a thread that never ended, which freezes obs. Upstream fixed it in 2.3.5 with a manual-reset event, and patch 12 backports that.
+
+What the review did not change: clock drift between the audio device and the system clock still costs one 2 ms cut or hole each time the two have moved 2 ms apart (every 20 seconds at 100 ppm, every 2 minutes at 20 ppm, against about five clicks a second on rk6), and a single timestamp that is too early costs a dropout of its size, where one that is too late costs nothing. The report line of patch 13 shows both, as trimmed frames and short gaps.
+
+The noise report behind rk3 to rk8 matches [obs issue 8064](https://github.com/obsproject/obs-studio/issues/8064), "sound becomes noisy after a long time" in the application audio capture of obs itself. The obs maintainers put it down to Windows: fixed in Windows 11, not in Windows 10. obs places packets one after the other whenever a timestamp is within 70 ms of the expected one, and it had the noise all the same, so the noise is in the samples Windows hands over and no placement of packets removes it. The output-device capture of patch 8 is the way around it.
+
+## Why rk10
+
+Patch 13 now anchors the fallback to arrival once, then uses the capture timeline's next frame for subsequent packets. When WASAPI delivers several packets together, they keep their spacing instead of overlapping. A discontinuity starts a new anchor.
+
+## Why rk11
+
+Patch 13 checks the fallback clock at the start of each WASAPI read batch. More than 5 ms of drift triggers a new arrival anchor. The rest of the batch follows the sample cursor. Corrections can add a gap or trim overlap at the batch boundary, so the fallback cannot drift indefinitely.
+
+## Why rk12
+
+Patch 13 now counts the remaining frames in the WASAPI batch before anchoring to arrival. This keeps a larger batch from moving the cursor ahead and trimming later packets when the queue returns to single reads. Normal timestamped capture still forwards each packet as it reads it.
+
 ## What is here
 
 | path | what |
 | --- | --- |
 | `upstream/` | 32 files, byte for byte as git stores them, of https://github.com/Ayrton09/win-capture-audio at commit `d11b381d41333964735a57d60bda54747f2232d9` (tag 2.3.4, root tree `fd06520a6586a6947bcd186b03a82fac070c477c`): `CMakeLists.txt`, `LICENSE`, `src/`, `data/locale/`, `installer/installer.iss.in` (the cmake file reads it) |
 | `MANIFEST.sha256` | the sha256 of every file of `upstream/`; the build refuses to run when one differs, is missing or is extra |
-| `patches/` and `PATCHES.sha256` | the eleven ReplayKit patches and their hashes, checked the same way |
+| `patches/` and `PATCHES.sha256` | the thirteen ReplayKit patches and their hashes, checked the same way |
 | `build.ps1` | fetches the pinned dependencies, verifies the inputs, builds and checks the dll, and stages the plugin files |
 | `BUILD-RECORD.json` | the hashes of both manifests, the toolchain, the dll's SHA-256 and size, and its imported modules |
 
@@ -59,7 +85,7 @@ Left out on purpose: README, CHANGELOG, CI files, the issue templates and `cmake
 ## The patches
 
 1. `0001-keep-exclude-mode-on-per-app-capture.patch` removes the "native exclude" shortcut of 2.3.0 from `AudioCapture::WorkerUpdate()`. With one excluded program playing, that shortcut switches to a single Windows client that captures everything except that one process tree. ReplayKit's exclude list names several programs (Discord, the obs processes, the cef pages, the helper) and Windows can leave out only one tree, so obs's own audio, the monitoring output of the share preview, would be captured again, and the capture would restart every time an excluded program starts or stops playing. Without the shortcut, exclude mode follows the sessions of every other program, as 2.2.x did. Everything else of the fork stays.
-2. `0002-build-id.patch` changes one line of build metadata: the obs log line `[win-capture-audio] Version 2.3.4 (d11b381+rk8)` names the upstream commit and the revision of this patch set (rk8), so a running dll can be traced to its source. Raise rk when a patch changes.
+2. `0002-build-id.patch` changes one line of build metadata: the obs log line `[win-capture-audio] Version 2.3.4 (d11b381+rk12)` names the upstream commit and the revision of this patch set (rk12), so a running dll can be traced to its source. Raise rk when a patch changes.
 3. `0003-guard-the-capture-buffer-read.patch` makes the copy out of the engine buffer in `Mixer::SubmitPacket` behind an SEH handler that takes only an access violation or in-page error whose address lies inside the buffer being read; a fault anywhere else stays the crash it is. A packet that could not be read ends that capture, and the capture starts over on a new client as it does after any other loss of the stream. `ForwardPacket` also stops reading a success code that carries no buffer (`AUDCLNT_S_BUFFER_EMPTY`) as a packet, and nothing of any kind can leave the capture thread or the worker thread of a mixer. The plugin is built without /EHa, so the handler sits in a function of its own with no object that has a destructor.
 4. `0004-heap-allocated-wasapi-callbacks.patch` makes the three notification clients of the session monitor (devices, new sessions, events of one session) heap objects held in `ComPtr` and made with `Make<>()`, instead of members of the watchers that register them with Windows. A member dies with its watcher, and a callback or a release that Windows still has on its way then lands in freed memory. It is the mistake of the 2022 release (a COM object on the stack) in three more places.
 5. `0005-obs-is-always-excluded.patch` puts obs itself into the excluded set in exclude mode, whether or not it has a session, so no ancestor of obs is ever a capture root and obs is never captured as part of another program's process tree (see "Why rk3").
@@ -69,6 +95,8 @@ Left out on purpose: README, CHANGELOG, CI files, the issue templates and `cmake
 9. `0009-trim-late-packets-after-mix-drains.patch` preserves the emitted timeline when a late packet arrives after the mix drains (see "Why rk7").
 10. `0010-track-timing-per-capture-stream.patch` stabilizes packet placement within each process-loopback capture before mixing (see "Why rk7").
 11. `0011-verify-capture-timestamp-jumps.patch` prevents a single forward timestamp outlier from moving the capture cursor (see "Why rk8").
+12. `0012-keep-the-stop-request.patch` makes the shutdown event of a capture manual-reset, so a stop request reaches every wait (see "Why rk9").
+13. `0013-report-timing-and-recover-from-early-timestamps.patch` logs what the timeline did to the packets of each capture, and times a capture by arrival while its timestamps stay ahead of the clock (see "Why rk9").
 
 ## The build
 

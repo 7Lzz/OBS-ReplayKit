@@ -44,14 +44,16 @@ namespace ReplayKitHelper
         // custom themes the user saved from the Appearance tab, one <name>.json of colour tokens each. per-user, gitignored.
         public static readonly string USER_THEMES_DIR = Path.GetFullPath(Path.Combine(APP_ICONS_DIR, "..", "themes-user"));
 
-        public static readonly string REPLAYKIT_TEMP_ROOT = Path.Combine(Path.GetTempPath(), "ReplayKit");
+        public static readonly string REPLAYKIT_TEMP_ROOT = ReplayKitShared.TempLayout.Root;
         public static readonly string THUMB_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "thumbs");
-        public static readonly string LOG_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "logs");
+        public static readonly string LOG_DIR = ReplayKitShared.TempLayout.Logs;
         public static readonly string HELPER_LOG_PATH = Path.Combine(LOG_DIR, "helper.log");
         public static readonly string UPLOAD_LOG_PATH = Path.Combine(LOG_DIR, "upload.log");
         public static readonly string COMPRESS_LOG_PATH = Path.Combine(LOG_DIR, "compress.log");
+        // written whether or not logging is on, by the helper and by its update window, see Log.AppendCapped
+        public static readonly string UPDATE_DEBUG_LOG_PATH = Path.Combine(LOG_DIR, "replaykit_update_debug.log");
         public static readonly string COMPRESS_TMP_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "compressed");
-        public static readonly string SCRATCH_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "scratch");
+        public static readonly string SCRATCH_DIR = ReplayKitShared.TempLayout.Scratch;
         // what makes a clip quick to open in the editor again, see ClipCache
         public static readonly string CACHE_DIR = Path.Combine(REPLAYKIT_TEMP_ROOT, "cache");
 

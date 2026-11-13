@@ -41,7 +41,7 @@ namespace ReplayKitHelper
             var before = new FileInfo(path);
             if (!before.Exists) return;
             long bytes = before.Length, written = before.LastWriteTimeUtc.Ticks, created = before.CreationTimeUtc.Ticks;
-            if (RemoveSilentDiscord(path, Compression.FindCompressionFfmpeg(), true))
+            if (RemoveSilentDiscord(path, Path.Combine(Constants.HelperRoot, "ffmpeg.exe"), true))
                 ClipGames.RefreshedRetag(path, bytes, written, created);
         }
 

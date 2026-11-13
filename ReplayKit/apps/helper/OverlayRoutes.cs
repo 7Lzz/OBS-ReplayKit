@@ -32,7 +32,7 @@ namespace ReplayKitHelper
             if (path == "/desktop-preview.jpg")
             {
                 byte[] jpeg = null;
-                try { jpeg = GetDesktopPreviewJpeg(); }
+                try { jpeg = DesktopPreview.GetDesktopPreviewJpeg(); }
                 catch (Exception ex) { Log.Write("desktop-preview capture failed: " + ex.Message); }
                 if (jpeg == null || jpeg.Length == 0)
                 {

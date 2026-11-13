@@ -87,11 +87,14 @@ namespace ReplayKitSetup
             return ExitCode;
         }
 
+        // the browser profile of the setup and uninstall windows
+        internal static string WebViewDataDir => Path.Combine(ReplayKitShared.TempLayout.Root, "webview2-setup-udf");
+
         private async void InitWebViewAsync()
         {
             try
             {
-                string udf = Path.Combine(Path.GetTempPath(), "ReplayKit", "webview2-setup-udf");
+                string udf = WebViewDataDir;
                 Directory.CreateDirectory(udf);
                 var env = await CoreWebView2Environment.CreateAsync(null, udf, new CoreWebView2EnvironmentOptions());
                 _controller = await env.CreateCoreWebView2ControllerAsync(_hwnd);

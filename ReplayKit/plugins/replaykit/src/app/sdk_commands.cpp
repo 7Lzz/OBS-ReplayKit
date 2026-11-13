@@ -10,7 +10,6 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <atomic>
 #include <map>
 #include <mutex>
@@ -23,6 +22,7 @@
 #include "core/idle_memory.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
+#include "core/state_files.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_frame.hpp"
 #include "shell/shell_projector.hpp"
@@ -370,7 +370,7 @@ QJsonObject UiSnapshot(const QJsonObject &args)
 	const QString name = args.value("name").toString(target);
 	if (!QRegularExpression(QStringLiteral("^[A-Za-z0-9_-]{1,40}$")).match(name).hasMatch())
 		return Fail(QStringLiteral("args.name is letters, digits, - and _, up to 40 of them."));
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QStringLiteral("/ReplayKit/sdk");
+	const QString dir = TempRootPath() + QStringLiteral("/sdk");
 	QDir().mkpath(dir);
 	const QString path = dir + QLatin1Char('/') + name + QStringLiteral(".png");
 	const QPixmap pixmap = widget->grab();

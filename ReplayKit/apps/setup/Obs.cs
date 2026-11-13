@@ -268,7 +268,7 @@ namespace ReplayKitSetup
         [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "com idispatch dispatch, no trimmable managed members")]
         private static bool LaunchObsViaShell(string obsExe, Action<string> log)
         {
-            string link = Path.Combine(Path.GetTempPath(), "ReplayKit", "scratch", "obs-launch.lnk");
+            string link = Path.Combine(TempLayout.Scratch, "obs-launch.lnk");
             object shell = null;
             object shortcut = null;
             try

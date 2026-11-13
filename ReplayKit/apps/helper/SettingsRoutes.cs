@@ -55,15 +55,15 @@ namespace ReplayKitHelper
                         var result = SettingsHttp.SaveSettingsFromRequest(req.Body);
                         if (result["restartRequired"]?.Value<bool>() == true)
                         {
-                            string obsPath = GetRunningObsPath();
+                            string obsPath = ObsProcess.GetRunningObsPath();
                             if (obsPath == null)
                             {
                                 HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." });
                                 return false;
                             }
-                            ArmRelaunchAndCloseObs(obsPath, "/settings");
+                            ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/settings");
                             HttpResponse.SendJson(stream, 200, result);
-                            StopObsForRestart("/settings", true);
+                            ObsProcess.StopObsForRestart("/settings", true);
                             return false;
                         }
                         HttpResponse.SendJson(stream, 200, result);

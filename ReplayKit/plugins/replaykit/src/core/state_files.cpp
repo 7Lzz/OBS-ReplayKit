@@ -1,9 +1,10 @@
-// where the saved state of replaykit is on the disk, by the same rule as shared/StateLayout.cs
+// where the saved state and the temp files of replaykit are on the disk, by the same rules as shared/StateLayout.cs and shared/TempLayout.cs
 #include "prelude.hpp"
 #include "core/state_files.hpp"
 
 #include <QDir>
 #include <QFileInfo>
+#include <QStandardPaths>
 
 #include "core/shared_values.hpp"
 
@@ -36,6 +37,16 @@ QString StateFilePath(const QString &name)
 	}
 	QDir().mkpath(folder);
 	return current;
+}
+
+QString TempRootPath()
+{
+	return QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QLatin1Char('/') + QString::fromLatin1(kTempFolder);
+}
+
+QString TempScratchPath()
+{
+	return TempRootPath() + QLatin1Char('/') + QString::fromLatin1(kTempScratchFolder);
 }
 
 } // namespace rk

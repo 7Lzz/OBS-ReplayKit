@@ -1,0 +1,337 @@
+Report what the packet timeline does, and keep a capture whose timestamps stay ahead of the clock.
+
+The timeline held, trimmed and dropped packets without a trace. Each capture now counts corrected timestamps, dropped held packets, short gaps, trimmed frames and timestamps ahead of the clock, and writes one line a minute, and one when it ends, while any of them is not zero. After 100 timestamps more than 2 ms ahead of the clock, anchor to arrival and advance by frame count. Correct drift against arrival only at the start of a batch.
+
+diff --git a/src/audio-capture-helper.cpp b/src/audio-capture-helper.cpp
+--- a/src/audio-capture-helper.cpp
++++ b/src/audio-capture-helper.cpp
+@@ -139,21 +139,48 @@ bool AudioCaptureHelper::UnRegisterMixer(Mixer *mixer)
+ 	return mixers.size() == 0;
+ }
+ 
+-bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags)
++static constexpr UINT32 ahead_limit = 100;
++static constexpr ULONGLONG timing_report_interval = 60000;
++
++bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags,
++							 UINT64 now, UINT64 queued_frames, bool batch_start)
+ {
+ 	const auto rate = format.nSamplesPerSec;
+ 	const bool discontinuity = (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0;
+-	const bool plausible = PacketTimeline::IsPlausible(qpc_position, os_gettime_ns() / 100);
++	bool plausible = PacketTimeline::IsPlausible(qpc_position, now);
++	bool by_arrival = false;
++
++	if (plausible) {
++		ahead_run = 0;
++	} else {
++		timing.ahead++;
++		const bool entering_fallback = ahead_run < ahead_limit && ++ahead_run == ahead_limit;
++		if (entering_fallback)
++			warn("timestamps of pid %lu stay ahead of the clock - timing its packets by arrival", pid);
++
++		by_arrival = ahead_run == ahead_limit;
++		if (by_arrival) {
++			qpc_position = packet_timeline.ArrivalTimestamp(now, queued_frames, rate, batch_start,
++								    entering_fallback || (batch_start && discontinuity));
++			plausible = true;
++		}
++	}
+ 
+ 	if (pending_packet.frames) {
+ 		auto frames = pending_packet.frames;
+ 		pending_packet.frames = 0;
+-		if (plausible) {
+-			auto timestamp = packet_timeline.ResolvePending(pending_packet.timestamp, frames, qpc_position,
+-								       num_frames, rate, pending_packet.discontinuity || discontinuity);
+-			if (timestamp && !SubmitPacket(*timestamp, pending_packet.samples.data(), frames, true))
+-				return false;
+-		}
++		std::optional<UINT64> timestamp;
++		if (plausible)
++			timestamp = packet_timeline.ResolvePending(pending_packet.timestamp, frames, qpc_position,
++								   num_frames, rate, pending_packet.discontinuity || discontinuity);
++
++		if (!timestamp)
++			timing.dropped++;
++		else if (timestamp != pending_packet.timestamp)
++			timing.corrected++;
++
++		if (timestamp && !SubmitPacket(*timestamp, pending_packet.samples.data(), frames, true))
++			return false;
+ 	}
+ 
+ 	if (!plausible && (!packet_timeline.HasAnchor() || discontinuity)) {
+@@ -162,7 +189,7 @@ bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32
+ 	}
+ 
+ 	// keep one suspect packet until the following timestamp confirms where it belongs
+-	if (!plausible || packet_timeline.IsForwardJump(qpc_position, num_frames, rate)) {
++	if (!by_arrival && (!plausible || packet_timeline.IsForwardJump(qpc_position, num_frames, rate))) {
+ 		pending_packet.samples.resize(static_cast<std::size_t>(num_frames) * format.nChannels);
+ 		if (!CopyFromEngineBuffer(pending_packet.samples.data(), data, pending_packet.samples.size() * sizeof(float)))
+ 			return false;
+@@ -178,6 +205,14 @@ bool AudioCaptureHelper::ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32
+ bool AudioCaptureHelper::SubmitPacket(UINT64 timestamp, float *samples, UINT32 frames, bool discontinuity)
+ {
+ 	auto placement = packet_timeline.Place(timestamp, frames, format.nSamplesPerSec, discontinuity);
++	timing.trimmed += placement.skip;
++
++	// a pause between two sounds is a gap as well, so only the short ones are counted
++	if (placement.gap && placement.gap < format.nSamplesPerSec / 10) {
++		timing.gaps++;
++		timing.gap_frames += placement.gap;
++	}
++
+ 	if (placement.skip == frames)
+ 		return true;
+ 
+@@ -192,11 +227,52 @@ bool AudioCaptureHelper::SubmitPacket(UINT64 timestamp, float *samples, UINT32 f
+ 	return forwarded;
+ }
+ 
++void AudioCaptureHelper::ReportTiming()
++{
++	timing_reported = GetTickCount64();
++	if (!timing.corrected && !timing.dropped && !timing.gaps && !timing.ahead && !timing.trimmed)
++		return;
++
++	info("timing of pid %lu: %u timestamps corrected, %u held packets dropped, %u short gaps of %llu frames in all, %llu frames trimmed, %u timestamps ahead of the clock",
++	     pid, timing.corrected, timing.dropped, timing.gaps, timing.gap_frames, timing.trimmed, timing.ahead);
++	timing = {};
++}
++
++bool AudioCaptureHelper::ForwardCapturedPacket(UINT64 timestamp, BYTE *data, UINT32 frames, DWORD flags,
++					       UINT64 now, UINT64 queued_frames, bool &batch_start)
++{
++	if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
++		warn("data discontinuity flag set");
++
++	if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) {
++		pending_packet.frames = 0;
++		packet_timeline.MarkGap();
++		warn("timestamp error flag set - dropping packet");
++		return true;
++	}
++
++	if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || data == nullptr) {
++		silence_buffer.assign(static_cast<std::size_t>(frames) * format.nChannels, 0.0f);
++		data = reinterpret_cast<BYTE *>(silence_buffer.data());
++	}
++
++	const bool forwarded = ForwardToMixers(timestamp, data, frames, flags, now, queued_frames, batch_start);
++	batch_start = false;
++	return forwarded;
++}
++
+ void AudioCaptureHelper::ForwardPacket()
+ {
++	if (GetTickCount64() - timing_reported >= timing_report_interval)
++		ReportTiming();
++
+ 	UINT32 num_frames = 0;
+ 	THROW_IF_FAILED(capture_client->GetNextPacketSize(&num_frames));
+ 
++	bool batch_start = true;
++	queued_packets.clear();
++	queued_samples.clear();
++	UINT64 queued_frames = 0;
+ 	while (num_frames > 0) {
+ 		BYTE *new_data = nullptr;
+ 		DWORD flags = 0;
+@@ -207,26 +283,28 @@ void AudioCaptureHelper::ForwardPacket()
+ 
+ 		// a success code that hands back no buffer: there is nothing to read and nothing to release
+ 		if (hr == AUDCLNT_S_BUFFER_EMPTY || num_frames == 0)
+-			return;
++			break;
+ 
++		const UINT64 now = os_gettime_ns() / 100;
++		const bool needs_arrival = ahead_run >= ahead_limit - 1 &&
++			!(flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) && !PacketTimeline::IsPlausible(qpc_position, now);
+ 		bool forwarded = true;
+-		if (flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) {
+-			pending_packet.frames = 0;
+-			packet_timeline.MarkGap();
+-			warn("timestamp error flag set - dropping packet");
+-		} else if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) || new_data == nullptr) {
+-			// Forward explicit silence instead of a gap: the mixer keeps a
+-			// continuous timeline and OBS never sees the stream stall.
+-			silence_buffer.assign((std::size_t)num_frames * format.nChannels, 0.0f);
+-			forwarded = ForwardToMixers(qpc_position, reinterpret_cast<BYTE *>(silence_buffer.data()),
+-						    num_frames, flags);
++		if (!queued_packets.empty() || (needs_arrival && (batch_start || ahead_run < ahead_limit))) {
++			// a packet buffer is only valid until release; keep the remainder of this batch for the arrival anchor
++			const auto offset = queued_samples.size();
++			if (new_data && !(flags & (AUDCLNT_BUFFERFLAGS_SILENT | AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR))) {
++				const auto samples = static_cast<std::size_t>(num_frames) * format.nChannels;
++				queued_samples.resize(offset + samples);
++				forwarded = CopyFromEngineBuffer(queued_samples.data() + offset, new_data, samples * sizeof(float));
++			} else if (!new_data) {
++				flags |= AUDCLNT_BUFFERFLAGS_SILENT;
++			}
++			queued_packets.push_back({qpc_position, num_frames, flags, offset});
++			queued_frames += num_frames;
+ 		} else {
+-			forwarded = ForwardToMixers(qpc_position, new_data, num_frames, flags);
++			forwarded = ForwardCapturedPacket(qpc_position, new_data, num_frames, flags, now, num_frames, batch_start);
+ 		}
+ 
+-		if (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY)
+-			warn("data discontinuity flag set");
+-
+ 		THROW_IF_FAILED(capture_client->ReleaseBuffer(num_frames));
+ 
+ 		// the audio service took the buffer away in the middle of the read, which is what a program that exits or a device that changes does; this client is done for, so the capture starts over on a fresh one
+@@ -235,6 +313,16 @@ void AudioCaptureHelper::ForwardPacket()
+ 
+ 		THROW_IF_FAILED(capture_client->GetNextPacketSize(&num_frames));
+ 	}
++
++	const UINT64 now = os_gettime_ns() / 100;
++	for (const auto &packet : queued_packets) {
++		BYTE *data = nullptr;
++		if (!(packet.flags & (AUDCLNT_BUFFERFLAGS_SILENT | AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR)))
++			data = reinterpret_cast<BYTE *>(queued_samples.data() + packet.sample_offset);
++		if (!ForwardCapturedPacket(packet.timestamp, data, packet.frames, packet.flags, now, queued_frames, batch_start))
++			THROW_HR(AUDCLNT_E_DEVICE_INVALIDATED);
++		queued_frames -= packet.frames;
++	}
+ }
+ 
+ void AudioCaptureHelper::Capture()
+@@ -243,6 +331,7 @@ void AudioCaptureHelper::Capture()
+ 	THROW_IF_FAILED(client->Start());
+ 	packet_timeline = {};
+ 	pending_packet.frames = 0;
++	ahead_run = 0;
+ 	last_error = S_OK;
+ 
+ 	bool shutdown = false;
+@@ -297,6 +386,7 @@ void AudioCaptureHelper::CaptureSafe()
+ 
+ 		try {
+ 			Capture();
++			ReportTiming();
+ 			return;
+ 		} catch (const wil::ResultException &e) {
+ 			last_error = e.GetErrorCode();
+@@ -312,6 +402,8 @@ void AudioCaptureHelper::CaptureSafe()
+ 			error("capture failed for pid %lu: unknown error", pid);
+ 		}
+ 
++		ReportTiming();
++
+ 		// A capture that ran for a while before dying is a fresh failure
+ 		// (device change, target exit), not another round of the same one:
+ 		// re-attach promptly instead of continuing a grown backoff.
+diff --git a/src/audio-capture-helper.hpp b/src/audio-capture-helper.hpp
+--- a/src/audio-capture-helper.hpp
++++ b/src/audio-capture-helper.hpp
+@@ -82,6 +82,29 @@ private:
+ 		bool discontinuity = false;
+ 	} pending_packet;
+ 
++	struct QueuedPacket {
++		UINT64 timestamp;
++		UINT32 frames;
++		DWORD flags;
++		std::size_t sample_offset;
++	};
++	std::vector<QueuedPacket> queued_packets;
++	std::vector<float> queued_samples;
++
++	// what the timeline did to the packets of this capture since the last report line in the log
++	struct TimingReport {
++		UINT32 corrected = 0;
++		UINT32 dropped = 0;
++		UINT32 gaps = 0;
++		UINT32 ahead = 0;
++		UINT64 trimmed = 0;
++		UINT64 gap_frames = 0;
++	} timing;
++	ULONGLONG timing_reported = 0;
++
++	// packets in a row whose timestamp was ahead of the clock
++	UINT32 ahead_run = 0;
++
+ 	// S_OK while the stream is running (or has not failed yet); otherwise the
+ 	// HRESULT of the most recent failed attempt. Read by the properties dialog
+ 	// so a capture that keeps failing is visible outside the log.
+@@ -97,9 +120,13 @@ private:
+ 	void InitCapture();
+ 
+ 	// false when a mixer could not read the packet out of the buffer of the audio engine
+-	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags);
++	bool ForwardToMixers(UINT64 qpc_position, BYTE *data, UINT32 num_frames, DWORD flags,
++							 UINT64 now, UINT64 queued_frames, bool batch_start);
+ 	bool SubmitPacket(UINT64 timestamp, float *samples, UINT32 frames, bool discontinuity);
++	bool ForwardCapturedPacket(UINT64 timestamp, BYTE *data, UINT32 frames, DWORD flags,
++				   UINT64 now, UINT64 queued_frames, bool &batch_start);
+ 	void ForwardPacket();
++	void ReportTiming();
+ 
+ 	void Capture();
+ 	void CaptureSafe();
+diff --git a/src/packet-timeline.hpp b/src/packet-timeline.hpp
+--- a/src/packet-timeline.hpp
++++ b/src/packet-timeline.hpp
+@@ -7,11 +7,14 @@
+ struct PacketPlacement {
+ 	std::uint64_t timestamp;
+ 	std::uint32_t skip;
++	// frames left empty between the cursor and this packet
++	std::uint64_t gap;
+ };
+ 
+ class PacketTimeline {
+ 	static constexpr std::uint64_t ticks_per_second = 10'000'000;
+ 	static constexpr std::uint64_t max_jitter = 20'000; // 2 ms
++	static constexpr std::uint64_t max_arrival_drift = 50'000; // 5 ms
+ 	std::uint64_t next_frame = 0;
+ 	bool continuous = false;
+ 
+@@ -46,6 +49,21 @@ public:
+ 		return timestamp <= now || timestamp - now <= max_jitter;
+ 	}
+ 
++	std::uint64_t ArrivalTimestamp(std::uint64_t now, std::uint64_t queued_frames, std::uint32_t rate,
++				       bool batch_start, bool reanchor) const
++	{
++		// only a batch's first packet can correct drift against the arrival clock
++		if (HasAnchor() && !batch_start && !reanchor)
++			return ToTimestamp(next_frame, rate);
++
++		const auto duration = ToTimestamp(queued_frames, rate);
++		const auto arrival_frame = ToFrame(now > duration ? now - duration : 0, rate);
++		if (continuous && !reanchor && IsClose(arrival_frame, next_frame, max_arrival_drift * rate / ticks_per_second))
++			return ToTimestamp(next_frame, rate);
++
++		return ToTimestamp(arrival_frame, rate);
++	}
++
+ 	bool IsForwardJump(std::uint64_t timestamp, std::uint32_t frames, std::uint32_t rate) const
+ 	{
+ 		auto frame = ToFrame(timestamp, rate);
+@@ -77,16 +95,19 @@ public:
+ 			frame = next_frame;
+ 
+ 		std::uint32_t skip = 0;
++		std::uint64_t gap = 0;
+ 		if (frame < next_frame) {
+ 			auto overlap = next_frame - frame;
+ 			if (overlap >= frames)
+-				return {timestamp, frames};
++				return {timestamp, frames, 0};
+ 			skip = static_cast<std::uint32_t>(overlap);
+ 			frame = next_frame;
++		} else if (HasAnchor()) {
++			gap = frame - next_frame;
+ 		}
+ 
+ 		next_frame = frame + frames - skip;
+ 		continuous = true;
+-		return {ToTimestamp(frame, rate), skip};
++		return {ToTimestamp(frame, rate), skip, gap};
+ 	}
+ };

@@ -205,7 +205,7 @@ namespace ReplayKitHelper
                     string root = path == "/open-screenshot-folder" ? Screenshots.Folder(create: true) : path == "/open-gif-folder" ? GifExports.Folder(true) : Path.GetFullPath(AppConfig.GetClipDir());
                     if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip folder not found" }); return false; }
                     // dedupe: if explorer already has the clip folder open, raise it instead of spawning another window. falls thru to the normal launch path if the com probe fails or no match is found.
-                    var existing = GetExplorerHwndForPath(root);
+                    var existing = Explorer.GetExplorerHwndForPath(root);
                     if (existing != IntPtr.Zero)
                     {
                         bool focused2 = Native.FocusHwnd(existing);
@@ -224,7 +224,7 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
                 if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
-                try { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = RevealInExplorer(selected.Full) }); }
+                try { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = Explorer.RevealInExplorer(selected.Full) }); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
             }
@@ -241,7 +241,7 @@ namespace ReplayKitHelper
                     if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot);
                     else if (path == "/screenshots/rename") answer["name"] = Screenshots.Rename(shot, query.ContainsKey("to") ? query["to"] : null);
                     else if (path == "/screenshots/copy") Screenshots.Copy(shot);
-                    else answer["focused"] = RevealInExplorer(shot);
+                    else answer["focused"] = Explorer.RevealInExplorer(shot);
                     HttpResponse.SendJson(stream, 200, answer);
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException || ex is Newtonsoft.Json.JsonException)
@@ -364,7 +364,7 @@ namespace ReplayKitHelper
                         if (path == "/gifs/delete") answer["kept"] = GifExports.Delete(gif);
                         else if (path == "/gifs/rename") answer["name"] = GifExports.Rename(gif, Q("to"));
                         else if (path == "/gifs/copy") GifExports.Copy(gif);
-                        else answer["focused"] = RevealInExplorer(gif);
+                        else answer["focused"] = Explorer.RevealInExplorer(gif);
                     }
                     HttpResponse.SendJson(stream, 200, answer);
                 }

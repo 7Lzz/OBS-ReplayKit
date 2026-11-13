@@ -2,17 +2,19 @@
 
 param(
     [string]$Path = '',
-    [string]$SweepDirs = ''
+    [string]$SweepDirs = '',
+    [string]$SettingsFile = '',
+    [string]$ConfigFile = ''
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
 $scriptDir = $PSScriptRoot
 $allowedExts = @('.mp4', '.mkv', '.mov')
 $scratchDir = Join-Path $env:TEMP 'ReplayKit\scratch'
-$sweepStatePath = Join-Path $scratchDir 'hevc_sweep.json'
+$sweepStateDir = Join-Path $scratchDir 'hevc-sweeps'
 $logPath = Join-Path $env:TEMP 'ReplayKit\logs\hevc_tag_fix.log'
 # standalone script (see file header), so it cant rely on the main helpers startup directory creation -- this can be the very first ReplayKit process to touch %temp% on a given run.
-foreach ($__dir in @((Split-Path -Parent $sweepStatePath), (Split-Path -Parent $logPath))) {
+foreach ($__dir in @($scratchDir, (Split-Path -Parent $logPath))) {
     if (-not (Test-Path -LiteralPath $__dir)) { try { [void](New-Item -ItemType Directory -Path $__dir -Force) } catch {} }
 }
 
@@ -24,20 +26,16 @@ function Write-FixLog([string]$msg) {
     } catch {}
 }
 
-function Get-ClipDirFromHelperConfig {
-    # mirrors the helpers own Get-ClipDir (same json, same defualt); reading it directly here avoids dot-sourcing the whole module chain for one string.
-    $default = Join-Path $env:USERPROFILE 'Videos'
-    # the config sits in the replaykit folder, two levels above this script; an install from before that move keeps it beside the helper
-    $cfgPath = [System.IO.Path]::GetFullPath((Join-Path $scriptDir '..\..\helper_config.json'))
-    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = [System.IO.Path]::GetFullPath((Join-Path $scriptDir '..\helper\helper_config.json')) }
-    if (-not (Test-Path -LiteralPath $cfgPath)) { return $default }
-    try {
-        $cfg = Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
-        if ($cfg.clipDir -and (Test-Path -LiteralPath ([string]$cfg.clipDir))) {
-            return [string]$cfg.clipDir
-        }
-    } catch {}
-    return $default
+function Get-ClipDir {
+    # the order of the helper (AppConfig.GetClipDir): the folder picked in the settings, then the one helper_config.json carries, then Videos. lua hands over both files, since the saved state has moved before and this script cannot know where it is
+    foreach ($file in @($SettingsFile, $ConfigFile)) {
+        if (-not $file -or -not (Test-Path -LiteralPath $file)) { continue }
+        try {
+            $dir = [string](Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json).clipDir
+            if ($dir -and (Test-Path -LiteralPath $dir)) { return $dir }
+        } catch {}
+    }
+    return (Join-Path $env:USERPROFILE 'Videos')
 }
 
 function Get-ObsRecordingDir {
@@ -54,15 +52,8 @@ function Get-ObsRecordingDir {
 }
 
 function Resolve-Tool([string]$exeName) {
-    $primary = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\helper\$exeName"))
-    if (Test-Path -LiteralPath $primary) { return $primary }
-    foreach ($dir in @((Get-ClipDirFromHelperConfig), (Join-Path $env:USERPROFILE 'Videos'))) {
-        if ([string]::IsNullOrWhiteSpace($dir)) { continue }
-        $candidate = Join-Path $dir $exeName
-        if (Test-Path -LiteralPath $candidate) { return [System.IO.Path]::GetFullPath($candidate) }
-    }
-    $cmd = Get-Command $exeName -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source)) { return $cmd.Source }
+    $managed = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\helper\$exeName"))
+    if (Test-Path -LiteralPath $managed -PathType Leaf) { return $managed }
     return $null
 }
 
@@ -184,33 +175,49 @@ function Repair-WithRetry([string]$file) {
 }
 
 function Invoke-Sweep([string[]]$dirs) {
-    $watermark = [DateTime]::MinValue
-    if (Test-Path -LiteralPath $sweepStatePath) {
-        try {
-            $state = Get-Content -LiteralPath $sweepStatePath -Raw | ConvertFrom-Json
-            if ($state.lastSweepUtc) { $watermark = [DateTime]::Parse($state.lastSweepUtc).ToUniversalTime() }
-        } catch {}
+    if (-not $script:Ffmpeg -or -not $script:Ffprobe) {
+        Write-FixLog 'skipped HEVC sweep: the ReplayKit FFmpeg tools are missing'
+        return
     }
-
+    [void][IO.Directory]::CreateDirectory($sweepStateDir)
     $seenDirs = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
-    $sweepStart = [DateTime]::UtcNow
     foreach ($dir in $dirs) {
         if ([string]::IsNullOrWhiteSpace($dir)) { continue }
-        $full = [System.IO.Path]::GetFullPath($dir)
-        if (-not $seenDirs.Add($full)) { continue }
-        if (-not (Test-Path -LiteralPath $full)) { continue }
-        foreach ($ext in $allowedExts) {
-            Get-ChildItem -LiteralPath $full -Filter "*$ext" -File -ErrorAction SilentlyContinue | ForEach-Object {
-                if ($_.LastWriteTimeUtc -gt $watermark) {
-                    Repair-OneFile $_.FullName
+        $progress = $null
+        try {
+            $full = [IO.Path]::GetFullPath($dir)
+            if ($full.Length -gt [IO.Path]::GetPathRoot($full).Length) { $full = $full.TrimEnd('\', '/') }
+            if (-not $seenDirs.Add($full) -or -not (Test-Path -LiteralPath $full -PathType Container)) { continue }
+
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try { $key = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($full.ToUpperInvariant()))).Replace('-', '') }
+            finally { $sha.Dispose() }
+            $statePath = Join-Path $sweepStateDir ($key + '.sweep')
+            # the same folder is only swept by one worker at a time
+            $progress = [IO.File]::Open($statePath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+            $sweepStart = [DateTime]::UtcNow.Ticks
+            $watermark = 0L
+            $saved = [byte[]]::new(8)
+            if ($progress.Length -eq $saved.Length -and $progress.Read($saved, 0, $saved.Length) -eq $saved.Length) {
+                $ticks = [BitConverter]::ToInt64($saved, 0)
+                if ($ticks -gt 0 -and $ticks -le $sweepStart) { $watermark = $ticks }
+            }
+
+            foreach ($ext in $allowedExts) {
+                Get-ChildItem -LiteralPath $full -Filter "*$ext" -File -ErrorAction Stop | ForEach-Object {
+                    if ($_.LastWriteTimeUtc.Ticks -gt $watermark) { Repair-OneFile $_.FullName }
                 }
             }
+            $saved = [BitConverter]::GetBytes($sweepStart)
+            $progress.Position = 0
+            $progress.Write($saved, 0, $saved.Length)
+            $progress.SetLength($saved.Length)
+        } catch {
+            Write-FixLog "HEVC sweep could not finish for $dir : $($_.Exception.Message)"
+        } finally {
+            if ($progress) { $progress.Dispose() }
         }
     }
-
-    try {
-        @{ lastSweepUtc = $sweepStart.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $sweepStatePath -Encoding utf8
-    } catch {}
 }
 
 if ($Path) {
@@ -226,7 +233,7 @@ if ($Path) {
     $dirs = $SweepDirs -split ';' | Where-Object { $_ }
     Invoke-Sweep $dirs
 } else {
-    $clipDir = Get-ClipDirFromHelperConfig
+    $clipDir = Get-ClipDir
     $recDir  = Get-ObsRecordingDir
     Invoke-Sweep @($clipDir, $recDir)
 }
