@@ -1,7 +1,5 @@
 <!-- shared partial (helper #include target: editor-tools). the bar on the left of the preview in the clip editor and the panel it opens: subtitles (made by hand or by the speech engine of the helper), audio (the import moved here from the toolbar) and a voiceover recorded from a microphone. the subtitle that is selected, and the look of its row, is edited in the panel on the right. the subtitles themselves live in the lanes module, which owns the timeline, the history and the drafts; this file only drives them. depends on _color-picker being on the page -->
 <style>
-  /* a font of the subtitles that windows does not have, shipped with replaykit; the helper hands the same file to the saved copy */
-  @font-face { font-family: "Fredoka One"; src: url(/fonts/FredokaOne-Regular.ttf) format("truetype"); font-display: block; }
   /* the bar and the panel stand against the left edge of the window, square: the bar in the window colour, the panel it opens in the panel colour the toolbar shares, a hairline toward the video, and the groups inside drawn straight on the panel */
   .ed-left { display: flex; min-height: 0; background: var(--bg_window); border-right: 1px solid var(--grey4-solid, var(--grey4)); }
   .ed-rail { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; width: 68px; padding: 8px 6px; }

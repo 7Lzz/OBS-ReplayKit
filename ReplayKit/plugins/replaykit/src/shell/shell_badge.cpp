@@ -3,6 +3,7 @@
 #include "shell/shell_badge.hpp"
 
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_tip.hpp"
 
 namespace rk {
@@ -51,6 +52,12 @@ void ShellBadge::SetArmed(bool armed)
 	if (armed == m_armed)
 		return;
 	m_armed = armed;
+	SizeToContent();
+	update();
+}
+
+void ShellBadge::FontChanged()
+{
 	SizeToContent();
 	update();
 }
@@ -233,7 +240,7 @@ void ShellBadge::paintEvent(QPaintEvent *)
 
 QFont ShellBadge::ChipFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setWeight(QFont::DemiBold);
 	return f;
@@ -241,7 +248,7 @@ QFont ShellBadge::ChipFont()
 
 QFont ShellBadge::LabelFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(13);
 	f.setWeight(QFont::DemiBold);
 	return f;

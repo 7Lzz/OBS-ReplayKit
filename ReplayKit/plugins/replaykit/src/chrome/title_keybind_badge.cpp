@@ -3,6 +3,7 @@
 #include "chrome/title_keybind_badge.hpp"
 
 #include "core/keybind_label.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_button.hpp"
 
 namespace rk {
@@ -150,14 +151,14 @@ void TitleKeybindBadge::paintEvent(QPaintEvent *)
 
 QFont TitleKeybindBadge::ChipFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(10);
 	return f;
 }
 
 QFont TitleKeybindBadge::NameFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setBold(true);
 	return f;

@@ -6,6 +6,7 @@
 
 #include "core/draw_util.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 
 namespace rk {
 
@@ -169,7 +170,7 @@ void NotifyTip::paintEvent(QPaintEvent *)
 
 QFont NotifyTip::TipFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setWeight(kTipWeight);
 	f.setHintingPreference(QFont::PreferNoHinting);

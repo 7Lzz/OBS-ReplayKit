@@ -148,6 +148,8 @@ namespace ReplayKitHelper
                 ["gameRecognition"] = true,
                 // how the date line of the clip and screenshot cards reads: the time ago, the date, the date and time, or the short date of the region
                 ["cardDateFormat"] = "date",
+                // the font every page and the native chrome draw their text in, one of Fonts.Families
+                ["uiFont"] = "Segoe UI",
                 // how the clip editor behaves: whether it starts playing and loops the selection, how far the arrow keys skip in seconds, the mouse wheel zoom and how a zoomed in video is drawn (smooth or sharp)
                 ["editorAutoplay"] = false,
                 ["editorLoopPreview"] = false,
@@ -625,6 +627,7 @@ namespace ReplayKitHelper
                 ["showCodecTags"] = GetBoolSetting(data, "showCodecTags", defaults["showCodecTags"].Value<bool>()),
                 ["gameRecognition"] = GetBoolSetting(data, "gameRecognition", defaults["gameRecognition"].Value<bool>()),
                 ["cardDateFormat"] = GetEnumSetting(data, "cardDateFormat", defaults["cardDateFormat"].Value<string>(), new[] { "relative", "date", "datetime", "short" }),
+                ["uiFont"] = GetEnumSetting(data, "uiFont", defaults["uiFont"].Value<string>(), Fonts.Families),
                 ["editorAutoplay"] = GetBoolSetting(data, "editorAutoplay", defaults["editorAutoplay"].Value<bool>()),
                 ["editorLoopPreview"] = GetBoolSetting(data, "editorLoopPreview", defaults["editorLoopPreview"].Value<bool>()),
                 ["editorSeekStep"] = GetIntSetting(data, "editorSeekStep", defaults["editorSeekStep"].Value<int>(), 1, 60),

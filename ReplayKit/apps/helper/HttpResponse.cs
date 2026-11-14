@@ -108,6 +108,26 @@ namespace ReplayKitHelper
             catch { return html; }
         }
 
+        // the shipped fonts and the font of the interface before </head>, after the :root of the page so its own --font and --font_family give way; a settings file that cannot be read still gets the faces, so a page naming a shipped font draws it
+        private static string InjectFontStyle(string html)
+        {
+            int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return html;
+            string rules = Fonts.FaceRules();
+            try { rules += Fonts.InterfaceRules(ReplaykitSettings.Normalize(ReplaykitSettings.ReadSettings())["uiFont"]?.Value<string>()); }
+            catch (Exception ex) { Log.Write("HttpResponse.InjectFontStyle: " + ex.Message); }
+            return html.Insert(i, "<style id=\"rk-font\">" + rules + "</style>");
+        }
+
+        // the fonts a picker offers, for pages that name the list, so no page keeps a copy of its own
+        private static string InjectFontList(string html)
+        {
+            if (html.IndexOf("RK_FONTS", StringComparison.Ordinal) < 0) return html;
+            int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return html;
+            return html.Insert(i, "<script>window.RK_FONTS=" + JsonConvert.SerializeObject(Fonts.Families) + ";</script>");
+        }
+
         // every page keeps tab from walking the focus through its controls, which only lit up whatever it landed on in an app driven by the pointer and keybinds; the key still reaches the page, so a keybind field can record it, and the guard keeps a page that takes in the scripts of another (the editor) to one listener
         private const string NoTabTag = "<script>(function(){if(window.__rkNoTab)return;window.__rkNoTab=true;window.addEventListener(\"keydown\",function(e){if(e.key===\"Tab\")e.preventDefault();},true);})();</script>";
 
@@ -265,7 +285,7 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectNoTab(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f))))))));
+                        string html = InjectNoTab(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f))))))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var hash = SHA256.Create())

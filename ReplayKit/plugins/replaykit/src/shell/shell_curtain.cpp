@@ -3,6 +3,7 @@
 #include "shell/shell_curtain.hpp"
 
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 
 namespace rk {
 
@@ -47,10 +48,10 @@ void ShellCurtain::paintEvent(QPaintEvent *)
 	p.fillRect(rect(), g_chromeBg);
 	if (!m_title.isEmpty()) {
 		p.setRenderHint(QPainter::TextAntialiasing, true);
-		QFont head("Segoe UI");
+		QFont head(UiFontFamily());
 		head.setPixelSize(16);
 		head.setWeight(QFont::DemiBold);
-		QFont note("Segoe UI");
+		QFont note(UiFontFamily());
 		note.setPixelSize(12);
 		p.setFont(head);
 		p.setPen(ChromeInk(0.86));

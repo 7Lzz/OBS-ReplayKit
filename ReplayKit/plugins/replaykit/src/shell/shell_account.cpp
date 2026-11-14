@@ -8,6 +8,7 @@
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "shell/shell_state.hpp"
 #include "ui/anchored_panel.hpp"
 
@@ -128,7 +129,7 @@ void ShellAccountButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover
 	p.setPen(Qt::NoPen);
 	p.setBrush(fill);
 	p.drawEllipse(disc);
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(12);
 	f.setWeight(QFont::Bold);
 	p.setFont(f);

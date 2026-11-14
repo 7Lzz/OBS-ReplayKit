@@ -5,6 +5,7 @@
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "shell/shell_frame.hpp"
 #include "shell/shell_state.hpp"
 
@@ -28,7 +29,7 @@ public:
 		setModal(true);
 		{
 			QFont f = font();
-			f.setFamily("Segoe UI");
+			f.setFamily(UiFontFamily());
 			f.setPixelSize(13);
 			setFont(f);
 		}
@@ -55,10 +56,12 @@ public:
 			"#rkCard QPushButton:focus { border-color:%7; }"
 			"#rkOk { background:%9; border-color:%9; color:%10; }"
 			"#rkOk:hover { background:%11; border-color:%11; }"
-			"#rkOk:pressed { background:%9; }");
+			"#rkOk:pressed { background:%9; }"
+			// the stylesheet of obs names a family for every widget, which a font set on the dialog does not beat
+			"#rkCard QLabel, #rkCard QPushButton { font-family:'%12'; }");
 		qss = qss.arg(panel.name()).arg(brd.name()).arg(ink.name()).arg(muted.name())
 			  .arg(btnBg.name()).arg(btnBgHover.name()).arg(btnBorderHover.name())
-			  .arg(btnBg.darker(112).name()).arg(okBg.name()).arg(okInk.name()).arg(okBg2.name());
+			  .arg(btnBg.darker(112).name()).arg(okBg.name()).arg(okInk.name()).arg(okBg2.name()).arg(UiFontFamily());
 		setStyleSheet(qss);
 
 		auto *root = new QVBoxLayout(this);

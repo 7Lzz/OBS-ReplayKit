@@ -47,6 +47,7 @@ set(REPLAYKIT_SOURCES
     src/core/state.cpp
     src/core/state_files.cpp
     src/core/theme.cpp
+    src/core/ui_font.cpp
     src/core/window_state.cpp
 
     src/layout/controls_dock.cpp

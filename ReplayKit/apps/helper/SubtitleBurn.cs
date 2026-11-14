@@ -22,9 +22,7 @@ namespace ReplayKitHelper
         private const double ShadowBlur = 6;
         private const string ShadowAlpha = "&H33&";
 
-        private static readonly string[] Fonts = { "Arial", "Segoe UI", "Verdana", "Tahoma", "Trebuchet MS", "Impact", "Georgia", "Times New Roman", "Courier New", "Comic Sans MS", "Bahnschrift", "Consolas", "Fredoka One" };
-        // fonts windows does not have, shipped with replaykit; the ones a save uses are copied next to the subtitles for the ass filter to load
-        private static readonly Dictionary<string, string> BundledFonts = new Dictionary<string, string> { ["Fredoka One"] = "FredokaOne-Regular.ttf" };
+        // the shipped fonts a save uses are copied next to the subtitles for the ass filter to load
         private const string FontsFolder = "fonts";
         private static readonly Regex ColorRe = new Regex("^#[0-9a-f]{6}([0-9a-f]{2})?$", RegexOptions.CultureInvariant);
 
@@ -156,7 +154,7 @@ namespace ReplayKitHelper
             if (s == null) return null;
             var style = new Style();
             string font = s["font"]?.Type == JTokenType.String ? s["font"].Value<string>() : null;
-            if (Array.IndexOf(Fonts, font) < 0) return null;
+            if (!Fonts.IsKnown(font)) return null;
             style.Font = font;
             style.Size = Whole(s["size"], 16, 200, style.Size);
             style.BorderWidth = Whole(s["borderWidth"], 0, 20, style.BorderWidth);
@@ -353,8 +351,9 @@ namespace ReplayKitHelper
         {
             foreach (var row in _rows)
             {
-                if (!BundledFonts.TryGetValue(row.Style.Font, out string file)) continue;
-                string from = Path.Combine(Constants.APP_FONTS_DIR, file);
+                string file = Fonts.BundledFile(row.Style.Font);
+                if (file == null) continue;
+                string from = Fonts.BundledPath(row.Style.Font);
                 if (!File.Exists(from)) throw new InvalidOperationException("The " + row.Style.Font + " font is missing. Run the ReplayKit setup again.");
                 string to = Path.Combine(dir, FontsFolder, file);
                 Directory.CreateDirectory(Path.GetDirectoryName(to));

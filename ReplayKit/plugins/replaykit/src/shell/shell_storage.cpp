@@ -8,6 +8,7 @@
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_state.hpp"
 #include "shell/shell_storage_modal.hpp"
@@ -45,7 +46,7 @@ QColor UsageColour(qreal fraction)
 
 QFont UsedFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setWeight(QFont::DemiBold);
 	return f;
@@ -53,7 +54,7 @@ QFont UsedFont()
 
 QFont CompressFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(10);
 	f.setWeight(QFont::Medium);
 	return f;
@@ -61,7 +62,7 @@ QFont CompressFont()
 
 QFont LimitFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(10);
 	f.setWeight(QFont::Medium);
 	return f;

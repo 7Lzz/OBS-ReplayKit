@@ -1403,7 +1403,7 @@ namespace ReplayKitHelper
                 warnings.AddRange((audio["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             }
 
-            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, or interface layout changes require OBS to restart." : "";
+            string restartReason = restartObs ? "Recording quality, GPU-use, clip-size, codec, audio tracks, theme, font, or interface layout changes require OBS to restart." : "";
 
             return new JObject
             {

@@ -7,6 +7,7 @@
 
 #include "core/draw_util.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_projector.hpp"
 #include "shell/shell_title_button.hpp"
@@ -33,7 +34,7 @@ constexpr int kGrowMs = 130;
 
 QFont LabelFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(13);
 	f.setWeight(QFont::DemiBold);
 	f.setHintingPreference(QFont::PreferNoHinting);

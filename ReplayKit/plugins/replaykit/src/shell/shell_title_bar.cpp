@@ -12,6 +12,7 @@
 #include "core/helper_client.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_button.hpp"
 #include "notify/notify_panel.hpp"
 #include "shell/shell_badge.hpp"
@@ -117,7 +118,7 @@ void ShellUpdateButton::SetVersion(const QString &version)
 		return;
 	m_version = version;
 	if (!version.isEmpty())
-		setFixedWidth(qCeil(kUpdatePadLeft + kUpdateIcon + kUpdateGap + QFontMetricsF(LabelFont()).horizontalAdvance(Label()) + kUpdatePadRight));
+		SizeToLabel();
 	if (version.isEmpty())
 		ClearHover();
 	setVisible(!version.isEmpty());
@@ -156,9 +157,21 @@ void ShellUpdateButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
 	p.drawText(QRectF(textX, pill.top(), pill.right() - textX, pill.height()), Qt::AlignVCenter | Qt::AlignLeft, Label());
 }
 
+void ShellUpdateButton::FontChanged()
+{
+	if (!m_version.isEmpty())
+		SizeToLabel();
+	update();
+}
+
+void ShellUpdateButton::SizeToLabel()
+{
+	setFixedWidth(qCeil(kUpdatePadLeft + kUpdateIcon + kUpdateGap + QFontMetricsF(LabelFont()).horizontalAdvance(Label()) + kUpdatePadRight));
+}
+
 QFont ShellUpdateButton::LabelFont()
 {
-	QFont f(QStringLiteral("Segoe UI"));
+	QFont f(UiFontFamily());
 	f.setPixelSize(12);
 	f.setWeight(QFont::DemiBold);
 	return f;
@@ -399,6 +412,16 @@ void ShellTitleBar::LayoutChildren()
 	AnchoredPanel::FollowAll();
 }
 
+void ShellTitleBar::FontChanged()
+{
+	m_clip->FontChanged();
+	m_rec->FontChanged();
+	m_update->FontChanged();
+	m_obsUpdate->FontChanged();
+	LayoutChildren();
+	update();
+}
+
 void ShellTitleBar::resizeEvent(QResizeEvent *event)
 {
 	QWidget::resizeEvent(event);
@@ -461,6 +484,10 @@ void ShellTitleBar::paintEvent(QPaintEvent *)
 
 	// the name of the page keeps its colour when the window is not in front, so nothing in the bar greys out
 	p.setPen(ChromeInk(0.8));
+	// the size stays the one the stylesheet of obs gives the bar, only the family is the font of the interface
+	QFont pageFont = font();
+	pageFont.setFamily(UiFontFamily());
+	p.setFont(pageFont);
 	p.drawText(m_pageRect, Qt::AlignLeft | Qt::AlignVCenter, p.fontMetrics().elidedText(m_page, Qt::ElideRight, m_pageRect.width()));
 }
 

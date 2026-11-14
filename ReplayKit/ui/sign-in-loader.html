@@ -8,7 +8,7 @@
 <style>
   /* base is obs-default dark; the helper's injected rk-theme block overrides bg/color/color-scheme (with !important) for any non-default theme, so a light theme flips this page too */
   html { color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: var(--window, #1D1F26); color: var(--text, #FFFFFF); font: 13px "Segoe UI", system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; background: var(--window, #1D1F26); color: var(--text, #FFFFFF); font: 13px var(--font, "Segoe UI", system-ui, sans-serif); }
   .wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 18px; }
   .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line, #3C404D); border-top-color: var(--selected2, #476BD7); animation: r 0.8s linear infinite; }
   @keyframes r { to { transform: rotate(360deg); } }

@@ -15,6 +15,7 @@
 #include "core/open_clips_hotkey.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "core/window_state.hpp"
 #include "notify/clip_toast.hpp"
 #include "notify/notify_button.hpp"
@@ -220,6 +221,13 @@ void PollHelperSettings()
 			SyncStartMinimized(settingsBody);
 			RegisterOpenClipsHotkey(settingsBody);
 			ApplyNotifyThemeColors(settingsBody);
+			// what is sized to its text measures again, then every widget paints with the new family
+			if (UiFontApplySettings(settingsBody)) {
+				ShellFontChanged();
+				PositionAllTitleKeybindBadges();
+				for (QWidget *w : QApplication::allWidgets())
+					w->update();
+			}
 			ClipToastApplySettings(settingsBody);
 			RefreshTitleKeybindBadges(settingsBody);
 			ShellApplySettings(settingsBody);

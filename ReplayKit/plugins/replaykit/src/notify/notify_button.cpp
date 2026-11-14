@@ -5,6 +5,7 @@
 #include "core/draw_util.hpp"
 #include "core/helper_client.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_panel.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_title_button.hpp"
@@ -234,6 +235,7 @@ void NotifyButton::paintEvent(QPaintEvent *)
 	if (g_notifyUnread > 0) {
 		QString label = g_notifyUnread > 9 ? QString("9+") : QString::number(g_notifyUnread);
 		QFont f = font();
+		f.setFamily(UiFontFamily());
 		f.setPixelSize(8);
 		f.setBold(true);
 		p.setFont(f);

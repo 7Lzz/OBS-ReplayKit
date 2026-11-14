@@ -429,6 +429,12 @@ void ShellRepaintChrome()
 	ShellTintPreview();
 }
 
+void ShellFontChanged()
+{
+	if (g_shellTitle)
+		g_shellTitle->FontChanged();
+}
+
 // the two views that show clips: the clips view and the recent clips on home. a clip can only be playing fullscreen in one of them
 bool ShellShowsClips(ShellView view)
 {

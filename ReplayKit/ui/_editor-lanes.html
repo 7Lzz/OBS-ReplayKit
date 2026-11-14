@@ -999,7 +999,9 @@
     var SUB_MIN = 0.2;
     var SUB_TEXT_MAX = 300;
     var SUB_TITLE_MAX = 40;
-    var SUB_FONTS = ["Arial", "Bahnschrift", "Comic Sans MS", "Consolas", "Courier New", "Fredoka One", "Georgia", "Impact", "Segoe UI", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana"];
+    // the fonts the helper offers, the same list the font of the interface is picked from
+    var SUB_FONTS = window.RK_FONTS;
+    if (!SUB_FONTS) throw new Error("The font list was not served with this page.");
     // sizes are pixels of a 1080p picture, so the look is the same at any size the clip is saved at
     var SUB_RANGES = { size: [16, 200], borderWidth: [0, 20], radius: [0, 60], padX: [0, 80], padY: [0, 60], rotate: [-180, 180] };
     var SUB_SHADOW = { offset: 6, blur: 12, alpha: 0.8 };

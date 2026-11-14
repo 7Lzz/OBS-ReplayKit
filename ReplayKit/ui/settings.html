@@ -2024,6 +2024,10 @@
           <div class="label">Card Dates</div>
           <div class="field-wrap"><div class="combo" id="cardDateFormat" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
         </div>
+        <div class="form-row" data-search="font typeface text letters interface">
+          <div class="label">Font</div>
+          <div class="field-wrap"><div class="combo" id="uiFont" tabindex="0" role="combobox" aria-expanded="false" aria-label="Font"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        </div>
       </div>
     </section>
   </main>
@@ -2272,7 +2276,7 @@
     quality:"smaller_files",
   };
   // encoder/video changes use the restart path. clip length and motion blur apply through runtime settings. recordingScaleMode + downscaleHeight apply live (helper stops outputs, re-applies video settings, restarts them); only downscaleFilter needs an OBS restart.
-  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "recordingSeparateAudioTracks", "theme", "themeCustom", "interfaceLayout"]);
+  const restartSettingKeys = new Set(["recordingPreset", "compressionMode", "codecPreference", "fpsNumerator", "downscaleFilter", "recordingSeparateAudioTracks", "theme", "themeCustom", "interfaceLayout", "uiFont"]);
 
   const els = {
     recordingPreset: document.getElementById("recordingPreset"),
@@ -2425,6 +2429,7 @@
     showCodecTags: document.getElementById("showCodecTags"),
     gameRecognition: document.getElementById("gameRecognition"),
     cardDateFormat: document.getElementById("cardDateFormat"),
+    uiFont: document.getElementById("uiFont"),
     debugLoggingEnabled: document.getElementById("debugLoggingEnabled"),
     autoDeleteLogsOnLaunch: document.getElementById("autoDeleteLogsOnLaunch"),
     autoDeleteLogsOnLaunchRow: document.getElementById("autoDeleteLogsOnLaunchRow"),
@@ -2496,6 +2501,10 @@
     { value:"short", label:"Short date", blurb:"Like " + cardDateSample.toLocaleDateString() + "." },
     { value:"relative", label:"Time ago", blurb:"Like 3 days ago." }
   ]);
+  // the same fonts the subtitles of the editor offer, from the helper, each shown in its own letters
+  const UI_FONTS = window.RK_FONTS;
+  if (!UI_FONTS) throw new Error("The font list was not served with this page.");
+  fillCombo(els.uiFont, UI_FONTS.map((family) => ({ value:family, label:family, font:family })));
   fillCombo(els.clipAntialiasing, [
     { value:"none", label:"None", blurb:"Play videos without extra edge smoothing." },
     { value:"msaa", label:"MSAA", blurb:"Sharper edges and less shimmer when videos are scaled down. Uses more GPU power." },
@@ -2976,7 +2985,7 @@
     const disabled = option.disabled ? " is-disabled" : "";
     return '<div class="combo-option' + selected + disabled + '" role="option" data-value="' +
       escapeHtml(option.value) + '" aria-selected="' + (option.value === selectedValue ? "true" : "false") + '">' +
-      '<span>' + escapeHtml(option.label) + '</span></div>';
+      '<span' + (option.font ? ' style="font-family:&quot;' + escapeHtml(option.font) + '&quot;, sans-serif"' : '') + '>' + escapeHtml(option.label) + '</span></div>';
   }
 
   function updateComboNote(combo, value) {
@@ -3028,7 +3037,9 @@
     const options = comboOptions(combo);
     const value = comboValue(combo);
     const option = options.find((o) => o.value === value) || options[0] || { label:"" };
-    combo.querySelector(".combo-label").textContent = option.label || "";
+    const label = combo.querySelector(".combo-label");
+    label.textContent = option.label || "";
+    label.style.fontFamily = option.font ? '"' + option.font + '", sans-serif' : "";
     updateComboNote(combo);
     // rebuild the option list only when it actually changed. re-setting innerHTML recreates every .combo-option, which restarts the rk-option-in entrance animation -- refreshExternalSettings re-fills combos every 2s, so an open menu would visibly re-animate on a loop. value + options json fully determines the rendered markup.
     const menu = combo.querySelector(".combo-menu");
@@ -3845,6 +3856,7 @@
     els.showCodecTags.checked = !!state.showCodecTags;
     els.gameRecognition.checked = !!settingOr("gameRecognition");
     setComboValue(els.cardDateFormat, ["relative", "datetime", "short"].includes(state.cardDateFormat) ? state.cardDateFormat : SETTING_DEFAULTS.cardDateFormat, false);
+    setComboValue(els.uiFont, settingOr("uiFont"), false);
     els.debugLoggingEnabled.checked = !!state.debugLoggingEnabled;
     els.autoDeleteLogsOnLaunch.checked = !!settingOr("autoDeleteLogsOnLaunch");
     syncDebugLoggingFields();
@@ -3947,6 +3959,7 @@
     state.showCodecTags = els.showCodecTags.checked;
     state.gameRecognition = els.gameRecognition.checked;
     state.cardDateFormat = ["relative", "datetime", "short"].includes(comboValue(els.cardDateFormat)) ? comboValue(els.cardDateFormat) : "date";
+    state.uiFont = comboValue(els.uiFont);
     state.debugLoggingEnabled = els.debugLoggingEnabled.checked;
     state.autoDeleteLogsOnLaunch = els.autoDeleteLogsOnLaunch.checked;
     state.autoCopyLink = els.autoCopyLink.checked;
@@ -4046,6 +4059,19 @@
         const delta = e.key === "ArrowDown" ? 1 : -1;
         const next = options[(current + delta + options.length) % options.length];
         setComboValue(combo, next.value, true);
+      } else if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // a letter goes to the next option that starts with it, the way the dropdowns of the editor do
+        e.preventDefault();
+        const letter = e.key.toLowerCase();
+        for (let offset = 1; offset <= options.length; offset++) {
+          const next = options[(current + offset) % options.length];
+          if (!String(next.label || "").trim().toLowerCase().startsWith(letter)) continue;
+          delete combo.dataset.noteValue;
+          setComboValue(combo, next.value, true);
+          const row = combo.querySelector(".combo-option.is-selected");
+          if (row && combo.classList.contains("is-open")) row.scrollIntoView({ block:"nearest" });
+          break;
+        }
       }
     });
   });
@@ -4061,7 +4087,7 @@
     if (btn) btn.classList.toggle("is-default", fieldAtDefault(key, def));
   }
 
-  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.deletedHistoryDays, els.browserSleepSeconds, els.editorSeekStep, els.gifFrameDelay, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat].forEach((combo) => {
+  [els.recordingPreset, els.compressionMode, els.codecPreference, els.recordingScaleMode, els.recordingBuffer, els.captureDisplay, els.downscaleTarget, els.downscaleFilter, els.screenshareCaptureMode, els.screenshareGameWindow, els.overlayStyle, els.bongoMode, els.inputOverlayKeyboard, els.inputOverlayMouse, els.storageLimit, els.storageCompressionType, els.deletedHistoryDays, els.browserSleepSeconds, els.editorSeekStep, els.gifFrameDelay, els.editorZoomScaling, els.clipAntialiasing, els.cardDateFormat, els.uiFont].forEach((combo) => {
     combo.addEventListener("combochange", () => {
       readUi();
       if (combo === els.recordingPreset) {

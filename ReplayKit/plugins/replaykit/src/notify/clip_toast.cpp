@@ -16,6 +16,7 @@
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 
 namespace rk {
 
@@ -52,7 +53,9 @@ QString FormatLength(int seconds)
 
 QFont ToastFont()
 {
-	QFont font(QStringLiteral("Segoe UI Semibold"));
+	QFont font;
+	// windows lists the semibold face of a family like segoe ui as a family of its own, and a family without one falls back to its own weight
+	font.setFamilies({UiFontFamily() + QStringLiteral(" Semibold"), UiFontFamily()});
 	font.setPixelSize(26);
 	font.setWeight(QFont::DemiBold);
 	return font;

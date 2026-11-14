@@ -15,6 +15,7 @@
 #include "core/json_lite.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
+#include "core/ui_font.hpp"
 #include "notify/notify_tip.hpp"
 #include "shell/shell_types.hpp"
 #include "shell/shell_views.hpp"
@@ -93,9 +94,9 @@ void ShellObsNav::showEvent(QShowEvent *event)
 {
 	QWidget::showEvent(event);
 	// the box takes the colours of the theme as they are now
-	m_search->setStyleSheet(QStringLiteral("QLineEdit { background:%1; border:1px solid %2; border-radius:4px; padding:0 9px; color:%3; font-family:'Segoe UI'; font-size:13px; selection-background-color:%4; selection-color:%5; }"
+	m_search->setStyleSheet(QStringLiteral("QLineEdit { background:%1; border:1px solid %2; border-radius:4px; padding:0 9px; color:%3; font-family:'%7'; font-size:13px; selection-background-color:%4; selection-color:%5; }"
 					       "QLineEdit:focus { border-color:%6; }")
-						.arg(g_chromeBg.name(), g_menuField.name(), QColor(g_notifyTipFg).name(), g_menuAccent.name(), g_menuOnAccent.name(), g_menuAccentLight.name()));
+						.arg(g_chromeBg.name(), g_menuField.name(), QColor(g_notifyTipFg).name(), g_menuAccent.name(), g_menuOnAccent.name(), g_menuAccentLight.name(), UiFontFamily()));
 	PlaceSearch();
 	PullSearch();
 	m_logo = ShellLogoPixmap(kIconPx, devicePixelRatioF());
@@ -236,7 +237,7 @@ void ShellObsNav::paintEvent(QPaintEvent *)
 
 QFont ShellObsNav::RowFont(bool selected)
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(14);
 	f.setWeight(selected ? kRowWeightSelected : kRowWeight);
 	f.setHintingPreference(QFont::PreferNoHinting);
@@ -245,7 +246,7 @@ QFont ShellObsNav::RowFont(bool selected)
 
 QFont ShellObsNav::VersionFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setWeight(QFont::Normal);
 	f.setHintingPreference(QFont::PreferNoHinting);
@@ -254,7 +255,7 @@ QFont ShellObsNav::VersionFont()
 
 QFont ShellObsNav::HeadFont()
 {
-	QFont f("Segoe UI");
+	QFont f(UiFontFamily());
 	f.setPixelSize(11);
 	f.setWeight(QFont::Bold);
 	f.setLetterSpacing(QFont::AbsoluteSpacing, 0.99);

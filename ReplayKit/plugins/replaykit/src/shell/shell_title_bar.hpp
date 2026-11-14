@@ -40,12 +40,14 @@ public:
 	// the version that is ready, or empty to take the button away
 	void SetVersion(const QString &version);
 	const QString &Version() const { return m_version; }
+	void FontChanged();
 
 protected:
 	void PaintGlyph(QPainter &p, const QRectF &pill, qreal hover) override;
 
 private:
 	static QFont LabelFont();
+	void SizeToLabel();
 	QString Label() const { return (m_kind == Kind::Obs ? QStringLiteral("OBS %1 Available") : QStringLiteral("ReplayKit %1 Available")).arg(m_version); }
 
 	Kind m_kind;
@@ -68,6 +70,8 @@ public:
 	bool IsCaptionAt(const QPoint &inTitle) const;
 
 	void LayoutChildren();
+	// the font of the interface changed, so the badges measure their text again and the bar lays them out with the new widths
+	void FontChanged();
 	// who is signed in to streamable, for the circle next to the bell
 	void SetAccount(const ShellAccountButton::Account &account);
 	// the arrows after the logo: one is dimmed while the history has nowhere to go that way

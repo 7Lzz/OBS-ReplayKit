@@ -10,6 +10,8 @@
 namespace rk {
 
 void ShellRepaintChrome();
+// the font of the interface changed: what the shell sized to its text measures again
+void ShellFontChanged();
 void ShellTintPreview();
 bool ShellShowsClips(ShellView view);
 void ShellLayout();

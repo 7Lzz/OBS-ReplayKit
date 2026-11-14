@@ -93,7 +93,7 @@ namespace ReplayKitHelper
             lock (SettingsStore.Gate)
             {
                 var settings = ReadSettings();
-                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings), ["updateReady"] = Update.ReadyVersion, ["obsUpdateReady"] = ObsUpdate.ReadyVersion };
+                return new JObject { ["ok"] = true, ["settings"] = settings, ["menuColors"] = ActiveMenuColors(settings), ["uiFontFile"] = Fonts.NativePath(settings["uiFont"]?.Value<string>()), ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings), ["updateReady"] = Update.ReadyVersion, ["obsUpdateReady"] = ObsUpdate.ReadyVersion };
             }
         }
 
@@ -124,6 +124,8 @@ namespace ReplayKitHelper
                     ["ok"] = true,
                     ["settings"] = settings,
                     ["menuColors"] = ActiveMenuColors(settings),
+                    // a shipped font the native chrome adds to qt before it draws with the family of uiFont
+                    ["uiFontFile"] = Fonts.NativePath(settings["uiFont"]?.Value<string>()),
                     ["clipBufferMode"] = ClipBuffer.EffectiveMode(settings),
                     ["systemMemoryGb"] = ClipBuffer.SystemMemoryGb,
                     // drives Install vs Uninstall on the Share Preview audio row in the Uninstall box
@@ -203,6 +205,8 @@ namespace ReplayKitHelper
             }
             // theme: obs only reads user.ini [Appearance] Theme= at startup, so a theme change needs a restart to reach obs (the dock + replaykit windows re-theme live on the fresh load). the Appearance tab shows a live preview meanwhile, the restart is what applies it
             if (previous["theme"]?.ToString() != settings["theme"]?.ToString()) return true;
+            // a page takes the font of the interface when it is served, so the font reaches every page at once through the restart that loads them all again
+            if (previous["uiFont"]?.ToString() != settings["uiFont"]?.ToString()) return true;
             // the clean layout is a frameless window with its own title bar, which the native plugin can only set up before obs shows its window
             if (previous["interfaceLayout"]?.ToString() != settings["interfaceLayout"]?.ToString()) return true;
             string theme = settings["theme"]?.ToString() ?? "default";

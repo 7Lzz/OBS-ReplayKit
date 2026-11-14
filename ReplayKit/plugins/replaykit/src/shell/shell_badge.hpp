@@ -45,6 +45,8 @@ public:
 	bool IsOpen() const { return m_open; }
 	// screen rect of the badge, where the menu hangs from
 	QRect GlobalRect() const;
+	// the font of the interface changed, so the badge measures its text again
+	void FontChanged();
 
 protected:
 	void enterEvent(QEnterEvent *event) override;
