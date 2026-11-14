@@ -41,7 +41,8 @@ namespace ReplayKitHelper
         {
             if (!IsKnown(family)) throw new ArgumentException("Unknown interface font: " + family);
             string stack = "\"" + family + "\",system-ui,sans-serif";
-            return ":root{--font:" + stack + ";--font_family:" + stack + ";}";
+            return ":root{--font:" + stack + ";--font_family:" + stack + ";}" +
+                ":where(button,input,select,textarea){font-family:inherit;}";
         }
     }
 }

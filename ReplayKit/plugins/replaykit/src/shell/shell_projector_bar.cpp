@@ -6,6 +6,7 @@
 #include <QVariantAnimation>
 
 #include "core/draw_util.hpp"
+#include "core/locale.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
 #include "notify/notify_tip.hpp"
@@ -208,14 +209,14 @@ private:
 	// the lock says Locked while it holds and Lock while it does not, and the wider word is what the button is sized for so it never changes width
 	QString Label(bool preview) const
 	{
-		return preview ? QStringLiteral("Preview") : (m_on ? QStringLiteral("Locked") : QStringLiteral("Lock"));
+		return preview ? Tr("Preview") : (m_on ? Tr("Locked") : Tr("Lock"));
 	}
 
 	static qreal TextWidth(const QString &text) { return QFontMetricsF(LabelFont()).horizontalAdvance(text); }
 
 	static int WidthFor(Kind kind)
 	{
-		const qreal text = TextWidth(kind == Kind::Preview ? QStringLiteral("Preview") : QStringLiteral("Locked"));
+		const qreal text = TextWidth(kind == Kind::Preview ? Tr("Preview") : Tr("Locked"));
 		return qCeil(11 + kIconSide + 8 + text + 12 + (kind == Kind::Preview ? kSwitchW + 12 : 0));
 	}
 
@@ -258,9 +259,9 @@ private:
 	void UpdateTip()
 	{
 		if (m_kind == Kind::Preview)
-			SetTip(m_held ? QStringLiteral("Studio Mode keeps the preview on") : m_on ? QStringLiteral("Turn the preview off") : QStringLiteral("Turn the preview on"));
+			SetTip(m_held ? Tr("Studio Mode keeps the preview on") : m_on ? Tr("Turn the preview off") : Tr("Turn the preview on"));
 		else
-			SetTip(m_on ? QStringLiteral("Unlock the preview") : QStringLiteral("Lock the preview so the scene and the overlay cannot be moved by accident"));
+			SetTip(m_on ? Tr("Unlock the preview") : Tr("Lock the preview so the scene and the overlay cannot be moved by accident"));
 	}
 
 	Kind m_kind;

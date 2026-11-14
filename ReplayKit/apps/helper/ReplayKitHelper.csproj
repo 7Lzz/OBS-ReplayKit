@@ -47,6 +47,8 @@
     <Compile Include="..\..\shared\TempLayout.cs" Link="TempLayout.cs" />
     <Compile Include="..\..\shared\ObsLaunch.cs" Link="ObsLaunch.cs" />
     <Compile Include="..\..\shared\HelperEndpoint.cs" Link="HelperEndpoint.cs" />
+    <Compile Include="..\..\shared\LanguageMatch.cs" Link="LanguageMatch.cs" />
+    <Compile Include="..\..\shared\MessageCatalog.cs" Link="MessageCatalog.cs" />
     <Compile Include="..\..\shared\VideoTools.cs" Link="VideoTools.cs" />
     <Compile Include="..\..\shared\OverlayRotation.cs" Link="OverlayRotation.cs" />
     <Compile Include="..\..\shared\AudioVolume.cs" Link="AudioVolume.cs" />

@@ -281,11 +281,11 @@
     const then = Date.parse(iso);
     if (!Number.isFinite(then)) return "";
     const secs = Math.max(0, (Date.now() - then) / 1000);
-    if (secs < 60) return "just now";
-    if (secs < 3600) return Math.floor(secs / 60) + "m ago";
-    if (secs < 86400) return Math.floor(secs / 3600) + "h ago";
+    if (secs < 60) return RK_T("just now");
+    if (secs < 3600) return RK_T("{count}m ago", { count: Math.floor(secs / 60) });
+    if (secs < 86400) return RK_T("{count}h ago", { count: Math.floor(secs / 3600) });
     const d = Math.floor(secs / 86400);
-    if (d < 30) return d + "d ago";
+    if (d < 30) return RK_T("{count}d ago", { count: d });
     return new Date(then).toLocaleDateString();
   }
 
@@ -298,7 +298,7 @@
     countEl.textContent = String(unread);
     markAllEl.disabled = unread === 0;
     clearAllEl.disabled = items.length === 0;
-    noteEl.textContent = items.length ? items.length + (items.length === 1 ? " notification" : " notifications") : "";
+    noteEl.textContent = items.length ? (items.length === 1 ? RK_T("1 notification") : RK_T("{count} notifications", { count: items.length })) : "";
   }
 
   function render() {
@@ -324,7 +324,7 @@
           "</div>" +
           (notes ? CHEVRON : '<span class="item-chevron-gap"></span>') +
         "</div>" +
-        (notes ? '<div class="item-drop"><div class="item-drop-inner"><div class="item-body">' + notes + "</div></div></div>" : "") +
+        (notes ? '<div class="item-drop"><div class="item-drop-inner"><div class="item-body" translate="no">' + notes + "</div></div></div>" : "") +
         "</div>";
     }).join("");
     applyHovers(listEl);

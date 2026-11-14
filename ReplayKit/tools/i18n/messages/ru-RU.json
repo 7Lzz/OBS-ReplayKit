@@ -1,0 +1,79 @@
+{
+  "capture.clipSaved": {
+    "source": "de65a9a7ac711c41",
+    "text": "Сохранены последние {length}"
+  },
+  "capture.clipSavedUnderSecond": {
+    "source": "a096fb52b31755cd",
+    "text": "Сохранено менее 1 с"
+  },
+  "capture.clipSavedUnknown": {
+    "source": "137d9c40106a6caf",
+    "text": "Клип сохранён"
+  },
+  "capture.recordingStarted": {
+    "source": "c9ad24bd74b949ab",
+    "text": "Запись начата"
+  },
+  "capture.recordingStopped": {
+    "source": "c7e743d4c20fed44",
+    "text": "Запись остановлена"
+  },
+  "clips.selectedCount": {
+    "source": "08e97b60a4dc6ce0",
+    "text": {
+      "few": "Выбрано {count} клипа",
+      "many": "Выбрано {count} клипов",
+      "one": "Выбран {count} клип",
+      "other": "Выбрано {count} клипа"
+    }
+  },
+  "clips.showInClips": {
+    "source": "89fca022ec0aa5c0",
+    "text": "Показать в клипах"
+  },
+  "common.close": {
+    "source": "d7cf5045c01b2eb9",
+    "text": "Закрыть"
+  },
+  "notifications.deletedHint": {
+    "source": "5d1e67f9e652a62b",
+    "text": "Возможно, он был удалён."
+  },
+  "notifications.notFound": {
+    "source": "9660581acdceaa01",
+    "text": "Уведомление не найдено"
+  },
+  "notifications.openReleasePage": {
+    "source": "943ca6886bf827b7",
+    "text": "Открыть страницу выпуска"
+  },
+  "picker.iconImage": {
+    "source": "a842c813ab15e1e8",
+    "text": "Выберите изображение значка"
+  },
+  "picker.importAudio": {
+    "source": "5ead5299907864ba",
+    "text": "Импорт звука"
+  },
+  "picker.importMedia": {
+    "source": "795636276d09ecd6",
+    "text": "Добавить GIF или изображение"
+  },
+  "picker.importVideo": {
+    "source": "2b9b8a67ab660949",
+    "text": "Добавить видео"
+  },
+  "picker.recordingFolder": {
+    "source": "2bbc70e8c4a90ae9",
+    "text": "Выберите папку записей"
+  },
+  "setup.uninstallTitle": {
+    "source": "6610dbeda8014a0b",
+    "text": "Удаление OBS ReplayKit"
+  },
+  "setup.windowTitle": {
+    "source": "2e0e00e71a75260a",
+    "text": "Установка OBS ReplayKit"
+  }
+}

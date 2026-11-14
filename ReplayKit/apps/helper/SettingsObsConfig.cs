@@ -209,7 +209,7 @@ namespace ReplayKitHelper
                 using var process = Process.Start(psi);
                 if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
                 if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = "powercfg did not finish." };
-                return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = "powercfg exited " + process.ExitCode + "." };
+                return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = Locales.T("powercfg exited {code}.", "code", process.ExitCode) };
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
@@ -262,7 +262,7 @@ namespace ReplayKitHelper
                 shortcut.Arguments = ObsLaunch.Arguments;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(obsPath);
                 shortcut.IconLocation = obsPath + ",0";
-                shortcut.Description = "Start OBS ReplayKit when Windows signs in.";
+                shortcut.Description = Locales.T("Start OBS ReplayKit when Windows signs in.");
                 shortcut.Save();
             }
             finally
@@ -323,7 +323,7 @@ namespace ReplayKitHelper
             var result = GetObsProfileParameterSafe(category, name);
             if (!result.Ok) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = result.Message };
             var value = result.Data?["parameterValue"];
-            if (value == null || value.Type == JTokenType.Null) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = "OBS did not return " + category + "." + name + "." };
+            if (value == null || value.Type == JTokenType.Null) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = Locales.T("OBS did not return {category}.{name}.", "category", category, "name", name) };
             return new JObject { ["ok"] = true, ["value"] = value.Value<string>(), ["message"] = "" };
         }
 
@@ -380,7 +380,7 @@ namespace ReplayKitHelper
                 lastMessage = "OBS still reports monitoring device '" + actualName + "' (" + actualId + ").";
             }
 
-            return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = "Could not set OBS monitoring device to " + deviceName + " after " + attempts + " attempts. " + lastMessage };
+            return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.T("Could not set OBS monitoring device to {device} after {attempts} attempts. {error}", "device", deviceName, "attempts", attempts, "error", lastMessage) };
         }
 
         // -- keybind <-> basic.ini hotkey json --

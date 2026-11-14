@@ -518,7 +518,7 @@
     var control = RKCombo.bind(wrap, onPick, Object.assign({ menuKeys:true, preview:onPreview, signal:EDITOR_SIGNAL }, extra));
     wrap.setOptions = function (list, value) {
       control.setOptions(list.map(function (entry) {
-        return { value:entry[0], label:entry[1], font:entry[2] || "", description:entry[3] || "" };
+        return { value:entry[0], label:entry[1], font:entry[2] || "", description:entry[3] || "", raw:!!entry[4] };
       }));
       control.value = value;
     };
@@ -816,10 +816,10 @@
       input.maxLength = 9;
       input.spellcheck = false;
       input.autocomplete = "off";
-      input.setAttribute("aria-label", label);
+      input.setAttribute("aria-label", RK_T(label));
       var dot = el("button", "ed-colordot");
       dot.type = "button";
-      dot.setAttribute("aria-label", "Choose " + label.toLowerCase());
+      dot.setAttribute("aria-label", RK_T("Choose {label}", { label: RK_T(label).toLowerCase() }));
       box.appendChild(input);
       box.appendChild(dot);
       var current = "#000000";
@@ -950,6 +950,9 @@
 
       var typo = section("Typography", "Changes every subtitle in this row.");
       els.font = makeCombo(function (v) { writeStyle({ font: v }); });
+      // the entries are font names, which are never translated
+      els.font.setAttribute("translate", "no");
+      els.font.querySelector(".combo-menu").setAttribute("translate", "no");
       els.font.setOptions(subs.fonts().map(function (f) { return [f, f, f]; }), "Arial");
       typo.appendChild(row("Font", els.font));
       els.color = colorField("color", "Text color");
@@ -965,8 +968,9 @@
       styles.appendChild(els.italic);
       typo.appendChild(row("Style", styles));
       var aligns = el("div", "ed-toggles");
+      var ALIGN_NAMES = { left: RK_T("Align left"), center: RK_T("Align center"), right: RK_T("Align right") };
       els.aligns = ["left", "center", "right"].map(function (a) {
-        var b = toggle(ALIGN_ICONS[a], "Align " + a, function () { writeStyle({ align: a }); });
+        var b = toggle(ALIGN_ICONS[a], ALIGN_NAMES[a], function () { writeStyle({ align: a }); });
         b.dataset.value = a;
         aligns.appendChild(b);
         return b;
@@ -1119,7 +1123,7 @@
           var group = LIB_SORT_GROUPS[g.dataset.group];
           var member = group.members.indexOf(sort) >= 0 ? sort : "";
           g.classList.toggle("has-active", !!member);
-          g.querySelector(".clip-sort-grouprow .clip-sort-label").textContent = member ? group.base + ": " + LIB_SORT_LABELS[member] : group.base;
+          g.querySelector(".clip-sort-grouprow .clip-sort-label").textContent = member ? RK_T("{group}: {sort}", { group: RK_T(group.base), sort: RK_T(LIB_SORT_LABELS[member]) }) : group.base;
         });
       }
       function close() {
@@ -1272,6 +1276,7 @@
     function libraryCard(c) {
       var card = el("button", "ed-lib-card");
       card.type = "button";
+      card.setAttribute("translate", "no");
       var thumb = el("span", "ed-lib-thumb");
       var img = el("img");
       img.loading = "lazy";
@@ -1635,14 +1640,14 @@
         var bad = [];
         r.files.reduce(function (chain, f) {
           return chain.then(function () {
-            if (!f.ok) { bad.push(f.name + ": " + f.message); return null; }
+            if (!f.ok) { bad.push(RK_T("{name}: {error}", { name: f.name, error: f.message })); return null; }
             return new Promise(function (resolve) {
               var img = new Image();
               img.onload = function () { resolve(img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1); };
               img.onerror = function () { resolve(1); };
               img.src = o.helper + "/import-media/file?id=" + encodeURIComponent(f.id);
             }).then(function (aspect) {
-              if (!lanes.addLayer({ kind: "media", ref: f.id, name: f.name, aspect: aspect, w: 0.3, gif: !!f.gif })) bad.push(f.name + ": there is no room for another layer");
+              if (!lanes.addLayer({ kind: "media", ref: f.id, name: f.name, aspect: aspect, w: 0.3, gif: !!f.gif })) bad.push(RK_T("{name}: there is no room for another layer", { name: f.name }));
             });
           });
         }, Promise.resolve()).then(function () { if (bad.length) o.notify(bad.join("\n"), "bad", "Elements"); });
@@ -1779,7 +1784,7 @@
       card.classList.remove("is-closing");
       card.hidden = false;
       var many = subs.picked().length;
-      els.subTitle.textContent = many > 1 ? many + " subtitles" : "Subtitle";
+      els.subTitle.textContent = many > 1 ? RK_T("{count} subtitles", { count: many }) : RK_T("Subtitle");
       els.textSec.hidden = many > 1;
       els.subTime.textContent = many > 1 ? "" : fmt(cue.at) + " - " + fmt(cue.end);
       if (document.activeElement !== els.subText && els.subText.value !== cue.text) els.subText.value = cue.text;
@@ -1838,7 +1843,7 @@
         p = Math.max(p, 90 * (1 - Math.exp(-t / job.listenTau)));
       }
       els.genFill.style.width = p + "%";
-      els.genLabel.textContent = text + (job.listenAt || p <= 0 ? "..." : " " + Math.round(p) + "%");
+      els.genLabel.textContent = RK_T(text) + (job.listenAt || p <= 0 ? "..." : " " + Math.round(p) + "%");
     }
 
     function endJob() {
@@ -1884,7 +1889,7 @@
         if (run !== job.run) return null;
         if (st.installed) return transcribe(run, model);
         if (!st.installing) throw new Error(st.error || "The speech engine could not be downloaded.");
-        setProgress("Downloading " + st.downloadMb + " MB", st.percent);
+        setProgress(RK_T("Downloading {size} MB", { size: st.downloadMb }), st.percent);
         return new Promise(function (resolve, reject) { poll(function () { waitInstall(run, model).then(resolve, reject); }, 500); });
       });
     }
@@ -1893,7 +1898,7 @@
       var range = subs.sourceRange();
       var tracks = els.listenRow.hidden ? "0" : els.listen.value() || "0";
       var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? t.label : ""; });
-      var title = tracks === "0" || names.indexOf("") >= 0 ? "Subtitles" : names.join(" + ");
+      var title = tracks === "0" || names.indexOf("") >= 0 ? RK_T("Subtitles") : names.join(" + ");
       // a guess at how long listening takes until the engine reports, from a two minute clip taking about 5 seconds on fast and 19 on accurate
       job.listenAt = performance.now();
       job.listenTau = Math.max(4, (range.end - range.start) * (model === "fast" ? 0.05 : 0.17));
@@ -1925,8 +1930,8 @@
         var made = subs.list().filter(function (c) { return c.row === rowId; });
         if (made.length) { subs.select(made[0].id); subs.pickRow(rowId); }
         var unsure = cues.filter(function (c) { return c.unsure; }).length;
-        var check = unsure === 1 ? " One might be misheard. It is marked in orange; select it and open Check on the right." : unsure > 1 ? " " + unsure + " might be misheard. They are marked in orange; select them and open Check on the right." : "";
-        o.notify(cues.length + " subtitles added in a new row. Undo takes them back." + check + (j.warning ? " " + j.warning : ""), "info");
+        var check = unsure === 1 ? " " + RK_T("One might be misheard. It is marked in orange; select it and open Check on the right.") : unsure > 1 ? " " + RK_T("{count} might be misheard. They are marked in orange; select them and open Check on the right.", { count: unsure }) : "";
+        o.notify(RK_T("{count} subtitles added in a new row. Undo takes them back.", { count: cues.length }) + check + (j.warning ? " " + j.warning : ""), "info");
         return null;
       });
     }
@@ -2029,9 +2034,9 @@
           var devices = m.devices || [];
           var hit = devices.find(function (x) { return x.value === id; });
           var name = hit ? (hit.value === "default" && hit.blurb ? hit.blurb : hit.label) : "";
-          var list = [["", "Settings microphone", "", (name ? name + ". " : "") + "Uses Settings > Audio processing."]];
+          var list = [["", "Settings microphone", "", (name ? RK_T("{name}. Uses Settings > Audio processing.", { name: name }) : RK_T("Uses Settings > Audio processing."))]];
           devices.forEach(function (x) {
-            list.push([x.value, x.value === "default" ? "Windows default" : x.label, "", (x.blurb || x.label) + ". Records this device directly."]);
+            list.push([x.value, x.value === "default" ? "Windows default" : x.label, "", RK_T("{name}. Records this device directly.", { name: x.blurb || x.label }), x.value !== "default"]);
           });
           els.mic.setOptions(list, prefs.mic);
         });

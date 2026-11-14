@@ -4,6 +4,7 @@
 
 #include "core/draw_util.hpp"
 #include "core/helper_client.hpp"
+#include "core/locale.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
 #include "notify/notify_panel.hpp"
@@ -110,7 +111,7 @@ void NotifyButton::ShowTip()
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
 	QRect pillGlobal(mapToGlobal(QPoint(0, 0)), QSize(kPillWidth, height()));
-	g_notifyTip->ShowFor("Notifications", pillGlobal);
+	g_notifyTip->ShowFor(Tr("Notifications"), pillGlobal);
 }
 
 void NotifyButton::HideTip()

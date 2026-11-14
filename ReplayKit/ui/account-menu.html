@@ -195,11 +195,13 @@
     els.changePicture.disabled = picture.picking;
     els.removePicture.disabled = picture.picking;
     els.removePicture.hidden = !picture.version;
+    // the account name is the users own, only the fallbacks are ui text
+    if (on && auth.name) els.name.setAttribute("translate", "no"); else els.name.removeAttribute("translate");
     els.name.textContent = on ? (auth.name || "Signed in") : "Anonymous";
-    els.sub.textContent = on ? planLabel(auth.plan) + " plan" : "Not signed in";
+    els.sub.textContent = on ? RK_T("{plan} plan", { plan: planLabel(auth.plan) }) : "Not signed in";
     els.note.innerHTML = on
-      ? "Uploads go to your Streamable account and are kept for <b>" + auth.retentionDays + " days</b>."
-      : "Clips you share upload without an account and stay up for <b>" + auth.retentionDays + " days</b>. Sign in to use your own Streamable account.";
+      ? RK_T("Uploads go to your Streamable account and are kept for <b>{days} days</b>.", { days: auth.retentionDays })
+      : RK_T("Clips you share upload without an account and stay up for <b>{days} days</b>. Sign in to use your own Streamable account.", { days: auth.retentionDays });
     const working = !!busyText;
     els.busy.hidden = !working;
     if (working) els.busyText.textContent = busyText;

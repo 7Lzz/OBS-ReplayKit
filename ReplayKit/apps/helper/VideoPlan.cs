@@ -101,7 +101,7 @@ namespace ReplayKitHelper
                     if (clip == null || !System.IO.File.Exists(clip.Full)) { error = refToken.Type == JTokenType.String && VideoImports.IsRef(refToken.Value<string>()) ? "A video added to the video in the editor was moved or changed. Add it again." : "A clip added to the video in the editor is no longer in the clip folder."; return null; }
                     if (!durations.TryGetValue(clip.Full, out length))
                     {
-                        if (plan.OtherClips.Count >= MaxOtherClips) { error = "The video can take pieces of " + MaxOtherClips + " other clips at most."; return null; }
+                        if (plan.OtherClips.Count >= MaxOtherClips) { error = Locales.T("The video can take pieces of {count} other clips at most.", "count", MaxOtherClips); return null; }
                         var info = Trim.ProbeVideo(clip.Full);
                         if (info == null) { error = "The video of a clip added in the editor could not be read."; return null; }
                         length = info.Duration;

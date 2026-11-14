@@ -101,14 +101,14 @@ namespace ReplayKitHelper
 
             string verb = install ? "--install-discord-screenshare" : "--uninstall-discord-screenshare";
             string what = install ? "install" : "removal";
-            string message = install ? "Installing Discord screenshare support. OBS will close." : "Removing Discord screenshare support. OBS will close.";
+            string message = install ? Locales.T("Installing Discord screenshare support. OBS will close.") : Locales.T("Removing Discord screenshare support. OBS will close.");
             var argList = new List<string> { verb, "--start-delay-ms", "900" };
 
             if (Elevation.IsAdmin())
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int pid = Native.SpawnDetached(cmdLine, cacheDir);
-                if (pid <= 0) throw new InvalidOperationException("Could not start Discord screenshare " + what + ".");
+                if (pid <= 0) throw new InvalidOperationException(install ? Locales.T("Could not start Discord screenshare install.") : Locales.T("Could not start Discord screenshare removal."));
                 Log.Write("Discord screenshare " + what + " started detached as PID " + pid + ".");
                 return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = message };
             }
@@ -122,7 +122,7 @@ namespace ReplayKitHelper
                 Verb = "runas",
             };
             var proc = Process.Start(psi);
-            if (proc == null) throw new InvalidOperationException("Could not start Discord screenshare " + what + ".");
+            if (proc == null) throw new InvalidOperationException(install ? Locales.T("Could not start Discord screenshare install.") : Locales.T("Could not start Discord screenshare removal."));
             Log.Write("Discord screenshare " + what + " started elevated as PID " + proc.Id + ".");
             return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = message };
         }

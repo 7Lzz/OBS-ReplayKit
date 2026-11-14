@@ -36,9 +36,14 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    string file = JObject.Parse(req.Body)["path"]?.Value<string>();
-                    bool queued = !string.IsNullOrWhiteSpace(file) && Path.IsPathRooted(file) && SavedClipWorker.Enqueue(file);
-                    HttpResponse.SendJson(stream, queued ? 200 : 400, new JObject { ["ok"] = queued });
+                    var saved = JObject.Parse(req.Body);
+                    string file = saved["path"]?.Value<string>();
+                    string full = null;
+                    bool queued = !string.IsNullOrWhiteSpace(file) && Path.IsPathRooted(file) && SavedClipWorker.Enqueue(file, out full);
+                    var result = new JObject { ["ok"] = queued };
+                    if (queued && saved["readDuration"]?.Type == JTokenType.Boolean && saved["readDuration"].Value<bool>())
+                        result["duration"] = SavedClipWorker.ProbeDuration(full);
+                    HttpResponse.SendJson(stream, queued ? 200 : 400, result);
                 }
                 catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false }); }
                 return false;
@@ -367,7 +372,7 @@ namespace ReplayKitHelper
                                 ["icon"] = "gif",
                                 ["media"] = "/gifs/file?file=" + Uri.EscapeDataString(made) + "&v=" + size,
                                 ["text"] = Path.GetFileNameWithoutExtension(made),
-                                ["detail"] = Storage.FormatBytes(size) + " · Saved to the GIFs section",
+                                ["detail"] = Locales.T("{size} · Saved to the GIFs section", "size", Storage.FormatBytes(size)),
                                 ["action"] = new JObject { ["label"] = "Go to GIF", ["kind"] = "reveal-gif", ["file"] = made },
                             });
                     }

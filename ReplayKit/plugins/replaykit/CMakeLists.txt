@@ -40,6 +40,7 @@ set(REPLAYKIT_SOURCES
     src/core/idle_memory.cpp
     src/core/ipc_pipe.cpp
     src/core/json_lite.cpp
+    src/core/locale.cpp
     src/core/keybind_label.cpp
     src/core/main_window.cpp
     src/core/open_clips_hotkey.cpp

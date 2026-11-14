@@ -39,6 +39,8 @@ namespace ReplayKitHelper
                 {
                     Server.State.Config = new JObject { ["scriptDir"] = Constants.HelperRoot };
                     Themes.PrepareForLaunch(ReplaykitSettings.ReadSettings());
+                    // a language picked while obs ran is put back the same way, since obs wrote its old one over it as it exited
+                    Locales.ApplyPending();
                     return 0;
                 }
                 catch (Exception ex) { Console.Error.WriteLine("Theme preparation failed: " + ex.Message); return 1; }

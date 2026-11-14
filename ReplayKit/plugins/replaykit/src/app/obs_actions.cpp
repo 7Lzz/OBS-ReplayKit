@@ -6,6 +6,7 @@
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "shell/shell_views.hpp"
 #include "tray/tray_menu.hpp"
@@ -43,7 +44,7 @@ void ReportActionFailure(const QString &title, const std::string &response)
 	if (JsonBoolField(response, "ok", false))
 		return;
 	std::string message = ExtractJsonStringField(response, "message");
-	QString text = message.empty() ? QObject::tr("ReplayKit did not answer. Restart OBS and try again.") : QString::fromStdString(message);
+	QString text = message.empty() ? Tr("ReplayKit did not answer. Restart OBS and try again.") : QString::fromStdString(message);
 	QMetaObject::invokeMethod(
 		g_callbacks,
 		[title, text]() {
@@ -70,17 +71,17 @@ void HandleConfirmRequest(const std::string &kind)
 	std::string route;
 	if (kind == "sharepreview-setup") {
 		ok = ShowReplayKitConfirm(
-			QObject::tr("Set up Discord screenshare?"),
-			QObject::tr("This installs an audio cable driver and a hidden OBS projector window so Discord "
+			Tr("Set up Discord screenshare?"),
+			Tr("This installs an audio cable driver and a hidden OBS projector window so Discord "
 				    "and other apps can screen-share OBS's output.\n\nOBS will close while it installs."),
-			QObject::tr("Set Up"), false);
+			Tr("Set Up"), false);
 		route = "/install-discord-screenshare";
 	} else if (kind == "streamable-relogin") {
 		ok = ShowReplayKitConfirm(
-			QObject::tr("Force re-login to Streamable?"),
-			QObject::tr("This closes OBS, wipes the Streamable cookies, and relaunches OBS as admin so you "
+			Tr("Force re-login to Streamable?"),
+			Tr("This closes OBS, wipes the Streamable cookies, and relaunches OBS as admin so you "
 				    "can sign in as a different account.\n\nSave any unsaved scene work first."),
-			QObject::tr("Continue"), true);
+			Tr("Continue"), true);
 		route = "/restart-obs-clean";
 	}
 	if (!ok || route.empty())
@@ -90,7 +91,7 @@ void HandleConfirmRequest(const std::string &kind)
 	RunAsync([route, setup]() {
 		std::string response = HttpRequest("POST", route.c_str(), nullptr, setup ? 180000 : 8000);
 		if (setup)
-			ReportActionFailure(QObject::tr("Discord screenshare setup"), response);
+			ReportActionFailure(Tr("Discord screenshare setup"), response);
 	});
 }
 
@@ -127,8 +128,8 @@ void RestartObs()
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
 	ShowLifecycleConfirm(
-		QObject::tr("Restart OBS"),
-		QObject::tr("This will close and reopen OBS. Any active recording or stream will be stopped. Continue?"),
+		Tr("Restart OBS"),
+		Tr("This will close and reopen OBS. Any active recording or stream will be stopped. Continue?"),
 		"/restart-obs");
 }
 
@@ -148,8 +149,8 @@ void ConfirmedExit()
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
 	ShowLifecycleConfirm(
-		QObject::tr("Exit OBS"),
-		QObject::tr("This will close OBS. Any active recording or stream will be stopped. Continue?"),
+		Tr("Exit OBS"),
+		Tr("This will close OBS. Any active recording or stream will be stopped. Continue?"),
 		"/exit-obs");
 }
 

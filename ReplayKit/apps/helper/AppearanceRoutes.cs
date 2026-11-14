@@ -266,7 +266,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/appearance/pick-color: " + ex.Message);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Desktop color picker failed: " + ex.Message });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Desktop color picker failed: {error}", "error", ex.Message) });
                 }
                 return false;
             }

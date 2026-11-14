@@ -262,7 +262,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                string message = ex is MicAudioException ? ex.Message : "Microphone test failed: " + ex.Message;
+                string message = ex is MicAudioException ? ex.Message : Locales.T("Microphone test failed: {error}", "error", ex.Message);
                 if (!_running) _startError = message;
                 else _endReason = message;
                 Log.Write("MicLoopback: " + message);

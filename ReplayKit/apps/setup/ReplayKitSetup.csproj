@@ -55,6 +55,8 @@
     <!-- the modern setup + uninstall window html, loaded via NavigateToString from SetupWindow.cs / UninstallWindow.cs -->
     <EmbeddedResource Include="setup_installer.html" LogicalName="ReplayKitSetup.setup_installer.html" />
     <EmbeddedResource Include="uninstall_prompt.html" LogicalName="ReplayKitSetup.uninstall_prompt.html" />
+    <!-- the page runtime that translates by the table SetupLocale.cs puts in front of it; the same file the helper puts in every page it serves -->
+    <EmbeddedResource Include="..\..\ui\_i18n.html" Link="_i18n.html" LogicalName="ReplayKitSetup._i18n.html" />
   </ItemGroup>
   <ItemGroup>
     <!-- the C# both programs compile; the helper lists the same folder in its csproj -->
@@ -118,6 +120,7 @@
       <AssetBundleFile Include="$(RepoDir)resources\icons\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\icons\" />
       <AssetBundleFile Include="$(RepoDir)resources\fonts\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\fonts\" />
       <AssetBundleFile Include="$(RepoDir)resources\data\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\data\" />
+      <AssetBundleFile Include="$(RepoDir)resources\locale\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\obs-replayKit\locale\" />
       <AssetBundleFile Include="$(RepoDir)config\replaykit_settings.json;$(RepoDir)dist\version.json" BundleDir="obs-studio\obs-replayKit\" />
       <AssetBundleFile Include="$(RepoDir)config\obs\**\*" Exclude="$(AssetBundleExclude)" BundleDir="obs-studio\" />
       <AssetBundleFile Include="$(RepoDir)config\obs-versions.json;$(RepoDir)plugins\obs-shaderfilter\$(ShaderfilterZip)" BundleDir="" />
@@ -127,6 +130,7 @@
     <Error Condition="!Exists('$(RepoDir)dist\version.json') Or !Exists('$(RepoDir)dist\replaykit.dll') Or !Exists('$(RepoDir)dist\helper\OBSReplayKit.exe')" Text="A built part of the payload is missing from dist\ -- run build.bat so the release exe does not ship without it." />
     <RemoveDir Directories="$(AssetBundleStageDir)" />
     <Copy SourceFiles="@(AssetBundleFile)" DestinationFiles="@(AssetBundleFile->'$(AssetBundleStageDir)%(BundleDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Exec Command="python -B &quot;$(RepoDir)tools\i18n\messages.py&quot; --output &quot;$(AssetBundleStageDir)obs-studio\obs-replayKit\locale\messages&quot;" />
     <!-- the process host sits flat in dist\process-host\<version>\; its manifest says where each file installs, and the bundle keeps that layout -->
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(RepoDir)scripts\stage_process_host.ps1&quot; -Stage &quot;$(AssetBundleStageDir)process-host-roles&quot;" />
     <!-- plugin files are kept loose in the repo and zipped here by the names and folders of shared/BundleLayout.cs, the same constants the installer reads them back with -->

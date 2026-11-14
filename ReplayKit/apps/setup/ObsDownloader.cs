@@ -210,7 +210,7 @@ namespace ReplayKitSetup
                     string mb = total > 0
                         ? $"{done / (1024 * 1024)} / {total / (1024 * 1024)} MB"
                         : $"{done / (1024 * 1024)} MB";
-                    progress.SubProgress(frac, "Downloading OBS Studio  " + mb);
+                    progress.SubProgress(frac, SetupLocale.T("Downloading OBS Studio  {size}", "size", mb));
                 });
                 long done = new FileInfo(dst).Length;
                 progress.SubProgress(1.0, "Downloaded OBS Studio");

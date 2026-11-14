@@ -92,7 +92,7 @@ namespace ReplayKitHelper
             }
             catch (BadLayer ex)
             {
-                error = "Bad layer: " + ex.Message;
+                error = Locales.T("Bad layer: {error}", "error", ex.Message);
                 return null;
             }
         }

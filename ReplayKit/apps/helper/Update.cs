@@ -577,7 +577,7 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 WriteUpdateDebug("update window spawn failed: " + ex.Message);
-                return new JObject { ["ok"] = false, ["message"] = "Could not open the update window: " + ex.Message };
+                return new JObject { ["ok"] = false, ["message"] = Locales.T("Could not open the update window: {error}", "error", ex.Message) };
             }
         }
 
@@ -855,7 +855,7 @@ namespace ReplayKitHelper
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(release.ChecksumsUrl)) throw new InvalidOperationException("The release is missing " + ChecksumsAsset + ".");
+                if (string.IsNullOrWhiteSpace(release.ChecksumsUrl)) throw new InvalidOperationException(Locales.T("The release is missing {file}.", "file", ChecksumsAsset));
                 string installerPath = Path.Combine(tempDir, InstallerAsset);
                 string checksumsPath = Path.Combine(tempDir, ChecksumsAsset);
                 SetProgressStage("download");
@@ -871,7 +871,7 @@ namespace ReplayKitHelper
 
                 long installerBytes = new FileInfo(installerPath).Length;
                 if (installerBytes < MinInstallerBytes)
-                    throw new InvalidOperationException("The " + release.LatestVersion + " installer is incomplete (" + (installerBytes / (1024 * 1024)) + " MB) -- it was published without its bundled ReplayKit files." + incompleteHint);
+                    throw new InvalidOperationException(Locales.T("The {version} installer is incomplete ({size} MB) -- it was published without its bundled ReplayKit files.", "version", release.LatestVersion, "size", installerBytes / (1024 * 1024)) + incompleteHint);
                 return installerPath;
             }
             catch
@@ -918,14 +918,14 @@ namespace ReplayKitHelper
                         ["message"] = "ReplayKit is already up to date.",
                     };
                 }
-                if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException("Latest release is missing " + ChecksumsAsset + ".");
+                if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException(Locales.T("Latest release is missing {file}.", "file", ChecksumsAsset));
 
                 string tempDir = CreateUpdateTemp();
                 JObject started;
                 string previousResult = null;
                 try
                 {
-                    string installerPath = DownloadVerifiedInstaller(latest, tempDir, " OBS was left running; try again once a fixed release is out.");
+                    string installerPath = DownloadVerifiedInstaller(latest, tempDir, " " + Locales.T("OBS was left running; try again once a fixed release is out."));
                     previousResult = ClearInstallResult();
                     SetProgressStage("install");
                     started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
@@ -944,7 +944,7 @@ namespace ReplayKitHelper
                     ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
                     ["releaseUrl"] = releaseUrl,
                     ["processId"] = started["processId"],
-                    ["message"] = "ReplayKit " + latest.LatestVersion + " is installing. OBS will restart.",
+                    ["message"] = Locales.T("ReplayKit {version} is installing. OBS will restart.", "version", latest.LatestVersion),
                 };
             }
             catch (Exception ex)

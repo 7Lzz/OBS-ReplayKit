@@ -112,7 +112,7 @@ namespace ReplayKitHelper
                     if (path == "/profile-picture/clear") ProfilePicture.Clear();
                     else
                     {
-                        string picked = FilePickers.PickPath(false, "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files (*.*)|*.*", "");
+                        string picked = FilePickers.PickPath(false, FilePickers.ImagesFilter, "");
                         if (string.IsNullOrEmpty(picked))
                         {
                             HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["changed"] = false, ["picture"] = ProfilePicture.Version() });

@@ -2,6 +2,7 @@
 #include "prelude.hpp"
 #include "ui/confirm_dialog.hpp"
 
+#include "core/locale.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
@@ -91,7 +92,7 @@ public:
 		auto *btnRow = new QHBoxLayout();
 		btnRow->setSpacing(8);
 		btnRow->addStretch();
-		auto *cancel = new QPushButton(QObject::tr("Cancel"), card);
+		auto *cancel = new QPushButton(Tr("Cancel"), card);
 		auto *ok = new QPushButton(okText, card);
 		ok->setObjectName("rkOk");
 		ok->setCursor(Qt::PointingHandCursor);

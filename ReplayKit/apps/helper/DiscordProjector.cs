@@ -49,7 +49,7 @@ namespace ReplayKitHelper
         public static SizeResult GetObsCanvasSize()
         {
             var videoSettings = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
-            if (!videoSettings.Ok) return new SizeResult { Ok = false, Message = "OBS video settings unavailable: " + videoSettings.Message };
+            if (!videoSettings.Ok) return new SizeResult { Ok = false, Message = Locales.T("OBS video settings unavailable: {error}", "error", videoSettings.Message) };
 
             int baseWidth = GetObjectInt(videoSettings.Data, "baseWidth");
             int baseHeight = GetObjectInt(videoSettings.Data, "baseHeight");
@@ -113,7 +113,7 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Screen[] screens;
             try { screens = System.Windows.Forms.Screen.AllScreens; }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is ExternalException) { return new MonitorWorkArea { Ok = false, Message = "Could not read monitor work areas: " + ex.Message }; }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ExternalException) { return new MonitorWorkArea { Ok = false, Message = Locales.T("Could not read monitor work areas: {error}", "error", ex.Message) }; }
             if (screens.Length < 1) return new MonitorWorkArea { Ok = false, Message = "No real monitor work area was reported by Windows." };
 
             int idx = monitorIndex <= 0 ? screens.Length - 1 : Math.Max(1, monitorIndex) - 1;
@@ -422,7 +422,7 @@ namespace ReplayKitHelper
             if (!open.Ok)
             {
                 Log.Write("warn: OpenVideoMixProjector request failed: " + open.Message);
-                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = "Opening OBS Windowed Projector failed: " + open.Message };
+                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.T("Opening OBS Windowed Projector failed: {error}", "error", open.Message) };
             }
 
             // 24x250ms=6s -- a slow pc that misses a shorter window would report "not found" while obs was still mid-create, leaving that projector un-renamed and un-hidden until some later cycle happened to trip over it. matching against baseline (not title text) so this works regardless of obss ui language -- a non-english install localizes the windows own title, but never localizes what obs process it belongs to or when it appeared, which is all this actually checks now.
@@ -786,7 +786,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) when (ex is System.Security.SecurityException || ex is IOException || ex is InvalidOperationException)
             {
-                return new AudioDeviceResult { Ok = false, Message = "Could not inspect OBS Stream Audio playback endpoint: " + ex.Message };
+                return new AudioDeviceResult { Ok = false, Message = Locales.T("Could not inspect OBS Stream Audio playback endpoint: {error}", "error", ex.Message) };
             }
 
             var selected = candidates.OrderBy(c => c.Rank).ThenBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault();

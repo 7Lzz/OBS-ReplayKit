@@ -938,7 +938,7 @@ namespace ReplayKitHelper
                     catch (Newtonsoft.Json.JsonException) { }
                     Native.MoveFileReplace(path, aside);
                     Log.Write("Read-ReplayKitSettings: the settings file was not json (" + error.Message + "), kept it as " + aside + " and went back to the defaults.");
-                    try { Notifications.Add("warning", "settings-unreadable", "ReplayKit settings were reset", "The settings file could not be read, so ReplayKit went back to its defaults. The old file was kept as " + Path.GetFileName(aside) + " in the user-data folder of ReplayKit."); }
+                    try { Notifications.Add("warning", "settings-unreadable", Locales.T("ReplayKit settings were reset"), Locales.T("The settings file could not be read, so ReplayKit went back to its defaults. The old file was kept as {file} in the user-data folder of ReplayKit.", "file", Path.GetFileName(aside))); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("settings reset notice: " + ex.Message); }
                 }
             }
@@ -1161,7 +1161,7 @@ namespace ReplayKitHelper
                 new[] { "FPSDen", denominator.ToString() },
             }) {
                 var result = SetObsProfileParameterSafe("Video", update[0], update[1]);
-                if (!result.Ok) warnings.Add("OBS did not accept Video." + update[0] + ": " + result.Message);
+                if (!result.Ok) warnings.Add(Locales.T("OBS did not accept Video.{update}: {error}", "update", update[0], "error", result.Message));
             }
         }
 

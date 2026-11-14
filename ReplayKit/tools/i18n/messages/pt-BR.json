@@ -1,0 +1,78 @@
+{
+  "capture.clipSaved": {
+    "source": "de65a9a7ac711c41",
+    "text": "Os últimos {length} foram salvos"
+  },
+  "capture.clipSavedUnderSecond": {
+    "source": "a096fb52b31755cd",
+    "text": "Menos de 1 s salvo"
+  },
+  "capture.clipSavedUnknown": {
+    "source": "137d9c40106a6caf",
+    "text": "Clipe salvo"
+  },
+  "capture.recordingStarted": {
+    "source": "c9ad24bd74b949ab",
+    "text": "Gravação iniciada"
+  },
+  "capture.recordingStopped": {
+    "source": "c7e743d4c20fed44",
+    "text": "Gravação interrompida"
+  },
+  "clips.selectedCount": {
+    "source": "08e97b60a4dc6ce0",
+    "text": {
+      "many": "{count} clipes selecionados",
+      "one": "{count} clipe selecionado",
+      "other": "{count} clipes selecionados"
+    }
+  },
+  "clips.showInClips": {
+    "source": "89fca022ec0aa5c0",
+    "text": "Mostrar em Clipes"
+  },
+  "common.close": {
+    "source": "d7cf5045c01b2eb9",
+    "text": "Fechar"
+  },
+  "notifications.deletedHint": {
+    "source": "5d1e67f9e652a62b",
+    "text": "Ele pode ter sido excluído."
+  },
+  "notifications.notFound": {
+    "source": "9660581acdceaa01",
+    "text": "Notificação não encontrada"
+  },
+  "notifications.openReleasePage": {
+    "source": "943ca6886bf827b7",
+    "text": "Abrir página de versão"
+  },
+  "picker.iconImage": {
+    "source": "a842c813ab15e1e8",
+    "text": "Escolha uma imagem de ícone"
+  },
+  "picker.importAudio": {
+    "source": "5ead5299907864ba",
+    "text": "Importar áudio"
+  },
+  "picker.importMedia": {
+    "source": "795636276d09ecd6",
+    "text": "Adicionar um GIF ou imagem"
+  },
+  "picker.importVideo": {
+    "source": "2b9b8a67ab660949",
+    "text": "Adicionar um vídeo"
+  },
+  "picker.recordingFolder": {
+    "source": "2bbc70e8c4a90ae9",
+    "text": "Escolha a pasta das gravações"
+  },
+  "setup.uninstallTitle": {
+    "source": "6610dbeda8014a0b",
+    "text": "Desinstalação do OBS ReplayKit"
+  },
+  "setup.windowTitle": {
+    "source": "2e0e00e71a75260a",
+    "text": "Instalação do OBS ReplayKit"
+  }
+}

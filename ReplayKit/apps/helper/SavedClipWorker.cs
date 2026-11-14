@@ -42,9 +42,9 @@ namespace ReplayKitHelper
         }
 
         // false when the path is not a clip of the clip folder or the queue is full
-        public static bool Enqueue(string path)
+        public static bool Enqueue(string path, out string full)
         {
-            string full;
+            full = null;
             try { full = Path.GetFullPath(path); }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return false; }
             if (!InClipFolder(full) || !Constants.ALLOWED_EXTS.Contains(Path.GetExtension(full))) return false;
@@ -71,6 +71,19 @@ namespace ReplayKitHelper
             string root = ClipRoot();
             string dir = Path.GetDirectoryName(full);
             return string.Equals(dir, root, StringComparison.OrdinalIgnoreCase) || string.Equals(Path.GetDirectoryName(dir), root, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static double? ProbeDuration(string full)
+        {
+            try
+            {
+                string root = ClipRoot();
+                string dir = Path.GetDirectoryName(full);
+                if (!InClipFolder(full) || (!string.Equals(dir, root, StringComparison.OrdinalIgnoreCase) &&
+                    (File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0)) return null;
+                return ClipBuffer.ProbeSavedDuration(full);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { return null; }
         }
 
         private static void Loop()

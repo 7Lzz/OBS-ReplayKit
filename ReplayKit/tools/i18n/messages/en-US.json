@@ -1,0 +1,78 @@
+{
+  "capture.clipSaved": {
+    "context": "Native toast. Length is the duration of the saved replay.",
+    "text": "Saved the last {length}"
+  },
+  "capture.clipSavedUnderSecond": {
+    "context": "Confirmation when a replay file contains less than one second of footage.",
+    "text": "Saved less than 1s"
+  },
+  "capture.clipSavedUnknown": {
+    "context": "Confirmation when a replay file was saved but its duration could not be read.",
+    "text": "Clip saved"
+  },
+  "capture.recordingStarted": {
+    "context": "Native toast after an OBS recording starts.",
+    "text": "Recording started"
+  },
+  "capture.recordingStopped": {
+    "context": "Native toast after an OBS recording stops.",
+    "text": "Recording stopped"
+  },
+  "clips.selectedCount": {
+    "context": "Count of selected cards in the Clips bulk-action toolbar.",
+    "text": {
+      "one": "{count} clip selected",
+      "other": "{count} clips selected"
+    }
+  },
+  "clips.showInClips": {
+    "context": "Home card action that reveals the clip in the Clips library.",
+    "text": "Show in Clips"
+  },
+  "common.close": {
+    "context": "Dismisses a dialog. Matches OBS's Close message.",
+    "obsKey": "Close",
+    "text": "Close"
+  },
+  "notifications.deletedHint": {
+    "context": "Below Notification not found in the reader.",
+    "text": "It may have been deleted."
+  },
+  "notifications.notFound": {
+    "context": "Heading in the notification reader when an item has disappeared.",
+    "text": "Notification not found"
+  },
+  "notifications.openReleasePage": {
+    "context": "Button opening the GitHub release associated with a notification.",
+    "text": "Open release page"
+  },
+  "picker.iconImage": {
+    "context": "Windows file picker title for an account or app icon.",
+    "text": "Choose an icon image"
+  },
+  "picker.importAudio": {
+    "context": "Editor audio file picker title.",
+    "text": "Import audio"
+  },
+  "picker.importMedia": {
+    "context": "Editor image and GIF picker title.",
+    "text": "Add a GIF or image"
+  },
+  "picker.importVideo": {
+    "context": "Editor video file picker title.",
+    "text": "Add a video"
+  },
+  "picker.recordingFolder": {
+    "context": "Windows folder picker title.",
+    "text": "Choose the recordings folder"
+  },
+  "setup.uninstallTitle": {
+    "context": "Windows uninstaller caption.",
+    "text": "OBS ReplayKit Uninstall"
+  },
+  "setup.windowTitle": {
+    "context": "Windows installer caption.",
+    "text": "OBS ReplayKit Setup"
+  }
+}

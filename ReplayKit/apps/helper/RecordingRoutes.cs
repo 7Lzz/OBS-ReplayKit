@@ -128,7 +128,7 @@ namespace ReplayKitHelper
                         if (!rbReached)
                         {
                             body["ok"] = false;
-                            body["message"] = "OBS did not " + (rbWantOn ? "start" : "stop") + " the replay buffer in time.";
+                            body["message"] = rbWantOn ? Locales.T("OBS did not start the replay buffer in time.") : Locales.T("OBS did not stop the replay buffer in time.");
                         }
                         HttpResponse.SendJson(stream, rbReached ? 200 : 409, body);
                         return false;

@@ -200,7 +200,9 @@
   }
 
   // every call here is real, final-for-now copy (never placeholder junk), so this is also the signal the window is worth showing
-  function setHero(title, first, second, bad) {
+  function setHero(title, first, second, bad, titleIsContent) {
+    // a release name comes from github, so it is not ui text
+    if (titleIsContent) els.title.setAttribute("translate", "no"); else els.title.removeAttribute("translate");
     els.title.textContent = title;
     els.title.classList.toggle("is-bad", !!bad);
     els.line1.textContent = first || "";
@@ -238,8 +240,8 @@
         if (p.stage === "download") {
           const pct = p.total > 0 ? (p.done / p.total) * 70 : -1;
           const speed = p.bytesPerSecond > 0 ? (p.bytesPerSecond / (1024 * 1024)).toFixed(1) + " MB/s" : "";
-          const size = p.total > 0 ? formatBytes(p.done) + " of " + formatBytes(p.total) : formatBytes(p.done);
-          setStatus("Downloading ReplayKit update", speed ? speed + " (" + size + ")" : size, pct);
+          const size = p.total > 0 ? RK_T("{done} of {total}", { done: formatBytes(p.done), total: formatBytes(p.total) }) : formatBytes(p.done);
+          setStatus("Downloading ReplayKit update", speed ? RK_T("{speed} ({size})", { speed: speed, size: size }) : size, pct);
         } else if (p.stage === "verify") {
           setStatus("Verifying download", "", 76);
         } else if (p.stage === "install") {
@@ -304,7 +306,7 @@
       }
       setStatus("Installing update", "", 82);
       watchInstall(() => {
-        setHero(latest && latest.repairRequired ? "Repair complete" : "Update complete", "ReplayKit " + (latest && latest.latestVersion ? latest.latestVersion : "") + " is installed.", "OBS is back up.");
+        setHero(latest && latest.repairRequired ? "Repair complete" : "Update complete", RK_T("ReplayKit {version} is installed.", { version: latest && latest.latestVersion ? latest.latestVersion : "" }), "OBS is back up.");
         setStatus("Done", "", 100, "done");
         setTimeout(closeWindow, 1500);
       }, failUpdate);
@@ -318,12 +320,12 @@
   async function runPreview() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const total = 24 * 1024 * 1024;
-    setHero("ReplayKit 9.9.9", "Installing version 9.9.9.", "OBS restarts when it is done.");
+    setHero("ReplayKit 9.9.9", RK_T("Installing version {version}.", { version: "9.9.9" }), "OBS restarts when it is done.");
     setStatus("Preparing download", "", 2);
     await wait(700);
     for (let done = 0; done <= total; done += total / 28) {
       const speed = (7 + Math.random() * 4).toFixed(1) + " MB/s";
-      setStatus("Downloading ReplayKit update", speed + " (" + formatBytes(done) + " of " + formatBytes(total) + ")",
+      setStatus("Downloading ReplayKit update", RK_T("{speed} ({size})", { speed: speed, size: RK_T("{done} of {total}", { done: formatBytes(done), total: formatBytes(total) }) }),
                 (done / total) * 70);
       await wait(110);
     }
@@ -335,7 +337,7 @@
     await wait(1100);
     setStatus("Copying ReplayKit files", "", 97);
     await wait(900);
-    setHero("Update complete", "ReplayKit 9.9.9 is installed.", "OBS is back up.");
+    setHero("Update complete", RK_T("ReplayKit {version} is installed.", { version: "9.9.9" }), "OBS is back up.");
     setStatus("Done", "", 100, "done");
   }
 
@@ -356,13 +358,13 @@
       const data = await helperJson("update/check?t=" + Date.now());
       latest = data;
       if (!data.updateAvailable && !data.repairRequired) {
-        setHero("ReplayKit is up to date", data.message || ("Version " + (data.installedVersion || "") + " is the latest."), "");
+        setHero("ReplayKit is up to date", data.message || RK_T("Version {version} is the latest.", { version: data.installedVersion || "" }), "");
         setStatus("Up to date", "", 100, "done");
         setTimeout(closeWindow, 1600);
         return;
       }
       // no prompt: the update installs itself, the window only reports what is happening
-      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || ("ReplayKit " + data.latestVersion)), data.repairRequired ? "Repairing your ReplayKit installation." : "Installing version " + data.latestVersion + ".", "OBS restarts when it is done.");
+      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || RK_T("ReplayKit {version}", { version: data.latestVersion })), data.repairRequired ? "Repairing your ReplayKit installation." : RK_T("Installing version {version}.", { version: data.latestVersion }), "OBS restarts when it is done.", false, !data.repairRequired && !!data.releaseName);
       installUpdate();
     } catch (e) {
       failUpdate(e.message || String(e));

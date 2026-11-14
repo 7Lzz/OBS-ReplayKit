@@ -119,26 +119,26 @@ window.RKClipGames = (function () {
     const capture = item.capture || { kind:"unknown" };
     const games = capture.games || [];
     const game = capture.kind === "game" ? (capture.id ? capture : games[0]) : capture.kind === "unknown" ? capture.partial : null;
-    if (game && game.id) return { key:"game:" + game.id, id:game.id, kind:"game", name:game.name || "Unknown game" };
-    if (capture.kind === "desktop") return { key:"desktop", id:"desktop", kind:"desktop", name:"Desktop" };
-    if (capture.kind === "mixed") return { key:"mixed", id:"mixed", kind:"game", name:"Mixed games" };
-    return { key:"unknown", id:"unknown", kind:"unknown", name:"Unassigned" };
+    if (game && game.id) return { key:"game:" + game.id, id:game.id, kind:"game", name:game.name || RK_T("Unknown game") };
+    if (capture.kind === "desktop") return { key:"desktop", id:"desktop", kind:"desktop", name:RK_T("Desktop") };
+    if (capture.kind === "mixed") return { key:"mixed", id:"mixed", kind:"game", name:RK_T("Mixed games") };
+    return { key:"unknown", id:"unknown", kind:"unknown", name:RK_T("Unassigned") };
   }
   // why a clip has no game, in words, from the reason the helper found for most of it; a clip set to unassigned by hand says so, and an older clip with no reason says nothing more
   const REASONS = {
-    "multiple-captures": "several capture sources were showing and none clearly showed the game",
-    "no-visible-capture": "no capture source was showing in the scene",
-    "capture-not-live": "the capture source had no picture",
-    "capture-target-not-focused": "the captured window was not the one in focus",
-    "foreground-unavailable": "the window in focus could not be read",
-    "shown-window-unreadable": "the window on screen could not be read",
-    "display-not-found": "the captured display could not be found",
-    "no-evidence": "ReplayKit was not watching while it was recorded",
+    "multiple-captures": () => RK_T("several capture sources were showing and none clearly showed the game"),
+    "no-visible-capture": () => RK_T("no capture source was showing in the scene"),
+    "capture-not-live": () => RK_T("the capture source had no picture"),
+    "capture-target-not-focused": () => RK_T("the captured window was not the one in focus"),
+    "foreground-unavailable": () => RK_T("the window in focus could not be read"),
+    "shown-window-unreadable": () => RK_T("the window on screen could not be read"),
+    "display-not-found": () => RK_T("the captured display could not be found"),
+    "no-evidence": () => RK_T("ReplayKit was not watching while it was recorded"),
   };
-  function unassignedReason(capture) {
-    if (capture.manual) return " (set by you)";
-    if (capture.why === "not-recognised") return ": " + (capture.app ? capture.app : "the app on screen") + " is not a known game";
-    return REASONS[capture.why] ? ": " + REASONS[capture.why] : "";
+  function unassignedLabel(capture, name) {
+    if (capture.manual) return RK_T("{name} (set by you)", { name });
+    if (capture.why === "not-recognised") return RK_T("{name}: {app} is not a known game", { name, app: capture.app ? capture.app : RK_T("the app on screen") });
+    return REASONS[capture.why] ? RK_T("{name}: {reason}", { name, reason: REASONS[capture.why]() }) : name;
   }
   // the game icon of a card; on a clip or screenshot card it opens the game picker as well, with the newest copy of the item so a renamed clip is changed by its new name
   function badge(parent, item, options) {
@@ -158,15 +158,19 @@ window.RKClipGames = (function () {
     const game = contained && capture.partial ? capture.partial : contained ? { id:"" } : capture;
     // a roblox clip made in a known experience says which one, and shows its icon, while it is still grouped and filed as roblox
     const experience = capture.experience && capture.experience.id ? capture.experience : null;
-    const place = experience && experience.name ? " - " + experience.name : "";
-    const label = contained ? "Contains " + capture.games.map(g => g.name + (capture.partial && g.id === capture.partial.id ? place : "")).join(" · ") : (capture.name || "Unassigned") + (capture.kind === "game" ? place : "") + (capture.kind === "unknown" ? unassignedReason(capture) : "");
+    const withPlace = name => experience && experience.name ? RK_T("{game} - {place}", { game: name, place: experience.name }) : name;
+    // only a game has a name of its own; desktop, mixed and unassigned are words of the page
+    const shownName = capture.kind === "game" ? (capture.name || RK_T("Unassigned")) : RK_T(capture.name || "Unassigned");
+    const label = contained ? RK_T("Contains {games}", { games: capture.games.map(g => capture.partial && g.id === capture.partial.id ? withPlace(g.name) : g.name).join(" · ") }) : capture.kind === "unknown" ? unassignedLabel(capture, shownName) : capture.kind === "game" ? withPlace(shownName) : shownName;
     const node = document.createElement("span");
     node.className = "clip-game-badge" + (changeable ? " is-changeable" : "");
     node.dataset.capture = key;
     node._item = item;
     node.setAttribute("role", changeable ? "button" : "img");
-    node.setAttribute("aria-label", changeable ? label + ", change game" : label);
-    node.dataset.tooltip = label + (contained ? ". Other parts of this clip could not be assigned." : "") + (changeable ? " · Click to change" : "");
+    node.setAttribute("aria-label", changeable ? RK_T("{label}, change game", { label }) : label);
+    let tip = contained ? RK_T("{label}. Other parts of this clip could not be assigned.", { label }) : label;
+    if (changeable) tip = RK_T("{label} · Click to change", { label: tip });
+    node.dataset.tooltip = tip;
     if (!parent.closest("button")) node.tabIndex = 0;
     node.addEventListener("focus", () => { if (window.RKTooltip) RKTooltip.show(node); });
     node.addEventListener("blur", () => { if (window.RKTooltip) RKTooltip.hide(); });
@@ -194,7 +198,7 @@ window.RKClipGames = (function () {
     const top = document.createElement("header"); top.className = "game-picker-top";
     const title = document.createElement("h1"); title.textContent = "Change game";
     const close = document.createElement("button"); close.type = "button"; close.className = "game-picker-x"; close.setAttribute("aria-label", "Close"); close.innerHTML = icon("editor/close");
-    const sub = document.createElement("p"); sub.className = "game-picker-sub"; sub.textContent = String(item.name || "").replace(/\.[^.]+$/, "");
+    const sub = document.createElement("p"); sub.className = "game-picker-sub"; sub.setAttribute("translate", "no"); sub.textContent = String(item.name || "").replace(/\.[^.]+$/, "");
     close.addEventListener("click", () => dialog.close()); top.append(title, close, sub);
     const search = document.createElement("input"); search.className = "game-picker-search"; search.placeholder = "Search games"; search.setAttribute("aria-label", "Search games");
     const list = document.createElement("div"); list.className = "game-picker-list";
@@ -292,18 +296,20 @@ window.RKClipGames = (function () {
       const button = document.createElement("button"); button.type = "button"; button.className = "game-picker-choice";
       const isCurrent = !custom && id === selectedId && (experience ? item.capture?.experience?.universe === experience.universe : !item.capture?.experience?.universe);
       if (isCurrent) button.setAttribute("aria-current", "true");
-      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + '<span class="game-picker-name"></span>' + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>' : "");
+      // desktop and unassigned are words of the page; every other row is the name of a game
+      const named = kind === "desktop" || kind === "unknown" ? '<span class="game-picker-name"></span>' : '<span class="game-picker-name" translate="no"></span>';
+      button.innerHTML = picture(experience?.id || id, kind, experience ? id : null, true) + named + (isCurrent ? '<svg class="game-picker-check" viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/check}}</svg>' : "");
       button.querySelector(".game-picker-name").textContent = name;
       if (target === list && owned.some(game => game.id === id)) {
         const entry = document.createElement("div"); entry.className = "game-picker-entry";
         const remove = document.createElement("button"); remove.type = "button"; remove.className = "game-picker-remove";
-        remove.setAttribute("aria-label", "Remove " + name + " from Your games"); remove.title = "Remove from Your games; clips keep their game tags";
+        remove.setAttribute("aria-label", RK_T("Remove {name} from Your games", { name })); remove.title = "Remove from Your games; clips keep their game tags";
         remove.innerHTML = icon("action/trash");
         remove.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); removeGame(id); });
         entry.append(button, remove); target.append(entry);
       } else target.append(button);
       if (children?.length) {
-        const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", name + " experiences");
+        const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", RK_T("{name} experiences", { name }));
         sublist.hidden = !search.value.trim(); button.setAttribute("aria-expanded", String(!sublist.hidden));
         button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>');
         const expand = on => { sublist.hidden = !on; button.setAttribute("aria-expanded", String(on)); };
@@ -314,7 +320,7 @@ window.RKClipGames = (function () {
         });
         sublist.addEventListener("keydown", event => { if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); button.focus(); } });
         target.append(sublist);
-        row(name + " (any experience)", id, kind, null, sublist);
+        row(RK_T("{name} (any experience)", { name }), id, kind, null, sublist);
         children.forEach(child => row(child.name, id, kind, null, sublist, child));
       } else button.addEventListener("click", () => choose(id, custom, experience?.universe));
     }
@@ -364,7 +370,7 @@ window.RKClipGames = (function () {
         mine.forEach(game => row(game.name, game.id, "game", null, list, null, (game.experiences || []).filter(child => matching(game) || matching(child))));
         const others = choices.filter(game => !shown.has(game.id) && matching(game));
         if (others.length) { section("All games"); others.forEach(game => row(game.name, game.id, "game")); }
-        if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section("Not listed"); row("Use “" + query + "”", "", "game", query); }
+        if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section("Not listed"); row(RK_T("Use “{name}”", { name: query }), "", "game", query); }
         if (!list.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = "No games match."; list.append(empty); }
         list.querySelectorAll("img[data-artwork]").forEach(image => artworkObserver.observe(image));
         status.textContent = "Games you record or pick stay in this list. Your video is not changed.";
@@ -388,14 +394,14 @@ window.RKClipGames = (function () {
       button.insertAdjacentHTML("afterbegin", picture(state.game));
     }
     function paintGames() {
-      games.setOptions([{value:"all",label:"All games",icon:picture("all")}, ...gameRows.map(game => ({value:game.id,label:game.name,detail:String(game.count),icon:picture(game.id)}))]);
+      games.setOptions([{value:"all",label:"All games",icon:picture("all")}, ...gameRows.map(game => ({value:game.id,label:game.name,detail:String(game.count),icon:picture(game.id),raw:!["desktop","mixed","unknown"].includes(game.id)}))]);
       games.value = state.game;
       if (games.value !== state.game && libraryReady) state.game = "all";
       paintGameIcon();
     }
     function markTypes() {
       typesEl.classList.toggle("has-filters", state.favorites || state.linked);
-      typesEl.querySelector(".combo-button").dataset.tooltip = [state.favorites ? "Favorites only" : "",state.linked ? "Linked only" : ""].filter(Boolean).join(" · ");
+      typesEl.querySelector(".combo-button").dataset.tooltip = [state.favorites ? RK_T("Favorites only") : "",state.linked ? RK_T("Linked only") : ""].filter(Boolean).join(" · ");
       const button = typesEl.querySelector(".combo-button");
       let leading = button.querySelector(":scope > .clip-type-icon");
       if (!leading) {

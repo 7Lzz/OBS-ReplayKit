@@ -13,6 +13,7 @@
 #include "core/draw_util.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
@@ -75,7 +76,7 @@ ShellObsNav::ShellObsNav(QListWidget *source, QDialog *dialog, QWidget *parent)
 		update();
 	});
 	m_search = new QLineEdit(this);
-	m_search->setPlaceholderText(QStringLiteral("Search settings"));
+	m_search->setPlaceholderText(Tr("Search settings"));
 	m_search->installEventFilter(this);
 	m_sendTimer.setSingleShot(true);
 	m_sendTimer.setInterval(250);
@@ -148,12 +149,12 @@ void ShellObsNav::paintEvent(QPaintEvent *)
 	p.setBrush(g_menuPanel);
 	p.drawRoundedRect(panel, 8, 8);
 
-	DrawPageText(p, QRectF(panel.left() + 16, panel.top() + kHeadTop, panel.width() - 32, 22), Qt::AlignLeft, QStringLiteral("OBS SETTINGS"), HeadFont(), g_menuMuted, kHeadStroke);
+	DrawPageText(p, QRectF(panel.left() + 16, panel.top() + kHeadTop, panel.width() - 32, 22), Qt::AlignLeft, Tr("OBS SETTINGS"), HeadFont(), g_menuMuted, kHeadStroke);
 	const QList<Row> rows = Rows();
 	if (!rows.isEmpty()) {
 		const int footTop = rows.last().rect.top();
 		p.fillRect(QRectF(panel.left() + 16, footTop - 36, panel.width() - 32, 1), ChromeInk(0.10));
-		DrawPageText(p, QRectF(panel.left() + 16, footTop - 30, panel.width() - 32, 22), Qt::AlignLeft, QStringLiteral("REPLAYKIT"), HeadFont(), g_menuMuted, kHeadStroke);
+		DrawPageText(p, QRectF(panel.left() + 16, footTop - 30, panel.width() - 32, 22), Qt::AlignLeft, Tr("REPLAYKIT"), HeadFont(), g_menuMuted, kHeadStroke);
 		if (VersionRowFits(rows)) {
 			// the version on the left and the github mark on the right, standing on the rule like the ones in the sidebar of the replaykit settings
 			const QRectF box = GithubRect();
@@ -282,7 +283,7 @@ QList<ShellObsNav::Row> ShellObsNav::Rows() const
 		rows.append({i, QRect(x, y, w, kRowH), item->text()});
 		y += kRowH + 2;
 	}
-	rows.append({kBack, QRect(x, qRound(panel.bottom()) - 6 - kRowH, w, kRowH), QStringLiteral("ReplayKit Settings")});
+	rows.append({kBack, QRect(x, qRound(panel.bottom()) - 6 - kRowH, w, kRowH), Tr("ReplayKit Settings")});
 	return rows;
 }
 
@@ -465,7 +466,7 @@ void ShellObsNav::SetHover(int index)
 		if (!g_notifyTip)
 			g_notifyTip = new NotifyTip();
 		const QRectF box = GithubRect();
-		g_notifyTip->ShowFor(QStringLiteral("ReplayKit on GitHub"), QRect(mapToGlobal(box.topLeft().toPoint()), box.size().toSize()));
+		g_notifyTip->ShowFor(Tr("ReplayKit on GitHub"), QRect(mapToGlobal(box.topLeft().toPoint()), box.size().toSize()));
 	}
 	setCursor(index == kNone ? Qt::ArrowCursor : Qt::PointingHandCursor);
 	if (index != kNone && !m_hoverT.contains(index))

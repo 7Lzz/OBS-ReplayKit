@@ -10,6 +10,7 @@
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
 #include "core/keybind_label.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "windows/clips_window.hpp"
 #include "windows/settings_window.hpp"
@@ -200,9 +201,9 @@ void ApplyMenuHover(const QString &accent, const QString &accentLight, const QSt
 void RefreshActionRowText()
 {
 	if (g_recordRow)
-		g_recordRow->nameLabel->setText(obs_frontend_recording_active() ? "Stop Recording" : "Start Recording");
+		g_recordRow->nameLabel->setText(obs_frontend_recording_active() ? Tr("Stop Recording") : Tr("Start Recording"));
 	if (g_replayBufferRow)
-		g_replayBufferRow->nameLabel->setText(ClipBufferActive() ? "Stop Clipping" : "Start Clipping");
+		g_replayBufferRow->nameLabel->setText(ClipBufferActive() ? Tr("Stop Clipping") : Tr("Start Clipping"));
 }
 
 // obs builds the tray menu once and never rebuilds it, so this refreshes the share-preview checkbox and the record/clipping rows keybind chip right before each show instead of polling on a timer nobody is watching
@@ -315,10 +316,10 @@ void InstallTrayMenu()
 		if (clipsRow)
 			clipsRow->ProxyTrigger();
 	});
-	clipsRow->nameLabel->setText(QObject::tr("View Clips"));
+	clipsRow->nameLabel->setText(Tr("View Clips"));
 	g_clipsRow = clipsRow;
 
-	QAction *sharePreview = new QAction(QObject::tr("Share Preview"), trayMenu);
+	QAction *sharePreview = new QAction(Tr("Share Preview"), trayMenu);
 	sharePreview->setCheckable(true);
 	QObject::connect(sharePreview, &QAction::triggered, trayMenu, [](bool checked) {
 		// not set up yet -- the checkbox flip is meaningless, so undo it and offer the install instead
@@ -332,7 +333,7 @@ void InstallTrayMenu()
 	});
 	g_sharePreviewAction = sharePreview;
 
-	QAction *customSettings = new QAction(QObject::tr("ReplayKit Settings"), trayMenu);
+	QAction *customSettings = new QAction(Tr("ReplayKit Settings"), trayMenu);
 	QObject::connect(customSettings, &QAction::triggered, trayMenu, []() { ShowSettings(); });
 
 	QObject::connect(trayMenu, &QMenu::aboutToShow, trayMenu, [trayMenu]() {
@@ -439,9 +440,9 @@ void InstallTrayMenu()
 		QObject::disconnect(exitAction, &QAction::triggered, nullptr, nullptr);
 		QObject::connect(exitAction, &QAction::triggered, trayMenu, []() { ConfirmedExit(); });
 	}
-	QAction *restartObs = new QAction(QObject::tr("Restart OBS"), trayMenu);
+	QAction *restartObs = new QAction(Tr("Restart OBS"), trayMenu);
 	QObject::connect(restartObs, &QAction::triggered, trayMenu, []() { RestartObs(); });
-	QAction *viewCrashLogs = new QAction(QObject::tr("View Crash Logs"), trayMenu);
+	QAction *viewCrashLogs = new QAction(Tr("View Crash Logs"), trayMenu);
 	QObject::connect(viewCrashLogs, &QAction::triggered, trayMenu, []() { OpenCrashLogsFolder(); });
 	trayMenu->insertSeparator(exitAction);
 	trayMenu->insertAction(exitAction, restartObs);

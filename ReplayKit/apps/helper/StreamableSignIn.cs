@@ -96,7 +96,7 @@ namespace ReplayKitHelper
             {
                 Directory.CreateDirectory(ProfileDirectory);
                 Application.EnableVisualStyles();
-                using (var form = new Form { Text = "Sign in to Streamable", Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
+                using (var form = new Form { Text = Locales.T("Sign in to Streamable"), Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
                 using (var browser = new WebView2 { Dock = DockStyle.Fill })
                 // one-shot watchdog: if the form is somehow still not visible a moment after Shown, force it. this is a self-healing backstop, not the primary fix -- it exists because a hidden top-level window with no error logged anywhere is otherwise undiagnosable from the outside.
                 using (var visibilityWatchdog = new System.Windows.Forms.Timer { Interval = 800 })
@@ -172,7 +172,7 @@ namespace ReplayKitHelper
                         }
                         catch (Exception ex)
                         {
-                            SetError("Could not open the secure Streamable sign-in window: " + ex.Message);
+                            SetError(Locales.T("Could not open the secure Streamable sign-in window: {error}", "error", ex.Message));
                             form.Close();
                         }
                     };
@@ -196,7 +196,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                SetError("Streamable sign-in failed: " + ex.Message);
+                SetError(Locales.T("Streamable sign-in failed: {error}", "error", ex.Message));
                 SetClosed();
             }
         }

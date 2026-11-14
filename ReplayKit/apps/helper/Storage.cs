@@ -399,7 +399,7 @@ namespace ReplayKitHelper
             if (names == null || names.Count == 0)
                 return new JObject { ["ok"] = false, ["message"] = "Pick at least one clip." };
             if (names.Count > MaxBatchClips)
-                return new JObject { ["ok"] = false, ["message"] = "Select up to " + MaxBatchClips + " clips at a time." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.T("Select up to {count} clips at a time.", "count", MaxBatchClips) };
             string mode = ReplaykitSettings.GetStorageCompressionType();
             if (expectedMode != null && expectedMode != mode)
                 return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "The storage compression type changed. Review the clips again." };
@@ -612,16 +612,18 @@ namespace ReplayKitHelper
                 bool cancelled;
                 string error;
                 lock (CompressGate) { done = batch.Done; failed = batch.Failed; saved = batch.SavedBytes; cancelled = batch.Cancelled; error = batch.Error; }
-                string clipsText = done + " clip" + (done == 1 ? "" : "s");
-                string failedText = failed > 0 ? failed + " could not be compressed" + (string.IsNullOrEmpty(error) ? "" : " (" + error + ")") + "." : "";
+                string clipsText = done == 1 ? Locales.T("1 clip") : Locales.T("{count} clips", "count", done);
+                string failedText = failed <= 0 ? ""
+                    : string.IsNullOrEmpty(error) ? Locales.T("{count} could not be compressed.", "count", failed)
+                    : Locales.T("{count} could not be compressed ({error}).", "count", failed, "error", error);
                 // the same popup as an exported gif, over the obs window from any view, with what was freed in large
                 bool nothing = done == 0 && failed > 0;
-                string title = nothing ? "Compression did not finish" : cancelled ? "Compression stopped" : "Compression finished";
-                string body = nothing ? (string.IsNullOrEmpty(error) ? "The clips could not be compressed." : error)
-                    : "Compressed " + clipsText + " and freed " + FormatBytes(saved) + (cancelled ? " before it was stopped." : ".") + (failedText.Length > 0 ? " " + failedText : "");
+                string title = nothing ? Locales.T("Compression did not finish") : cancelled ? Locales.T("Compression stopped") : Locales.T("Compression finished");
+                string body = nothing ? (string.IsNullOrEmpty(error) ? Locales.T("The clips could not be compressed.") : error)
+                    : (cancelled ? Locales.T("Compressed {clips} and freed {size} before it was stopped.", "clips", clipsText, "size", FormatBytes(saved)) : Locales.T("Compressed {clips} and freed {size}.", "clips", clipsText, "size", FormatBytes(saved))) + (failedText.Length > 0 ? " " + failedText : "");
                 var popup = nothing
-                    ? new JObject { ["icon"] = "warning", ["text"] = "Nothing was compressed.", ["detail"] = body }
-                    : new JObject { ["icon"] = "check", ["text"] = "Space freed", ["big"] = FormatBytes(saved), ["detail"] = ("Compressed " + clipsText + ". " + failedText).Trim() };
+                    ? new JObject { ["icon"] = "warning", ["text"] = Locales.T("Nothing was compressed."), ["detail"] = body }
+                    : new JObject { ["icon"] = "check", ["text"] = Locales.T("Space freed"), ["big"] = FormatBytes(saved), ["detail"] = (Locales.T("Compressed {clips}.", "clips", clipsText) + " " + failedText).Trim() };
                 // the result is told in the popup, not the bell; only when the plugin cannot be reached is it left in the bell so it is not lost
                 if (!DonePopups.Show(nothing ? "warning" : "done", title, popup))
                     Notifications.Add(nothing ? "warning" : "info", "compress-batch", title, body);

@@ -209,7 +209,7 @@ namespace ReplayKitHelper
         public static void AnnounceUpdate(string version, string notes, string releaseUrl = "")
         {
             if (string.IsNullOrWhiteSpace(version)) return;
-            Add("update", "update:" + version, "Update ReplayKit " + version, notes ?? "", releaseUrl ?? "");
+            Add("update", "update:" + version, Locales.T("Update ReplayKit {version}", "version", version), notes ?? "", releaseUrl ?? "");
         }
     }
 }

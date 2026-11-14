@@ -17,6 +17,11 @@ $stateFolder = Read-Constant 'shared\StateLayout.cs' 'const\s+string\s+Folder\s*
 $tempFolder = Read-Constant 'shared\TempLayout.cs' 'const\s+string\s+Folder\s*=\s*"([^"]+)"' 'the temp folder'
 $tempScratch = Read-Constant 'shared\TempLayout.cs' 'const\s+string\s+ScratchFolder\s*=\s*"([^"]+)"' 'the scratch folder'
 $tempClipBuffer = Read-Constant 'shared\TempLayout.cs' 'const\s+string\s+ClipBufferFolder\s*=\s*"([^"]+)"' 'the clip buffer folder'
+$localeCodes = (Read-Constant 'shared\LanguageMatch.cs' 'const\s+string\s+SupportedCodes\s*=\s*"([^"]+)"' 'the supported languages') -split ','
+foreach ($code in $localeCodes) {
+    if ($code -cnotmatch '^[a-z]{2,3}-[A-Za-z]{2,4}$') { throw "Unexpected locale code: $code" }
+}
+$cppLocales = ($localeCodes | ForEach-Object { '"' + $_ + '"' }) -join ', '
 
 # every consumer pastes these into code or into a path, so anything outside the expected shape is refused
 if ($helperHost -notmatch '^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$') { throw "Helper host must be a loopback address, got '$helperHost'" }
@@ -66,6 +71,7 @@ inline constexpr char kStateFolder[] = "$stateFolder";
 inline constexpr char kTempFolder[] = "$tempFolder";
 inline constexpr char kTempScratchFolder[] = "$tempScratch";
 inline constexpr char kTempClipBufferFolder[] = "$tempClipBuffer";
+inline constexpr const char *kSupportedLocales[] = {$cppLocales};
 
 // the places each state file lived before the state folder, relative to obs-replayKit, newest first
 struct StateOldPlaces {

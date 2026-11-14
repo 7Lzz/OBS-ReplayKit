@@ -566,7 +566,7 @@ namespace ReplayKitHelper
                 if (auth.DurationLimited && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
                 {
                     int total = (int)Math.Round(duration);
-                    string msg = "Clip is " + (total / 60) + ":" + (total % 60).ToString("D2") + " long. Streamable's limit is 10 minutes -- trim it shorter first.";
+                    string msg = Locales.T("Clip is {length} long. Streamable's limit is 10 minutes -- trim it shorter first.", "length", (total / 60) + ":" + (total % 60).ToString("D2"));
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooLong"] = true, ["durationSec"] = total };
                 }
@@ -586,7 +586,7 @@ namespace ReplayKitHelper
                 {
                     long capMb = effCap / 1024 / 1024;
                     long sizeMb = (long)Math.Ceiling(new FileInfo(selected.Full).Length / 1024.0 / 1024.0);
-                    string msg = "Clip is too long to compress under " + capMb + " MB without going below a safe video bitrate";
+                    string msg = Locales.T("Clip is too long to compress under {size} MB without going below a safe video bitrate", "size", capMb);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = sizeMb, ["capMb"] = capMb };
                 }

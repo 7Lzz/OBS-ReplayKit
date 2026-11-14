@@ -1,0 +1,7884 @@
+{
+ "(signed in)": [
+  "controls_app.html"
+ ],
+ "0 selected": [
+  "_clip-toolbar.html"
+ ],
+ "00.0 MB": [
+  "clip-app.js"
+ ],
+ "1 clip": [
+  "storage.html"
+ ],
+ "1 clip selected": [
+  "clip-app.js"
+ ],
+ "1 clip was not deleted": [
+  "clip-app.js"
+ ],
+ "1 day": [
+  "settings.html"
+ ],
+ "1 day left": [
+  "_deleted.html"
+ ],
+ "1 matching setting": [
+  "settings.html"
+ ],
+ "1 notification": [
+  "notifications.html"
+ ],
+ "1 oldest clip": [
+  "storage.html"
+ ],
+ "1 second": [
+  "settings.html"
+ ],
+ "1 selected clip was not queued for upload": [
+  "clip-app.js"
+ ],
+ "1 setting found": [
+  "settings.html"
+ ],
+ "10 fps (smallest)": [
+  "settings.html"
+ ],
+ "10 Mbps": [
+  "editor.html"
+ ],
+ "10 seconds": [
+  "settings.html"
+ ],
+ "100 perfect": [
+  "_editor-tools.html"
+ ],
+ "100px \"Fredoka One\"": [
+  "_editor-tools.html"
+ ],
+ "1080p60. Recommended.": [
+  "setup.html"
+ ],
+ "120px \"Fredoka One\"": [
+  "_editor-tools.html"
+ ],
+ "14 days": [
+  "settings.html"
+ ],
+ "15 Mbps": [
+  "editor.html"
+ ],
+ "15 seconds": [
+  "settings.html"
+ ],
+ "2 days ago": [
+  "clip-app.js"
+ ],
+ "2 seconds": [
+  "settings.html"
+ ],
+ "20 fps": [
+  "settings.html"
+ ],
+ "20 Mbps": [
+  "editor.html"
+ ],
+ "25 fps": [
+  "settings.html"
+ ],
+ "3 days": [
+  "settings.html"
+ ],
+ "30 days": [
+  "settings.html"
+ ],
+ "30 Mbps": [
+  "editor.html"
+ ],
+ "30 seconds": [
+  "settings.html"
+ ],
+ "33 fps (recommended)": [
+  "settings.html"
+ ],
+ "3D stickers are Fluent Emoji by Microsoft (MIT), animated ones are Noto Emoji by Google (CC BY 4.0). They load from the internet the first time.": [
+  "_editor-tools.html"
+ ],
+ "5 Mbps": [
+  "editor.html"
+ ],
+ "5 seconds": [
+  "settings.html"
+ ],
+ "50 fps (smoothest, largest)": [
+  "settings.html"
+ ],
+ "50 Mbps": [
+  "editor.html"
+ ],
+ "7 days": [
+  "settings.html"
+ ],
+ "720p30. Lowest load.": [
+  "setup.html"
+ ],
+ "<b>1</b> clip": [
+  "_home-dashboard.html",
+  "storage.html"
+ ],
+ "<b>1</b> clip will be skipped (already compressed or busy).": [
+  "clip-app.js"
+ ],
+ "<b>1</b> selected clip was skipped because it is already compressed or busy.": [
+  "clip-app.js"
+ ],
+ "<b>{count}</b> clips": [
+  "_home-dashboard.html",
+  "storage.html"
+ ],
+ "<b>{count}</b> clips will be skipped (already compressed or busy).": [
+  "clip-app.js"
+ ],
+ "<b>{count}</b> selected clips were skipped because they are already compressed or busy.": [
+  "clip-app.js"
+ ],
+ "<b>{count}</b> selected · {size}": [
+  "storage.html"
+ ],
+ "<b>{count}</b> this week": [
+  "_home-dashboard.html"
+ ],
+ "= uLod + 0.001 ? 4 : 0;": [
+  "_editor-fx.html"
+ ],
+ "A buffered piece could not be read.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "A buffered piece has a bad path.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "A buffered piece is missing.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "A bundled process host file failed verification.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "A clip can hold {count} rows at most.": [
+  "_editor-lanes.html"
+ ],
+ "A clip can hold {max} rows at most, so 1 file was left out": [
+  "_editor-lanes.html"
+ ],
+ "A clip can hold {max} rows at most, so {count} files were left out": [
+  "_editor-lanes.html"
+ ],
+ "A clip is already being saved.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "A clip named “{from}” already exists, so this clip was renamed to “{to}”.": [
+  "clip-app.js"
+ ],
+ "A clip that is loading": [
+  "clip-app.js"
+ ],
+ "A clip was not saved": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "A clip with that output name already exists": [
+  "apps/helper/Trim.cs"
+ ],
+ "A color picker is already active.": [
+  "apps/helper/DesktopColorPicker.cs"
+ ],
+ "A combined track can hold {count} tracks at most.": [
+  "_editor-lanes.html"
+ ],
+ "A compression is already running.": [
+  "apps/helper/Storage.cs"
+ ],
+ "A copy at another speed is always made again frame by frame.": [
+  "editor.html"
+ ],
+ "A copy with colour, filters, effects or layers is always made again frame by frame.": [
+  "editor.html"
+ ],
+ "A copy with subtitles is always made again frame by frame, since they are drawn into the picture.": [
+  "editor.html"
+ ],
+ "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.": [
+  "editor.html"
+ ],
+ "a day ago": [
+  "clip-app.js"
+ ],
+ "A deleted item is a link.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "A few quick choices and you are set. Everything here can be changed later in ReplayKit Settings, which opens from the OBS window or the tray menu.": [
+  "setup.html"
+ ],
+ "A file with that name already exists": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "A GIF with that name already exists": [
+  "apps/helper/GifExports.cs"
+ ],
+ "A gradient can have at most {count} stops.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "a minute ago": [
+  "clip-app.js"
+ ],
+ "A process host path escapes its folder.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "A rename keeps the file type of the clip": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "A screenshot with that name already exists": [
+  "apps/helper/Screenshots.cs"
+ ],
+ "A selected clip could not be verified. Review the list again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "A selected clip is no longer eligible. Review the list again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "A track could not be read": [
+  "_editor-lanes.html"
+ ],
+ "A track did not load": [
+  "_editor-lanes.html"
+ ],
+ "Above 60 FPS uses more disk space and GPU resources.": [
+  "settings.html"
+ ],
+ "Accent": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Accent color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Account": [
+  "settings.html"
+ ],
+ "Account details": [
+  "settings.html"
+ ],
+ "Add a GIF or image": [
+  "_editor-tools.html",
+  "apps/helper/FilePickers.cs"
+ ],
+ "Add a video": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "Add a video from the computer": [
+  "_editor-tools.html"
+ ],
+ "Add another hotkey": [
+  "settings.html"
+ ],
+ "Add audio from files (or drop files here)": [
+  "_editor-lanes.html"
+ ],
+ "Add game": [
+  "settings.html"
+ ],
+ "Add manually": [
+  "_editor-tools.html"
+ ],
+ "Add subtitle": [
+  "_editor-tools.html"
+ ],
+ "Add to favorites": [
+  "_editor-fx.html"
+ ],
+ "Adding audio...": [
+  "_editor-tools.html"
+ ],
+ "Adds desktop audio capture.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Adds OBS to Windows startup.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Adds the dock and Clips files.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Adds the motion blur filter.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Adds the ReplayKit window, notifications and tray menu.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Adds the WASD/mouse overlay plugin.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Advanced": [
+  "settings.html"
+ ],
+ "After 1 minute": [
+  "settings.html"
+ ],
+ "After 15 minutes": [
+  "settings.html"
+ ],
+ "After 30 seconds": [
+  "settings.html"
+ ],
+ "After 5 minutes": [
+  "settings.html"
+ ],
+ "After {seconds} seconds": [
+  "settings.html"
+ ],
+ "Align center": [
+  "_editor-tools.html"
+ ],
+ "Align left": [
+  "_editor-tools.html"
+ ],
+ "Align right": [
+  "_editor-tools.html"
+ ],
+ "All audio": [
+  "_editor-tools.html"
+ ],
+ "All clips": [
+  "_clip-content.html",
+  "_editor-tools.html",
+  "clip-app.js"
+ ],
+ "All effects": [
+  "_editor-fx.html"
+ ],
+ "All files (*.*)": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "All filters": [
+  "_editor-fx.html"
+ ],
+ "All games": [
+  "_clip-games.html",
+  "_clip-toolbar.html"
+ ],
+ "All PC Audio": [
+  "settings.html"
+ ],
+ "All PC Audio + Discord": [
+  "settings.html"
+ ],
+ "All set": [
+  "setup.html"
+ ],
+ "All types": [
+  "_clip-games.html",
+  "_clip-toolbar.html"
+ ],
+ "Allow monitor and PC sleep": [
+  "apps/setup/Apply.cs"
+ ],
+ "Already at maximum compression (slow mode).": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Already at maximum compression.": [
+  "_clip-dialogs.html"
+ ],
+ "Already compressed in Fast mode — choose Smaller for further reduction.": [
+  "_clip-dialogs.html"
+ ],
+ "Already compressed.": [
+  "clip-app.js"
+ ],
+ "Already fast-compressed. Choose Smaller for further reduction.": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Already running {count} clip operations": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "Also lower the resolution": [
+  "_clip-dialogs.html"
+ ],
+ "Also uninstall OBS Studio": [
+  "setup_installer.html",
+  "settings.html"
+ ],
+ "Always run as administrator": [
+  "settings.html"
+ ],
+ "Ambiguous Steam installation.": [
+  "apps/helper/SteamGames.cs"
+ ],
+ "An audio file added in the editor is no longer available. Add it again.": [
+  "apps/helper/Trim.cs"
+ ],
+ "An editor source is unavailable.": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "An experience must belong to Roblox.": [
+  "apps/helper/ClipGames.cs"
+ ],
+ "an hour ago": [
+  "clip-app.js"
+ ],
+ "An update is already being applied.": [
+  "apps/helper/Update.cs"
+ ],
+ "Angle": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Animated": [
+  "_editor-tools.html"
+ ],
+ "Animated cat": [
+  "settings.html"
+ ],
+ "Animated keyboard and mouse overlay.": [
+  "_overlay-controls.html"
+ ],
+ "Anonymous": [
+  "account-menu.html",
+  "settings.html"
+ ],
+ "Anonymous upload details": [
+  "settings.html"
+ ],
+ "Another clip just took that name. Try restoring it again.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "Another ReplayKit update is already running.": [
+  "apps/setup/Update.cs"
+ ],
+ "Answer too large.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "Anti-aliasing": [
+  "settings.html"
+ ],
+ "App Icon": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "App settings": [
+  "settings.html"
+ ],
+ "Appearance": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Applies your theme before OBS starts.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Apply": [
+  "settings.html"
+ ],
+ "Apply & Restart": [
+  "settings.html"
+ ],
+ "Apply default settings": [
+  "apps/setup/Apply.cs"
+ ],
+ "Apply failed: {error}": [
+  "settings.html"
+ ],
+ "Apply or cancel settings changes before uninstalling.": [
+  "settings.html"
+ ],
+ "Apply or cancel settings changes first.": [
+  "settings.html"
+ ],
+ "Applying settings and restarting OBS...": [
+  "settings.html"
+ ],
+ "Applying settings...": [
+  "settings.html"
+ ],
+ "Arrow key skip": [
+  "settings.html"
+ ],
+ "Aspect ratio": [
+  "editor.html"
+ ],
+ "Audio": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "Audio cannot be added to this clip": [
+  "_editor-lanes.html"
+ ],
+ "Audio cannot be added to this clip.": [
+  "_editor-tools.html"
+ ],
+ "Audio cannot be added to this kind of clip.": [
+  "apps/helper/Trim.cs"
+ ],
+ "Audio could not be added": [
+  "_editor-lanes.html"
+ ],
+ "Audio driver": [
+  "settings.html"
+ ],
+ "Audio files": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "Audio Input Capture": [
+  "apps/setup/DefaultsMigration.cs"
+ ],
+ "Audio is still loading": [
+  "editor.html"
+ ],
+ "Audio Processes": [
+  "settings.html"
+ ],
+ "Audio that was added to this edit is no longer there, so it was left out:": [
+  "editor.html"
+ ],
+ "Auto Game List": [
+  "settings.html"
+ ],
+ "Auto generate": [
+  "_editor-tools.html"
+ ],
+ "Auto generate subtitles": [
+  "_editor-tools.html"
+ ],
+ "Auto subtitles": [
+  "_editor-tools.html"
+ ],
+ "Auto subtitles are not set up yet.": [
+  "apps/helper/Speech.cs"
+ ],
+ "Automatic startup": [
+  "settings.html"
+ ],
+ "Automatically copy link": [
+  "settings.html"
+ ],
+ "Automatically delete logs on next launch": [
+  "settings.html"
+ ],
+ "Avoid gaming or other demanding tasks until this finishes. Your PC may feel a little slower meanwhile.": [
+  "storage.html"
+ ],
+ "Back": [
+  "_editor-fx.html",
+  "_editor-tools.html",
+  "setup.html"
+ ],
+ "Back (Alt + Left)": [
+  "plugins/replaykit/src/shell/shell_nav_button.cpp"
+ ],
+ "Back up current OBS settings": [
+  "apps/setup/Apply.cs"
+ ],
+ "Background": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Background color": [
+  "_appearance-panel.html",
+  "_editor-tools.html",
+  "settings.html"
+ ],
+ "Backspace": [
+  "_editor-lanes.html"
+ ],
+ "Bad action": [
+  "apps/helper/QuickActions.cs"
+ ],
+ "Bad audio edit": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad command name.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "Bad edit": [
+  "apps/helper/EditDrafts.cs",
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad editor session.": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad editor sources.": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad filename": [
+  "apps/helper/ClipRoutes.cs",
+  "apps/helper/EditDrafts.cs",
+  "apps/helper/ShareRoutes.cs"
+ ],
+ "Bad json": [
+  "apps/helper/QuickActions.cs"
+ ],
+ "Bad json.": [
+  "apps/helper/SdkRoutes.cs"
+ ],
+ "Bad layer: {error}": [
+  "apps/helper/LayerPlan.cs"
+ ],
+ "Bad menu.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Bad new filename": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Bad presets": [
+  "apps/helper/EditorPresets.cs"
+ ],
+ "Bad render settings": [
+  "apps/helper/Trim.cs"
+ ],
+ "Bad report": [
+  "apps/helper/RecordingRoutes.cs"
+ ],
+ "Bad request": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad screenshot time": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "Bad screenshot time or video edit": [
+  "apps/helper/Trim.cs"
+ ],
+ "Bad speed": [
+  "apps/helper/EditorRoutes.cs",
+  "apps/helper/Trim.cs"
+ ],
+ "Bad start/end": [
+  "apps/helper/Trim.cs"
+ ],
+ "Bad version.": [
+  "apps/helper/ObsUpdate.cs",
+  "apps/helper/Update.cs"
+ ],
+ "Bad video look: {error}": [
+  "apps/helper/VideoLook.cs"
+ ],
+ "Balanced": [
+  "setup.html"
+ ],
+ "Balanced (recommended)": [
+  "apps/setup/Recording.cs"
+ ],
+ "Bango Cat": [
+  "apps/setup/BongoCat.cs",
+  "apps/setup/Cleanup.cs"
+ ],
+ "Bars": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Base colors": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Biggest": [
+  "_clip-toolbar.html"
+ ],
+ "Birthday cake": [
+  "_editor-tools.html"
+ ],
+ "Bitrate": [
+  "editor.html"
+ ],
+ "Black & White": [
+  "_editor-fx.html"
+ ],
+ "Black bars": [
+  "editor.html"
+ ],
+ "Blend pixels for smoother zoomed-in video.": [
+  "settings.html"
+ ],
+ "Blinking": [
+  "settings.html"
+ ],
+ "Blue heart": [
+  "_editor-tools.html"
+ ],
+ "Blue Hour": [
+  "_editor-fx.html"
+ ],
+ "Bongo Cat": [
+  "_overlay-controls.html",
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Bongo Cat could not be installed or repaired. Run the ReplayKit installer again to finish setting up the overlay.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Bongo Cat files and saved sources": [
+  "apps/setup/Installer.cs"
+ ],
+ "Bongo Cat is not working": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Bongo Cat mode": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Bongo Cat needs the ReplayKit OBS plugin. Run the ReplayKit installer again, then restart OBS.": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Bongo Cat Overlay (Switching)": [
+  "apps/setup/Transform.cs"
+ ],
+ "Bongo Cat speed": [
+  "settings.html"
+ ],
+ "Bongo Cat speed slider": [
+  "settings.html"
+ ],
+ "Border": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Border color": [
+  "_appearance-panel.html",
+  "_editor-tools.html",
+  "settings.html"
+ ],
+ "Breathing": [
+  "settings.html"
+ ],
+ "Brightens and tints the overlay. Black keeps the colors as they are.": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Broken heart": [
+  "_editor-tools.html"
+ ],
+ "Build ReplayKit helper": [
+  "apps/setup/Apply.cs"
+ ],
+ "Building the preview": [
+  "editor.html"
+ ],
+ "Building the preview {done}/{total}": [
+  "editor.html"
+ ],
+ "Bundled entry is outside the unpack folder.": [
+  "apps/setup/AssetBundle.cs"
+ ],
+ "Bundled file escapes its install directory.": [
+  "apps/setup/BundledFiles.cs"
+ ],
+ "button type=\"button\" class=\"hm-btn": [
+  "_home-dashboard.html"
+ ],
+ "By game": [
+  "_clip-content.html"
+ ],
+ "C:\\path\\to\\icon.ico  (.ico, .png, .jpg, .bmp)": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "CABLE In 16ch": [
+  "apps/setup/VbCable.cs"
+ ],
+ "CABLE Input": [
+  "apps/setup/VbCable.cs"
+ ],
+ "CABLE Out 16ch": [
+  "apps/setup/VbCable.cs"
+ ],
+ "CABLE Output": [
+  "apps/setup/VbCable.cs"
+ ],
+ "Camera flash": [
+  "_editor-tools.html"
+ ],
+ "Cancel": [
+  "setup_installer.html",
+  "_clip-dialogs.html",
+  "account-menu.html"
+ ],
+ "Cancel 1 upload": [
+  "clip-app.js"
+ ],
+ "Cancel edit": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Cancel save": [
+  "editor.html"
+ ],
+ "Cancel {count} uploads": [
+  "clip-app.js"
+ ],
+ "Cancellation requested": [
+  "apps/helper/UploadState.cs"
+ ],
+ "Cancelled 1 upload.": [
+  "clip-app.js"
+ ],
+ "Cancelled {count} uploads.": [
+  "clip-app.js"
+ ],
+ "Cannot establish exclusive helper ownership.": [
+  "apps/helper/Program.cs"
+ ],
+ "Cannot reach OBS.": [
+  "_home-dashboard.html"
+ ],
+ "Capture Effects": [
+  "settings.html"
+ ],
+ "Capture Source": [
+  "settings.html"
+ ],
+ "Capture switch delay in seconds": [
+  "settings.html"
+ ],
+ "Capture switch delay slider": [
+  "settings.html"
+ ],
+ "Card Dates": [
+  "settings.html"
+ ],
+ "Cat face": [
+  "_editor-tools.html"
+ ],
+ "Center on the video": [
+  "_editor-lanes.html"
+ ],
+ "Center X": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Center Y": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Change game": [
+  "_clip-games.html"
+ ],
+ "Change picture": [
+  "account-menu.html",
+  "settings.html"
+ ],
+ "Change profile picture": [
+  "settings.html"
+ ],
+ "Change the audio speed too": [
+  "_editor-lanes.html"
+ ],
+ "Changes every subtitle in this row.": [
+  "_editor-tools.html"
+ ],
+ "Changes the sound's speed along with the video, so the sound stays lined up with the picture. Saving takes about as long as the clip when you change the speed, cut the video into pieces, or let the audio run past the video.": [
+  "_editor-lanes.html"
+ ],
+ "Check for OBS updates": [
+  "settings.html"
+ ],
+ "Check for updates": [
+  "settings.html"
+ ],
+ "Check mark button": [
+  "_editor-tools.html"
+ ],
+ "Check these subtitles": [
+  "_editor-fx.html"
+ ],
+ "Check your connection and run the installer again to repair the video tools.": [
+  "apps/setup/FfmpegInstall.cs"
+ ],
+ "Checking clip eligibility...": [
+  "storage.html"
+ ],
+ "Checking connection…": [
+  "settings.html"
+ ],
+ "Checking for updates...": [
+  "update_prompt.html"
+ ],
+ "Checking unclear words": [
+  "_editor-tools.html"
+ ],
+ "Choose an icon image": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "Choose color": [
+  "_color-picker.html"
+ ],
+ "Choose folder": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Choose how clips play, look, and save in the video editor.": [
+  "settings.html"
+ ],
+ "Choose how ReplayKit captures gameplay and saves your clips.": [
+  "settings.html"
+ ],
+ "Choose how ReplayKit starts and behaves in Windows.": [
+  "settings.html"
+ ],
+ "Choose image": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Choose the recordings folder": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "Choose what the close button does. Off: OBS keeps running in the system tray. On: OBS closes completely.": [
+  "settings.html"
+ ],
+ "Choose what to remove and whether to keep your settings.": [
+  "settings.html"
+ ],
+ "Choose what you share on Discord and manage the Share Preview window.": [
+  "settings.html"
+ ],
+ "Choose when your mouse cursor shows up in recordings and clips.": [
+  "settings.html"
+ ],
+ "Choose which recording and sharing notifications you see.": [
+  "settings.html"
+ ],
+ "Choose {label}": [
+  "_editor-tools.html"
+ ],
+ "Cleanup complete": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Clear": [
+  "_clip-toolbar.html",
+  "notifications.html",
+  "storage.html"
+ ],
+ "Clear hotkey": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Clear old OBS files": [
+  "apps/setup/Apply.cs"
+ ],
+ "Clear the setup cache": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Click a color square to change that color.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Click a field, then press the key combo you want. These are global OBS hotkeys.": [
+  "setup.html"
+ ],
+ "Click a key, then press the key to use for it. Backspace puts back the key of the mode.": [
+  "settings.html"
+ ],
+ "Click again to delete": [
+  "notifications.html",
+  "clip-app.js"
+ ],
+ "Click again to delete everything here": [
+  "_deleted.html"
+ ],
+ "Click again to move to trash": [
+  "clip-app.js"
+ ],
+ "Click anywhere on any monitor. Esc or right-click cancels.": [
+  "_color-picker.html"
+ ],
+ "Click the ramp to add a stop, drag to move it, click a stop to recolor.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Click to install": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Click to see what changed": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Click to set a hotkey": [
+  "hotkey-menu.html"
+ ],
+ "Clip": [
+  "_deleted.html",
+  "_editor-lanes.html",
+  "plugins/replaykit/src/chrome/title_keybind_badge.cpp"
+ ],
+ "Clip browser script was not found.": [
+  "apps/helper/HttpResponse.cs"
+ ],
+ "Clip database is busy.": [
+  "apps/helper/ClipStore.cs"
+ ],
+ "Clip duration is unavailable.": [
+  "clip-app.js"
+ ],
+ "Clip filters": [
+  "_clip-toolbar.html"
+ ],
+ "Clip folder must be an absolute path.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Clip folder not found": [
+  "apps/helper/ClipRoutes.cs",
+  "apps/helper/GifExports.cs",
+  "apps/helper/Screenshots.cs"
+ ],
+ "Clip folder path is too long.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Clip folder was saved, but the helper could not switch to it: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Clip is too big for Streamable": [
+  "_clip-dialogs.html"
+ ],
+ "Clip is too long for Streamable": [
+  "clip-app.js"
+ ],
+ "Clip is too long to compress under {size} MB without going below a safe video bitrate": [
+  "apps/helper/Compression.cs"
+ ],
+ "Clip is {length} long. Streamable's limit is 10 minutes -- trim it shorter first.": [
+  "apps/helper/Compression.cs",
+  "apps/helper/Upload.cs"
+ ],
+ "Clip Length": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Clip length": [
+  "setup.html"
+ ],
+ "Clip name": [
+  "editor.html",
+  "clip-app.js"
+ ],
+ "Clip not found": [
+  "apps/helper/ClipAudioTracks.cs",
+  "apps/helper/ClipFilmstrip.cs",
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Clip not found.": [
+  "apps/helper/ClipGames.cs",
+  "apps/helper/GameRoutes.cs",
+  "apps/helper/GifExports.cs"
+ ],
+ "Clip not found: {clipPath}": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Clip operation is no longer reserved.": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "Clip retention": [
+  "settings.html"
+ ],
+ "Clip settings": [
+  "hotkey-menu.html"
+ ],
+ "Clip state body is required.": [
+  "apps/helper/Clips.cs"
+ ],
+ "Clip Uploaded": [
+  "apps/helper/Upload.cs"
+ ],
+ "Clip {length}": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Clipboard copy failed: {error}": [
+  "clip-app.js",
+  "apps/helper/Trim.cs"
+ ],
+ "Clipping": [
+  "hotkey-menu.html",
+  "settings.html",
+  "setup.html"
+ ],
+ "Clipping is off, nothing is being kept": [
+  "hotkey-menu.html"
+ ],
+ "Clipping is off.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "Clipping is off. Click to open settings": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Clipping off": [
+  "settings.html"
+ ],
+ "Clipping on": [
+  "settings.html"
+ ],
+ "Clipping Sound": [
+  "settings.html"
+ ],
+ "Clipping sound volume": [
+  "settings.html"
+ ],
+ "Clipping sound volume slider": [
+  "settings.html"
+ ],
+ "Clips": [
+  "settings.html",
+  "setup.html",
+  "clip-app.js"
+ ],
+ "Clips - Editor": [
+  "clip-app.js"
+ ],
+ "Clips folder not found.": [
+  "_home-dashboard.html"
+ ],
+ "Clips you share upload without an account and stay up for <b>{days} days</b>. Sign in to use your own Streamable account.": [
+  "account-menu.html"
+ ],
+ "Close": [
+  "setup_installer.html",
+  "uninstall_prompt.html",
+  "_clip-games.html"
+ ],
+ "Close deleted history": [
+  "_deleted.html"
+ ],
+ "Close GIF": [
+  "_screenshots.html"
+ ],
+ "Close OBS": [
+  "apps/setup/Apply.cs",
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Update.cs"
+ ],
+ "Close OBS and its browser and helper processes before changing the process host.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "Close screenshot": [
+  "_screenshots.html"
+ ],
+ "Close the panel": [
+  "_editor-tools.html"
+ ],
+ "Closing OBS to apply files": [
+  "update_prompt.html"
+ ],
+ "Clown face": [
+  "_editor-tools.html"
+ ],
+ "Cold face": [
+  "_editor-tools.html"
+ ],
+ "Collapse All clips": [
+  "_clip-content.html"
+ ],
+ "Collapse Drafts": [
+  "_clip-content.html"
+ ],
+ "Collapse Favorites": [
+  "_clip-content.html"
+ ],
+ "Collapse GIFs": [
+  "_clip-content.html"
+ ],
+ "Collapse Linked": [
+  "_clip-content.html"
+ ],
+ "Collapse Screenshots": [
+  "_clip-content.html"
+ ],
+ "Collapse {name}": [
+  "clip-app.js"
+ ],
+ "Collapse {name} clips": [
+  "clip-app.js"
+ ],
+ "Collapsed game groups could not be saved": [
+  "clip-app.js"
+ ],
+ "Color Add": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Color Multiply": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Colours each word while it is said.": [
+  "_editor-tools.html"
+ ],
+ "Compress": [
+  "_clip-dialogs.html",
+  "_clip-toolbar.html",
+  "storage.html"
+ ],
+ "Compress All": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Compress all": [
+  "_clip-dialogs.html",
+  "clip-app.js"
+ ],
+ "Compress all clips": [
+  "_clip-dialogs.html"
+ ],
+ "Compress clip": [
+  "_clip-dialogs.html"
+ ],
+ "Compress Clips": [
+  "storage.html"
+ ],
+ "Compress selected": [
+  "clip-app.js"
+ ],
+ "Compress selected clips": [
+  "_clip-toolbar.html"
+ ],
+ "Compress {clips}": [
+  "storage.html"
+ ],
+ "Compressed file is empty": [
+  "apps/helper/CompressedUploadWorker.cs"
+ ],
+ "Compressed {clips} and freed {size} before it was stopped.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Compressed {clips} and freed {size}.": [
+  "storage.html",
+  "apps/helper/Storage.cs"
+ ],
+ "Compressed {clips}.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Compressing": [
+  "storage.html"
+ ],
+ "Compressing (fast)": [
+  "clip-app.js"
+ ],
+ "Compressing (smaller)": [
+  "clip-app.js"
+ ],
+ "Compressing clips {time}, {percent}%": [
+  "plugins/replaykit/src/shell/shell_storage.cpp"
+ ],
+ "Compressing temp copy and uploading": [
+  "apps/helper/Compression.cs"
+ ],
+ "Compressing temp copy for {name}.": [
+  "clip-app.js"
+ ],
+ "Compressing {clips} ({size}) should free about <b>{estimate}</b>.": [
+  "storage.html"
+ ],
+ "Compressing {clips} ({size}).": [
+  "storage.html"
+ ],
+ "Compressing {position} of {total}": [
+  "storage.html"
+ ],
+ "Compression did not finish": [
+  "apps/helper/Storage.cs"
+ ],
+ "Compression exceeded its time limit.": [
+  "apps/helper/CompressOverwriteWorker.cs",
+  "apps/helper/CompressedUploadWorker.cs"
+ ],
+ "Compression finished": [
+  "apps/helper/Storage.cs"
+ ],
+ "Compression history could not be opened or saved. Check ReplayKit's saved state folder before compressing.": [
+  "apps/helper/CompressOverwrite.cs"
+ ],
+ "Compression history was not saved": [
+  "apps/helper/CompressOverwriteWorker.cs"
+ ],
+ "Compression mode must be a string.": [
+  "apps/helper/StorageRoutes.cs"
+ ],
+ "Compression stopped": [
+  "apps/helper/Storage.cs"
+ ],
+ "Compression type": [
+  "settings.html"
+ ],
+ "Confetti ball": [
+  "_editor-tools.html"
+ ],
+ "Confirm?": [
+  "settings.html"
+ ],
+ "Connected account": [
+  "settings.html"
+ ],
+ "Connecting...": [
+  "settings.html"
+ ],
+ "Connection": [
+  "settings.html"
+ ],
+ "Contains {games}": [
+  "_clip-games.html"
+ ],
+ "Continue": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Continue editing": [
+  "clip-app.js"
+ ],
+ "Copied to clipboard - paste anywhere to share the file": [
+  "clip-app.js"
+ ],
+ "Copies the Streamable link when your shared clip is ready to watch.": [
+  "settings.html"
+ ],
+ "Copy": [
+  "_editor-lanes.html"
+ ],
+ "Copy GIF": [
+  "_screenshots.html"
+ ],
+ "Copy image": [
+  "_screenshots.html"
+ ],
+ "Copy Link": [
+  "clip-app.js"
+ ],
+ "Copy to clipboard": [
+  "_screenshots.html"
+ ],
+ "Copying ReplayKit files": [
+  "update_prompt.html"
+ ],
+ "Could not add noise suppression: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not add the noise gate: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not ask to restart OBS: {error}": [
+  "_home-dashboard.html"
+ ],
+ "Could not auto-save the custom theme: {error}": [
+  "settings.html"
+ ],
+ "Could not change Bongo Cat visibility: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not change noise suppression: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not change {name}.": [
+  "settings.html"
+ ],
+ "Could not check clip eligibility.": [
+  "storage.html"
+ ],
+ "Could not create Bongo Cat overlay: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not create the setup window.": [
+  "apps/setup/SetupWindow.cs"
+ ],
+ "Could not create the uninstall window.": [
+  "apps/setup/UninstallWindow.cs"
+ ],
+ "Could not create {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not create {sourceName} motion blur filter: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not delete the clips.": [
+  "storage.html"
+ ],
+ "Could not download it: {error}": [
+  "settings.html"
+ ],
+ "Could not enable {sourceName} motion blur: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not fit {captureName} to canvas: {error}": [
+  "apps/helper/SettingsOverlayLive.cs",
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not flip {itemName}: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not group the WASD and mouse overlays. Restart OBS to rebuild them.": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not hide Display Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not inspect OBS Stream Audio playback endpoint: {error}": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Could not launch the transcode status worker.": [
+  "apps/helper/Upload.cs"
+ ],
+ "Could not list microphones: {error}": [
+  "apps/helper/MicTest.cs"
+ ],
+ "Could not load deleted items": [
+  "_deleted.html"
+ ],
+ "Could not load notifications.": [
+  "notifications.html"
+ ],
+ "Could not load release notes for the installed version.": [
+  "notifications.html"
+ ],
+ "Could not load settings: {error}": [
+  "settings.html"
+ ],
+ "Could not locate OBS executable path to relaunch from.": [
+  "apps/helper/AppRoutes.cs",
+  "apps/helper/SettingsRoutes.cs"
+ ],
+ "Could not open Clips: {error}": [
+  "_appearance-panel.html",
+  "clip-app.js"
+ ],
+ "Could not open Settings: {error}": [
+  "_home-dashboard.html"
+ ],
+ "Could not open the log folder: {error}": [
+  "settings.html"
+ ],
+ "Could not open the microphone.": [
+  "_mic-controls.html"
+ ],
+ "Could not open the OBS menu: {error}": [
+  "settings.html"
+ ],
+ "Could not open the OBS settings: {error}": [
+  "settings.html"
+ ],
+ "Could not open the secure Streamable sign-in window: {error}": [
+  "apps/helper/StreamableSignIn.cs"
+ ],
+ "Could not open the storage card: {error}": [
+  "_home-dashboard.html"
+ ],
+ "Could not open the update window: {error}": [
+  "apps/helper/Update.cs"
+ ],
+ "Could not pause OBS hotkey": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Could not pause the OBS hotkeys": [
+  "hotkey-menu.html"
+ ],
+ "Could not place {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not position Bongo Cat overlay: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not position input overlay group: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not position Window Capture under overlays: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not position {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not prepare Display Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not prepare Game Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not prepare signed-in Streamable session: {error}": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Could not prepare the selected OBS theme.": [
+  "apps/helper/Themes.cs"
+ ],
+ "Could not prepare Window Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not preview overlay rotation: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not preview {itemName} flip: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not preview {name} size: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not publish trimmed copy: {error}": [
+  "apps/helper/Trim.cs"
+ ],
+ "Could not read Desktop Audio capture settings: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not read Desktop Audio monitor state: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not read Desktop Audio mute state: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not read keyframes: {error}": [
+  "apps/helper/TrimKeyframesWorker.cs"
+ ],
+ "Could not read monitor work areas: {error}": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Could not read the microphone filters: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not read the overlay group: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not read the {label}: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not read video duration": [
+  "apps/helper/CompressOverwrite.cs"
+ ],
+ "Could not read video duration for compression.": [
+  "apps/helper/Compression.cs"
+ ],
+ "Could not read your library.": [
+  "storage.html"
+ ],
+ "Could not read your saved section preferences.": [
+  "clip-app.js"
+ ],
+ "Could not read {itemName} to flip: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not read {name} rotation.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not remove a duplicate {source} item: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not remove icon": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Could not remove preview opacity filter from {sourceName}: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not remove retired {sourceName} Composite Blur filter: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not remove the input overlay group: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not remove theme": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Could not remove {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not remove {sourceName} motion blur filter: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not repair Desktop Audio monitoring state: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not replace original: {error}": [
+  "apps/helper/CompressOverwriteWorker.cs",
+  "apps/helper/Trim.cs"
+ ],
+ "Could not resize {name}: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not resolve a safe projector parking corner.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Could not resolve a valid projector window size.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Could not restore {name}: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not restore {sourceName} opacity filter enabled state: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not restore {sourceName} opacity filter settings: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not rotate overlay: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not rotate {name}: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not save favorites": [
+  "clip-app.js"
+ ],
+ "Could not save favorites. Try again.": [
+  "clip-app.js"
+ ],
+ "Could not save the hotkey": [
+  "hotkey-menu.html"
+ ],
+ "Could not save the limit.": [
+  "storage.html"
+ ],
+ "Could not save theme": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Could not save your section preferences.": [
+  "clip-app.js"
+ ],
+ "Could not save: {error}. Press Finish to try again.": [
+  "setup.html"
+ ],
+ "Could not set Bongo Cat overlay opacity: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not set OBS monitoring device to {device} after {attempts} attempts. {error}": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "Could not set the input sensitivity: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not set the {label}: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not set up Bongo Cat: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not set {name} opacity: {error}": [
+  "apps/helper/SettingsOverlayLive.cs",
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not show Display Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not show or hide {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not sign out: {error}": [
+  "settings.html"
+ ],
+ "Could not start compressing.": [
+  "storage.html"
+ ],
+ "Could not start Discord screenshare install.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Could not start Discord screenshare removal.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Could not start OBS theme preparation.": [
+  "apps/setup/Installer.cs"
+ ],
+ "Could not start ReplayKit uninstall.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Could not start the microphone test: {error}": [
+  "apps/helper/MicTest.cs"
+ ],
+ "Could not start the update: {error}": [
+  "_home-dashboard.html"
+ ],
+ "Could not switch the microphone: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not toggle Game Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not toggle Window Capture: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not turn clipping off": [
+  "hotkey-menu.html"
+ ],
+ "Could not turn clipping off: {error}": [
+  "settings.html"
+ ],
+ "Could not turn clipping on": [
+  "hotkey-menu.html"
+ ],
+ "Could not turn clipping on: {error}": [
+  "settings.html"
+ ],
+ "Could not turn the noise gate off: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Could not update Bongo Cat settings: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not update Game Capture settings: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not update the Display Capture cursor: {error}": [
+  "apps/helper/SettingsOverlayLive.cs",
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not update Window Capture settings: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Could not update {name}: {error}": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Could not update {sourceName} motion blur settings: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Couldn't create link: {error}": [
+  "clip-app.js"
+ ],
+ "Couldn't start compress: {error}": [
+  "clip-app.js"
+ ],
+ "Couldn't start compression: {error}": [
+  "clip-app.js"
+ ],
+ "Couldn’t rename: {error}": [
+  "_screenshots.html",
+  "clip-app.js"
+ ],
+ "Couldn’t save the screenshot: {error}": [
+  "clip-app.js"
+ ],
+ "Create a temporary compressed copy and upload that instead?": [
+  "clip-app.js"
+ ],
+ "Create Link": [
+  "clip-app.js"
+ ],
+ "Creates the clip folders.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Creates the config folder.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Creating link": [
+  "clip-app.js"
+ ],
+ "Cross mark": [
+  "_editor-tools.html"
+ ],
+ "Cross Process": [
+  "_editor-fx.html"
+ ],
+ "Crossed swords": [
+  "_editor-tools.html"
+ ],
+ "Crystal ball": [
+  "_editor-tools.html"
+ ],
+ "Ctrl + Shift + S": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Custom file": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Custom Height": [
+  "settings.html"
+ ],
+ "Custom limit": [
+  "settings.html"
+ ],
+ "Custom theme": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Customize ReplayKit’s theme, icons, and clip dates.": [
+  "settings.html"
+ ],
+ "Customize the input overlay and effects in your recordings.": [
+  "settings.html"
+ ],
+ "Custom…": [
+  "settings.html"
+ ],
+ "Cutting the clip": [
+  "editor.html"
+ ],
+ "Danger": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Danger color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Darkens and tints the overlay. White keeps the colors as they are.": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Date": [
+  "settings.html"
+ ],
+ "Date and time": [
+  "settings.html"
+ ],
+ "Decrease clip length": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Default": [
+  "_mic-controls.html"
+ ],
+ "Default (system)": [
+  "apps/setup/Audio.cs"
+ ],
+ "Delete": [
+  "_clip-toolbar.html",
+  "_deleted.html",
+  "_editor-lanes.html"
+ ],
+ "Delete (Backspace)": [
+  "_editor-lanes.html"
+ ],
+ "Delete clip": [
+  "clip-app.js"
+ ],
+ "Delete draft": [
+  "clip-app.js"
+ ],
+ "Delete everything here for good": [
+  "_deleted.html"
+ ],
+ "Delete failed": [
+  "clip-app.js"
+ ],
+ "Delete failed: {error}": [
+  "clip-app.js"
+ ],
+ "Delete for good": [
+  "_deleted.html"
+ ],
+ "Delete GIF": [
+  "_screenshots.html",
+  "clip-app.js"
+ ],
+ "Delete notification": [
+  "notifications.html"
+ ],
+ "Delete preset": [
+  "_editor-fx.html"
+ ],
+ "Delete screenshot": [
+  "_screenshots.html",
+  "clip-app.js"
+ ],
+ "Delete selected clips": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Delete subtitle": [
+  "_editor-fx.html",
+  "_editor-lanes.html"
+ ],
+ "Delete the row": [
+  "_editor-lanes.html"
+ ],
+ "Delete the temporary files. The ones kept to open clips quickly are made again the next time a clip is opened.": [
+  "storage.html"
+ ],
+ "Delete {clips}": [
+  "storage.html"
+ ],
+ "Delete {name}": [
+  "_editor-fx.html"
+ ],
+ "Delete?": [
+  "_deleted.html",
+  "_editor-fx.html",
+  "_screenshots.html"
+ ],
+ "Deleted 1 selected clip.": [
+  "clip-app.js"
+ ],
+ "Deleted for good soon": [
+  "_deleted.html"
+ ],
+ "Deleted history": [
+  "_clip-toolbar.html",
+  "_deleted.html",
+  "settings.html"
+ ],
+ "Deleted history ({count})": [
+  "_deleted.html"
+ ],
+ "Deleted {clips}, freed {size} ({failed} could not be deleted).": [
+  "storage.html"
+ ],
+ "Deleted {clips}, freed {size}.": [
+  "storage.html"
+ ],
+ "Deleted {count} selected clips.": [
+  "clip-app.js"
+ ],
+ "Deleted {name}": [
+  "clip-app.js"
+ ],
+ "Deletes ReplayKit OBS plugins from the OBS install folder.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deletes ReplayKit's OBS config folder while preserving OBS scenes and profiles.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deletes saved ReplayKit preferences.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deletes the clips and screenshots that are waiting in ReplayKit's deleted history, since nothing could restore or clear them once ReplayKit is gone.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deletes the old logs each time OBS starts, so they don't pile up. Leave this on unless you want to keep logs from an earlier session.": [
+  "settings.html"
+ ],
+ "Deletes the optional virtual display driver if it exists.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deletes the ReplayKit scheduled task.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Deselect": [
+  "_editor-lanes.html",
+  "clip-app.js"
+ ],
+ "Deselect (Esc)": [
+  "_editor-lanes.html"
+ ],
+ "Deselect clip": [
+  "clip-app.js"
+ ],
+ "Desktop": [
+  "_clip-games.html"
+ ],
+ "Desktop Audio (excl. Discord)": [
+  "apps/setup/Transform.cs"
+ ],
+ "Desktop Audio is not the ReplayKit audio capture source.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Desktop Audio mixer state could not be changed: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Desktop Audio monitoring state could not be verified: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Desktop Audio monitoring was applied live, but could not be saved for restart: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Desktop Capture": [
+  "settings.html"
+ ],
+ "Desktop color picker failed: {error}": [
+  "apps/helper/AppearanceRoutes.cs"
+ ],
+ "Detect automatically": [
+  "_editor-tools.html"
+ ],
+ "Development": [
+  "settings.html"
+ ],
+ "Development mode": [
+  "settings.html"
+ ],
+ "Disable Share Preview": [
+  "controls_app.html"
+ ],
+ "Disable sleeping": [
+  "settings.html"
+ ],
+ "Disable the OBS \"crash detected / safe mode\" popup after an unclean shutdown": [
+  "settings.html"
+ ],
+ "Discard draft": [
+  "editor.html"
+ ],
+ "Discord": [
+  "settings.html"
+ ],
+ "Discord Audio": [
+  "settings.html"
+ ],
+ "Discord Audio (record only)": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Discord audio tracks could not be updated: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord audio volume": [
+  "settings.html"
+ ],
+ "Discord audio volume slider": [
+  "settings.html"
+ ],
+ "Discord output mode was saved, but legacy virtual camera could not be started: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord output mode was saved, but virtual camera could not be stopped: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord output mode was saved, but virtual camera state could not be read: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord output mode was saved, but {message}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord projector is not the active Share Preview mode.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Discord Screenshare": [
+  "settings.html"
+ ],
+ "Discord screenshare setup": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Discord screenshare support is disabled in Advanced settings.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Discord screenshare support is disabled.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Discord screenshare support is not available.": [
+  "settings.html"
+ ],
+ "Disk": [
+  "setup.html"
+ ],
+ "Dismiss": [
+  "_home-dashboard.html"
+ ],
+ "Display": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Display Capture": [
+  "apps/setup/Transform.cs"
+ ],
+ "Display not connected": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Display to capture": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Do not warn when closing OBS with active outputs": [
+  "settings.html"
+ ],
+ "Docks": [
+  "settings.html"
+ ],
+ "Dog face": [
+  "_editor-tools.html"
+ ],
+ "Done": [
+  "storage.html",
+  "update_prompt.html"
+ ],
+ "Done.": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Done. OBS is starting…": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Download again": [
+  "settings.html"
+ ],
+ "Download exceeds the expected size.": [
+  "apps/setup/Download.cs"
+ ],
+ "Download exceeds the size limit.": [
+  "apps/setup/Download.cs"
+ ],
+ "Download manually from GitHub": [
+  "settings.html"
+ ],
+ "Download size does not match the release metadata.": [
+  "apps/setup/Download.cs"
+ ],
+ "Download URL is not trusted.": [
+  "apps/setup/Download.cs"
+ ],
+ "Download was incomplete.": [
+  "apps/setup/Download.cs"
+ ],
+ "Downloaded installer hash did not match the release hash.": [
+  "apps/helper/Update.cs"
+ ],
+ "Downloaded OBS Studio": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "Downloading OBS Studio  {size}": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "Downloading ReplayKit update": [
+  "update_prompt.html"
+ ],
+ "Downloading the setup file...": [
+  "settings.html"
+ ],
+ "Downloading the setup file... {done} of {total} MB": [
+  "settings.html"
+ ],
+ "Downloading {size} MB": [
+  "_editor-tools.html"
+ ],
+ "Downscale Filter": [
+  "settings.html"
+ ],
+ "Downscale To": [
+  "settings.html"
+ ],
+ "Draft deleted": [
+  "clip-app.js"
+ ],
+ "Draft dropped": [
+  "editor.html"
+ ],
+ "Draft not restored": [
+  "editor.html"
+ ],
+ "Draft saved": [
+  "editor.html"
+ ],
+ "Drafts": [
+  "_clip-content.html"
+ ],
+ "Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply.": [
+  "_overlay-preview.html"
+ ],
+ "Drag to position": [
+  "_overlay-preview.html"
+ ],
+ "Drag to reorder, or use Up and Down.": [
+  "clip-app.js"
+ ],
+ "Drag to resize cards, double-click to reset": [
+  "clip-app.js"
+ ],
+ "Drawing the waveforms": [
+  "_editor-lanes.html"
+ ],
+ "Drop audio files to add them": [
+  "_editor-lanes.html"
+ ],
+ "Drop shadow": [
+  "_editor-tools.html"
+ ],
+ "Drops the audio stream from the edited output.": [
+  "editor.html"
+ ],
+ "Drum": [
+  "_editor-tools.html"
+ ],
+ "Duplicate": [
+  "_editor-lanes.html"
+ ],
+ "Duplicate failed: {error}": [
+  "clip-app.js"
+ ],
+ "Duplicate HTTP header.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Duplicate Steam metadata field.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Duplicated {name}": [
+  "clip-app.js"
+ ],
+ "Duration: {time}": [
+  "editor.html"
+ ],
+ "Each clip's original file will be replaced. Only Fast mode runs in bulk — for Smaller, use a clip's 3-dot menu individually.": [
+  "clip-app.js"
+ ],
+ "Each one is added at the playhead in a row of its own. Click it on the timeline to edit it on the right.": [
+  "_editor-tools.html"
+ ],
+ "Each source clip is replaced with a smaller fast-compressed version. Clips are queued through ReplayKit's existing limiter, so they do not all encode at once.": [
+  "clip-app.js"
+ ],
+ "Edit": [
+  "_appearance-panel.html",
+  "_editor-fx.html",
+  "settings.html"
+ ],
+ "Edit clip": [
+  "clip-app.js"
+ ],
+ "Edit drafts": [
+  "clip-app.js"
+ ],
+ "Edit name": [
+  "_screenshots.html"
+ ],
+ "Edit {label}": [
+  "_editor-fx.html"
+ ],
+ "Edit {name}": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Editing is locked until this is done.": [
+  "editor.html"
+ ],
+ "Editor": [
+  "editor.html",
+  "clip-app.js",
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Editor initialization failed": [
+  "clip-app.js"
+ ],
+ "Editor resources are incomplete": [
+  "clip-app.js"
+ ],
+ "Editor resources could not be loaded": [
+  "clip-app.js"
+ ],
+ "Elements": [
+  "_editor-tools.html"
+ ],
+ "Empty": [
+  "_deleted.html"
+ ],
+ "Empty deleted history": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Empty?": [
+  "_deleted.html"
+ ],
+ "Enable clipping": [
+  "settings.html"
+ ],
+ "Enable debug logging": [
+  "settings.html"
+ ],
+ "Enable Discord screenshare": [
+  "apps/setup/Apply.cs"
+ ],
+ "Enable Discord screenshare (Share Preview)": [
+  "setup_installer.html"
+ ],
+ "Enable motion blur on capture sources": [
+  "settings.html"
+ ],
+ "Enable OBS WebSocket": [
+  "apps/setup/Apply.cs"
+ ],
+ "Enable Share Preview": [
+  "controls_app.html"
+ ],
+ "Enable Share Preview before reparking the projector.": [
+  "settings.html"
+ ],
+ "Enable Share Preview before showing the projector.": [
+  "settings.html"
+ ],
+ "Enables the local OBS WebSocket.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Encoder output is empty.": [
+  "apps/helper/ClipFiles.cs"
+ ],
+ "Encoding on the processor can lower your frame rate in games.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "End must be greater than start": [
+  "apps/helper/Trim.cs"
+ ],
+ "End the cut here (])": [
+  "_editor-lanes.html"
+ ],
+ "English": [
+  "setup.html"
+ ],
+ "Enter a game name of 1–100 characters.": [
+  "apps/helper/GameCatalog.cs"
+ ],
+ "Enter a size in GB, at least 1.": [
+  "storage.html"
+ ],
+ "Esc": [
+  "_editor-lanes.html"
+ ],
+ "Estimated savings:": [
+  "storage.html"
+ ],
+ "Every clip is already compressed.": [
+  "clip-app.js"
+ ],
+ "Every clip that could go is a favorite, so <b>nothing can be deleted</b> for you. Pick a higher limit or delete clips by hand.": [
+  "storage.html"
+ ],
+ "Everything else is set up in the wizard that opens the first time OBS launches.": [
+  "setup_installer.html"
+ ],
+ "Existing OBS websocket configuration could not be read; it was not changed.": [
+  "apps/setup/WebSocketConfig.cs"
+ ],
+ "Exit": [
+  "editor.html"
+ ],
+ "Exit editor": [
+  "editor.html"
+ ],
+ "Exit fullscreen (F)": [
+  "_deleted.html",
+  "_screenshots.html",
+  "editor.html"
+ ],
+ "Exit OBS": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Exit the editor": [
+  "editor.html"
+ ],
+ "Exit theater mode (T)": [
+  "clip-app.js"
+ ],
+ "Expand {name}": [
+  "clip-app.js"
+ ],
+ "Expand {name} clips": [
+  "clip-app.js"
+ ],
+ "Expected dir back or forward.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Expected dirty 0 or 1.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Expected input (mic, desktop or discord) and muted (true or false).": [
+  "apps/helper/AudioRoutes.cs"
+ ],
+ "Expected n.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Expected src and state (1 or 0).": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Exploding head": [
+  "_editor-tools.html"
+ ],
+ "Exporting GIF…": [
+  "clip-app.js"
+ ],
+ "External tool exceeded its time limit.": [
+  "apps/helper/Compression.cs"
+ ],
+ "Eye roll": [
+  "_editor-tools.html"
+ ],
+ "F1 to F4 give the cat another face, which stays until another one is picked.": [
+  "settings.html"
+ ],
+ "Face screaming in fear": [
+  "_editor-tools.html"
+ ],
+ "Face vomiting": [
+  "_editor-tools.html"
+ ],
+ "Face with tears of joy": [
+  "_editor-tools.html"
+ ],
+ "Faces on F1 to F4": [
+  "settings.html"
+ ],
+ "Fade in": [
+  "_editor-lanes.html"
+ ],
+ "Fade out": [
+  "_editor-lanes.html"
+ ],
+ "Failed: {error}": [
+  "controls_app.html"
+ ],
+ "Fast": [
+  "_clip-dialogs.html",
+  "settings.html",
+  "storage.html"
+ ],
+ "Fast trim is not ready yet": [
+  "editor.html"
+ ],
+ "Fast uses your GPU when supported to finish sooner. It continues if you close this window and replaces each clip only when the result is smaller.": [
+  "storage.html"
+ ],
+ "Fast-compress <b>1</b> clip.": [
+  "clip-app.js"
+ ],
+ "Fast-compress <b>1</b> selected clip.": [
+  "clip-app.js"
+ ],
+ "Fast-compress <b>{count}</b> clips.": [
+  "clip-app.js"
+ ],
+ "Fast-compress <b>{count}</b> selected clips.": [
+  "clip-app.js"
+ ],
+ "Fast-compress every clip that isn't already compressed.": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Favorite": [
+  "clip-app.js"
+ ],
+ "Favorite clip": [
+  "clip-app.js"
+ ],
+ "Favorite clips": [
+  "_clip-content.html"
+ ],
+ "Favorites": [
+  "_clip-content.html",
+  "clip-app.js"
+ ],
+ "Favorites changed in another view. Reload them before saving.": [
+  "apps/helper/Clips.cs"
+ ],
+ "Favorites only": [
+  "_clip-games.html"
+ ],
+ "Feixue": [
+  "_overlay-controls.html"
+ ],
+ "FFmpeg and FFprobe": [
+  "apps/setup/Installer.cs"
+ ],
+ "FFmpeg and FFprobe could not be installed or verified. Check your connection and run the installer again to repair trimming and compression.": [
+  "apps/setup/Apply.cs"
+ ],
+ "FFmpeg and FFprobe could not be installed or verified; trimming and compression are unavailable.": [
+  "apps/setup/FfmpegInstall.cs"
+ ],
+ "FFmpeg is missing or unavailable. Use Settings > Check for Updates or run the ReplayKit installer again to repair the video tools.": [
+  "apps/helper/Trim.cs"
+ ],
+ "FFmpeg is unavailable.": [
+  "apps/helper/GifExports.cs"
+ ],
+ "Field": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Field color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "File": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "File size": [
+  "_clip-toolbar.html",
+  "_editor-tools.html",
+  "clip-app.js"
+ ],
+ "Filters": [
+  "_clip-toolbar.html"
+ ],
+ "Finds the game you were playing, so new clips and screenshots get its name, icon and folder. Turn it off to hide game icons and the game filter, and ReplayKit stops looking up games.": [
+  "settings.html"
+ ],
+ "Finish": [
+  "setup.html"
+ ],
+ "Finishes sooner, which helps on slower PCs, but mishears more words.": [
+  "_editor-tools.html"
+ ],
+ "Finishing up": [
+  "editor.html"
+ ],
+ "Fit to zoom (0)": [
+  "_editor-lanes.html"
+ ],
+ "Fix HEVC playback compatibility": [
+  "settings.html"
+ ],
+ "Flexed biceps": [
+  "_editor-tools.html"
+ ],
+ "Flip horizontally": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Folded hands": [
+  "_editor-tools.html"
+ ],
+ "Folders cannot be added, drop the files in them": [
+  "_editor-lanes.html"
+ ],
+ "Follows how the mouse itself moves, so the paw still moves in games that keep the cursor still.": [
+  "settings.html"
+ ],
+ "Font": [
+  "settings.html"
+ ],
+ "Force re-login": [
+  "controls_app.html"
+ ],
+ "Force re-login to Streamable?": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Forward (Alt + Right)": [
+  "plugins/replaykit/src/shell/shell_nav_button.cpp"
+ ],
+ "Four leaf clover": [
+  "_editor-tools.html"
+ ],
+ "Frame Rate": [
+  "settings.html"
+ ],
+ "Frame rate": [
+  "editor.html",
+  "settings.html"
+ ],
+ "Frame-accurate cut": [
+  "editor.html"
+ ],
+ "Free memory when hidden": [
+  "settings.html"
+ ],
+ "Free up space": [
+  "_home-dashboard.html"
+ ],
+ "Free-up Space": [
+  "settings.html",
+  "storage.html"
+ ],
+ "Free: <b>{free}</b>": [
+  "storage.html"
+ ],
+ "Free: <b>{free}</b> ({drive})": [
+  "storage.html"
+ ],
+ "Freed so far: <b>{size}</b>": [
+  "storage.html"
+ ],
+ "Fullscreen": [
+  "_screenshots.html"
+ ],
+ "Fullscreen (F)": [
+  "_deleted.html",
+  "_screenshots.html",
+  "editor.html"
+ ],
+ "Fullscreen could not be changed.": [
+  "_deleted.html",
+  "_screenshots.html"
+ ],
+ "Fullscreen is unavailable.": [
+  "_deleted.html",
+  "_screenshots.html"
+ ],
+ "Fullscreen {name}": [
+  "_screenshots.html"
+ ],
+ "Game Audio": [
+  "settings.html"
+ ],
+ "Game Capture": [
+  "settings.html",
+  "apps/setup/Transform.cs"
+ ],
+ "Game could not be changed.": [
+  "_clip-games.html"
+ ],
+ "Game could not be removed.": [
+  "_clip-games.html"
+ ],
+ "Game details could not be read or updated.": [
+  "apps/helper/GameRoutes.cs"
+ ],
+ "Game die": [
+  "_editor-tools.html"
+ ],
+ "Game only": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Game panel with W, A, S, D and Space, and a mouse paw.": [
+  "_overlay-controls.html"
+ ],
+ "Game Window": [
+  "settings.html"
+ ],
+ "Games": [
+  "_clip-toolbar.html"
+ ],
+ "Games could not be loaded.": [
+  "_clip-games.html"
+ ],
+ "Games you record or pick stay in this list. Your video is not changed.": [
+  "_clip-games.html"
+ ],
+ "GB": [
+  "storage.html"
+ ],
+ "Gem stone": [
+  "_editor-tools.html"
+ ],
+ "General": [
+  "settings.html"
+ ],
+ "Generate subtitles": [
+  "_editor-tools.html"
+ ],
+ "Get {app}": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "Getting ready": [
+  "_editor-tools.html"
+ ],
+ "Getting the audio": [
+  "_editor-tools.html"
+ ],
+ "GIF copied to the clipboard": [
+  "_screenshots.html"
+ ],
+ "GIF export": [
+  "settings.html"
+ ],
+ "GIF export failed": [
+  "clip-app.js"
+ ],
+ "GIF export is in progress.": [
+  "clip-app.js"
+ ],
+ "GIF exported": [
+  "clip-app.js"
+ ],
+ "GIF frame rate": [
+  "settings.html"
+ ],
+ "GIF name": [
+  "_screenshots.html"
+ ],
+ "GIF not found": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "GIF, PNG or JPEG files from your computer.": [
+  "_editor-tools.html"
+ ],
+ "GIFs": [
+  "_clip-content.html"
+ ],
+ "GIFs and images": [
+  "_editor-tools.html",
+  "apps/helper/FilePickers.cs"
+ ],
+ "GIFs are limited to 15 seconds.": [
+  "clip-app.js"
+ ],
+ "GIFs must be at least 0.5 seconds.": [
+  "clip-app.js"
+ ],
+ "Give the tracks the same speed to combine them.": [
+  "_editor-lanes.html"
+ ],
+ "Glowing star": [
+  "_editor-tools.html"
+ ],
+ "Go to GIF": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Go to Library": [
+  "storage.html"
+ ],
+ "Go to this subtitle": [
+  "_editor-fx.html"
+ ],
+ "Golden Hour": [
+  "_editor-fx.html"
+ ],
+ "GPU Use and Clip Size": [
+  "settings.html"
+ ],
+ "Gradient angle": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient angle value": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient center X": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient center X value": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient center Y": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient center Y value": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient stop {number}": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient stop {number}, {color} at {position}%": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient stops": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradient type": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Gradients": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Guitar": [
+  "_editor-tools.html"
+ ],
+ "Head follows the mouse": [
+  "settings.html"
+ ],
+ "Hear the clip while recording": [
+  "_editor-tools.html"
+ ],
+ "Hears speech best and times the words most closely. Takes longer on slower PCs.": [
+  "_editor-tools.html"
+ ],
+ "Heart eyes": [
+  "_editor-tools.html"
+ ],
+ "Help": [
+  "settings.html"
+ ],
+ "Helper accept loop failed.": [
+  "apps/helper/Program.cs"
+ ],
+ "Helper error: {error}": [
+  "apps/helper/ShareRoutes.cs"
+ ],
+ "HEVC / H.265": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Hex color": [
+  "_color-picker.html"
+ ],
+ "Hide advanced": [
+  "setup.html"
+ ],
+ "Hide popups from screenshots and screen recordings": [
+  "settings.html"
+ ],
+ "High voltage": [
+  "_editor-tools.html"
+ ],
+ "Higher-quality target.": [
+  "setup.html"
+ ],
+ "Highlight the word being said": [
+  "_editor-tools.html"
+ ],
+ "Home": [
+  "_home-dashboard.html",
+  "plugins/replaykit/src/shell/shell_rail.cpp",
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Hot beverage": [
+  "_editor-tools.html"
+ ],
+ "Hot face": [
+  "_editor-tools.html"
+ ],
+ "Hotkey capture failed": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Hotkey key must be a string.": [
+  "apps/setup/Keybind.cs"
+ ],
+ "Hotkeys": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Hourglass done": [
+  "_editor-tools.html"
+ ],
+ "How far the left and right arrow keys jump through the clip in the editor.": [
+  "settings.html"
+ ],
+ "How fast the cat breathes, blinks and moves.": [
+  "settings.html"
+ ],
+ "How long deleted clips and screenshots stay in Deleted, the trash button next to the folder button in Clips, before they're gone for good. Off deletes them right away.": [
+  "settings.html"
+ ],
+ "How long each clip is when you press the save hotkey.": [
+  "setup.html"
+ ],
+ "How long new uploads remain available.": [
+  "settings.html"
+ ],
+ "How long the OBS window stays minimized or in the tray before ReplayKit's pages are closed to free memory. They load again when the window opens. Pages with unsaved changes or a running job stay open.": [
+  "settings.html"
+ ],
+ "How many seconds ReplayKit waits after you leave a game before it goes back to your whole screen. A short wait is quicker. A longer wait avoids flickering when you switch windows for a moment.": [
+  "settings.html"
+ ],
+ "How many words show at once.": [
+  "_editor-tools.html"
+ ],
+ "How smooth exported GIFs play. Higher looks smoother but makes bigger files that take longer to export. Every choice plays at an even pace.": [
+  "settings.html"
+ ],
+ "HTTP header line too long.": [
+  "apps/helper/Connection.cs"
+ ],
+ "HTTP headers too large.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Hue": [
+  "_color-picker.html"
+ ],
+ "Hue Shift": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Hugh Bailey": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "Hundred points": [
+  "_editor-tools.html"
+ ],
+ "i class=\"": [
+  "storage.html"
+ ],
+ "Icon": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Icon file is truncated.": [
+  "apps/helper/Native.cs"
+ ],
+ "Icon too large.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "Icon unavailable.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again": [
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Image": [
+  "_editor-lanes.html"
+ ],
+ "Images (*.ico;*.png;*.jpg;*.bmp)": [
+  "apps/helper/FilePickers.cs"
+ ],
+ "Import audio": [
+  "_editor-tools.html",
+  "editor.html",
+  "apps/helper/FilePickers.cs"
+ ],
+ "Importing audio": [
+  "_editor-lanes.html"
+ ],
+ "In love": [
+  "_editor-tools.html"
+ ],
+ "In use": [
+  "_editor-fx.html"
+ ],
+ "Incomplete HTTP body.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Incomplete HTTP header.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Incomplete HTTP headers.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Incomplete upload.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Increase clip length": [
+  "settings.html",
+  "setup.html"
+ ],
+ "input class=\"volume-slider rk-range\" type=\"range\" min=\"0\" max=\"200\" step=\"1\" value=\"": [
+  "settings.html"
+ ],
+ "Input Overlay": [
+  "settings.html"
+ ],
+ "Input overlay assets are missing from the ReplayKit install, so OBS could not switch that overlay live.": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "Input overlay is off": [
+  "_overlay-preview.html"
+ ],
+ "Input Sensitivity": [
+  "_mic-controls.html"
+ ],
+ "Input sensitivity in decibels": [
+  "_mic-controls.html"
+ ],
+ "Input sensitivity must be a number.": [
+  "apps/helper/AudioRoutes.cs"
+ ],
+ "Input sensitivity must be between {SensitivityMin} and {SensitivityMax}.": [
+  "apps/helper/MicTest.cs"
+ ],
+ "Input sensitivity slider": [
+  "_mic-controls.html"
+ ],
+ "input type=\"checkbox\" data-app=\"": [
+  "settings.html"
+ ],
+ "input type=\"checkbox\" data-live=\"": [
+  "settings.html"
+ ],
+ "Install": [
+  "setup_installer.html",
+  "settings.html"
+ ],
+ "Install and Uninstall in Settings > Advanced need it. They download it again by themselves, or use Download again there.": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "Install Bongo Cat overlay": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install Custom Controls and Clips": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install desktop audio capture": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install Discord screenshare / Share Preview audio?": [
+  "settings.html"
+ ],
+ "Install failed:": [
+  "settings.html"
+ ],
+ "Install motion blur filter": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install OBS process roles": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install OBS Stream Audio": [
+  "apps/setup/Update.cs"
+ ],
+ "Install OBS Studio": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install or open **{app}**, update the {maker} graphics driver, then restart your PC. ReplayKit switches back to the {maker} encoder by itself once it loads.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "Install ReplayKit plugin": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install the audio driver needed for Share Preview.": [
+  "settings.html"
+ ],
+ "Install video tools": [
+  "apps/setup/Apply.cs"
+ ],
+ "Install WASD/mouse overlay": [
+  "apps/setup/Apply.cs"
+ ],
+ "Installed ReplayKit version file is invalid.": [
+  "apps/helper/Update.cs"
+ ],
+ "Installed ReplayKit version file is missing version.": [
+  "apps/helper/Update.cs"
+ ],
+ "Installing Discord screenshare support. OBS will close.": [
+  "settings.html",
+  "apps/helper/Uninstall.cs"
+ ],
+ "Installing Discord screenshare support...": [
+  "settings.html"
+ ],
+ "Installing OBS Studio...": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "Installing update": [
+  "update_prompt.html"
+ ],
+ "Installing version {version}.": [
+  "update_prompt.html"
+ ],
+ "Installs an audio cable driver and a hidden OBS projector window so you can screen-share OBS's output in Discord. Leave unchecked to not install the driver or have support for Discord screenshare. It can be installed later at any time.": [
+  "setup_installer.html"
+ ],
+ "Installs OBS Studio if it is not already here, applies the ReplayKit setup, and starts OBS.": [
+  "setup_installer.html"
+ ],
+ "Installs OBS, or updates it to the version ReplayKit supports.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Installs the audio cable driver.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Installs the ReplayKit virtual audio device.": [
+  "apps/setup/Update.cs"
+ ],
+ "int mode = uZBlur > 0.0 ? 1 : uMotion > 0.0 ? 2 : uBlurS > 0.0 ? 3 : uPix > 1.0 && lod": [
+  "_editor-fx.html"
+ ],
+ "Intensity": [
+  "_editor-fx.html"
+ ],
+ "Interface": [
+  "settings.html"
+ ],
+ "Invalid Auto Game List entry.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Invalid Bongo mesh": [
+  "_live2d-bongo.html"
+ ],
+ "Invalid clip folder metadata.": [
+  "apps/helper/ClipStore.cs"
+ ],
+ "Invalid clip state.": [
+  "apps/helper/Clips.cs"
+ ],
+ "Invalid compression history entry.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "Invalid compression history file.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "Invalid compression history number.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "Invalid compression history result.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "Invalid compression type.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "Invalid draft duration": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "Invalid favorites folder": [
+  "clip-app.js"
+ ],
+ "Invalid game filter.": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Invalid game window executable.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Invalid game window token.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Invalid GIF range.": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Invalid helper host.": [
+  "apps/helper/ProcessHost.cs"
+ ],
+ "Invalid host command line.": [
+  "apps/helper/ProcessHost.cs"
+ ],
+ "Invalid HTTP header character.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Invalid HTTP header.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Invalid HTTP line ending.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Invalid HTTP request line.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Invalid id.": [
+  "apps/helper/NotificationRoutes.cs"
+ ],
+ "Invalid index path.": [
+  "apps/helper/ClipIndexWorker.cs"
+ ],
+ "Invalid overlay preview revision.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Invalid power configuration request.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "Invalid Roblox experience.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "Invalid section preferences": [
+  "clip-app.js"
+ ],
+ "Invalid setup executable path.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Invalid Steam app payload.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam app record.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam cache footer.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam installation.": [
+  "apps/helper/SteamGames.cs"
+ ],
+ "Invalid Steam library list.": [
+  "apps/helper/SteamGames.cs"
+ ],
+ "Invalid Steam string index.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam string table.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam text field.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam text object.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid Steam text string.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Invalid subtitle range.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "Invalid uninstall confirmation.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Invalid video transform.": [
+  "apps/helper/EditorRoutes.cs",
+  "apps/helper/Trim.cs"
+ ],
+ "It is {duration} long and the limit is 10 minutes. Trim it shorter first.": [
+  "clip-app.js"
+ ],
+ "It may have been deleted.": [
+  "notification-reader.html"
+ ],
+ "Jack o lantern": [
+  "_editor-tools.html"
+ ],
+ "Joins this subtitle and the next one in its row. Right-click a row to merge whole rows.": [
+  "_editor-tools.html"
+ ],
+ "Just now": [
+  "clip-app.js"
+ ],
+ "just now": [
+  "notifications.html",
+  "clip-app.js"
+ ],
+ "Keep all as they are": [
+  "_editor-fx.html"
+ ],
+ "Keep as it is": [
+  "_editor-fx.html"
+ ],
+ "Keep Game Focus": [
+  "settings.html"
+ ],
+ "Keep pixels crisp when zooming in to see small details.": [
+  "settings.html"
+ ],
+ "Keep ReplayKit settings": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Keep the OBS tray icon pinned next to the clock": [
+  "settings.html"
+ ],
+ "Keep them": [
+  "storage.html"
+ ],
+ "Keep user settings for next install": [
+  "setup_installer.html",
+  "settings.html"
+ ],
+ "Keep user settings must be a JSON boolean.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Keeps OBS on a version ReplayKit supports.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Keeps ReplayKit's pop-up messages, like 'clip saved', out of screenshots and recordings. They never show up in your clips or streams.": [
+  "settings.html"
+ ],
+ "Keeps the last moments of your screen ready, so the clip hotkey or the Clip button can save them. Turn it off and nothing is kept for clips.": [
+  "settings.html"
+ ],
+ "Keeps the sound at its normal pitch when the video speeds up, so voices don't sound high and squeaky.": [
+  "_editor-lanes.html"
+ ],
+ "Keeps the sound at its normal pitch when you change the speed, so faster parts don't sound high and squeaky.": [
+  "_editor-lanes.html"
+ ],
+ "Keeps your screen and PC awake while OBS is running.": [
+  "settings.html"
+ ],
+ "Kept for 1 day": [
+  "_deleted.html"
+ ],
+ "Kept for {count} days": [
+  "_deleted.html"
+ ],
+ "Key {number} of {mode}: {key}": [
+  "settings.html"
+ ],
+ "Keyboard": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Keyframe scan timed out; using normal fast trim": [
+  "apps/helper/Trim.cs"
+ ],
+ "Keyframe scans are busy": [
+  "apps/helper/Trim.cs"
+ ],
+ "Keyframe snap points are loading": [
+  "apps/helper/Trim.cs"
+ ],
+ "Keyframe snap points are still loading": [
+  "apps/helper/Trim.cs"
+ ],
+ "Keys": [
+  "settings.html"
+ ],
+ "Keys of the custom keyboard": [
+  "settings.html"
+ ],
+ "L Alt": [
+  "settings.html"
+ ],
+ "L Ctrl": [
+  "settings.html"
+ ],
+ "L Shift": [
+  "settings.html"
+ ],
+ "Landscape": [
+  "editor.html"
+ ],
+ "Language": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Later": [
+  "_home-dashboard.html"
+ ],
+ "Latest clip": [
+  "_clip-content.html"
+ ],
+ "Latest release did not include a tag name.": [
+  "apps/helper/Update.cs"
+ ],
+ "Latest release is missing {file}.": [
+  "apps/helper/Update.cs"
+ ],
+ "Launch OBS": [
+  "apps/setup/Apply.cs"
+ ],
+ "Layer": [
+  "_editor-fx.html",
+  "_editor-lanes.html"
+ ],
+ "Layers need the video of the edit to be put together": [
+  "apps/helper/Trim.cs"
+ ],
+ "Leave favorites out of Compress Clips": [
+  "settings.html"
+ ],
+ "Leave without saving": [
+  "settings.html"
+ ],
+ "Leaves the tray icon default.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Length": [
+  "_clip-toolbar.html",
+  "_editor-lanes.html"
+ ],
+ "Let Discord or other apps capture your OBS scene (use Application screen share).": [
+  "controls_app.html"
+ ],
+ "LET'S GO!": [
+  "_editor-tools.html"
+ ],
+ "Lets an area fade between colors instead of using one solid color.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Lets clip-ready notifications show up as OBS in the Action Center.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Lets Windows sleep during capture.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Lets you zoom into the video by scrolling over it in the editor, up to 4 times, to see small details. When it's off, scrolling does nothing there.": [
+  "settings.html"
+ ],
+ "Library": [
+  "_editor-tools.html"
+ ],
+ "Library section order could not be read": [
+  "clip-app.js"
+ ],
+ "Library section order could not be saved": [
+  "clip-app.js"
+ ],
+ "Light bulb": [
+  "_editor-tools.html"
+ ],
+ "Like 3 days ago.": [
+  "settings.html"
+ ],
+ "Like {date}.": [
+  "settings.html"
+ ],
+ "Limits apply to new uploads. Existing links keep the limits they were uploaded with.": [
+  "settings.html"
+ ],
+ "Linear": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Link Copied": [
+  "clip-app.js"
+ ],
+ "Link {time} left": [
+  "clip-app.js"
+ ],
+ "Linked": [
+  "_clip-content.html",
+  "clip-app.js"
+ ],
+ "Linked only": [
+  "_clip-games.html"
+ ],
+ "Listen to": [
+  "_editor-tools.html"
+ ],
+ "Listening...": [
+  "settings.html"
+ ],
+ "Loading clips...": [
+  "_editor-tools.html"
+ ],
+ "Loading deleted clips...": [
+  "_deleted.html"
+ ],
+ "Loading games…": [
+  "_clip-games.html"
+ ],
+ "Loading GIFs...": [
+  "_clip-content.html",
+  "_screenshots.html"
+ ],
+ "Loading more clips for this filter...": [
+  "clip-app.js"
+ ],
+ "Loading screenshots...": [
+  "_clip-content.html",
+  "_screenshots.html"
+ ],
+ "Loading settings...": [
+  "settings.html"
+ ],
+ "Loading the tracks": [
+  "_editor-lanes.html"
+ ],
+ "Loading…": [
+  "notifications.html"
+ ],
+ "Lock": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Lock OBS updates": [
+  "apps/setup/Apply.cs"
+ ],
+ "Lock the preview so the scene and the overlay cannot be moved by accident": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Locked": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Log folder not found": [
+  "apps/helper/AppRoutes.cs"
+ ],
+ "Log interface events": [
+  "settings.html"
+ ],
+ "Longer than {minutes} min": [
+  "clip-app.js"
+ ],
+ "Longest": [
+  "_clip-toolbar.html"
+ ],
+ "Looking for clips...": [
+  "_clip-content.html"
+ ],
+ "Loop the selected part": [
+  "settings.html"
+ ],
+ "Lost contact with ReplayKit, so the microphone stopped.": [
+  "_mic-controls.html"
+ ],
+ "Loudly crying face": [
+  "_editor-tools.html"
+ ],
+ "Low disk space.": [
+  "_home-dashboard.html"
+ ],
+ "Lowest GPU use": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Lush Green": [
+  "_editor-fx.html"
+ ],
+ "M50 6a44 44 0 1 0 .01 0zM50 18a32 32 0 1 1-.01 0z": [
+  "_editor-tools.html"
+ ],
+ "Magic wand": [
+  "_editor-tools.html"
+ ],
+ "Manage clip storage and free up space on your drive.": [
+  "settings.html"
+ ],
+ "Manage Hotkeys": [
+  "hotkey-menu.html"
+ ],
+ "Manage recorded sound, audio tracks, and your microphone.": [
+  "settings.html"
+ ],
+ "Manage the recording buffer, sharing, updates, and troubleshooting.": [
+  "settings.html"
+ ],
+ "Manage your connected account for clip uploads and sharing.": [
+  "settings.html"
+ ],
+ "Mania": [
+  "_overlay-controls.html"
+ ],
+ "Mark all read": [
+  "notifications.html"
+ ],
+ "Mark as read": [
+  "notifications.html"
+ ],
+ "Mark as unread": [
+  "notifications.html"
+ ],
+ "Maximum file size per video.": [
+  "settings.html"
+ ],
+ "Maximum length per video.": [
+  "settings.html"
+ ],
+ "Memory": [
+  "setup.html"
+ ],
+ "Menu bar": [
+  "settings.html"
+ ],
+ "Merge row into {name}": [
+  "_editor-lanes.html"
+ ],
+ "Merge with next": [
+  "_editor-tools.html"
+ ],
+ "Merge with the next subtitle": [
+  "_editor-lanes.html"
+ ],
+ "Mic Test": [
+  "_mic-controls.html"
+ ],
+ "Microphone": [
+  "_mic-controls.html",
+  "settings.html",
+  "setup.html"
+ ],
+ "Microphone level": [
+  "_mic-controls.html"
+ ],
+ "Microphone settings were saved, but OBS could not be reached or has no \"{MicInputName}\" input. Restart OBS and try again.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Microphone test failed: {error}": [
+  "apps/helper/MicAudio.cs"
+ ],
+ "Microphone Volume": [
+  "_mic-controls.html"
+ ],
+ "Microphone volume": [
+  "_mic-controls.html"
+ ],
+ "Microphone volume slider": [
+  "_mic-controls.html"
+ ],
+ "Microscopic GPU Cooker": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Microsoft Corporation": [
+  "apps/setup/InputOverlay.cs"
+ ],
+ "Might be misheard": [
+  "_editor-fx.html"
+ ],
+ "Might be misheard. Select it and open Check on the right.": [
+  "_editor-lanes.html"
+ ],
+ "Might have been": [
+  "_editor-fx.html"
+ ],
+ "Mind blown": [
+  "_editor-tools.html"
+ ],
+ "Missing helper role.": [
+  "apps/helper/ProcessHost.cs"
+ ],
+ "Missing id.": [
+  "apps/helper/NotificationRoutes.cs"
+ ],
+ "Missing or invalid w/h.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Missing overlay preview body.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Missing overlay preview setting.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Missing settings body.": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Missing share preview body.": [
+  "apps/helper/DiscordRoutes.cs"
+ ],
+ "Missing theme colours.": [
+  "apps/helper/AppearanceRoutes.cs"
+ ],
+ "Missing uninstall confirmation.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Missing update version.": [
+  "apps/helper/Update.cs"
+ ],
+ "Mixed games": [
+  "_clip-games.html"
+ ],
+ "Money bag": [
+  "_editor-tools.html"
+ ],
+ "Money face": [
+  "_editor-tools.html"
+ ],
+ "Money with wings": [
+  "_editor-tools.html"
+ ],
+ "Monitor work area is invalid.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "More options": [
+  "_deleted.html",
+  "_screenshots.html",
+  "notifications.html"
+ ],
+ "Motion Blur": [
+  "_editor-fx.html"
+ ],
+ "Motion blur strength": [
+  "settings.html"
+ ],
+ "Motion blur strength slider": [
+  "settings.html"
+ ],
+ "Motion blur was saved, but OBS Shaderfilter is not installed. Re-run ReplayKit setup, then restart OBS after the plugin install.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Motion blur was saved, but {sourceName} filters could not be read: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Mouse": [
+  "settings.html"
+ ],
+ "Mouse Cursor": [
+  "settings.html"
+ ],
+ "Mouse cursor was saved, but OBS could not be reached: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Mouse cursor was saved, but the {target} could not be updated: {error}": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space.": [
+  "_overlay-controls.html"
+ ],
+ "Move selected clips to trash": [
+  "clip-app.js"
+ ],
+ "Move the row down": [
+  "_editor-lanes.html"
+ ],
+ "Move the row up": [
+  "_editor-lanes.html"
+ ],
+ "Move to trash": [
+  "clip-app.js"
+ ],
+ "Moved 1 selected clip to the trash.": [
+  "clip-app.js"
+ ],
+ "Moved {count} selected clips to the trash.": [
+  "clip-app.js"
+ ],
+ "Moved {name} to the trash": [
+  "clip-app.js"
+ ],
+ "Much slower.": [
+  "settings.html"
+ ],
+ "Music and sounds": [
+  "_editor-tools.html"
+ ],
+ "Musical notes": [
+  "_editor-tools.html"
+ ],
+ "Mute": [
+  "_editor-lanes.html"
+ ],
+ "Mute (M)": [
+  "clip-app.js"
+ ],
+ "Mute Discord audio": [
+  "settings.html"
+ ],
+ "Mute the whole row": [
+  "_editor-lanes.html"
+ ],
+ "Mutes or unmutes this sound in OBS. The change is applied when you press Apply or OK.": [
+  "settings.html"
+ ],
+ "Name the theme first": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Name this preset": [
+  "_editor-fx.html"
+ ],
+ "Name this theme": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Names can’t contain \\ / : * ? \" < > |": [
+  "clip-app.js"
+ ],
+ "Native canvas -> 1080p60, high-quality target - good on most modern PCs.": [
+  "apps/setup/Recording.cs"
+ ],
+ "Needs graphics acceleration in the OBS browser, which is not available here.": [
+  "settings.html"
+ ],
+ "Neon Edges": [
+  "_editor-fx.html"
+ ],
+ "Nerd face": [
+  "_editor-tools.html"
+ ],
+ "Network worker exceeded its time limit.": [
+  "apps/helper/Curl.cs"
+ ],
+ "Never": [
+  "settings.html"
+ ],
+ "Newest": [
+  "_clip-toolbar.html"
+ ],
+ "Next": [
+  "setup.html"
+ ],
+ "No audio rows. Drop an audio file here or press the import button.": [
+  "_editor-lanes.html"
+ ],
+ "No available GIF filename.": [
+  "apps/helper/GifExports.cs"
+ ],
+ "No available numbered name was found.": [
+  "apps/helper/ClipFiles.cs"
+ ],
+ "No Bongo Cat modes": [
+  "_live2d-bongo.html"
+ ],
+ "no capture source was showing in the scene": [
+  "_clip-games.html"
+ ],
+ "No clips found.": [
+  "clip-app.js"
+ ],
+ "No clips match that.": [
+  "_editor-tools.html"
+ ],
+ "No clips match these filters.": [
+  "clip-app.js"
+ ],
+ "No clips match your search.": [
+  "clip-app.js"
+ ],
+ "No clips yet.": [
+  "clip-app.js"
+ ],
+ "No color": [
+  "_color-picker.html"
+ ],
+ "No compatible compression encoder is available on this PC.": [
+  "apps/helper/CompressOverwrite.cs"
+ ],
+ "No compatible compression encoder is available.": [
+  "apps/helper/CompressionProfile.cs"
+ ],
+ "No edit drafts yet. Edits you leave unfinished are kept here.": [
+  "clip-app.js"
+ ],
+ "No effects match that.": [
+  "_editor-fx.html"
+ ],
+ "No elements match that.": [
+  "_editor-tools.html"
+ ],
+ "No encoders were reported.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "No favorite clips yet.": [
+  "clip-app.js"
+ ],
+ "No filters match that.": [
+  "_editor-fx.html"
+ ],
+ "No free clip name was found.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "No games added yet. Pick one above and press + to have the screenshare switch to it while you play it.": [
+  "settings.html"
+ ],
+ "No games match.": [
+  "_clip-games.html"
+ ],
+ "No GIFs match these filters.": [
+  "_screenshots.html"
+ ],
+ "No GIFs match your search.": [
+  "_screenshots.html"
+ ],
+ "No GIFs yet. Choose Export GIF in the menu of a clip up to 15 seconds long.": [
+  "_screenshots.html"
+ ],
+ "No GitHub Release has been published yet.": [
+  "apps/helper/Update.cs"
+ ],
+ "No input overlay in the OBS scene.": [
+  "_overlay-controls.html"
+ ],
+ "No large clips are eligible for Smaller compression.": [
+  "storage.html"
+ ],
+ "No large uncompressed clips are available for Fast compression.": [
+  "storage.html"
+ ],
+ "No Limit": [
+  "storage.html"
+ ],
+ "No limit": [
+  "settings.html"
+ ],
+ "no limit": [
+  "storage.html"
+ ],
+ "No linked clips yet.": [
+  "clip-app.js"
+ ],
+ "No local-only clips.": [
+  "clip-app.js"
+ ],
+ "No matching settings": [
+  "settings.html"
+ ],
+ "No mp4/mkv/mov clip found": [
+  "apps/helper/Upload.cs"
+ ],
+ "No OBS scene is available.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "No presets yet. Name {kind} below and save it to use it on any clip.": [
+  "_editor-fx.html"
+ ],
+ "No real monitor work area was reported by Windows.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "No release notes found for version {version}.": [
+  "apps/helper/UpdateRoutes.cs"
+ ],
+ "No saved original game assignment to restore": [
+  "_clip-games.html"
+ ],
+ "No screenshots match these filters.": [
+  "_screenshots.html"
+ ],
+ "No screenshots match your search.": [
+  "_screenshots.html"
+ ],
+ "No screenshots yet. Save a frame with the screenshot button in the editor.": [
+  "_screenshots.html"
+ ],
+ "No selected clips can be compressed": [
+  "clip-app.js"
+ ],
+ "No selected clips need uploading": [
+  "clip-app.js"
+ ],
+ "No settings changed": [
+  "settings.html"
+ ],
+ "No sign-in is needed to upload clips and create shareable links. Anonymous uploads use the limits below. Sign in to keep new uploads with your account.": [
+  "settings.html"
+ ],
+ "No speech was found in this part of the clip.": [
+  "_editor-tools.html"
+ ],
+ "No stickers match that.": [
+  "_editor-tools.html"
+ ],
+ "No usable experience icon.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "Noise suppression": [
+  "_mic-controls.html"
+ ],
+ "Noise suppression must be 0 or 1.": [
+  "apps/helper/AudioRoutes.cs"
+ ],
+ "Noise suppression was added but could not be moved ahead of the noise gate: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "None": [
+  "settings.html"
+ ],
+ "None of those clips are eligible for the selected compression type.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Not an icon file.": [
+  "apps/helper/Native.cs"
+ ],
+ "Not an mp4 with a readable moov box": [
+  "apps/helper/ClipAudioTracks.cs"
+ ],
+ "Not listed": [
+  "_clip-games.html"
+ ],
+ "Not signed in": [
+  "account-menu.html",
+  "controls_app.html"
+ ],
+ "Nothing here. Clips, screenshots and GIFs you delete stay here for 1 day before they're gone for good.": [
+  "_deleted.html"
+ ],
+ "Nothing here. Clips, screenshots and GIFs you delete stay here for {count} days before they're gone for good.": [
+  "_deleted.html"
+ ],
+ "Nothing is being compressed.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Nothing is being recorded.": [
+  "apps/helper/Voiceover.cs"
+ ],
+ "Nothing new.": [
+  "notifications.html"
+ ],
+ "Nothing to listen to in that part of the clip.": [
+  "apps/helper/Speech.cs"
+ ],
+ "Nothing was compressed.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Nothing was compressed: {error}": [
+  "storage.html"
+ ],
+ "Nothing worth compressing right now. Your biggest clips are small already or as compressed as they can get.": [
+  "storage.html"
+ ],
+ "Notification needs a title.": [
+  "apps/helper/Notifications.cs"
+ ],
+ "Notification not found": [
+  "notification-reader.html"
+ ],
+ "Notifications": [
+  "notifications.html",
+  "settings.html",
+  "plugins/replaykit/src/notify/notify_button.cpp"
+ ],
+ "Num *": [
+  "settings.html"
+ ],
+ "Num +": [
+  "settings.html"
+ ],
+ "Num -": [
+  "settings.html"
+ ],
+ "Num .": [
+  "settings.html"
+ ],
+ "Num /": [
+  "settings.html"
+ ],
+ "Num Enter": [
+  "settings.html"
+ ],
+ "OBS close warning was saved, but OBS config could not be updated: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS config root did not resolve to the expected AppData path.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS could not apply recording audio: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS could not close safely": [
+  "apps/helper/ObsProcess.cs"
+ ],
+ "OBS could not load the {encoder} encoder. This almost always means the {gpu} graphics driver is out of date.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "OBS could not load the {encoder} encoder. Your {gpu} graphics driver is most likely out of date.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "OBS did not accept Video.{update}: {error}": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "OBS did not accept {section}.{key}: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.": [
+  "apps/helper/ObsProcess.cs"
+ ],
+ "OBS did not report the refreshed monitor and mute state.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not report the requested monitor state after retries. {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not report the requested mute state after setting it.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not return an input monitor type.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not return Desktop Audio settings.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not return Discord audio tracks.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS did not return {category}.{name}.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS did not start the replay buffer in time.": [
+  "apps/helper/RecordingRoutes.cs"
+ ],
+ "OBS did not stop the replay buffer in time.": [
+  "apps/helper/RecordingRoutes.cs"
+ ],
+ "OBS executable was not found for relaunch.": [
+  "apps/setup/Update.cs"
+ ],
+ "OBS executable was not found.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS install was not found - install OBS, set OBS_REPLAYKIT_OBS_EXE, or re-run from an active OBS install.": [
+  "apps/setup/Obs.cs"
+ ],
+ "OBS installer did not finish within 10 minutes": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "OBS is back up.": [
+  "update_prompt.html"
+ ],
+ "OBS is closing.": [
+  "apps/helper/AppRoutes.cs"
+ ],
+ "OBS is restarting.": [
+  "apps/helper/AppRoutes.cs"
+ ],
+ "OBS is starting back up.": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "OBS menu": [
+  "settings.html"
+ ],
+ "OBS monitoring device id/name is invalid.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS monitoring device id/name is missing.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS or its helper/browser processes are still running after termination. No update files were replaced; restart Windows before trying again.": [
+  "apps/setup/Obs.cs"
+ ],
+ "OBS outputs were not stopped safely, so video/output live changes were not applied.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS profile path resolved outside the OBS profiles directory.": [
+  "apps/helper/SettingsRecording.cs"
+ ],
+ "OBS projector was not ready: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS projector window information is unavailable.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS projector window was found, but it did not close after repeated attempts.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS projector window was found, but Windows rejected the move/resize request.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS projector window was moved, but Windows rejected the taskbar-hide request.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS relaunch failed": [
+  "apps/setup/Update.cs"
+ ],
+ "OBS replay buffer settings were saved, but live apply failed: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS ReplayKit": [
+  "apps/setup/Config.cs",
+  "apps/setup/Startup.cs"
+ ],
+ "OBS ReplayKit cannot run without the helper -- see the warning above for why it's missing.": [
+  "apps/setup/Apply.cs"
+ ],
+ "OBS ReplayKit changes were removed.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "OBS ReplayKit is ready.": [
+  "apps/setup/Apply.cs"
+ ],
+ "OBS ReplayKit removed": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "OBS ReplayKit Setup": [
+  "apps/setup/InstallerWindow.cs",
+  "apps/setup/SetupWindow.cs"
+ ],
+ "OBS ReplayKit setup hit an unexpected error.": [
+  "apps/setup/InstallerWindow.cs"
+ ],
+ "OBS ReplayKit setup needs the Microsoft WebView2 runtime and it could not be installed automatically.\n\nInstall \"Microsoft Edge WebView2 Runtime\" from microsoft.com, then run this installer again.": [
+  "apps/setup/InstallerWindow.cs"
+ ],
+ "OBS ReplayKit turned off the OBS updater so OBS stays on a version ReplayKit supports. ReplayKit updates OBS itself when it supports a newer one. Uninstalling ReplayKit removes this file.\\r": [
+  "apps/setup/ObsUpdateLock.cs"
+ ],
+ "OBS ReplayKit Uninstall": [
+  "apps/setup/UninstallWindow.cs"
+ ],
+ "OBS ReplayKit.lnk": [
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Installer.cs",
+  "apps/setup/Startup.cs"
+ ],
+ "OBS restarts once to finish the update. Your clips are not touched.": [
+  "_home-dashboard.html"
+ ],
+ "OBS restarts when it is done.": [
+  "uninstall_prompt.html",
+  "update_prompt.html"
+ ],
+ "OBS scene collection file was not found.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "OBS scene collection has no sources list.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "OBS scene collection name is invalid.": [
+  "apps/helper/SettingsSceneJson.cs"
+ ],
+ "OBS scene collection path resolved outside the OBS scenes directory.": [
+  "apps/helper/SettingsSceneJson.cs"
+ ],
+ "OBS SETTINGS": [
+  "plugins/replaykit/src/shell/shell_obs_nav.cpp"
+ ],
+ "OBS Settings": [
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again.": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "OBS starts in the system tray instead of opening its window.": [
+  "settings.html"
+ ],
+ "OBS Stream Audio": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio (Surround)": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio device already installed": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio device installed": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio installer ran but the driver was not detected": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio installer timed out after 300s": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio Loopback": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio Loopback (Surround)": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Stream Audio playback endpoint is not active. Install or enable VB-Audio Cable, then re-run Share Preview.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS Stream Audio uninstaller timed out after 300s": [
+  "apps/setup/VbCable.cs"
+ ],
+ "OBS Studio": [
+  "settings.html",
+  "apps/setup/Cleanup.cs"
+ ],
+ "OBS Studio is missing.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "OBS Studio is not installed; clearing any leftover files.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "OBS Studio itself will also be uninstalled.": [
+  "settings.html"
+ ],
+ "OBS Studio leftovers cleared.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "OBS Studio removed.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "OBS Studio Settings": [
+  "controls_app.html"
+ ],
+ "OBS Studio was uninstalled too.": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "OBS Studio.lnk": [
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Installer.cs"
+ ],
+ "OBS theme preparation timed out.": [
+  "apps/setup/Installer.cs"
+ ],
+ "OBS theme prepared before launch": [
+  "apps/setup/Installer.cs"
+ ],
+ "OBS tray icon already pinned": [
+  "apps/setup/TrayPin.cs"
+ ],
+ "OBS tray icon not pinned: no matching entry yet (run OBS at least once first)": [
+  "apps/setup/TrayPin.cs"
+ ],
+ "OBS tray icon not pinned: no tray icons registered on this account yet": [
+  "apps/setup/TrayPin.cs"
+ ],
+ "OBS tray icon pinned to the taskbar": [
+  "apps/setup/TrayPin.cs"
+ ],
+ "OBS tray icon unpinned": [
+  "apps/setup/TrayPin.cs"
+ ],
+ "OBS version is invalid.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "OBS video settings did not include a valid canvas or output size.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS video settings unavailable: {error}": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS video settings were applied, but the fractional FPS value was invalid.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "OBS video settings were saved, but live apply failed: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "OBS was left running; try again once a fixed release is out.": [
+  "apps/helper/Update.cs"
+ ],
+ "OBS websocket authentication data is missing.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket closed the connection.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket config is not valid JSON.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket config not found.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket did not identify this client.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket did not send Hello.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket is not reachable.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket message is invalid or too large.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket password is missing.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket port is invalid.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS websocket server is disabled.": [
+  "apps/helper/ObsWebSocket.cs"
+ ],
+ "OBS will close while ReplayKit and its installed components are removed.": [
+  "settings.html"
+ ],
+ "OBS will close while the selected components are removed.": [
+  "settings.html"
+ ],
+ "OBS will close while the Share Preview audio driver is removed. ReplayKit stays installed.": [
+  "settings.html"
+ ],
+ "OBS will restart with a clean Streamable session.": [
+  "apps/helper/AppRoutes.cs"
+ ],
+ "OBS Windowed Projector was opened, but its window could not be found.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "OBS {version}": [
+  "settings.html"
+ ],
+ "OBSReplayKit/1.0 (+https://github.com/7Lzz/OBS-ReplayKit)": [
+  "apps/setup/FfmpegInstall.cs",
+  "apps/setup/ObsDownloader.cs",
+  "apps/setup/WebView2Runtime.cs"
+ ],
+ "Off": [
+  "_mic-controls.html",
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "OK": [
+  "_clip-content.html",
+  "settings.html"
+ ],
+ "Old Film": [
+  "_editor-fx.html"
+ ],
+ "Oldest": [
+  "_clip-toolbar.html"
+ ],
+ "One might be misheard. It is marked in orange; select it and open Check on the right.": [
+  "_editor-tools.html"
+ ],
+ "Only a release page or a graphics driver page can be opened this way.": [
+  "apps/helper/NotificationRoutes.cs"
+ ],
+ "Only saved custom icons can be removed.": [
+  "apps/helper/AppearanceRoutes.cs"
+ ],
+ "Only saved themes can be removed.": [
+  "apps/helper/AppearanceRoutes.cs"
+ ],
+ "Only {size} left on {drive}. New clips may fail to save.": [
+  "_home-dashboard.html"
+ ],
+ "Only {size} left. New clips may fail to save.": [
+  "_home-dashboard.html"
+ ],
+ "Opacity": [
+  "_color-picker.html",
+  "_editor-lanes.html",
+  "_overlay-controls.html"
+ ],
+ "Opacity percent": [
+  "_color-picker.html"
+ ],
+ "Open Clips": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Open clips folder": [
+  "_clip-toolbar.html",
+  "controls_app.html",
+  "clip-app.js"
+ ],
+ "Open file location": [
+  "_screenshots.html"
+ ],
+ "Open folder": [
+  "_home-dashboard.html"
+ ],
+ "Open Free-up Space": [
+  "settings.html"
+ ],
+ "Open GIFs folder": [
+  "clip-app.js"
+ ],
+ "Open log folder": [
+  "settings.html"
+ ],
+ "Open release page": [
+  "notification-reader.html",
+  "notifications.html"
+ ],
+ "Open screenshots folder": [
+  "clip-app.js"
+ ],
+ "Open settings": [
+  "_home-dashboard.html"
+ ],
+ "Open Streamable": [
+  "account-menu.html"
+ ],
+ "Open the Clips window to see this theme on real clips": [
+  "_appearance-panel.html"
+ ],
+ "Open Tools or Help. Other menus are unavailable in the ReplayKit layout.": [
+  "settings.html"
+ ],
+ "Opening OBS Windowed Projector failed: {error}": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Opening Streamable...": [
+  "account-menu.html",
+  "settings.html"
+ ],
+ "Opening Streamable…": [
+  "controls_app.html",
+  "sign-in-loader.html"
+ ],
+ "Opens OBS and ReplayKit when you sign in to Windows.": [
+  "settings.html"
+ ],
+ "Opens OBS with administrator rights the next time it starts. Windows will ask for your permission every time. Most people don't need this.": [
+  "settings.html"
+ ],
+ "Operation already completed.": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "Operation already started.": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "Operation has already finished or committed": [
+  "apps/helper/UploadState.cs"
+ ],
+ "Options": [
+  "editor.html"
+ ],
+ "Organize": [
+  "_screenshots.html"
+ ],
+ "Original": [
+  "editor.html"
+ ],
+ "Output": [
+  "settings.html"
+ ],
+ "Output height in pixels. Width follows the canvas aspect ratio.": [
+  "settings.html"
+ ],
+ "Over your storage limit.": [
+  "_home-dashboard.html"
+ ],
+ "Over {size}": [
+  "clip-app.js"
+ ],
+ "Overlay": [
+  "_overlay-controls.html",
+  "settings.html",
+  "setup.html"
+ ],
+ "Overlay apply failed: {error}": [
+  "settings.html"
+ ],
+ "Overlay color add": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay color add hex": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay color multiply": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay color multiply hex": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay hue shift": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay hue shift slider": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay opacity": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay opacity slider": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay rotation in degrees": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay rotation slider": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay setting was saved, but the OBS scene file could not be prepared for restart: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Overlay size": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overlay size slider": [
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Overwrote {name}": [
+  "editor.html"
+ ],
+ "Padding H": [
+  "_editor-tools.html"
+ ],
+ "Padding horizontal": [
+  "_editor-tools.html"
+ ],
+ "Padding V": [
+  "_editor-tools.html"
+ ],
+ "Padding vertical": [
+  "_editor-tools.html"
+ ],
+ "Page Down": [
+  "settings.html"
+ ],
+ "Page Up": [
+  "settings.html"
+ ],
+ "Panel": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Panel color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Park the OBS projector back off screen.": [
+  "settings.html"
+ ],
+ "Party face": [
+  "_editor-tools.html"
+ ],
+ "Party popper": [
+  "_editor-tools.html"
+ ],
+ "Partying face": [
+  "_editor-tools.html"
+ ],
+ "Paste here": [
+  "_editor-lanes.html"
+ ],
+ "Pause": [
+  "_deleted.html",
+  "clip-app.js"
+ ],
+ "Paused": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "PC Audio": [
+  "settings.html"
+ ],
+ "PC audio": [
+  "_editor-lanes.html"
+ ],
+ "PC Audio records the apps you turn on. New apps that play sound show up here turned off.": [
+  "settings.html"
+ ],
+ "PC audio volume": [
+  "settings.html"
+ ],
+ "PC audio volume slider": [
+  "settings.html"
+ ],
+ "Performance": [
+  "setup.html"
+ ],
+ "Pick a color from anywhere on screen": [
+  "_color-picker.html"
+ ],
+ "Pick a preset to overwrite": [
+  "_editor-fx.html"
+ ],
+ "Pick a preset, then apply it, or overwrite it with {kind}.": [
+  "_editor-fx.html"
+ ],
+ "Pick an image file smaller than 32 MB.": [
+  "apps/helper/ProfilePicture.cs"
+ ],
+ "Pick an input overlay and tune it — the preview reacts to your keyboard and mouse.": [
+  "setup.html"
+ ],
+ "Pick at least one clip.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Pick the clips to compress": [
+  "storage.html"
+ ],
+ "Pick the keys to show. They keep their place on the keyboard, and empty rows and wide gaps close up.": [
+  "settings.html"
+ ],
+ "Pick the microphone ReplayKit records and check how you sound. Mic Test lets you hear yourself, and the sensitivity bar shows what gets cut off.": [
+  "setup.html"
+ ],
+ "Pick up your unsaved edits": [
+  "clip-app.js"
+ ],
+ "Pile of poo": [
+  "_editor-tools.html"
+ ],
+ "Pin OBS tray icon": [
+  "apps/setup/Apply.cs"
+ ],
+ "Pins the OBS tray icon.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Plan": [
+  "settings.html"
+ ],
+ "Play": [
+  "_deleted.html",
+  "clip-app.js"
+ ],
+ "Play and pause (Space)": [
+  "_editor-lanes.html"
+ ],
+ "Play videos without extra edge smoothing.": [
+  "settings.html"
+ ],
+ "Play/Pause": [
+  "editor.html"
+ ],
+ "Playback": [
+  "settings.html"
+ ],
+ "Playback must be 0 or 1.": [
+  "apps/helper/AudioRoutes.cs"
+ ],
+ "Playback preview: {name}": [
+  "_deleted.html"
+ ],
+ "Playing now": [
+  "settings.html"
+ ],
+ "Plays the clip as soon as the editor opens, instead of waiting for you to press play.": [
+  "settings.html"
+ ],
+ "Plays the part between the two handles again and again until you pause it.": [
+  "settings.html"
+ ],
+ "Plays your microphone back to you, with your volume, sensitivity, and noise settings applied.": [
+  "_mic-controls.html"
+ ],
+ "Pleading face": [
+  "_editor-tools.html"
+ ],
+ "Pointing right": [
+  "_editor-tools.html"
+ ],
+ "Police car light": [
+  "_editor-tools.html"
+ ],
+ "Popups": [
+  "settings.html"
+ ],
+ "Portrait": [
+  "editor.html"
+ ],
+ "Prepare clip folders": [
+  "apps/setup/Apply.cs"
+ ],
+ "Prepare OBS settings folder": [
+  "apps/setup/Apply.cs"
+ ],
+ "Prepare OBS theme": [
+  "apps/setup/Apply.cs"
+ ],
+ "Prepares OBS browser and ReplayKit helper processes.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Prepares the local helper.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Preparing download": [
+  "update_prompt.html"
+ ],
+ "Preparing the audio": [
+  "_editor-lanes.html"
+ ],
+ "Preparing the editor": [
+  "clip-app.js"
+ ],
+ "Preparing video": [
+  "editor.html"
+ ],
+ "Preserve pitch": [
+  "_editor-lanes.html"
+ ],
+ "Preset name": [
+  "_editor-fx.html"
+ ],
+ "Preset saved. Apply to use it in OBS.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Preset updated. Apply to update OBS.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Preset {number}": [
+  "_editor-fx.html"
+ ],
+ "Presets": [
+  "_editor-fx.html"
+ ],
+ "Press a key": [
+  "settings.html"
+ ],
+ "Press a key combination": [
+  "hotkey-menu.html"
+ ],
+ "Preview": [
+  "settings.html",
+  "setup.html",
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Preview disabled": [
+  "controls_app.html"
+ ],
+ "Preview enabled": [
+  "controls_app.html"
+ ],
+ "Preview failed: {error}": [
+  "controls_app.html"
+ ],
+ "Preview in Clips": [
+  "_appearance-panel.html"
+ ],
+ "Preview is off": [
+  "plugins/replaykit/src/shell/shell_projector.cpp"
+ ],
+ "Preview warning": [
+  "controls_app.html"
+ ],
+ "Primary display": [
+  "settings.html",
+  "setup.html",
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Process host copy verification failed.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "Processing clip…": [
+  "_clip-dialogs.html"
+ ],
+ "Processing failed": [
+  "clip-app.js"
+ ],
+ "Processing on Streamable": [
+  "clip-app.js"
+ ],
+ "Processing…": [
+  "clip-app.js"
+ ],
+ "Profile": [
+  "settings.html"
+ ],
+ "Profile Picture": [
+  "settings.html"
+ ],
+ "Programs that play sound show up here while they play. Tick the ones to record.": [
+  "settings.html"
+ ],
+ "Projector": [
+  "plugins/replaykit/src/shell/shell_rail.cpp",
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Projector failed: {error}": [
+  "settings.html"
+ ],
+ "Projector parked": [
+  "settings.html"
+ ],
+ "Projector shown": [
+  "settings.html"
+ ],
+ "Projector source monitor bounds are invalid.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "Projector Tools": [
+  "settings.html"
+ ],
+ "Put in a row of its own": [
+  "_editor-lanes.html"
+ ],
+ "Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Putting your edits back": [
+  "editor.html"
+ ],
+ "Quality": [
+  "setup.html"
+ ],
+ "Quality (high-end PCs)": [
+  "apps/setup/Recording.cs"
+ ],
+ "Queued": [
+  "clip-app.js"
+ ],
+ "Quick actions": [
+  "quick-actions.html",
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp",
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Quick compression using your GPU when supported. Keeps the original if the file would be larger.": [
+  "_clip-dialogs.html"
+ ],
+ "Quit on close": [
+  "settings.html"
+ ],
+ "R Alt": [
+  "settings.html"
+ ],
+ "R Ctrl": [
+  "settings.html"
+ ],
+ "R Shift": [
+  "settings.html"
+ ],
+ "Radial": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Raw mouse movement": [
+  "settings.html"
+ ],
+ "Re-Install": [
+  "setup_installer.html"
+ ],
+ "Re-installing OBS ReplayKit": [
+  "setup_installer.html"
+ ],
+ "Reading the clip": [
+  "editor.html"
+ ],
+ "Recent": [
+  "_clip-content.html"
+ ],
+ "Recent clips": [
+  "_clip-content.html"
+ ],
+ "Recognize games in clips": [
+  "settings.html"
+ ],
+ "Record": [
+  "_editor-tools.html",
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Record your voice": [
+  "_editor-tools.html"
+ ],
+ "Record {name}": [
+  "settings.html"
+ ],
+ "Recording": [
+  "hotkey-menu.html",
+  "settings.html",
+  "setup.html"
+ ],
+ "Recording Audio": [
+  "settings.html"
+ ],
+ "Recording Buffer": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Recording buffer": [
+  "setup.html"
+ ],
+ "Recording Codec": [
+  "settings.html"
+ ],
+ "Recording codec was saved, but encoder settings could not be written: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Recording Path": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Recording Quality": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Recording Resolution": [
+  "settings.html"
+ ],
+ "Recording settings": [
+  "hotkey-menu.html"
+ ],
+ "Recording Sound": [
+  "settings.html"
+ ],
+ "Recording sound volume": [
+  "settings.html"
+ ],
+ "Recording sound volume slider": [
+  "settings.html"
+ ],
+ "Recording started": [
+  "plugins/replaykit/src/notify/clip_toast.cpp"
+ ],
+ "Recording stopped": [
+  "plugins/replaykit/src/notify/clip_toast.cpp"
+ ],
+ "Records everything played through the Windows default output device. Discord is included in PC Audio and Share Preview audio is off.": [
+  "settings.html"
+ ],
+ "Records PC audio and Discord. Discord gets its own track when separate audio tracks are enabled.": [
+  "settings.html"
+ ],
+ "rect x=\"": [
+  "editor.html"
+ ],
+ "Red heart": [
+  "_editor-tools.html"
+ ],
+ "Red question mark": [
+  "_editor-tools.html"
+ ],
+ "Redo": [
+  "editor.html",
+  "settings.html"
+ ],
+ "Redo (Ctrl+Shift+Z)": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "Redo settings change": [
+  "settings.html"
+ ],
+ "Reduces background noise like keyboard clicks and fans from your microphone.": [
+  "_mic-controls.html"
+ ],
+ "Register clip notifications": [
+  "apps/setup/Apply.cs"
+ ],
+ "Removal failed:": [
+  "settings.html"
+ ],
+ "Remove": [
+  "_appearance-panel.html",
+  "account-menu.html",
+  "settings.html"
+ ],
+ "Remove audio": [
+  "editor.html"
+ ],
+ "Remove clip notifications": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove Discord screenshare": [
+  "apps/setup/Apply.cs"
+ ],
+ "Remove Discord screenshare / Share Preview audio?": [
+  "settings.html"
+ ],
+ "Remove empty space": [
+  "_editor-lanes.html"
+ ],
+ "Remove favorite": [
+  "clip-app.js"
+ ],
+ "Remove from favorites": [
+  "_editor-fx.html"
+ ],
+ "Remove launch permission": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove layer": [
+  "_editor-lanes.html"
+ ],
+ "Remove legacy launcher task": [
+  "apps/setup/Apply.cs"
+ ],
+ "Remove link": [
+  "clip-app.js"
+ ],
+ "Remove OBS must be a JSON boolean.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Remove OBS plugins": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove OBS Stream Audio": [
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Update.cs"
+ ],
+ "Remove ReplayKit and its installed components from OBS.": [
+  "settings.html"
+ ],
+ "Remove ReplayKit from OBS": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove ReplayKit or Share Preview audio": [
+  "settings.html"
+ ],
+ "Remove ReplayKit settings": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove stop": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Remove the virtual audio driver and keep ReplayKit installed.": [
+  "settings.html"
+ ],
+ "Remove this hotkey": [
+  "settings.html"
+ ],
+ "Remove virtual display driver": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove Windows sleep override": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove Windows startup": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Remove {name}": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Remove {name} from Your games": [
+  "_clip-games.html"
+ ],
+ "Removes files an OBS update left behind.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Removes Streamable login data and schedules the cached uninstaller in LOCALAPPDATA for deletion on the next reboot.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Removes the old launcher task.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Removes the ReplayKit scene, sources, Custom Controls dock, script entry and generated theme from OBS's own config.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Removes the Start Menu shortcut and header registration used for clip-ready notifications.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Removing Discord screenshare support. OBS will close.": [
+  "settings.html",
+  "apps/helper/Uninstall.cs"
+ ],
+ "Removing Discord screenshare support...": [
+  "settings.html"
+ ],
+ "Removing game…": [
+  "_clip-games.html"
+ ],
+ "Removing OBS ReplayKit": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Removing Share Preview audio...": [
+  "settings.html"
+ ],
+ "Rename": [
+  "_editor-fx.html",
+  "_screenshots.html",
+  "editor.html"
+ ],
+ "Rename clip": [
+  "editor.html"
+ ],
+ "Rename {name}": [
+  "_editor-fx.html"
+ ],
+ "Render": [
+  "editor.html"
+ ],
+ "Render settings": [
+  "editor.html"
+ ],
+ "Render video": [
+  "editor.html"
+ ],
+ "Rendering": [
+  "settings.html"
+ ],
+ "Rendering over the original": [
+  "editor.html"
+ ],
+ "Rendering screenshot": [
+  "editor.html"
+ ],
+ "Rendering video": [
+  "editor.html"
+ ],
+ "Reorder {name}": [
+  "clip-app.js"
+ ],
+ "Repair complete": [
+  "update_prompt.html"
+ ],
+ "Repairing ReplayKit": [
+  "update_prompt.html"
+ ],
+ "Repairing the ReplayKit installation.": [
+  "settings.html"
+ ],
+ "Repairing your ReplayKit installation.": [
+  "update_prompt.html"
+ ],
+ "Repairs the video tag on HEVC clips and recordings so they can play on devices such as iPhones. It keeps the original video quality.": [
+  "settings.html"
+ ],
+ "Repark": [
+  "settings.html"
+ ],
+ "Reparking projector...": [
+  "settings.html"
+ ],
+ "Replace the original": [
+  "editor.html"
+ ],
+ "Replace {name} with {kind}": [
+  "_editor-fx.html"
+ ],
+ "Replaces the original file on disk — this can’t be undone.": [
+  "_clip-dialogs.html"
+ ],
+ "REPLAYKIT": [
+  "plugins/replaykit/src/shell/shell_obs_nav.cpp"
+ ],
+ "ReplayKit": [
+  "setup_installer.html",
+  "uninstall_prompt.html",
+  "settings.html"
+ ],
+ "ReplayKit 9.9.9": [
+  "update_prompt.html"
+ ],
+ "ReplayKit can't read the list of apps from OBS right now, so it's showing the apps it already knew about.": [
+  "settings.html"
+ ],
+ "ReplayKit cannot save clips until the folder is back. Check that its drive is connected, or choose another folder in Settings.": [
+  "_home-dashboard.html"
+ ],
+ "ReplayKit color picker": [
+  "apps/helper/DesktopColorPicker.cs"
+ ],
+ "ReplayKit could not be reached.": [
+  "_screenshots.html",
+  "clip-app.js"
+ ],
+ "ReplayKit could not find another encoder to switch to, so clips cannot be recorded until the driver is fixed.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "ReplayKit did not answer. Restart OBS and try again.": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "ReplayKit is already up to date.": [
+  "apps/helper/Update.cs"
+ ],
+ "ReplayKit is not responding": [
+  "clip-app.js"
+ ],
+ "ReplayKit is not responding.": [
+  "_home-dashboard.html"
+ ],
+ "ReplayKit is ready. OBS will restart now to finish applying your choices.": [
+  "setup.html"
+ ],
+ "ReplayKit is ready. This window will close on its own.": [
+  "setup.html"
+ ],
+ "ReplayKit is up to date": [
+  "settings.html",
+  "update_prompt.html"
+ ],
+ "ReplayKit is up to date ({version})": [
+  "settings.html"
+ ],
+ "ReplayKit lost its connection to OBS, so clips cannot be saved right now. Restarting OBS usually fixes it. Your clips are not affected.": [
+  "_home-dashboard.html"
+ ],
+ "ReplayKit needs repair. Apply or cancel your settings changes first.": [
+  "settings.html"
+ ],
+ "ReplayKit needs repair. Use the update button at the top to install it.": [
+  "settings.html"
+ ],
+ "ReplayKit Noise Suppression": [
+  "apps/setup/DefaultsMigration.cs"
+ ],
+ "ReplayKit on GitHub": [
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_obs_nav.cpp"
+ ],
+ "ReplayKit plugin already current ->": [
+  "apps/setup/NativePlugin.cs"
+ ],
+ "ReplayKit Settings": [
+  "controls_app.html",
+  "plugins/replaykit/src/shell/shell_obs_nav.cpp",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "ReplayKit settings were reset": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "ReplayKit setup completed.": [
+  "apps/setup/Update.cs"
+ ],
+ "ReplayKit setup file is damaged": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "ReplayKit setup file is missing": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "ReplayKit setup file restored": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "ReplayKit setup is incomplete. Run the installer again to finish the repair.": [
+  "apps/setup/Update.cs"
+ ],
+ "ReplayKit took too long to answer.": [
+  "_screenshots.html"
+ ],
+ "ReplayKit took too long to answer. The list will show the clip’s name once it does.": [
+  "clip-app.js"
+ ],
+ "ReplayKit was not watching while it was recorded": [
+  "_clip-games.html"
+ ],
+ "ReplayKit will delete your <b>{clips}</b> (<b>{size}</b>). Favorites are kept.": [
+  "storage.html"
+ ],
+ "ReplayKit {version}": [
+  "settings.html",
+  "update_prompt.html"
+ ],
+ "ReplayKit {version} is available.": [
+  "_home-dashboard.html"
+ ],
+ "ReplayKit {version} is installed.": [
+  "update_prompt.html"
+ ],
+ "ReplayKit {version} is installing. OBS will restart.": [
+  "apps/helper/Update.cs"
+ ],
+ "ReplayKit's helper did not answer": [
+  "clip-app.js"
+ ],
+ "ReplayKit's OBS plugin is not connected.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "ReplayKit's setup file is damaged.": [
+  "settings.html"
+ ],
+ "ReplayKit's setup file is missing.": [
+  "settings.html"
+ ],
+ "Reset sign-in": [
+  "settings.html"
+ ],
+ "Reset the video to default": [
+  "_editor-fx.html"
+ ],
+ "Reset these subtitles to default": [
+  "_editor-fx.html"
+ ],
+ "Reset this audio to default": [
+  "_editor-fx.html"
+ ],
+ "Reset to Default": [
+  "_editor-fx.html"
+ ],
+ "Reset to default": [
+  "_clip-games.html",
+  "_editor-fx.html",
+  "_editor-lanes.html"
+ ],
+ "Reset {label}": [
+  "_editor-fx.html",
+  "_editor-lanes.html"
+ ],
+ "Resize the timeline": [
+  "editor.html"
+ ],
+ "Resolution": [
+  "editor.html"
+ ],
+ "Resolution for compressed clip": [
+  "_clip-dialogs.html"
+ ],
+ "Resolution: {width} × {height}": [
+  "editor.html"
+ ],
+ "Restart OBS": [
+  "_home-dashboard.html",
+  "plugins/replaykit/src/app/obs_actions.cpp",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Restart OBS to reconnect.": [
+  "clip-app.js"
+ ],
+ "Restore": [
+  "_deleted.html"
+ ],
+ "Restore OBS browser": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Restore OBS sleep blocking": [
+  "apps/setup/Apply.cs"
+ ],
+ "Restore the game recorded with this clip": [
+  "_clip-games.html"
+ ],
+ "Restored {name}": [
+  "_deleted.html"
+ ],
+ "Restores default Windows sleep behavior for OBS.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Restores OBS sleep blocking.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Restores the original OBS browser process files.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Retro Green": [
+  "_editor-fx.html"
+ ],
+ "Retry or run the ReplayKit installer again.": [
+  "update_prompt.html"
+ ],
+ "Retry the clip.": [
+  "clip-app.js"
+ ],
+ "Retry the clips.": [
+  "clip-app.js"
+ ],
+ "Review the clips to delete first.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Review the oldest clips": [
+  "storage.html"
+ ],
+ "RGB Split": [
+  "_editor-fx.html"
+ ],
+ "Rhythm game keys Z, X, comma and period.": [
+  "_overlay-controls.html"
+ ],
+ "Rock on": [
+  "_editor-tools.html"
+ ],
+ "Rolling on the floor": [
+  "_editor-tools.html"
+ ],
+ "Rolling on the floor laughing": [
+  "_editor-tools.html"
+ ],
+ "Rotation": [
+  "_editor-lanes.html",
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Rounded square": [
+  "_editor-tools.html"
+ ],
+ "Runs OBS Studio's own uninstaller and clears what it leaves behind. Your OBS scenes and profiles in AppData are kept.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "S3 upload failed: HTTP {s3Status}.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Saturation and brightness": [
+  "_color-picker.html"
+ ],
+ "Save": [
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp"
+ ],
+ "Save & Restart": [
+  "settings.html"
+ ],
+ "Save a clip": [
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Save a clip with your clip hotkey, or pick a different clip folder in ReplayKit Settings.": [
+  "clip-app.js"
+ ],
+ "Save a screenshot of this frame": [
+  "editor.html"
+ ],
+ "Save as draft": [
+  "editor.html"
+ ],
+ "Save as new": [
+  "_editor-fx.html"
+ ],
+ "Save as preset": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Save cancelled, nothing was changed": [
+  "editor.html"
+ ],
+ "Save Clip": [
+  "controls_app.html",
+  "settings.html",
+  "setup.html"
+ ],
+ "Save clip": [
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp"
+ ],
+ "Save screenshot": [
+  "editor.html"
+ ],
+ "Save separate audio tracks": [
+  "settings.html"
+ ],
+ "Save the last {length} of gameplay": [
+  "hotkey-menu.html"
+ ],
+ "Save them before you leave Settings, or leave without saving and lose them.": [
+  "settings.html"
+ ],
+ "Saved as {name}": [
+  "editor.html"
+ ],
+ "Saved presets": [
+  "_editor-fx.html"
+ ],
+ "Saved the last {length}": [
+  "plugins/replaykit/src/notify/clip_toast.cpp"
+ ],
+ "Saved to the GIFs section.": [
+  "clip-app.js"
+ ],
+ "Saves a restore copy first.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Saves current ReplayKit settings for the next install.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Saves PC audio, Discord, and your microphone as separate tracks, along with the normal mixed track. You can change each one in the clip editor. Needs an OBS restart.": [
+  "settings.html"
+ ],
+ "Saving a copy": [
+  "editor.html"
+ ],
+ "Saving a screenshot": [
+  "editor.html"
+ ],
+ "Saving clip": [
+  "clip-app.js"
+ ],
+ "Saving clip…": [
+  "clip-app.js"
+ ],
+ "Saving…": [
+  "_clip-games.html"
+ ],
+ "Scene Collection": [
+  "settings.html"
+ ],
+ "Scene item is missing.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Screenshare": [
+  "settings.html"
+ ],
+ "Screenshot": [
+  "_deleted.html"
+ ],
+ "Screenshot copied to the clipboard": [
+  "_screenshots.html"
+ ],
+ "Screenshot name": [
+  "_screenshots.html"
+ ],
+ "Screenshot not found": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "Screenshot saved in Screenshots as {name}": [
+  "editor.html",
+  "clip-app.js"
+ ],
+ "Screenshot this frame": [
+  "editor.html"
+ ],
+ "Screenshots": [
+  "_clip-content.html",
+  "settings.html",
+  "clip-app.js"
+ ],
+ "Scrub timeline": [
+  "editor.html"
+ ],
+ "SDK mode": [
+  "settings.html"
+ ],
+ "SDK mode is off.": [
+  "apps/helper/SdkRoutes.cs"
+ ],
+ "Search": [
+  "_clip-toolbar.html",
+  "_editor-tools.html"
+ ],
+ "Search clips": [
+  "_clip-toolbar.html",
+  "_editor-tools.html",
+  "clip-app.js"
+ ],
+ "Search effects": [
+  "_editor-fx.html"
+ ],
+ "Search elements": [
+  "_editor-tools.html"
+ ],
+ "Search filters": [
+  "_editor-fx.html"
+ ],
+ "Search games": [
+  "_clip-games.html"
+ ],
+ "Search GIFs": [
+  "clip-app.js"
+ ],
+ "Search is too long.": [
+  "apps/helper/GameCatalog.cs"
+ ],
+ "Search screenshots": [
+  "clip-app.js"
+ ],
+ "Search settings": [
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_obs_nav.cpp"
+ ],
+ "Search stickers": [
+  "_editor-tools.html"
+ ],
+ "See all": [
+  "_clip-content.html",
+  "_editor-tools.html"
+ ],
+ "Select": [
+  "clip-app.js"
+ ],
+ "Select all": [
+  "storage.html"
+ ],
+ "Select between 0.5 and 15 seconds for a GIF.": [
+  "apps/helper/GifExports.cs"
+ ],
+ "Select clip": [
+  "clip-app.js"
+ ],
+ "Select empty space": [
+  "_editor-lanes.html"
+ ],
+ "Select the whole row": [
+  "_editor-tools.html"
+ ],
+ "Select up to {count} clips at a time.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Selection": [
+  "editor.html"
+ ],
+ "Separate the tracks": [
+  "_editor-lanes.html"
+ ],
+ "Set a Storage Limit": [
+  "storage.html"
+ ],
+ "Set limit": [
+  "storage.html"
+ ],
+ "Set shortcuts for saving clips, recording, and opening your library.": [
+  "settings.html"
+ ],
+ "Set Up": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Set up Discord screenshare so Discord and other apps can capture your OBS scene.": [
+  "controls_app.html"
+ ],
+ "Set up Discord screenshare?": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "Set up OBS ReplayKit": [
+  "setup_installer.html"
+ ],
+ "Set up Share Preview": [
+  "plugins/replaykit/src/shell/shell_rail.cpp"
+ ],
+ "Set Windows startup": [
+  "apps/setup/Apply.cs"
+ ],
+ "Setting up OBS ReplayKit": [
+  "setup_installer.html"
+ ],
+ "Settings": [
+  "plugins/replaykit/src/shell/shell_rail.cpp",
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Settings applied": [
+  "settings.html"
+ ],
+ "Settings changed": [
+  "settings.html"
+ ],
+ "Settings file is too large.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "Settings history": [
+  "settings.html"
+ ],
+ "Settings loaded": [
+  "settings.html"
+ ],
+ "Settings microphone": [
+  "_editor-tools.html"
+ ],
+ "Settings saved. OBS is restarting...": [
+  "settings.html"
+ ],
+ "Settings sections": [
+  "settings.html"
+ ],
+ "Setup": [
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "Setup complete": [
+  "apps/setup/Apply.cs"
+ ],
+ "Setup failed": [
+  "setup_installer.html"
+ ],
+ "Setup failed: {error}": [
+  "controls_app.html"
+ ],
+ "Setup file": [
+  "settings.html"
+ ],
+ "Setup incomplete": [
+  "apps/setup/Apply.cs"
+ ],
+ "Setup is incomplete: {count} step(s) need attention. Run the installer again after resolving the warnings in the log.": [
+  "apps/setup/SetupWindow.cs"
+ ],
+ "several capture sources were showing and none clearly showed the game": [
+  "_clip-games.html"
+ ],
+ "Shape color": [
+  "_editor-tools.html"
+ ],
+ "Share": [
+  "_screenshots.html"
+ ],
+ "Share Preview": [
+  "plugins/replaykit/src/shell/shell_rail.cpp",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Share Preview audio": [
+  "settings.html"
+ ],
+ "Share Preview audio only": [
+  "settings.html"
+ ],
+ "Share preview could not be disabled: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Share preview enabled must be a JSON boolean.": [
+  "apps/helper/DiscordRoutes.cs"
+ ],
+ "Share Preview stays off.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Share Preview: off": [
+  "plugins/replaykit/src/shell/shell_rail.cpp"
+ ],
+ "Share Preview: on": [
+  "plugins/replaykit/src/shell/shell_rail.cpp"
+ ],
+ "Sharp pixels": [
+  "settings.html"
+ ],
+ "Sharper edges and less shimmer when videos are scaled down. Uses more GPU power.": [
+  "settings.html"
+ ],
+ "Shift + \\": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Short date": [
+  "settings.html"
+ ],
+ "Shortest": [
+  "_clip-toolbar.html"
+ ],
+ "Show a notification when a link is ready": [
+  "settings.html"
+ ],
+ "Show advanced": [
+  "setup.html"
+ ],
+ "Show black bars around the frame": [
+  "editor.html"
+ ],
+ "Show clip saved popup": [
+  "settings.html"
+ ],
+ "Show codec tags on clips": [
+  "settings.html"
+ ],
+ "Show in Clips": [
+  "clip-app.js"
+ ],
+ "Show more clips": [
+  "storage.html"
+ ],
+ "Show Projector": [
+  "settings.html"
+ ],
+ "Show recording dot": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Show recording started/stopped popup": [
+  "settings.html"
+ ],
+ "Show the OBS projector as a movable test window.": [
+  "settings.html"
+ ],
+ "Show the waveforms": [
+  "_editor-lanes.html"
+ ],
+ "Show {count} more clips": [
+  "storage.html"
+ ],
+ "Showing projector...": [
+  "settings.html"
+ ],
+ "Shown in the account circle at the top of the window. Any image works and is cut to a square.": [
+  "settings.html"
+ ],
+ "Shows a grey badge at the top when a newer OBS is out. OBS doesn't update itself while ReplayKit is installed, so this only lets you know.": [
+  "settings.html"
+ ],
+ "Shows a Windows notification when a clip you shared is ready to watch.": [
+  "settings.html"
+ ],
+ "Shows extra settings for troubleshooting and for developers. Most people never need them.": [
+  "settings.html"
+ ],
+ "Shows the standard OBS interface. Changing this restarts OBS.": [
+  "settings.html"
+ ],
+ "Shows your mouse cursor when you record a game in fullscreen.": [
+  "settings.html"
+ ],
+ "Shows your mouse cursor when you record a single game window (picked on the Screenshare page).": [
+  "settings.html"
+ ],
+ "Shows your mouse cursor when you record your whole screen.": [
+  "settings.html"
+ ],
+ "Shrinks the clip to this size before compressing — smaller file, but the lost detail can’t be brought back.": [
+  "_clip-dialogs.html"
+ ],
+ "Sign in in the Streamable window...": [
+  "account-menu.html",
+  "settings.html"
+ ],
+ "Sign in in the Streamable window…": [
+  "controls_app.html"
+ ],
+ "Sign in to Streamable": [
+  "account-menu.html",
+  "controls_app.html",
+  "settings.html"
+ ],
+ "Sign in with Google, Facebook, or email": [
+  "sign-in-loader.html"
+ ],
+ "Sign out": [
+  "account-menu.html",
+  "controls_app.html",
+  "settings.html"
+ ],
+ "Signed in": [
+  "account-menu.html",
+  "controls_app.html"
+ ],
+ "Signed in! Cleaning up…": [
+  "controls_app.html"
+ ],
+ "Signed-in Streamable session is unavailable. Sign out and sign in again.": [
+  "apps/helper/Upload.cs",
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Signing in…": [
+  "controls_app.html"
+ ],
+ "Signing out...": [
+  "settings.html"
+ ],
+ "Simple keyboard and mouse overlay.": [
+  "_overlay-controls.html"
+ ],
+ "Sit tight.": [
+  "update_prompt.html"
+ ],
+ "Size": [
+  "_editor-lanes.html",
+  "_overlay-controls.html",
+  "settings.html"
+ ],
+ "Size in GB.": [
+  "settings.html"
+ ],
+ "Skip Discord screenshare": [
+  "apps/setup/Apply.cs"
+ ],
+ "Skip favorites": [
+  "storage.html"
+ ],
+ "Skip tray icon pinning": [
+  "apps/setup/Apply.cs"
+ ],
+ "Sleeping face": [
+  "_editor-tools.html"
+ ],
+ "Smaller": [
+  "_clip-dialogs.html",
+  "settings.html",
+  "storage.html"
+ ],
+ "Smaller can take much longer and uses more CPU. Large libraries may take hours. Avoid gaming or other demanding tasks while it runs. It continues if you close this window and replaces each clip only when the result is smaller.": [
+  "storage.html"
+ ],
+ "Smaller can take much longer with large clips or libraries and uses more CPU while it runs.": [
+  "settings.html"
+ ],
+ "Smallest": [
+  "_clip-toolbar.html"
+ ],
+ "Smallest clips": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Smiling face with sunglasses": [
+  "_editor-tools.html"
+ ],
+ "Smooth": [
+  "settings.html"
+ ],
+ "Smooth jagged edges quickly. Fine details may look softer.": [
+  "settings.html"
+ ],
+ "Snap to edges and the playhead": [
+  "_editor-lanes.html"
+ ],
+ "Some audio is missing": [
+  "editor.html"
+ ],
+ "Some steps need attention. See the setup log and run the installer again.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Something went wrong": [
+  "clip-app.js"
+ ],
+ "Sort all clips by game": [
+  "_clip-content.html"
+ ],
+ "Sort all clips into a section per game": [
+  "_clip-content.html"
+ ],
+ "Sort by": [
+  "_clip-toolbar.html",
+  "_editor-tools.html"
+ ],
+ "Sort clips": [
+  "_clip-toolbar.html",
+  "_editor-tools.html"
+ ],
+ "Sorted 1 clip into its folder.": [
+  "clip-app.js"
+ ],
+ "Sorted {count} clips into their folders.": [
+  "clip-app.js"
+ ],
+ "Sorting clips into folders": [
+  "_clip-toolbar.html"
+ ],
+ "Sorting clips into folders · {done} of {total}": [
+  "clip-app.js"
+ ],
+ "Sounds": [
+  "settings.html"
+ ],
+ "Source clip not found": [
+  "apps/helper/ClipRoutes.cs",
+  "apps/helper/Trim.cs",
+  "apps/helper/TrimKeyframesWorker.cs"
+ ],
+ "Space freed": [
+  "apps/helper/Storage.cs"
+ ],
+ "Space invader": [
+  "_editor-tools.html"
+ ],
+ "SpawnDetached returned 0 for installer": [
+  "apps/helper/Update.cs"
+ ],
+ "SpawnDetached returned 0 for the update window.": [
+  "apps/helper/Update.cs"
+ ],
+ "Specific apps": [
+  "settings.html"
+ ],
+ "Specific game": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "Specific game capture was selected without a game window.": [
+  "apps/helper/SettingsOverlayLive.cs"
+ ],
+ "Speech bubble": [
+  "_editor-tools.html"
+ ],
+ "Speech-word timings could not be aligned with the original audio.": [
+  "apps/helper/SpeechTimings.cs"
+ ],
+ "Speed": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "Split at the playhead": [
+  "_editor-lanes.html"
+ ],
+ "Split at the playhead (S)": [
+  "_editor-lanes.html"
+ ],
+ "Spoken word": [
+  "_editor-tools.html"
+ ],
+ "Square": [
+  "editor.html"
+ ],
+ "Standard": [
+  "_overlay-controls.html",
+  "editor.html"
+ ],
+ "Start / Stop Recording": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Start and stop a recording of any length": [
+  "hotkey-menu.html"
+ ],
+ "Start Clipping": [
+  "controls_app.html",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Start clipping first": [
+  "controls_app.html"
+ ],
+ "Start compressing": [
+  "storage.html"
+ ],
+ "Start Menu": [
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Shortcuts.cs",
+  "apps/setup/Startup.cs"
+ ],
+ "Start minimized": [
+  "settings.html"
+ ],
+ "Start must be >= 0": [
+  "apps/helper/Trim.cs"
+ ],
+ "Start OBS ReplayKit when Windows signs in.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "Start playing when the editor opens": [
+  "settings.html"
+ ],
+ "Start Recording": [
+  "_editor-tools.html",
+  "controls_app.html",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Start recording": [
+  "_editor-tools.html",
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp",
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Start the cut here ([)": [
+  "_editor-lanes.html"
+ ],
+ "Start the replay buffer so you can save clips.": [
+  "controls_app.html"
+ ],
+ "Starting": [
+  "editor.html"
+ ],
+ "Starting install...": [
+  "settings.html"
+ ],
+ "Starting removal...": [
+  "settings.html"
+ ],
+ "Starting render": [
+  "editor.html"
+ ],
+ "Starting ReplayKit uninstall...": [
+  "settings.html"
+ ],
+ "Starting…": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Starts OBS.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Startup": [
+  "settings.html"
+ ],
+ "Startup update check already ran.": [
+  "apps/helper/Update.cs"
+ ],
+ "Status check timed out": [
+  "clip-app.js"
+ ],
+ "Stay": [
+  "settings.html"
+ ],
+ "Steam app record is too large.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam metadata is too complex.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam metadata is too deep.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam metadata is too large or redirected.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam metadata string is too long.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam string table is too large.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Steam text metadata is too large.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Step 1 curl failed (exit={code}).": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Step 1 response missing shortcode.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Step 1 response missing the S3 upload url.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Stickers": [
+  "_editor-tools.html"
+ ],
+ "Stop": [
+  "_editor-tools.html",
+  "storage.html"
+ ],
+ "Stop ({count} queued)": [
+  "clip-app.js"
+ ],
+ "Stop Clipping": [
+  "controls_app.html",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Stop compression queue ({done} / {total})": [
+  "clip-app.js"
+ ],
+ "Stop generating": [
+  "_editor-tools.html"
+ ],
+ "Stop letting Discord or other apps capture your OBS scene (Application screen share).": [
+  "controls_app.html"
+ ],
+ "Stop Recording": [
+  "_editor-tools.html",
+  "controls_app.html",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "Stop recording": [
+  "_editor-tools.html",
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp",
+  "plugins/replaykit/src/shell/shell_title_bar.cpp"
+ ],
+ "Stop Test": [
+  "_mic-controls.html"
+ ],
+ "Stop the replay buffer. You will not be able to save clips until it is started again.": [
+  "controls_app.html"
+ ],
+ "Stop uploads": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Stop uploads ({count})": [
+  "clip-app.js"
+ ],
+ "Stop {progress}": [
+  "clip-app.js"
+ ],
+ "Stop — {uploading} uploading, {queued} queued": [
+  "clip-app.js"
+ ],
+ "Stopped after {clips}, freed {size}.": [
+  "storage.html"
+ ],
+ "Stopping": [
+  "editor.html"
+ ],
+ "Stops OBS and ReplayKit helpers so the audio driver can be installed.": [
+  "apps/setup/Update.cs"
+ ],
+ "Stops OBS and ReplayKit helpers so the audio driver can be removed.": [
+  "apps/setup/Update.cs"
+ ],
+ "Stops OBS and ReplayKit helpers, but keeps this setup window alive.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Stops OBS to write settings.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Stops ReplayKit from launching OBS when Windows signs in.": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Storage": [
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_storage.cpp"
+ ],
+ "Storage Analysis": [
+  "storage.html"
+ ],
+ "Storage compression type": [
+  "settings.html"
+ ],
+ "Storage limit": [
+  "settings.html",
+  "storage.html"
+ ],
+ "Storage limit in GB": [
+  "storage.html"
+ ],
+ "Stores recent gameplay until you save a clip. Disk uses very little RAM and writes to your drive while clipping is on. Memory saves clips fastest but uses more RAM, and can help if Disk causes problems.": [
+  "settings.html",
+  "setup.html"
+ ],
+ "Streamable account": [
+  "account-menu.html",
+  "settings.html",
+  "plugins/replaykit/src/shell/shell_account.cpp"
+ ],
+ "Streamable sign-in failed: {error}": [
+  "apps/helper/StreamableSignIn.cs"
+ ],
+ "Streamable: anonymous": [
+  "plugins/replaykit/src/shell/shell_account.cpp"
+ ],
+ "Streamable: signed in": [
+  "plugins/replaykit/src/shell/shell_account.cpp"
+ ],
+ "Streamable: {name}": [
+  "plugins/replaykit/src/shell/shell_account.cpp"
+ ],
+ "Strength": [
+  "_editor-fx.html",
+  "settings.html"
+ ],
+ "Studio Mode keeps the preview on": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Subtitle": [
+  "_editor-fx.html",
+  "_editor-lanes.html",
+  "_editor-tools.html"
+ ],
+ "Subtitle presets": [
+  "_editor-fx.html"
+ ],
+ "Subtitles": [
+  "_editor-lanes.html",
+  "_editor-tools.html"
+ ],
+ "Subtitles could not be made": [
+  "_editor-tools.html"
+ ],
+ "Subtitles that might be misheard": [
+  "_editor-fx.html"
+ ],
+ "Switch Speed": [
+  "settings.html"
+ ],
+ "Take Screenshot": [
+  "settings.html"
+ ],
+ "Take screenshot": [
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp"
+ ],
+ "Take the fades off the tracks to combine them.": [
+  "_editor-lanes.html"
+ ],
+ "Teal & Orange": [
+  "_editor-fx.html"
+ ],
+ "Teddy bear": [
+  "_editor-tools.html"
+ ],
+ "Temporary files": [
+  "storage.html"
+ ],
+ "Text": [
+  "_appearance-panel.html",
+  "_editor-tools.html",
+  "settings.html"
+ ],
+ "Text color": [
+  "_appearance-panel.html",
+  "_editor-tools.html",
+  "settings.html"
+ ],
+ "That application cannot be added to the Auto Game List.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "That audio is longer than an hour": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "That audio is too short to use": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "That clip is already being changed.": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "That clip was not found": [
+  "apps/helper/EditorRoutes.cs"
+ ],
+ "That could not be done": [
+  "_deleted.html"
+ ],
+ "That deleted item is no longer there.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "That deleted item was not found.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "That file could not be used as a picture.": [
+  "account-menu.html",
+  "settings.html"
+ ],
+ "That file has no audio": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "That file is empty": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "That file is larger than 512 MB": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "That GIF is no longer in the GIFs folder.": [
+  "clip-app.js"
+ ],
+ "That is still not enough to get under the limit, because your favorites take the rest.": [
+  "storage.html"
+ ],
+ "That microphone is not connected.": [
+  "apps/helper/MicTest.cs"
+ ],
+ "That microphone is not valid.": [
+  "apps/helper/MicTest.cs",
+  "apps/helper/Voiceover.cs"
+ ],
+ "That name cannot be used": [
+  "apps/helper/GifExports.cs",
+  "apps/helper/Screenshots.cs"
+ ],
+ "That name is too long": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "That name is too long.": [
+  "clip-app.js"
+ ],
+ "the app on screen": [
+  "_clip-games.html"
+ ],
+ "The audio could not be imported": [
+  "_editor-lanes.html"
+ ],
+ "The audio could not be loaded": [
+  "editor.html"
+ ],
+ "The audio could not be played here": [
+  "_editor-lanes.html"
+ ],
+ "The audio is too long.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The audio of the clip could not be read.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The audio of this clip could not be read": [
+  "_editor-lanes.html"
+ ],
+ "The audio of this clip was not prepared, so the video cannot be edited with it. Turn on Remove audio to edit the video alone.": [
+  "apps/helper/Trim.cs"
+ ],
+ "The audio tracks could not be loaded": [
+  "_editor-lanes.html"
+ ],
+ "The audio tracks could not be prepared": [
+  "_editor-lanes.html"
+ ],
+ "The audio tracks were saved, but OBS could not be reached: {error}. They apply the next time OBS starts.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The audio tracks were saved, but the scene file could not be updated: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The audio tracks were saved, but {name} could not be updated: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The audio went back to default. Undo brings it back.": [
+  "_editor-fx.html"
+ ],
+ "The background helper stopped answering and normally comes back within a few seconds. If this stays, restart OBS.": [
+  "_home-dashboard.html"
+ ],
+ "The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back.": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "The Bongo Cat source is missing or still uses the older renderer. Run the ReplayKit installer again to repair the saved scene.": [
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "The bundled archive contains no installable files.": [
+  "apps/setup/BundledFiles.cs"
+ ],
+ "The bundled game catalog is invalid.": [
+  "apps/helper/GameCatalog.cs"
+ ],
+ "The bundled game catalog is missing or invalid.": [
+  "apps/helper/GameCatalog.cs"
+ ],
+ "The bundled ReplayKit helper is missing or incomplete.": [
+  "apps/setup/Installer.cs"
+ ],
+ "The bundled ReplayKit runtime is empty.": [
+  "apps/setup/Installer.cs"
+ ],
+ "the capture source had no picture": [
+  "_clip-games.html"
+ ],
+ "the captured display could not be found": [
+  "_clip-games.html"
+ ],
+ "the captured window was not the one in focus": [
+  "_clip-games.html"
+ ],
+ "The cat blinks now and then.": [
+  "settings.html"
+ ],
+ "The cat breathes while it waits.": [
+  "settings.html"
+ ],
+ "The cat turns its head toward the mouse.": [
+  "settings.html"
+ ],
+ "The clip audio could not be read again.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The clip audio ended early.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The clip changed while its compression history was checked.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clip compression history could not be checked. Reinstall ReplayKit to restore ffprobe.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clip compression history could not be read.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clip could not be listened to.": [
+  "_editor-tools.html"
+ ],
+ "The clip could not be prepared for upload (ffmpeg exit {code}).": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "The clip could not be renamed: {error}": [
+  "editor.html"
+ ],
+ "The clip could not be saved.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip could not be written.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip could not be written: {error}": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip folder changed. Reload the favorites before saving.": [
+  "apps/helper/Clips.cs"
+ ],
+ "The clip folder changed; review the library again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clip folder changed; select the clips again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clip folder {clipDir} was not found and could not be made, so the clip was lost. Check that its drive is connected, or pick another folder in Settings.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip is busy": [
+  "clip-app.js"
+ ],
+ "The clip is processing.": [
+  "_editor-tools.html"
+ ],
+ "The clip is replaced on disk, which can't be undone.": [
+  "editor.html"
+ ],
+ "The clip is still being prepared. Rename it after preparation finishes.": [
+  "apps/helper/JobCoordinator.cs"
+ ],
+ "The clip length is not valid.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip length is unavailable.": [
+  "apps/helper/ClipGames.cs"
+ ],
+ "The clip name is not valid.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The clip was compressed, but its result could not be saved to compression history.": [
+  "apps/helper/CompressOverwriteWorker.cs"
+ ],
+ "The clip was not found.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The clips could not be compressed.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The clips could not be listed.": [
+  "_editor-tools.html"
+ ],
+ "The compression result was already recorded with different values.": [
+  "apps/helper/CompressionHistory.cs"
+ ],
+ "The current OBS browser is not the original supported file. Repair OBS Studio before removing ReplayKit.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "The defaults marker contains an invalid step.": [
+  "apps/setup/DefaultsMigration.cs"
+ ],
+ "The defaults marker has no valid steps list.": [
+  "apps/setup/DefaultsMigration.cs"
+ ],
+ "The deleted history folder cannot be a link.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "The deleted items could not be loaded.": [
+  "_deleted.html"
+ ],
+ "The download is larger than expected.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The download left https.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The downloaded file did not match its expected hash.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The downloaded OBS installer is not validly signed by OBS Project. Install OBS yourself from obsproject.com, then re-run this installer.": [
+  "apps/setup/ObsDownloader.cs"
+ ],
+ "The draft could not be kept": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "The draft could not be removed": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "The draft of this clip could not be put back, and it is still kept.": [
+  "editor.html"
+ ],
+ "The draft of this clip was dropped, since the clip is not the one it was kept for.": [
+  "editor.html"
+ ],
+ "The drafts could not be read": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "The edit is too large to keep": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "The editor clip could not be protected.": [
+  "clip-app.js"
+ ],
+ "The editor could not be loaded. Reopen ReplayKit and try again.": [
+  "clip-app.js"
+ ],
+ "The element could not be added": [
+  "_editor-tools.html"
+ ],
+ "The file could not be received": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "The file could not be sent": [
+  "_editor-lanes.html"
+ ],
+ "The file is in use by another program. Close anything that is playing it and try again.": [
+  "apps/helper/ClipFiles.cs"
+ ],
+ "The files could not be added": [
+  "_editor-tools.html"
+ ],
+ "The folder it came from is a link now.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "The font list was not served with this page.": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "The game folder cannot be a link.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The game folder is not valid.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "The GIF could not be changed": [
+  "_screenshots.html"
+ ],
+ "The GIF folder cannot be a link": [
+  "apps/helper/GifExports.cs"
+ ],
+ "The GIF folder is occupied by a file": [
+  "apps/helper/GifExports.cs"
+ ],
+ "The GIF took too long to export.": [
+  "apps/helper/GifExports.cs"
+ ],
+ "The GIFs could not be loaded.": [
+  "_screenshots.html"
+ ],
+ "The GIFs could not be read": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "The helper that loads the clips is not answering, so nothing can load right now. OBS usually starts it again by itself within about half a minute. If this stays, restart OBS.": [
+  "clip-app.js"
+ ],
+ "The icon folder is a link.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "The image is empty.": [
+  "apps/helper/ProfilePicture.cs"
+ ],
+ "The input sensitivity was set but the noise gate could not be turned on: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The installer did not finish within 3 minutes.": [
+  "update_prompt.html"
+ ],
+ "The installer did not start.": [
+  "apps/helper/Update.cs"
+ ],
+ "The installer reported a failure.": [
+  "update_prompt.html"
+ ],
+ "The installer stopped without confirming completion. Run the ReplayKit installer again to finish the update or repair.": [
+  "apps/helper/UpdateWatchdog.cs"
+ ],
+ "The language list was not served with this page.": [
+  "settings.html"
+ ],
+ "The language of ReplayKit and OBS. Changing it restarts OBS.": [
+  "settings.html"
+ ],
+ "The language of ReplayKit and OBS. OBS restarts in it when you finish.": [
+  "setup.html"
+ ],
+ "The last update did not finish": [
+  "update_prompt.html"
+ ],
+ "The latest clip is loading.mp4": [
+  "clip-app.js"
+ ],
+ "The Live2D cat whose paw follows the mouse. Off shows the flat drawing of the mode.": [
+  "settings.html"
+ ],
+ "the look of this video": [
+  "_editor-fx.html"
+ ],
+ "The microphone could not be started.": [
+  "_editor-tools.html"
+ ],
+ "The microphone stopped unexpectedly.": [
+  "_mic-controls.html"
+ ],
+ "The microphone test is not running.": [
+  "apps/helper/MicTest.cs"
+ ],
+ "The noise suppression model did not parse cleanly.": [
+  "apps/helper/Rnnoise.cs"
+ ],
+ "The noise suppression model is missing from this build.": [
+  "apps/helper/Rnnoise.cs"
+ ],
+ "The noise suppression model is the wrong size.": [
+  "apps/helper/Rnnoise.cs"
+ ],
+ "The numbered name is too large.": [
+  "apps/helper/ClipFiles.cs"
+ ],
+ "The obs log folder was not found.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "The OBS projector window change did not finish with a valid sharing window.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "The OBS projector window could not be confirmed or parked.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "The old ReplayKit helper could not be stopped, so no files were changed.": [
+  "apps/setup/Update.cs"
+ ],
+ "The original game assignment is unavailable.": [
+  "apps/helper/ClipGames.cs"
+ ],
+ "The original OBS backup failed verification.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "The picture could not be made": [
+  "_editor-tools.html"
+ ],
+ "The plan used for new uploads.": [
+  "settings.html"
+ ],
+ "The plugin answered with something that is not json.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "The plugin did not answer in time.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "The plugin is not connected.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "The presets could not be read": [
+  "_editor-fx.html",
+  "apps/helper/EditorPresets.cs"
+ ],
+ "The presets could not be saved": [
+  "_editor-fx.html",
+  "apps/helper/EditorPresets.cs"
+ ],
+ "The previous projector window change is still finishing.": [
+  "apps/helper/DiscordProjector.cs"
+ ],
+ "The process role backup is missing. Repair OBS Studio before removing ReplayKit.": [
+  "apps/setup/ProcessHost.cs"
+ ],
+ "The recording could not be added": [
+  "_editor-lanes.html"
+ ],
+ "The recording could not be added.": [
+  "_editor-tools.html"
+ ],
+ "The release is missing {file}.": [
+  "apps/helper/Update.cs"
+ ],
+ "The ReplayKit setup file is missing, so it is downloaded again from GitHub first (about 26 MB, checked before it is used).": [
+  "settings.html"
+ ],
+ "The running ReplayKit helper does not support graceful-only shutdown.": [
+  "apps/setup/Obs.cs"
+ ],
+ "The same quality as the clip, at the size it needs": [
+  "editor.html"
+ ],
+ "The save notice was not valid.": [
+  "apps/helper/RecordingRoutes.cs"
+ ],
+ "The save request was not valid.": [
+  "apps/helper/RecordingRoutes.cs"
+ ],
+ "The saved state file is too large.": [
+  "apps/helper/ClipStore.cs"
+ ],
+ "The scene file could not be updated: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The screenshot could not be changed": [
+  "_screenshots.html"
+ ],
+ "The screenshot time is outside the saved part of the video": [
+  "apps/helper/Trim.cs"
+ ],
+ "The screenshots could not be loaded.": [
+  "_screenshots.html"
+ ],
+ "The screenshots could not be read": [
+  "apps/helper/ClipRoutes.cs"
+ ],
+ "The screenshots folder cannot be a link": [
+  "apps/helper/Screenshots.cs"
+ ],
+ "The screenshots folder is occupied by a file": [
+  "apps/helper/Screenshots.cs"
+ ],
+ "The selected clip changed; review the library again.": [
+  "apps/helper/Clips.cs",
+  "apps/helper/Storage.cs"
+ ],
+ "The selected clip changed; select it again.": [
+  "apps/helper/CompressOverwrite.cs",
+  "apps/helper/CompressOverwriteWorker.cs"
+ ],
+ "The selected clip is no longer available.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The selected clips changed. Review the list again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "The selected OBS theme could not be saved before launch.": [
+  "apps/helper/Themes.cs"
+ ],
+ "The selected video could not be exported as a GIF.": [
+  "apps/helper/GifExports.cs"
+ ],
+ "The settings defaults and limits were not served with this page.": [
+  "_mic-controls.html",
+  "_overlay-controls.html"
+ ],
+ "The settings defaults were not served with this page.": [
+  "settings.html",
+  "setup.html"
+ ],
+ "The settings file could not be read, so ReplayKit went back to its defaults. The old file was kept as {file} in the user-data folder of ReplayKit.": [
+  "apps/helper/ReplaykitSettings.cs"
+ ],
+ "The settings limits were not served with this page.": [
+  "settings.html",
+  "setup.html"
+ ],
+ "The setup file is back.": [
+  "settings.html"
+ ],
+ "The setup file that Install and Uninstall in Settings use was missing, so it was downloaded again from GitHub release {version} and checked against its published hash.": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "The setup file was downloaded again from release {version}.": [
+  "apps/helper/SetupExe.cs"
+ ],
+ "The setup window could not start.\n\n{error}": [
+  "apps/setup/SetupWindow.cs"
+ ],
+ "The source clip changed during processing; the original was left untouched.": [
+  "apps/helper/ClipFiles.cs"
+ ],
+ "The speech detector returned inconsistent speech ranges.": [
+  "apps/helper/SpeechTimings.cs"
+ ],
+ "The speech detector returned speech out of order.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech engine could not be downloaded.": [
+  "_editor-tools.html"
+ ],
+ "The speech engine did not provide word timings that could be aligned with the audio.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine download is missing files.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech engine gave no result on the second listen.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech engine gave no result.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech engine result is too large.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech engine returned an invalid segment.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine returned an invalid transcript.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine returned invalid segment timings.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine returned invalid subtitle text.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine returned repeated text instead of reliable speech. Choose the spoken language or an isolated voice track.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The speech engine took too long.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The speech map is too large.": [
+  "apps/helper/SpeechTimings.cs"
+ ],
+ "The sticker could not be added": [
+  "_editor-tools.html"
+ ],
+ "The sticker could not be loaded. Check the internet connection.": [
+  "_editor-tools.html"
+ ],
+ "The sticker could not be made": [
+  "_editor-tools.html"
+ ],
+ "The storage compression type changed. Review the clips again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "the style of these subtitles": [
+  "_editor-fx.html"
+ ],
+ "The subtitles went back to default. Undo brings it back.": [
+  "_editor-fx.html"
+ ],
+ "The transcript has too many words. Select a shorter section.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "The Uninstall and Install buttons on this page run it. Download again fetches it from GitHub and checks it before it is used.": [
+  "settings.html"
+ ],
+ "The uninstall window could not start.\n\n{error}": [
+  "apps/setup/UninstallWindow.cs"
+ ],
+ "The update could not be applied.": [
+  "update_prompt.html"
+ ],
+ "The update stopped before it was applied.": [
+  "update_prompt.html"
+ ],
+ "The video can take pieces of {count} other clips at most.": [
+  "apps/helper/VideoPlan.cs"
+ ],
+ "The video could not be added": [
+  "_editor-tools.html"
+ ],
+ "The video is too small for this aspect ratio": [
+  "apps/helper/EditorFrame.cs"
+ ],
+ "The video of the clip could not be read": [
+  "apps/helper/Trim.cs"
+ ],
+ "The video tools are missing. Run the ReplayKit setup again.": [
+  "apps/helper/Speech.cs"
+ ],
+ "The video went back to default. Undo brings it back.": [
+  "_editor-fx.html"
+ ],
+ "the window in focus could not be read": [
+  "_clip-games.html"
+ ],
+ "the window on screen could not be read": [
+  "_clip-games.html"
+ ],
+ "The {font} font is missing. Run the ReplayKit setup again.": [
+  "apps/helper/SubtitleBurn.cs"
+ ],
+ "The {label} was set but the filter could not be moved to the end of the chain: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "The {version} installer is incomplete ({size} MB) -- it was published without its bundled ReplayKit files.": [
+  "apps/helper/Update.cs"
+ ],
+ "Theater mode (T)": [
+  "clip-app.js"
+ ],
+ "Theme": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Theme the ReplayKit windows and OBS. This window previews live; OBS restarts once at the end.": [
+  "setup.html"
+ ],
+ "There are no clips in the clip folder yet.": [
+  "_editor-tools.html"
+ ],
+ "There is no buffered video to save yet.": [
+  "apps/helper/ClipBuffer.cs"
+ ],
+ "There is no draft for this clip": [
+  "apps/helper/EditDrafts.cs"
+ ],
+ "There is no free name to restore that item under.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "There is no obs log yet.": [
+  "apps/helper/Sdk.cs"
+ ],
+ "There is no room for another layer.": [
+  "_editor-tools.html"
+ ],
+ "There is no speech map to place the words with.": [
+  "apps/helper/SpeechTranscript.cs"
+ ],
+ "These {count} subtitles were hard to make out. Pick or type what was said, keep it, or delete it.": [
+  "_editor-fx.html"
+ ],
+ "Thinking face": [
+  "_editor-tools.html"
+ ],
+ "This audio is no longer available. Add it again.": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "This can take a few minutes.": [
+  "setup_installer.html"
+ ],
+ "This clip has no audio to listen to.": [
+  "_editor-tools.html"
+ ],
+ "This clip is <b>already at maximum compression</b> (Smaller mode). Re-encoding wouldn’t reduce the size further, only the quality.": [
+  "_clip-dialogs.html"
+ ],
+ "This clip is being compressed right now. Edit it once that has finished, or cancel it first.": [
+  "clip-app.js"
+ ],
+ "This clip is being uploaded right now. Edit it once that has finished, or cancel it first.": [
+  "clip-app.js"
+ ],
+ "This clip is too short for a screenshot.": [
+  "clip-app.js"
+ ],
+ "This closes OBS and installs the OBS Stream Audio virtual audio driver, then turns Share Preview on. The rest of ReplayKit stays as it is.": [
+  "settings.html"
+ ],
+ "This closes OBS and uninstalls the OBS Stream Audio virtual audio driver. The rest of ReplayKit stays installed.": [
+  "settings.html"
+ ],
+ "This closes OBS, wipes the Streamable cookies, and relaunches OBS as admin so you can sign in as a different account.\n\nSave any unsaved scene work first.": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "This computer cannot show the look on the preview. The saved copy still gets it.": [
+  "_editor-fx.html"
+ ],
+ "This deleted clip could not be played.": [
+  "_deleted.html"
+ ],
+ "This installs an audio cable driver and a hidden OBS projector window so Discord and other apps can screen-share OBS's output.\n\nOBS will close while it installs.": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "This language could not be shown yet. It will be used after OBS restarts.": [
+  "setup.html"
+ ],
+ "This OBSReplayKit.exe was built without its bundled ReplayKit files.": [
+  "apps/setup/Update.cs"
+ ],
+ "This removes ReplayKit and then runs OBS Studio's own uninstaller.": [
+  "uninstall_prompt.html"
+ ],
+ "This removes the ReplayKit dock, scene, sources and script from OBS, then restarts OBS.": [
+  "setup_installer.html"
+ ],
+ "This removes the ReplayKit dock, scene, sources, script and settings from OBS.": [
+  "uninstall_prompt.html"
+ ],
+ "This setup was built without its ReplayKit version.": [
+  "apps/setup/VersionInfo.cs"
+ ],
+ "This speed would put a video piece outside its supported range. Change that piece's speed first.": [
+  "_editor-lanes.html"
+ ],
+ "This speed would put the linked audio outside its supported range.": [
+  "_editor-lanes.html"
+ ],
+ "This subtitle was hard to make out. Pick or type what was said, keep it, or delete it.": [
+  "_editor-fx.html"
+ ],
+ "This will close and reopen OBS. Any active recording or stream will be stopped. Continue?": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "This will close OBS. Any active recording or stream will be stopped. Continue?": [
+  "plugins/replaykit/src/app/obs_actions.cpp"
+ ],
+ "This window cannot play the tracks.": [
+  "_editor-lanes.html"
+ ],
+ "Those audio tracks cannot be listened to.": [
+  "apps/helper/Speech.cs"
+ ],
+ "Thumbs up": [
+  "_editor-tools.html"
+ ],
+ "Tilt Shift": [
+  "_editor-fx.html"
+ ],
+ "Time ago": [
+  "settings.html"
+ ],
+ "Title bar and sidebar": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Title bar and sidebar color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "To keep clipping working, ReplayKit switched recording to {encoder} for now.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "Toggle fullscreen": [
+  "editor.html"
+ ],
+ "Too big: {size} MB / {cap} MB limit": [
+  "apps/helper/Upload.cs"
+ ],
+ "Too many actions": [
+  "apps/helper/QuickActions.cs"
+ ],
+ "Too many existing trim outputs": [
+  "apps/helper/Trim.cs"
+ ],
+ "Too many installed Steam apps.": [
+  "apps/helper/SteamGames.cs"
+ ],
+ "Too many saved games.": [
+  "apps/helper/GameCatalog.cs"
+ ],
+ "Tools": [
+  "settings.html"
+ ],
+ "Transcode trigger curl failed (exit={code}).": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Transcode trigger failed: HTTP {tcStatus}.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Transcode trigger returned an unreadable status.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Transfer-Encoding is not supported.": [
+  "apps/helper/Connection.cs"
+ ],
+ "Trash?": [
+  "clip-app.js"
+ ],
+ "Trim end": [
+  "editor.html"
+ ],
+ "Trim failed: ReplayKit's helper stopped answering, so the save may not have finished. Check the clip before editing it again.": [
+  "editor.html"
+ ],
+ "Trim failed: {error}": [
+  "editor.html",
+  "apps/helper/Trim.cs"
+ ],
+ "Trim must be at least 0.5s long": [
+  "apps/helper/Trim.cs"
+ ],
+ "Trim start": [
+  "editor.html"
+ ],
+ "Trim the audio with the video": [
+  "_editor-lanes.html"
+ ],
+ "Trim timeline": [
+  "editor.html"
+ ],
+ "Trimming": [
+  "settings.html"
+ ],
+ "Try again": [
+  "_home-dashboard.html",
+  "update_prompt.html"
+ ],
+ "Try that clip again in a moment.": [
+  "clip-app.js"
+ ],
+ "Trying again now.": [
+  "update_prompt.html"
+ ],
+ "Turn clipping on or off": [
+  "hotkey-menu.html"
+ ],
+ "Turn it back on with the Preview switch above": [
+  "plugins/replaykit/src/shell/shell_projector.cpp"
+ ],
+ "Turn preview off": [
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp"
+ ],
+ "Turn preview on": [
+  "plugins/replaykit/src/shell/shell_quick_menu.cpp"
+ ],
+ "Turn the preview off": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Turn the preview on": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light.": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it's off, cuts are instant, but a clip may start slightly earlier than you chose.": [
+  "editor.html"
+ ],
+ "Turns on the defaults this version ships with.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Two paws on the arrow keys, R, Left Ctrl and Left Shift.": [
+  "_overlay-controls.html"
+ ],
+ "Type the subtitle": [
+  "_editor-tools.html"
+ ],
+ "Type your own at the playhead": [
+  "_editor-tools.html"
+ ],
+ "Types": [
+  "_clip-toolbar.html"
+ ],
+ "Ultrawide": [
+  "editor.html"
+ ],
+ "Unassigned": [
+  "_clip-games.html"
+ ],
+ "Unavailable": [
+  "settings.html"
+ ],
+ "Unavailable device": [
+  "_mic-controls.html"
+ ],
+ "Undo": [
+  "editor.html",
+  "settings.html"
+ ],
+ "Undo (Ctrl+Z)": [
+  "_editor-lanes.html",
+  "settings.html"
+ ],
+ "Undo settings change": [
+  "settings.html"
+ ],
+ "Unexpected editor resource": [
+  "clip-app.js"
+ ],
+ "Uninstall": [
+  "setup_installer.html",
+  "settings.html"
+ ],
+ "Uninstall failed": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Uninstall failed: {error}": [
+  "settings.html"
+ ],
+ "Uninstall OBS ReplayKit?": [
+  "setup_installer.html"
+ ],
+ "Uninstall OBS Studio": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Uninstall options": [
+  "settings.html"
+ ],
+ "Uninstall started. Follow the progress window.": [
+  "apps/helper/Uninstall.cs"
+ ],
+ "Uninstall started. OBS will close.": [
+  "settings.html"
+ ],
+ "Uninstalls the audio cable driver.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Uninstalls the ReplayKit virtual audio device.": [
+  "apps/setup/Cleanup.cs",
+  "apps/setup/Update.cs"
+ ],
+ "Uninstall…": [
+  "settings.html"
+ ],
+ "Unknown aspect ratio": [
+  "apps/helper/EditorFrame.cs",
+  "apps/helper/Trim.cs"
+ ],
+ "Unknown audio import": [
+  "apps/helper/AudioImports.cs"
+ ],
+ "Unknown confirm kind.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Unknown edge.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Unknown error": [
+  "clip-app.js"
+ ],
+ "unknown error": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Unknown game": [
+  "_clip-games.html"
+ ],
+ "Unknown game.": [
+  "apps/helper/ClipGames.cs",
+  "apps/helper/GameCatalog.cs"
+ ],
+ "Unknown job.": [
+  "apps/helper/Speech.cs"
+ ],
+ "Unknown kind of preset": [
+  "apps/helper/EditorPresets.cs"
+ ],
+ "Unknown language.": [
+  "apps/helper/LocaleRoutes.cs",
+  "apps/helper/Speech.cs"
+ ],
+ "Unknown popup page": [
+  "popup.html"
+ ],
+ "Unknown Roblox experience.": [
+  "apps/helper/RobloxExperiences.cs"
+ ],
+ "Unknown speech model.": [
+  "apps/helper/Speech.cs"
+ ],
+ "Unknown speech range.": [
+  "apps/helper/SpeechTimings.cs"
+ ],
+ "Unknown view": [
+  "apps/helper/QuickActions.cs"
+ ],
+ "Unknown view.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Unlimited": [
+  "settings.html"
+ ],
+ "Unlock the preview": [
+  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
+ ],
+ "Unmute": [
+  "_editor-lanes.html"
+ ],
+ "Unmute (M)": [
+  "clip-app.js"
+ ],
+ "Unsaved edits": [
+  "clip-app.js"
+ ],
+ "Unsupported Steam app cache.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Unsupported Steam binary type.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Unsupported Steam text token.": [
+  "apps/helper/SteamData.cs"
+ ],
+ "Unsupported window title.": [
+  "apps/helper/WindowRoutes.cs"
+ ],
+ "Up to date": [
+  "update_prompt.html"
+ ],
+ "Update": [
+  "setup_installer.html"
+ ],
+ "Update available: {latest} (installed {installed})": [
+  "settings.html"
+ ],
+ "Update available: {latest} (installed {installed}). Use the update button at the top to install it.": [
+  "settings.html"
+ ],
+ "Update available: {latest}. Apply or cancel your settings changes first.": [
+  "settings.html"
+ ],
+ "Update check failed: {error}": [
+  "settings.html"
+ ],
+ "Update complete": [
+  "update_prompt.html"
+ ],
+ "Update download exceeds the size limit.": [
+  "apps/helper/Update.cs"
+ ],
+ "Update download redirected outside HTTPS.": [
+  "apps/helper/Update.cs"
+ ],
+ "Update download URL must use GitHub HTTPS.": [
+  "apps/helper/Update.cs"
+ ],
+ "Update failed": [
+  "update_prompt.html"
+ ],
+ "Update keeps your current settings. Re-Install starts over with the default settings, so your Auto Game List, keybinds and everything else set in ReplayKit are cleared.": [
+  "setup_installer.html"
+ ],
+ "Update notices show up here.": [
+  "notifications.html"
+ ],
+ "Update now": [
+  "_home-dashboard.html"
+ ],
+ "Update preset": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Update ReplayKit {version}": [
+  "apps/helper/Notifications.cs"
+ ],
+ "Update temp folder name is invalid.": [
+  "apps/helper/Update.cs"
+ ],
+ "Update temp folder resolved outside %TEMP%\\ReplayKit.": [
+  "apps/helper/Update.cs"
+ ],
+ "Update your graphics driver from the website of your graphics card maker, then restart OBS.": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "Update your {gpu} graphics driver": [
+  "apps/helper/GpuDrivers.cs"
+ ],
+ "Updates": [
+  "settings.html"
+ ],
+ "Updating ReplayKit": [
+  "update_prompt.html"
+ ],
+ "Upload": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Upload cancelled": [
+  "clip-app.js"
+ ],
+ "Upload destination must use HTTPS.": [
+  "apps/helper/UploadWorker.cs"
+ ],
+ "Upload details": [
+  "settings.html"
+ ],
+ "Upload failed: {error}": [
+  "clip-app.js"
+ ],
+ "Upload file not found: {path}": [
+  "apps/helper/Upload.cs"
+ ],
+ "Upload queue is full": [
+  "clip-app.js"
+ ],
+ "Upload selected clips": [
+  "_clip-toolbar.html",
+  "clip-app.js"
+ ],
+ "Upload size": [
+  "settings.html"
+ ],
+ "Upload size limit is too small for automatic compression.": [
+  "apps/helper/Compression.cs"
+ ],
+ "Upload: queued 1 selected clip before stopping.": [
+  "clip-app.js"
+ ],
+ "Upload: queued 1 selected clip.": [
+  "clip-app.js"
+ ],
+ "Upload: queued {count} selected clips before stopping.": [
+  "clip-app.js"
+ ],
+ "Upload: queued {count} selected clips.": [
+  "clip-app.js"
+ ],
+ "Uploading anonymously": [
+  "settings.html"
+ ],
+ "Uploads go to your Streamable account and are kept for <b>{days} days</b>.": [
+  "account-menu.html"
+ ],
+ "Use a gradient for Background": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Use a gradient for {target}": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Use classic OBS layout": [
+  "settings.html"
+ ],
+ "Use dark icons, menus and native controls": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Use text": [
+  "_editor-fx.html"
+ ],
+ "Use the graphics card to encode edits": [
+  "settings.html"
+ ],
+ "Use “{name}”": [
+  "_clip-games.html"
+ ],
+ "Used by Compress Clips in Free-up Space.": [
+  "settings.html"
+ ],
+ "Used: <b>{used}</b> / <b>{limit}</b>": [
+  "storage.html"
+ ],
+ "User settings": [
+  "settings.html"
+ ],
+ "Uses more time to reduce the file size further. Speed and savings depend on your PC and the clip.": [
+  "_clip-dialogs.html"
+ ],
+ "Uses Settings > Audio processing.": [
+  "_editor-tools.html"
+ ],
+ "Uses the Game Audio volume": [
+  "settings.html"
+ ],
+ "Uses your graphics card to save edited videos much faster, like exact cuts, black sections, and speed changes. It also keeps your game running smoothly. If your PC can't do this, ReplayKit uses your processor instead.": [
+  "settings.html"
+ ],
+ "VB-Audio Virtual Cable": [
+  "apps/setup/VbCable.cs"
+ ],
+ "VC++ 2015-2022 (x64) Redistributable already installed": [
+  "apps/setup/InputOverlay.cs"
+ ],
+ "VC++ redist install timed out after 300s": [
+  "apps/setup/InputOverlay.cs"
+ ],
+ "VC++ redist missing; downloading latest x64 package from Microsoft...": [
+  "apps/setup/InputOverlay.cs"
+ ],
+ "Verifies the Bongo Cat files and saved sources.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Verifies the trim/compress tools.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Verifying download": [
+  "update_prompt.html"
+ ],
+ "Version {version} is the latest.": [
+  "update_prompt.html"
+ ],
+ "Very high quality target. Best for replay clips.": [
+  "apps/setup/Recording.cs"
+ ],
+ "Video": [
+  "_editor-lanes.html",
+  "_editor-tools.html"
+ ],
+ "Video Editor": [
+  "settings.html"
+ ],
+ "Video game": [
+  "_editor-tools.html"
+ ],
+ "Video length": [
+  "settings.html"
+ ],
+ "Video presets": [
+  "_editor-fx.html"
+ ],
+ "Video speed": [
+  "_editor-lanes.html"
+ ],
+ "Video {speed}x": [
+  "_editor-lanes.html"
+ ],
+ "View": [
+  "settings.html"
+ ],
+ "View Clips": [
+  "controls_app.html",
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "View Crash Logs": [
+  "plugins/replaykit/src/tray/tray_menu.cpp"
+ ],
+ "View {name}": [
+  "_screenshots.html"
+ ],
+ "Virtual Camera is legacy/deprecated for Discord output.": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Virtual Display Driver": [
+  "apps/setup/VirtualDisplayDriver.cs"
+ ],
+ "Volume": [
+  "_editor-lanes.html"
+ ],
+ "Volume must be a number.": [
+  "apps/helper/AudioRoutes.cs"
+ ],
+ "Volume must be between 0 and {VolumeMax}.": [
+  "apps/helper/MicTest.cs"
+ ],
+ "Wait a moment or turn on Frame-accurate.": [
+  "editor.html"
+ ],
+ "Wait for the running upload, trim or compression to finish, or cancel it first.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Wait until the audio has been added": [
+  "editor.html"
+ ],
+ "Wait until the audio has been added, then save.": [
+  "editor.html"
+ ],
+ "Waiting for the ReplayKit helper": [
+  "plugins/replaykit/src/shell/shell_views.cpp"
+ ],
+ "WASD / mouse": [
+  "_overlay-controls.html",
+  "apps/helper/SettingsHttp.cs"
+ ],
+ "WebView2 runtime install finished but the runtime is still not detected.": [
+  "apps/setup/WebView2Runtime.cs"
+ ],
+ "WebView2 runtime installed.": [
+  "apps/setup/WebView2Runtime.cs"
+ ],
+ "WebView2 runtime installer did not finish within 5 minutes.": [
+  "apps/setup/WebView2Runtime.cs"
+ ],
+ "WebView2 runtime not found; downloading it from Microsoft...": [
+  "apps/setup/WebView2Runtime.cs"
+ ],
+ "Welcome": [
+  "setup.html"
+ ],
+ "Welcome to OBS ReplayKit": [
+  "setup.html"
+ ],
+ "What was said": [
+  "_editor-fx.html"
+ ],
+ "What would you like to remove?": [
+  "settings.html"
+ ],
+ "What's new": [
+  "notifications.html"
+ ],
+ "When this is on and a game from your list is detected, ReplayKit shares only that game, even if you switch to another window like Discord, until the game is no longer detected.": [
+  "settings.html"
+ ],
+ "Where that item came from is unknown.": [
+  "apps/helper/DeletedHistory.cs"
+ ],
+ "Which surface to give a gradient": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "While OBS runs": [
+  "settings.html"
+ ],
+ "Widescreen": [
+  "editor.html"
+ ],
+ "Window behavior": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "Window Capture": [
+  "settings.html",
+  "apps/setup/Transform.cs"
+ ],
+ "Windows default": [
+  "_editor-tools.html"
+ ],
+ "Windows monitor and PC sleep timers can now run while OBS/ReplayKit is active.": [
+  "apps/setup/SleepOverride.cs"
+ ],
+ "Windows OS": [
+  "settings.html"
+ ],
+ "Windows Startup folder was not found.": [
+  "apps/helper/SettingsObsConfig.cs"
+ ],
+ "Windows startup was saved, but Windows rejected the change: {error}": [
+  "apps/helper/SettingsLiveApply.cs"
+ ],
+ "Windows startup: OBS will start when you sign in": [
+  "apps/setup/Startup.cs"
+ ],
+ "Windows startup: off": [
+  "apps/setup/Startup.cs"
+ ],
+ "Windows startup: removed legacy registry entry": [
+  "apps/setup/Startup.cs"
+ ],
+ "Windows startup: removed Startup folder shortcut": [
+  "apps/setup/Startup.cs"
+ ],
+ "Windows startup: shortcut refreshed": [
+  "apps/setup/Startup.cs"
+ ],
+ "Wipe OBS ReplayKit config": [
+  "apps/setup/Cleanup.cs"
+ ],
+ "Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.": [
+  "controls_app.html"
+ ],
+ "Word color": [
+  "_editor-tools.html"
+ ],
+ "Word lights up one word at a time. Fill sweeps the colour through the words as they are said.": [
+  "_editor-tools.html"
+ ],
+ "Wrapped gift": [
+  "_editor-tools.html"
+ ],
+ "Write ReplayKit OBS profile": [
+  "apps/setup/Apply.cs"
+ ],
+ "Writes the ReplayKit OBS profile.": [
+  "apps/setup/Apply.cs"
+ ],
+ "Writes them from the clip audio": [
+  "_editor-tools.html"
+ ],
+ "You are on the latest version.": [
+  "update_prompt.html"
+ ],
+ "You can upload clips and create shareable links without an account.": [
+  "settings.html"
+ ],
+ "You have unsaved changes": [
+  "settings.html"
+ ],
+ "Your \"{name}\" is ready": [
+  "apps/helper/Upload.cs"
+ ],
+ "Your \"{name}\" is ready, link copied to clipboard": [
+  "apps/helper/Upload.cs"
+ ],
+ "Your clip is ready": [
+  "apps/helper/Upload.cs"
+ ],
+ "Your clip is ready and the link is on your clipboard": [
+  "apps/helper/Upload.cs"
+ ],
+ "Your clips are shared using this account.": [
+  "settings.html"
+ ],
+ "Your clips take {size} more than the limit you set. Nothing is deleted unless you say so.": [
+  "_home-dashboard.html"
+ ],
+ "Your edits": [
+  "editor.html"
+ ],
+ "Your edits are kept in Drafts": [
+  "editor.html"
+ ],
+ "Your games": [
+  "_clip-games.html"
+ ],
+ "Your library changed while you were looking. Review it again.": [
+  "apps/helper/Storage.cs"
+ ],
+ "Your library is <b>{size}</b> over the limit.": [
+  "storage.html"
+ ],
+ "Your OBS scenes and profiles in AppData are left in place.": [
+  "setup_installer.html",
+  "uninstall_prompt.html"
+ ],
+ "Your scenes and profiles in AppData are left in place.": [
+  "settings.html"
+ ],
+ "Your unsaved edits are back": [
+  "editor.html"
+ ],
+ "Zoom Blur": [
+  "_editor-fx.html"
+ ],
+ "Zoom in (+)": [
+  "_editor-lanes.html"
+ ],
+ "Zoom out (-)": [
+  "_editor-lanes.html"
+ ],
+ "Zoom the video with the mouse wheel": [
+  "settings.html"
+ ],
+ "Zoomed-in video": [
+  "settings.html"
+ ],
+ "{color} at {position}%": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "{count} clips": [
+  "storage.html"
+ ],
+ "{count} clips could not be checked and were left out.": [
+  "storage.html"
+ ],
+ "{count} clips selected": [
+  "clip-app.js"
+ ],
+ "{count} clips were not deleted": [
+  "clip-app.js"
+ ],
+ "{count} could not be compressed ({error}).": [
+  "storage.html"
+ ],
+ "{count} could not be compressed.": [
+  "storage.html"
+ ],
+ "{count} days": [
+  "settings.html"
+ ],
+ "{count} days ago": [
+  "clip-app.js"
+ ],
+ "{count} days left": [
+  "_deleted.html"
+ ],
+ "{count} hours ago": [
+  "clip-app.js"
+ ],
+ "{count} matching settings": [
+  "settings.html"
+ ],
+ "{count} might be misheard. They are marked in orange; select them and open Check on the right.": [
+  "_editor-tools.html"
+ ],
+ "{count} minutes": [
+  "settings.html"
+ ],
+ "{count} minutes ago": [
+  "clip-app.js"
+ ],
+ "{count} notifications": [
+  "notifications.html"
+ ],
+ "{count} oldest clips": [
+  "storage.html"
+ ],
+ "{count} seconds ago": [
+  "clip-app.js"
+ ],
+ "{count} selected clips were not queued for upload": [
+  "clip-app.js"
+ ],
+ "{count} settings found": [
+  "settings.html"
+ ],
+ "{count} subtitles": [
+  "_editor-tools.html"
+ ],
+ "{count} subtitles added in a new row. Undo takes them back.": [
+  "_editor-tools.html"
+ ],
+ "{count}d ago": [
+  "notifications.html"
+ ],
+ "{count}h ago": [
+  "notifications.html"
+ ],
+ "{count}m ago": [
+  "notifications.html"
+ ],
+ "{days}d retention": [
+  "controls_app.html"
+ ],
+ "{days}d {hours}h": [
+  "clip-app.js"
+ ],
+ "{done} of {total}": [
+  "update_prompt.html"
+ ],
+ "{error} Use the GitHub link below instead.": [
+  "settings.html"
+ ],
+ "{exe} - playing sound now": [
+  "settings.html"
+ ],
+ "{file} is <b>{size} MB</b>, which is over Streamable's <b>{cap} MB</b> limit for your current plan.": [
+  "clip-app.js"
+ ],
+ "{game} - {place}": [
+  "_clip-games.html"
+ ],
+ "{group}: {sort}": [
+  "_editor-tools.html",
+  "clip-app.js"
+ ],
+ "{height}p": [
+  "clip-app.js"
+ ],
+ "{hours}h {minutes}m": [
+  "clip-app.js"
+ ],
+ "{label} - {name}": [
+  "clip-app.js"
+ ],
+ "{label} -> {height}p": [
+  "clip-app.js"
+ ],
+ "{label} slider": [
+  "_editor-lanes.html"
+ ],
+ "{label} · Click to change": [
+  "_clip-games.html"
+ ],
+ "{label}, change game": [
+  "_clip-games.html"
+ ],
+ "{label}. Other parts of this clip could not be assigned.": [
+  "_clip-games.html"
+ ],
+ "{label}: scheduled 1 clip for compression.": [
+  "clip-app.js"
+ ],
+ "{label}: scheduled {count} clips for compression.": [
+  "clip-app.js"
+ ],
+ "{minutes}m": [
+  "hotkey-menu.html",
+  "clip-app.js"
+ ],
+ "{minutes}m {seconds}s": [
+  "hotkey-menu.html"
+ ],
+ "{name} (any experience)": [
+  "_clip-games.html"
+ ],
+ "{name} (muted)": [
+  "_editor-lanes.html"
+ ],
+ "{name} (set by you)": [
+  "_clip-games.html"
+ ],
+ "{name} experiences": [
+  "_clip-games.html"
+ ],
+ "{name} volume": [
+  "settings.html"
+ ],
+ "{name}. Records this device directly.": [
+  "_editor-tools.html"
+ ],
+ "{name}. Uses Settings > Audio processing.": [
+  "_editor-tools.html"
+ ],
+ "{name}: the file is empty": [
+  "_editor-lanes.html"
+ ],
+ "{name}: the file is larger than 512 MB": [
+  "_editor-lanes.html"
+ ],
+ "{name}: there is no room for another layer": [
+  "_editor-tools.html"
+ ],
+ "{name}: {app} is not a known game": [
+  "_clip-games.html"
+ ],
+ "{name}: {error}": [
+  "_editor-lanes.html",
+  "_editor-tools.html"
+ ],
+ "{name}: {reason}": [
+  "_clip-games.html"
+ ],
+ "{plan} plan": [
+  "account-menu.html"
+ ],
+ "{reason} -- Streamable will not accept this clip": [
+  "clip-app.js"
+ ],
+ "{reason} -- Streamable will not accept this clip. Trim or compress it first.": [
+  "clip-app.js"
+ ],
+ "{seconds}s": [
+  "hotkey-menu.html"
+ ],
+ "{speed} ({size})": [
+  "update_prompt.html"
+ ],
+ "{target} is a flat color": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "{target} uses a gradient": [
+  "_appearance-panel.html",
+  "settings.html"
+ ],
+ "{value} dB": [
+  "_mic-controls.html"
+ ],
+ "{width} × {height}": [
+  "clip-app.js"
+ ],
+ "{width} × {height} · {fps} fps": [
+  "clip-app.js"
+ ],
+ "“{name}” is a name Windows keeps for itself.": [
+  "clip-app.js"
+ ]
+}

@@ -21,6 +21,7 @@
 #include "core/cef_host.hpp"
 #include "core/helper_client.hpp"
 #include "core/ipc_pipe.hpp"
+#include "core/json_lite.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
 #include "core/state.hpp"
@@ -102,13 +103,18 @@ QTimer *g_notifyTimer = nullptr;
 NotifyTrackFilter *g_notifyTrackFilter = nullptr;
 
 // the helper finishes a file obs has just written (the silent discord track, the hevc tag); a helper that is down at that moment finds the clip on its next pass through the library
-void TellHelperFileSaved(const char *path)
+void TellHelperFileSaved(const char *path, bool clip = false)
 {
 	const QString file = QString::fromUtf8(path ? path : "");
 	if (file.isEmpty())
 		return;
-	const std::string body = QJsonDocument(QJsonObject{{"path", QDir::toNativeSeparators(file)}}).toJson(QJsonDocument::Compact).toStdString();
-	RunAsync([body]() { HttpRequest("POST", "/clips/saved", body.c_str(), 3000); });
+	const bool readDuration = clip && ClipToastEnabled();
+	const std::string body = QJsonDocument(QJsonObject{{"path", QDir::toNativeSeparators(file)}, {"readDuration", readDuration}}).toJson(QJsonDocument::Compact).toStdString();
+	RunAsync([body, readDuration]() {
+		const auto answer = HttpRequest("POST", "/clips/saved", body.c_str(), 3500);
+		if (readDuration)
+			ClipToastShow(ClipToastKind::Clip, JsonDoubleField(answer, "duration", 0));
+	});
 }
 
 } // namespace
@@ -153,9 +159,8 @@ void OnFrontendEvent(enum obs_frontend_event event, void *)
 	if (event == OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED) {
 		char *path = obs_frontend_get_last_replay();
 		CaptureContextReplayFile(path ? path : "");
-		TellHelperFileSaved(path);
+		TellHelperFileSaved(path, true);
 		bfree(path);
-		ClipToastShow(ClipToastKind::Clip);
 	}
 	if (event == OBS_FRONTEND_EVENT_RECORDING_STARTED)
 		ClipToastShow(ClipToastKind::RecordingStarted);

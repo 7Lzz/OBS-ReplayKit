@@ -31,7 +31,7 @@
       var line = rawLine.replace(/\s+$/, "");
       if (/^```/.test(line)) {
         if (inCode) {
-          out.push("<pre><code>" + escapeHtml(codeBuf.join("\n")) + "</code></pre>");
+          out.push("<pre translate=\"no\"><code>" + escapeHtml(codeBuf.join("\n")) + "</code></pre>");
           codeBuf.length = 0;
           inCode = false;
         } else { closeList(); inCode = true; }
@@ -40,21 +40,21 @@
       if (inCode) { codeBuf.push(rawLine); continue; }
       if (/^(-{3,}|\*{3,})$/.test(line)) { closeList(); out.push("<hr/>"); continue; }
       var ordered = line.match(/^\d+[.)]\s+(.*)$/);
-      if (ordered) { openList("ol"); out.push("<li>" + applyInline(escapeHtml(ordered[1])) + "</li>"); continue; }
+      if (ordered) { openList("ol"); out.push("<li translate=\"no\">" + applyInline(escapeHtml(ordered[1])) + "</li>"); continue; }
       var bullet = line.match(/^[-*]\s+(.*)$/);
-      if (bullet) { openList("ul"); out.push("<li>" + applyInline(escapeHtml(bullet[1])) + "</li>"); continue; }
+      if (bullet) { openList("ul"); out.push("<li translate=\"no\">" + applyInline(escapeHtml(bullet[1])) + "</li>"); continue; }
       closeList();
       var header = line.match(/^(#{1,3})\s+(.*)$/);
       if (header) {
         var level = header[1].length + 2; // h3..h5
-        out.push("<h" + level + ">" + applyInline(escapeHtml(header[2])) + "</h" + level + ">");
+        out.push("<h" + level + " translate=\"no\">" + applyInline(escapeHtml(header[2])) + "</h" + level + ">");
         continue;
       }
       if (!line) { out.push(""); continue; }
-      out.push("<p>" + applyInline(escapeHtml(line)) + "</p>");
+      out.push("<p translate=\"no\">" + applyInline(escapeHtml(line)) + "</p>");
     }
     // file ended mid-codeblock: flush what we have so content isnt lost
-    if (inCode && codeBuf.length) out.push("<pre><code>" + escapeHtml(codeBuf.join("\n")) + "</code></pre>");
+    if (inCode && codeBuf.length) out.push("<pre translate=\"no\"><code>" + escapeHtml(codeBuf.join("\n")) + "</code></pre>");
     closeList();
     return out.join("\n");
   }

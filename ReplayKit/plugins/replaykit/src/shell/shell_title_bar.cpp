@@ -10,6 +10,7 @@
 #include "core/app_icon.hpp"
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
@@ -60,7 +61,7 @@ constexpr qreal kUpdatePadRight = 11.0;
 
 ShellLogoButton::ShellLogoButton(QWidget *parent) : ShellTitleButton(kWidth, parent)
 {
-	SetTip(QStringLiteral("Quick actions"));
+	SetTip(Tr("Quick actions"));
 }
 
 void ShellLogoButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
@@ -92,7 +93,7 @@ ShellUpdateButton::ShellUpdateButton(Kind kind, QWidget *parent) : ShellTitleBut
 {
 	hide();
 	if (kind == Kind::Obs) {
-		SetTip(QStringLiteral("Click to see what changed"));
+		SetTip(Tr("Click to see what changed"));
 		onPress = [this]() {
 			// the version goes into the address as it is, so only a plain release number is let through
 			if (!QRegularExpression(QStringLiteral("^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}$")).match(m_version).hasMatch())
@@ -101,7 +102,7 @@ ShellUpdateButton::ShellUpdateButton(Kind kind, QWidget *parent) : ShellTitleBut
 		};
 		return;
 	}
-	SetTip(QStringLiteral("Click to install"));
+	SetTip(Tr("Click to install"));
 	onPress = [this]() {
 		const QString version = m_version;
 		// the version goes into the address as it is, so only the characters a release tag uses are let through
@@ -200,7 +201,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_logo = new ShellLogoButton(this);
 	m_logo->onPress = [this]() { m_quick->Toggle(m_logo); };
 	m_clip = new ShellBadge(this);
-	m_clip->SetLabel(QStringLiteral("Clip"));
+	m_clip->SetLabel(Tr("Clip"));
 	m_clip->onClick = [this]() {
 		m_hotkeys->Hide();
 		if (ClipBufferActive())
@@ -211,7 +212,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_clip->onContextMenu = [this]() { m_hotkeys->Toggle(m_clip, ShellHotkeyMenu::Kind::Clip); };
 	m_clip->onEnter = [this]() { m_hotkeys->Prepare(m_clip, ShellHotkeyMenu::Kind::Clip); };
 	m_rec = new ShellBadge(this);
-	m_rec->SetLabel(QStringLiteral("Record"));
+	m_rec->SetLabel(Tr("Record"));
 	m_rec->onClick = [this]() {
 		m_hotkeys->Hide();
 		ToggleRecording();
@@ -279,7 +280,7 @@ void ShellTitleBar::SetLabels(const QString &recordKeybind, const QString &clipK
 	m_clip->SetKeys(clipKeybind);
 	m_rec->SetKeys(recordKeybind);
 	if (replaySeconds > 0)
-		m_clip->SetLabel(QStringLiteral("Clip %1").arg(ShellClipLengthText(replaySeconds)));
+		m_clip->SetLabel(Tr("Clip {length}", {{"length", ShellClipLengthText(replaySeconds)}}));
 	LayoutChildren();
 }
 
@@ -301,16 +302,16 @@ void ShellTitleBar::RefreshStates()
 
 	m_clip->SetState(false, !clipping, false, QString());
 	m_clip->SetArmed(clipping);
-	m_clip->SetTip(clipping ? QStringLiteral("Save a clip") : QStringLiteral("Clipping is off. Click to open settings"));
+	m_clip->SetTip(clipping ? Tr("Save a clip") : Tr("Clipping is off. Click to open settings"));
 	QString timer;
 	if (recording) {
 		const qint64 s = g_recMs / 1000;
 		timer = s >= 3600 ? QString("%1:%2:%3").arg(s / 3600).arg((s / 60) % 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'))
 				  : QString("%1:%2").arg(s / 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'));
 	}
-	m_rec->SetLabel(paused ? QStringLiteral("Paused") : recording ? QStringLiteral("Recording") : QStringLiteral("Record"));
+	m_rec->SetLabel(paused ? Tr("Paused") : recording ? Tr("Recording") : Tr("Record"));
 	m_rec->SetState(recording, false, paused, timer);
-	m_rec->SetTip(recording ? QStringLiteral("Stop recording") : QStringLiteral("Start recording"));
+	m_rec->SetTip(recording ? Tr("Stop recording") : Tr("Start recording"));
 	m_rec->Pulse((now / 600) % 2 == 0);
 	m_max->SetMaximized(m_mw && (ShellIsMaximized() || m_mw->isMaximized()));
 	// views that came and went (the obs settings are built and torn down by obs) change where the arrows can go

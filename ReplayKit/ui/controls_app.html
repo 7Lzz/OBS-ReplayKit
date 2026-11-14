@@ -901,7 +901,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       const r = await helperJson("obs/replay-buffer", { method: "POST" });
       if (typeof r.active === "boolean") replayBufferActive = r.active;
     } catch (e) {
-      flashButton(clipToggleBtn, ("Failed: " + (e.message || e)).slice(0, 40), "is-flash-error", 2500,
+      flashButton(clipToggleBtn, RK_T("Failed: {error}", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
                   replayBufferActive ? "Stop Clipping" : "Start Clipping");
     } finally {
       clipActionInFlight = false;
@@ -919,7 +919,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       const r = await helperJson("obs/record", { method: "POST" });
       if (typeof r.active === "boolean") recordActive = r.active;
     } catch (e) {
-      flashButton(recordBtn, ("Failed: " + (e.message || e)).slice(0, 40), "is-flash-error", 2500,
+      flashButton(recordBtn, RK_T("Failed: {error}", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
                   recordActive ? "Stop Recording" : "Start Recording");
     } finally {
       recordActionInFlight = false;
@@ -934,7 +934,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     try {
       await rkNativeConfirm("sharepreview-setup");
     } catch (e) {
-      flashButton(modeBtn, ("Setup failed: " + (e.message || e)).slice(0, 42), "is-flash-error", 3000, "Enable Share Preview");
+      flashButton(modeBtn, RK_T("Setup failed: {error}", { error: e.message || e }).slice(0, 42), "is-flash-error", 3000, "Enable Share Preview");
     }
   }
 
@@ -961,7 +961,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
                   warnings.length ? 3000 : 1400,
                   sharePreviewLabel(enabled, available));
     } catch (e) {
-      flashButton(modeBtn, ("Preview failed: " + (e.message || e)).slice(0, 42),
+      flashButton(modeBtn, RK_T("Preview failed: {error}", { error: e.message || e }).slice(0, 42),
                   "is-flash-error", 3000, sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable));
     } finally {
       modeBtn.classList.remove("is-busy");
@@ -1013,10 +1013,10 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       authBtn.classList.add("is-signed-in");
       authLabel.textContent = "Signed in";
       authInfo.innerHTML =
-        '<b class="spoiler" tabindex="0">' +
-        escapeHtml(authState.username || "(signed in)") + "</b><br>" +
-        escapeHtml(planLabel(authState.plan)) + " &middot; " +
-        authState.retentionDays + "d retention";
+        '<b class="spoiler" tabindex="0"' + (authState.username ? ' translate="no"' : "") + ">" +
+        escapeHtml(authState.username || RK_T("(signed in)")) + "</b><br>" +
+        '<span translate="no">' + escapeHtml(planLabel(authState.plan)) + "</span> &middot; " +
+        "<span>" + escapeHtml(RK_T("{days}d retention", { days: authState.retentionDays })) + "</span>";
     } else {
       authBtn.classList.remove("is-signed-in");
       authLabel.textContent = "Sign in to Streamable";

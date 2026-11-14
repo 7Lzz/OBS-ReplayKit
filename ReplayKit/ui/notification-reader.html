@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="background:#1D1F26;color:#ffffff;color-scheme:dark">
+<html lang="en" data-i18n-explicit style="background:#1D1F26;color:#ffffff;color-scheme:dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="color-scheme" content="dark" />
@@ -80,14 +80,14 @@
   <header class="top">
     <h1 id="title">&nbsp;</h1>
     <p class="sub" id="when">&nbsp;</p>
-    <button class="x" type="button" id="close" aria-label="Close">
+    <button class="x" type="button" id="close" aria-label="Close" data-i18n-aria-label="common.close">
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:editor/close}}</svg>
     </button>
   </header>
-  <div class="body" id="body"></div>
+  <div class="body" id="body" translate="no"></div>
   <div class="foot">
-    <button class="btn" type="button" id="link" hidden>Open release page</button>
-    <button class="btn is-primary" type="button" id="done">Close</button>
+    <button class="btn" type="button" id="link" hidden></button>
+    <button class="btn is-primary" type="button" id="done" data-i18n="common.close"></button>
   </div>
 </div>
 <!--#include markdown-->
@@ -132,21 +132,21 @@
     } catch (_) {}
     if (run !== showRun) return;
     if (!item) {
-      els.title.textContent = "Notification not found";
-      els.when.textContent = "It may have been deleted.";
+      els.title.textContent = RK_M("notifications.notFound");
+      els.when.textContent = RK_M("notifications.deletedHint");
       els.body.innerHTML = "";
       els.link.hidden = true;
       return;
     }
     els.title.textContent = item.title || "";
     const when = Date.parse(item.createdUtc);
-    els.when.textContent = Number.isFinite(when) ? new Date(when).toLocaleString() : "";
+    els.when.textContent = Number.isFinite(when) ? new Date(when).toLocaleString(document.documentElement.lang) : "";
     if (window.RKMarkdown) els.body.innerHTML = RKMarkdown.render(item.body || "");
     else els.body.textContent = item.body || "";
     els.body.scrollTop = 0;
     url = item.url || "";
     els.link.hidden = !url;
-    els.link.textContent = item.linkLabel || "Open release page";
+    els.link.textContent = item.linkLabel || RK_M("notifications.openReleasePage");
   };
 
   // the next open must not show this notification for a frame before its own arrives

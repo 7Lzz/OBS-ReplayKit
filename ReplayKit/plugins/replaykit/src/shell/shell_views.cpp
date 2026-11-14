@@ -8,6 +8,7 @@
 #include "core/cef_host.hpp"
 #include "core/dev_log.hpp"
 #include "core/helper_client.hpp"
+#include "core/locale.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
@@ -253,7 +254,7 @@ constexpr int kHostLoadRetries = 3;
 
 // a stage that waits on the helper for more than a few seconds says so on its cover, since a helper that does not come back (removed by antivirus, a broken install) otherwise left a blank stage that looked frozen
 constexpr int kHelperNoticeMs = 6000;
-const QString kHelperWaitTitle = QStringLiteral("Waiting for the ReplayKit helper");
+const QString kHelperWaitTitle = Tr("Waiting for the ReplayKit helper");
 
 void ShellHelperNotice(bool waiting)
 {
@@ -261,7 +262,7 @@ void ShellHelperNotice(bool waiting)
 	if (!curtain)
 		return;
 	if (waiting && !curtain->HasMessage())
-		curtain->SetMessage(kHelperWaitTitle, QStringLiteral("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
+		curtain->SetMessage(kHelperWaitTitle, Tr("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
 	else if (!waiting && curtain->Message() == kHelperWaitTitle)
 		curtain->SetMessage(QString(), QString());
 }
@@ -375,12 +376,12 @@ void ShellUpdateTitle()
 		return;
 	QString page;
 	switch (g_shellView) {
-	case ShellView::Home: page = g_homeEditor ? QStringLiteral("Editor") : QStringLiteral("Home"); break;
-	case ShellView::Clips: page = g_clipsEditor ? QStringLiteral("Editor") : QStringLiteral("Clips"); break;
-	case ShellView::Projector: page = QStringLiteral("Projector"); break;
-	case ShellView::Settings: page = QStringLiteral("Settings"); break;
-	case ShellView::ObsSettings: page = QStringLiteral("OBS Settings"); break;
-	case ShellView::Setup: page = QStringLiteral("Setup"); break;
+	case ShellView::Home: page = g_homeEditor ? Tr("Editor") : Tr("Home"); break;
+	case ShellView::Clips: page = g_clipsEditor ? Tr("Editor") : Tr("Clips"); break;
+	case ShellView::Projector: page = Tr("Projector"); break;
+	case ShellView::Settings: page = Tr("Settings"); break;
+	case ShellView::ObsSettings: page = Tr("OBS Settings"); break;
+	case ShellView::Setup: page = Tr("Setup"); break;
 	}
 	g_shellTitle->SetPage(page);
 }

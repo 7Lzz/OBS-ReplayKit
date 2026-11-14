@@ -87,14 +87,14 @@ namespace ReplayKitHelper
                         SetFractionalFpsProfile(preset, warnings);
                         applied.Add("OBS video format");
                     }
-                    else warnings.Add("OBS video settings were saved, but live apply failed: " + video.Message);
+                    else warnings.Add(Locales.T("OBS video settings were saved, but live apply failed: {error}", "error", video.Message));
                 }
 
                 if (applyReplayBufferOutput)
                 {
                     var rb = SetReplayBufferOutputLive(settings, preset);
                     if (rb.Ok) applied.Add("OBS replay buffer output");
-                    else warnings.Add("OBS replay buffer settings were saved, but live apply failed: " + rb.Message);
+                    else warnings.Add(Locales.T("OBS replay buffer settings were saved, but live apply failed: {error}", "error", rb.Message));
                 }
             }
             else
@@ -207,13 +207,13 @@ namespace ReplayKitHelper
                     ? "OBS reported '" + actualAfter["value"] + "' instead of '" + monitorType + "'."
                     : actualAfter["message"]?.Value<string>();
             }
-            if (!monitorReady) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = "OBS did not report the requested monitor state after retries. " + lastMonitorMessage };
+            if (!monitorReady) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.T("OBS did not report the requested monitor state after retries. {error}", "error", lastMonitorMessage) };
 
             if (!ensureUnmuted)
                 return new JObject { ["ok"] = true, ["applied"] = new JArray("desktop audio monitor off"), ["message"] = "" };
 
             var unmute = SetInputMuteState(inputName, false, 6);
-            if (unmute["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = "monitor state changed, but Desktop Audio could not be unmuted: " + unmute["message"] };
+            if (unmute["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.T("monitor state changed, but Desktop Audio could not be unmuted: {error}", "error", unmute["message"]) };
 
             applied.Add("desktop audio unmuted");
             // the refresh mutes desktop audio for a moment, which leaves a gap in the clip buffer, so it only runs when the monitor type was changed here and the mixer icon is stale
@@ -223,7 +223,7 @@ namespace ReplayKitHelper
                 return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
             }
             var refresh = RefreshDesktopAudioMixerIconState(inputName, monitorType);
-            if (refresh["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = "monitor state changed, but the OBS mixer icon could not be refreshed: " + refresh["message"] };
+            if (refresh["ok"]?.Value<bool>() != true) return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["message"] = Locales.T("monitor state changed, but the OBS mixer icon could not be refreshed: {error}", "error", refresh["message"]) };
             applied.AddRange((refresh["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
             applied.Add(targetIsOff ? "desktop audio monitor off" : "desktop audio monitor on");
             return new JObject { ["ok"] = true, ["applied"] = new JArray(applied), ["message"] = "" };
@@ -435,7 +435,7 @@ namespace ReplayKitHelper
                         int sceneMonitoringType = shareEnabled ? 2 : 0;
                         var sceneFile = SetShareModeSceneFile(sceneMonitoringType, false);
                         if (sceneFile["ok"]?.Value<bool>() != true)
-                            warnings.Add("Desktop Audio monitoring was applied live, but could not be saved for restart: " + sceneFile["message"]);
+                            warnings.Add(Locales.T("Desktop Audio monitoring was applied live, but could not be saved for restart: {error}", "error", sceneFile["message"]));
                         else if (sceneFile["changed"]?.Value<bool>() == true)
                             applied.Add("desktop audio monitor state saved");
                     }
@@ -443,8 +443,8 @@ namespace ReplayKitHelper
                 else
                 {
                     ok = false;
-                    message = "Desktop Audio monitoring state could not be verified: " + mixer["message"];
-                    warnings.Add("Discord output mode was saved, but " + message);
+                    message = Locales.T("Desktop Audio monitoring state could not be verified: {error}", "error", mixer["message"]);
+                    warnings.Add(Locales.T("Discord output mode was saved, but {message}", "message", message));
                 }
             }
             else
@@ -457,8 +457,8 @@ namespace ReplayKitHelper
                 else
                 {
                     ok = false;
-                    message = "Desktop Audio mixer state could not be changed: " + mixer["message"];
-                    warnings.Add("Discord output mode was saved, but " + message);
+                    message = Locales.T("Desktop Audio mixer state could not be changed: {error}", "error", mixer["message"]);
+                    warnings.Add(Locales.T("Discord output mode was saved, but {message}", "message", message));
                 }
             }
 
@@ -468,7 +468,7 @@ namespace ReplayKitHelper
             var status = ObsWebSocket.InvokeRequest("GetVirtualCamStatus", null, 3000);
             if (!status.Ok)
             {
-                warnings.Add("Discord output mode was saved, but virtual camera state could not be read: " + status.Message);
+                warnings.Add(Locales.T("Discord output mode was saved, but virtual camera state could not be read: {error}", "error", status.Message));
             }
             else
             {
@@ -478,13 +478,13 @@ namespace ReplayKitHelper
                     Log.Write("Virtual Camera legacy mode enabled for Discord output.");
                     var start = ObsWebSocket.InvokeRequest("StartVirtualCam", null, 8000);
                     if (start.Ok) applied.Add("virtual camera started (legacy)");
-                    else warnings.Add("Discord output mode was saved, but legacy virtual camera could not be started: " + start.Message);
+                    else warnings.Add(Locales.T("Discord output mode was saved, but legacy virtual camera could not be started: {error}", "error", start.Message));
                 }
                 else if (!isLegacyVcam && running)
                 {
                     var stop = ObsWebSocket.InvokeRequest("StopVirtualCam", null, 8000);
                     if (stop.Ok) applied.Add("virtual camera stopped");
-                    else warnings.Add("Discord output mode was saved, but virtual camera could not be stopped: " + stop.Message);
+                    else warnings.Add(Locales.T("Discord output mode was saved, but virtual camera could not be stopped: {error}", "error", stop.Message));
                 }
                 else
                 {
@@ -505,8 +505,8 @@ namespace ReplayKitHelper
                 else
                 {
                     ok = false;
-                    if (string.IsNullOrWhiteSpace(message)) message = "OBS projector was not ready: " + projector["message"];
-                    warnings.Add("OBS projector was not ready: " + projector["message"]);
+                    if (string.IsNullOrWhiteSpace(message)) message = Locales.T("OBS projector was not ready: {error}", "error", projector["message"]);
+                    warnings.Add(Locales.T("OBS projector was not ready: {error}", "error", projector["message"]));
                 }
                 if (projector["warnings"] is JArray pw) warnings.AddRange(pw.Select(t => t.Value<string>()));
             }
@@ -521,8 +521,8 @@ namespace ReplayKitHelper
                 else
                 {
                     ok = false;
-                    if (string.IsNullOrWhiteSpace(message)) message = "Share preview could not be disabled: " + projector["message"];
-                    warnings.Add("Share preview could not be disabled: " + projector["message"]);
+                    if (string.IsNullOrWhiteSpace(message)) message = Locales.T("Share preview could not be disabled: {error}", "error", projector["message"]);
+                    warnings.Add(Locales.T("Share preview could not be disabled: {error}", "error", projector["message"]));
                 }
                 if (projector["warnings"] is JArray pw2) warnings.AddRange(pw2.Select(t => t.Value<string>()));
             }
@@ -609,7 +609,7 @@ namespace ReplayKitHelper
                 else
                 {
                     deviceCapture = true;
-                    warnings.Add("Could not read Desktop Audio capture settings: " + capture.Message);
+                    warnings.Add(Locales.T("Could not read Desktop Audio capture settings: {error}", "error", capture.Message));
                 }
             }
             string desiredMonitorType = enabled && !deviceCapture ? "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT" : "OBS_MONITORING_TYPE_NONE";
@@ -617,13 +617,13 @@ namespace ReplayKitHelper
 
             var actual = GetInputMonitorTypeValue(inputName);
             string actualMonitorType = actual["ok"]?.Value<bool>() == true ? actual["value"]?.Value<string>() : "";
-            if (actual["ok"]?.Value<bool>() != true) warnings.Add("Could not read Desktop Audio monitor state: " + actual["message"]);
+            if (actual["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not read Desktop Audio monitor state: {error}", "error", actual["message"]));
 
             var mute = ObsWebSocket.InvokeRequest("GetInputMute", new JObject { ["inputName"] = inputName }, 3000);
             bool muteOk = mute.Ok;
             bool? inputMuted = null;
             if (muteOk) inputMuted = mute.Data?["inputMuted"]?.Value<bool>() ?? false;
-            else warnings.Add("Could not read Desktop Audio mute state: " + mute.Message);
+            else warnings.Add(Locales.T("Could not read Desktop Audio mute state: {error}", "error", mute.Message));
 
             bool synced = actual["ok"]?.Value<bool>() == true && actualMonitorType == desiredMonitorType && (deviceCapture || (muteOk && inputMuted != true));
             if (enabled && !deviceCapture && repairMonitoring && DiscordProjector.ClearCableMute() > 0) repaired = true;
@@ -642,7 +642,7 @@ namespace ReplayKitHelper
                 }
                 else
                 {
-                    warnings.Add("Could not repair Desktop Audio monitoring state: " + repair["message"]);
+                    warnings.Add(Locales.T("Could not repair Desktop Audio monitoring state: {error}", "error", repair["message"]));
                 }
             }
 
@@ -725,12 +725,12 @@ namespace ReplayKitHelper
             foreach (var sourceName in sourceNames)
             {
                 var list = ObsWebSocket.InvokeRequest("GetSourceFilterList", new JObject { ["sourceName"] = sourceName }, 3000);
-                if (!list.Ok) { warnings.Add("Motion blur was saved, but " + sourceName + " filters could not be read: " + list.Message); continue; }
+                if (!list.Ok) { warnings.Add(Locales.T("Motion blur was saved, but {sourceName} filters could not be read: {error}", "sourceName", sourceName, "error", list.Message)); continue; }
                 var filters = list.Data?["filters"] as JArray ?? list.Data?["sourceFilters"] as JArray ?? new JArray();
                 foreach (var retiredName in GetRetiredMotionBlurLiveFilterNames(filters))
                 {
                     var removeRetired = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = retiredName }, 3000);
-                    if (!removeRetired.Ok) warnings.Add("Could not remove retired " + sourceName + " Composite Blur filter: " + removeRetired.Message);
+                    if (!removeRetired.Ok) warnings.Add(Locales.T("Could not remove retired {sourceName} Composite Blur filter: {error}", "sourceName", sourceName, "error", removeRetired.Message));
                 }
                 string existingFilterName = GetMotionBlurLiveFilterName(filters);
 
@@ -743,7 +743,7 @@ namespace ReplayKitHelper
                             ["sourceName"] = sourceName, ["filterName"] = existingFilterName,
                             ["filterSettings"] = MotionBlurFilterSettingsLive(strength), ["overlay"] = false,
                         }, 3000);
-                        if (!set.Ok) { warnings.Add("Could not update " + sourceName + " motion blur settings: " + set.Message); continue; }
+                        if (!set.Ok) { warnings.Add(Locales.T("Could not update {sourceName} motion blur settings: {error}", "sourceName", sourceName, "error", set.Message)); continue; }
                     }
                     else
                     {
@@ -752,18 +752,18 @@ namespace ReplayKitHelper
                             ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = "shader_filter",
                             ["filterSettings"] = MotionBlurFilterSettingsLive(strength),
                         }, 3000);
-                        if (!create.Ok) { warnings.Add("Could not create " + sourceName + " motion blur filter: " + create.Message); continue; }
+                        if (!create.Ok) { warnings.Add(Locales.T("Could not create {sourceName} motion blur filter: {error}", "sourceName", sourceName, "error", create.Message)); continue; }
                         existingFilterName = filterName;
                     }
                     var enable = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName, ["filterEnabled"] = true }, 3000);
                     if (enable.Ok) applied.Add(sourceName + " motion blur on");
-                    else warnings.Add("Could not enable " + sourceName + " motion blur: " + enable.Message);
+                    else warnings.Add(Locales.T("Could not enable {sourceName} motion blur: {error}", "sourceName", sourceName, "error", enable.Message));
                 }
                 else if (!string.IsNullOrWhiteSpace(existingFilterName))
                 {
                     var remove = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = existingFilterName }, 3000);
                     if (remove.Ok) applied.Add(sourceName + " motion blur off");
-                    else warnings.Add("Could not remove " + sourceName + " motion blur filter: " + remove.Message);
+                    else warnings.Add(Locales.T("Could not remove {sourceName} motion blur filter: {error}", "sourceName", sourceName, "error", remove.Message));
                 }
             }
 
@@ -820,7 +820,7 @@ namespace ReplayKitHelper
             if (volumePercent == 0 || current?[AudioVolume.SavedLevel] != null)
             {
                 var volume = ObsWebSocket.InvokeRequest("GetInputVolume", new JObject { ["inputName"] = sourceName }, 3000);
-                if (!volume.Ok) { warnings.Add("Could not read the " + label + ": " + volume.Message); return; }
+                if (!volume.Ok) { warnings.Add(Locales.T("Could not read the {label}: {error}", "label", label, "error", volume.Message)); return; }
                 inputLevel = AudioVolume.Level(volume.Data?["inputVolumeMul"]);
             }
             var next = AudioVolume.Prepare(current, volumePercent, inputLevel, out double outputLevel);
@@ -829,7 +829,7 @@ namespace ReplayKitHelper
             {
                 if (!levelChanged) return true;
                 var result = ObsWebSocket.InvokeRequest("SetInputVolume", new JObject { ["inputName"] = sourceName, ["inputVolumeMul"] = outputLevel }, 3000);
-                if (!result.Ok) warnings.Add("Could not set the " + label + ": " + result.Message);
+                if (!result.Ok) warnings.Add(Locales.T("Could not set the {label}: {error}", "label", label, "error", result.Message));
                 return result.Ok;
             }
 
@@ -843,14 +843,14 @@ namespace ReplayKitHelper
                     ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterKind"] = GainFilterKind,
                     ["filterSettings"] = next,
                 }, 3000);
-                if (!create.Ok) { warnings.Add("Could not set the " + label + ": " + create.Message); return; }
+                if (!create.Ok) { warnings.Add(Locales.T("Could not set the {label}: {error}", "label", label, "error", create.Message)); return; }
                 var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterIndex"] = filters.Count }, 3000);
-                if (!move.Ok) warnings.Add("The " + label + " was set but the filter could not be moved to the end of the chain: " + move.Message);
+                if (!move.Ok) warnings.Add(Locales.T("The {label} was set but the filter could not be moved to the end of the chain: {error}", "label", label, "error", move.Message));
             }
             else if (filterChanged)
             {
                 var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterSettings"] = next, ["overlay"] = false }, 3000);
-                if (!set.Ok) { warnings.Add("Could not set the " + label + ": " + set.Message); return; }
+                if (!set.Ok) { warnings.Add(Locales.T("Could not set the {label}: {error}", "label", label, "error", set.Message)); return; }
             }
             if (volumePercent == 0 && !SetLevel()) return;
             if (filterChanged || levelChanged) applied.Add(label);
@@ -890,9 +890,9 @@ namespace ReplayKitHelper
             var warnings = new List<string>();
             var live = SetDesktopAudioCaptureSettingsLive(settings, current ?? GetDesktopAudioCaptureSettings());
             if (live.Ok) applied.Add("recording audio");
-            else warnings.Add("OBS could not apply recording audio: " + live.Message);
+            else warnings.Add(Locales.T("OBS could not apply recording audio: {error}", "error", live.Message));
             var file = SetDesktopAudioCaptureInSceneFile(settings);
-            if (file["ok"]?.Value<bool>() != true) warnings.Add("The scene file could not be updated: " + file["message"]);
+            if (file["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("The scene file could not be updated: {error}", "error", file["message"]));
             return new JObject { ["liveApplied"] = live.Ok, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
@@ -950,19 +950,19 @@ namespace ReplayKitHelper
                     var desktop = GetDesktopAudioCaptureSettings();
                     if (!desktop.Ok && desktop.Code != 600)
                     {
-                        warnings.Add("Discord audio tracks could not be updated: " + desktop.Message);
+                        warnings.Add(Locales.T("Discord audio tracks could not be updated: {error}", "error", desktop.Message));
                         continue;
                     }
                     if (CapturesOutputDevice(desktop.Data?["inputSettings"])) continue;
                 }
                 var set = SetAudioSourceMixersLive(name, mixers);
                 if (set.Ok) { if (!applied.Contains("audio tracks")) applied.Add("audio tracks"); }
-                else if (set.Unavailable) { warnings.Add("The audio tracks were saved, but OBS could not be reached: " + set.Message + ". They apply the next time OBS starts."); break; }
+                else if (set.Unavailable) { warnings.Add(Locales.T("The audio tracks were saved, but OBS could not be reached: {error}. They apply the next time OBS starts.", "error", set.Message)); break; }
                 // code 600 is a source that is not in the scene, like discord audio on a machine without it
-                else if (set.Code != 600) warnings.Add("The audio tracks were saved, but " + name + " could not be updated: " + set.Message);
+                else if (set.Code != 600) warnings.Add(Locales.T("The audio tracks were saved, but {name} could not be updated: {error}", "name", name, "error", set.Message));
             }
             var file = SetAudioTracksInSceneFile(settings);
-            if (file["ok"]?.Value<bool>() != true) warnings.Add("The audio tracks were saved, but the scene file could not be updated: " + file["message"]);
+            if (file["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("The audio tracks were saved, but the scene file could not be updated: {error}", "error", file["message"]));
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
@@ -1120,7 +1120,7 @@ namespace ReplayKitHelper
             var live = ReadMicLive();
             if (live == null)
             {
-                warnings.Add("Microphone settings were saved, but OBS could not be reached or has no \"" + MicInputName + "\" input. Restart OBS and try again.");
+                warnings.Add(Locales.T("Microphone settings were saved, but OBS could not be reached or has no \"{MicInputName}\" input. Restart OBS and try again.", "MicInputName", MicInputName));
                 return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
             }
 
@@ -1128,9 +1128,9 @@ namespace ReplayKitHelper
             {
                 var set = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = MicInputName, ["inputSettings"] = new JObject { ["device_id"] = deviceId }, ["overlay"] = true }, 3000);
                 if (set.Ok) applied.Add("microphone device");
-                else warnings.Add("Could not switch the microphone: " + set.Message);
+                else warnings.Add(Locales.T("Could not switch the microphone: {error}", "error", set.Message));
             }
-            if (live["micVolume"].Value<int>() != volume || volume == 0) ApplyGainVolumeLive(MicInputName, MicGainFilterName, "microphone volume", volume, applied, warnings);
+            if (live["micVolume"].Value<int>() != volume || volume == 0) ApplyGainVolumeLive(MicInputName, MicGainFilterName, Locales.T("microphone volume"), volume, applied, warnings);
             if (live["micNoiseSuppression"].Value<bool>() != noise) ApplyMicNoiseSuppressionLive(noise, applied, warnings);
             if (live["micInputSensitivity"].Value<int>() != sensitivity) ApplyMicGateLive(sensitivity, applied, warnings);
 
@@ -1141,7 +1141,7 @@ namespace ReplayKitHelper
         internal static void ApplyMicNoiseSuppressionLive(bool enabled, List<string> applied, List<string> warnings)
         {
             var list = GetSourceFilterListLive(MicInputName);
-            if (list["ok"]?.Value<bool>() != true) { warnings.Add("Could not read the microphone filters: " + list["message"]); return; }
+            if (list["ok"]?.Value<bool>() != true) { warnings.Add(Locales.T("Could not read the microphone filters: {error}", "error", list["message"])); return; }
             var existing = FindNoiseSuppressFilters((JArray)list["filters"]);
 
             if (existing.Count == 0)
@@ -1152,10 +1152,10 @@ namespace ReplayKitHelper
                     ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterKind"] = NoiseSuppressFilterKind,
                     ["filterSettings"] = new JObject { ["method"] = "rnnoise" },
                 }, 3000);
-                if (!create.Ok) { warnings.Add("Could not add noise suppression: " + create.Message); return; }
+                if (!create.Ok) { warnings.Add(Locales.T("Could not add noise suppression: {error}", "error", create.Message)); return; }
                 // obs runs filters top to bottom, so suppression goes ahead of the noise gate and the gate judges the cleaned signal.
                 var move = ObsWebSocket.InvokeRequest("SetSourceFilterIndex", new JObject { ["sourceName"] = MicInputName, ["filterName"] = MicNoiseFilterName, ["filterIndex"] = 0 }, 3000);
-                if (!move.Ok) warnings.Add("Noise suppression was added but could not be moved ahead of the noise gate: " + move.Message);
+                if (!move.Ok) warnings.Add(Locales.T("Noise suppression was added but could not be moved ahead of the noise gate: {error}", "error", move.Message));
                 applied.Add("microphone noise suppression on");
                 return;
             }
@@ -1166,7 +1166,7 @@ namespace ReplayKitHelper
             {
                 var toggle = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = filter["filterName"]?.Value<string>(), ["filterEnabled"] = enabled }, 3000);
                 if (toggle.Ok) applied.Add(enabled ? "microphone noise suppression on" : "microphone noise suppression off");
-                else warnings.Add("Could not change noise suppression: " + toggle.Message);
+                else warnings.Add(Locales.T("Could not change noise suppression: {error}", "error", toggle.Message));
             }
         }
 
@@ -1174,7 +1174,7 @@ namespace ReplayKitHelper
         internal static void ApplyMicGateLive(int sensitivity, List<string> applied, List<string> warnings)
         {
             var list = GetSourceFilterListLive(MicInputName);
-            if (list["ok"]?.Value<bool>() != true) { warnings.Add("Could not read the microphone filters: " + list["message"]); return; }
+            if (list["ok"]?.Value<bool>() != true) { warnings.Add(Locales.T("Could not read the microphone filters: {error}", "error", list["message"])); return; }
             var gates = FindNoiseGateFilters((JArray)list["filters"]);
 
             if (sensitivity <= MicTest.SensitivityMin)
@@ -1183,7 +1183,7 @@ namespace ReplayKitHelper
                 {
                     var off = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = gate["filterName"]?.Value<string>(), ["filterEnabled"] = false }, 3000);
                     if (off.Ok) applied.Add("microphone input sensitivity off");
-                    else warnings.Add("Could not turn the noise gate off: " + off.Message);
+                    else warnings.Add(Locales.T("Could not turn the noise gate off: {error}", "error", off.Message));
                 }
                 return;
             }
@@ -1205,17 +1205,17 @@ namespace ReplayKitHelper
                     ["sourceName"] = MicInputName, ["filterName"] = MicGateFilterName, ["filterKind"] = NoiseGateFilterKind, ["filterSettings"] = thresholds,
                 }, 3000);
                 if (create.Ok) applied.Add("microphone input sensitivity");
-                else warnings.Add("Could not add the noise gate: " + create.Message);
+                else warnings.Add(Locales.T("Could not add the noise gate: {error}", "error", create.Message));
                 return;
             }
 
             string name = existing["filterName"]?.Value<string>();
             var set = ObsWebSocket.InvokeRequest("SetSourceFilterSettings", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterSettings"] = thresholds, ["overlay"] = true }, 3000);
-            if (!set.Ok) { warnings.Add("Could not set the input sensitivity: " + set.Message); return; }
+            if (!set.Ok) { warnings.Add(Locales.T("Could not set the input sensitivity: {error}", "error", set.Message)); return; }
             if (!(existing["filterEnabled"]?.Value<bool>() ?? false))
             {
                 var on = ObsWebSocket.InvokeRequest("SetSourceFilterEnabled", new JObject { ["sourceName"] = MicInputName, ["filterName"] = name, ["filterEnabled"] = true }, 3000);
-                if (!on.Ok) { warnings.Add("The input sensitivity was set but the noise gate could not be turned on: " + on.Message); return; }
+                if (!on.Ok) { warnings.Add(Locales.T("The input sensitivity was set but the noise gate could not be turned on: {error}", "error", on.Message)); return; }
             }
             applied.Add("microphone input sensitivity");
         }
@@ -1227,8 +1227,8 @@ namespace ReplayKitHelper
         {
             var applied = new List<string>();
             var warnings = new List<string>();
-            ApplyGainVolumeLive(DesktopAudioInputName, DesktopGainFilterName, "desktop audio volume", settings["desktopAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
-            ApplyGainVolumeLive(DiscordAudioInputName, DiscordGainFilterName, "discord audio volume", settings["discordAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
+            ApplyGainVolumeLive(DesktopAudioInputName, DesktopGainFilterName, Locales.T("desktop audio volume"), settings["desktopAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
+            ApplyGainVolumeLive(DiscordAudioInputName, DiscordGainFilterName, Locales.T("discord audio volume"), settings["discordAudioVolume"]?.Value<int>() ?? 100, applied, warnings);
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
@@ -1287,16 +1287,16 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                warnings.Add("Clip folder was saved, but the helper could not switch to it: " + ex.Message);
+                warnings.Add(Locales.T("Clip folder was saved, but the helper could not switch to it: {error}", "error", ex.Message));
             }
 
             var startup = SetObsStartupSetting(settings["obsStartupEnabled"]?.Value<bool>() ?? false);
             if (startup["ok"]?.Value<bool>() == true) applied.Add("Windows startup");
-            else warnings.Add("Windows startup was saved, but Windows rejected the change: " + startup["message"]);
+            else warnings.Add(Locales.T("Windows startup was saved, but Windows rejected the change: {error}", "error", startup["message"]));
 
             var closeWarning = SetObsCloseWarningConfig(settings["disableObsCloseWarning"]?.Value<bool>() ?? false);
             if (closeWarning["ok"]?.Value<bool>() == true) applied.Add("OBS close warning");
-            else warnings.Add("OBS close warning was saved, but OBS config could not be updated: " + closeWarning["message"]);
+            else warnings.Add(Locales.T("OBS close warning was saved, but OBS config could not be updated: {error}", "error", closeWarning["message"]));
 
             // only a change of the setting is applied, since applying it can take the administrator prompt
             if (applySleep)
@@ -1334,12 +1334,12 @@ namespace ReplayKitHelper
 
             var encoderWrite = WriteRecordEncoderJson(encoder);
             if (encoderWrite["ok"]?.Value<bool>() == true) applied.Add("recording encoder settings");
-            else warnings.Add("Recording codec was saved, but encoder settings could not be written: " + encoderWrite["message"]);
+            else warnings.Add(Locales.T("Recording codec was saved, but encoder settings could not be written: {error}", "error", encoderWrite["message"]));
 
             foreach (var u in profileUpdates)
             {
                 var r = SetObsProfileParameterSafe(u[0], u[1], u[2]);
-                if (!r.Ok) warnings.Add("OBS did not accept " + u[0] + "." + u[1] + ": " + r.Message);
+                if (!r.Ok) warnings.Add(Locales.T("OBS did not accept {section}.{key}: {error}", "section", u[0], "key", u[1], "error", r.Message));
             }
 
             applied.Add("OBS profile settings");
@@ -1370,7 +1370,7 @@ namespace ReplayKitHelper
                 {
                     var overlayFile = SetOverlaySceneFile(settings, preset);
                     if (overlayFile["ok"]?.Value<bool>() == true) applied.Add("OBS overlay scene file");
-                    else warnings.Add("Overlay setting was saved, but the OBS scene file could not be prepared for restart: " + overlayFile["message"]);
+                    else warnings.Add(Locales.T("Overlay setting was saved, but the OBS scene file could not be prepared for restart: {error}", "error", overlayFile["message"]));
                 }
                 else
                 {

@@ -278,7 +278,7 @@ namespace ReplayKitHelper
             {
                 _area = area;
                 _snapshot = snapshot;
-                Text = "ReplayKit color picker";
+                Text = Locales.T("ReplayKit color picker");
                 FormBorderStyle = FormBorderStyle.None;
                 ShowInTaskbar = false;
                 StartPosition = FormStartPosition.Manual;

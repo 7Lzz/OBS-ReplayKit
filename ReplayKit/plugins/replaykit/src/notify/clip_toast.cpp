@@ -3,6 +3,8 @@
 #include "notify/clip_toast.hpp"
 
 #include <optional>
+#include <cmath>
+#include <limits>
 
 #include <QEasingCurve>
 #include <QPainter>
@@ -14,6 +16,7 @@
 
 #include "core/app_icon.hpp"
 #include "core/json_lite.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
 #include "core/ui_font.hpp"
@@ -39,7 +42,6 @@ constexpr int kOutMs = 220;
 std::optional<bool> g_clipOn;
 std::optional<bool> g_recordingOn;
 std::optional<bool> g_hideFromCapture;
-std::optional<int> g_clipSeconds;
 
 // "90" -> "1m 30s", "120" -> "2m", "45" -> "45s", the way the rest of the interface writes a length
 QString FormatLength(int seconds)
@@ -219,16 +221,23 @@ private:
 
 QPointer<ClipToast> g_toast;
 
-void ShowNow(ClipToastKind kind)
+void ShowNow(ClipToastKind kind, double duration)
 {
 	const bool clip = kind == ClipToastKind::Clip;
 	const std::optional<bool> on = clip ? g_clipOn : g_recordingOn;
 	if (!on || !*on || !g_hideFromCapture)
 		return;
-	if (clip && !g_clipSeconds)
-		return;
-	const QString message = clip ? QStringLiteral("Saved the last ") + FormatLength(*g_clipSeconds)
-				     : kind == ClipToastKind::RecordingStarted ? QStringLiteral("Recording started") : QStringLiteral("Recording stopped");
+	QString message;
+	if (clip) {
+		if (std::isfinite(duration) && duration >= 1 && duration <= (std::numeric_limits<int>::max)())
+			message = TrMessage("capture.clipSaved", {{"length", FormatLength(int(std::round(duration)))}});
+		else if (duration > 0 && duration < 1)
+			message = TrMessage("capture.clipSavedUnderSecond");
+		else
+			message = TrMessage("capture.clipSavedUnknown");
+	} else {
+		message = kind == ClipToastKind::RecordingStarted ? TrMessage("capture.recordingStarted") : TrMessage("capture.recordingStopped");
+	}
 	if (!g_toast)
 		g_toast = new ClipToast();
 	if (!g_toast->Present(message, *g_hideFromCapture))
@@ -237,11 +246,16 @@ void ShowNow(ClipToastKind kind)
 
 } // namespace
 
-void ClipToastShow(ClipToastKind kind)
+void ClipToastShow(ClipToastKind kind, double duration)
 {
 	if (!g_callbacks)
 		return;
-	QMetaObject::invokeMethod(g_callbacks, [kind]() { ShowNow(kind); }, Qt::QueuedConnection);
+	QMetaObject::invokeMethod(g_callbacks, [kind, duration]() { ShowNow(kind, duration); }, Qt::QueuedConnection);
+}
+
+bool ClipToastEnabled()
+{
+	return g_clipOn.value_or(false) && g_hideFromCapture.has_value();
 }
 
 void ClipToastApplySettings(const std::string &settingsBody)
@@ -252,8 +266,6 @@ void ClipToastApplySettings(const std::string &settingsBody)
 		g_recordingOn = *value;
 	if (const auto value = JsonBoolIfPresent(settingsBody, "hideNotificationsFromCapture"))
 		g_hideFromCapture = *value;
-	if (const auto value = JsonIntIfPresent(settingsBody, "clipNotificationSeconds"))
-		g_clipSeconds = *value;
 }
 
 QWidget *ClipToastWidget()

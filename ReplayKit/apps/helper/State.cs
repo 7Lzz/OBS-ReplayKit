@@ -37,6 +37,8 @@ namespace ReplayKitHelper
         public static readonly string APP_ICONS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "icons"));
         // the fonts of Fonts.cs that windows does not have, mirrored from assets/ like the icons
         public static readonly string APP_FONTS_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "fonts"));
+        // the translations of the interface, one <code>.json per language, mirrored from resources/ like the fonts
+        public static readonly string APP_LOCALE_DIR = Path.GetFullPath(Path.Combine(HelperRoot, "..", "..", "locale"));
         // custom icons the user has picked -- converted to .ico and saved here so they become deletable presets. kept out of APP_ICONS_DIR so the installers assets/ mirror never touches them and so "delete" can be gated to this dir only.
         public static readonly string USER_ICONS_DIR = Path.Combine(APP_ICONS_DIR, "user");
         // %APPDATA%\obs-studio -- APP_ICONS_DIR is ...\obs-replayKit\icons, so up two.

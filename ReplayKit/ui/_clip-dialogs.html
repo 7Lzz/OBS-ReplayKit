@@ -23,15 +23,16 @@
   <div class="modal-veil" id="compress-mode-veil">
     <div class="modal compress-mode-modal" id="compress-mode-modal">
       <h2>Compress clip</h2>
-      <div class="clip-name" id="compress-mode-clip-name"></div>
+      <div class="clip-name" id="compress-mode-clip-name" translate="no"></div>
       <div class="compress-mode-warning" role="note">
         <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/warning-outline}}</svg>
         <span>Replaces the original file on disk &mdash; this can&rsquo;t be undone.</span>
       </div>
-      <div class="compress-mode-locked" role="note">
-        This clip is <b>already at maximum compression</b> (Smaller mode).
-        Re-encoding wouldn&rsquo;t reduce the size further, only the quality.
-      </div>
+      <div class="compress-mode-locked" role="note" id="compress-mode-locked-note"></div>
+      <script>
+        // one translatable sentence, since the bold part would otherwise split it into pieces that are translated apart
+        document.getElementById("compress-mode-locked-note").innerHTML = RK_T("This clip is <b>already at maximum compression</b> (Smaller mode). Re-encoding wouldn’t reduce the size further, only the quality.");
+      </script>
       <div class="compress-mode-list">
         <button type="button" class="compress-mode-card" data-mode="fast">
           <span class="title">Fast</span>

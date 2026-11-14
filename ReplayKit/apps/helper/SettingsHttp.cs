@@ -119,6 +119,8 @@ namespace ReplayKitHelper
                     settings["overlayOpacity"] = overlayOpacity["opacity"];
                     WriteSettings(settings);
                 }
+                // the language lives in user.ini of obs, so it joins the settings only here, never the file
+                settings["language"] = Locales.Current();
                 return new JObject
                 {
                     ["ok"] = true,
@@ -598,10 +600,10 @@ namespace ReplayKitHelper
                 return;
             }
             Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", source uses ReplayKit renderer: " + sourceCurrent + ", Bango Cat folder and baked models present: " + filesPresent + ".");
-            Notifications.Add("warning", BongoCatNoticeKey, "Bongo Cat is not working", !filesPresent
-                ? "The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back."
-                : !loaded ? "OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again."
-                : "The Bongo Cat source is missing or still uses the older renderer. Run the ReplayKit installer again to repair the saved scene.");
+            Notifications.Add("warning", BongoCatNoticeKey, Locales.T("Bongo Cat is not working"), !filesPresent
+                ? Locales.T("The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back.")
+                : !loaded ? Locales.T("OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again.")
+                : Locales.T("The Bongo Cat source is missing or still uses the older renderer. Run the ReplayKit installer again to repair the saved scene."));
         }
 
         internal static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
@@ -690,12 +692,40 @@ namespace ReplayKitHelper
 
         public static JObject SaveOverlayPreviewFromRequest(string body) => OverlayPreviewFromRequest(body, "preview");
 
+        // the language is the one obs keeps in user.ini rather than a key of the settings file: it is taken out of the request and checked before anything is saved, and written to obs once the rest has saved; a change of it restarts obs, which reads it only as it starts
         public static JObject SaveSettingsFromRequest(string body)
         {
             lock (SettingsStore.Gate)
             {
                 if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing settings body.");
                 var incoming = JObject.Parse(body);
+                string language = TakeLanguage(incoming);
+                var result = SaveSettings(incoming);
+                if (language != null && language != Locales.Current())
+                {
+                    Locales.ApplyToObs(language);
+                    result["restartRequired"] = true;
+                    if (string.IsNullOrEmpty(result["restartReason"]?.Value<string>())) result["restartReason"] = "Changing the language requires OBS to restart.";
+                }
+                if (result["settings"] is JObject saved) saved["language"] = Locales.Current();
+                return result;
+            }
+        }
+
+        private static string TakeLanguage(JObject incoming)
+        {
+            var token = incoming["language"];
+            if (token == null) return null;
+            incoming.Remove("language");
+            string code = token.Type == JTokenType.String ? token.Value<string>() : null;
+            if (!Locales.IsAvailable(code)) throw new InvalidOperationException("Invalid option for language: " + code);
+            return code;
+        }
+
+        private static JObject SaveSettings(JObject incoming)
+        {
+            lock (SettingsStore.Gate)
+            {
                 var current = ReadSettings();
                 var previous = Normalize(current);
                 foreach (var prop in incoming.Properties())

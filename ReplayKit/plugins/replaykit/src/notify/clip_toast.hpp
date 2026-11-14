@@ -10,8 +10,9 @@ namespace rk {
 enum class ClipToastKind { Clip, RecordingStarted, RecordingStopped };
 
 // shows the card for kind when its setting is on; any thread
-void ClipToastShow(ClipToastKind kind);
-// the four settings the card goes by, from the one second settings poll
+void ClipToastShow(ClipToastKind kind, double duration = 0);
+bool ClipToastEnabled();
+// the settings the card goes by, from the one second settings poll
 void ClipToastApplySettings(const std::string &settingsBody);
 // the card while it is on the screen, for the sdk snapshot
 QWidget *ClipToastWidget();

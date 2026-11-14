@@ -208,7 +208,9 @@
           els.title.classList.add("is-bad");
           els.title.textContent = "Uninstall failed";
           els.statLine.classList.add("is-bad");
-          els.statLine.textContent = d.message || "unknown error";
+          // the host translated the message and added the log path
+          els.statLine.setAttribute("translate", "no");
+          els.statLine.textContent = d.message || RK_T("unknown error");
           els.statPct.textContent = "";
           els.fill.classList.add("is-bad");
           els.closeBtn.hidden = false;

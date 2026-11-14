@@ -66,7 +66,7 @@ window.RKDeleted = {
       const left = document.createElement("span");
       const n = daysLeft(row);
       left.className = "left" + (n <= 1 ? " is-soon" : "");
-      left.textContent = n <= 0 ? "Deleted for good soon" : n === 1 ? "1 day left" : n + " days left";
+      left.textContent = n <= 0 ? RK_T("Deleted for good soon") : n === 1 ? RK_T("1 day left") : RK_T("{count} days left", { count: n });
       const dot = () => { const d = document.createElement("span"); d.className = "dot"; return d; };
       target.append(size, dot(), kind, dot(), left);
       // a gif belongs to no game, as on its card in the GIFs section
@@ -100,7 +100,7 @@ window.RKDeleted = {
       picture.querySelectorAll(".settings-wrap, .snap-btn, .theater-btn").forEach(control => control.remove());
       picture.tabIndex = 0;
       picture.setAttribute("role", "group");
-      picture.setAttribute("aria-label", "Playback preview: " + row.name);
+      picture.setAttribute("aria-label", RK_T("Playback preview: {name}", { name: row.name }));
       options.player.volume(card);
       const bar = picture.querySelector(".progress-bar");
       const fill = picture.querySelector(".progress-fill");
@@ -237,7 +237,7 @@ window.RKDeleted = {
       if (button) button.disabled = true;
       try {
         const done = await act("restore", row.id);
-        options.toast("Restored " + baseName(done.name || row.name));
+        options.toast(RK_T("Restored {name}", { name: baseName(done.name || row.name) }));
         options.restored(done.kind || row.kind);
         refresh();
       } catch (error) { options.notify(error.message); }
@@ -254,12 +254,13 @@ window.RKDeleted = {
       thumb.loading = "lazy";
       thumb.decoding = "async";
       thumb.alt = row.name;
+      thumb.setAttribute("translate", "no");
       thumb.src = options.helper + "/deleted/thumb?id=" + encodeURIComponent(row.id);
       picture.appendChild(thumb);
       const body = document.createElement("div");
       body.className = "body";
       body.innerHTML =
-        '<div class="title-row"><span class="name"></span>' +
+        '<div class="title-row"><span class="name" translate="no"></span>' +
         '<div class="title-actions">' +
           '<button class="icon-mini-btn delete-btn" data-delete-label="Delete for good" data-tooltip="Delete for good" aria-label="Delete for good" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
           '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
@@ -318,7 +319,7 @@ window.RKDeleted = {
       return card;
     }
     function paintHeading() {
-      note.textContent = days > 0 ? "Kept for " + days + (days === 1 ? " day" : " days") : "";
+      note.textContent = days > 0 ? (days === 1 ? RK_T("Kept for 1 day") : RK_T("Kept for {count} days", { count: days })) : "";
       emptyAll.hidden = !rows.length;
     }
     function paintButton() {
@@ -327,7 +328,7 @@ window.RKDeleted = {
       button.hidden = !loaded || days <= 0;
       badge.hidden = !rows.length;
       badge.textContent = rows.length > 99 ? "99+" : String(rows.length);
-      const label = rows.length ? "Deleted history (" + rows.length + ")" : "Deleted history";
+      const label = rows.length ? RK_T("Deleted history ({count})", { count: rows.length }) : RK_T("Deleted history");
       button.dataset.tooltip = label;
       button.setAttribute("aria-label", label);
     }
@@ -350,7 +351,7 @@ window.RKDeleted = {
       }
       empty.hidden = rows.length > 0;
       empty.textContent = !loaded ? "Loading deleted clips..."
-        : "Nothing here. Clips, screenshots and GIFs you delete stay here for " + days + (days === 1 ? " day" : " days") + " before they're gone for good.";
+        : days === 1 ? RK_T("Nothing here. Clips, screenshots and GIFs you delete stay here for 1 day before they're gone for good.") : RK_T("Nothing here. Clips, screenshots and GIFs you delete stay here for {count} days before they're gone for good.", { count: days });
     }
     // the page asks for the list from several places as it starts and as things change, so asks that come while a read is out are folded into one more read after it
     let reading = null, readAgain = false;

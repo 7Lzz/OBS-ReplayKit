@@ -5,6 +5,7 @@
 #include "core/async.hpp"
 #include "core/helper_client.hpp"
 #include "core/json_lite.hpp"
+#include "core/locale.hpp"
 #include "core/state.hpp"
 #include "core/state_files.hpp"
 #include "core/theme.hpp"
@@ -44,7 +45,7 @@ QString InitialOf(const QString &name)
 
 ShellAccountButton::ShellAccountButton(QWidget *owner, QWidget *parent) : ShellTitleButton(kWidth, parent), m_owner(owner)
 {
-	SetTip(QStringLiteral("Streamable account"));
+	SetTip(Tr("Streamable account"));
 	onPress = [this]() { TogglePanel(); };
 }
 
@@ -65,7 +66,7 @@ void ShellAccountButton::SetAccount(const Account &account)
 			m_picture.load(StateFilePath(QStringLiteral("profile_picture.png")), "PNG");
 	}
 	m_account = account;
-	SetTip(account.signedIn ? QStringLiteral("Streamable: %1").arg(account.name.isEmpty() ? QStringLiteral("signed in") : account.name) : QStringLiteral("Streamable: anonymous"));
+	SetTip(account.signedIn ? (account.name.isEmpty() ? Tr("Streamable: signed in") : Tr("Streamable: {name}", {{"name", account.name}})) : Tr("Streamable: anonymous"));
 	update();
 }
 

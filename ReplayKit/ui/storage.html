@@ -262,7 +262,7 @@
           </div>
           <div class="run-txt">
             <div class="run-title" id="cmpTitle">Compressing</div>
-            <div class="run-sub" id="cmpCurrent"></div>
+            <div class="run-sub" id="cmpCurrent" translate="no"></div>
             <div class="run-sub" id="cmpSaved"></div>
             <div class="cmp-actions"><button class="btn" type="button" id="cmpStop">Stop</button></div>
           </div>
@@ -350,6 +350,8 @@
     return gb >= 1024 && gb % 1024 === 0 ? (gb / 1024) + " TB" : gb + " GB";
   }
 
+  function clipsText(n) { return n === 1 ? RK_T("1 clip") : RK_T("{count} clips", { count: n }); }
+
   function setStatus(el, text, isError) {
     el.textContent = text || "";
     el.title = text || "";
@@ -357,8 +359,8 @@
   }
 
   function renderSub(s) {
-    const parts = ["Used: <b>" + s.usedText + "</b> / <b>" + (s.limitGb ? limitName(s.limitGb) : "no limit") + "</b>"];
-    if (s.freeBytes >= 0) parts.push("Free: <b>" + s.freeText + "</b>" + (s.drive ? " (" + s.drive + ")" : ""));
+    const parts = [RK_T("Used: <b>{used}</b> / <b>{limit}</b>", { used: s.usedText, limit: s.limitGb ? limitName(s.limitGb) : RK_T("no limit") })];
+    if (s.freeBytes >= 0) parts.push(s.drive ? RK_T("Free: <b>{free}</b> ({drive})", { free: s.freeText, drive: s.drive }) : RK_T("Free: <b>{free}</b>", { free: s.freeText }));
     els.sub.innerHTML = parts.join('<span class="sep"></span>');
   }
 
@@ -372,7 +374,7 @@
       segs[i].style.width = item[1] > 0 ? "max(" + pct.toFixed(3) + "%, 4px)" : "0";
     });
     // the temporary files include what is kept to open clips quickly in the editor, which is made again from the clips whenever one is opened, so they can be emptied from here
-    els.legend.innerHTML = items.map((i) => '<li><i class="' + i[0] + '"></i>' + i[2] + " " + i[3] + (i[0] === "temp" && i[1] > 0 ? ' <button class="clear-temp" type="button" data-clear-temp title="Delete the temporary files. The ones kept to open clips quickly are made again the next time a clip is opened.">Clear</button>' : "") + "</li>").join("");
+    els.legend.innerHTML = items.map((i) => '<li><i class="' + i[0] + '"></i><span>' + i[2] + "</span> " + i[3] + (i[0] === "temp" && i[1] > 0 ? ' <button class="clear-temp" type="button" data-clear-temp title="Delete the temporary files. The ones kept to open clips quickly are made again the next time a clip is opened.">Clear</button>' : "") + "</li>").join("");
   }
 
   els.legend.addEventListener("click", async (event) => {
@@ -387,7 +389,7 @@
     showLimit(s.limitGb);
     if (s.state === "over" && !plan) {
       els.over.classList.add("is-shown");
-      els.overText.innerHTML = "Your library is <b>" + s.overText + "</b> over the limit.";
+      els.overText.innerHTML = RK_T("Your library is <b>{size}</b> over the limit.", { size: s.overText });
       els.overActions.innerHTML = '<button class="btn" type="button" id="review">Review the oldest clips</button>';
       $("review").addEventListener("click", reviewPlan);
     } else if (s.state !== "over") {
@@ -470,13 +472,14 @@
       return;
     }
     if (!plan.count) {
-      els.overText.innerHTML = "Every clip that could go is a favorite, so <b>nothing can be deleted</b> for you. Pick a higher limit or delete clips by hand.";
+      els.overText.innerHTML = RK_T("Every clip that could go is a favorite, so <b>nothing can be deleted</b> for you. Pick a higher limit or delete clips by hand.");
       els.overActions.innerHTML = "";
       return;
     }
-    els.overText.innerHTML = "ReplayKit will delete your <b>" + plan.count + " oldest clip" + (plan.count === 1 ? "" : "s") + "</b> (<b>" + plan.bytesText + "</b>). Favorites are kept." +
-      (plan.insufficient ? " That is still not enough to get under the limit, because your favorites take the rest." : "");
-    els.overActions.innerHTML = '<button class="btn is-solid" type="button" id="confirmTrim">Delete ' + plan.count + " clip" + (plan.count === 1 ? "" : "s") + '</button><button class="btn" type="button" id="cancelTrim">Keep them</button>';
+    const oldest = plan.count === 1 ? RK_T("1 oldest clip") : RK_T("{count} oldest clips", { count: plan.count });
+    els.overText.innerHTML = RK_T("ReplayKit will delete your <b>{clips}</b> (<b>{size}</b>). Favorites are kept.", { clips: oldest, size: plan.bytesText }) +
+      (plan.insufficient ? " " + RK_T("That is still not enough to get under the limit, because your favorites take the rest.") : "");
+    els.overActions.innerHTML = '<button class="btn is-solid" type="button" id="confirmTrim">' + RK_T("Delete {clips}", { clips: clipsText(plan.count) }) + '</button><button class="btn" type="button" id="cancelTrim">Keep them</button>';
     $("confirmTrim").addEventListener("click", applyPlan);
     $("cancelTrim").addEventListener("click", () => { plan = null; if (summary) render(summary); });
   }
@@ -489,7 +492,7 @@
     try {
       const done = await helperJson("/storage/trim-apply?token=" + encodeURIComponent(plan.token), { method:"POST" });
       plan = null;
-      setStatus(els.limitStatus, "Deleted " + done.deleted + " clip" + (done.deleted === 1 ? "" : "s") + ", freed " + done.freedText + (done.failed ? " (" + done.failed + " could not be deleted)" : "") + ".", !!done.failed);
+      setStatus(els.limitStatus, done.failed ? RK_T("Deleted {clips}, freed {size} ({failed} could not be deleted).", { clips: clipsText(done.deleted), size: done.freedText, failed: done.failed }) : RK_T("Deleted {clips}, freed {size}.", { clips: clipsText(done.deleted), size: done.freedText }), !!done.failed);
     } catch (err) {
       plan = null;
       setStatus(els.limitStatus, err.message || "Could not delete the clips.", true);
@@ -550,7 +553,7 @@
     els.picked.hidden = !has;
     els.tools.hidden = !has;
     els.more.hidden = !has || !cmp.hasMore || cmp.limit >= CMP_MAX;
-    els.more.textContent = "Show " + Math.min(CMP_PAGE, CMP_MAX - cmp.limit) + " more clips";
+    els.more.textContent = RK_T("Show {count} more clips", { count: Math.min(CMP_PAGE, CMP_MAX - cmp.limit) });
     els.list.textContent = "";
     const items = document.createElement("div");
     items.className = "cmp-items";
@@ -571,6 +574,7 @@
       mark.innerHTML = (window.RK_ICONS || {})["action/select"] || "";
       const name = document.createElement("span");
       name.className = "nm";
+      name.setAttribute("translate", "no");
       name.textContent = clip.name;
       name.title = clip.name;
       const size = document.createElement("span");
@@ -590,11 +594,11 @@
   function renderPickedFoot() {
     const count = cmp.picked.size;
     const estimate = pickedEstimate();
-    els.picked.innerHTML = count ? "<b>" + count + "</b> selected · " + formatBytes(pickedBytes()) : "Pick the clips to compress";
+    els.picked.innerHTML = count ? RK_T("<b>{count}</b> selected · {size}", { count: count, size: formatBytes(pickedBytes()) }) : "Pick the clips to compress";
     els.estInfo.hidden = !count || !estimate;
     els.estimateValue.textContent = count && estimate ? formatBytes(estimate) : "";
     els.go.disabled = cmp.loading || count === 0 || !!(summary && summary.busy);
-    els.go.textContent = count ? "Compress " + count + " clip" + (count === 1 ? "" : "s") : "Compress";
+    els.go.textContent = count ? RK_T("Compress {clips}", { clips: clipsText(count) }) : "Compress";
   }
 
   async function loadCandidates() {
@@ -617,7 +621,7 @@
       const kept = new Set();
       cmp.clips.forEach((c) => { if (firstPage || !previous.has(c.name) || cmp.picked.has(c.name)) kept.add(c.name); });
       cmp.picked = kept;
-      setStatus(els.cmpStatus, data.unchecked ? data.unchecked + " clips could not be checked and were left out." : "");
+      setStatus(els.cmpStatus, data.unchecked ? RK_T("{count} clips could not be checked and were left out.", { count: data.unchecked }) : "");
       renderPick();
     } catch (err) {
       if (generation !== cmp.loadGeneration) return;
@@ -643,7 +647,10 @@
     if (cmp.loading || !cmp.picked.size) return;
     setStatus(els.cmpStatus, "");
     const estimate = pickedEstimate();
-    els.confirmSum.innerHTML = "Compressing <b>" + cmp.picked.size + "</b> clip" + (cmp.picked.size === 1 ? "" : "s") + " (" + formatBytes(pickedBytes()) + ")" + (estimate ? " should free about <b>" + formatBytes(estimate) + "</b>." : ".");
+    const picked = cmp.picked.size === 1 ? RK_T("<b>1</b> clip") : RK_T("<b>{count}</b> clips", { count: cmp.picked.size });
+    els.confirmSum.innerHTML = estimate
+      ? RK_T("Compressing {clips} ({size}) should free about <b>{estimate}</b>.", { clips: picked, size: formatBytes(pickedBytes()), estimate: formatBytes(estimate) })
+      : RK_T("Compressing {clips} ({size}).", { clips: picked, size: formatBytes(pickedBytes()) });
     showPhase("confirm");
   });
   els.back.addEventListener("click", () => showPhase("pick"));
@@ -693,18 +700,18 @@
     els.arc.style.strokeDashoffset = String(RING * (1 - percent / 100));
     els.pct.textContent = percent + "%";
     const position = Math.min(st.total || 0, (st.done || 0) + (st.failed || 0) + 1);
-    els.runTitle.textContent = "Compressing " + position + " of " + (st.total || 0);
+    els.runTitle.textContent = RK_T("Compressing {position} of {total}", { position: position, total: st.total || 0 });
     els.runCurrent.textContent = st.current || "";
-    els.runSaved.innerHTML = "Freed so far: <b>" + (st.savedText || "0 B") + "</b>";
+    els.runSaved.innerHTML = RK_T("Freed so far: <b>{size}</b>", { size: st.savedText || "0 B" });
     if (!st.cancelled) { els.stop.disabled = false; els.stop.textContent = "Stop"; }
   }
 
   function paintDone(st) {
     if (st.mode) showCompressionType(st.mode);
-    const clips = (st.done || 0) + " clip" + (st.done === 1 ? "" : "s");
-    let text = st.cancelled ? "Stopped after " + clips + ", freed " + st.savedText + "." : "Compressed " + clips + " and freed " + st.savedText + ".";
-    if (st.failed) text += " " + st.failed + " could not be compressed" + (st.error ? " (" + st.error + ")" : "") + ".";
-    if (!st.done && !st.cancelled && st.failed && st.error) text = "Nothing was compressed: " + st.error;
+    const clips = clipsText(st.done || 0);
+    let text = st.cancelled ? RK_T("Stopped after {clips}, freed {size}.", { clips: clips, size: st.savedText }) : RK_T("Compressed {clips} and freed {size}.", { clips: clips, size: st.savedText });
+    if (st.failed) text += " " + (st.error ? RK_T("{count} could not be compressed ({error}).", { count: st.failed, error: st.error }) : RK_T("{count} could not be compressed.", { count: st.failed }));
+    if (!st.done && !st.cancelled && st.failed && st.error) text = RK_T("Nothing was compressed: {error}", { error: st.error });
     els.doneText.textContent = text;
   }
 

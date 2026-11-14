@@ -10,7 +10,7 @@
         <!-- the name of the clip with the pencil that renames it, like the title row of a card -->
         <div class="editor-lead">
           <div class="title-row editor-title">
-            <span class="name" id="trim-clip-name"></span>
+            <span class="name" id="trim-clip-name" translate="no"></span>
             <button class="icon-mini-btn edit-btn" type="button" id="trim-rename" data-tooltip="Rename" aria-label="Rename clip"><svg data-i="action/edit" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
             <span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span>
           </div>
@@ -84,7 +84,7 @@
                  disablePictureInPicture></video>
           </div>
           <div class="lay-overlay" id="trim-layer-overlay" hidden aria-hidden="true"></div>
-          <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true"></div>
+          <div class="sub-overlay" id="trim-sub-overlay" hidden aria-hidden="true" translate="no"></div>
           </div>
           <div class="lay-item is-selected main-picture-handles" id="main-picture-handles" hidden>
             <i class="sub-grip lay-grip" data-corner="nw"></i><i class="sub-grip lay-grip" data-corner="ne"></i>
@@ -185,7 +185,7 @@
   <div class="modal-veil" id="save-veil">
     <div class="modal save-modal" id="save-modal" role="alertdialog" aria-modal="true" aria-labelledby="save-title" aria-describedby="save-note">
       <h2 id="save-title">Saving a copy</h2>
-      <div class="clip-name" id="save-clip-name"></div>
+      <div class="clip-name" id="save-clip-name" translate="no"></div>
       <div class="save-track is-waiting" id="save-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="save-fill" id="save-fill"></div></div>
       <div class="save-line"><span id="save-stage">Starting</span><span class="save-percent" id="save-percent"></span></div>
       <div class="body save-note" id="save-note">Editing is locked until this is done.</div>
@@ -1292,7 +1292,7 @@ window.__rkEditorApi = (function () {
       // the preview frames, the audio tracks with their waveforms and the keyframes are all prepared while the loading screen is up, and the editor shows once every one of them is in -- otherwise the timeline fills in piece by piece in front of the user, which is what this screen exists to hide. each part guards itself against a clip that was closed or replaced meanwhile.
       trimProcessingStage.textContent = "Building the preview";
       const filmstripPromise = buildTrimFilmstrip(clip, dur, (done, total) => {
-        trimProcessingStage.textContent = "Building the preview " + done + "/" + total;
+        trimProcessingStage.textContent = RK_T("Building the preview {done}/{total}", { done: done, total: total });
       });
       const lanesPromise = trimLanes.load(clip.name, {
         stage: (text) => { if (trimSourceClip === clip) trimProcessingStage.textContent = text; },
@@ -1643,6 +1643,7 @@ window.__rkEditorApi = (function () {
     input.setAttribute("aria-label", "Clip name");
     const extSpan = document.createElement("span");
     extSpan.className = "name-edit-ext";
+    extSpan.setAttribute("translate", "no");
     extSpan.textContent = ext;
     // the pencil glides aside as the name swaps to the input, the way the rename of a card does
     const flipTargets = [document.getElementById("trim-rename"), trimDraftNote];
@@ -1678,7 +1679,7 @@ window.__rkEditorApi = (function () {
         editorTools.renamed(name);
         trimDraftSent = "";
       } catch (err) {
-        showToast("The clip could not be renamed: " + escapeHtml(err.message || String(err)), "bad", "Rename");
+        showToast(RK_T("The clip could not be renamed: {error}", { error: escapeHtml(err.message || String(err)) }), "bad", "Rename");
         scheduleToastHide(TOAST_ERROR_MS);
       } finally {
         trimRenaming = false;
@@ -1820,7 +1821,7 @@ window.__rkEditorApi = (function () {
     updateSeekFill();
     updateTrimUi();
     if (result.dropped.length) {
-      showToast("Audio that was added to this edit is no longer there, so it was left out:<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", "Some audio is missing");
+      showToast(RK_T("Audio that was added to this edit is no longer there, so it was left out:") + "<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", "Some audio is missing");
     }
     return result;
   }
@@ -2063,7 +2064,7 @@ window.__rkEditorApi = (function () {
       }
       endTrimSave(save);
       if (screenshot) {
-        showToast("Screenshot saved in Screenshots as " + escapeHtml(data.name), "info");
+        showToast(RK_T("Screenshot saved in Screenshots as {name}", { name: escapeHtml(data.name) }), "info");
         window.dispatchEvent(new Event("replaykit:screenshot-saved"));
         scheduleToastHide(3500);
         return;
@@ -2079,15 +2080,15 @@ window.__rkEditorApi = (function () {
       // under this name there is another file now, and a favorite that was read earlier still describes the old one
       if (mode === "overwrite" && isFavorite(sourceName)) refreshFavoriteClips();
       const msg = mode === "overwrite"
-        ? ("Overwrote " + escapeHtml(sourceName))
-        : ("Saved as " + escapeHtml(data.name));
+        ? RK_T("Overwrote {name}", { name: escapeHtml(sourceName) })
+        : RK_T("Saved as {name}", { name: escapeHtml(data.name) });
       showToast(msg, "info");
       scheduleToastHide(3500);
       scheduleNextPoll(50);
     } catch (e) {
       if (save && save.abandoned) return;
       endTrimSave(save || trimSaving);
-      showToast("Trim failed: " + (e.message || e));
+      showToast(RK_T("Trim failed: {error}", { error: e.message || e }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -2126,10 +2127,10 @@ window.__rkEditorApi = (function () {
       b.classList.toggle("is-selected", on);
       b.setAttribute("aria-checked", on ? "true" : "false");
     });
-    document.getElementById("render-size").textContent = "Resolution: " + w + " \u00d7 " + h;
+    document.getElementById("render-size").textContent = RK_T("Resolution: {width} \u00d7 {height}", { width: w, height: h });
     const plan = trimLanes.videoPlan(true);
     const seconds = plan ? plan.window.end - plan.window.start : trimDuration() / trimLanes.videoSpeed();
-    document.getElementById("render-length").textContent = "Duration: " + (formatDuration(seconds) || "0:00");
+    document.getElementById("render-length").textContent = RK_T("Duration: {time}", { time: formatDuration(seconds) || "0:00" });
   }
   function openRenderSettings() {
     if (trimRender.disabled || trimSaving) return;

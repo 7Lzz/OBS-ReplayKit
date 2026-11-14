@@ -43,7 +43,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/upload-latest threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Helper error: " + ex.Message });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Helper error: {error}", "error", ex.Message) });
                 }
                 return false;
             }
@@ -64,7 +64,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/upload threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Helper error: " + ex.Message });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Helper error: {error}", "error", ex.Message) });
                 }
                 return false;
             }

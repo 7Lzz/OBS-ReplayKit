@@ -10,6 +10,7 @@
 #include "core/crash_reporter.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/idle_memory.hpp"
+#include "core/locale.hpp"
 #include "core/main_window.hpp"
 #include "core/open_clips_hotkey.hpp"
 #include "core/process_group.hpp"
@@ -25,6 +26,7 @@ OBS_DECLARE_MODULE()
 bool obs_module_load(void)
 {
 	using namespace rk;
+	LocaleLoad();
 	StartProcessGroup();
 	RegisterBongo();
 	g_callbacks = new QObject();

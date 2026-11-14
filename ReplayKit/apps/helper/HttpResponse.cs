@@ -119,6 +119,37 @@ namespace ReplayKitHelper
             return html.Insert(i, "<style id=\"rk-font\">" + rules + "</style>");
         }
 
+        private static readonly Regex HeadOpen = new Regex(@"<head(\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        // the language of obs, its strings and the runtime that translates the page (_i18n.html), first thing in <head> so every text the parser adds is seen; english pages get the runtime alone, so RK_T always exists and a page reads as it always did
+        private static string InjectLocale(string html)
+        {
+            Match head = HeadOpen.Match(html);
+            if (!head.Success) return html;
+            string code = Locales.English;
+            try { code = Locales.Current(); }
+            catch (Exception ex) { Log.Write("HttpResponse.InjectLocale: " + ex.Message); }
+            var sb = new StringBuilder();
+            sb.Append("<script>window.RK_LANG=").Append(JsonConvert.SerializeObject(code)).Append(";</script>");
+            bool explicitPage = html.IndexOf("data-i18n-explicit", StringComparison.Ordinal) >= 0;
+            sb.Append("<script src=\"/locale/strings.js?lang=").Append(Uri.EscapeDataString(code))
+                .Append("&amp;v=").Append(Locales.BundleVersion(code, explicitPage));
+            if (explicitPage) sb.Append("&amp;explicit=1");
+            sb.Append("\"></script>");
+            sb.Append("<!--#include i18n-->");
+            return html.Insert(head.Index + head.Length, sb.ToString());
+        }
+
+        // the languages a picker offers, for pages that name the list
+        private static string InjectLanguageList(string html)
+        {
+            if (html.IndexOf("RK_LANGUAGES", StringComparison.Ordinal) < 0) return html;
+            int i = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return html;
+            string json = Locales.ToJson().ToString(Formatting.None).Replace("<", "\\u003c").Replace(">", "\\u003e");
+            return html.Insert(i, "<script>window.RK_LANGUAGES=" + json + ";</script>");
+        }
+
         // the fonts a picker offers, for pages that name the list, so no page keeps a copy of its own
         private static string InjectFontList(string html)
         {
@@ -285,7 +316,7 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectNoTab(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(File.ReadAllText(f))))))))));
+                        string html = InjectNoTab(InjectLanguageList(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(InjectLocale(File.ReadAllText(f))))))))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var hash = SHA256.Create())

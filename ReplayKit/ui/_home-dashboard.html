@@ -133,7 +133,7 @@
     var week = Array.isArray(sum.week) ? sum.week : [];
     var thisWeek = week.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
     var sep = '<span class="hm-sep">&middot;</span>';
-    return ["<b>" + sum.clipCount + "</b> " + (sum.clipCount === 1 ? "clip" : "clips"), "<b>" + thisWeek + "</b> this week"].join(sep);
+    return [sum.clipCount === 1 ? RK_T("<b>1</b> clip") : RK_T("<b>{count}</b> clips", { count: sum.clipCount }), RK_T("<b>{count}</b> this week", { count: thisWeek })].join(sep);
   }
 
   function headHtml() {
@@ -154,13 +154,13 @@
     if (sum && sum.clipDirExists === false) {
       list.push({ id: "folder", tone: "error", title: "Clips folder not found.", text: "ReplayKit cannot save clips until the folder is back. Check that its drive is connected, or choose another folder in Settings.", label: "Open settings", act: "open-settings" });
     } else if (sum && sum.freeBytes >= 0 && sum.freeBytes < LOW_SPACE_BYTES) {
-      list.push({ id: "space", tone: "warn", title: "Low disk space.", text: "Only " + fmtBytes(sum.freeBytes) + " left" + (sum.drive ? " on " + sum.drive : "") + ". New clips may fail to save.", label: "Free up space", act: "open-storage" });
+      list.push({ id: "space", tone: "warn", title: "Low disk space.", text: sum.drive ? RK_T("Only {size} left on {drive}. New clips may fail to save.", { size: fmtBytes(sum.freeBytes), drive: sum.drive }) : RK_T("Only {size} left. New clips may fail to save.", { size: fmtBytes(sum.freeBytes) }), label: "Free up space", act: "open-storage" });
     }
     if (S.storage && S.storage.state === "over") {
-      list.push({ id: "storage-over", tone: "warn", title: "Over your storage limit.", text: "Your clips take " + S.storage.overText + " more than the limit you set. Nothing is deleted unless you say so.", label: "Free up space", act: "open-storage" });
+      list.push({ id: "storage-over", tone: "warn", title: "Over your storage limit.", text: RK_T("Your clips take {size} more than the limit you set. Nothing is deleted unless you say so.", { size: S.storage.overText }), label: "Free up space", act: "open-storage" });
     }
     if (S.update && S.updateDismissed !== S.update.latest) {
-      list.push({ id: "update", tone: "info", title: "ReplayKit " + S.update.latest + " is available.", text: "OBS restarts once to finish the update. Your clips are not touched.", label: "Update now", act: "update-now", later: true, primary: true });
+      list.push({ id: "update", tone: "info", title: RK_T("ReplayKit {version} is available.", { version: S.update.latest }), text: "OBS restarts once to finish the update. Your clips are not touched.", label: "Update now", act: "update-now", later: true, primary: true });
     }
     return list.filter(function (b) { return b.keep || !S.dismissed[b.id]; });
   }
@@ -212,13 +212,13 @@
   }
 
   var ACTIONS = {
-    "restart-obs": function () { post("/ui-confirm", { kind: "restart-obs" }).catch(function (e) { say("Could not ask to restart OBS: " + e.message); }); },
+    "restart-obs": function () { post("/ui-confirm", { kind: "restart-obs" }).catch(function (e) { say(RK_T("Could not ask to restart OBS: {error}", { error: e.message })); }); },
     "open-folder": function () { post("/open-clip-folder").catch(function (e) { say(e.message); }); },
-    "open-storage": function () { post("/storage/open").catch(function (e) { say("Could not open the storage card: " + e.message); }); },
-    "open-settings": function () { post("/open-settings-window").catch(function (e) { say("Could not open Settings: " + e.message); }); },
+    "open-storage": function () { post("/storage/open").catch(function (e) { say(RK_T("Could not open the storage card: {error}", { error: e.message })); }); },
+    "open-settings": function () { post("/open-settings-window").catch(function (e) { say(RK_T("Could not open Settings: {error}", { error: e.message })); }); },
     "retry": function () { S.helperFailSince = 0; pollState(); pollSummary(); },
     "dismiss": function (el) { S.dismissed[el.dataset.name] = true; paint(); },
-    "update-now": function () { if (S.update) post("/update/open-prompt?version=" + encodeURIComponent(S.update.latest)).catch(function (e) { say("Could not start the update: " + e.message); }); },
+    "update-now": function () { if (S.update) post("/update/open-prompt?version=" + encodeURIComponent(S.update.latest)).catch(function (e) { say(RK_T("Could not start the update: {error}", { error: e.message })); }); },
     "update-later": function () { if (S.update) { S.updateDismissed = S.update.latest; lsSet("rkHomeUpdateDismissed", S.update.latest); paint(); } },
   };
 

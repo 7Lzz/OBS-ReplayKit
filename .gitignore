@@ -67,3 +67,9 @@ logs/
 Thumbs.db
 desktop.ini
 .DS_Store
+# working files of tools/i18n/i18n.py; the merged translations live in resources/locale
+ReplayKit/tools/i18n/parts/
+ReplayKit/tools/i18n/chunks/
+ReplayKit/tools/i18n/seeds/
+ReplayKit/tools/i18n/todo/
+ReplayKit/tools/i18n/done/

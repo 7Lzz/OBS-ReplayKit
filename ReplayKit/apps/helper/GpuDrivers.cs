@@ -85,7 +85,7 @@ namespace ReplayKitHelper
         private static string Describe(string encoderId)
         {
             string id = (encoderId ?? "").ToLowerInvariant();
-            if (id.Contains("x264")) return "your processor (x264)";
+            if (id.Contains("x264")) return Locales.T("your processor (x264)");
             var maker = MakerOf(id);
             string codec = id.Contains("hevc") || id.Contains("h265") ? "H.265" : "H.264";
             return maker == null ? encoderId : maker.Name + " " + codec + " (" + (maker == Nvidia ? "NVENC" : maker == Amd ? "AMF" : "Quick Sync") + ")";
@@ -96,22 +96,22 @@ namespace ReplayKitHelper
             var maker = MakerOf(missing);
             string gpu = maker?.Name ?? "graphics";
             string now = string.IsNullOrEmpty(fallback)
-                ? "ReplayKit could not find another encoder to switch to, so clips cannot be recorded until the driver is fixed."
-                : "To keep clipping working, ReplayKit switched recording to " + Describe(fallback) + " for now." +
-                  (fallback.IndexOf("x264", StringComparison.OrdinalIgnoreCase) >= 0 ? " Encoding on the processor can lower your frame rate in games." : "");
+                ? Locales.T("ReplayKit could not find another encoder to switch to, so clips cannot be recorded until the driver is fixed.")
+                : Locales.T("To keep clipping working, ReplayKit switched recording to {encoder} for now.", "encoder", Describe(fallback)) +
+                  (fallback.IndexOf("x264", StringComparison.OrdinalIgnoreCase) >= 0 ? " " + Locales.T("Encoding on the processor can lower your frame rate in games.") : "");
             string how = maker == null
-                ? "Update your graphics driver from the website of your graphics card maker, then restart OBS."
-                : "Install or open **" + maker.App + "**, update the " + maker.Name + " graphics driver, then restart your PC. ReplayKit switches back to the " + maker.Name + " encoder by itself once it loads.";
-            string body = "OBS could not load the " + Describe(missing) + " encoder. This almost always means the " + gpu + " graphics driver is out of date.\n\n" + now + "\n\n" + how;
-            Notifications.Announce("warning", "encoder-driver", "Update your " + gpu + " graphics driver", body,
+                ? Locales.T("Update your graphics driver from the website of your graphics card maker, then restart OBS.")
+                : Locales.T("Install or open **{app}**, update the {maker} graphics driver, then restart your PC. ReplayKit switches back to the {maker} encoder by itself once it loads.", "app", maker.App, "maker", maker.Name);
+            string body = Locales.T("OBS could not load the {encoder} encoder. This almost always means the {gpu} graphics driver is out of date.", "encoder", Describe(missing), "gpu", gpu) + "\n\n" + now + "\n\n" + how;
+            Notifications.Announce("warning", "encoder-driver", Locales.T("Update your {gpu} graphics driver", "gpu", gpu), body,
                 new JObject
                 {
                     ["icon"] = "warning",
-                    ["text"] = "OBS could not load the " + Describe(missing) + " encoder. Your " + gpu + " graphics driver is most likely out of date.",
+                    ["text"] = Locales.T("OBS could not load the {encoder} encoder. Your {gpu} graphics driver is most likely out of date.", "encoder", Describe(missing), "gpu", gpu),
                     ["detail"] = now,
-                    ["action"] = maker == null ? null : new JObject { ["label"] = "Get " + maker.App, ["kind"] = "link", ["url"] = maker.Url },
+                    ["action"] = maker == null ? null : new JObject { ["label"] = Locales.T("Get {app}", "app", maker.App), ["kind"] = "link", ["url"] = maker.Url },
                 },
-                maker?.Url ?? "", maker == null ? null : "Get " + maker.App);
+                maker?.Url ?? "", maker == null ? null : Locales.T("Get {app}", "app", maker.App));
         }
     }
 }

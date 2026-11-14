@@ -40,7 +40,7 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 Log.Write("MicTest.GetDevicesPayload: " + ex.Message);
-                return Fail("Could not list microphones: " + ex.Message);
+                return Fail(Locales.T("Could not list microphones: {error}", "error", ex.Message));
             }
         }
 
@@ -48,8 +48,8 @@ namespace ReplayKitHelper
         public static JObject Start(string deviceId, int volumePercent, bool noiseSuppression, int sensitivityDb, bool playback)
         {
             if (!MicDevices.IsValidId(deviceId)) return Fail("That microphone is not valid.");
-            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail("Volume must be between 0 and " + VolumeMax + ".");
-            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail("Input sensitivity must be between " + SensitivityMin + " and " + SensitivityMax + ".");
+            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.T("Volume must be between 0 and {VolumeMax}.", "VolumeMax", VolumeMax));
+            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.T("Input sensitivity must be between {SensitivityMin} and {SensitivityMax}.", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
 
             try
             {
@@ -75,15 +75,15 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 Log.Write("MicTest.Start: " + ex.Message);
-                return Fail("Could not start the microphone test: " + ex.Message);
+                return Fail(Locales.T("Could not start the microphone test: {error}", "error", ex.Message));
             }
         }
 
         // the page pushes its current (possibly unsaved) values here, so the preview follows the controls the moment they move.
         public static JObject SetParams(int volumePercent, bool noiseSuppression, int sensitivityDb)
         {
-            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail("Volume must be between 0 and " + VolumeMax + ".");
-            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail("Input sensitivity must be between " + SensitivityMin + " and " + SensitivityMax + ".");
+            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.T("Volume must be between 0 and {VolumeMax}.", "VolumeMax", VolumeMax));
+            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.T("Input sensitivity must be between {SensitivityMin} and {SensitivityMax}.", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
             lock (Gate)
             {
                 if (_session == null || !_session.IsRunning) return Fail("The microphone test is not running.");

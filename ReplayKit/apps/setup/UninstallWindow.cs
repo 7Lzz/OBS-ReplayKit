@@ -58,7 +58,7 @@ namespace ReplayKitSetup
         {
             _scale = SafeDpiScale();
             _theme = WindowTheme.Load();
-            _html = _theme.ApplyTo(LoadHtml());
+            _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml()));
             _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
 
             _wndProcRef = WndProc;
@@ -80,7 +80,7 @@ namespace ReplayKitSetup
             int y = (Native.GetSystemMetrics(1) - h) / 2;
             // borderless like the update window: keep WS_THICKFRAME (dwm needs it to round the corners) + WS_SYSMENU + WS_MINIMIZEBOX, drop WS_CAPTION, and eat the whole non-client area in WM_NCCALCSIZE so no title bar draws.
             const uint style = 0x00040000 | 0x00080000 | 0x00020000; // WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX
-            _hwnd = Native.CreateWindowExW(0, ClassName, "OBS ReplayKit Uninstall", style, x, y, w, h,
+            _hwnd = Native.CreateWindowExW(0, ClassName, SetupLocale.Message("setup.uninstallTitle"), style, x, y, w, h,
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
             if (_hwnd == IntPtr.Zero) throw new InvalidOperationException("Could not create the uninstall window.");
 
@@ -127,7 +127,7 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 WriteErrorLog(ex);
-                InstallerApp.ShowFatalError("The uninstall window could not start.\n\n" + ex, null);
+                InstallerApp.ShowFatalError(SetupLocale.T("The uninstall window could not start.\n\n{error}", "error", ex), null);
                 Native.DestroyWindow(_hwnd);
             }
         }
@@ -217,7 +217,7 @@ namespace ReplayKitSetup
         private void OnFlowFailed(string message)
         {
             _done = true;
-            string shown = (message ?? "unknown error") + "  (log: " + SetupLog.Path + ")";
+            string shown = SetupLocale.T("{message}  (log: {path})", "message", SetupLocale.T(message ?? "unknown error"), "path", SetupLog.Path);
             PostToPage(new JObject { ["type"] = "failed", ["message"] = shown });
         }
 

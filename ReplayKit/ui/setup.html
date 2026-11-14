@@ -257,6 +257,10 @@
     <section class="panel" data-step="1" hidden>
       <div class="box-title">Welcome to OBS ReplayKit</div>
       <div class="box-lead">A few quick choices and you are set. Everything here can be changed later in ReplayKit Settings, which opens from the OBS window or the tray menu.</div>
+      <div class="form-row">
+        <div class="label">Language <span class="control-note">The language of ReplayKit and OBS. OBS restarts in it when you finish.</span></div>
+        <div class="field-wrap"><div class="combo" id="language" tabindex="0" role="combobox" aria-expanded="false" aria-label="Language"><button class="combo-button" type="button"><span class="combo-label" translate="no"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox" translate="no"></div></div></div>
+      </div>
     </section>
 
     <section class="panel" data-step="2" hidden>
@@ -264,7 +268,7 @@
       <div class="form-row">
         <div class="label">Recording Path</div>
         <div class="field-wrap">
-          <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Videos">
+          <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Videos" translate="no">
           <button class="icon-btn field-browse" type="button" id="browseClipDir" title="Choose folder">
             <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
           </button>
@@ -322,7 +326,7 @@
         <div class="hotkey-section">Clipping</div>
         <div class="hotkey-row">
           <div class="label">Save Clip</div>
-          <div class="hotkey-input" id="clipKeybind" tabindex="0" role="textbox" aria-label="Save Clip hotkey"></div>
+          <div class="hotkey-input" id="clipKeybind" translate="no" tabindex="0" role="textbox" aria-label="Save Clip hotkey"></div>
           <div class="hotkey-actions">
             <button class="icon-btn" type="button" data-reset="clipKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
             <button class="icon-btn" type="button" data-clear="clipKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
@@ -331,7 +335,7 @@
         <div class="hotkey-section">Recording</div>
         <div class="hotkey-row">
           <div class="label">Start / Stop Recording</div>
-          <div class="hotkey-input" id="recordingKeybind" tabindex="0" role="textbox" aria-label="Start or Stop Recording hotkey"></div>
+          <div class="hotkey-input" id="recordingKeybind" translate="no" tabindex="0" role="textbox" aria-label="Start or Stop Recording hotkey"></div>
           <div class="hotkey-actions">
             <button class="icon-btn" type="button" data-reset="recordingKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
             <button class="icon-btn" type="button" data-clear="recordingKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
@@ -340,7 +344,7 @@
         <div class="hotkey-section">Clips</div>
         <div class="hotkey-row">
           <div class="label">Open Clips</div>
-          <div class="hotkey-input" id="openClipsKeybind" tabindex="0" role="textbox" aria-label="Open clips hotkey"></div>
+          <div class="hotkey-input" id="openClipsKeybind" translate="no" tabindex="0" role="textbox" aria-label="Open clips hotkey"></div>
           <div class="hotkey-actions">
             <button class="icon-btn" type="button" data-reset="openClipsKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
             <button class="icon-btn" type="button" data-clear="openClipsKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
@@ -443,6 +447,7 @@
     recordingPreset: document.getElementById("recordingPreset"),
     captureDisplay: document.getElementById("captureDisplay"),
     recordingBuffer: document.getElementById("recordingBuffer"),
+    language: document.getElementById("language"),
     toggleAdvanced: document.getElementById("toggleAdvanced"),
     recordingAdvanced: document.getElementById("recordingAdvanced"),
     replaySeconds: document.getElementById("replaySeconds"),
@@ -453,6 +458,7 @@
   };
 
   const state = {
+    language: window.RK_LANG || "en-US",
     clipDir: "",
     recordingPreset: "balanced",
     captureDisplay: "primary",
@@ -546,12 +552,32 @@
         const delta = e.key === "ArrowDown" ? 1 : -1;
         setComboValue(combo, options[(current + delta + options.length) % options.length].value, true);
       }
+      else if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // a letter goes to the next option that starts with it, by its own name or the second name it carries
+        e.preventDefault();
+        const letter = e.key.toLowerCase();
+        for (let offset = 1; offset <= options.length; offset++) {
+          const next = options[(current + offset) % options.length];
+          if (![next.label, next.alias].some((name) => String(name || "").trim().toLowerCase().startsWith(letter))) continue;
+          setComboValue(combo, next.value, true);
+          const row = combo.querySelector(".combo-option.is-selected");
+          if (row && combo.classList.contains("is-open")) row.scrollIntoView({ block:"nearest" });
+          break;
+        }
+      }
     });
   });
   document.addEventListener("click", () => closeCombos());
   els.recordingPreset.addEventListener("combochange", () => { state.recordingPreset = comboValue(els.recordingPreset); });
   els.captureDisplay.addEventListener("combochange", () => { state.captureDisplay = comboValue(els.captureDisplay) || "primary"; });
   els.recordingBuffer.addEventListener("combochange", () => { state.recordingBuffer = comboValue(els.recordingBuffer) || "disk"; });
+  // the wizard shows the picked language at once; obs and the rest of replaykit take it on the restart that finishing triggers
+  els.language.addEventListener("combochange", () => {
+    const code = comboValue(els.language);
+    if (!code || code === state.language) return;
+    state.language = code;
+    if (window.RK_I18N) RK_I18N.use(code).catch(() => setStatus(RK_T("This language could not be shown yet. It will be used after OBS restarts."), "bad"));
+  });
   els.toggleAdvanced.addEventListener("click", () => {
     const open = els.recordingAdvanced.hidden;
     els.recordingAdvanced.hidden = !open;
@@ -775,6 +801,7 @@
     setTabsDisabled(true);
     setStatus("Saving...");
     const payload = {
+      language: state.language,
       clipDir: state.clipDir,
       recordingPreset: state.recordingPreset,
       captureDisplay: state.captureDisplay,
@@ -803,14 +830,14 @@
       const restarting = res && res.restartRequired;
       showStep("done");
       els.doneMsg.textContent = restarting
-        ? "ReplayKit is ready. OBS will restart now to finish applying the theme."
+        ? "ReplayKit is ready. OBS will restart now to finish applying your choices."
         : "ReplayKit is ready. This window will close on its own.";
       setTimeout(closeWindow, restarting ? 1200 : 2400);
     } catch (e) {
       els.nextBtn.disabled = false;
       els.backBtn.disabled = false;
       setTabsDisabled(false);
-      setStatus("Could not save: " + String(e.message || e).replace(/[.\s]+$/, "") + ". Press Finish to try again.", "bad");
+      setStatus(RK_T("Could not save: {error}. Press Finish to try again.", { error: String(e.message || e).replace(/[.\s]+$/, "") }), "bad");
     }
   }
 
@@ -830,6 +857,7 @@
       opts = s.options || {};
       if (s.defaultClipDir) els.clipDir.placeholder = s.defaultClipDir;
       const g = s.settings || {};
+      if (typeof g.language === "string" && g.language) state.language = g.language;
       if (typeof g.clipDir === "string") state.clipDir = g.clipDir;
       if (g.recordingPreset) state.recordingPreset = g.recordingPreset;
       if (typeof g.captureDisplay === "string" && g.captureDisplay) state.captureDisplay = g.captureDisplay;
@@ -847,6 +875,9 @@
     // noise suppression starts ticked even when obs has no filter yet; finishing the wizard is what applies it
     state.micNoiseSuppression = true;
 
+    // the languages obs ships, each under its own name, with the english name to jump to by letter as well
+    fillCombo(els.language, (window.RK_LANGUAGES || [{ code:"en-US", name:"English", englishName:"English" }]).map((l) => ({ value:l.code, label:l.name, alias:l.englishName })));
+    setComboValue(els.language, state.language, false);
     fillCombo(els.recordingPreset, opts.recordingPresets || [
       { value:"performance", label:"Performance", blurb:"720p30. Lowest load." },
       { value:"balanced", label:"Balanced", blurb:"1080p60. Recommended." },

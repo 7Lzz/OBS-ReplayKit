@@ -386,7 +386,7 @@
       button.className = "grad-target" + (entry.key === gradientTarget ? " is-active" : "") + (on ? " has-gradient" : "");
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", entry.key === gradientTarget ? "true" : "false");
-      button.dataset.tooltip = on ? entry.label + " uses a gradient" : entry.label + " is a flat color";
+      button.dataset.tooltip = on ? RK_T("{target} uses a gradient", { target: RK_T(entry.label) }) : RK_T("{target} is a flat color", { target: RK_T(entry.label) });
       button.innerHTML = '<span class="grad-target-dot"></span>';
       button.appendChild(document.createTextNode(entry.label));
       button.addEventListener("click", () => {
@@ -403,7 +403,7 @@
   function loadGradientEditor() {
     const spec = currentGradient();
     const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
-    els.themeGradientEnabledLabel.textContent = "Use a gradient for " + label;
+    els.themeGradientEnabledLabel.textContent = RK_T("Use a gradient for {target}", { target: RK_T(label) });
     els.themeGradientEnabled.checked = !!spec.enabled;
     els.themeGradientEditor.hidden = !spec.enabled;
     setComboValue(els.themeGradientType, spec.type === "radial" ? "radial" : "linear", false);
@@ -506,8 +506,8 @@
       handle.className = "grad-ramp-handle" + (stop === selectedGradientStop ? " is-selected" : "");
       handle.style.left = stop.position + "%";
       handle.style.setProperty("--color", stop.color);
-      handle.dataset.tooltip = stop.color + " at " + stop.position + "%";
-      handle.setAttribute("aria-label", "Gradient stop " + (index + 1) + ", " + stop.color + " at " + stop.position + "%");
+      handle.dataset.tooltip = RK_T("{color} at {position}%", { color: stop.color, position: stop.position });
+      handle.setAttribute("aria-label", RK_T("Gradient stop {number}, {color} at {position}%", { number: index + 1, color: stop.color, position: stop.position }));
 
       // a press that never moves is a recolor; anything that moves is a drag. distinguishing them here is what lets one handle do both without a separate edit button.
       handle.addEventListener("pointerdown", (event) => {
@@ -525,7 +525,7 @@
           moved = true;
           stop.position = next;
           live.style.left = next + "%";
-          live.dataset.tooltip = stop.color + " at " + next + "%";
+          live.dataset.tooltip = RK_T("{color} at {position}%", { color: stop.color, position: next });
           updateGradientPreview();
           applyThemeEditorChange();
         };
@@ -534,7 +534,7 @@
           live.removeEventListener("pointerup", up);
           live.classList.remove("is-dragging");
           if (moved) renderGradientStops();
-          else openColorDialog(stop.color, "Gradient stop " + (index + 1), (value) => {
+          else openColorDialog(stop.color, RK_T("Gradient stop {number}", { number: index + 1 }), (value) => {
             stop.color = cleanHexColor(value, stop.color);
             renderGradientStops();
             applyThemeEditorChange();
@@ -645,6 +645,7 @@
     tile.dataset.id = id;
     const lab = document.createElement("span");
     lab.className = "icon-tile-label";
+    if (deletable) lab.setAttribute("translate", "no");
     lab.textContent = label;
     tile.append(sw ? themeSwatchEl(sw) : (function () { const s = document.createElement("span"); s.className = "icon-tile-swatch"; s.textContent = "＋"; return s; })(), lab);
     tile.addEventListener("click", () => selectTheme(id));
@@ -652,7 +653,7 @@
       const edit = document.createElement("span");
       edit.className = "icon-tile-edit";
       edit.setAttribute("role", "button");
-      edit.setAttribute("aria-label", "Edit " + label);
+      edit.setAttribute("aria-label", RK_T("Edit {name}", { name: label }));
       edit.dataset.tooltip = "Edit";
       edit.innerHTML = THEME_EDIT_SVG;
       edit.addEventListener("click", (e) => { e.stopPropagation(); editUserTheme(id); });
@@ -660,7 +661,7 @@
       const del = document.createElement("span");
       del.className = "icon-tile-del";
       del.setAttribute("role", "button");
-      del.setAttribute("aria-label", "Remove " + label);
+      del.setAttribute("aria-label", RK_T("Remove {name}", { name: label }));
       del.dataset.tooltip = "Remove";
       del.innerHTML = APPICON_X_SVG;
       del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
@@ -766,7 +767,7 @@
   els.themeGradientRamp.addEventListener("pointerdown", (event) => {
     if (event.target.closest(".grad-ramp-handle")) return;
     if (gradientStops.length >= GRADIENT_MAX_STOPS) {
-      setStatus("A gradient can have at most " + GRADIENT_MAX_STOPS + " stops.", "bad");
+      setStatus(RK_T("A gradient can have at most {count} stops.", { count: GRADIENT_MAX_STOPS }), "bad");
       return;
     }
     const position = gradientPositionFromEvent(event);
@@ -787,7 +788,7 @@
   });
   els.themeCustomDark.addEventListener("change", applyThemeEditorChange);
   els.openThemeClipsBtn.addEventListener("click", () => {
-    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus("Could not open Clips: " + (error.message || error), "bad"));
+    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus(RK_T("Could not open Clips: {error}", { error: error.message || error }), "bad"));
   });
   // cancelling an edit closes the editor and drops the unsaved colours back to whatever the preset actually holds
   els.cancelThemeEditBtn.addEventListener("click", () => {
@@ -845,6 +846,7 @@
     else { swatch = document.createElement("span"); swatch.className = "icon-tile-swatch"; swatch.textContent = glyph || ""; }
     const lab = document.createElement("span");
     lab.className = "icon-tile-label";
+    if (deletable) lab.setAttribute("translate", "no");
     lab.textContent = label;
     tile.append(swatch, lab);
     tile.addEventListener("click", () => selectAppIcon(id));
@@ -852,7 +854,7 @@
       const del = document.createElement("span");
       del.className = "icon-tile-del";
       del.setAttribute("role", "button");
-      del.setAttribute("aria-label", "Remove " + label);
+      del.setAttribute("aria-label", RK_T("Remove {name}", { name: label }));
       del.title = "Remove";
       del.innerHTML = APPICON_X_SVG;
       del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserIcon(id); });

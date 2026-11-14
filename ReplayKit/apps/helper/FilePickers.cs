@@ -14,8 +14,8 @@ namespace ReplayKitHelper
             public IntPtr Handle { get; }
         }
 
-        internal const string FolderPickerTitle = "Choose the recordings folder";
-        internal const string FilePickerTitle = "Choose an icon image";
+        internal static string FolderPickerTitle => Locales.Message("picker.recordingFolder");
+        internal static string FilePickerTitle => Locales.Message("picker.iconImage");
 
         // blocking modal picker on a one-shot STA thread (winforms dialogs need STA + a pump). parents to the ReplayKit Settings popup if its open. "" on cancel/error.
         internal static string PickPath(bool folder, string filter, string initial)
@@ -25,20 +25,22 @@ namespace ReplayKitHelper
             {
                 try
                 {
+                    string folderTitle = FolderPickerTitle;
+                    string fileTitle = FilePickerTitle;
                     IntPtr ownerHwnd = Native.FindReplayKitSettingsWindow();
                     // show() below blocks this thread while the dialog is up, so bring it to the front from a watcher -- the helper is a separate process and the dialog otherwise opens behind OBS.
-                    var raiser = new Thread(() => Native.RaiseOwnDialog(folder ? FolderPickerTitle : FilePickerTitle))
+                    var raiser = new Thread(() => Native.RaiseOwnDialog(folder ? folderTitle : fileTitle))
                     { IsBackground = true, Name = "picker-raise" };
                     raiser.Start();
 
                     if (folder)
                     {
-                        result = PickFolderModern(ownerHwnd, initial);
+                        result = PickFolderModern(ownerHwnd, initial, folderTitle);
                     }
                     else
                     {
                         System.Windows.Forms.IWin32Window owner = ownerHwnd == IntPtr.Zero ? null : new OwnerWindow(ownerHwnd);
-                        using (var d = new System.Windows.Forms.OpenFileDialog { Filter = filter, CheckFileExists = true, Title = FilePickerTitle })
+                        using (var d = new System.Windows.Forms.OpenFileDialog { Filter = filter, CheckFileExists = true, Title = fileTitle })
                         {
                             if (!string.IsNullOrEmpty(initial) && File.Exists(initial)) d.FileName = initial;
                             if (d.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK) result = d.FileName;
@@ -54,15 +56,22 @@ namespace ReplayKitHelper
             return result;
         }
 
-        internal const string AudioPickerTitle = "Import audio";
+        internal static string AudioPickerTitle => Locales.Message("picker.importAudio");
         // the containers of video are listed too, since the sound of a video file can be taken out and used
-        internal const string AudioFilter = "Audio files|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|All files (*.*)|*.*";
+        internal static string AudioFilter => Locales.T("Audio files") + "|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|" + AllFiles;
 
-        internal const string MediaPickerTitle = "Add a GIF or image";
-        internal const string MediaFilter = "GIFs and images|*.gif;*.png;*.jpg;*.jpeg|All files (*.*)|*.*";
+        internal static string MediaPickerTitle => Locales.Message("picker.importMedia");
+        internal static string MediaFilter => Locales.T("GIFs and images") + "|*.gif;*.png;*.jpg;*.jpeg|" + AllFiles;
 
-        internal const string VideoPickerTitle = "Add a video";
-        internal const string VideoFilter = "Videos|*.mp4;*.m4v;*.mov;*.mkv;*.webm|All files (*.*)|*.*";
+        internal static string VideoPickerTitle => Locales.Message("picker.importVideo");
+        internal static string ImagesFilter => Locales.T("Images") + "|*.png;*.jpg;*.jpeg;*.bmp;*.gif|" + AllFiles;
+
+        internal static string IconFilter => Locales.T("Images (*.ico;*.png;*.jpg;*.bmp)") + "|*.ico;*.png;*.jpg;*.jpeg;*.bmp|" + AllFiles;
+
+        internal static string VideoFilter => Locales.T("Videos") + "|*.mp4;*.m4v;*.mov;*.mkv;*.webm|" + AllFiles;
+
+        // the catch-all filter entry shared by every picker, pattern kept
+        private static string AllFiles => Locales.T("All files (*.*)") + "|*.*";
 
         internal static string[] PickAudioFiles() => PickFiles(AudioPickerTitle, AudioFilter);
 
@@ -93,7 +102,7 @@ namespace ReplayKitHelper
         }
 
         // modern folder picker -- IFileOpenDialog with FOS_PICKFOLDERS, the same Explorer-style chrome as the icon file picker. the net48 WinForms FolderBrowserDialog is the legacy tree-view control. STA-only; the caller already runs this on a one-shot STA thread. "" on cancel or any failure.
-        internal static string PickFolderModern(IntPtr owner, string initial)
+        internal static string PickFolderModern(IntPtr owner, string initial, string title)
         {
             IFileOpenDialog dlg = null;
             try
@@ -101,7 +110,7 @@ namespace ReplayKitHelper
                 dlg = (IFileOpenDialog)new FileOpenDialogClass();
                 dlg.GetOptions(out uint opts);
                 dlg.SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
-                dlg.SetTitle(FolderPickerTitle);
+                dlg.SetTitle(title);
                 if (!string.IsNullOrEmpty(initial) && Directory.Exists(initial) &&
                     SHCreateItemFromParsingName(initial, IntPtr.Zero, typeof(IShellItem).GUID, out IShellItem seed) == 0 && seed != null)
                 {

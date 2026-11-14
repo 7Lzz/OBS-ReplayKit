@@ -154,14 +154,14 @@
 
   function lengthText(seconds) {
     const v = Math.max(0, Math.round(seconds || 0));
-    if (v < 60) return v + "s";
+    if (v < 60) return RK_T("{seconds}s", { seconds: v });
     const m = Math.floor(v / 60), s = v % 60;
-    return s === 0 ? (m + "m") : (m + "m " + s + "s");
+    return s === 0 ? RK_T("{minutes}m", { minutes: m }) : RK_T("{minutes}m {seconds}s", { minutes: m, seconds: s });
   }
 
   function infoText() {
     if (kind === "clip" && clipShown() === false) return "Clipping is off, nothing is being kept";
-    if (kind === "clip") return "Save the last " + lengthText(settings.replaySeconds || 90) + " of gameplay";
+    if (kind === "clip") return RK_T("Save the last {length} of gameplay", { length: lengthText(settings.replaySeconds || 90) });
     return "Start and stop a recording of any length";
   }
 
@@ -177,6 +177,8 @@
     else if (phase === "listening") { text = "Press a key combination"; state = "is-listening"; }
     else if (phase === "saving") { text = "Saving..."; state = "is-hint is-busy"; }
     else if (flashText) { text = flashText; state = "is-error"; }
+    // a key combination is not ui text, so it stays out of the translator
+    if (label && text === label) els.keyLabel.setAttribute("translate", "no"); else els.keyLabel.removeAttribute("translate");
     els.keyLabel.textContent = text;
     els.key.className = "key" + (state ? " " + state : "");
     const shown = clipShown();

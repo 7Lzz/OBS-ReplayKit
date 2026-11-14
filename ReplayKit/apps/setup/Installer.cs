@@ -303,6 +303,25 @@ namespace ReplayKitSetup
                     log?.Invoke($"warn: could not remove legacy {rel.Replace('\\', '/')}: {ex.Message}");
                 }
             }
+            string localeDir = Path.Combine(Config.REPLAYKIT_CONFIG, "locale");
+            try
+            {
+                if (Directory.Exists(localeDir) && (File.GetAttributes(localeDir) & FileAttributes.ReparsePoint) == 0)
+                {
+                    foreach (string file in Directory.EnumerateFiles(localeDir, "*.json"))
+                    {
+                        string code = Path.GetFileNameWithoutExtension(file);
+                        if (!LanguageMatch.IsCode(code) || LanguageMatch.IsSupported(code)) continue;
+                        File.Delete(file);
+                        removed++;
+                        log?.Invoke("removed legacy locale: " + code);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                log?.Invoke("warn: could not remove legacy locale files: " + ex.Message);
+            }
             return removed;
         }
 

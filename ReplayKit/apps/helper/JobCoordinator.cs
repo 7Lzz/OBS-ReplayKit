@@ -190,7 +190,7 @@ namespace ReplayKitHelper
                 int running = Jobs.Values.Count(j => !j.Instant);
                 if (!instant && running >= Constants.MAX_CONCURRENT_VIDEO_JOBS)
                 {
-                    message = "Already running " + running + " clip operations";
+                    message = Locales.T("Already running {count} clip operations", "count", running);
                     return null;
                 }
                 var job = new Reservation(requestId, paths, instant);

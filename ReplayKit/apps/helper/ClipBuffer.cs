@@ -153,7 +153,7 @@ namespace ReplayKitHelper
             // the save sound and toast already went out on the press, so a clip that did not make it says so where it stays seen
             if (result["ok"]?.Value<bool>() != true && result["message"]?.Value<string>() != BusyMessage)
             {
-                try { Notifications.Add("warning", "clip-save-failed", "A clip was not saved", result["message"]?.Value<string>() ?? "The clip could not be saved."); }
+                try { Notifications.Add("warning", "clip-save-failed", Locales.T("A clip was not saved"), result["message"]?.Value<string>() ?? Locales.T("The clip could not be saved.")); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("clip save notice: " + ex.Message); }
             }
             return result;
@@ -196,7 +196,7 @@ namespace ReplayKitHelper
                 try { Directory.CreateDirectory(clipDir); Log.Write("clip folder was missing, made it again: " + clipDir); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { Log.Write("clip folder could not be made: " + ex.Message); }
             }
-            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail("The clip folder " + clipDir + " was not found and could not be made, so the clip was lost. Check that its drive is connected, or pick another folder in Settings.");
+            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail(Locales.T("The clip folder {clipDir} was not found and could not be made, so the clip was lost. Check that its drive is connected, or pick another folder in Settings.", "clipDir", clipDir));
             string ffmpeg = Compression.FindCompressionFfmpeg();
             string ffprobe = Compression.FindCompressionFfprobe();
             if (!File.Exists(ffmpeg) || !File.Exists(ffprobe)) return Fail("ffmpeg is missing, so the clip could not be saved.");
@@ -261,17 +261,18 @@ namespace ReplayKitHelper
                 File.Move(part, target);
                 part = null;
                 if (folder.Length > 0) Clips.RegisterGameFolder(target);
-                try { ClipGames.SavedDisk(target, id, files, lengths); }
+                double? duration = ProbeSavedDuration(target);
+                try { ClipGames.SavedDisk(target, id, files, lengths, duration ?? 0); }
                 catch (Exception ex) { Log.Write("Clip capture metadata unavailable: " + ex.GetType().Name); }
                 // said as soon as the file is in the folder, so a page that already lists the clip also reads that its save ended
                 MarkSaveEnded(id, Path.GetFileName(target));
                 Log.Write("clip buffer save: " + (files.Count - first) + " of " + files.Count + " piece(s), " + lengths.Sum().ToString("0.0", CultureInfo.InvariantCulture) + " s buffered -> " + target);
-                return new JObject { ["ok"] = true, ["path"] = target };
+                return new JObject { ["ok"] = true, ["path"] = target, ["duration"] = duration };
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 Log.Write("clip buffer save: " + ex.Message);
-                return Fail("The clip could not be written: " + ex.Message);
+                return Fail(Locales.T("The clip could not be written: {error}", "error", ex.Message));
             }
             finally
             {
@@ -298,9 +299,27 @@ namespace ReplayKitHelper
             }
         }
 
-        private static double ProbeSeconds(string ffprobe, string file)
+        internal static double? ProbeSavedDuration(string file)
         {
-            var run = Compression.InvokeNativeCapture(ffprobe, new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file }, CancellationToken.None, 15000);
+            string ffprobe = Path.Combine(Constants.HelperRoot, "ffprobe.exe");
+            if (!File.Exists(ffprobe)) return null;
+            try
+            {
+                if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0) return null;
+                double seconds = ProbeSeconds(ffprobe, file, 2500);
+                return seconds > 0 && !double.IsInfinity(seconds) ? seconds : (double?)null;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                ex is System.ComponentModel.Win32Exception || ex is TimeoutException || ex is InvalidOperationException)
+            {
+                Log.Write("Could not read saved clip duration: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static double ProbeSeconds(string ffprobe, string file, int timeoutMs = 15000)
+        {
+            var run = Compression.InvokeNativeCapture(ffprobe, new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file }, CancellationToken.None, timeoutMs);
             string line = run.Output.LastOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim();
             return run.ExitCode == 0 && double.TryParse(line, NumberStyles.Float, CultureInfo.InvariantCulture, out double seconds) && seconds >= 0 ? seconds : -1;
         }

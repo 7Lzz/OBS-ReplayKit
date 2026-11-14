@@ -270,7 +270,7 @@ namespace ReplayKitHelper
             { Log.Write("Invalid capture save boundary rejected."); }
         }
 
-        internal static void SavedDisk(string file, long id, IList<string> files, IList<double> lengths)
+        internal static void SavedDisk(string file, long id, IList<string> files, IList<double> lengths, double duration)
         {
             if (!RecognitionOn()) return;
             SaveBounds saved = null;
@@ -284,7 +284,6 @@ namespace ReplayKitHelper
             for (int i = 0; i < files.Count; i++)
                 if (!string.Equals(Path.GetFullPath(saved.Pieces[i]["path"].Value<string>()), Path.GetFullPath(files[i]), StringComparison.OrdinalIgnoreCase))
                 { Log.Write("Clip saved without capture evidence: native piece list differs."); return; }
-            double duration = Trim.ProbeVideo(file)?.Duration ?? 0;
             var capture = CaptureTimeline.Pieces(saved.Pieces, lengths, duration);
             var last = saved.Pieces.Last;
             RobloxExperiences.Attach(capture, last?["e"]?.Value<long>() ?? 0);

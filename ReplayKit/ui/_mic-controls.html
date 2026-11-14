@@ -142,10 +142,13 @@
       opts.push({ value:st.micDeviceId, label:"Unavailable device", blurb:"not connected" });
     return opts;
   }
+  // device names are user content; the built in Default and Unavailable entries are ui text
+  function isDeviceOption(o) { return o.value !== "default" && o.label !== "Unavailable device"; }
   function renderCombo() {
     var opts = deviceOptions();
     var cur = String(st.micDeviceId || "default").toLowerCase();
     var sel = opts.find(function (o) { return o.value.toLowerCase() === cur; }) || opts[0];
+    if (isDeviceOption(sel)) comboLabel.setAttribute("translate", "no"); else comboLabel.removeAttribute("translate");
     comboLabel.textContent = sel.label;
     var sig = sel.value + "|" + JSON.stringify(opts);
     // rebuilding the open menu replays the option animation, so only touch it when something actually changed
@@ -154,7 +157,7 @@
     comboMenu.innerHTML = opts.map(function (o) {
       var blurb = o.blurb ? '<span class="option-blurb">- ' + esc(o.blurb) + "</span>" : "";
       var on = o === sel;
-      return '<div class="combo-option' + (on ? " is-selected" : "") + '" role="option" aria-selected="' + on + '" data-v="' + esc(o.value) + '"><span>' + esc(o.label) + "</span>" + blurb + "</div>";
+      return '<div class="combo-option' + (on ? " is-selected" : "") + '" role="option" aria-selected="' + on + '" data-v="' + esc(o.value) + '"><span' + (isDeviceOption(o) ? ' translate="no"' : "") + ">" + esc(o.label) + "</span>" + blurb + "</div>";
     }).join("");
   }
   function loadDevices() {
@@ -236,10 +239,10 @@
   resetVol.addEventListener("click", function () { commitVolume(DEF.micVolume); });
 
   // the far left of the bar is the gate being off, so it reads Off instead of a decibel value
-  function sensText(v) { return v <= SENS_MIN ? "Off" : v + " dB"; }
+  function sensText(v) { return v <= SENS_MIN ? RK_T("Off") : RK_T("{value} dB", { value: v }); }
   function parseSens(text) {
     var t = String(text).trim().toLowerCase();
-    if (t === "off") return SENS_MIN;
+    if (t === "off" || t === RK_T("Off").toLowerCase()) return SENS_MIN;
     var n = parseInt(t.replace(/[^\d-]/g, ""), 10);
     return Number.isFinite(n) ? clampSens(n) : null;
   }

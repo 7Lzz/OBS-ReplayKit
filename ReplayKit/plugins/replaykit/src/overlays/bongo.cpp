@@ -1,5 +1,6 @@
 #include "prelude.hpp"
 #include "overlays/bongo.hpp"
+#include "core/locale.hpp"
 #include "overlays/bongo_animation.hpp"
 #include "overlays/bongo_input.hpp"
 #include "overlays/bongo_model.hpp"
@@ -719,11 +720,17 @@ struct Bongo {
 
 };
 
+// obs copies a property label as it is added, so the buffer only has to live through that call
+QByteArray Label(const char *english)
+{
+	return Tr(english).toUtf8();
+}
+
 // the properties of VtuberGetProperties in its order; the mode list is the readable modes of the config, so it also works when obs asks without a source
 obs_properties_t *Properties()
 {
 	obs_properties_t *props = obs_properties_create();
-	obs_property_t *list = obs_properties_add_list(props, "mode", "Mode", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	obs_property_t *list = obs_properties_add_list(props, "mode", Label("Mode").constData(), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	const QString root = BangoCatFolder();
 	for (const QString &name : Strings(ReadJson(QDir(root).filePath(QStringLiteral("mode/config.json")))["ModelPath"])) {
 		if (ReadJson(QDir(root).filePath(QStringLiteral("mode/") + name + QStringLiteral("/config.json"))).isEmpty())
@@ -731,17 +738,17 @@ obs_properties_t *Properties()
 		const QByteArray utf8 = name.toUtf8();
 		obs_property_list_add_string(list, utf8.constData(), utf8.constData());
 	}
-	obs_properties_add_bool(props, "relative_mouse", "Relative Mouse Movement");
-	obs_properties_add_bool(props, "mouse_horizontal_flip", "Mouse Horizontal Flip");
-	obs_properties_add_bool(props, "mouse_vertical_flip", "Mouse Vertical Flip");
-	obs_properties_add_bool(props, "mask", "Use Mask");
-	obs_properties_add_bool(props, "live2d", "Live2D");
-	obs_properties_add_float_slider(props, "delay", "Speed", 0.0, 10.0, 0.1);
+	obs_properties_add_bool(props, "relative_mouse", Label("Relative Mouse Movement").constData());
+	obs_properties_add_bool(props, "mouse_horizontal_flip", Label("Mouse Horizontal Flip").constData());
+	obs_properties_add_bool(props, "mouse_vertical_flip", Label("Mouse Vertical Flip").constData());
+	obs_properties_add_bool(props, "mask", Label("Use Mask").constData());
+	obs_properties_add_bool(props, "live2d", Label("Live2D").constData());
+	obs_properties_add_float_slider(props, "delay", Label("Speed").constData(), 0.0, 10.0, 0.1);
 	// kept for the same settings, but no Bango Cat model ships motions, so it changes nothing in the plugin either
-	obs_properties_add_bool(props, "random_motion", "Random Motion");
-	obs_properties_add_bool(props, "breath", "Breath");
-	obs_properties_add_bool(props, "eyeblink", "Eye Blink");
-	obs_properties_add_bool(props, "track", "Mouse Tracking");
+	obs_properties_add_bool(props, "random_motion", Label("Random Motion").constData());
+	obs_properties_add_bool(props, "breath", Label("Breath").constData());
+	obs_properties_add_bool(props, "eyeblink", Label("Eye Blink").constData());
+	obs_properties_add_bool(props, "track", Label("Mouse Tracking").constData());
 	return props;
 }
 

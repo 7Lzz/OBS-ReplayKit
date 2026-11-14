@@ -227,8 +227,8 @@ namespace ReplayKitHelper
                     ["overlay"] = true,
                 }, 3000);
                 if (set.Ok) { if (!applied.Contains("Mouse cursor")) applied.Add("Mouse cursor"); }
-                else if (set.Unavailable) { warnings.Add("Mouse cursor was saved, but OBS could not be reached: " + set.Message); break; }
-                else if (set.Code != 600) warnings.Add("Mouse cursor was saved, but the " + target[0] + " could not be updated: " + set.Message);
+                else if (set.Unavailable) { warnings.Add(Locales.T("Mouse cursor was saved, but OBS could not be reached: {error}", "error", set.Message)); break; }
+                else if (set.Code != 600) warnings.Add(Locales.T("Mouse cursor was saved, but the {target} could not be updated: {error}", "target", target[0], "error", set.Message));
             }
             return new JObject { ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -400,17 +400,17 @@ namespace ReplayKitHelper
 
             var gameInputSettings = GetGameCaptureInputSettings(settings);
             var displayEnsure = EnsureInputSceneItem(sceneName, "Display Capture", "monitor_capture", DisplayCaptureMethodSettings(), useDesktop);
-            if (displayEnsure["ok"]?.Value<bool>() != true) warnings.Add("Could not prepare Display Capture: " + displayEnsure["message"]);
+            if (displayEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not prepare Display Capture: {error}", "error", displayEnsure["message"]));
             var display = displayEnsure["ok"]?.Value<bool>() == true ? (JObject)displayEnsure["item"] : FindSceneItem(items, "Display Capture");
             var gameEnsure = EnsureInputSceneItem(sceneName, "Game Capture", "game_capture", gameInputSettings, useGameCapture);
-            if (gameEnsure["ok"]?.Value<bool>() != true) warnings.Add("Could not prepare Game Capture: " + gameEnsure["message"]);
+            if (gameEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not prepare Game Capture: {error}", "error", gameEnsure["message"]));
             var game = gameEnsure["ok"]?.Value<bool>() == true ? (JObject)gameEnsure["item"] : FindSceneItem(items, "Game Capture");
 
             var windowSettings = GetWindowCaptureInputSettings(settings);
             // in automatic mode the capture switch script picks the window; writing the specific game window here pointed the capture at whatever that setting last held while the script still believed it showed its game
             if (mode == "hybrid_auto") windowSettings.Remove("window");
             var windowEnsure = EnsureInputSceneItem(sceneName, "Window Capture", "window_capture", windowSettings, useWindowCapture);
-            if (windowEnsure["ok"]?.Value<bool>() != true) warnings.Add("Could not prepare Window Capture: " + windowEnsure["message"]);
+            if (windowEnsure["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not prepare Window Capture: {error}", "error", windowEnsure["message"]));
             itemsResult = GetSceneItems(sceneName);
             if (itemsResult["ok"]?.Value<bool>() == true) items = itemsResult["items"] as JArray;
             var window = FindSceneItem(items, "Window Capture");
@@ -418,33 +418,33 @@ namespace ReplayKitHelper
             if (!useDesktop)
             {
                 var hideDesktop = SetSceneItemEnabled(sceneName, display, false);
-                if (hideDesktop["ok"]?.Value<bool>() != true) warnings.Add("Could not hide Display Capture: " + hideDesktop["message"]);
+                if (hideDesktop["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not hide Display Capture: {error}", "error", hideDesktop["message"]));
             }
 
             var cursorResult = SetDisplayCaptureCursorLive(settings);
-            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add("Could not update the Display Capture cursor: " + cursorResult["message"]);
+            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not update the Display Capture cursor: {error}", "error", cursorResult["message"]));
 
             var setGame = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Game Capture", ["inputSettings"] = gameInputSettings, ["overlay"] = true }, 3000);
-            if (!setGame.Ok) warnings.Add("Could not update Game Capture settings: " + setGame.Message);
+            if (!setGame.Ok) warnings.Add(Locales.T("Could not update Game Capture settings: {error}", "error", setGame.Message));
 
             var setWindow = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = "Window Capture", ["inputSettings"] = windowSettings, ["overlay"] = true }, 3000);
-            if (!setWindow.Ok) warnings.Add("Could not update Window Capture settings: " + setWindow.Message);
+            if (!setWindow.Ok) warnings.Add(Locales.T("Could not update Window Capture settings: {error}", "error", setWindow.Message));
 
             if (useWindowCapture && string.IsNullOrWhiteSpace(settings["screenshareGameWindow"]?.Value<string>()))
                 warnings.Add("Specific game capture was selected without a game window.");
 
             var enableGame = SetSceneItemEnabled(sceneName, game, useGameCapture);
-            if (enableGame["ok"]?.Value<bool>() != true) warnings.Add("Could not toggle Game Capture: " + enableGame["message"]);
+            if (enableGame["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not toggle Game Capture: {error}", "error", enableGame["message"]));
             var enableWindow = SetSceneItemEnabled(sceneName, window, useWindowCapture);
-            if (enableWindow["ok"]?.Value<bool>() != true) warnings.Add("Could not toggle Window Capture: " + enableWindow["message"]);
+            if (enableWindow["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not toggle Window Capture: {error}", "error", enableWindow["message"]));
             if (useDesktop)
             {
                 var enableDisplay = SetSceneItemEnabled(sceneName, display, true);
-                if (enableDisplay["ok"]?.Value<bool>() != true) warnings.Add("Could not show Display Capture: " + enableDisplay["message"]);
+                if (enableDisplay["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not show Display Capture: {error}", "error", enableDisplay["message"]));
             }
 
             var order = SetWindowCaptureSceneOrder(sceneName, items);
-            if (order["ok"]?.Value<bool>() != true) warnings.Add("Could not position Window Capture under overlays: " + order["message"]);
+            if (order["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not position Window Capture under overlays: {error}", "error", order["message"]));
 
             if (preset != null)
             {
@@ -453,7 +453,7 @@ namespace ReplayKitHelper
                     var capture = FindSceneItem(items, captureName);
                     var captureTransform = MainCaptureTransform(captureName, preset);
                     var captureResult = SetSceneItemTransform(sceneName, capture, captureTransform);
-                    if (captureResult["ok"]?.Value<bool>() != true) warnings.Add("Could not fit " + captureName + " to canvas: " + captureResult["message"]);
+                    if (captureResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not fit {captureName} to canvas: {error}", "captureName", captureName, "error", captureResult["message"]));
                 }
             }
 
@@ -927,7 +927,7 @@ namespace ReplayKitHelper
                 if (item == null) continue;
                 var r = SetSceneItemScaledFromCurrent(sceneName, item, scaleRatio, preset);
                 if (r["ok"]?.Value<bool>() == true) { if (r["skipped"]?.Value<bool>() != true) applied.Add(name + " size"); }
-                else warnings.Add("Could not resize " + name + ": " + r["message"]);
+                else warnings.Add(Locales.T("Could not resize {name}: {error}", "name", name, "error", r["message"]));
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -960,10 +960,10 @@ namespace ReplayKitHelper
             {
                 var item = FindSceneItem(items, name);
                 var current = GetSceneItemTransformLive(sceneName, item);
-                if (current["ok"]?.Value<bool>() != true || !(current["transform"] is JObject transform)) { warnings.Add("Could not read " + name + " rotation."); continue; }
+                if (current["ok"]?.Value<bool>() != true || !(current["transform"] is JObject transform)) { warnings.Add(Locales.T("Could not read {name} rotation.", "name", name)); continue; }
                 var result = SetSceneItemTransform(sceneName, item, OverlayRotation.Rotate(transform, settings["overlayRotation"]?.Value<int>() ?? 0));
                 if (result["ok"]?.Value<bool>() == true) applied.Add(name + " rotation");
-                else warnings.Add("Could not rotate " + name + ": " + result["message"]);
+                else warnings.Add(Locales.T("Could not rotate {name}: {error}", "name", name, "error", result["message"]));
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -992,7 +992,7 @@ namespace ReplayKitHelper
                 return new JObject { ["ok"] = false, ["applied"] = new JArray(applied), ["warnings"] = new JArray("Overlay flip was saved, but " + itemName + "'s current position could not be read: " + cur["message"]) };
             var r = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style, settings));
             if (r["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
-            else warnings.Add("Could not flip " + itemName + ": " + r["message"]);
+            else warnings.Add(Locales.T("Could not flip {itemName}: {error}", "itemName", itemName, "error", r["message"]));
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
 
@@ -1005,7 +1005,7 @@ namespace ReplayKitHelper
             {
                 var r = ApplyOverlayOpacityLive(name, opacity, settings);
                 if (r["ok"]?.Value<bool>() == true) applied.Add(name + " opacity");
-                else warnings.Add("Could not set " + name + " opacity: " + r["message"]);
+                else warnings.Add(Locales.T("Could not set {name} opacity: {error}", "name", name, "error", r["message"]));
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -1031,7 +1031,7 @@ namespace ReplayKitHelper
                 var rotation = ApplyOverlayRotationLive(settings);
                 applied.AddRange((rotation["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((rotation["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add("Could not rotate overlay: " + rotation["message"]);
+                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add(Locales.T("Could not rotate overlay: {error}", "error", rotation["message"]));
             }
             bool colorChanged = previous["overlayOpacity"]?.Value<int>() != settings["overlayOpacity"]?.Value<int>() ||
                 previous["overlayHueShift"]?.Value<double>() != settings["overlayHueShift"]?.Value<double>() ||
@@ -1206,7 +1206,7 @@ namespace ReplayKitHelper
                     }
                     var rs = SetSceneItemTransform(sceneName, entry["item"] as JObject, scaled);
                     if (rs["ok"]?.Value<bool>() == true) { if (!flipTransition) applied.Add(prop.Name + " size"); }
-                    else warnings.Add("Could not preview " + prop.Name + " size: " + rs["message"]);
+                    else warnings.Add(Locales.T("Could not preview {name} size: {error}", "name", prop.Name, "error", rs["message"]));
                 }
             }
 
@@ -1228,9 +1228,9 @@ namespace ReplayKitHelper
                         }
                         var rf = SetSceneItemTransform(sceneName, item, MirrorTransformInPlace(cur["transform"] as JObject, style, settings));
                         if (rf["ok"]?.Value<bool>() == true) applied.Add(itemName + " flip");
-                        else warnings.Add("Could not preview " + itemName + " flip: " + rf["message"]);
+                        else warnings.Add(Locales.T("Could not preview {itemName} flip: {error}", "itemName", itemName, "error", rf["message"]));
                     }
-                    else warnings.Add("Could not read " + itemName + " to flip: " + cur["message"]);
+                    else warnings.Add(Locales.T("Could not read {itemName} to flip: {error}", "itemName", itemName, "error", cur["message"]));
                 }
                 preview["mirrorApplied"] = wantMirror;
             }
@@ -1239,7 +1239,7 @@ namespace ReplayKitHelper
                 var rotation = ApplyOverlayRotationLive(settings);
                 applied.AddRange((rotation["applied"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
                 warnings.AddRange((rotation["warnings"] as JArray)?.Select(t => t.Value<string>()) ?? Enumerable.Empty<string>());
-                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add("Could not preview overlay rotation: " + rotation["message"]);
+                if (rotation["ok"]?.Value<bool>() != true && rotation["warnings"] == null) warnings.Add(Locales.T("Could not preview overlay rotation: {error}", "error", rotation["message"]));
             }
             return new JObject { ["ok"] = warnings.Count == 0, ["applied"] = new JArray(applied), ["warnings"] = new JArray(warnings) };
         }
@@ -1258,7 +1258,7 @@ namespace ReplayKitHelper
                     var entry = (JObject)prop.Value;
                     var r = SetSceneItemTransform(sceneName, entry["item"] as JObject, entry["transform"] as JObject);
                     if (r["ok"]?.Value<bool>() == true) applied.Add(prop.Name + " size restored");
-                    else warnings.Add("Could not restore " + prop.Name + ": " + r["message"]);
+                    else warnings.Add(Locales.T("Could not restore {name}: {error}", "name", prop.Name, "error", r["message"]));
                 }
             }
             bool restoredExactOpacity = false;
@@ -1283,11 +1283,11 @@ namespace ReplayKitHelper
                             ["sourceName"] = sourceName, ["filterName"] = filterName, ["filterEnabled"] = entry["enabled"]?.Value<bool>() ?? false,
                         }, 3000);
                         if (enable.Ok) { applied.Add(sourceName + " opacity restored"); restoredExactOpacity = true; }
-                        else warnings.Add("Could not restore " + sourceName + " opacity filter enabled state: " + enable.Message);
+                        else warnings.Add(Locales.T("Could not restore {sourceName} opacity filter enabled state: {error}", "sourceName", sourceName, "error", enable.Message));
                     }
                     else
                     {
-                        warnings.Add("Could not restore " + sourceName + " opacity filter settings: " + set.Message);
+                        warnings.Add(Locales.T("Could not restore {sourceName} opacity filter settings: {error}", "sourceName", sourceName, "error", set.Message));
                     }
                 }
                 else
@@ -1299,7 +1299,7 @@ namespace ReplayKitHelper
                         if (filterToken["filterName"]?.Value<string>() != "ReplayKit Overlay Opacity") continue;
                         var remove = ObsWebSocket.InvokeRequest("RemoveSourceFilter", new JObject { ["sourceName"] = sourceName, ["filterName"] = "ReplayKit Overlay Opacity" }, 3000);
                         if (remove.Ok) { applied.Add(sourceName + " opacity restored"); restoredExactOpacity = true; }
-                        else warnings.Add("Could not remove preview opacity filter from " + sourceName + ": " + remove.Message);
+                        else warnings.Add(Locales.T("Could not remove preview opacity filter from {sourceName}: {error}", "sourceName", sourceName, "error", remove.Message));
                         break;
                     }
                 }

@@ -248,7 +248,7 @@ QJsonObject UiToast(const QJsonObject &args)
 {
 	const QString kind = args.value("kind").toString(QStringLiteral("clip"));
 	if (kind == QLatin1String("clip"))
-		ClipToastShow(ClipToastKind::Clip);
+		ClipToastShow(ClipToastKind::Clip, args.value("duration").toDouble());
 	else if (kind == QLatin1String("recording-started"))
 		ClipToastShow(ClipToastKind::RecordingStarted);
 	else if (kind == QLatin1String("recording-stopped"))

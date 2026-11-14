@@ -931,8 +931,8 @@ namespace ReplayKitHelper
                     string msg = combined.Length > 400 ? combined.Substring(0, 400) + "..." : combined;
                     try { if (File.Exists(outPath)) File.Delete(outPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     // a card that cannot run the encoder fails here with the message of ffmpeg, and the processor only takes over when the switch in the settings is turned off
-                    string hint = encoder != null && encoder.Hardware ? " (encoded by " + encoder.Name + ", Settings > Video Editor can switch edits to the processor)" : "";
-                    return new TrimResult { Ok = false, Message = "ffmpeg trim failed (exit=" + result.ExitCode + "): " + msg + hint };
+                    string hint = encoder != null && encoder.Hardware ? " " + Locales.T("(encoded by {encoder}, Settings > Video Editor can switch edits to the processor)", "encoder", encoder.Name) : "";
+                    return new TrimResult { Ok = false, Message = Locales.T("ffmpeg trim failed (exit={code}): {error}", "code", result.ExitCode, "error", msg) + hint };
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -943,7 +943,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
             {
                 try { if (File.Exists(outPath)) File.Delete(outPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                return new TrimResult { Ok = false, Message = "Trim failed: " + ex.Message };
+                return new TrimResult { Ok = false, Message = Locales.T("Trim failed: {error}", "error", ex.Message) };
             }
 
             if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = "ffmpeg reported success but the output file is missing or empty" };
@@ -975,7 +975,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                    return new TrimResult { Ok = false, Message = "Could not publish trimmed copy: " + ex.Message };
+                    return new TrimResult { Ok = false, Message = Locales.T("Could not publish trimmed copy: {error}", "error", ex.Message) };
                 }
             }
             else
@@ -994,7 +994,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
                 {
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                    return new TrimResult { Ok = false, Message = "Could not replace original: " + ex.Message };
+                    return new TrimResult { Ok = false, Message = Locales.T("Could not replace original: {error}", "error", ex.Message) };
                 }
                 // restore the original mtime/ctime captured before the encode -- without this the clip would jump to the top of the date-sorted list every time its trimmed in place.
                 if (origLastWriteUtc.HasValue)
@@ -1054,7 +1054,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                return new TrimResult { Ok = false, Message = "Clipboard copy failed: " + ex.Message };
+                return new TrimResult { Ok = false, Message = Locales.T("Clipboard copy failed: {error}", "error", ex.Message) };
             }
         }
     }

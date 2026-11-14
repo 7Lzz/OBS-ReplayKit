@@ -108,9 +108,9 @@ namespace ReplayKitHelper
             if (!stopped)
             {
                 Server.State.RestartAfterCleanObsPath = null;
-                const string message = "OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.";
+                string message = Locales.T("OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.");
                 Log.Write(reason + ": " + message);
-                Notifications.Add("warning", "obs-close-timeout", "OBS could not close safely", message);
+                Notifications.Add("warning", "obs-close-timeout", Locales.T("OBS could not close safely"), message);
                 return;
             }
             Server.State.Shutdown = true;
@@ -199,12 +199,13 @@ namespace ReplayKitHelper
             }
         }
 
-        // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene and theme edits staged for after its exit-save are put in place
+        // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene, theme and language edits staged for after its exit-save are put in place
         internal static bool Relaunch(string obsPath)
         {
             try { ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearCrashSentinel: " + ex.Message); }
             try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
             try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
+            Locales.ApplyPending();
             if (string.IsNullOrEmpty(obsPath) || !File.Exists(obsPath))
             {
                 Log.Write("Relaunch: OBS not found at '" + obsPath + "'");

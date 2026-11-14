@@ -1113,7 +1113,7 @@ const CLIP_HOVER_PROFILES = {
         const labelEl = groupEl.querySelector(".clip-sort-grouprow .clip-sort-label");
         const activeMember = g.members.indexOf(activeSort) >= 0 ? activeSort : "";
         groupEl.classList.toggle("has-active", !!activeMember);
-        if (labelEl) labelEl.textContent = activeMember ? (g.base + ": " + clipSortLabel(activeMember)) : g.base;
+        if (labelEl) labelEl.textContent = activeMember ? RK_T("{group}: {sort}", { group: RK_T(g.base), sort: RK_T(clipSortLabel(activeMember)) }) : RK_T(g.base);
       }
     }
   }
@@ -1344,7 +1344,7 @@ const CLIP_HOVER_PROFILES = {
       button.hidden = activeFilter !== "all";
       const label = button.parentElement.querySelector("span").textContent;
       button.setAttribute("aria-expanded", String(expanded));
-      button.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + label);
+      button.setAttribute("aria-label", expanded ? RK_T("Collapse {name}", { name: label }) : RK_T("Expand {name}", { name: label }));
     });
     if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? "Search screenshots" : activeFilter === "gifs" ? "Search GIFs" : "Search clips");
     const folder = document.getElementById("clip-folder-btn");
@@ -1453,7 +1453,7 @@ const CLIP_HOVER_PROFILES = {
         el.type = "button";
         el.className = "game-group-heading";
         el.dataset.key = group.key;
-          el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name"></span><span class="game-group-count"></span><span class="icon-mini-btn game-group-caret" aria-hidden="true">' + ((window.RK_ICONS || {})["nav/combo-arrow"] || "") + '</span>';
+          el.innerHTML = RKClipGames.picture(group.id, group.kind) + '<span class="game-group-name" translate="no"></span><span class="game-group-count"></span><span class="icon-mini-btn game-group-caret" aria-hidden="true">' + ((window.RK_ICONS || {})["nav/combo-arrow"] || "") + '</span>';
           applyClipHovers(el);
         el.addEventListener("click", () => {
           const temporary = gameCollapseState();
@@ -1467,7 +1467,7 @@ const CLIP_HOVER_PROFILES = {
       el.querySelector(".game-group-name").textContent = group.name;
       el.querySelector(".game-group-count").textContent = String(group.count);
       el.setAttribute("aria-expanded", String(!group.collapsed));
-      el.setAttribute("aria-label", (group.collapsed ? "Expand " : "Collapse ") + group.name + " clips");
+      el.setAttribute("aria-label", group.collapsed ? RK_T("Expand {name} clips", { name: group.name }) : RK_T("Collapse {name} clips", { name: group.name }));
       el.style.setProperty("--group-y", group.top + "px");
     }
     for (const leftover of existing.values()) leftover.remove();
@@ -1491,10 +1491,10 @@ const CLIP_HOVER_PROFILES = {
   function uploadBlockReason(clip) {
     if (!clip) return null;
     const cap = uploadLimits.maxUploadBytes;
-    if (cap > 0 && Number(clip.size) > cap) return "Over " + formatSize(cap);
+    if (cap > 0 && Number(clip.size) > cap) return RK_T("Over {size}", { size: formatSize(cap) });
     const maxSeconds = uploadLimits.maxDurationSec;
     const duration = Number(clip.duration);
-    if (maxSeconds > 0 && isFinite(duration) && duration > maxSeconds) return "Longer than " + Math.round(maxSeconds / 60) + " min";
+    if (maxSeconds > 0 && isFinite(duration) && duration > maxSeconds) return RK_T("Longer than {minutes} min", { minutes: Math.round(maxSeconds / 60) });
     return null;
   }
 
@@ -1507,14 +1507,14 @@ const CLIP_HOVER_PROFILES = {
 
   function formatTimeAgo(unixSec) {
     const diff = Math.max(0, Math.floor(Date.now() / 1000 - unixSec));
-    if (diff < 5) return "just now";
-    if (diff < 60) return diff + " seconds ago";
-    if (diff < 120) return "a minute ago";
-    if (diff < 3600) return Math.floor(diff / 60) + " minutes ago";
-    if (diff < 7200) return "an hour ago";
-    if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
-    if (diff < 172800) return "a day ago";
-    return Math.floor(diff / 86400) + " days ago";
+    if (diff < 5) return RK_T("just now");
+    if (diff < 60) return RK_T("{count} seconds ago", { count: diff });
+    if (diff < 120) return RK_T("a minute ago");
+    if (diff < 3600) return RK_T("{count} minutes ago", { count: Math.floor(diff / 60) });
+    if (diff < 7200) return RK_T("an hour ago");
+    if (diff < 86400) return RK_T("{count} hours ago", { count: Math.floor(diff / 3600) });
+    if (diff < 172800) return RK_T("a day ago");
+    return RK_T("{count} days ago", { count: Math.floor(diff / 86400) });
   }
 
   // the date line of a card in the format picked in the Appearance tab, the time ago by default
@@ -1540,9 +1540,9 @@ const CLIP_HOVER_PROFILES = {
     const remaining = retSec - (Math.floor(Date.now() / 1000) - uploadedAt);
     if (remaining <= 0) return null;
     const h = Math.floor(remaining / 3600);
-    if (h >= 24) return Math.floor(h / 24) + "d " + (h % 24) + "h";
-    if (h >= 1) return h + "h " + Math.floor((remaining % 3600) / 60) + "m";
-    return Math.max(1, Math.floor(remaining / 60)) + "m";
+    if (h >= 24) return RK_T("{days}d {hours}h", { days: Math.floor(h / 24), hours: h % 24 });
+    if (h >= 1) return RK_T("{hours}h {minutes}m", { hours: h, minutes: Math.floor((remaining % 3600) / 60) });
+    return RK_T("{minutes}m", { minutes: Math.max(1, Math.floor(remaining / 60)) });
   }
 
   let toastTimer = 0;
@@ -2634,13 +2634,18 @@ const CLIP_HOVER_PROFILES = {
     return clips.map(applyLink);
   }
 
-  // what the helper is doing with a clip right now, in words that finish "this clip is": a file that is being uploaded or compressed is refused when the edit is saved, or is replaced under the editor
+  // what the helper is doing with a clip right now (compressing or uploading, empty when idle): a file that is being uploaded or compressed is refused when the edit is saved, or is replaced under the editor
   function clipBusyWith(name) {
     const job = lastUploadJobsByName.get(name);
     const state = job && job.active ? job.state : localState.get(name);
-    if (state === "compressing") return "being compressed";
-    if (state === "uploading") return "being uploaded";
+    if (state === "compressing" || state === "uploading") return state;
     return "";
+  }
+
+  function clipBusyMessage(busyWith) {
+    return busyWith === "compressing"
+      ? RK_T("This clip is being compressed right now. Edit it once that has finished, or cancel it first.")
+      : RK_T("This clip is being uploaded right now. Edit it once that has finished, or cancel it first.");
   }
 
   // the one way into the editor from a card: a clip that is being uploaded or compressed is told so instead
@@ -2648,7 +2653,7 @@ const CLIP_HOVER_PROFILES = {
     if (!clip) return;
     const busyWith = clipBusyWith(clip.name);
     if (busyWith) {
-      showToast("This clip is " + busyWith + " right now. Edit it once that has finished, or cancel it first.", "bad", "The clip is busy");
+      showToast(clipBusyMessage(busyWith), "bad", "The clip is busy");
       return;
     }
     openEditor(clip);
@@ -2914,7 +2919,7 @@ const CLIP_HOVER_PROFILES = {
       const clip = lastClipsByName.get(name) || loadedClips.find((item) => item && item.name === name);
       totalBytes += Math.max(0, Number(clip && clip.size) || 0);
     });
-    if (bulkCount) bulkCount.textContent = count + " clip" + (count === 1 ? "" : "s") + " selected";
+    if (bulkCount) bulkCount.textContent = RK_M("clips.selectedCount", { count });
     if (bulkSize) bulkSize.textContent = formatSize(totalBytes);
     document.body.classList.toggle("is-selection-mode", count > 0);
     if (count > 0 && activePreview && activePreview.closest(".card") && !isVideoFullscreen(activePreview)) {
@@ -3034,6 +3039,7 @@ const CLIP_HOVER_PROFILES = {
     if (Number(clip.duration) > 0) durationCache.set(clip.name, Number(clip.duration));
     const thumbUrl   = thumbUrlFor(clip);
     const nameEsc    = escapeHtml(displayClipName(clip.name));
+    const locateLabel = escapeHtml(RK_M("clips.showInClips"));
 
     card.innerHTML = `
       <div class="preview">
@@ -3046,7 +3052,7 @@ const CLIP_HOVER_PROFILES = {
                  disablePictureInPicture></video>
         </div>
         <div class="draft-mark" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON.OPEN_EDITOR}</svg></div>
-        <button class="locate-btn" type="button" data-tooltip="Show in Clips" aria-label="Show in Clips">
+        <button class="locate-btn" type="button" data-tooltip="${locateLabel}" aria-label="${locateLabel}">
           <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/open-external}}</svg>
         </button>
         <div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div>
@@ -3078,7 +3084,7 @@ const CLIP_HOVER_PROFILES = {
       </div>
       <div class="body">
         <div class="title-row">
-          <span class="name">${nameEsc}</span>
+          <span class="name" translate="no">${nameEsc}</span>
           <button class="icon-mini-btn edit-btn" data-tooltip="Rename" type="button">
             <svg viewBox="0 0 24 24">${ICON.EDIT}</svg>
           </button>
@@ -3891,10 +3897,10 @@ const CLIP_HOVER_PROFILES = {
         // force a fresh, non-merged clips fetch so the copy shows up on the next tick.
         clipsPageVersion = "";
         scheduleNextPoll(0);
-        showToast("Duplicated " + escapeHtml(displayClipName(name)), "info");
+        showToast(RK_T("Duplicated {name}", { name: '<span translate="no">' + escapeHtml(displayClipName(name)) + "</span>" }), "info");
         scheduleToastHide(2200);
       } catch (err) {
-        showToast("Duplicate failed: " + escapeHtml(err.message || err));
+        showToast(RK_T("Duplicate failed: {error}", { error: escapeHtml(err.message || err) }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
     });
@@ -3912,7 +3918,7 @@ const CLIP_HOVER_PROFILES = {
         showToast("Copied to clipboard - paste anywhere to share the file", "info");
         scheduleToastHide(3000);
       } catch (err) {
-        showToast("Clipboard copy failed: " + (err.message || err));
+        showToast(RK_T("Clipboard copy failed: {error}", { error: err.message || err }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
     });
@@ -3962,12 +3968,13 @@ const CLIP_HOVER_PROFILES = {
       clipsNextOffset = Math.min(clipsNextOffset, clipsTotal);
       renderLoadedClips(loadedClips);
       refreshBulkSelectionUi();
-      showToast(data.kept ? "Moved " + escapeHtml(displayClipName(filename)) + " to the trash" : "Deleted " + escapeHtml(displayClipName(filename)), "info");
+      const shownName = '<span translate="no">' + escapeHtml(displayClipName(filename)) + "</span>";
+      showToast(data.kept ? RK_T("Moved {name} to the trash", { name: shownName }) : RK_T("Deleted {name}", { name: shownName }), "info");
       scheduleToastHide(data.kept ? 3200 : 1800);
       window.dispatchEvent(new Event("replaykit:deleted-changed"));
       scheduleNextPoll(250);
     } catch (e) {
-      showToast("Delete failed: " + escapeHtml(e.message || e));
+      showToast(RK_T("Delete failed: {error}", { error: escapeHtml(e.message || e) }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -3988,7 +3995,7 @@ const CLIP_HOVER_PROFILES = {
       input.classList.add("is-rejected");
       if (!told) {
         told = true;
-        showToast(escapeHtml("Names can’t contain \\ / : * ? \" < > |"), "info");
+        showToast(escapeHtml(RK_T("Names can’t contain \\ / : * ? \" < > |")), "info");
         scheduleToastHide(2600);
       }
     });
@@ -3997,7 +4004,7 @@ const CLIP_HOVER_PROFILES = {
   // the part of a typed name that is kept (windows drops trailing dots and spaces), and what is wrong with it when something is
   function cleanTypedName(value) { return String(value || "").trim().replace(/[. ]+$/, ""); }
   function nameProblem(base) {
-    if (RESERVED_NAME.test(base)) return "“" + base + "” is a name Windows keeps for itself.";
+    if (RESERVED_NAME.test(base)) return RK_T("“{name}” is a name Windows keeps for itself.", { name: base });
     if (base.length > 180) return "That name is too long.";
     return "";
   }
@@ -4052,7 +4059,7 @@ const CLIP_HOVER_PROFILES = {
       transferFavorite(name, finalName);
       hydrateClipUiState();
       if (finalName !== to) {
-        showToast("A clip named “" + escapeHtml(displayClipName(to)) + "” already exists, so this clip was renamed to “" + escapeHtml(displayClipName(finalName)) + "”.", "info");
+        showToast(RK_T("A clip named “{from}” already exists, so this clip was renamed to “{to}”.", { from: '<span translate="no">' + escapeHtml(displayClipName(to)) + "</span>", to: '<span translate="no">' + escapeHtml(displayClipName(finalName)) + "</span>" }), "info");
         scheduleToastHide(5000);
       }
       return finalName;
@@ -4127,6 +4134,7 @@ const CLIP_HOVER_PROFILES = {
     if (hasExt) {
       extSpan = document.createElement("span");
       extSpan.className = "name-edit-ext";
+      extSpan.setAttribute("translate", "no");
       extSpan.textContent = ext;
     }
 
@@ -4182,7 +4190,7 @@ const CLIP_HOVER_PROFILES = {
         saving = false;
         input.readOnly = false;
         input.classList.remove("is-saving");
-        rejectName(input, "Couldn’t rename: " + (e.message || e));
+        rejectName(input, RK_T("Couldn’t rename: {error}", { error: e.message || e }));
         if (viaEnter && input.isConnected) { input.focus(); input.select(); return; }
         settled = true;
         swapBackToNameSpan();
@@ -4215,10 +4223,10 @@ const CLIP_HOVER_PROFILES = {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       window.dispatchEvent(new Event("replaykit:screenshot-saved"));
-      showToast("Screenshot saved in Screenshots as " + escapeHtml(data.name || ""), "info");
+      showToast(RK_T("Screenshot saved in Screenshots as {name}", { name: '<span translate="no">' + escapeHtml(data.name || "") + "</span>" }), "info");
       scheduleToastHide(3000);
     } catch (error) {
-      showToast("Couldn’t save the screenshot: " + escapeHtml(error.message || error), "info");
+      showToast(RK_T("Couldn’t save the screenshot: {error}", { error: escapeHtml(error.message || error) }), "info");
       scheduleToastHide(TOAST_ERROR_MS);
     } finally {
       button.classList.remove("is-busy");
@@ -4672,7 +4680,7 @@ const CLIP_HOVER_PROFILES = {
       const menuBlockReason = showCopy ? null : uploadBlockReason(clip);
       linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked || menuBlockReason));
       const linkText = showCopy ? "Copy Link"
-        : menuBlockReason ? menuBlockReason + " -- Streamable will not accept this clip"
+        : menuBlockReason ? RK_T("{reason} -- Streamable will not accept this clip", { reason: menuBlockReason })
         : processing ? "Processing on Streamable"
         : failed ? "Processing failed"
         : busy ? "Creating link" : "Create Link";
@@ -4748,7 +4756,7 @@ const CLIP_HOVER_PROFILES = {
           const retSec = (clip.retention_days || 2) * 86400;
           const remaining = retSec - (Math.floor(Date.now() / 1000) - clip.uploaded_at);
           const threshold = retSec > 7 * 86400 ? 24 * 3600 : 6 * 3600;
-          addMetaStatus("Link " + expiry + " left", remaining < threshold);
+          addMetaStatus(RK_T("Link {time} left", { time: expiry }), remaining < threshold);
         }
       }
     } else if (state === "compressing" || state === "uploading") {
@@ -4788,7 +4796,7 @@ const CLIP_HOVER_PROFILES = {
       if (blockReason) {
         btn.disabled = true;
         btn.classList.add("is-blocked");
-        btn.title = blockReason + " -- Streamable will not accept this clip. Trim or compress it first.";
+        btn.title = RK_T("{reason} -- Streamable will not accept this clip. Trim or compress it first.", { reason: blockReason });
       } else {
         btn.addEventListener("click", () => onCreateLink(clip.name, btn));
       }
@@ -4878,13 +4886,13 @@ const CLIP_HOVER_PROFILES = {
           } else if (e && e.tooLong) {
             const d = e.durationSec || 0;
             const mmss = Math.floor(d / 60) + ":" + String(Math.round(d % 60)).padStart(2, "0");
-            showToast("It is " + mmss + " long and the limit is 10 minutes. Trim it shorter first.", "bad", "Clip is too long for Streamable");
+            showToast(RK_T("It is {duration} long and the limit is 10 minutes. Trim it shorter first.", { duration: mmss }), "bad", "Clip is too long for Streamable");
             scheduleToastHide(TOAST_ERROR_MS);
           } else if (e && e.busy) {
             showToast("Try that clip again in a moment.", "bad", "Upload queue is full");
             scheduleToastHide(TOAST_ERROR_MS);
           } else {
-            showToast("Couldn't create link: " + (e.message || "Unknown error"));
+            showToast(RK_T("Couldn't create link: {error}", { error: e.message || RK_T("Unknown error") }));
             scheduleToastHide(TOAST_ERROR_MS);
           }
           return;
@@ -5091,9 +5099,9 @@ const CLIP_HOVER_PROFILES = {
     const width = Number(clip.width) || 0;
     const height = Number(clip.height) || 0;
     const fps = Number(clip.fps) || 0;
-    if (width > 0 && height > 0) facts.push(["Resolution", width + " \u00d7 " + height + (fps > 0 ? " \u00b7 " + Math.round(fps) + " fps" : "")]);
+    if (width > 0 && height > 0) facts.push(["Resolution", fps > 0 ? RK_T("{width} × {height} · {fps} fps", { width, height, fps: Math.round(fps) }) : RK_T("{width} × {height}", { width, height })]);
     facts.push(["Size", formatSize(clip.size)]);
-    return '<div class="home-hero-name">' + name + "</div>"
+    return '<div class="home-hero-name" translate="no">' + name + "</div>"
       + '<div class="home-hero-age age" data-mtime="' + (Number(clip.mtime) || 0) + '">' + formatClipDate(clip.mtime) + "</div>"
       + '<dl class="home-hero-facts">' + facts.map(([label, value]) => "<dt>" + label + "</dt><dd>" + escapeHtml(value) + "</dd>").join("") + "</dl>";
   }
@@ -5210,7 +5218,7 @@ const CLIP_HOVER_PROFILES = {
       .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); })
       .catch((e) => {
         try { localStorage.removeItem(OPEN_FILTER_KEY); } catch {}
-        showToast("Could not open Clips: " + escapeHtml(e.message));
+        showToast(RK_T("Could not open Clips: {error}", { error: escapeHtml(e.message) }));
         scheduleToastHide(TOAST_ERROR_MS);
       });
   }
@@ -5313,7 +5321,7 @@ const CLIP_HOVER_PROFILES = {
         syncBulkUploadButtons();
       }
       if (uploadError) {
-        showToast("Upload failed: " + uploadError);
+        showToast(RK_T("Upload failed: {error}", { error: uploadError }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
       // the placeholder goes with the first list and with nothing before it: the drafts, the clip state and the favorites draw the list again as they come in, and an empty list drawn by them is not the library being empty
@@ -5361,14 +5369,14 @@ const CLIP_HOVER_PROFILES = {
     clipFoldersStatusEl.hidden = !active;
     if (active) {
       clipFoldersWatchedPass = Number(state.pass) || 0;
-      clipFoldersTextEl.textContent = "Sorting clips into folders · " + (Number(state.done) || 0) + " of " + (Number(state.total) || 0);
+      clipFoldersTextEl.textContent = RK_T("Sorting clips into folders · {done} of {total}", { done: Number(state.done) || 0, total: Number(state.total) || 0 });
       return;
     }
     if (!state || !clipFoldersWatchedPass || Number(state.pass) !== clipFoldersWatchedPass) return;
     clipFoldersWatchedPass = 0;
     const moved = Number(state.moved) || 0;
     if (moved > 0) {
-      showToast(escapeHtml("Sorted " + moved + (moved === 1 ? " clip" : " clips") + " into their folders."), "info");
+      showToast(escapeHtml(moved === 1 ? RK_T("Sorted 1 clip into its folder.") : RK_T("Sorted {count} clips into their folders.", { count: moved })), "info");
       scheduleToastHide(2400);
     }
   }
@@ -5816,9 +5824,7 @@ const CLIP_HOVER_PROFILES = {
   function openCompressModal(filename, sizeMb, capMb) {
     pendingCompressFile = filename;
     compressBody.innerHTML =
-      "<p><code>" + escapeHtml(filename) + "</code> is <b>" + sizeMb +
-      " MB</b>, which is over Streamable's <b>" + capMb +
-      " MB</b> limit for your current plan.</p>" +
+      "<p>" + RK_T("{file} is <b>{size} MB</b>, which is over Streamable's <b>{cap} MB</b> limit for your current plan.", { file: '<code translate="no">' + escapeHtml(filename) + "</code>", size: sizeMb, cap: capMb }) + "</p>" +
       "<p>Create a temporary compressed copy and upload that instead?</p>";
     compressVeil.classList.add("is-open");
   }
@@ -5852,10 +5858,10 @@ const CLIP_HOVER_PROFILES = {
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
-      showToast("Compressing temp copy for " + escapeHtml(file) + ".", "info");
+      showToast(RK_T("Compressing temp copy for {name}.", { name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
       scheduleToastHide(3500);
     } catch (e) {
-      showToast("Couldn't start compression: " + (e.message || e));
+      showToast(RK_T("Couldn't start compression: {error}", { error: e.message || e }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   });
@@ -5896,7 +5902,7 @@ const CLIP_HOVER_PROFILES = {
     const heights = COMPRESS_DS_LADDER.filter((h) => h < srcH);
     compressDsSelect.setOptions(heights.map((h) => {
       const w = srcW && srcH ? Math.round((srcW * h / srcH) / 2) * 2 : 0;
-      return { value:String(h), label:w ? (w + " × " + h) : (h + "p") };
+      return { value:String(h), label:w ? RK_T("{width} × {height}", { width: w, height: h }) : RK_T("{height}p", { height: h }) };
     }));
     if (!heights.length) return false;
     return true;
@@ -6002,12 +6008,12 @@ const CLIP_HOVER_PROFILES = {
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
-      let label = mode === "fast" ? "Compressing (fast)" : "Compressing (smaller)";
-      if (scaleHeight > 0) label += " -> " + scaleHeight + "p";
-      showToast(label + " - " + escapeHtml(file), "info");
+      let label = mode === "fast" ? RK_T("Compressing (fast)") : RK_T("Compressing (smaller)");
+      if (scaleHeight > 0) label = RK_T("{label} -> {height}p", { label, height: scaleHeight });
+      showToast(RK_T("{label} - {name}", { label, name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
       scheduleToastHide(3000);
     } catch (err) {
-      showToast("Couldn't start compress: " + (err.message || err));
+      showToast(RK_T("Couldn't start compress: {error}", { error: err.message || err }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6097,19 +6103,19 @@ const CLIP_HOVER_PROFILES = {
     const queued = bulkUploadQueued.size;
     if (bulkUploadRunning || queued > 0) {
       return queued > 0
-        ? "Stop — " + up + " uploading, " + queued + " queued"
-        : "Stop uploads (" + up + ")";
+        ? RK_T("Stop — {uploading} uploading, {queued} queued", { uploading: up, queued })
+        : RK_T("Stop uploads ({count})", { count: up });
     }
-    return "Cancel " + up + " upload" + (up === 1 ? "" : "s");
+    return up === 1 ? RK_T("Cancel 1 upload") : RK_T("Cancel {count} uploads", { count: up });
   }
   // terse form for the #bulk-upload-stop text button, which shares the toolbar row with Clear + Sort.
   function bulkStopLabelShort() {
     if (bulkUploadAbort) return "Stopping...";
     const up = bulkUploadInFlight.size;
     const queued = bulkUploadQueued.size;
-    if (queued > 0) return "Stop (" + queued + " queued)";
-    if (bulkUploadRunning) return "Stop uploads";
-    return "Cancel " + up + " upload" + (up === 1 ? "" : "s");
+    if (queued > 0) return RK_T("Stop ({count} queued)", { count: queued });
+    if (bulkUploadRunning) return RK_T("Stop uploads");
+    return up === 1 ? RK_T("Cancel 1 upload") : RK_T("Cancel {count} uploads", { count: up });
   }
   function syncBulkUploadButtons() {
     const stopMode = bulkUploadRunning || bulkUploadInFlight.size > 0;
@@ -6157,7 +6163,7 @@ const CLIP_HOVER_PROFILES = {
       cancelActiveUpload(name, (job && job.requestId) || (pend && pend.requestId) || "", true);
     });
     if (inflight.length) {
-      showToast("Cancelled " + inflight.length + " upload" + (inflight.length === 1 ? "" : "s") + ".", "info");
+      showToast(inflight.length === 1 ? RK_T("Cancelled 1 upload.") : RK_T("Cancelled {count} uploads.", { count: inflight.length }), "info");
       scheduleToastHide(2500);
     }
     if (!bulkUploadRunning) bulkUploadAbort = false;
@@ -6262,11 +6268,13 @@ const CLIP_HOVER_PROFILES = {
     scheduleNextPoll(POLL_FAST_MS);
     refreshBulkSelectionUi();
     if (started) {
-      showToast("Upload: queued " + started + " selected clip" + (started === 1 ? "" : "s") + (aborted ? " before stopping." : "."), "info");
+      showToast(started === 1
+        ? (aborted ? RK_T("Upload: queued 1 selected clip before stopping.") : RK_T("Upload: queued 1 selected clip."))
+        : (aborted ? RK_T("Upload: queued {count} selected clips before stopping.", { count: started }) : RK_T("Upload: queued {count} selected clips.", { count: started })), "info");
       scheduleToastHide(3500);
     }
     if (failed.length) {
-      showToast("Retry the clip" + (failed.length === 1 ? "" : "s") + ".", "bad", failed.length + " selected clip" + (failed.length === 1 ? " was" : "s were") + " not queued for upload");
+      showToast(failed.length === 1 ? RK_T("Retry the clip.") : RK_T("Retry the clips."), "bad", failed.length === 1 ? RK_T("1 selected clip was not queued for upload") : RK_T("{count} selected clips were not queued for upload", { count: failed.length }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6276,8 +6284,7 @@ const CLIP_HOVER_PROFILES = {
     compressAllBtn.classList.toggle("is-running", state === "running");
     compressAllBtn.classList.toggle("is-disabled", state === "disabled");
     if (state === "running" && info) {
-      compressAllLabelEl.innerHTML = "Stop "
-        + '<span class="progress">(' + info.done + " / " + info.total + ")</span>";
+      compressAllLabelEl.innerHTML = RK_T("Stop {progress}", { progress: '<span class="progress">(' + info.done + " / " + info.total + ")</span>" });
       compressAllBtn.title = "Click to stop scheduling new compresses. "
         + "In-flight encodes will finish.";
     } else if (state === "disabled") {
@@ -6290,7 +6297,7 @@ const CLIP_HOVER_PROFILES = {
     if (!bulkCompressBtn) return;
     if (state === "running" && info) {
       bulkCompressBtn.classList.add("is-running");
-      bulkCompressBtn.dataset.tooltip = "Stop compression queue (" + info.done + " / " + info.total + ")";
+      bulkCompressBtn.dataset.tooltip = RK_T("Stop compression queue ({done} / {total})", { done: info.done, total: info.total });
       bulkCompressBtn.setAttribute("aria-label", bulkCompressBtn.dataset.tooltip);
       bulkCompressBtn.disabled = false;
     } else {
@@ -6319,15 +6326,11 @@ const CLIP_HOVER_PROFILES = {
     const total = allClips.length;
     const skipped = total - candidates.length;
     compressAllBody.innerHTML =
-      "<p>Fast-compress <b>" + candidates.length + "</b> clip"
-        + (candidates.length === 1 ? "" : "s") + ".</p>"
+      "<p>" + (candidates.length === 1 ? RK_T("Fast-compress <b>1</b> clip.") : RK_T("Fast-compress <b>{count}</b> clips.", { count: candidates.length })) + "</p>"
       + (skipped > 0
-          ? "<p><b>" + skipped + "</b> clip" + (skipped === 1 ? "" : "s")
-            + " will be skipped (already compressed or busy).</p>"
+          ? "<p>" + (skipped === 1 ? RK_T("<b>1</b> clip will be skipped (already compressed or busy).") : RK_T("<b>{count}</b> clips will be skipped (already compressed or busy).", { count: skipped })) + "</p>"
           : "")
-      + "<p>Each clip's original file will be replaced. "
-        + "Only Fast mode runs in bulk &mdash; for Smaller, use a clip's "
-        + "3-dot menu individually.</p>";
+      + "<p>" + RK_T("Each clip's original file will be replaced. Only Fast mode runs in bulk — for Smaller, use a clip's 3-dot menu individually.") + "</p>";
     compressAllGo.textContent = "Compress all";
     compressAllGo.disabled = (candidates.length === 0);
     compressAllVeil.classList.add("is-open");
@@ -6344,9 +6347,9 @@ const CLIP_HOVER_PROFILES = {
     pendingBulkCompressQueue = candidates.slice();
     const skipped = selectedClipNames.size - candidates.length;
     compressAllBody.innerHTML =
-      "<p>Fast-compress <b>" + candidates.length + "</b> selected clip" + (candidates.length === 1 ? "" : "s") + ".</p>"
+      "<p>" + (candidates.length === 1 ? RK_T("Fast-compress <b>1</b> selected clip.") : RK_T("Fast-compress <b>{count}</b> selected clips.", { count: candidates.length })) + "</p>"
       + (skipped > 0
-          ? "<p><b>" + skipped + "</b> selected clip" + (skipped === 1 ? " was" : "s were") + " skipped because it is already compressed or busy.</p>"
+          ? "<p>" + (skipped === 1 ? RK_T("<b>1</b> selected clip was skipped because it is already compressed or busy.") : RK_T("<b>{count}</b> selected clips were skipped because they are already compressed or busy.", { count: skipped })) + "</p>"
           : "")
       + "<p>Each source clip is replaced with a smaller fast-compressed version. Clips are queued through ReplayKit's existing limiter, so they do not all encode at once.</p>";
     compressAllGo.textContent = "Compress selected";
@@ -6407,8 +6410,9 @@ const CLIP_HOVER_PROFILES = {
     compressAllAbort = false;
     refreshCompressAllButton();
     if (done > 0) {
-      showToast((operationLabel || "Compress All") + ": scheduled " + done + " clip"
-        + (done === 1 ? "" : "s") + " for compression.", "info");
+      showToast(done === 1
+        ? RK_T("{label}: scheduled 1 clip for compression.", { label: RK_T(operationLabel || "Compress All") })
+        : RK_T("{label}: scheduled {count} clips for compression.", { label: RK_T(operationLabel || "Compress All"), count: done }), "info");
       scheduleToastHide(4000);
     }
   }
@@ -6468,7 +6472,7 @@ const CLIP_HOVER_PROFILES = {
     let firstFailure = "";
     for (let i = 0; i < names.length; i++) {
       if (bulkDeleteBtn) {
-        bulkDeleteBtn.dataset.tooltip = (trashOn ? "Moving to trash " : "Deleting ") + (i + 1) + " / " + names.length;
+        bulkDeleteBtn.dataset.tooltip = RK_T(trashOn ? "Moving to trash {done} / {total}" : "Deleting {done} / {total}", { done: i + 1, total: names.length });
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
       }
       try {
@@ -6506,11 +6510,14 @@ const CLIP_HOVER_PROFILES = {
     resetBulkDeleteButton();
     refreshBulkSelectionUi();
     if (deleted.length) {
-      showToast((trashed === deleted.length ? "Moved " : "Deleted ") + deleted.length + " selected clip" + (deleted.length === 1 ? "" : "s") + (trashed === deleted.length ? " to the trash." : "."), "info");
+      const toTrash = trashed === deleted.length;
+      showToast(deleted.length === 1
+        ? (toTrash ? RK_T("Moved 1 selected clip to the trash.") : RK_T("Deleted 1 selected clip."))
+        : (toTrash ? RK_T("Moved {count} selected clips to the trash.", { count: deleted.length }) : RK_T("Deleted {count} selected clips.", { count: deleted.length })), "info");
       scheduleToastHide(3000);
     }
     if (failed.length) {
-      showToast(escapeHtml(firstFailure), "bad", failed.length + " clip" + (failed.length === 1 ? " was" : "s were") + " not deleted");
+      showToast(escapeHtml(firstFailure), "bad", failed.length === 1 ? RK_T("1 clip was not deleted") : RK_T("{count} clips were not deleted", { count: failed.length }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6550,7 +6557,7 @@ const CLIP_HOVER_PROFILES = {
       if (!bulkDeleteArmed) {
         bulkDeleteArmed = true;
         bulkDeleteBtn.classList.add("is-armed");
-        bulkDeleteBtn.dataset.tooltip = (trashOn ? "Confirm move to trash (" : "Confirm delete (") + selectedClipNames.size + ")";
+        bulkDeleteBtn.dataset.tooltip = RK_T(trashOn ? "Confirm move to trash ({count})" : "Confirm delete ({count})", { count: selectedClipNames.size });
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
         bulkDeleteArmTimer = setTimeout(resetBulkDeleteButton, 3000);
         return;
@@ -6758,7 +6765,7 @@ const CLIP_HOVER_PROFILES = {
       await loadEditor();
       if (request !== editorRequest) return;
       const blocked = clipBusyWith(clip.name);
-      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(blocked, "bad", "Editor"); return; }
+      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(clipBusyMessage(blocked), "bad", "Editor"); return; }
       editorApi().open(clip);
       if (!trimProcessingVeil.classList.contains("has-bones")) drawEditorSkeleton(trimVeil);
     } catch (err) {
@@ -6937,7 +6944,7 @@ const CLIP_HOVER_PROFILES = {
       const handle = document.createElement("button");
       handle.type = "button";
       handle.className = "icon-mini-btn section-drag";
-      handle.setAttribute("aria-label", "Reorder " + heading.querySelector("span").textContent);
+      handle.setAttribute("aria-label", RK_T("Reorder {name}", { name: heading.querySelector("span").textContent }));
       handle.dataset.tooltip = "Drag to reorder, or use Up and Down.";
       heading.prepend(handle);
       handle.addEventListener("pointerdown", event => {

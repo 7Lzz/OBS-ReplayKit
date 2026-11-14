@@ -475,18 +475,7 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("Themes.EnsureObsInSync: " + ex.Message); }
         }
 
-        private static string ReadObsThemeKey(string ini)
-        {
-            if (!File.Exists(ini)) return null;
-            bool inApp = false;
-            foreach (var raw in File.ReadAllLines(ini))
-            {
-                string s = raw.Trim();
-                if (s.StartsWith("[") && s.EndsWith("]")) { inApp = s.Equals("[Appearance]", StringComparison.OrdinalIgnoreCase); continue; }
-                if (inApp && s.StartsWith("Theme=", StringComparison.OrdinalIgnoreCase)) return s.Substring(6).Trim();
-            }
-            return null;
-        }
+        private static string ReadObsThemeKey(string ini) => ObsUserIni.Read("Appearance", "Theme");
 
         private static string BuildOvt(Tokens t, string obsId, string label)
         {
@@ -569,43 +558,7 @@ namespace ReplayKitHelper
         }
 
         // minimal ini edit: set (or remove, when value == "") [Appearance] Theme= in user.ini, preserving everything else.
-        private static void SetObsThemeKey(string value)
-        {
-            string ini = Path.Combine(Constants.OBS_CONFIG_DIR, "user.ini");
-            var lines = File.Exists(ini) ? new List<string>(File.ReadAllLines(ini)) : new List<string>();
-            int appIdx = -1, keyIdx = -1, nextSection = lines.Count;
-            for (int i = 0; i < lines.Count; i++)
-            {
-                string s = lines[i].Trim();
-                if (s.StartsWith("[") && s.EndsWith("]"))
-                {
-                    if (appIdx >= 0) { nextSection = i; break; }
-                    if (s.Equals("[Appearance]", StringComparison.OrdinalIgnoreCase)) appIdx = i;
-                    continue;
-                }
-                if (appIdx >= 0 && keyIdx < 0 && s.StartsWith("Theme=", StringComparison.OrdinalIgnoreCase)) keyIdx = i;
-            }
-
-            if (string.IsNullOrEmpty(value))
-            {
-                if (keyIdx >= 0) lines.RemoveAt(keyIdx);
-            }
-            else if (keyIdx >= 0)
-            {
-                lines[keyIdx] = "Theme=" + value;
-            }
-            else if (appIdx >= 0)
-            {
-                lines.Insert(appIdx + 1, "Theme=" + value);
-            }
-            else
-            {
-                if (lines.Count > 0 && lines[lines.Count - 1].Trim().Length > 0) lines.Add("");
-                lines.Add("[Appearance]");
-                lines.Add("Theme=" + value);
-            }
-            File.WriteAllLines(ini, lines, new UTF8Encoding(false));
-        }
+        private static void SetObsThemeKey(string value) => ObsUserIni.Set("Appearance", "Theme", value);
 
         // -- user (saved) themes --
 

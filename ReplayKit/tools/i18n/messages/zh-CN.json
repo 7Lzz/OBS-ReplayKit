@@ -1,0 +1,76 @@
+{
+  "capture.clipSaved": {
+    "source": "de65a9a7ac711c41",
+    "text": "已保存最近 {length}"
+  },
+  "capture.clipSavedUnderSecond": {
+    "source": "a096fb52b31755cd",
+    "text": "已保存不到 1 秒"
+  },
+  "capture.clipSavedUnknown": {
+    "source": "137d9c40106a6caf",
+    "text": "剪辑已保存"
+  },
+  "capture.recordingStarted": {
+    "source": "c9ad24bd74b949ab",
+    "text": "已开始录制"
+  },
+  "capture.recordingStopped": {
+    "source": "c7e743d4c20fed44",
+    "text": "已停止录制"
+  },
+  "clips.selectedCount": {
+    "source": "08e97b60a4dc6ce0",
+    "text": {
+      "other": "已选择 {count} 个剪辑"
+    }
+  },
+  "clips.showInClips": {
+    "source": "89fca022ec0aa5c0",
+    "text": "在剪辑列表中显示"
+  },
+  "common.close": {
+    "source": "d7cf5045c01b2eb9",
+    "text": "关闭"
+  },
+  "notifications.deletedHint": {
+    "source": "5d1e67f9e652a62b",
+    "text": "它可能已被删除。"
+  },
+  "notifications.notFound": {
+    "source": "9660581acdceaa01",
+    "text": "未找到通知"
+  },
+  "notifications.openReleasePage": {
+    "source": "943ca6886bf827b7",
+    "text": "打开发布页面"
+  },
+  "picker.iconImage": {
+    "source": "a842c813ab15e1e8",
+    "text": "选择图标图片"
+  },
+  "picker.importAudio": {
+    "source": "5ead5299907864ba",
+    "text": "导入音频"
+  },
+  "picker.importMedia": {
+    "source": "795636276d09ecd6",
+    "text": "添加 GIF 或图片"
+  },
+  "picker.importVideo": {
+    "source": "2b9b8a67ab660949",
+    "text": "添加视频"
+  },
+  "picker.recordingFolder": {
+    "source": "2bbc70e8c4a90ae9",
+    "text": "选择录像文件夹"
+  },
+  "setup.uninstallTitle": {
+    "source": "6610dbeda8014a0b",
+    "text": "OBS ReplayKit 卸载"
+  },
+  "setup.windowTitle": {
+    "source": "2e0e00e71a75260a",
+    "text": "OBS ReplayKit 安装程序"
+  }
+}

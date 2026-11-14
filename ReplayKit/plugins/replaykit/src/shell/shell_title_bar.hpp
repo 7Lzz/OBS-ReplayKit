@@ -10,6 +10,7 @@
 #include <QString>
 #include <QWidget>
 
+#include "core/locale.hpp"
 #include "shell/shell_account.hpp"
 #include "shell/shell_title_button.hpp"
 
@@ -48,7 +49,7 @@ protected:
 private:
 	static QFont LabelFont();
 	void SizeToLabel();
-	QString Label() const { return (m_kind == Kind::Obs ? QStringLiteral("OBS %1 Available") : QStringLiteral("ReplayKit %1 Available")).arg(m_version); }
+	QString Label() const { return (m_kind == Kind::Obs ? Tr("OBS {version} Available", {{"version", m_version}}) : Tr("ReplayKit {version} Available", {{"version", m_version}})); }
 
 	Kind m_kind;
 	QString m_version;

@@ -666,7 +666,7 @@
     function vSpeed(v) { return v && v.speed != null ? v.speed : st.vspeed; }
     function vLen(v) { return (v.srcEnd - v.srcStart) / vSpeed(v); }
     function vEnd(v) { return v.at + vLen(v); }
-    function videoLabel(v) { var speed = v ? vSpeed(v) : st.vspeed; return speed === 1 ? "Video" : "Video " + r3(speed) + "x"; }
+    function videoLabel(v) { var speed = v ? vSpeed(v) : st.vspeed; return speed === 1 ? RK_T("Video") : RK_T("Video {speed}x", { speed: r3(speed) }); }
     function findV(id) {
       if (!id) return null;
       for (var i = 0; i < st.vsegs.length; i++) if (st.vsegs[i].id === id) return { seg: st.vsegs[i], index: i };
@@ -1055,7 +1055,7 @@
       if (row.auto && row.title) return row.title;
       var first = rowCues(row.id)[0];
       var text = first ? first.text.trim().replace(/\s+/g, " ") : "";
-      return text ? text.slice(0, SUB_TITLE_MAX) : "Subtitle";
+      return text ? text.slice(0, SUB_TITLE_MAX) : RK_T("Subtitle");
     }
     // rows left without a cue by a delete, a merge or an undo are gone, the way an emptied row of audio is
     function dropEmptyRows() {
@@ -1275,7 +1275,9 @@
 
     function makeSubEl() {
       var node = el("div", "tl-cue");
-      node.appendChild(el("span", "tl-cue-text"));
+      var text = el("span", "tl-cue-text");
+      text.setAttribute("translate", "no");
+      node.appendChild(text);
       node.appendChild(el("i", "tl-h l"));
       node.appendChild(el("i", "tl-h r"));
       return node;
@@ -1286,7 +1288,9 @@
       node.dataset.row = row.id;
       var chip = el("span", "tl-chip tl-subchip");
       chip.innerHTML = icon("editor/subtitles");
-      chip.appendChild(el("span", "tl-chip-label"));
+      var chipLabel = el("span", "tl-chip-label");
+      chipLabel.setAttribute("translate", "no");
+      chip.appendChild(chipLabel);
       node.appendChild(chip);
       return node;
     }
@@ -1625,7 +1629,7 @@
         items.push({ label: "Merge with the next subtitle", icon: "editor/mix", disabled: !nextInRow(cue), action: function () { mergeNext(cue); } });
       }
       st.subRows.forEach(function (other) {
-        if (other !== row) items.push({ label: "Merge row into " + rowTitle(other), icon: "editor/mix", action: function () { mergeRows(row.id, other.id); } });
+        if (other !== row) items.push({ label: RK_T("Merge row into {name}", { name: rowTitle(other) }), icon: "editor/mix", action: function () { mergeRows(row.id, other.id); } });
       });
       if (items.length) items.push("-");
       items.push(
@@ -1724,7 +1728,9 @@
       var row = el("div", "tl-subrow tl-layerrow");
       var chip = el("span", "tl-chip tl-subchip tl-layerchip");
       chip.innerHTML = icon(l.kind === "clip" ? "editor/video" : "editor/image");
-      chip.appendChild(el("span", "tl-chip-label"));
+      var rowLabel = el("span", "tl-chip-label");
+      rowLabel.setAttribute("translate", "no");
+      chip.appendChild(rowLabel);
       row.appendChild(chip);
       return row;
     }
@@ -1732,10 +1738,14 @@
     function makeLayerNode(l) {
       var node = el("div", "tl-cue tl-layer");
       node.dataset.layer = l.id;
-      node.appendChild(el("span", "tl-cue-text"));
+      var cueText = el("span", "tl-cue-text");
+      cueText.setAttribute("translate", "no");
+      node.appendChild(cueText);
       var chip = el("span", "tl-chip");
       chip.innerHTML = icon(l.kind === "clip" ? "editor/video" : "editor/image");
-      chip.appendChild(el("span", "tl-chip-label"));
+      var tagLabel = el("span", "tl-chip-label");
+      tagLabel.setAttribute("translate", "no");
+      chip.appendChild(tagLabel);
       node.appendChild(chip);
       node.appendChild(el("i", "tl-h l"));
       node.appendChild(el("i", "tl-h r"));
@@ -2588,7 +2598,7 @@
     // whether one more row fits, which the plan of the saved copy limits; a note says so when it does not
     function roomForRow() {
       if (restRows().length < MAX_LANES) return true;
-      if (opts.notify) opts.notify("A clip can hold " + MAX_LANES + " rows at most.");
+      if (opts.notify) opts.notify(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES }));
       return false;
     }
 
@@ -2876,7 +2886,7 @@
         if (s.fadeIn > 0.001 || s.fadeOut > 0.001) return "Take the fades off the tracks to combine them.";
         if (Math.abs(s.speed - first.speed) > 1e-6 || s.pitch !== first.pitch) return "Give the tracks the same speed to combine them.";
       }
-      if (count > MAX_PARTS) return "A combined track can hold " + MAX_PARTS + " tracks at most.";
+      if (count > MAX_PARTS) return RK_T("A combined track can hold {count} tracks at most.", { count: MAX_PARTS });
       return "";
     }
 
@@ -3080,7 +3090,9 @@
       node.classList.toggle("is-linked", !!rgb);
       var label = pieceLabel(seg);
       var chipLabel = node.firstChild.lastChild;
-      if (chipLabel.textContent !== label) {
+      // the label is a track name or an imported file name, so the guard reads the last label set and not the translated text in the dom
+      if (chipLabel.dataset.label !== label) {
+        chipLabel.dataset.label = label;
         chipLabel.textContent = label;
         node.firstChild.firstChild.innerHTML = icon(chipIcon(seg));
       }
@@ -3149,6 +3161,8 @@
           node.insertBefore(chip, node.firstChild);
         }
         var label = v.ref ? v.name || "" : videoLabel(v);
+        // a piece of another clip is named after that clip, which is user content
+        chip.lastChild.setAttribute("translate", v.ref ? "no" : "yes");
         if (chip.lastChild.textContent !== label) chip.lastChild.textContent = label;
         live[v.id] = true;
       });
@@ -3713,18 +3727,18 @@
       value.type = "text";
       value.inputMode = "decimal";
       value.autocomplete = "off";
-      value.setAttribute("aria-label", cfg.label);
+      value.setAttribute("aria-label", RK_T(cfg.label));
       var wrap = el("div", "tl-slider-wrap");
       var slide = el("input", "tl-slider rk-range");
       slide.type = "range";
       slide.min = String(cfg.min);
       slide.max = String(cfg.max);
       slide.step = String(cfg.step);
-      slide.setAttribute("aria-label", cfg.label + " slider");
+      slide.setAttribute("aria-label", RK_T("{label} slider", { label: RK_T(cfg.label) }));
       wrap.appendChild(slide);
       var reset = el("button", "tl-reset");
       reset.type = "button";
-      reset.setAttribute("aria-label", "Reset " + cfg.label.toLowerCase());
+      reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(cfg.label).toLowerCase() }));
       reset.dataset.tooltip = "Reset to default";
       reset.innerHTML = icon("action/reset");
       var head = el("div", "tl-field-head");
@@ -3783,7 +3797,7 @@
       var label = el("div", "trim-mode-row");
       var input = el("input", "rk-switch");
       input.type = "checkbox";
-      input.setAttribute("aria-label", text);
+      input.setAttribute("aria-label", RK_T(text));
       var span = el("span");
       span.textContent = text;
       label.appendChild(input);
@@ -3804,6 +3818,7 @@
       var head = el("div", "tl-props-head");
       els.propsTitle = el("div", "editor-card-title");
       els.source = el("div", "tl-source");
+      els.source.setAttribute("translate", "no");
       var close = el("button", "tl-x");
       close.type = "button";
       close.setAttribute("aria-label", "Close");
@@ -4026,7 +4041,7 @@
       }
       var s = hit.seg;
       els.propsTitle.textContent = "Audio";
-      els.source.textContent = pieceLabel(s) + (s.muted ? " (muted)" : "");
+      els.source.textContent = s.muted ? RK_T("{name} (muted)", { name: pieceLabel(s) }) : pieceLabel(s);
       var len = segLen(s);
       els.fin.slide.max = String(r3(Math.min(10, Math.max(0.1, len))));
       els.fout.slide.max = String(r3(Math.min(10, Math.max(0.1, len))));
@@ -4358,7 +4373,7 @@
       if (!L.solo && restRows().length >= MAX_LANES) {
         if (!L.capNoted && opts.notify) {
           L.capNoted = true;
-          opts.notify("A clip can hold " + MAX_LANES + " rows at most.");
+          opts.notify(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES }));
         }
         return { kind: "stay" };
       }
@@ -5349,7 +5364,7 @@
           return job.begin()
             .then(function (id) { return waitImport(id, mine); })
             .then(function (info) { return info ? placeImport(info, at, mine) : false; })
-            .catch(function (err) { problems.push(job.name + ": " + ((err && err.message) || "The audio could not be imported")); })
+            .catch(function (err) { problems.push(RK_T("{name}: {error}", { name: job.name, error: (err && err.message) || RK_T("The audio could not be imported") })); })
             .then(function () {
               if (mine !== seq) return;
               st.importing = Math.max(0, st.importing - 1);
@@ -5363,7 +5378,7 @@
     function pickAudio() {
       if (!st.ready || st.picking) return;
       var room = importRoom();
-      if (room < 1) { importNote("A clip can hold " + MAX_LANES + " rows at most."); return; }
+      if (room < 1) { importNote(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES })); return; }
       var mine = seq;
       st.picking = true;
       refreshToolbar();
@@ -5376,16 +5391,16 @@
           refreshToolbar();
           notifyBusy();
           if (!data || !data.ok) {
-            if (data && !data.cancelled) importNote(data.message || "The audio could not be imported");
+            if (data && !data.cancelled) importNote(data.message || RK_T("The audio could not be imported"));
             return null;
           }
           var jobs = [];
           var problems = [];
           (data.files || []).forEach(function (f) {
-            if (!f.ok) { problems.push((f.name || "File") + ": " + (f.message || "The audio could not be imported")); return; }
+            if (!f.ok) { problems.push(RK_T("{name}: {error}", { name: f.name || RK_T("File"), error: f.message || RK_T("The audio could not be imported") })); return; }
             jobs.push({ name: f.name, begin: function () { return Promise.resolve(f.id); } });
           });
-          if (data.skipped > 0) problems.push("A clip can hold " + MAX_LANES + " rows at most, so " + data.skipped + (data.skipped === 1 ? " file was" : " files were") + " left out");
+          if (data.skipped > 0) problems.push(data.skipped === 1 ? RK_T("A clip can hold {max} rows at most, so 1 file was left out", { max: MAX_LANES }) : RK_T("A clip can hold {max} rows at most, so {count} files were left out", { max: MAX_LANES, count: data.skipped }));
           if (!jobs.length) { if (problems.length) reportProblems(problems); return null; }
           st.importing += jobs.length;
           setBusy();
@@ -5412,12 +5427,12 @@
       var problems = [];
       var left = 0;
       files.forEach(function (file) {
-        if (!file.size) { problems.push(file.name + ": the file is empty"); return; }
-        if (file.size > MAX_IMPORT_BYTES) { problems.push(file.name + ": the file is larger than 512 MB"); return; }
+        if (!file.size) { problems.push(RK_T("{name}: the file is empty", { name: file.name })); return; }
+        if (file.size > MAX_IMPORT_BYTES) { problems.push(RK_T("{name}: the file is larger than 512 MB", { name: file.name })); return; }
         if (jobs.length >= room) { left += 1; return; }
         jobs.push({ name: file.name, begin: function () { return upload(file); } });
       });
-      if (left > 0) problems.push("A clip can hold " + MAX_LANES + " rows at most, so " + left + (left === 1 ? " file was" : " files were") + " left out");
+      if (left > 0) problems.push(left === 1 ? RK_T("A clip can hold {max} rows at most, so 1 file was left out", { max: MAX_LANES }) : RK_T("A clip can hold {max} rows at most, so {count} files were left out", { max: MAX_LANES, count: left }));
       if (!jobs.length) { if (problems.length) reportProblems(problems); return; }
       st.importing += jobs.length;
       setBusy();
@@ -5980,7 +5995,7 @@
       },
       // cues made from the words of the speech engine, in seconds of the timeline, as a new row named after what was listened to; the rows already there stay, and undo takes the new one back in one step
       addRow: function (title, cues) {
-        var row = { id: newId("R"), auto: true, title: String(title || "Subtitles").slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
+        var row = { id: newId("R"), auto: true, title: String(title || RK_T("Subtitles")).slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
         var made = cleanSubs(cues.map(function (c) { return { id: newId("C"), row: row.id, at: c.at, end: c.end, text: c.text, words: c.words, unsure: c.unsure === true, alts: c.alts }; }), [row]);
         if (!made.length) return "";
         st.subRows.push(row);
@@ -6110,7 +6125,7 @@
         setBusy();
         return waitImport(id, mine)
           .then(function (info) { return info ? placeImport(info, at, mine, link) : false; })
-          .catch(function (err) { importNote((err && err.message) || "The recording could not be added"); return false; })
+          .catch(function (err) { importNote((err && err.message) || RK_T("The recording could not be added")); return false; })
           .then(function (placed) {
             if (mine === seq) { st.importing = Math.max(0, st.importing - 1); setBusy(); }
             return placed;

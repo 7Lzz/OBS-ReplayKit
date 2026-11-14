@@ -7,6 +7,7 @@
 #include <QVariantAnimation>
 
 #include "core/dev_log.hpp"
+#include "core/locale.hpp"
 #include "core/main_window.hpp"
 #include "core/state.hpp"
 #include "core/theme.hpp"
@@ -407,9 +408,9 @@ void ShellProjectorApply()
 	const bool on = !WindowOnScreen() || ShellPreviewIsOn();
 	// while the preview is off its window is gone and the page the browser last showed would come through, so the stage is covered with a plain message in its place; the cover is taken away again once the preview is on or the view is another one. the preview windows sit above it
 	if (g_shellCurtain) {
-		static const QString previewOff = QStringLiteral("Preview is off");
+		static const QString previewOff = Tr("Preview is off");
 		if (showing && !on) {
-			Cover()->SetMessage(previewOff, QStringLiteral("Turn it back on with the Preview switch above"));
+			Cover()->SetMessage(previewOff, Tr("Turn it back on with the Preview switch above"));
 			g_shellCurtain->show();
 			g_shellCurtain->raise();
 		} else if (Cover()->Message() == previewOff) {

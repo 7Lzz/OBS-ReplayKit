@@ -151,6 +151,7 @@ namespace ReplayKitHelper
             ClipRoutes.Handle,
             ShareRoutes.Handle,
             SdkRoutes.Handle,
+            LocaleRoutes.Handle,
         };
     }
 }

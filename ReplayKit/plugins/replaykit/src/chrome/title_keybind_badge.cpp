@@ -3,6 +3,7 @@
 #include "chrome/title_keybind_badge.hpp"
 
 #include "core/keybind_label.hpp"
+#include "core/locale.hpp"
 #include "core/ui_font.hpp"
 #include "notify/notify_button.hpp"
 
@@ -89,9 +90,9 @@ QList<QPair<QString, QString>> TitleKeybindBadge::Entries() const
 {
 	QList<QPair<QString, QString>> entries;
 	if (!m_clipLabel.isEmpty())
-		entries.append({QStringLiteral("Clip"), m_clipLabel});
+		entries.append({Tr("Clip"), m_clipLabel});
 	if (!m_recordLabel.isEmpty())
-		entries.append({QStringLiteral("Recording"), m_recordLabel});
+		entries.append({Tr("Recording"), m_recordLabel});
 	return entries;
 }
 

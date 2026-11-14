@@ -186,7 +186,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
             {
                 try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                string msg = "Could not replace original: " + ex.Message;
+                string msg = Locales.T("Could not replace original: {error}", "error", ex.Message);
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: msg);
                 return new CompressOverwriteResult { Ok = false, Message = msg };
             }
@@ -224,9 +224,9 @@ namespace ReplayKitHelper
             try { CompressionHistory.Record(requestId, mode, preBytes, outBytes, scaleHeight); }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
             {
-                historyWarning = "The clip was compressed, but its result could not be saved to compression history.";
+                historyWarning = Locales.T("The clip was compressed, but its result could not be saved to compression history.");
                 Log.Write("Compression history: " + ex.Message, "compress", requestId);
-                try { Notifications.Add("warning", "compression-history", "Compression history was not saved", historyWarning); }
+                try { Notifications.Add("warning", "compression-history", Locales.T("Compression history was not saved"), historyWarning); }
                 catch (Exception notice) when (notice is IOException || notice is UnauthorizedAccessException || notice is Newtonsoft.Json.JsonException)
                 { Log.Write("Compression history notification: " + notice.Message, "compress", requestId); }
             }

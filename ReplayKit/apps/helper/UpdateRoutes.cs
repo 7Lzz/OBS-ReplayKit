@@ -44,9 +44,9 @@ namespace ReplayKitHelper
                 {
                     string installed = Update.NormalizeVersion(Update.GetInstalledVersion());
                     var release = Update.GetReleaseForVersion(installed);
-                    if (release == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "No release notes found for version " + installed + "." }); return false; }
+                    if (release == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.T("No release notes found for version {version}.", "version", installed) }); return false; }
                     // a real, persisted notification (not a throwaway client-side one) so it survives closing the panel or restarting obs same as any other -- keyed on the version so pressing the button again just refreshes the same row instead of stacking a duplicate. marked read immediately: the user asked to see this, it should not also bump the unread badge.
-                    string title = (string.IsNullOrEmpty(release.Name) ? "ReplayKit " + installed : release.Name) + " (installed)";
+                    string title = Locales.T("{name} (installed)", "name", string.IsNullOrEmpty(release.Name) ? "ReplayKit " + installed : release.Name);
                     var snapshot = Notifications.Add("info", "whats-new:" + installed, title, release.Body, release.HtmlUrl);
                     string addedId = (snapshot["items"] as JArray)?.OfType<JObject>()
                         .FirstOrDefault(i => i["key"]?.Value<string>() == "whats-new:" + installed)?["id"]?.Value<string>();

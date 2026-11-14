@@ -1,0 +1,77 @@
+{
+  "capture.clipSaved": {
+    "source": "de65a9a7ac711c41",
+    "text": "Die letzten {length} gespeichert"
+  },
+  "capture.clipSavedUnderSecond": {
+    "source": "a096fb52b31755cd",
+    "text": "Weniger als 1 s gespeichert"
+  },
+  "capture.clipSavedUnknown": {
+    "source": "137d9c40106a6caf",
+    "text": "Clip gespeichert"
+  },
+  "capture.recordingStarted": {
+    "source": "c9ad24bd74b949ab",
+    "text": "Aufnahme gestartet"
+  },
+  "capture.recordingStopped": {
+    "source": "c7e743d4c20fed44",
+    "text": "Aufnahme beendet"
+  },
+  "clips.selectedCount": {
+    "source": "08e97b60a4dc6ce0",
+    "text": {
+      "one": "{count} Clip ausgewählt",
+      "other": "{count} Clips ausgewählt"
+    }
+  },
+  "clips.showInClips": {
+    "source": "89fca022ec0aa5c0",
+    "text": "In Clips anzeigen"
+  },
+  "common.close": {
+    "source": "d7cf5045c01b2eb9",
+    "text": "Schließen"
+  },
+  "notifications.deletedHint": {
+    "source": "5d1e67f9e652a62b",
+    "text": "Er wurde möglicherweise gelöscht."
+  },
+  "notifications.notFound": {
+    "source": "9660581acdceaa01",
+    "text": "Benachrichtigung nicht gefunden"
+  },
+  "notifications.openReleasePage": {
+    "source": "943ca6886bf827b7",
+    "text": "Versionsseite öffnen"
+  },
+  "picker.iconImage": {
+    "source": "a842c813ab15e1e8",
+    "text": "Symbolbild auswählen"
+  },
+  "picker.importAudio": {
+    "source": "5ead5299907864ba",
+    "text": "Audio importieren"
+  },
+  "picker.importMedia": {
+    "source": "795636276d09ecd6",
+    "text": "GIF oder Bild hinzufügen"
+  },
+  "picker.importVideo": {
+    "source": "2b9b8a67ab660949",
+    "text": "Video hinzufügen"
+  },
+  "picker.recordingFolder": {
+    "source": "2bbc70e8c4a90ae9",
+    "text": "Aufnahmeordner auswählen"
+  },
+  "setup.uninstallTitle": {
+    "source": "6610dbeda8014a0b",
+    "text": "OBS ReplayKit deinstallieren"
+  },
+  "setup.windowTitle": {
+    "source": "2e0e00e71a75260a",
+    "text": "OBS ReplayKit Setup"
+  }
+}

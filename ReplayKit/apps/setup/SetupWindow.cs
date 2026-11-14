@@ -45,7 +45,7 @@ namespace ReplayKitSetup
         {
             _scale = SafeDpiScale();
             _theme = WindowTheme.Load();
-            _html = _theme.ApplyTo(LoadHtml());
+            _html = _theme.ApplyTo(SetupLocale.Inject(LoadHtml()));
             _brushBg = Native.CreateSolidBrush((uint)WindowTheme.ColorRef(_theme.Window));
 
             _wndProcRef = WndProc;
@@ -66,7 +66,7 @@ namespace ReplayKitSetup
             int y = (Native.GetSystemMetrics(1) - h) / 2;
             // a plain titled window -- WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, no thickframe/maximize so it stays a fixed installer dialog. dwm themes + rounds the frame on its own.
             const uint style = 0x00C00000 | 0x00080000 | 0x00020000;
-            _hwnd = Native.CreateWindowExW(0, ClassName, "OBS ReplayKit Setup", style, x, y, w, h,
+            _hwnd = Native.CreateWindowExW(0, ClassName, SetupLocale.Message("setup.windowTitle"), style, x, y, w, h,
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
             if (_hwnd == IntPtr.Zero) throw new InvalidOperationException("Could not create the setup window.");
 
@@ -117,7 +117,7 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 WriteErrorLog(ex);
-                InstallerApp.ShowFatalError("The setup window could not start.\n\n" + ex, null);
+                InstallerApp.ShowFatalError(SetupLocale.T("The setup window could not start.\n\n{error}", "error", ex), null);
                 Native.DestroyWindow(_hwnd);
             }
         }
@@ -242,7 +242,7 @@ namespace ReplayKitSetup
         {
             if (issueCount > 0)
             {
-                OnFlowFailed("Setup is incomplete: " + issueCount + " step(s) need attention. Run the installer again after resolving the warnings in the log.");
+                OnFlowFailed(SetupLocale.T("Setup is incomplete: {count} step(s) need attention. Run the installer again after resolving the warnings in the log.", "count", issueCount));
                 return;
             }
             _done = true;
@@ -253,7 +253,7 @@ namespace ReplayKitSetup
         private void OnFlowFailed(string message)
         {
             _done = true;
-            string shown = (message ?? "unknown error") + "  (log: " + SetupLog.Path + ")";
+            string shown = SetupLocale.T("{message}  (log: {path})", "message", SetupLocale.T(message ?? "unknown error"), "path", SetupLog.Path);
             PostToPage(new JObject { ["type"] = "failed", ["message"] = shown });
         }
 

@@ -805,7 +805,7 @@
   };
   TAB_ICONS.presets = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-6}}</svg>';
   var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"], ["presets", "Presets"]];
-  var PRESET_KINDS = { video: "the look of this video", subtitle: "the style of these subtitles" };
+  var PRESET_KINDS = { video: RK_T("the look of this video"), subtitle: RK_T("the style of these subtitles") };
   var COLOR_GROUPS = [
     ["Channels", [["r", "Red"], ["g", "Green"], ["b", "Blue"], ["a", "Opacity"]]],
     ["Color", [["sat", "Saturation"], ["hue", "Hue"], ["vib", "Vibrance"]]],
@@ -860,7 +860,7 @@
       if (onReset) {
         var reset = el("button", "tl-reset");
         reset.type = "button";
-        reset.setAttribute("aria-label", "Reset " + label.toLowerCase());
+        reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(label).toLowerCase() }));
         reset.dataset.tooltip = "Reset to default";
         reset.innerHTML = icon("action/reset");
         reset.addEventListener("click", onReset);
@@ -924,7 +924,7 @@
         // the reset of the general tab, for the settings of this group alone
         var reset = el("button", "tl-reset");
         reset.type = "button";
-        reset.setAttribute("aria-label", "Reset " + group[0].toLowerCase());
+        reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(group[0]).toLowerCase() }));
         reset.dataset.tooltip = "Reset to default";
         reset.innerHTML = icon("action/reset");
         reset.addEventListener("click", function () {
@@ -971,7 +971,7 @@
       if (onEdit) {
         var edit = el("button", "ed-fx-edit");
         edit.type = "button";
-        edit.setAttribute("aria-label", "Edit " + label.toLowerCase());
+        edit.setAttribute("aria-label", RK_T("Edit {label}", { label: RK_T(label).toLowerCase() }));
         edit.dataset.tooltip = "Edit";
         edit.innerHTML = icon("action/edit");
         edit.addEventListener("click", function (e) { e.stopPropagation(); onEdit(); });
@@ -1004,10 +1004,16 @@
     }
 
     // the tiles of a pane in two grids, the favorites first, each in the order the list defines; a search hides tiles and a heading with nothing left under it
+    // the pane names are keys, so each sentence that carries one is written out whole
+    function kindText(kind) {
+      if (kind === "filters") return { all: RK_T("All filters"), search: RK_T("Search filters"), none: RK_T("No filters match that.") };
+      return { all: RK_T("All effects"), search: RK_T("Search effects"), none: RK_T("No effects match that.") };
+    }
+
     function tileGroups(box, kind, list) {
       var favHead = groupHead("toggle/star", "Favorites");
       var favGrid = el("div", "ed-fx-grid");
-      var restHead = groupHead("toggle/grid", "All " + kind);
+      var restHead = groupHead("toggle/grid", kindText(kind).all);
       var restGrid = el("div", "ed-fx-grid");
       var search = searchBox(list, kind, heads);
       [search, search.none, favHead, favGrid, restHead, restGrid].forEach(function (n) { box.appendChild(n); });
@@ -1049,12 +1055,12 @@
       box.innerHTML = SEARCH_ICON;
       var input = el("input");
       input.type = "text";
-      input.placeholder = "Search " + kind;
+      input.placeholder = kindText(kind).search;
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", "Search " + kind);
+      input.setAttribute("aria-label", kindText(kind).search);
       box.appendChild(input);
-      var none = el("p", "ed-fx-note", "No " + kind + " match that.");
+      var none = el("p", "ed-fx-note", kindText(kind).none);
       none.hidden = true;
       input.addEventListener("input", function () {
         var q = input.value.trim().toLowerCase();
@@ -1222,7 +1228,7 @@
         if (done === "video" || done === "subtitle") chosen[done] = "";
         presetsKey = "";
         paint();
-        if (o.notify) o.notify({ video: "The video", audio: "The audio", subtitle: "The subtitles" }[done] + " went back to default. Undo brings it back.", "info");
+        if (o.notify) o.notify({ video: RK_T("The video went back to default. Undo brings it back."), audio: RK_T("The audio went back to default. Undo brings it back."), subtitle: RK_T("The subtitles went back to default. Undo brings it back.") }[done], "info");
       });
       o.rail.appendChild(els.resetTab);
       // below reset, while a selected subtitle may be misheard: the list of them, with what else each might have been
@@ -1468,8 +1474,8 @@
       if (!name) {
         var names = presets[k].map(function (p) { return p.name; });
         var n = presets[k].length + 1;
-        while (names.indexOf("Preset " + n) >= 0) n++;
-        name = "Preset " + n;
+        while (names.indexOf(RK_T("Preset {number}", { number: n })) >= 0) n++;
+        name = RK_T("Preset {number}", { number: n });
       }
       var p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: name, data: data };
       chosen[k] = p.id;
@@ -1585,7 +1591,7 @@
       var inUse = list.filter(function (p) { return matches(k, p); }).map(function (p) { return p.id; });
       els.presetApply.disabled = !target;
       els.presetOverwrite.disabled = !target || !data;
-      els.presetOverwrite.dataset.tooltip = target ? "Replace " + target.name + " with " + PRESET_KINDS[k] : "Pick a preset to overwrite";
+      els.presetOverwrite.dataset.tooltip = target ? RK_T("Replace {name} with {kind}", { name: target.name, kind: PRESET_KINDS[k] }) : "Pick a preset to overwrite";
       els.presetSave.disabled = !data;
       // a name being typed into a row is never drawn over; the list catches up once it is done
       if (renaming && renaming.kind === k && findPreset(k, renaming.id)) return;
@@ -1593,20 +1599,22 @@
       var key = canon([k, list.map(function (p) { return [p.id, p.name]; }), inUse, chosen[k]]);
       if (key === presetsKey) return;
       presetsKey = key;
-      els.presetNote.textContent = list.length ? "Pick a preset, then apply it, or overwrite it with " + PRESET_KINDS[k] + "." : "No presets yet. Name " + PRESET_KINDS[k] + " below and save it to use it on any clip.";
+      els.presetNote.textContent = list.length ? RK_T("Pick a preset, then apply it, or overwrite it with {kind}.", { kind: PRESET_KINDS[k] }) : RK_T("No presets yet. Name {kind} below and save it to use it on any clip.", { kind: PRESET_KINDS[k] });
       els.presetList.textContent = "";
       list.forEach(function (p) {
         var row = el("div", "ed-preset" + (p.id === chosen[k] ? " is-selected" : ""));
         row.tabIndex = 0;
         row.setAttribute("role", "option");
         row.setAttribute("aria-selected", p.id === chosen[k] ? "true" : "false");
-        row.appendChild(el("span", "ed-preset-name", p.name));
+        var presetName = el("span", "ed-preset-name", p.name);
+        presetName.setAttribute("translate", "no");
+        row.appendChild(presetName);
         // the preset that matches what is on screen says so, picked or not
         row.appendChild(el("span", "ed-preset-use", inUse.indexOf(p.id) >= 0 ? "In use" : ""));
         var edit = el("button", "icon-mini-btn edit-btn");
         edit.type = "button";
         edit.dataset.tooltip = "Rename";
-        edit.setAttribute("aria-label", "Rename " + p.name);
+        edit.setAttribute("aria-label", RK_T("Rename {name}", { name: p.name }));
         edit.innerHTML = icon("action/edit");
         edit.addEventListener("click", function (e) { e.stopPropagation(); startRename(k, p, row); });
         row.appendChild(edit);
@@ -1615,7 +1623,7 @@
         bin.type = "button";
         bin.dataset.deleteLabel = "Delete preset";
         bin.dataset.tooltip = "Delete preset";
-        bin.setAttribute("aria-label", "Delete " + p.name);
+        bin.setAttribute("aria-label", RK_T("Delete {name}", { name: p.name }));
         bin.innerHTML = icon("action/trash");
         bin.appendChild(el("span", "delete-confirm-text", "Delete?"));
         bin.addEventListener("click", function (e) {
@@ -1679,7 +1687,7 @@
       var key = canon(cues.map(function (c) { return [c.id, c.text, c.at, c.alts || []]; }));
       if (key === checkKey) return;
       checkKey = key;
-      els.checkNote.textContent = (cues.length === 1 ? "This subtitle was" : "These " + cues.length + " subtitles were") + " hard to make out. Pick or type what was said, keep it, or delete it.";
+      els.checkNote.textContent = cues.length === 1 ? RK_T("This subtitle was hard to make out. Pick or type what was said, keep it, or delete it.") : RK_T("These {count} subtitles were hard to make out. Pick or type what was said, keep it, or delete it.", { count: cues.length });
       els.checkList.textContent = "";
       var subs = lanes.subtitles;
       cues.forEach(function (c) {
@@ -1687,6 +1695,7 @@
         var head = el("div", "ed-check-head");
         // the app tooltip sits on the text alone, so the bin beside it keeps its own
         var said = el("span", "ed-check-text", c.text);
+        said.setAttribute("translate", "no");
         said.dataset.tooltip = "Go to this subtitle";
         head.appendChild(said);
         head.appendChild(el("span", "ed-check-time", clockOf(c.at)));
@@ -1713,6 +1722,7 @@
           var row = el("div", "tl-speeds");
           alts.forEach(function (text) {
             var b = el("button", "btn tl-mini", text);
+            b.setAttribute("translate", "no");
             b.type = "button";
             b.addEventListener("click", function () { subs.pickAlternative(c.id, text); });
             row.appendChild(b);

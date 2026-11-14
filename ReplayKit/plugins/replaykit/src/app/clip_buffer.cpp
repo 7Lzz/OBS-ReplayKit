@@ -589,6 +589,7 @@ void SendSave()
 					return;
 				}
 				const std::string path = ExtractJsonStringField(answer, "path");
+				ClipToastShow(ClipToastKind::Clip, JsonDoubleField(answer, "duration", 0));
 				TellPagesClipSaving("done", path);
 				blog(LOG_INFO, "[replaykit] disk clip buffer saved a clip");
 				calldata_t cd = {};
@@ -615,8 +616,7 @@ void SaveDisk()
 	g_awaitingSplit = true;
 	const int gen = ++g_saveGen;
 	g_saveStamp = QDateTime::currentMSecsSinceEpoch();
-	// the card and the beep script come on the press, since joining the pieces takes long enough to notice
-	ClipToastShow(ClipToastKind::Clip);
+	// play the save sound on the press; the confirmation waits for the finished file
 	calldata_t saving = {};
 	signal_handler_signal(obs_get_signal_handler(), "replaykit_clip_saving", &saving);
 	calldata_free(&saving);

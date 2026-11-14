@@ -3,6 +3,7 @@
 #include "shell/shell_nav_button.hpp"
 
 #include "core/draw_util.hpp"
+#include "core/locale.hpp"
 #include "core/theme.hpp"
 
 namespace rk {
@@ -19,7 +20,7 @@ ShellNavButton::ShellNavButton(Kind kind, QWidget *parent) : ShellTitleButton(kW
 {
 	const bool back = kind == Kind::Back;
 	m_svg = new QSvgRenderer(IconPath(back ? QStringLiteral("nav/history-back.svg") : QStringLiteral("nav/history-forward.svg")), this);
-	SetTip(back ? QStringLiteral("Back (Alt + Left)") : QStringLiteral("Forward (Alt + Right)"));
+	SetTip(back ? Tr("Back (Alt + Left)") : Tr("Forward (Alt + Right)"));
 	setCursor(Qt::ArrowCursor);
 }
 

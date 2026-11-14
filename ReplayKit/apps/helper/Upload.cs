@@ -60,7 +60,7 @@ namespace ReplayKitHelper
                     ["ok"] = false,
                     ["tooLong"] = true,
                     ["durationSec"] = total,
-                    ["message"] = "Clip is " + mmss + " long. Streamable's limit is 10 minutes -- trim it shorter first.",
+                    ["message"] = Locales.T("Clip is {length} long. Streamable's limit is 10 minutes -- trim it shorter first.", "length", mmss),
                 };
             }
             catch (Exception ex)
@@ -95,7 +95,7 @@ namespace ReplayKitHelper
                 string uploadFull = !string.IsNullOrWhiteSpace(uploadPath) ? Path.GetFullPath(uploadPath) : clip.Full;
                 if (!File.Exists(uploadFull))
                 {
-                    string msg = "Upload file not found: " + uploadFull;
+                    string msg = Locales.T("Upload file not found: {path}", "path", uploadFull);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg };
                 }
@@ -115,7 +115,7 @@ namespace ReplayKitHelper
                     // keep this short -- the dock button caps display at 60 chars and the popup buttons cap at 28. full context goes via toast in the popup.
                     long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);
                     long cap = effCap / 1024 / 1024;
-                    string msg = "Too big: " + mb + " MB / " + cap + " MB limit";
+                    string msg = Locales.T("Too big: {size} MB / {cap} MB limit", "size", mb, "cap", cap);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = mb, ["capMb"] = cap };
                 }
@@ -213,9 +213,9 @@ namespace ReplayKitHelper
         {
             string shownName = string.IsNullOrEmpty(clipName) ? "" : Path.GetFileNameWithoutExtension(clipName);
             string body = string.IsNullOrEmpty(shownName)
-                ? (copied ? "Your clip is ready and the link is on your clipboard" : "Your clip is ready")
-                : "Your \"" + shownName + "\" is ready" + (copied ? ", link copied to clipboard" : "");
-            ToastNotify.Show("Clip Uploaded", body, ResolveToastIconPath());
+                ? (copied ? Locales.T("Your clip is ready and the link is on your clipboard") : Locales.T("Your clip is ready"))
+                : (copied ? Locales.T("Your \"{name}\" is ready, link copied to clipboard", "name", shownName) : Locales.T("Your \"{name}\" is ready", "name", shownName));
+            ToastNotify.Show(Locales.T("Clip Uploaded"), body, ResolveToastIconPath());
         }
 
         // background transcode poller: streamables /transcode only queues the encode, and the video is watchable once /api/v1/videos/<shortcode> reports status 2. it runs as this exe in --transcode-poll mode outside the kill-on-close job, since a poll inside the helper died with it and left clips stuck on processing

@@ -138,7 +138,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                return new KeyframeScanResult { Ok = false, Message = "Could not read keyframes: " + ex.Message };
+                return new KeyframeScanResult { Ok = false, Message = Locales.T("Could not read keyframes: {error}", "error", ex.Message) };
             }
         }
     }

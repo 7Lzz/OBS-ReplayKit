@@ -1,0 +1,76 @@
+{
+  "capture.clipSaved": {
+    "source": "de65a9a7ac711c41",
+    "text": "直近 {length} を保存しました"
+  },
+  "capture.clipSavedUnderSecond": {
+    "source": "a096fb52b31755cd",
+    "text": "1 秒未満を保存しました"
+  },
+  "capture.clipSavedUnknown": {
+    "source": "137d9c40106a6caf",
+    "text": "クリップを保存しました"
+  },
+  "capture.recordingStarted": {
+    "source": "c9ad24bd74b949ab",
+    "text": "録画を開始しました"
+  },
+  "capture.recordingStopped": {
+    "source": "c7e743d4c20fed44",
+    "text": "録画を停止しました"
+  },
+  "clips.selectedCount": {
+    "source": "08e97b60a4dc6ce0",
+    "text": {
+      "other": "{count} 件のクリップを選択中"
+    }
+  },
+  "clips.showInClips": {
+    "source": "89fca022ec0aa5c0",
+    "text": "クリップ一覧に表示"
+  },
+  "common.close": {
+    "source": "d7cf5045c01b2eb9",
+    "text": "閉じる"
+  },
+  "notifications.deletedHint": {
+    "source": "5d1e67f9e652a62b",
+    "text": "削除された可能性があります。"
+  },
+  "notifications.notFound": {
+    "source": "9660581acdceaa01",
+    "text": "通知が見つかりません"
+  },
+  "notifications.openReleasePage": {
+    "source": "943ca6886bf827b7",
+    "text": "リリースページを開く"
+  },
+  "picker.iconImage": {
+    "source": "a842c813ab15e1e8",
+    "text": "アイコン画像を選択"
+  },
+  "picker.importAudio": {
+    "source": "5ead5299907864ba",
+    "text": "音声を読み込む"
+  },
+  "picker.importMedia": {
+    "source": "795636276d09ecd6",
+    "text": "GIF または画像を追加"
+  },
+  "picker.importVideo": {
+    "source": "2b9b8a67ab660949",
+    "text": "動画を追加"
+  },
+  "picker.recordingFolder": {
+    "source": "2bbc70e8c4a90ae9",
+    "text": "録画フォルダーを選択"
+  },
+  "setup.uninstallTitle": {
+    "source": "6610dbeda8014a0b",
+    "text": "OBS ReplayKit のアンインストール"
+  },
+  "setup.windowTitle": {
+    "source": "2e0e00e71a75260a",
+    "text": "OBS ReplayKit のセットアップ"
+  }
+}
