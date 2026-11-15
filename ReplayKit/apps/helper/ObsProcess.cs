@@ -72,6 +72,7 @@ namespace ReplayKitHelper
                     Log.Write(reason + ": native plugin did not acknowledge ALLOWCLOSE.");
             }
             catch (Exception ex) { Log.Write(reason + ": close acknowledgement failed: " + ex.Message); }
+            ObsWebSocket.DisconnectForObsClose();
             var procs = GetProcessesByNames("obs64", "obs32", "obs");
             bool stopped = true;
             DateTime deadline = DateTime.UtcNow.AddSeconds(15);
@@ -107,6 +108,7 @@ namespace ReplayKitHelper
             }
             if (!stopped)
             {
+                ObsWebSocket.AllowConnect();
                 Server.State.RestartAfterCleanObsPath = null;
                 string message = Locales.T("OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.");
                 Log.Write(reason + ": " + message);

@@ -93,6 +93,21 @@ namespace ReplayKitHelper
             socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token).GetAwaiter().GetResult();
         }
 
+        // set while obs is asked to close for a restart or exit: the cached socket is only read during a request, so obs never got an answer to its close, waited out its 5 s handshake and then kept its websocket thread, and with it its exit, waiting on the open connection until the restart stopped it at 15 s
+        private static volatile bool obsClosing;
+
+        internal static void DisconnectForObsClose()
+        {
+            lock (Server.State.ObsWebSocketLock)
+            {
+                obsClosing = true;
+                CloseCached();
+            }
+        }
+
+        // obs stayed open after all
+        internal static void AllowConnect() => obsClosing = false;
+
         // drops the cached connection (if any) and closes it. only ever called with ObsWebSocketLock already held.
         private static void CloseCached()
         {
@@ -159,6 +174,7 @@ namespace ReplayKitHelper
             // the whole connect-reuse-or-fresh + send + receive cycle runs under one lock -- the request/response matching below has no way to tell two concurrent callers requests apart on a shared socket, so at most one request can be in flight on it at a time regardless of how many callers fire one.
             lock (Server.State.ObsWebSocketLock)
             {
+                if (obsClosing) return new ObsWebSocketResult { Ok = false, Unavailable = true, Message = "OBS is closing." };
                 if (!settings.Ok)
                 {
                     CloseCached();
