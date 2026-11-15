@@ -36,12 +36,15 @@ bool PipeWriteLine(HANDLE pipe, const std::string &line)
 	return true;
 }
 
-// serves one connected helper until it disconnects or the plugin shuts down. non-blocking: PeekNamedPipe drains inbound, small WriteFiles push outbound, a 40ms sleep paces the loop. MAINWIN goes once per connection, PROJECTORS about every 250ms (the cadence the old file write used).
+// serves one connected helper until it disconnects or the plugin shuts down. non-blocking: PeekNamedPipe drains inbound, small WriteFiles push outbound, a 40ms sleep paces the loop. LOCALE and MAINWIN go once per connection, PROJECTORS about every 250ms (the cadence the old file write used).
 void PipeServeClient(HANDLE pipe)
 {
 	bool mainWinSent = false;
 	auto lastProjectors = std::chrono::steady_clock::now() - std::chrono::milliseconds(250);
 	std::string inbound;
+	const char *locale = obs_get_locale();
+	if (!PipeWriteLine(pipe, std::string("LOCALE ") + (locale ? locale : "")))
+		return;
 
 	while (!g_pipeStop.load()) {
 		for (const std::string &message : CaptureContextMessages())
@@ -59,6 +62,14 @@ void PipeServeClient(HANDLE pipe)
 		}
 		if (g_pipeSendOutputsReleasedAck.exchange(false)) {
 			if (!PipeWriteLine(pipe, "RELEASEOUTPUTS_ACK"))
+				return;
+		}
+		if (g_pipeSendLanguageAck.exchange(false)) {
+			if (!PipeWriteLine(pipe, "LANGUAGE_ACK"))
+				return;
+		}
+		if (g_pipeSendShareProjectorAck.exchange(false)) {
+			if (!PipeWriteLine(pipe, "SHAREPROJECTOR_ACK"))
 				return;
 		}
 		auto now = std::chrono::steady_clock::now();
@@ -142,6 +153,8 @@ std::atomic<quintptr> g_mainWinValue{0};
 std::atomic<unsigned long long> g_allowCloseUntilMs{0};
 std::atomic<bool> g_pipeSendAllowCloseAck{false};
 std::atomic<bool> g_pipeSendOutputsReleasedAck{false};
+std::atomic<bool> g_pipeSendLanguageAck{false};
+std::atomic<bool> g_pipeSendShareProjectorAck{false};
 
 // obs marks every real projector window with windowHandle()->setProperty("isOBSProjectorWindow", true) -- see OBSProjector.cpp, which does this specifically so obss own code (SetDisplayAffinity) can recognize one reliably. thats a qt object property, invisible to plain win32 enumeration, so the helper (a separate process with no qt/obs-object access) cant read it directly -- this plugin can, since it runs inside obss own qt process. this refreshes the hwnd list the pipe thread streams to the helper so it can check the SAME authoritative signal obs uses internally instead of inferring "looks like a projector" from window class + ownership heuristics, which had real false-positive risk (NameDialog, the Scripts window, the auto-config wizard are independently-owned top-level windows too). must run on the gui thread for topLevelWindows()/winId().
 void PublishProjectorWindows()

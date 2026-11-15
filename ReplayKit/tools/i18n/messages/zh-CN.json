@@ -65,6 +65,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "选择录像文件夹"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "锁定"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "已锁定"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "由于 OBS 没有响应，语言未更改。请重试。"
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "OBS ReplayKit 卸载"
@@ -72,5 +84,35 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "OBS ReplayKit 安装程序"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "other": "{count} 个剪辑无法压缩。"
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "other": "{count} 个剪辑无法压缩（{error}）。"
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "other": "已压缩 {count} 个剪辑。"
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "other": "已压缩 {count} 个剪辑并释放 {size}。"
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "other": "已在停止前压缩 {count} 个剪辑并释放 {size}。"
+    }
   }
 }

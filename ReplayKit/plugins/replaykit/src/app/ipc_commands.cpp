@@ -3,6 +3,7 @@
 #include "app/ipc_commands.hpp"
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <util/config-file.h>
 
 #include "app/clip_buffer.hpp"
 #include "app/capture_context.hpp"
@@ -10,9 +11,11 @@
 #include "app/obs_menu.hpp"
 #include "app/sdk_commands.hpp"
 #include "app/settings_poll.hpp"
+#include "app/share_projector.hpp"
 #include "core/app_icon.hpp"
 #include "core/ipc_pipe.hpp"
 #include "core/main_window.hpp"
+#include "core/shared_values.hpp"
 #include "core/state.hpp"
 #include "core/window_state.hpp"
 #include "notify/notify_button.hpp"
@@ -204,6 +207,31 @@ void PipeDispatchLine(const std::string &line)
 		// the helper is about to start the replay buffer or a recording through obs-websocket and waits for the ack
 		QMetaObject::invokeMethod(g_callbacks, []() {
 			ShellStartOutputWhenFree([]() { g_pipeSendOutputsReleasedAck.store(true); });
+		}, Qt::QueuedConnection);
+	} else if (line.rfind("LANGUAGE ", 0) == 0) {
+		// the language obs starts in next, set in the user config obs holds and saved the way its own language picker does, so no later save of obs writes the old one back; - clears it to follow windows
+		const std::string code = line.substr(9);
+		const bool follow = code == "-";
+		if (!follow && std::none_of(std::begin(kSupportedLocales), std::end(kSupportedLocales), [&code](const char *supported) { return code == supported; }))
+			return;
+		QMetaObject::invokeMethod(g_callbacks, [code, follow]() {
+			config_t *config = obs_frontend_get_user_config();
+			if (!config)
+				return;
+			if (follow)
+				config_remove_value(config, "General", "Language");
+			else
+				config_set_string(config, "General", "Language", code.c_str());
+			if (config_save_safe(config, "tmp", nullptr) == CONFIG_SUCCESS)
+				g_pipeSendLanguageAck.store(true);
+			else
+				blog(LOG_WARNING, "[replaykit] the picked language could not be saved to the obs user config");
+		}, Qt::QueuedConnection);
+	} else if (line == "OPENSHAREPROJECTOR") {
+		QMetaObject::invokeMethod(g_callbacks, []() {
+			if (!OpenShareProjectorHidden())
+				blog(LOG_WARNING, "[replaykit] the share projector opened but could not be made see-through before it showed");
+			g_pipeSendShareProjectorAck.store(true);
 		}, Qt::QueuedConnection);
 	} else if (line == "SETTINGSAPPLIED") {
 		QMetaObject::invokeMethod(g_callbacks, []() {

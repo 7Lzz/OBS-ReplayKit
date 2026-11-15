@@ -11,9 +11,6 @@
  "1 clip": [
   "storage.html"
  ],
- "1 clip selected": [
-  "clip-app.js"
- ],
  "1 clip was not deleted": [
   "clip-app.js"
  ],
@@ -269,11 +266,7 @@
   "settings.html"
  ],
  "Add a GIF or image": [
-  "_editor-tools.html",
-  "apps/helper/FilePickers.cs"
- ],
- "Add a video": [
-  "apps/helper/FilePickers.cs"
+  "_editor-tools.html"
  ],
  "Add a video from the computer": [
   "_editor-tools.html"
@@ -899,9 +892,6 @@
  "Checking unclear words": [
   "_editor-tools.html"
  ],
- "Choose an icon image": [
-  "apps/helper/FilePickers.cs"
- ],
  "Choose color": [
   "_color-picker.html"
  ],
@@ -921,9 +911,6 @@
  "Choose image": [
   "_appearance-panel.html",
   "settings.html"
- ],
- "Choose the recordings folder": [
-  "apps/helper/FilePickers.cs"
  ],
  "Choose what the close button does. Off: OBS keeps running in the system tray. On: OBS closes completely.": [
   "settings.html"
@@ -1236,15 +1223,8 @@
  "Compressed file is empty": [
   "apps/helper/CompressedUploadWorker.cs"
  ],
- "Compressed {clips} and freed {size} before it was stopped.": [
-  "apps/helper/Storage.cs"
- ],
  "Compressed {clips} and freed {size}.": [
-  "storage.html",
-  "apps/helper/Storage.cs"
- ],
- "Compressed {clips}.": [
-  "apps/helper/Storage.cs"
+  "storage.html"
  ],
  "Compressing": [
   "storage.html"
@@ -2878,8 +2858,7 @@
  ],
  "Import audio": [
   "_editor-tools.html",
-  "editor.html",
-  "apps/helper/FilePickers.cs"
+  "editor.html"
  ],
  "Importing audio": [
   "_editor-lanes.html"
@@ -3161,9 +3140,6 @@
  "It is {duration} long and the limit is 10 minutes. Trim it shorter first.": [
   "clip-app.js"
  ],
- "It may have been deleted.": [
-  "notification-reader.html"
- ],
  "Jack o lantern": [
   "_editor-tools.html"
  ],
@@ -3397,16 +3373,10 @@
  "Loading…": [
   "notifications.html"
  ],
- "Lock": [
-  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
- ],
  "Lock OBS updates": [
   "apps/setup/Apply.cs"
  ],
  "Lock the preview so the scene and the overlay cannot be moved by accident": [
-  "plugins/replaykit/src/shell/shell_projector_bar.cpp"
- ],
- "Locked": [
   "plugins/replaykit/src/shell/shell_projector_bar.cpp"
  ],
  "Log folder not found": [
@@ -3914,9 +3884,6 @@
  "Notification needs a title.": [
   "apps/helper/Notifications.cs"
  ],
- "Notification not found": [
-  "notification-reader.html"
- ],
  "Notifications": [
   "notifications.html",
   "settings.html",
@@ -4076,8 +4043,7 @@
   "uninstall_prompt.html"
  ],
  "OBS ReplayKit Setup": [
-  "apps/setup/InstallerWindow.cs",
-  "apps/setup/SetupWindow.cs"
+  "apps/setup/InstallerWindow.cs"
  ],
  "OBS ReplayKit setup hit an unexpected error.": [
   "apps/setup/InstallerWindow.cs"
@@ -4087,9 +4053,6 @@
  ],
  "OBS ReplayKit turned off the OBS updater so OBS stays on a version ReplayKit supports. ReplayKit updates OBS itself when it supports a newer one. Uninstalling ReplayKit removes this file.\\r": [
   "apps/setup/ObsUpdateLock.cs"
- ],
- "OBS ReplayKit Uninstall": [
-  "apps/setup/UninstallWindow.cs"
  ],
  "OBS ReplayKit.lnk": [
   "apps/setup/Cleanup.cs",
@@ -4349,7 +4312,6 @@
   "settings.html"
  ],
  "Open release page": [
-  "notification-reader.html",
   "notifications.html"
  ],
  "Open screenshots folder": [
@@ -4875,12 +4837,6 @@
  "Recording sound volume slider": [
   "settings.html"
  ],
- "Recording started": [
-  "plugins/replaykit/src/notify/clip_toast.cpp"
- ],
- "Recording stopped": [
-  "plugins/replaykit/src/notify/clip_toast.cpp"
- ],
  "Records everything played through the Windows default output device. Discord is included in PC Audio and Share Preview audio is off.": [
   "settings.html"
  ],
@@ -5403,9 +5359,6 @@
  "Saved presets": [
   "_editor-fx.html"
  ],
- "Saved the last {length}": [
-  "plugins/replaykit/src/notify/clip_toast.cpp"
- ],
  "Saved to the GIFs section.": [
   "clip-app.js"
  ],
@@ -5685,9 +5638,6 @@
  ],
  "Show codec tags on clips": [
   "settings.html"
- ],
- "Show in Clips": [
-  "clip-app.js"
  ],
  "Show more clips": [
   "storage.html"
@@ -7677,9 +7627,6 @@
  ],
  "{count} clips could not be checked and were left out.": [
   "storage.html"
- ],
- "{count} clips selected": [
-  "clip-app.js"
  ],
  "{count} clips were not deleted": [
   "clip-app.js"

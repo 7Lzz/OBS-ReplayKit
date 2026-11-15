@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using ReplayKitShared;
@@ -30,8 +29,7 @@ namespace ReplayKitSetup
         internal static string Message(string id, params object[] pairs)
         {
             Ensure();
-            var value = messages[id];
-            return MessageCatalog.Format(value?.Type == JTokenType.String ? value.Value<string>() : id, code, pairs);
+            return MessageCatalog.Text(messages[id], id, code, pairs);
         }
 
         // the english text in the current language, with {name} placeholders filled from the name/value pairs; an unknown text stays english
@@ -117,17 +115,7 @@ namespace ReplayKitSetup
             if (!files.TryGetValue(chosen, out ZipArchiveEntry file) || string.Equals(chosen, LanguageMatch.English, StringComparison.OrdinalIgnoreCase)) return;
             if (file.Length > MaxLocaleBytes) throw new InvalidDataException("translation file is too large");
             using Stream stream = file.Open();
-            using JsonDocument doc = JsonDocument.Parse(stream);
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidDataException("translation file is not an object");
-            var parsed = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (JsonProperty property in doc.RootElement.EnumerateObject())
-            {
-                if (property.Value.ValueKind != JsonValueKind.String) continue;
-                string value = property.Value.GetString();
-                if (string.IsNullOrEmpty(value) || !SamePlaceholders(property.Name, value)) continue;
-                parsed[property.Name] = value;
-            }
-            table = parsed;
+            table = MessageCatalog.ReadTable(stream);
             code = chosen;
         }
 
@@ -139,13 +127,6 @@ namespace ReplayKitSetup
             var catalog = MessageCatalog.Read(stream);
             if (language == LanguageMatch.English) messages = catalog;
             else MessageCatalog.Overlay(messages, catalog);
-        }
-
-        private static bool SamePlaceholders(string english, string translated)
-        {
-            var a = Placeholder.Matches(english).Cast<Match>().Select(m => m.Value).OrderBy(s => s, StringComparer.Ordinal);
-            var b = Placeholder.Matches(translated).Cast<Match>().Select(m => m.Value).OrderBy(s => s, StringComparer.Ordinal);
-            return a.SequenceEqual(b);
         }
 
         // [General] Language of the obs user.ini, read only; null when it is missing or not a language code

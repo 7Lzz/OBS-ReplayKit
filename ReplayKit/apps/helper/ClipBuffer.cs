@@ -150,7 +150,7 @@ namespace ReplayKitHelper
             var result = SaveSegmentsCore(body, id);
             // a save that failed ends here; one that worked already ended the moment its file was in place
             MarkSaveEnded(id, "");
-            // the save sound and toast already went out on the press, so a clip that did not make it says so where it stays seen
+            // the save sound already went out on the press, so a clip that did not make it says so where it stays seen
             if (result["ok"]?.Value<bool>() != true && result["message"]?.Value<string>() != BusyMessage)
             {
                 try { Notifications.Add("warning", "clip-save-failed", Locales.T("A clip was not saved"), result["message"]?.Value<string>() ?? Locales.T("The clip could not be saved.")); }

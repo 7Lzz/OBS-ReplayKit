@@ -65,6 +65,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "録画フォルダーを選択"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "ロック"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "ロック中"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "OBS が応答しなかったため、言語は変更されませんでした。もう一度お試しください。"
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "OBS ReplayKit のアンインストール"
@@ -72,5 +84,35 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "OBS ReplayKit のセットアップ"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "other": "{count} 件は圧縮できませんでした。"
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "other": "{count} 件は圧縮できませんでした ({error})。"
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "other": "{count} 件のクリップを圧縮しました。"
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "other": "{count} 件のクリップを圧縮し、{size} を解放しました。"
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "other": "停止する前に {count} 件のクリップを圧縮し、{size} を解放しました。"
+    }
   }
 }

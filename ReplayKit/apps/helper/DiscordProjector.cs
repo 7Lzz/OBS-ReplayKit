@@ -18,6 +18,16 @@ namespace ReplayKitHelper
         // 0 waits for OBS, 1 is queued or running, 2 has completed the startup attempt.
         private static int startupState;
 
+        private sealed class ParkedWindow
+        {
+            public long Hwnd;
+            public string Title;
+            public ParkedRect Rect;
+        }
+
+        // the window the last successful park left in its corner, so the keep-alive can see between its ticks that it was minimized or moved; null when share preview is off, shown for inspection or a park did not finish
+        private static volatile ParkedWindow parkedWindow;
+
         public static string GetProjectorTitle(JObject settings)
         {
             const string defaultTitle = "OBS ReplayKit Discord Share";
@@ -417,12 +427,12 @@ namespace ReplayKitHelper
             }
             var baseline = Server.State.ReplaykitDiscordProjectorPendingBaseline;
 
+            // the plugin opens it, since only from inside obs can it be made see-through before obs first shows it; opened over obs-websocket it sat on the screen until the poll below found it
             Log.Write("Opening OBS Windowed Projector for title '" + title + "'");
-            var open = ObsWebSocket.InvokeRequest("OpenVideoMixProjector", new JObject { ["videoMixType"] = "OBS_WEBSOCKET_VIDEO_MIX_TYPE_PROGRAM", ["monitorIndex"] = -1 }, 5000);
-            if (!open.Ok)
+            if (!PipeClient.OpenShareProjectorAndWait(5000))
             {
-                Log.Write("warn: OpenVideoMixProjector request failed: " + open.Message);
-                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.T("Opening OBS Windowed Projector failed: {error}", "error", open.Message) };
+                Log.Write("warn: the native plugin did not open the share projector");
+                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.T("Opening OBS Windowed Projector failed: {error}", "error", "the native plugin did not answer") };
             }
 
             // 24x250ms=6s -- a slow pc that misses a shorter window would report "not found" while obs was still mid-create, leaving that projector un-renamed and un-hidden until some later cycle happened to trip over it. matching against baseline (not title text) so this works regardless of obss ui language -- a non-english install localizes the windows own title, but never localizes what obs process it belongs to or when it appeared, which is all this actually checks now.
@@ -484,6 +494,7 @@ namespace ReplayKitHelper
         // finds/opens/parks the projector hidden in a screen corner (topmost + alpha-0 layered, so its click-thru and invisible but still discoverable in discords screen picker). runs the whole find/open/park sequence under ProjectorLock -- without it, a helper restart firing this function at the same moment as the keep-alive tick could see no projector from both, and both would open one. Inspect and Disable take the same lock for their own find/open/close sequences so none of the three can interleave with each other either.
         public static JObject Repark(JObject settings = null, string titleOverride = "", bool force = false)
         {
+            parkedWindow = null;
             if (settings == null) settings = ReplaykitSettings.ReadSettings();
             string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
             if (mode != "projector")
@@ -557,30 +568,16 @@ namespace ReplayKitHelper
                     return new JObject { ["ok"] = false, ["message"] = msg, ["warnings"] = new JArray(warnings) };
                 }
 
+                // explorer puts the button back whenever it builds a taskbar again (an explorer restart, a monitor that wakes or comes back), so the hide is applied on every park rather than once per window
                 const bool hideProjectorTaskbar = true;
-                if (hideProjectorTaskbar)
+                if (hideProjectorTaskbar && !ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, true))
                 {
-                    if (alreadyPlaced && Server.State.ReplaykitDiscordProjectorTaskbarHiddenApplied)
-                    {
-                        Server.State.ReplaykitDiscordProjectorTaskbarHiddenApplied = true;
-                    }
-                    else
-                    {
-                        bool hidden = ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, true);
-                        if (!hidden)
-                        {
-                            Server.State.ReplaykitDiscordProjectorTaskbarHiddenApplied = false;
-                            string msg = "OBS projector window was moved, but Windows rejected the taskbar-hide request.";
-                            warnings.Add(msg);
-                            Log.Write("warn: " + msg);
-                        }
-                        else
-                        {
-                            Server.State.ReplaykitDiscordProjectorTaskbarHiddenApplied = true;
-                        }
-                    }
+                    string msg = "OBS projector window was moved, but Windows rejected the taskbar-hide request.";
+                    warnings.Add(msg);
+                    Log.Write("warn: " + msg);
                 }
 
+                parkedWindow = new ParkedWindow { Hwnd = open.Hwnd, Title = title, Rect = rect };
                 Log.Write("Discord projector ready");
                 return new JObject
                 {
@@ -600,6 +597,7 @@ namespace ReplayKitHelper
         // shows the projector centered and windowed, for a user-triggered visual check -- not hidden, not topmost.
         public static JObject Inspect(JObject settings = null, string titleOverride = "")
         {
+            parkedWindow = null;
             if (settings == null) settings = ReplaykitSettings.ReadSettings();
             string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
             if (mode != "projector") return new JObject { ["ok"] = false, ["message"] = "Discord projector is not the active Share Preview mode.", ["warnings"] = new JArray() };
@@ -652,7 +650,6 @@ namespace ReplayKitHelper
                 }
 
                 ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, false);
-                Server.State.ReplaykitDiscordProjectorTaskbarHiddenApplied = false;
                 Server.State.ReplaykitDiscordProjectorInspectMode = true;
                 return new JObject
                 {
@@ -665,6 +662,7 @@ namespace ReplayKitHelper
 
         public static JObject Disable(JObject settings = null, string titleOverride = "")
         {
+            parkedWindow = null;
             if (settings == null) settings = ReplaykitSettings.ReadSettings();
             var warnings = new List<string>();
             string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
@@ -801,6 +799,11 @@ namespace ReplayKitHelper
         private static int _keepAliveFailures;
         // open-if-missing has no upper bound tighter than a 5s websocket call plus a 6s find-poll, and that whole sequence runs on this same main thread while holding ProjectorLock -- on a machine where the projector genuinely fails to appear, every single 30s tick re-attempts and re-blocks the entire helper for the full open+poll duration, starving every other connection. capping the backoff here so a persistently-broken projector gets retried every few minutes instead of every 30s forever, once its clearly not a one-off miss.
         private const int KeepAliveMaxBackoffSeconds = 300;
+        // a minimized projector is 160x28 with no client area, which is all a capture of it gets, and a minimize request still reaches it with no minimize box; the check only reads window state, so it can run every second
+        private const int ParkedCheckMilliseconds = 1000;
+        private static DateTime _parkedCheckAt = DateTime.MinValue;
+        // one early park per keep-alive interval, so a window something keeps moving cannot be fought over every second
+        private static bool _earlyParkUsed;
 
         public static void KeepAlive()
         {
@@ -826,9 +829,17 @@ namespace ReplayKitHelper
                 double backoff = KeepAliveSeconds * Math.Pow(2, _keepAliveFailures - 1);
                 intervalSeconds = Math.Min(backoff, KeepAliveMaxBackoffSeconds);
             }
-            if ((now - _keepAliveAt).TotalSeconds < intervalSeconds) return;
+            bool leftItsPlace = false;
+            var known = parkedWindow;
+            if (known != null && !_earlyParkUsed && _keepAliveFailures == 0 && (now - _parkedCheckAt).TotalMilliseconds >= ParkedCheckMilliseconds)
+            {
+                _parkedCheckAt = now;
+                leftItsPlace = !ProjectorNative.IsProjectorParked(known.Hwnd, known.Title, known.Rect.X, known.Rect.Y, known.Rect.Width, known.Rect.Height, true);
+            }
+            if (!leftItsPlace && (now - _keepAliveAt).TotalSeconds < intervalSeconds) return;
+            _earlyParkUsed = leftItsPlace;
             _keepAliveAt = now;
-            Log.Write("Discord projector keep-alive tick");
+            Log.Write(leftItsPlace ? "Discord projector was minimized or moved; parking it again now" : "Discord projector keep-alive tick");
 
             JObject settings;
             try { settings = ReplaykitSettings.ReadSettings(); }

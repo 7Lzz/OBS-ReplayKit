@@ -120,7 +120,6 @@ namespace ReplayKitHelper
                 ["pinObsTrayIcon"] = SettingDefaults.PinObsTrayIcon,
                 ["clipNotificationEnabled"] = SettingDefaults.ClipNotificationEnabled,
                 ["recordingNotificationEnabled"] = SettingDefaults.RecordingNotificationEnabled,
-                ["clipNotificationSeconds"] = 90,
                 // keeps the clip saved and recording popups out of screenshots and screen recordings
                 ["hideNotificationsFromCapture"] = true,
                 // copy the streamable link to the clipboard once the uploaded video is watchable
@@ -611,7 +610,6 @@ namespace ReplayKitHelper
                 ["pinObsTrayIcon"] = GetBoolSetting(data, "pinObsTrayIcon", defaults["pinObsTrayIcon"].Value<bool>()),
                 ["clipNotificationEnabled"] = GetBoolSetting(data, "clipNotificationEnabled", defaults["clipNotificationEnabled"].Value<bool>()),
                 ["recordingNotificationEnabled"] = GetBoolSetting(data, "recordingNotificationEnabled", defaults["recordingNotificationEnabled"].Value<bool>()),
-                ["clipNotificationSeconds"] = GetIntSetting(data, "clipNotificationSeconds", replaySeconds, 1, 1200),
                 ["hideNotificationsFromCapture"] = GetBoolSetting(data, "hideNotificationsFromCapture", defaults["hideNotificationsFromCapture"].Value<bool>()),
                 ["autoCopyLink"] = GetBoolSetting(data, "autoCopyLink", defaults["autoCopyLink"].Value<bool>()),
                 ["hevcFixEnabled"] = GetBoolSetting(data, "hevcFixEnabled", defaults["hevcFixEnabled"].Value<bool>()),

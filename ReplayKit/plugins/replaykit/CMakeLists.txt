@@ -25,6 +25,7 @@ set(REPLAYKIT_SOURCES
     src/app/obs_menu.cpp
     src/app/sdk_commands.cpp
     src/app/settings_poll.cpp
+    src/app/share_projector.cpp
 
     src/chrome/caption_track_filter.cpp
     src/chrome/title_keybind_badge.cpp

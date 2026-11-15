@@ -264,7 +264,6 @@ namespace ReplayKitHelper
         // -- ProjectorLock --
         public readonly object ProjectorLock = new object();
         public bool ReplaykitDiscordProjectorInspectMode;
-        public bool ReplaykitDiscordProjectorTaskbarHiddenApplied;
         // null means "no open attempt pending"; non-null (even an empty list) is the hwnd snapshot taken before the current pending OpenVideoMixProjector call, reused across retries so a slow-to-appear window isnt wrongly read as pre-existing.
         public List<long> ReplaykitDiscordProjectorPendingBaseline;
 

@@ -209,14 +209,14 @@ private:
 	// the lock says Locked while it holds and Lock while it does not, and the wider word is what the button is sized for so it never changes width
 	QString Label(bool preview) const
 	{
-		return preview ? Tr("Preview") : (m_on ? Tr("Locked") : Tr("Lock"));
+		return preview ? Tr("Preview") : (m_on ? TrMessage("projector.locked") : TrMessage("projector.lock"));
 	}
 
 	static qreal TextWidth(const QString &text) { return QFontMetricsF(LabelFont()).horizontalAdvance(text); }
 
 	static int WidthFor(Kind kind)
 	{
-		const qreal text = TextWidth(kind == Kind::Preview ? Tr("Preview") : Tr("Locked"));
+		const qreal text = kind == Kind::Preview ? TextWidth(Tr("Preview")) : qMax(TextWidth(TrMessage("projector.lock")), TextWidth(TrMessage("projector.locked")));
 		return qCeil(11 + kIconSide + 8 + text + 12 + (kind == Kind::Preview ? kSwitchW + 12 : 0));
 	}
 

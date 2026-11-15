@@ -4,6 +4,8 @@
 <script>
 // a dock still pointed at this file on disk has no helper page to take the address from, so it reads the generated helper-endpoint.js next to it
 if (location.protocol === "file:") document.write('<script src="helper-endpoint.js"><\/script>');
+// nor the translations, so its text stays english and RK_T only fills in the values
+if (!window.RK_T) window.RK_T = (english, vars) => String(english).replace(/\{([A-Za-z0-9_]+)\}/g, (match, key) => vars && vars[key] != null ? String(vars[key]) : match);
 </script>
 <script>
 if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {

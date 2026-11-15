@@ -66,6 +66,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Aufnahmeordner auswählen"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "Fixieren"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "Fixiert"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "Die Sprache wurde nicht geändert, weil OBS nicht geantwortet hat. Versuche es erneut."
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "OBS ReplayKit deinstallieren"
@@ -73,5 +85,40 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "OBS ReplayKit Setup"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "one": "{count} Clip konnte nicht komprimiert werden.",
+      "other": "{count} Clips konnten nicht komprimiert werden."
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "one": "{count} Clip konnte nicht komprimiert werden ({error}).",
+      "other": "{count} Clips konnten nicht komprimiert werden ({error})."
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "one": "{count} Clip komprimiert.",
+      "other": "{count} Clips komprimiert."
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "one": "{count} Clip komprimiert und {size} freigegeben.",
+      "other": "{count} Clips komprimiert und {size} freigegeben."
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "one": "{count} Clip komprimiert und {size} freigegeben, bevor der Vorgang gestoppt wurde.",
+      "other": "{count} Clips komprimiert und {size} freigegeben, bevor der Vorgang gestoppt wurde."
+    }
   }
 }

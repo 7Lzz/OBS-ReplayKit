@@ -10,6 +10,8 @@ extern std::atomic<quintptr> g_mainWinValue;
 extern std::atomic<unsigned long long> g_allowCloseUntilMs;
 extern std::atomic<bool> g_pipeSendAllowCloseAck;
 extern std::atomic<bool> g_pipeSendOutputsReleasedAck;
+extern std::atomic<bool> g_pipeSendLanguageAck;
+extern std::atomic<bool> g_pipeSendShareProjectorAck;
 void PublishProjectorWindows();
 void StartPipeServer();
 void StopPipeServer();

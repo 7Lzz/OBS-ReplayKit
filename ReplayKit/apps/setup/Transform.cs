@@ -516,7 +516,6 @@ namespace ReplayKitSetup
             obj["allowSleepWhileActive"] = prefs.AllowSleepWhileActive;
             obj["clipNotificationEnabled"] = prefs.ClipNotificationEnabled;
             obj["recordingNotificationEnabled"] = prefs.RecordingNotificationEnabled;
-            obj["clipNotificationSeconds"] = prefs.ReplayBufferSeconds;
             obj["trimPreciseDefault"] = prefs.TrimPreciseDefault;
             obj["debugLoggingEnabled"] = prefs.DebugLoggingEnabled;
             obj["clipSoundVolume"] = prefs.ClipSoundVolume;

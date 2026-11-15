@@ -16,8 +16,6 @@ namespace ReplayKitHelper
         public const string English = ReplayKitShared.LanguageMatch.English;
         private const string Section = "General";
         private const string Key = "Language";
-        // where a picked language waits between the save and the relaunch, since obs writes the user.ini it holds in memory back over the file as it exits
-        public static readonly string PendingMarker = Path.Combine(Constants.OBS_CONFIG_DIR, ".replaykit-language-pending");
 
         public sealed class Language
         {
@@ -79,8 +77,7 @@ namespace ReplayKitHelper
         internal static string Message(string id, params object[] pairs)
         {
             string code = Current();
-            var value = Messages(code)[id];
-            return MessageCatalog.Format(value?.Type == JTokenType.String ? value.Value<string>() : id, code, pairs);
+            return MessageCatalog.Text(Messages(code)[id], id, code, pairs);
         }
 
         // replaykit's supported languages with the names from the installed obs locale list
@@ -119,12 +116,20 @@ namespace ReplayKitHelper
 
         public static bool IsAvailable(string code) => code != null && Available().Any(l => l.Code == code);
 
-        // follow the obs language when replaykit supports it, otherwise use english
+        // the language obs runs in when replaykit supports it, otherwise english; a pick only takes over once obs restarts, so the pages keep the language of the native chrome until then
         public static string Current()
+        {
+            string running = PipeClient.ObsLocale;
+            if (running == null) return Picked();
+            return IsAvailable(running) ? running : English;
+        }
+
+        // the language obs starts in next: the user.ini key, or the windows language when there is none
+        public static string Picked()
         {
             string saved = null;
             try { saved = ObsUserIni.Read(Section, Key); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Locales.Current: " + ex.Message); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Locales.Picked: " + ex.Message); }
             if (string.IsNullOrEmpty(saved)) saved = WindowsDefault();
             return IsAvailable(saved) ? saved : English;
         }
@@ -153,32 +158,14 @@ namespace ReplayKitHelper
 
         public static JArray ToJson() => new JArray(Available().Select(l => new JObject { ["code"] = l.Code, ["name"] = l.Name, ["englishName"] = l.EnglishName }));
 
-        // writes the picked language into user.ini now and stages it for the relaunch, which puts it back after the exit-save of obs; obs reads it only as it starts, so a change needs a restart. picking the windows language clears the key instead, so obs and replaykit keep following windows the way a fresh obs does
-        public static void ApplyToObs(string code)
+        // the plugin puts the pick into the user config obs holds and saves it, the way the language picker of obs does, so every later save and exit of obs keeps it; obs reads it only as it starts, so a change needs a restart. picking the windows language clears the key instead, so obs and replaykit keep following windows the way a fresh obs does. false when the plugin did not confirm
+        public static bool ApplyToObs(string code)
         {
             if (!IsAvailable(code)) throw new InvalidOperationException("Unknown language: " + code);
-            string value = code == WindowsDefault() ? "" : code;
-            ObsUserIni.Set(Section, Key, value);
-            File.WriteAllText(PendingMarker, value, new UTF8Encoding(false));
-        }
-
-        // the staged language back into user.ini, once obs is gone; called by ObsProcess.Relaunch and before the installer starts obs
-        public static void ApplyPending()
-        {
-            try
-            {
-                if (!File.Exists(PendingMarker)) return;
-                string want = File.ReadAllText(PendingMarker).Trim();
-                // empty means follow windows, anything else has to be a language code
-                if (want.Length == 0 || ReplayKitShared.LanguageMatch.IsSupported(want))
-                {
-                    ObsUserIni.Set(Section, Key, want);
-                    Log.Write("Locales.ApplyPending: user.ini [General] Language=" + (want.Length == 0 ? "(cleared, follows windows)" : want));
-                }
-                else Log.Write("Locales.ApplyPending: ignored a staged language that is not a language code");
-                File.Delete(PendingMarker);
-            }
-            catch (Exception ex) { Log.Write("Locales.ApplyPending: " + ex.Message); }
+            string value = code == WindowsDefault() ? "-" : code;
+            bool applied = PipeClient.SetObsLanguageAndWait(value, 3000);
+            Log.Write("Locales.ApplyToObs: " + (value == "-" ? "follow windows" : value) + (applied ? "" : ", not confirmed by the plugin"));
+            return applied;
         }
 
         private static CachedStrings Load(string code)
@@ -198,14 +185,7 @@ namespace ReplayKitHelper
                     try
                     {
                         byte[] bytes = File.ReadAllBytes(file);
-                        var obj = JObject.Parse(Encoding.UTF8.GetString(bytes));
-                        foreach (var prop in obj.Properties())
-                        {
-                            if (prop.Value.Type != JTokenType.String) continue;
-                            string value = prop.Value.Value<string>();
-                            // a translation that lost or renamed a placeholder would drop a value from the sentence, and a | it added would split a file dialog filter, so the english text stays instead
-                            if (value.Length > 0 && SamePlaceholders(prop.Name, value) && (value.IndexOf('|') < 0 || prop.Name.IndexOf('|') >= 0)) loaded.Table[prop.Name] = value;
-                        }
+                        using (var stream = new MemoryStream(bytes)) loaded.Table = MessageCatalog.ReadTable(stream);
                         using (var sha = SHA256.Create()) loaded.Version = BitConverter.ToString(sha.ComputeHash(bytes), 0, 8).Replace("-", "").ToLowerInvariant();
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
@@ -219,15 +199,6 @@ namespace ReplayKitHelper
                 _strings[code] = loaded;
                 return loaded;
             }
-        }
-
-        private static readonly System.Text.RegularExpressions.Regex Placeholder = new System.Text.RegularExpressions.Regex(@"\{[A-Za-z0-9_]+\}", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
-        private static bool SamePlaceholders(string english, string translated)
-        {
-            var a = Placeholder.Matches(english).Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal);
-            var b = Placeholder.Matches(translated).Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal);
-            return a.SequenceEqual(b);
         }
 
         private static string EnglishNameOf(string code)

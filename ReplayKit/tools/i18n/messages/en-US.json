@@ -67,6 +67,18 @@
     "context": "Windows folder picker title.",
     "text": "Choose the recordings folder"
   },
+  "projector.lock": {
+    "context": "Projector bar toggle while the preview is unlocked. A verb: pressing it locks the preview so the scene cannot be moved.",
+    "text": "Lock"
+  },
+  "projector.locked": {
+    "context": "Projector bar toggle while the preview is locked. Describes the state.",
+    "text": "Locked"
+  },
+  "settings.languageNotSaved": {
+    "context": "Settings warning when OBS did not confirm the picked language, so nothing was changed.",
+    "text": "The language was not changed because OBS did not answer. Try again."
+  },
   "setup.uninstallTitle": {
     "context": "Windows uninstaller caption.",
     "text": "OBS ReplayKit Uninstall"
@@ -74,5 +86,40 @@
   "setup.windowTitle": {
     "context": "Windows installer caption.",
     "text": "OBS ReplayKit Setup"
+  },
+  "storage.compressFailed": {
+    "context": "Added after a compression result when some clips failed. Count is the number of clips that failed.",
+    "text": {
+      "one": "{count} could not be compressed.",
+      "other": "{count} could not be compressed."
+    }
+  },
+  "storage.compressFailedWithError": {
+    "context": "Added after a compression result when some clips failed. Error is the reason.",
+    "text": {
+      "one": "{count} could not be compressed ({error}).",
+      "other": "{count} could not be compressed ({error})."
+    }
+  },
+  "storage.compressed": {
+    "context": "Compression result popup, under Space freed.",
+    "text": {
+      "one": "Compressed {count} clip.",
+      "other": "Compressed {count} clips."
+    }
+  },
+  "storage.compressedFreed": {
+    "context": "Compression result notice. Size is the space freed, such as 1.2 GB.",
+    "text": {
+      "one": "Compressed {count} clip and freed {size}.",
+      "other": "Compressed {count} clips and freed {size}."
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "context": "Compression result notice after the user stopped it. Size is the space freed.",
+    "text": {
+      "one": "Compressed {count} clip and freed {size} before it was stopped.",
+      "other": "Compressed {count} clips and freed {size} before it was stopped."
+    }
   }
 }

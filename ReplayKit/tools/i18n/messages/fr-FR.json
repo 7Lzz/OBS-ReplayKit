@@ -67,6 +67,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Choisir le dossier des enregistrements"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "Verrouiller"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "Verrouillé"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "La langue n’a pas été changée, car OBS n’a pas répondu. Réessayez."
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "Désinstallation d'OBS ReplayKit"
@@ -74,5 +86,45 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "Installation d'OBS ReplayKit"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "many": "{count} de clips n’ont pas pu être compressés.",
+      "one": "{count} clip n’a pas pu être compressé.",
+      "other": "{count} clips n’ont pas pu être compressés."
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "many": "{count} de clips n’ont pas pu être compressés ({error}).",
+      "one": "{count} clip n’a pas pu être compressé ({error}).",
+      "other": "{count} clips n’ont pas pu être compressés ({error})."
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "many": "{count} de clips compressés.",
+      "one": "{count} clip compressé.",
+      "other": "{count} clips compressés."
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "many": "{count} de clips compressés et {size} libérés.",
+      "one": "{count} clip compressé et {size} libérés.",
+      "other": "{count} clips compressés et {size} libérés."
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "many": "{count} de clips compressés et {size} libérés avant l’arrêt.",
+      "one": "{count} clip compressé et {size} libérés avant l’arrêt.",
+      "other": "{count} clips compressés et {size} libérés avant l’arrêt."
+    }
   }
 }

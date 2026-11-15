@@ -102,7 +102,6 @@ namespace ReplayKitHelper
             if (!int.TryParse(rb["value"]?.Value<string>(), out int seconds)) return settings;
             if (seconds <= 0 || seconds == settings["replaySeconds"]?.Value<int>()) return settings;
             settings["replaySeconds"] = seconds;
-            settings["clipNotificationSeconds"] = seconds;
             WriteSettings(settings);
             return settings;
         }

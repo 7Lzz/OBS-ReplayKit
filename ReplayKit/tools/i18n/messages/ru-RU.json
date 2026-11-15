@@ -68,6 +68,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Выберите папку записей"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "Заблокировать"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "Заблокировано"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "Язык не изменён, потому что OBS не ответил. Попробуйте ещё раз."
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "Удаление OBS ReplayKit"
@@ -75,5 +87,50 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "Установка OBS ReplayKit"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "few": "Не удалось сжать {count} клипа.",
+      "many": "Не удалось сжать {count} клипов.",
+      "one": "Не удалось сжать {count} клип.",
+      "other": "Не удалось сжать {count} клипа."
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "few": "Не удалось сжать {count} клипа ({error}).",
+      "many": "Не удалось сжать {count} клипов ({error}).",
+      "one": "Не удалось сжать {count} клип ({error}).",
+      "other": "Не удалось сжать {count} клипа ({error})."
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "few": "Сжато {count} клипа.",
+      "many": "Сжато {count} клипов.",
+      "one": "Сжат {count} клип.",
+      "other": "Сжато {count} клипа."
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "few": "Сжато {count} клипа, освобождено {size}.",
+      "many": "Сжато {count} клипов, освобождено {size}.",
+      "one": "Сжат {count} клип, освобождено {size}.",
+      "other": "Сжато {count} клипа, освобождено {size}."
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "few": "До остановки сжато {count} клипа, освобождено {size}.",
+      "many": "До остановки сжато {count} клипов, освобождено {size}.",
+      "one": "До остановки сжат {count} клип, освобождено {size}.",
+      "other": "До остановки сжато {count} клипа, освобождено {size}."
+    }
   }
 }

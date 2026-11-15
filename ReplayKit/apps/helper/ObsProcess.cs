@@ -199,13 +199,12 @@ namespace ReplayKitHelper
             }
         }
 
-        // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene, theme and language edits staged for after its exit-save are put in place
+        // what has to happen between the exit of obs and its next start: the crash marker of the obs that was force-stopped goes, and the scene and theme edits staged for after its exit-save are put in place
         internal static bool Relaunch(string obsPath)
         {
             try { ClearCrashSentinel(); } catch (Exception ex) { Log.Write("ClearCrashSentinel: " + ex.Message); }
             try { ApplyPendingOverlayScene(); } catch (Exception ex) { Log.Write("ApplyPendingOverlayScene: " + ex.Message); }
             try { Themes.ApplyPendingTheme(); } catch (Exception ex) { Log.Write("Themes.ApplyPendingTheme: " + ex.Message); }
-            Locales.ApplyPending();
             if (string.IsNullOrEmpty(obsPath) || !File.Exists(obsPath))
             {
                 Log.Write("Relaunch: OBS not found at '" + obsPath + "'");

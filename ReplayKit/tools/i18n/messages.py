@@ -84,8 +84,8 @@ def references(catalog):
                 ident = match[match.lastindex]
                 if ident not in catalog:
                     yield f"{rel}:{source.count(chr(10), 0, match.start()) + 1}: unknown message {ident}"
-                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] != "RK_M"):
-                    yield f"{rel}: plural message {ident} requires RK_M with a numeric count"
+                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] not in ("RK_M", "Locales.Message", "SetupLocale.Message")):
+                    yield f"{rel}: plural message {ident} requires RK_M, Locales.Message or SetupLocale.Message with a numeric count"
 
 
 def compile_messages(destination=None):

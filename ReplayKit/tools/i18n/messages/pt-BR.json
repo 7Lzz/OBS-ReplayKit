@@ -67,6 +67,18 @@
     "source": "2bbc70e8c4a90ae9",
     "text": "Escolha a pasta das gravações"
   },
+  "projector.lock": {
+    "source": "241399e11d93bd7b",
+    "text": "Bloquear"
+  },
+  "projector.locked": {
+    "source": "3cf0b3a0f9456702",
+    "text": "Bloqueado"
+  },
+  "settings.languageNotSaved": {
+    "source": "ee2e9c210d1cb5b2",
+    "text": "O idioma não foi alterado porque o OBS não respondeu. Tente novamente."
+  },
   "setup.uninstallTitle": {
     "source": "6610dbeda8014a0b",
     "text": "Desinstalação do OBS ReplayKit"
@@ -74,5 +86,45 @@
   "setup.windowTitle": {
     "source": "2e0e00e71a75260a",
     "text": "Instalação do OBS ReplayKit"
+  },
+  "storage.compressFailed": {
+    "source": "d1853f834a72dea9",
+    "text": {
+      "many": "{count} de clipes não puderam ser compactados.",
+      "one": "{count} clipe não pôde ser compactado.",
+      "other": "{count} clipes não puderam ser compactados."
+    }
+  },
+  "storage.compressFailedWithError": {
+    "source": "9dc32c6bff3fc6c8",
+    "text": {
+      "many": "{count} de clipes não puderam ser compactados ({error}).",
+      "one": "{count} clipe não pôde ser compactado ({error}).",
+      "other": "{count} clipes não puderam ser compactados ({error})."
+    }
+  },
+  "storage.compressed": {
+    "source": "13af3ac91655ca50",
+    "text": {
+      "many": "{count} de clipes compactados.",
+      "one": "{count} clipe compactado.",
+      "other": "{count} clipes compactados."
+    }
+  },
+  "storage.compressedFreed": {
+    "source": "d4e31e80d8feb862",
+    "text": {
+      "many": "{count} de clipes compactados e {size} liberados.",
+      "one": "{count} clipe compactado e {size} liberados.",
+      "other": "{count} clipes compactados e {size} liberados."
+    }
+  },
+  "storage.compressedFreedStopped": {
+    "source": "2116cb81f90c5230",
+    "text": {
+      "many": "{count} de clipes compactados e {size} liberados antes de a operação ser interrompida.",
+      "one": "{count} clipe compactado e {size} liberados antes de a operação ser interrompida.",
+      "other": "{count} clipes compactados e {size} liberados antes de a operação ser interrompida."
+    }
   }
 }

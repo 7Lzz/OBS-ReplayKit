@@ -254,7 +254,10 @@ constexpr int kHostLoadRetries = 3;
 
 // a stage that waits on the helper for more than a few seconds says so on its cover, since a helper that does not come back (removed by antivirus, a broken install) otherwise left a blank stage that looked frozen
 constexpr int kHelperNoticeMs = 6000;
-const QString kHelperWaitTitle = Tr("Waiting for the ReplayKit helper");
+QString HelperWaitTitle()
+{
+	return Tr("Waiting for the ReplayKit helper");
+}
 
 void ShellHelperNotice(bool waiting)
 {
@@ -262,8 +265,8 @@ void ShellHelperNotice(bool waiting)
 	if (!curtain)
 		return;
 	if (waiting && !curtain->HasMessage())
-		curtain->SetMessage(kHelperWaitTitle, Tr("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
-	else if (!waiting && curtain->Message() == kHelperWaitTitle)
+		curtain->SetMessage(HelperWaitTitle(), Tr("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
+	else if (!waiting && curtain->Message() == HelperWaitTitle())
 		curtain->SetMessage(QString(), QString());
 }
 

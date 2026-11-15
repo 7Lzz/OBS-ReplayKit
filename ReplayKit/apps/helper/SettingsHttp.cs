@@ -120,7 +120,7 @@ namespace ReplayKitHelper
                     WriteSettings(settings);
                 }
                 // the language lives in user.ini of obs, so it joins the settings only here, never the file
-                settings["language"] = Locales.Current();
+                settings["language"] = Locales.Picked();
                 return new JObject
                 {
                     ["ok"] = true,
@@ -651,7 +651,7 @@ namespace ReplayKitHelper
 
         // the settings that are read where they are used and need nothing from obs when they change (start minimized is carried into obs by the native plugin), and the one that only rewrites the startup shortcut
         internal static readonly string[] BehaviorKeys =
-            { "autoCopyLink", "linkNotificationEnabled", "hevcFixEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "browserSleepSeconds", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "gifFrameDelay", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch", "clipSoundVolume", "recordingSoundVolume", "clipNotificationEnabled", "recordingNotificationEnabled", "clipNotificationSeconds", "closeToTray", "disableObsCrashPopup", "lastUpdatePromptVersion", "openClipsKeybind", "openClipsKeybindExtra", "pinObsTrayIcon", "runObsAsAdmin", "setupWizardPending", "showCodecTags" };
+            { "autoCopyLink", "linkNotificationEnabled", "hevcFixEnabled", "compressSkipFavorites", "storageCompressionType", "deletedHistoryDays", "browserSleepSeconds", "startMinimized", "hideNotificationsFromCapture", "trimPreciseDefault", "trimGpuEncode", "editorAutoplay", "editorLoopPreview", "editorSeekStep", "gifFrameDelay", "editorWheelZoom", "editorZoomScaling", "clipAntialiasing", "gameRecognition", "cardDateFormat", "developmentMode", "sdkMode", "checkObsUpdates", "logInterfaceEvents", "debugLoggingEnabled", "autoDeleteLogsOnLaunch", "clipSoundVolume", "recordingSoundVolume", "clipNotificationEnabled", "recordingNotificationEnabled", "closeToTray", "disableObsCrashPopup", "lastUpdatePromptVersion", "openClipsKeybind", "openClipsKeybindExtra", "pinObsTrayIcon", "runObsAsAdmin", "setupWizardPending", "showCodecTags" };
 
         internal static readonly string[] StartupKeys = { "obsStartupEnabled" };
 
@@ -692,7 +692,7 @@ namespace ReplayKitHelper
 
         public static JObject SaveOverlayPreviewFromRequest(string body) => OverlayPreviewFromRequest(body, "preview");
 
-        // the language is the one obs keeps in user.ini rather than a key of the settings file: it is taken out of the request and checked before anything is saved, and written to obs once the rest has saved; a change of it restarts obs, which reads it only as it starts
+        // the language is the one obs keeps in user.ini rather than a key of the settings file: it is taken out of the request and checked before anything is saved, and written to obs once the rest has saved; a pick other than the language obs runs in restarts obs, which reads it only as it starts
         public static JObject SaveSettingsFromRequest(string body)
         {
             lock (SettingsStore.Gate)
@@ -701,13 +701,20 @@ namespace ReplayKitHelper
                 var incoming = JObject.Parse(body);
                 string language = TakeLanguage(incoming);
                 var result = SaveSettings(incoming);
-                if (language != null && language != Locales.Current())
+                if (language != null && language != Locales.Picked())
                 {
-                    Locales.ApplyToObs(language);
-                    result["restartRequired"] = true;
-                    if (string.IsNullOrEmpty(result["restartReason"]?.Value<string>())) result["restartReason"] = "Changing the language requires OBS to restart.";
+                    if (!Locales.ApplyToObs(language))
+                    {
+                        if (!(result["warnings"] is JArray warnings)) result["warnings"] = warnings = new JArray();
+                        warnings.Add(Locales.Message("settings.languageNotSaved"));
+                    }
+                    else if (language != Locales.Current())
+                    {
+                        result["restartRequired"] = true;
+                        if (string.IsNullOrEmpty(result["restartReason"]?.Value<string>())) result["restartReason"] = "Changing the language requires OBS to restart.";
+                    }
                 }
-                if (result["settings"] is JObject saved) saved["language"] = Locales.Current();
+                if (result["settings"] is JObject saved) saved["language"] = Locales.Picked();
                 return result;
             }
         }
