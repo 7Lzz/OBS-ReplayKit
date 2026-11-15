@@ -2134,6 +2134,18 @@
       account:"Manage your connected account for clip uploads and sharing.",
       advanced:"Manage the recording buffer, sharing, updates, and troubleshooting."
     };
+    // tabs moved to keyed messages name their subtitle by message id
+    const subtitleIds = { privacy:"settings.privacySubtitle" };
+    const setMessage = (target, id) => {
+      target.setAttribute("data-i18n", id);
+      target.textContent = RK_M(id);
+    };
+    // a data-i18n source is still empty here since keyed messages render at domcontentloaded, so the copy renders the message itself and keeps its id for a language switch
+    const copyText = (target, source) => {
+      const id = source.getAttribute("data-i18n");
+      if (id) setMessage(target, id);
+      else target.textContent = source.textContent || "";
+    };
     document.querySelectorAll(".nav-btn[data-page]").forEach((nav) => {
       const page = document.getElementById("page-" + nav.dataset.page);
       const header = document.createElement("header");
@@ -2141,19 +2153,21 @@
       header.appendChild(nav.querySelector("svg").cloneNode(true));
       const heading = document.createElement("h1");
       heading.className = "page-heading";
-      heading.textContent = nav.querySelector("span").textContent;
+      copyText(heading, nav.querySelector("span"));
       const subtitle = document.createElement("p");
       subtitle.className = "page-subtitle";
-      subtitle.textContent = subtitles[nav.dataset.page];
+      if (subtitleIds[nav.dataset.page]) setMessage(subtitle, subtitleIds[nav.dataset.page]);
+      else subtitle.textContent = subtitles[nav.dataset.page];
       header.append(heading, subtitle);
       page.prepend(header);
       page.setAttribute("aria-label", heading.textContent);
+      if (heading.hasAttribute("data-i18n")) page.setAttribute("data-i18n-aria-label", heading.getAttribute("data-i18n"));
     });
     document.querySelectorAll(".page .control-note").forEach((note, index) => {
       const description = document.createElement("span");
       description.className = "setting-description";
       description.id = note.id || "setting-description-" + index;
-      description.textContent = note.textContent || "";
+      copyText(description, note);
       const row = note.closest(".form-row");
       const group = note.closest(".check-row, .action-row");
       const label = row && row.querySelector(":scope > .label");

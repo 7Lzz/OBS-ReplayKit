@@ -17,6 +17,8 @@ namespace ReplayKitHelper
         // the discord application the presence belongs to: its name is the activity discord shows and its art assets hold the logo; an application id is public by design, unlike its secret, which nothing here needs
         private const string ClientId = "1571337149347790899";
         private const string LogoAsset = "replaykit";
+        // the large image of a recognised game whose art is not on the web
+        private const string NoArtAsset = "unknown-game";
         private const int TickMs = 2000;
         // discord takes five activity updates every twenty seconds
         private const int MinSendMs = 4000;
@@ -181,15 +183,18 @@ namespace ReplayKitHelper
                     if (roblox.ImageUrl != null && roblox.ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) art = roblox.ImageUrl;
                 }
             }
-            var assets = new JObject { ["large_image"] = art ?? LogoAsset, ["large_text"] = Fit(name, 128) };
-            if (art != null)
+            var assets = new JObject
             {
-                assets["small_image"] = LogoAsset;
-                assets["small_text"] = "ReplayKit";
-            }
+                ["large_image"] = art ?? NoArtAsset,
+                ["large_text"] = Fit(name, 128),
+                ["small_image"] = LogoAsset,
+                ["small_text"] = "ReplayKit",
+            };
             return new JObject
             {
                 ["type"] = 0,
+                // discord titles the card with the application name unless the activity names itself, which is how medal shows the game there
+                ["name"] = Fit(Locales.Message("presence.title", "game", name), 128),
                 ["details"] = Fit(details, 128),
                 ["state"] = Fit(Locales.Message("presence.clipping"), 128),
                 ["timestamps"] = new JObject { ["start"] = sighting.StartUnix },

@@ -73,6 +73,10 @@
     "source": "fd7229458a54c23e",
     "text": "获取 ReplayKit"
   },
+  "presence.title": {
+    "source": "00109a97724092e2",
+    "text": "用 ReplayKit 玩 {game}"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "锁定"
@@ -96,6 +100,10 @@
   "settings.privacyTab": {
     "source": "84c5b0bf684d7bb8",
     "text": "隐私与安全"
+  },
+  "settings.privacySubtitle": {
+    "source": "86d8d3f220a14de2",
+    "text": "选择 ReplayKit 与 Discord 等其他应用共享的内容。"
   },
   "settings.privacyVisibility": {
     "source": "76d1d9370fb77aee",

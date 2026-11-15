@@ -84,6 +84,8 @@ namespace ReplayKitHelper
             uint steam = game.SteamAppId;
             if (steam == 0 && game.Id.StartsWith("steam-", StringComparison.Ordinal)) uint.TryParse(game.Id.Substring(6), out steam);
             var source = steam != 0 ? GameCatalog.BySteamId(steam) ?? game : game;
+            // a steam library game is a steam- id of its own, while the catalog entry with the same app id holds the discord icon
+            if (source.IconHash != null) return DiscordIconUrl(source.Id, source.IconHash, 512);
             return steam != 0 && source.SteamIconHash != null ? SteamIconUrl(steam, source.SteamIconHash) : null;
         }
 

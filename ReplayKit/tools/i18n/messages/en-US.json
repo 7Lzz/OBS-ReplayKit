@@ -75,6 +75,10 @@
     "context": "Button on the Discord activity card that opens the ReplayKit download page. At most 32 characters.",
     "text": "Get ReplayKit"
   },
+  "presence.title": {
+    "context": "Title of the Discord activity card friends see while the user plays a game. {game} is the game name.",
+    "text": "{game} with ReplayKit"
+  },
   "projector.lock": {
     "context": "Projector bar toggle while the preview is unlocked. A verb: pressing it locks the preview so the scene cannot be moved.",
     "text": "Lock"
@@ -98,6 +102,10 @@
   "settings.privacyTab": {
     "context": "Settings sidebar tab under User settings.",
     "text": "Privacy & Security"
+  },
+  "settings.privacySubtitle": {
+    "context": "Subtitle under the Privacy & Security heading at the top of that settings tab.",
+    "text": "Choose what ReplayKit shares with other apps, like Discord."
   },
   "settings.privacyVisibility": {
     "context": "Heading of the box on the Privacy & Security settings tab.",

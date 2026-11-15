@@ -75,6 +75,10 @@
     "source": "fd7229458a54c23e",
     "text": "Obtenir ReplayKit"
   },
+  "presence.title": {
+    "source": "00109a97724092e2",
+    "text": "{game} avec ReplayKit"
+  },
   "projector.lock": {
     "source": "241399e11d93bd7b",
     "text": "Verrouiller"
@@ -98,6 +102,10 @@
   "settings.privacyTab": {
     "source": "84c5b0bf684d7bb8",
     "text": "Confidentialité et sécurité"
+  },
+  "settings.privacySubtitle": {
+    "source": "86d8d3f220a14de2",
+    "text": "Choisissez ce que ReplayKit partage avec d’autres applications, comme Discord."
   },
   "settings.privacyVisibility": {
     "source": "76d1d9370fb77aee",
