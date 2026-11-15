@@ -169,7 +169,7 @@ namespace ReplayKitHelper
                 KeyframeScanResult result;
                 if (job.Task.IsFaulted)
                 {
-                    string msg = job.Task.Exception?.InnerException?.Message ?? job.Task.Exception?.Message ?? "unknown error";
+                    string msg = job.Task.Exception?.InnerException?.Message ?? job.Task.Exception?.Message ?? Locales.Message("setup.unknownError");
                     result = new KeyframeScanResult { Ok = false, Message = "Keyframe worker crashed: " + msg };
                 }
                 else
@@ -184,10 +184,10 @@ namespace ReplayKitHelper
             if (ageMs > TrimKeyframeWorkerTimeoutMs)
             {
                 try { job.Cts.Cancel(); } catch (ObjectDisposedException) { }
-                return new KeyframeScanResult { Ok = false, Pending = false, Message = "Keyframe scan timed out; using normal fast trim" };
+                return new KeyframeScanResult { Ok = false, Pending = false, Message = Locales.Message("editor.keyframeScanTimedOutUsingNormal") };
             }
 
-            return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are still loading", RetryMs = 500 };
+            return new KeyframeScanResult { Ok = false, Pending = true, Message = Locales.Message("editor.keyframeSnapPointsAreStillLoading"), RetryMs = 500 };
         }
 
         // caller must already hold TrimKeyframeJobsLock -- keeps "is a job already running" and "register a new one" one atomic step, so a background pre-warm and a users own trim-modal open racing on the same clip can never both see "no job yet" and each start their own ffprobe for the same file.
@@ -222,9 +222,9 @@ namespace ReplayKitHelper
         {
             var source = Clips.GetSafeClipPath(sourceName);
             if (source == null || !File.Exists(source.Full))
-                return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
+                return new KeyframeScanResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
             var fi = new FileInfo(source.Full);
-            if (!fi.Exists) return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
+            if (!fi.Exists) return new KeyframeScanResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
 
             string cacheKey = Clips.CacheIdentity(fi.FullName).ToLowerInvariant();
             string cacheSig = fi.Length + ":" + fi.LastWriteTimeUtc.Ticks;
@@ -239,7 +239,7 @@ namespace ReplayKitHelper
                 if (!Server.State.TrimKeyframeJobs.TryGetValue(jobKey, out job))
                 {
                     if (Server.State.TrimKeyframeJobs.Count >= 2)
-                        return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe scans are busy", RetryMs = 500 };
+                        return new KeyframeScanResult { Ok = false, Pending = true, Message = Locales.Message("editor.keyframeScansAreBusy"), RetryMs = 500 };
                     string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
                     if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
                         return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found in clip folder" };
@@ -247,7 +247,7 @@ namespace ReplayKitHelper
                     startedNew = true;
                 }
             }
-            if (startedNew) return new KeyframeScanResult { Ok = false, Pending = true, Message = "Keyframe snap points are loading", RetryMs = 500 };
+            if (startedNew) return new KeyframeScanResult { Ok = false, Pending = true, Message = Locales.Message("editor.keyframeSnapPointsAreLoading"), RetryMs = 500 };
             return GetTrimKeyframeWorkerResult(job);
         }
 
@@ -364,7 +364,24 @@ namespace ReplayKitHelper
         // the names of the audio tracks of a clip recorded with separate audio tracks: the mix first, then the tracks in the order obs writes them
         internal static readonly string[] AudioTrackLabels = { "All audio", "PC audio", "Discord", "Microphone" };
 
-        internal static string AudioTrackLabel(int index) => index >= 0 && index < AudioTrackLabels.Length ? AudioTrackLabels[index] : "Track " + (index + 1);
+        // the label of the one audio stream of a clip without separate tracks
+        internal const string SingleTrackLabel = "Audio";
+        private const string NumberedTrackLabel = "Track ";
+
+        internal static string AudioTrackLabel(int index) => index >= 0 && index < AudioTrackLabels.Length ? AudioTrackLabels[index] : NumberedTrackLabel + (index + 1);
+
+        // the name a page shows for a track label, in the current language; the label itself stays the english data the clip files carry, and a name of its own (Discord, or one a file came with) is shown as it is
+        internal static string AudioTrackName(string label)
+        {
+            if (label == null) return "";
+            if (label == AudioTrackLabels[0]) return Locales.Message("editor.allAudio");
+            if (label == AudioTrackLabels[1]) return Locales.Message("editor.trackPcAudio");
+            if (label == AudioTrackLabels[3]) return Locales.Message("common.microphone");
+            if (label == SingleTrackLabel) return Locales.Message("common.audio");
+            if (label.StartsWith(NumberedTrackLabel, StringComparison.Ordinal) && int.TryParse(label.Substring(NumberedTrackLabel.Length), NumberStyles.None, CultureInfo.InvariantCulture, out int number))
+                return Locales.Message("editor.trackNumber", "number", number);
+            return label;
+        }
 
         // the audio part of a trim command that has no plan: a clip with one audio track is left to ffmpeg as before and a clip with several keeps them all; a video at another speed takes its audio along, which cannot be a stream copy
         private static void AddAudioArgs(List<string> argv, int audioCount, bool removeAudio, double videoSpeed = 1)
@@ -545,24 +562,24 @@ namespace ReplayKitHelper
         {
             JObject sourceCapture = null;
             render ??= new RenderOptions();
-            if (!RenderOptions.Valid(render)) return new TrimResult { Ok = false, Message = "Bad render settings" };
-            if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = "Unknown aspect ratio" };
+            if (!RenderOptions.Valid(render)) return new TrimResult { Ok = false, Message = Locales.Message("editor.badRenderSettings") };
+            if (!EditorFrame.Valid(aspect)) return new TrimResult { Ok = false, Message = Locales.Message("editor.unknownAspectRatio") };
             bool screenshot = string.Equals(mode, "screenshot", StringComparison.OrdinalIgnoreCase);
             if (double.IsNaN(pictureScale) || double.IsNaN(pictureRotation) ||
                 pictureScale < .1 || pictureScale > 3 || pictureRotation < -180 || pictureRotation > 180)
-                return new TrimResult { Ok = false, Message = "Invalid video transform." };
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.invalidVideoTransform") };
             bool transformed = pictureScale != 1 || pictureRotation != 0;
             bool framed = aspect != "original" || transformed;
             if (screenshot)
             {
                 if (double.IsNaN(frameTime) || double.IsInfinity(frameTime) || frameTime < 0 || videoEdit == null)
-                    return new TrimResult { Ok = false, Message = "Bad screenshot time or video edit" };
+                    return new TrimResult { Ok = false, Message = Locales.Message("editor.badScreenshotTimeOrVideoEdit") };
                 removeAudio = true;
                 audioEdit = null;
             }
             // the editor offers a tenth of normal speed to five times normal
             if (double.IsNaN(videoSpeed) || double.IsInfinity(videoSpeed) || videoSpeed < 0.1 || videoSpeed > 5)
-                return new TrimResult { Ok = false, Message = "Bad speed" };
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.badSpeed") };
             // a video that plays at another speed is made again frame by frame, so it is never a stream copy
             bool retimed = Math.Abs(videoSpeed - 1) > 1e-6;
             // video pieces with black between them are put together frame by frame as well
@@ -573,22 +590,22 @@ namespace ReplayKitHelper
             bool looked = lookEdit != null;
             // and so are layers, which only the graph that puts the video together lays on
             bool layered = layerEdit != null;
-            if (layered && !composed) return new TrimResult { Ok = false, Message = "Layers need the video of the edit to be put together" };
+            if (layered && !composed) return new TrimResult { Ok = false, Message = Locales.Message("editor.layersNeedTheVideoOfThe") };
             // a picture of another size, rate or bitrate is made again as well
             if (retimed || composed || subtitled || looked || layered || framed || screenshot || render.Any) precise = true;
             if (double.IsNaN(startSec) || double.IsNaN(endSec) || double.IsInfinity(startSec) || double.IsInfinity(endSec))
-                return new TrimResult { Ok = false, Message = "Bad start/end" };
-            if (startSec < 0) return new TrimResult { Ok = false, Message = "Start must be >= 0" };
-            if (endSec <= startSec) return new TrimResult { Ok = false, Message = "End must be greater than start" };
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.badStartEnd") };
+            if (startSec < 0) return new TrimResult { Ok = false, Message = Locales.Message("editor.startMustBe0") };
+            if (endSec <= startSec) return new TrimResult { Ok = false, Message = Locales.Message("editor.endMustBeGreaterThanStart") };
             double duration = endSec - startSec;
-            if (duration < 0.5) return new TrimResult { Ok = false, Message = "Trim must be at least 0.5s long" };
+            if (duration < 0.5) return new TrimResult { Ok = false, Message = Locales.Message("editor.trimMustBeAtLeast0") };
 
             mode = !string.IsNullOrEmpty(mode) ? mode.ToLowerInvariant() : "copy";
             if (mode != "copy" && mode != "overwrite" && mode != "screenshot") return new TrimResult { Ok = false, Message = "Unknown trim mode '" + mode + "'" };
             bool overwrite = mode == "overwrite";
 
             var source = Clips.GetSafeClipPath(sourceName);
-            if (source == null || !File.Exists(source.Full)) return new TrimResult { Ok = false, Message = "Source clip not found" };
+            if (source == null || !File.Exists(source.Full)) return new TrimResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
             string requestId = UploadState.NewRequestId();
             using var reservation = JobCoordinator.TryReserve(requestId, source.Name, source.Full, "trim", out string busy);
             if (reservation == null) return new TrimResult { Ok = false, Message = busy };
@@ -598,7 +615,7 @@ namespace ReplayKitHelper
             var tools = Compression.GetToolPaths();
             string ffmpeg = tools["ffmpeg"]?.Value<string>();
             string ffprobePath = tools["ffprobe"]?.Value<string>();
-            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = "FFmpeg is missing or unavailable. Use Settings > Check for Updates or run the ReplayKit installer again to repair the video tools." };
+            if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg)) return new TrimResult { Ok = false, Message = Locales.Message("editor.ffmpegIsMissingOrUnavailableUse") };
 
             string ext = screenshot ? ".png" : Path.GetExtension(source.Name);
             // for overwrite mode, snapshot the sources filesystem timestamps now (before the atomic replace destroys them) so they can be restored after the encode -- same rationale as the compress-overwrite path: keeps the clip in its original sort position rather than jumping to the top of the dock list every time its trimmed.
@@ -635,7 +652,7 @@ namespace ReplayKitHelper
                 string outputFolder = screenshot ? Screenshots.Folder(Clips.LibraryRoot(Path.GetDirectoryName(source.Full)), create: true) : Path.GetDirectoryName(source.Full);
                 string suffix = screenshot ? "screenshot" : precise ? "trimmed" : "trimmed (fast)";
                 outName = GetSuffixedOutputName(screenshot ? Path.ChangeExtension(source.Name, ".png") : source.Name, suffix, outputFolder);
-                if (outName == null) return new TrimResult { Ok = false, Message = "Too many existing trim outputs" };
+                if (outName == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.tooManyExistingTrimOutputs") };
                 finalPath = Path.Combine(outputFolder, outName);
                 tempPath = Path.Combine(outputFolder, "_replaykit_trim_copy_" + Guid.NewGuid().ToString("N") + ext);
                 outPath = tempPath;
@@ -648,7 +665,7 @@ namespace ReplayKitHelper
             // a plan can also bring in audio files from outside the clip, which a clip without audio takes as well
             bool bringsIn = (((audioEdit as JObject)?["imports"] as JArray)?.Count ?? 0) > 0;
             // a clip whose boxes cannot be read may hold audio that is not seen, which a plan would leave out without a word
-            if (bringsIn && !removeAudio && audioCount == 0 && !Mp4Tracks.IsReadable(source.Full)) return new TrimResult { Ok = false, Message = "Audio cannot be added to this kind of clip." };
+            if (bringsIn && !removeAudio && audioCount == 0 && !Mp4Tracks.IsReadable(source.Full)) return new TrimResult { Ok = false, Message = Locales.Message("editor.audioCannotBeAddedToThis3") };
             bool hasPlan = audioEdit != null && !removeAudio && (audioCount > 0 || bringsIn);
             var importArgs = new List<string>();
             // the saved clip is the part of the timeline between these two times; with video pieces the editor says which part, and it may reach past the video on either side
@@ -662,9 +679,9 @@ namespace ReplayKitHelper
             if (composed)
             {
                 // the audio of a clip that has some is part of the same graph, so an edit that leaves it out would drop it without a word
-                if (audioCount > 0 && !removeAudio && audioEdit == null) return new TrimResult { Ok = false, Message = "The audio of this clip was not prepared, so the video cannot be edited with it. Turn on Remove audio to edit the video alone." };
+                if (audioCount > 0 && !removeAudio && audioEdit == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.theAudioOfThisClipWas") };
                 sourceInfo = ProbeVideo(source.Full);
-                if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                if (sourceInfo == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.theVideoOfTheClipCould") };
                 videoPlan = VideoPlan.Parse(videoEdit, videoSpeed, sourceInfo.Duration, out string videoError);
                 if (videoPlan == null) return new TrimResult { Ok = false, Message = videoError };
                 windowStart = videoPlan.Start;
@@ -685,7 +702,7 @@ namespace ReplayKitHelper
                 composedSeek = TrimSeek.Find(ffprobePath, source.Full, (decimal)spanFirst, (decimal)spanLast, token);
             bool audioApart = !composed || composedSeek != null;
             if (screenshot && (frameTime < windowStart || frameTime >= windowEnd))
-                return new TrimResult { Ok = false, Message = "The screenshot time is outside the saved part of the video" };
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.theScreenshotTimeIsOutsideThe") };
             if (screenshot)
             {
                 string[] rate = sourceInfo.Fps.Split('/');
@@ -699,7 +716,7 @@ namespace ReplayKitHelper
             if (framed)
             {
                 sourceInfo ??= ProbeVideo(source.Full);
-                if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                if (sourceInfo == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.theVideoOfTheClipCould") };
                 try
                 {
                     frameFilter = EditorFrame.Filter(aspect, sourceInfo.Width, sourceInfo.Height);
@@ -728,7 +745,7 @@ namespace ReplayKitHelper
                 foreach (var import in plan.Imports)
                 {
                     string importFile = AudioImports.PathFor(import.Id);
-                    if (importFile == null) return new TrimResult { Ok = false, Message = "An audio file added in the editor is no longer available. Add it again." };
+                    if (importFile == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.anAudioFileAddedInThe") };
                     importArgs.AddRange(new[] { "-i", importFile });
                     importInputs[import.Src] = nextInput++;
                 }
@@ -754,7 +771,7 @@ namespace ReplayKitHelper
                 if (lookPlan == null) return new TrimResult { Ok = false, Message = lookError };
                 lookTemporal = lookPlan.Temporal;
                 sourceInfo ??= ProbeVideo(source.Full);
-                if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                if (sourceInfo == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.theVideoOfTheClipCould") };
                 if (!framed) (frameW, frameH) = (sourceInfo.Width, sourceInfo.Height);
                 lookFilter = lookPlan.Filter(frameW, frameH);
             }
@@ -790,7 +807,7 @@ namespace ReplayKitHelper
                 if (frameW <= 0 || frameH <= 0)
                 {
                     sourceInfo ??= ProbeVideo(source.Full);
-                    if (sourceInfo == null) return new TrimResult { Ok = false, Message = "The video of the clip could not be read" };
+                    if (sourceInfo == null) return new TrimResult { Ok = false, Message = Locales.Message("editor.theVideoOfTheClipCould") };
                     (frameW, frameH) = (sourceInfo.Width, sourceInfo.Height);
                 }
                 renderFilter = render.Filter(frameW, frameH);
@@ -931,8 +948,8 @@ namespace ReplayKitHelper
                     string msg = combined.Length > 400 ? combined.Substring(0, 400) + "..." : combined;
                     try { if (File.Exists(outPath)) File.Delete(outPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
                     // a card that cannot run the encoder fails here with the message of ffmpeg, and the processor only takes over when the switch in the settings is turned off
-                    string hint = encoder != null && encoder.Hardware ? " " + Locales.T("(encoded by {encoder}, Settings > Video Editor can switch edits to the processor)", "encoder", encoder.Name) : "";
-                    return new TrimResult { Ok = false, Message = Locales.T("ffmpeg trim failed (exit={code}): {error}", "code", result.ExitCode, "error", msg) + hint };
+                    string hint = encoder != null && encoder.Hardware ? " " + Locales.Message("editor.encodedByEncoderSettingsVideoEditor", "encoder", encoder.Name) : "";
+                    return new TrimResult { Ok = false, Message = Locales.Message("editor.ffmpegTrimFailedExitCodeError", "code", result.ExitCode, "error", msg) + hint };
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -943,7 +960,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
             {
                 try { if (File.Exists(outPath)) File.Delete(outPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                return new TrimResult { Ok = false, Message = Locales.T("Trim failed: {error}", "error", ex.Message) };
+                return new TrimResult { Ok = false, Message = Locales.Message("editor.trimFailedError", "error", ex.Message) };
             }
 
             if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0) return new TrimResult { Ok = false, Message = "ffmpeg reported success but the output file is missing or empty" };
@@ -958,7 +975,7 @@ namespace ReplayKitHelper
                     if (File.Exists(finalPath))
                     {
                         try { File.Delete(tempPath); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-                        return new TrimResult { Ok = false, Message = "A clip with that output name already exists" };
+                        return new TrimResult { Ok = false, Message = Locales.Message("editor.aClipWithThatOutputName") };
                     }
                     // plain File.Move, not an atomic replace -- a new output name colliding with an existing file is a genuine error above, not a case to silently overwrite.
                     JobCoordinator.Commit(requestId, () =>
@@ -975,7 +992,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                    return new TrimResult { Ok = false, Message = Locales.T("Could not publish trimmed copy: {error}", "error", ex.Message) };
+                    return new TrimResult { Ok = false, Message = Locales.Message("editor.couldNotPublishTrimmedCopyError", "error", ex.Message) };
                 }
             }
             else
@@ -994,7 +1011,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception || ex is OperationCanceledException || ex is TimeoutException)
                 {
                     try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                    return new TrimResult { Ok = false, Message = Locales.T("Could not replace original: {error}", "error", ex.Message) };
+                    return new TrimResult { Ok = false, Message = Locales.Message("common.couldNotReplaceOriginalError", "error", ex.Message) };
                 }
                 // restore the original mtime/ctime captured before the encode -- without this the clip would jump to the top of the date-sorted list every time its trimmed in place.
                 if (origLastWriteUtc.HasValue)
@@ -1044,7 +1061,7 @@ namespace ReplayKitHelper
         public static TrimResult SetFileClipboard(string sourceName)
         {
             var source = Clips.GetSafeClipPath(sourceName);
-            if (source == null || !File.Exists(source.Full)) return new TrimResult { Ok = false, Message = "Source clip not found" };
+            if (source == null || !File.Exists(source.Full)) return new TrimResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
             try
             {
                 var col = new System.Collections.Specialized.StringCollection();
@@ -1054,7 +1071,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                return new TrimResult { Ok = false, Message = Locales.T("Clipboard copy failed: {error}", "error", ex.Message) };
+                return new TrimResult { Ok = false, Message = Locales.Message("common.clipboardCopyFailedError", "error", ex.Message) };
             }
         }
     }

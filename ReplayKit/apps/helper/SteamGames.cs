@@ -72,13 +72,13 @@ namespace ReplayKitHelper
         internal static Library Read(string root)
         {
             root = LocalPath(root);
-            if (root == null) throw new InvalidDataException("Invalid Steam installation.");
+            if (root == null) throw new InvalidDataException(Locales.Message("clips.invalidSteamInstallation"));
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { root };
             string file = Path.Combine(root, "steamapps", "libraryfolders.vdf");
             if (File.Exists(file))
             {
                 var entries = SteamData.Text(file)["libraryfolders"] as JObject;
-                if (entries == null || entries.Count > 64) throw new InvalidDataException("Invalid Steam library list.");
+                if (entries == null || entries.Count > 64) throw new InvalidDataException(Locales.Message("clips.invalidSteamLibraryList"));
                 foreach (var entry in entries.Properties())
                 {
                     string path = LocalPath(entry.Value.Type == JTokenType.String ? entry.Value.Value<string>() : entry.Value["path"]?.Value<string>());
@@ -94,7 +94,7 @@ namespace ReplayKitHelper
                 if (!Directory.Exists(apps)) continue;
                 foreach (string manifest in Directory.EnumerateFiles(apps, "appmanifest_*.acf").Take(10001))
                 {
-                    if (installed.Count >= 10000) throw new InvalidDataException("Too many installed Steam apps.");
+                    if (installed.Count >= 10000) throw new InvalidDataException(Locales.Message("clips.tooManyInstalledSteamApps"));
                     var app = SteamData.Text(manifest)["AppState"] as JObject;
                     if (app == null || !uint.TryParse(app["appid"]?.Value<string>(), out uint id) || id == 0 || !uint.TryParse(app["StateFlags"]?.Value<string>(), out uint flags) || (flags & 4) == 0) continue;
                     if (!string.Equals(Path.GetFileName(manifest), "appmanifest_" + id + ".acf", StringComparison.OrdinalIgnoreCase)) continue;
@@ -110,7 +110,7 @@ namespace ReplayKitHelper
                 if (!info.TryGetValue(app.Item1, out var details)) continue;
                 string type = details["common"]?["type"]?.Value<string>();
                 if (!string.Equals(type, "game", StringComparison.OrdinalIgnoreCase) && !string.Equals(type, "demo", StringComparison.OrdinalIgnoreCase)) continue;
-                if (result.Folders.ContainsKey(app.Item3)) throw new InvalidDataException("Ambiguous Steam installation.");
+                if (result.Folders.ContainsKey(app.Item3)) throw new InvalidDataException(Locales.Message("clips.ambiguousSteamInstallation"));
                 result.Folders[app.Item3] = GameCatalog.Known(app.Item2) ?? new GameCatalog.Game { Id = "steam-" + app.Item1, Name = app.Item2 };
             }
             return result;

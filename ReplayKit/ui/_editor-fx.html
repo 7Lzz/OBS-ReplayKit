@@ -151,76 +151,76 @@
   // the filters: a look is a matrix with an offset added before the result is cut to range (mo), an offset per channel after it, a gamma and a contrast, taken toward no change by its intensity
   function look(m, off, gamma, contrast, mo) { return { m: m, off: off || [0, 0, 0], gamma: gamma || 1, contrast: contrast || 1, mo: mo || [0, 0, 0] }; }
   var LOOKS = [
-    ["vivid", "Vivid", look(satM(1.45), [0, 0, 0], 1, 1.12)],
-    ["warm", "Warm", look(gainM(1.12, 1.02, 0.86), [0.02, 0.01, 0], 1, 1.04)],
-    ["cool", "Cool", look(gainM(0.88, 1.0, 1.14), [0, 0.01, 0.03], 1, 1.04)],
-    ["cinematic", "Cinematic", look(mul([1.05, 0, 0, 0, 1.0, 0.02, 0, 0.04, 1.08], satM(0.82)), [0.01, 0.01, 0.03], 0.95, 1.18)],
-    ["tealorange", "Teal & Orange", look([1.15, 0.05, -0.1, -0.05, 1.05, 0.02, -0.1, 0.05, 1.12], [0, 0, 0.02], 1, 1.12)],
-    ["vintage", "Vintage", look(mul(gainM(1.06, 0.98, 0.82), satM(0.7)), [0.06, 0.04, 0.02], 1.08, 0.86)],
-    ["sepia", "Sepia", look(SEPIA, [0, 0, 0], 1, 1)],
-    ["bw", "Black & White", look(satM(0), [0, 0, 0], 1, 1.05)],
-    ["noir", "Noir", look(satM(0), [-0.03, -0.03, -0.03], 0.9, 1.45)],
-    ["faded", "Faded", look(satM(0.75), [0.09, 0.09, 0.1], 1.05, 0.8)],
-    ["cross", "Cross Process", look([1.1, 0, -0.05, -0.02, 1.08, 0, 0.05, -0.05, 0.8], [0, 0.02, 0.06], 1.05, 1.15)],
-    ["sunset", "Sunset", look(gainM(1.2, 0.95, 0.8), [0.04, 0.0, 0.02], 1.02, 1.08)],
-    ["golden", "Golden Hour", look(mul(gainM(1.15, 1.05, 0.78), satM(1.1)), [0.04, 0.02, 0], 1.05, 1.05)],
-    ["arctic", "Arctic", look(mul(gainM(0.9, 1.02, 1.18), satM(0.7)), [0.02, 0.04, 0.07], 1.08, 0.95)],
-    ["neon", "Neon", look(mul([1.05, -0.05, 0.1, -0.05, 1.0, 0.1, 0.1, -0.05, 1.15], satM(1.6)), [0, 0, 0.02], 0.95, 1.2)],
-    ["pastel", "Pastel", look(satM(0.6), [0.08, 0.07, 0.09], 1.15, 0.85)],
-    ["moody", "Moody", look(mul(gainM(0.95, 0.98, 1.05), satM(0.65)), [-0.02, -0.01, 0.01], 0.85, 1.25)],
-    ["matrix", "Retro Green", look([0.8, 0.1, 0, 0.15, 1.1, 0.05, 0, 0.1, 0.75], [0, 0.02, 0], 1, 1.1)],
-    ["rose", "Rose", look(mul(gainM(1.1, 0.94, 1.02), satM(0.9)), [0.04, 0.01, 0.03], 1.04, 0.95)],
-    ["punch", "Punch", look(satM(1.25), [-0.02, -0.02, -0.02], 0.95, 1.3)],
-    ["dramatic", "Dramatic", look(satM(0.85), [-0.02, -0.02, -0.02], 0.92, 1.35)],
-    ["bright", "Bright", look(identity(), [0.05, 0.05, 0.05], 1.15, 1)],
-    ["bluehour", "Blue Hour", look(mul(gainM(0.86, 0.95, 1.18), satM(0.9)), [0, 0.01, 0.05], 1.02, 1.06)],
-    ["lush", "Lush Green", look(mul([1, 0, 0, -0.06, 1.16, -0.06, 0, 0, 1], satM(1.2)), [0, 0.01, 0], 1.02, 1.06)],
-    ["natural", "Natural", look(mul(gainM(1.03, 1, 0.97), satM(1.08)), [0, 0, 0], 1, 1.06)],
-    ["orange", "Orange", look(gainM(1.18, 1, 0.75), [0.03, 0.01, 0], 1, 1.05)],
-    ["magic", "Magic", look(mul(gainM(1.08, 0.9, 1.15), satM(1.15)), [0.02, 0, 0.04], 1, 1.08)],
-    ["shadow", "Shadow", look(satM(0.35), [-0.03, -0.03, -0.03], 0.82, 1.2)],
+    ["vivid", RK_M("editor.lookVivid"), look(satM(1.45), [0, 0, 0], 1, 1.12)],
+    ["warm", RK_M("editor.lookWarm"), look(gainM(1.12, 1.02, 0.86), [0.02, 0.01, 0], 1, 1.04)],
+    ["cool", RK_M("editor.lookCool"), look(gainM(0.88, 1.0, 1.14), [0, 0.01, 0.03], 1, 1.04)],
+    ["cinematic", RK_M("editor.lookCinematic"), look(mul([1.05, 0, 0, 0, 1.0, 0.02, 0, 0.04, 1.08], satM(0.82)), [0.01, 0.01, 0.03], 0.95, 1.18)],
+    ["tealorange", RK_M("editor.tealOrange"), look([1.15, 0.05, -0.1, -0.05, 1.05, 0.02, -0.1, 0.05, 1.12], [0, 0, 0.02], 1, 1.12)],
+    ["vintage", RK_M("editor.lookVintage"), look(mul(gainM(1.06, 0.98, 0.82), satM(0.7)), [0.06, 0.04, 0.02], 1.08, 0.86)],
+    ["sepia", RK_M("editor.lookSepia"), look(SEPIA, [0, 0, 0], 1, 1)],
+    ["bw", RK_M("editor.blackWhite"), look(satM(0), [0, 0, 0], 1, 1.05)],
+    ["noir", RK_M("editor.lookNoir"), look(satM(0), [-0.03, -0.03, -0.03], 0.9, 1.45)],
+    ["faded", RK_M("editor.lookFaded"), look(satM(0.75), [0.09, 0.09, 0.1], 1.05, 0.8)],
+    ["cross", RK_M("editor.crossProcess"), look([1.1, 0, -0.05, -0.02, 1.08, 0, 0.05, -0.05, 0.8], [0, 0.02, 0.06], 1.05, 1.15)],
+    ["sunset", RK_M("editor.lookSunset"), look(gainM(1.2, 0.95, 0.8), [0.04, 0.0, 0.02], 1.02, 1.08)],
+    ["golden", RK_M("editor.goldenHour"), look(mul(gainM(1.15, 1.05, 0.78), satM(1.1)), [0.04, 0.02, 0], 1.05, 1.05)],
+    ["arctic", RK_M("editor.lookArctic"), look(mul(gainM(0.9, 1.02, 1.18), satM(0.7)), [0.02, 0.04, 0.07], 1.08, 0.95)],
+    ["neon", RK_M("editor.lookNeon"), look(mul([1.05, -0.05, 0.1, -0.05, 1.0, 0.1, 0.1, -0.05, 1.15], satM(1.6)), [0, 0, 0.02], 0.95, 1.2)],
+    ["pastel", RK_M("editor.lookPastel"), look(satM(0.6), [0.08, 0.07, 0.09], 1.15, 0.85)],
+    ["moody", RK_M("editor.lookMoody"), look(mul(gainM(0.95, 0.98, 1.05), satM(0.65)), [-0.02, -0.01, 0.01], 0.85, 1.25)],
+    ["matrix", RK_M("editor.retroGreen"), look([0.8, 0.1, 0, 0.15, 1.1, 0.05, 0, 0.1, 0.75], [0, 0.02, 0], 1, 1.1)],
+    ["rose", RK_M("editor.lookRose"), look(mul(gainM(1.1, 0.94, 1.02), satM(0.9)), [0.04, 0.01, 0.03], 1.04, 0.95)],
+    ["punch", RK_M("editor.lookPunch"), look(satM(1.25), [-0.02, -0.02, -0.02], 0.95, 1.3)],
+    ["dramatic", RK_M("editor.lookDramatic"), look(satM(0.85), [-0.02, -0.02, -0.02], 0.92, 1.35)],
+    ["bright", RK_M("editor.lookBright"), look(identity(), [0.05, 0.05, 0.05], 1.15, 1)],
+    ["bluehour", RK_M("editor.blueHour"), look(mul(gainM(0.86, 0.95, 1.18), satM(0.9)), [0, 0.01, 0.05], 1.02, 1.06)],
+    ["lush", RK_M("editor.lushGreen"), look(mul([1, 0, 0, -0.06, 1.16, -0.06, 0, 0, 1], satM(1.2)), [0, 0.01, 0], 1.02, 1.06)],
+    ["natural", RK_M("editor.lookNatural"), look(mul(gainM(1.03, 1, 0.97), satM(1.08)), [0, 0, 0], 1, 1.06)],
+    ["orange", RK_M("editor.lookOrange"), look(gainM(1.18, 1, 0.75), [0.03, 0.01, 0], 1, 1.05)],
+    ["magic", RK_M("editor.lookMagic"), look(mul(gainM(1.08, 0.9, 1.15), satM(1.15)), [0.02, 0, 0.04], 1, 1.08)],
+    ["shadow", RK_M("editor.lookShadow"), look(satM(0.35), [-0.03, -0.03, -0.03], 0.82, 1.2)],
     // the photo film looks of the colour matrix filter of pixi.js, the matrices and offsets as it publishes them
-    ["polaroid", "Polaroid", look([1.438, -0.062, -0.062, -0.122, 1.378, -0.122, -0.016, -0.016, 1.483])],
-    ["kodachrome", "Kodachrome", look([1.1285582, -0.3967382, -0.0399256, -0.1640434, 1.0835252, -0.0549881, -0.1678601, -0.5603416, 1.6014851], null, 1, 1, [0.24992, 0.09699, 0.139725])],
-    ["technicolor", "Technicolor", look([1.9125278, -0.8545345, -0.0915551, -0.3087833, 1.7658909, -0.1060174, -0.2311034, -0.7501899, 1.8475978], null, 1, 1, [0.046249, -0.27589, 0.121376])],
-    ["brownie", "Brownie", look([0.5997023, 0.3455324, -0.2708299, -0.0377032, 0.8609578, 0.1505955, 0.2411364, -0.0744104, 0.4497218], null, 1, 1, [0.186008, -0.144974, -0.029655])],
+    ["polaroid", RK_M("editor.lookPolaroid"), look([1.438, -0.062, -0.062, -0.122, 1.378, -0.122, -0.016, -0.016, 1.483])],
+    ["kodachrome", RK_M("editor.lookKodachrome"), look([1.1285582, -0.3967382, -0.0399256, -0.1640434, 1.0835252, -0.0549881, -0.1678601, -0.5603416, 1.6014851], null, 1, 1, [0.24992, 0.09699, 0.139725])],
+    ["technicolor", RK_M("editor.lookTechnicolor"), look([1.9125278, -0.8545345, -0.0915551, -0.3087833, 1.7658909, -0.1060174, -0.2311034, -0.7501899, 1.8475978], null, 1, 1, [0.046249, -0.27589, 0.121376])],
+    ["brownie", RK_M("editor.lookBrownie"), look([0.5997023, 0.3455324, -0.2708299, -0.0377032, 0.8609578, 0.1505955, 0.2411364, -0.0744104, 0.4497218], null, 1, 1, [0.186008, -0.144974, -0.029655])],
   ];
 
   // the effects: each sets some of the steps from its strength (0 to 1), and effects that share a step take the stronger value. lengths are pixels of a 1080p picture
   var EFFECTS = [
-    ["pixelate", "Pixelate", true, function (s, a) { s.pixel = Math.max(s.pixel, Math.round(4 + 60 * a)); }],
-    ["blur", "Blur", true, function (s, a) { s.blur = Math.max(s.blur, 1 + 19 * a); }],
-    ["sharpen", "Sharpen", true, function (s, a) { s.sharp = Math.max(s.sharp, 0.2 + 2.3 * a); }],
-    ["vignette", "Vignette", true, function (s, a) { s.vignette = Math.max(s.vignette, 0.3 + 1.2 * a); }],
-    ["grain", "Grain", true, function (s, a) { s.noise = Math.max(s.noise, Math.round(10 + 50 * a)); }],
-    ["rgbsplit", "RGB Split", true, function (s, a) { s.shift = Math.max(s.shift, Math.round(2 + 18 * a)); }],
-    ["invert", "Invert", false, function (s) { s.invert = 1; }],
-    ["posterize", "Posterize", true, function (s, a) { var l = Math.round(16 - 13 * a); s.poster = s.poster ? Math.min(s.poster, l) : l; }],
-    ["thermal", "Thermal", false, function (s) { s.thermal = 1; }],
-    ["scanlines", "Scanlines", true, function (s, a) { s.scanP = 4; s.scanA = Math.max(s.scanA, 0.15 + 0.5 * a); }],
+    ["pixelate", RK_M("editor.effectPixelate"), true, function (s, a) { s.pixel = Math.max(s.pixel, Math.round(4 + 60 * a)); }],
+    ["blur", RK_M("editor.effectBlur"), true, function (s, a) { s.blur = Math.max(s.blur, 1 + 19 * a); }],
+    ["sharpen", RK_M("editor.effectSharpen"), true, function (s, a) { s.sharp = Math.max(s.sharp, 0.2 + 2.3 * a); }],
+    ["vignette", RK_M("editor.effectVignette"), true, function (s, a) { s.vignette = Math.max(s.vignette, 0.3 + 1.2 * a); }],
+    ["grain", RK_M("editor.effectGrain"), true, function (s, a) { s.noise = Math.max(s.noise, Math.round(10 + 50 * a)); }],
+    ["rgbsplit", RK_M("editor.rgbSplit"), true, function (s, a) { s.shift = Math.max(s.shift, Math.round(2 + 18 * a)); }],
+    ["invert", RK_M("editor.effectInvert"), false, function (s) { s.invert = 1; }],
+    ["posterize", RK_M("editor.effectPosterize"), true, function (s, a) { var l = Math.round(16 - 13 * a); s.poster = s.poster ? Math.min(s.poster, l) : l; }],
+    ["thermal", RK_M("editor.effectThermal"), false, function (s) { s.thermal = 1; }],
+    ["scanlines", RK_M("editor.effectScanlines"), true, function (s, a) { s.scanP = 4; s.scanA = Math.max(s.scanA, 0.15 + 0.5 * a); }],
     ["vhs", "VHS", true, function (s, a) { s.shift = Math.max(s.shift, Math.round(2 + 4 * a)); s.blur = Math.max(s.blur, 1); s.noise = Math.max(s.noise, Math.round(8 + 16 * a)); s.scanP = s.scanP || 3; s.scanA = Math.max(s.scanA, 0.1 + 0.3 * a); }],
-    ["oldfilm", "Old Film", true, function (s, a) { s.sepia = Math.max(s.sepia, 0.6 + 0.4 * a); s.noise = Math.max(s.noise, Math.round(10 + 20 * a)); s.vignette = Math.max(s.vignette, 0.6 + 0.5 * a); }],
-    ["emboss", "Emboss", false, function (s) { s.emboss = 1; }],
-    ["sketch", "Sketch", false, function (s) { s.sketch = 1; }],
-    ["zoom", "Zoom", true, function (s, a) { s.zoom = Math.max(s.zoom, 1 + a); }],
-    ["fisheye", "Fisheye", true, function (s, a) { s.lens = Math.max(s.lens, 0.1 + 0.5 * a); }],
-    ["mirror", "Mirror", false, function (s) { s.flip = 1; }],
+    ["oldfilm", RK_M("editor.oldFilm"), true, function (s, a) { s.sepia = Math.max(s.sepia, 0.6 + 0.4 * a); s.noise = Math.max(s.noise, Math.round(10 + 20 * a)); s.vignette = Math.max(s.vignette, 0.6 + 0.5 * a); }],
+    ["emboss", RK_M("editor.effectEmboss"), false, function (s) { s.emboss = 1; }],
+    ["sketch", RK_M("editor.effectSketch"), false, function (s) { s.sketch = 1; }],
+    ["zoom", RK_M("editor.effectZoom"), true, function (s, a) { s.zoom = Math.max(s.zoom, 1 + a); }],
+    ["fisheye", RK_M("editor.effectFisheye"), true, function (s, a) { s.lens = Math.max(s.lens, 0.1 + 0.5 * a); }],
+    ["mirror", RK_M("editor.effectMirror"), false, function (s) { s.flip = 1; }],
     // the bloom filter of pixi.js: a blurred copy laid over the picture as a screen
-    ["glow", "Glow", true, function (s, a) { s.glow = Math.max(s.glow, 0.3 + 0.6 * a); s.glowS = Math.max(s.glowS, 6 + 10 * a); }],
+    ["glow", RK_M("editor.effectGlow"), true, function (s, a) { s.glow = Math.max(s.glow, 0.3 + 0.6 * a); s.glowS = Math.max(s.glowS, 6 + 10 * a); }],
     // the advanced bloom of pixi.js: the part of each colour over a threshold, blurred and added to the picture
-    ["bloom", "Bloom", true, function (s, a) { var t = 0.75 - 0.35 * a; s.bloomT = s.bloomS ? Math.min(s.bloomT, t) : t; s.bloomS = Math.max(s.bloomS, 8 + 12 * a); }],
+    ["bloom", RK_M("editor.effectBloom"), true, function (s, a) { var t = 0.75 - 0.35 * a; s.bloomT = s.bloomS ? Math.min(s.bloomT, t) : t; s.bloomS = Math.max(s.bloomS, 8 + 12 * a); }],
     // a band across the middle stays sharp and the rows above and below it blur, the way a tilted lens fakes a model
-    ["tiltshift", "Tilt Shift", true, function (s, a) { s.tilt = Math.max(s.tilt, 3 + 9 * a); }],
-    ["motionblur", "Motion Blur", true, function (s, a) { s.motion = Math.max(s.motion, 3 + 22 * a); }],
+    ["tiltshift", RK_M("editor.tiltShift"), true, function (s, a) { s.tilt = Math.max(s.tilt, 3 + 9 * a); }],
+    ["motionblur", RK_M("editor.motionBlur"), true, function (s, a) { s.motion = Math.max(s.motion, 3 + 22 * a); }],
     // the picture averaged with copies of itself zoomed toward its centre
-    ["zoomblur", "Zoom Blur", true, function (s, a) { s.zblur = Math.max(s.zblur, 0.03 + 0.12 * a); }],
+    ["zoomblur", RK_M("editor.zoomBlur"), true, function (s, a) { s.zblur = Math.max(s.zblur, 0.03 + 0.12 * a); }],
     // every colour over the threshold is turned to its negative, the sabattier effect of the darkroom
-    ["solarize", "Solarize", true, function (s, a) { var t = 0.9 - 0.4 * a; s.solar = s.solar ? Math.min(s.solar, t) : t; }],
-    ["edges", "Neon Edges", false, function (s) { s.edges = 1; }],
+    ["solarize", RK_M("editor.effectSolarize"), true, function (s, a) { var t = 0.9 - 0.4 * a; s.solar = s.solar ? Math.min(s.solar, t) : t; }],
+    ["edges", RK_M("editor.neonEdges"), false, function (s) { s.edges = 1; }],
     // the top half again, upside down, in the bottom half
-    ["reflection", "Reflection", false, function (s) { s.reflect = 1; }],
+    ["reflection", RK_M("editor.effectReflection"), false, function (s) { s.reflect = 1; }],
     // the fisheye turned the other way; a fisheye that is also on wins
-    ["pinch", "Pinch", true, function (s, a) { if (s.lens <= 0) s.lens = Math.min(s.lens, -(0.1 + 0.4 * a)); }],
+    ["pinch", RK_M("editor.effectPinch"), true, function (s, a) { if (s.lens <= 0) s.lens = Math.min(s.lens, -(0.1 + 0.4 * a)); }],
     // a tube screen: a curved glass, lines between the rows, a dark edge and the colours a little apart
     ["crt", "CRT", true, function (s, a) { s.lens = Math.max(s.lens, 0.06 + 0.1 * a); s.scanP = s.scanP || 3; s.scanA = Math.max(s.scanA, 0.2 + 0.35 * a); s.vignette = Math.max(s.vignette, 0.5 + 0.4 * a); s.shift = Math.max(s.shift, Math.round(1 + 2 * a)); }],
   ];
@@ -641,7 +641,7 @@
       if (!result) {
         g = null; capable = false; context = null; current = null;
         canvas.hidden = true; delete video.dataset.rkFxOwned;
-        if (els.support) els.support.textContent = "This computer cannot show the look on the preview. The saved copy still gets it.";
+        if (els.support) els.support.textContent = RK_M("editor.thisComputerCannotShowTheLook");
         return;
       }
       context = result.gl;
@@ -804,12 +804,12 @@
     effects: '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-5}}</svg>',
   };
   TAB_ICONS.presets = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-6}}</svg>';
-  var TABS = [["general", "General"], ["color", "Color"], ["filters", "Filters"], ["effects", "Effects"], ["presets", "Presets"]];
-  var PRESET_KINDS = { video: RK_T("the look of this video"), subtitle: RK_T("the style of these subtitles") };
+  var TABS = [["general", RK_M("settings.general")], ["color", RK_M("editor.color")], ["filters", RK_M("clips.filters")], ["effects", RK_M("editor.effects")], ["presets", RK_M("editor.presets")]];
+  var PRESET_KINDS = { video: RK_M("editor.theLookOfThisVideo"), subtitle: RK_M("editor.theStyleOfTheseSubtitles") };
   var COLOR_GROUPS = [
-    ["Channels", [["r", "Red"], ["g", "Green"], ["b", "Blue"], ["a", "Opacity"]]],
-    ["Color", [["sat", "Saturation"], ["hue", "Hue"], ["vib", "Vibrance"]]],
-    ["Light", [["bright", "Brightness"], ["contrast", "Contrast"], ["gamma", "Gamma"]]],
+    [RK_M("editor.channels"), [["r", RK_M("editor.red")], ["g", RK_M("editor.green")], ["b", RK_M("editor.blue")], ["a", RK_M("common.opacity")]]],
+    [RK_M("editor.color"), [["sat", RK_M("editor.saturation")], ["hue", RK_M("settings.hue")], ["vib", RK_M("editor.vibrance")]]],
+    [RK_M("editor.light"), [["bright", RK_M("editor.brightness")], ["contrast", RK_M("editor.contrast")], ["gamma", RK_M("editor.gamma")]]],
   ];
   var FAVORITES_KEY = "rk-editor-fx-favorites";
   var THUMB_W = 192;
@@ -860,8 +860,8 @@
       if (onReset) {
         var reset = el("button", "tl-reset");
         reset.type = "button";
-        reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(label).toLowerCase() }));
-        reset.dataset.tooltip = "Reset to default";
+        reset.setAttribute("aria-label", RK_M("editor.resetLabel", { label: label }));
+        reset.dataset.tooltip = RK_M("common.resetToDefault");
         reset.innerHTML = icon("action/reset");
         reset.addEventListener("click", onReset);
         head.appendChild(reset);
@@ -924,8 +924,8 @@
         // the reset of the general tab, for the settings of this group alone
         var reset = el("button", "tl-reset");
         reset.type = "button";
-        reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(group[0]).toLowerCase() }));
-        reset.dataset.tooltip = "Reset to default";
+        reset.setAttribute("aria-label", RK_M("editor.resetLabel", { label: group[0] }));
+        reset.dataset.tooltip = RK_M("common.resetToDefault");
         reset.innerHTML = icon("action/reset");
         reset.addEventListener("click", function () {
           var next = fx();
@@ -936,7 +936,7 @@
         sec.querySelector(".ed-sec-head").appendChild(reset);
         box.appendChild(sec);
       });
-      var reset = el("button", "btn ed-fx-reset", "Reset to Default");
+      var reset = el("button", "btn ed-fx-reset", RK_M("editor.resetToDefault"));
       reset.type = "button";
       reset.addEventListener("click", function () {
         var next = fx();
@@ -971,8 +971,8 @@
       if (onEdit) {
         var edit = el("button", "ed-fx-edit");
         edit.type = "button";
-        edit.setAttribute("aria-label", RK_T("Edit {label}", { label: RK_T(label).toLowerCase() }));
-        edit.dataset.tooltip = "Edit";
+        edit.setAttribute("aria-label", RK_M("editor.editLabel", { label: label }));
+        edit.dataset.tooltip = RK_M("common.edit");
         edit.innerHTML = icon("action/edit");
         edit.addEventListener("click", function (e) { e.stopPropagation(); onEdit(); });
         frame.appendChild(edit);
@@ -1006,12 +1006,12 @@
     // the tiles of a pane in two grids, the favorites first, each in the order the list defines; a search hides tiles and a heading with nothing left under it
     // the pane names are keys, so each sentence that carries one is written out whole
     function kindText(kind) {
-      if (kind === "filters") return { all: RK_T("All filters"), search: RK_T("Search filters"), none: RK_T("No filters match that.") };
-      return { all: RK_T("All effects"), search: RK_T("Search effects"), none: RK_T("No effects match that.") };
+      if (kind === "filters") return { all: RK_M("editor.allFilters"), search: RK_M("editor.searchFilters"), none: RK_M("editor.noFiltersMatchThat") };
+      return { all: RK_M("editor.allEffects"), search: RK_M("editor.searchEffects"), none: RK_M("editor.noEffectsMatchThat") };
     }
 
     function tileGroups(box, kind, list) {
-      var favHead = groupHead("toggle/star", "Favorites");
+      var favHead = groupHead("toggle/star", RK_M("clips.favorites"));
       var favGrid = el("div", "ed-fx-grid");
       var restHead = groupHead("toggle/grid", kindText(kind).all);
       var restGrid = el("div", "ed-fx-grid");
@@ -1029,7 +1029,7 @@
           t.classList.toggle("is-favorite", fav);
           if (t.star) {
             t.star.innerHTML = icon(fav ? "toggle/star" : "toggle/star-border");
-            t.star.dataset.tooltip = fav ? "Remove from favorites" : "Add to favorites";
+            t.star.dataset.tooltip = fav ? RK_M("editor.removeFromFavorites") : RK_M("editor.addToFavorites");
             t.star.setAttribute("aria-label", t.star.dataset.tooltip);
           }
           (fav ? favGrid : restGrid).appendChild(t);
@@ -1078,7 +1078,7 @@
     function buildFilters(box) {
       var list = [];
       var layout = null;
-      var none = tile("None", function () { var next = fx(); next.look = null; write(next, true); });
+      var none = tile(RK_M("settings.none"), function () { var next = fx(); next.look = null; write(next, true); });
       els.lookTiles[""] = none;
       list.push(none);
       LOOKS.forEach(function (l) {
@@ -1116,7 +1116,7 @@
       var box = el("div", "ed-fx-box");
       els.editName = el("div", "ed-fx-box-title", "");
       box.appendChild(els.editName);
-      els.editField = field("Strength", [0, 100], 1, percent, function (v, record) {
+      els.editField = field(RK_M("common.strength"), [0, 100], 1, percent, function (v, record) {
         var next = fx();
         if (!setAmount(next, v)) return;
         write(next, record);
@@ -1191,7 +1191,7 @@
         o.rail.appendChild(b);
       });
       // an audio piece or a subtitle has one panel, and its tab only says what the panel is
-      [["audio", "Audio", "editor/audio"], ["subtitle", "Subtitle", "editor/subtitles"], ["layer", "Layer", "editor/image"]].forEach(function (t) {
+      [["audio", RK_M("common.audio"), "editor/audio"], ["subtitle", RK_M("editor.subtitle"), "editor/subtitles"], ["layer", RK_M("editor.layer"), "editor/image"]].forEach(function (t) {
         var b = el("button", "ed-tab is-active");
         b.type = "button";
         b.dataset.kind = t[0];
@@ -1209,7 +1209,7 @@
       els.subPresetsTab.type = "button";
       els.subPresetsTab.dataset.kind = "subtitle-presets";
       els.subPresetsTab.innerHTML = TAB_ICONS.presets;
-      els.subPresetsTab.appendChild(el("span", "", "Presets"));
+      els.subPresetsTab.appendChild(el("span", "", RK_M("editor.presets")));
       els.subPresetsTab.addEventListener("click", function () {
         setSubPane("presets");
         if (lanes.panelClosed()) lanes.openPanel();
@@ -1220,7 +1220,7 @@
       els.resetTab.type = "button";
       els.resetTab.dataset.kind = "reset";
       els.resetTab.innerHTML = icon("action/reset");
-      els.resetTab.appendChild(el("span", "", "Reset"));
+      els.resetTab.appendChild(el("span", "", RK_M("editor.reset")));
       els.resetTab.addEventListener("click", function () {
         var done = lanes.resetSelected();
         if (!done) return;
@@ -1228,16 +1228,16 @@
         if (done === "video" || done === "subtitle") chosen[done] = "";
         presetsKey = "";
         paint();
-        if (o.notify) o.notify({ video: RK_T("The video went back to default. Undo brings it back."), audio: RK_T("The audio went back to default. Undo brings it back."), subtitle: RK_T("The subtitles went back to default. Undo brings it back.") }[done], "info");
+        if (o.notify) o.notify({ video: RK_M("editor.theVideoWentBackToDefault"), audio: RK_M("editor.theAudioWentBackToDefault"), subtitle: RK_M("editor.theSubtitlesWentBackToDefault") }[done], "info");
       });
       o.rail.appendChild(els.resetTab);
       // below reset, while a selected subtitle may be misheard: the list of them, with what else each might have been
       els.checkTab = el("button", "ed-tab");
       els.checkTab.type = "button";
       els.checkTab.dataset.kind = "check";
-      els.checkTab.dataset.tooltip = "Subtitles that might be misheard";
+      els.checkTab.dataset.tooltip = RK_M("editor.subtitlesThatMightBeMisheard");
       els.checkTab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:editor-fx-7}}</svg>';
-      els.checkTab.appendChild(el("span", "", "Check"));
+      els.checkTab.appendChild(el("span", "", RK_M("editor.check")));
       els.checkTab.addEventListener("click", function () {
         setSubPane("check");
         if (lanes.panelClosed()) lanes.openPanel();
@@ -1248,8 +1248,8 @@
       var head = el("div", "ed-fx-head");
       els.back = el("button", "ed-x ed-back");
       els.back.type = "button";
-      els.back.setAttribute("aria-label", "Back");
-      els.back.dataset.tooltip = "Back";
+      els.back.setAttribute("aria-label", RK_M("common.back"));
+      els.back.dataset.tooltip = RK_M("common.back");
       els.back.innerHTML = BACK_ICON;
       els.back.hidden = true;
       els.back.addEventListener("click", closeEdit);
@@ -1258,7 +1258,7 @@
       head.appendChild(els.title);
       var close = el("button", "ed-x");
       close.type = "button";
-      close.setAttribute("aria-label", "Close");
+      close.setAttribute("aria-label", RK_M("common.close"));
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { lanes.closePanel(); });
       head.appendChild(close);
@@ -1313,7 +1313,7 @@
       Object.keys(els.kindTabs).forEach(function (k) { els.kindTabs[k].hidden = k !== kind; els.kindTabs[k].classList.toggle("is-active", !closed && (k !== "subtitle" || subPane === "edit")); });
       els.subPresetsTab.hidden = kind !== "subtitle";
       els.resetTab.hidden = ["video", "audio", "subtitle"].indexOf(kind) < 0;
-      els.resetTab.dataset.tooltip = { video: "Reset the video to default", audio: "Reset this audio to default", subtitle: "Reset these subtitles to default" }[kind] || "";
+      els.resetTab.dataset.tooltip = { video: RK_M("editor.resetTheVideoToDefault"), audio: RK_M("editor.resetThisAudioToDefault"), subtitle: RK_M("editor.resetTheseSubtitlesToDefault") }[kind] || "";
       els.subPresetsTab.classList.toggle("is-active", !closed && subPane === "presets");
       var toCheck = kind === "subtitle" ? unsureCues() : [];
       els.checkTab.hidden = !toCheck.length;
@@ -1331,7 +1331,7 @@
       if (subCheck) {
         els.editing = null;
         els.back.hidden = true;
-        els.title.textContent = "Might be misheard";
+        els.title.textContent = RK_M("editor.mightBeMisheard");
         els.support.textContent = "";
         Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = k !== "check"; });
         els.editView.hidden = true;
@@ -1343,7 +1343,7 @@
       if (subPresets) {
         els.editing = null;
         els.back.hidden = true;
-        els.title.textContent = "Subtitle presets";
+        els.title.textContent = RK_M("editor.subtitlePresets");
         els.support.textContent = "";
         Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = k !== "presets"; });
         els.editView.hidden = true;
@@ -1359,7 +1359,7 @@
       var view = ed ? "edit:" + ed.kind + ":" + ed.id : pane;
       var def = ed ? (ed.kind === "filter" ? lookById(ed.id) : effectById(ed.id)) : null;
       els.back.hidden = !ed;
-      els.title.textContent = ed ? def[1] : { color: "Color", filters: "Filters", effects: "Effects", presets: "Video presets" }[pane];
+      els.title.textContent = ed ? def[1] : { color: RK_M("editor.color"), filters: RK_M("clips.filters"), effects: RK_M("editor.effects"), presets: RK_M("editor.videoPresets") }[pane];
       Object.keys(els.panes).forEach(function (k) { els.panes[k].hidden = !!ed || k !== pane; });
       els.editView.hidden = !ed;
       // the card comes in by itself when it was not showing; a switch inside it, to another tab or a page and back, brings the new view in the same way
@@ -1370,10 +1370,10 @@
       });
       if (wasOpen && els.lastPane && els.lastPane !== view) slideIn(shownNode);
       els.lastPane = view;
-      els.support.textContent = !isIdentity(resolve(lanes.fx.main())) && !preview.supported() ? "This computer cannot show the look on the preview. The saved copy still gets it." : "";
+      els.support.textContent = !isIdentity(resolve(lanes.fx.main())) && !preview.supported() ? RK_M("editor.thisComputerCannotShowTheLook") : "";
       if (ed) {
         els.editName.textContent = def[1];
-        els.editLabel.textContent = ed.kind === "filter" ? "Intensity" : "Strength";
+        els.editLabel.textContent = ed.kind === "filter" ? RK_M("editor.intensity") : RK_M("common.strength");
         els.editField.show(amountOf(state));
         return;
       }
@@ -1419,12 +1419,12 @@
     function loadPresets() {
       if (!o.helper) return;
       fetch(o.helper + "/editor-presets", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
-        if (!j || !j.ok) throw new Error((j && j.message) || "The presets could not be read");
+        if (!j || !j.ok) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeRead"));
         presets.subtitle = Array.isArray(j.subtitle) ? j.subtitle : [];
         presets.video = Array.isArray(j.video) ? j.video : [];
         presetsKey = "";
         paint();
-      }).catch(function (err) { if (o.notify) o.notify(err.message || "The presets could not be read", "bad", "Presets"); });
+      }).catch(function (err) { if (o.notify) o.notify(err.message || RK_M("editor.thePresetsCouldNotBeRead"), "bad", RK_M("editor.presets")); });
     }
 
     // the list shows the change at once; one the helper refuses is taken back
@@ -1436,10 +1436,10 @@
       presetsSaving = presetsSaving.then(function () {
         return fetch(o.helper + "/editor-presets/save?kind=" + k, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ presets: list }) })
           .then(function (r) { return r.json(); })
-          .then(function (j) { if (!j || !j.ok) throw new Error((j && j.message) || "The presets could not be saved"); });
+          .then(function (j) { if (!j || !j.ok) throw new Error((j && j.message) || RK_M("editor.thePresetsCouldNotBeSaved")); });
       }).catch(function (err) {
         if (presets[k] === list) { presets[k] = before; presetsKey = ""; paint(); }
-        if (o.notify) o.notify(err.message || "The presets could not be saved", "bad", "Presets");
+        if (o.notify) o.notify(err.message || RK_M("editor.thePresetsCouldNotBeSaved"), "bad", RK_M("editor.presets"));
       });
     }
 
@@ -1474,8 +1474,8 @@
       if (!name) {
         var names = presets[k].map(function (p) { return p.name; });
         var n = presets[k].length + 1;
-        while (names.indexOf(RK_T("Preset {number}", { number: n })) >= 0) n++;
-        name = RK_T("Preset {number}", { number: n });
+        while (names.indexOf(RK_M("editor.presetNumber", { number: n })) >= 0) n++;
+        name = RK_M("editor.presetNumber", { number: n });
       }
       var p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: name, data: data };
       chosen[k] = p.id;
@@ -1509,7 +1509,7 @@
       input.maxLength = 40;
       input.spellcheck = false;
       input.value = p.name;
-      input.setAttribute("aria-label", "Preset name");
+      input.setAttribute("aria-label", RK_M("editor.presetName"));
       var swap = function (from, to) { if (typeof rkFlip === "function") rkFlip(flipTargets, function () { from.replaceWith(to); }); else from.replaceWith(to); };
       swap(name, input);
       try { input.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" }); } catch (_) {}
@@ -1548,14 +1548,14 @@
     }
 
     function buildPresets(box) {
-      var sec = section("Saved presets");
+      var sec = section(RK_M("editor.savedPresets"));
       els.presetNote = el("p", "ed-fx-note", "");
       sec.appendChild(els.presetNote);
       els.presetList = el("div", "ed-preset-table");
       sec.appendChild(els.presetList);
       var use = el("div", "ed-btns");
-      els.presetApply = presetButton("Apply", "primary");
-      els.presetOverwrite = presetButton("Overwrite");
+      els.presetApply = presetButton(RK_M("settings.apply"), "primary");
+      els.presetOverwrite = presetButton(RK_M("editor.overwrite"));
       use.appendChild(els.presetApply);
       use.appendChild(els.presetOverwrite);
       sec.appendChild(use);
@@ -1564,9 +1564,9 @@
       els.presetName.type = "text";
       els.presetName.maxLength = 40;
       els.presetName.spellcheck = false;
-      els.presetName.placeholder = "Name this preset";
-      els.presetName.setAttribute("aria-label", "Preset name");
-      els.presetSave = presetButton("Save as new");
+      els.presetName.placeholder = RK_M("editor.nameThisPreset");
+      els.presetName.setAttribute("aria-label", RK_M("editor.presetName"));
+      els.presetSave = presetButton(RK_M("editor.saveAsNew"));
       named.appendChild(els.presetName);
       named.appendChild(els.presetSave);
       sec.appendChild(named);
@@ -1591,7 +1591,7 @@
       var inUse = list.filter(function (p) { return matches(k, p); }).map(function (p) { return p.id; });
       els.presetApply.disabled = !target;
       els.presetOverwrite.disabled = !target || !data;
-      els.presetOverwrite.dataset.tooltip = target ? RK_T("Replace {name} with {kind}", { name: target.name, kind: PRESET_KINDS[k] }) : "Pick a preset to overwrite";
+      els.presetOverwrite.dataset.tooltip = target ? RK_M("editor.replaceNameWithKind", { name: target.name, kind: PRESET_KINDS[k] }) : RK_M("editor.pickAPresetToOverwrite");
       els.presetSave.disabled = !data;
       // a name being typed into a row is never drawn over; the list catches up once it is done
       if (renaming && renaming.kind === k && findPreset(k, renaming.id)) return;
@@ -1599,7 +1599,7 @@
       var key = canon([k, list.map(function (p) { return [p.id, p.name]; }), inUse, chosen[k]]);
       if (key === presetsKey) return;
       presetsKey = key;
-      els.presetNote.textContent = list.length ? RK_T("Pick a preset, then apply it, or overwrite it with {kind}.", { kind: PRESET_KINDS[k] }) : RK_T("No presets yet. Name {kind} below and save it to use it on any clip.", { kind: PRESET_KINDS[k] });
+      els.presetNote.textContent = list.length ? RK_M("editor.pickAPresetThenApplyIt", { kind: PRESET_KINDS[k] }) : RK_M("editor.noPresetsYetNameKindBelow", { kind: PRESET_KINDS[k] });
       els.presetList.textContent = "";
       list.forEach(function (p) {
         var row = el("div", "ed-preset" + (p.id === chosen[k] ? " is-selected" : ""));
@@ -1610,22 +1610,22 @@
         presetName.setAttribute("translate", "no");
         row.appendChild(presetName);
         // the preset that matches what is on screen says so, picked or not
-        row.appendChild(el("span", "ed-preset-use", inUse.indexOf(p.id) >= 0 ? "In use" : ""));
+        row.appendChild(el("span", "ed-preset-use", inUse.indexOf(p.id) >= 0 ? RK_M("editor.inUse") : ""));
         var edit = el("button", "icon-mini-btn edit-btn");
         edit.type = "button";
-        edit.dataset.tooltip = "Rename";
-        edit.setAttribute("aria-label", RK_T("Rename {name}", { name: p.name }));
+        edit.dataset.tooltip = RK_M("common.rename");
+        edit.setAttribute("aria-label", RK_M("editor.renameName", { name: p.name }));
         edit.innerHTML = icon("action/edit");
         edit.addEventListener("click", function (e) { e.stopPropagation(); startRename(k, p, row); });
         row.appendChild(edit);
         // the bin of a clip card: the first click turns it into a delete? button, the second deletes
         var bin = el("button", "icon-mini-btn delete-btn");
         bin.type = "button";
-        bin.dataset.deleteLabel = "Delete preset";
-        bin.dataset.tooltip = "Delete preset";
-        bin.setAttribute("aria-label", RK_T("Delete {name}", { name: p.name }));
+        bin.dataset.deleteLabel = RK_M("editor.deletePreset");
+        bin.dataset.tooltip = RK_M("editor.deletePreset");
+        bin.setAttribute("aria-label", RK_M("editor.deleteName", { name: p.name }));
         bin.innerHTML = icon("action/trash");
-        bin.appendChild(el("span", "delete-confirm-text", "Delete?"));
+        bin.appendChild(el("span", "delete-confirm-text", RK_M("common.delete2")));
         bin.addEventListener("click", function (e) {
           e.stopPropagation();
           if (bin.classList.contains("is-armed")) { deletePreset(k, p.id); return; }
@@ -1659,13 +1659,13 @@
     }
 
     function buildCheck(box) {
-      var sec = section("Check these subtitles");
+      var sec = section(RK_M("editor.checkTheseSubtitles"));
       els.checkNote = el("p", "ed-fx-note", "");
       sec.appendChild(els.checkNote);
       els.checkList = el("div", "ed-preset-table");
       sec.appendChild(els.checkList);
       var all = el("div", "ed-btns");
-      els.checkKeepAll = iconButton("action/select", "Keep all as they are");
+      els.checkKeepAll = iconButton("action/select", RK_M("editor.keepAllAsTheyAre"));
       els.checkKeepAll.addEventListener("click", function () { lanes.subtitles.markChecked(unsureCues().map(function (c) { return c.id; })); });
       all.appendChild(els.checkKeepAll);
       sec.appendChild(all);
@@ -1687,7 +1687,7 @@
       var key = canon(cues.map(function (c) { return [c.id, c.text, c.at, c.alts || []]; }));
       if (key === checkKey) return;
       checkKey = key;
-      els.checkNote.textContent = cues.length === 1 ? RK_T("This subtitle was hard to make out. Pick or type what was said, keep it, or delete it.") : RK_T("These {count} subtitles were hard to make out. Pick or type what was said, keep it, or delete it.", { count: cues.length });
+      els.checkNote.textContent = cues.length === 1 ? RK_M("editor.thisSubtitleWasHardToMake") : RK_M("editor.theseCountSubtitlesWereHardTo", { count: cues.length });
       els.checkList.textContent = "";
       var subs = lanes.subtitles;
       cues.forEach(function (c) {
@@ -1696,18 +1696,18 @@
         // the app tooltip sits on the text alone, so the bin beside it keeps its own
         var said = el("span", "ed-check-text", c.text);
         said.setAttribute("translate", "no");
-        said.dataset.tooltip = "Go to this subtitle";
+        said.dataset.tooltip = RK_M("editor.goToThisSubtitle");
         head.appendChild(said);
         head.appendChild(el("span", "ed-check-time", clockOf(c.at)));
         head.addEventListener("click", function () { subs.seek(c.at + 0.01); });
         // the bin of a clip card: a click turns it into delete?, a second one deletes, and undo brings the subtitle back
         var del = el("button", "icon-mini-btn delete-btn");
         del.type = "button";
-        del.dataset.deleteLabel = "Delete subtitle";
-        del.dataset.tooltip = "Delete subtitle";
-        del.setAttribute("aria-label", "Delete subtitle");
+        del.dataset.deleteLabel = RK_M("editor.deleteSubtitle");
+        del.dataset.tooltip = RK_M("editor.deleteSubtitle");
+        del.setAttribute("aria-label", RK_M("editor.deleteSubtitle"));
         del.innerHTML = icon("action/trash");
-        del.appendChild(el("span", "delete-confirm-text", "Delete?"));
+        del.appendChild(el("span", "delete-confirm-text", RK_M("common.delete2")));
         del.addEventListener("click", function (e) {
           e.stopPropagation();
           if (del.classList.contains("is-armed")) { subs.remove(c.id); return; }
@@ -1718,7 +1718,7 @@
         item.appendChild(head);
         var alts = Array.isArray(c.alts) ? c.alts : [];
         if (alts.length) {
-          item.appendChild(el("div", "ed-check-label", "Might have been"));
+          item.appendChild(el("div", "ed-check-label", RK_M("editor.mightHaveBeen")));
           var row = el("div", "tl-speeds");
           alts.forEach(function (text) {
             var b = el("button", "btn tl-mini", text);
@@ -1735,9 +1735,9 @@
         field.type = "text";
         field.maxLength = 300;
         field.spellcheck = false;
-        field.placeholder = "What was said";
-        field.setAttribute("aria-label", "What was said");
-        var use = iconButton("action/edit", "Use text");
+        field.placeholder = RK_M("editor.whatWasSaid");
+        field.setAttribute("aria-label", RK_M("editor.whatWasSaid"));
+        var use = iconButton("action/edit", RK_M("editor.useText"));
         use.disabled = true;
         var apply = function () {
           var text = field.value.trim();
@@ -1752,7 +1752,7 @@
         typed.appendChild(use);
         item.appendChild(typed);
         var keep = el("div", "ed-btns");
-        var k = iconButton("action/select", "Keep as it is");
+        var k = iconButton("action/select", RK_M("editor.keepAsItIs"));
         k.addEventListener("click", function () { subs.markChecked([c.id]); });
         keep.appendChild(k);
         item.appendChild(keep);

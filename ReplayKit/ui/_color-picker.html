@@ -62,14 +62,14 @@
   .cpick-status.is-bad { color:var(--cp-danger); }
   .cpick:not(.has-alpha) .cpick-alpha, .cpick:not(.has-alpha) .cpick-alpha-box, .cpick:not(.has-alpha) .cpick-sw.is-clear { display:none; }
 </style>
-<div class="cpick" id="cpick" hidden role="dialog" aria-label="Choose color">
-  <div class="cpick-plane-wrap" id="cpickPlaneWrap" aria-label="Saturation and brightness"><canvas class="cpick-plane" id="cpickPlane" width="244" height="140"></canvas><span class="cpick-dot" id="cpickDot"></span></div>
-  <div class="cpick-slider cpick-hue" id="cpickHue" tabindex="0" role="slider" aria-label="Hue" aria-valuemin="0" aria-valuemax="359"><span class="cpick-knob"></span></div>
-  <div class="cpick-slider cpick-alpha" id="cpickAlpha" tabindex="0" role="slider" aria-label="Opacity" aria-valuemin="0" aria-valuemax="100"><span class="cpick-knob"></span></div>
+<div class="cpick" id="cpick" hidden role="dialog" aria-label="Choose color" data-i18n-aria-label="settings.chooseColor">
+  <div class="cpick-plane-wrap" id="cpickPlaneWrap" aria-label="Saturation and brightness" data-i18n-aria-label="settings.saturationAndBrightness"><canvas class="cpick-plane" id="cpickPlane" width="244" height="140"></canvas><span class="cpick-dot" id="cpickDot"></span></div>
+  <div class="cpick-slider cpick-hue" id="cpickHue" tabindex="0" role="slider" aria-label="Hue" aria-valuemin="0" aria-valuemax="359" data-i18n-aria-label="settings.hue"><span class="cpick-knob"></span></div>
+  <div class="cpick-slider cpick-alpha" id="cpickAlpha" tabindex="0" role="slider" aria-label="Opacity" aria-valuemin="0" aria-valuemax="100" data-i18n-aria-label="common.opacity"><span class="cpick-knob"></span></div>
   <div class="cpick-row">
-    <button class="cpick-eyedrop" type="button" id="cpickEyedrop" data-tooltip="Pick a color from anywhere on screen" aria-label="Pick a color from anywhere on screen"><svg data-i="action/color-picker" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
-    <input class="cpick-field cpick-hex" id="cpickHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex color">
-    <div class="cpick-alpha-box" id="cpickAlphaBox"><input id="cpickAlphaNum" type="text" inputmode="numeric" maxlength="3" autocomplete="off" aria-label="Opacity percent"><span>%</span></div>
+    <button class="cpick-eyedrop" type="button" id="cpickEyedrop" data-tooltip="Pick a color from anywhere on screen" aria-label="Pick a color from anywhere on screen" data-i18n-aria-label="settings.pickAColorFromAnywhereOn" data-i18n-data-tooltip="settings.pickAColorFromAnywhereOn"><svg data-i="action/color-picker" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+    <input class="cpick-field cpick-hex" id="cpickHex" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex color" data-i18n-aria-label="settings.hexColor">
+    <div class="cpick-alpha-box" id="cpickAlphaBox"><input id="cpickAlphaNum" type="text" inputmode="numeric" maxlength="3" autocomplete="off" aria-label="Opacity percent" data-i18n-aria-label="settings.opacityPercent"><span>%</span></div>
   </div>
   <div class="cpick-swatches" id="cpickSwatches"></div>
   <div class="cpick-status" id="cpickStatus"></div>
@@ -170,7 +170,7 @@
     b.type = "button";
     b.className = "cpick-sw" + (value === "clear" ? " is-clear" : "");
     b.dataset.value = value;
-    b.setAttribute("aria-label", value === "clear" ? "No color" : value);
+    b.setAttribute("aria-label", value === "clear" ? RK_M("settings.noColor") : value);
     if (value !== "clear") b.style.setProperty("--sw", value);
     b.addEventListener("click", function () {
       if (value === "clear") { cpState.alpha = 0; cpSync(true); return; }
@@ -283,7 +283,7 @@
     var alpha = !!options.alpha;
     var original = alpha ? cleanAlphaColor(value, "#000000") : cleanHexColor(cleanAlphaColor(value, "#000000").slice(0, 7), "#000000");
     cpRequest = { original:original, apply:apply, alpha:alpha, anchor:anchor };
-    cp.root.setAttribute("aria-label", title || "Choose color");
+    cp.root.setAttribute("aria-label", title || RK_M("settings.chooseColor"));
     cp.root.classList.toggle("has-alpha", alpha);
     cp.root.hidden = false;
     cpSetStatus("");
@@ -344,7 +344,7 @@
     if (cpPicking) return;
     cpPicking = true;
     cp.eyedrop.disabled = true;
-    cpSetStatus("Click anywhere on any monitor. Esc or right-click cancels.");
+    cpSetStatus(RK_M("settings.clickAnywhereOnAnyMonitorEsc"));
     try {
       var res = await fetch(HELPER + "/appearance/pick-color", { method:"POST", cache:"no-store" });
       var data = await res.json();
@@ -358,7 +358,7 @@
           cpSync(true);
         }
       }
-      cpSetStatus(data.cancelled ? "Cancelled." : "");
+      cpSetStatus(data.cancelled ? RK_M("settings.cancelled") : "");
     } catch (error) {
       cpSetStatus(error.message || String(error), true);
     } finally {

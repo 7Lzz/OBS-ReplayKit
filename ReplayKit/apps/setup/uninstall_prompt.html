@@ -105,9 +105,9 @@
   <main class="hero">
     <img class="hero-art" src="{{HERO_ART}}" alt="" />
     <div class="hero-copy">
-      <h1 class="hero-title" id="title">Removing OBS ReplayKit</h1>
-      <div class="hero-line" id="line1">This removes the ReplayKit dock, scene, sources, script and settings from OBS.</div>
-      <div class="hero-line" id="line2">OBS restarts when it is done.</div>
+      <h1 class="hero-title" id="title" data-i18n="setup.removingObsReplaykit"></h1>
+      <div class="hero-line" id="line1" data-i18n="setup.thisRemovesTheReplaykitDockScene2"></div>
+      <div class="hero-line" id="line2" data-i18n="common.obsRestartsWhenItIsDone"></div>
     </div>
   </main>
 
@@ -115,15 +115,15 @@
     <div class="foot-fill" id="fill"></div>
     <div class="brand">
       <img class="mark" src="{{BRAND_ICON}}" alt="" />
-      <span>ReplayKit</span>
+      <span data-i18n="common.replaykit"></span>
     </div>
     <div class="stat">
       <div class="stat-text">
-        <div class="stat-line" id="statLine">Starting&hellip;</div>
+        <div class="stat-line" id="statLine" data-i18n="setup.starting"></div>
         <div class="stat-detail" id="statDetail"></div>
       </div>
       <div class="stat-pct" id="statPct"></div>
-      <button class="btn" type="button" id="closeBtn" hidden>Close</button>
+      <button class="btn" type="button" id="closeBtn" hidden data-i18n="common.close"></button>
       <div class="spinner" id="spinner"></div>
     </div>
   </footer>
@@ -157,8 +157,8 @@
     function send(obj) { if (host) host.postMessage(JSON.stringify(obj)); }
 
     if (STATE.removeObs) {
-      els.line1.textContent = "This removes ReplayKit and then runs OBS Studio's own uninstaller.";
-      els.line2.textContent = "Your OBS scenes and profiles in AppData are left in place.";
+      els.line1.textContent = RK_M("setup.thisRemovesReplaykitAndThenRuns");
+      els.line2.textContent = RK_M("setup.yourObsScenesAndProfilesIn");
     }
 
     // shrink a nowrap line until it fits its fixed-width box, so long step text scales down instead of clipping
@@ -192,10 +192,10 @@
         case "done":
           els.spinner.hidden = true;
           els.statLine.classList.remove("is-bad");
-          els.title.textContent = "OBS ReplayKit removed";
-          els.line1.textContent = d.removeObs ? "OBS Studio was uninstalled too." : "OBS is starting back up.";
+          els.title.textContent = RK_M("setup.obsReplaykitRemoved");
+          els.line1.textContent = d.removeObs ? RK_M("setup.obsStudioWasUninstalledToo") : RK_M("setup.obsIsStartingBackUp");
           els.line2.hidden = true;
-          els.statLine.textContent = d.removeObs ? "Done." : "Done. OBS is starting…";
+          els.statLine.textContent = d.removeObs ? RK_M("setup.done") : RK_M("setup.doneObsIsStarting");
           els.statDetail.textContent = "";
           els.statPct.textContent = "";
           els.fill.style.width = "100%";
@@ -206,11 +206,11 @@
         case "failed":
           els.spinner.hidden = true;
           els.title.classList.add("is-bad");
-          els.title.textContent = "Uninstall failed";
+          els.title.textContent = RK_M("setup.uninstallFailed");
           els.statLine.classList.add("is-bad");
           // the host translated the message and added the log path
           els.statLine.setAttribute("translate", "no");
-          els.statLine.textContent = d.message || RK_T("unknown error");
+          els.statLine.textContent = d.message || RK_M("setup.unknownError");
           els.statPct.textContent = "";
           els.fill.classList.add("is-bad");
           els.closeBtn.hidden = false;

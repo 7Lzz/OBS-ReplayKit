@@ -42,7 +42,7 @@ namespace ReplayKitHelper
                     {
                         if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                         string file = QFlag("screenshot") ? Screenshots.Resolve(Q("file")) : Clips.GetSafeClipPath(Q("file"))?.Full;
-                        if (file == null || !File.Exists(file)) throw new ArgumentException("Clip not found.");
+                        if (file == null || !File.Exists(file)) throw new ArgumentException(Locales.Message("common.clipNotFound2"));
                         if (path == "/games/reset") ClipGames.Reset(file);
                         else ClipGames.Correct(file, Q("id"), Q("name"), 0, Q("universe"));
                         // a clip given another game is filed in the folder of that game
@@ -63,7 +63,7 @@ namespace ReplayKitHelper
                     }
                 }
                 catch (Exception ex) when (ex is ArgumentException || ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
-                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Game details could not be read or updated." }); }
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.gameDetailsCouldNotBeRead") }); }
                 return false;
             }
 

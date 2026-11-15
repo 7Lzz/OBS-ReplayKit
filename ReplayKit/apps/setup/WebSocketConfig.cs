@@ -66,7 +66,7 @@ namespace ReplayKitSetup
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
             {
-                throw new InvalidDataException("Existing OBS websocket configuration could not be read; it was not changed.", ex);
+                throw new InvalidDataException(SetupLocale.Message("setup.existingObsWebsocketConfigurationCouldNot"), ex);
             }
         }
 

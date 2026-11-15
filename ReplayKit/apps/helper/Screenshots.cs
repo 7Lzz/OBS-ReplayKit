@@ -16,13 +16,13 @@ namespace ReplayKitHelper
         {
             string root = Path.GetFullPath(clipFolder ?? AppConfig.GetClipDir());
             string folder = Path.Combine(root, "Screenshots");
-            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Clip folder not found");
-            if (File.Exists(folder)) throw new IOException("The screenshots folder is occupied by a file");
+            if (!Directory.Exists(root)) throw new DirectoryNotFoundException(Locales.Message("common.clipFolderNotFound"));
+            if (File.Exists(folder)) throw new IOException(Locales.Message("clips.theScreenshotsFolderIsOccupiedBy"));
             if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("The screenshots folder cannot be a link");
+                throw new IOException(Locales.Message("clips.theScreenshotsFolderCannotBeA"));
             if (create) Directory.CreateDirectory(folder);
             if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("The screenshots folder cannot be a link");
+                throw new IOException(Locales.Message("clips.theScreenshotsFolderCannotBeA"));
             return folder;
         }
 
@@ -107,11 +107,11 @@ namespace ReplayKitHelper
         {
             to = (to ?? "").Trim();
             if (!string.Equals(Path.GetExtension(to), ".png", StringComparison.OrdinalIgnoreCase)) to += ".png";
-            if (!ValidName(to)) throw new ArgumentException("That name cannot be used");
+            if (!ValidName(to)) throw new ArgumentException(Locales.Message("common.thatNameCannotBeUsed"));
             string target = Path.Combine(Path.GetDirectoryName(path), to);
             if (string.Equals(target, path, StringComparison.Ordinal)) return to;
             // a change of case only is the same file to windows, so it is moved on its own
-            if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException("A screenshot with that name already exists");
+            if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException(Locales.Message("clips.aScreenshotWithThatNameAlready"));
             var capture = ClipGames.Read(path);
             ClipFiles.MoveWhenFree(path, target);
             ClipGames.Write(target, capture);

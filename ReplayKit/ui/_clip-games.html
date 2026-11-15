@@ -119,26 +119,26 @@ window.RKClipGames = (function () {
     const capture = item.capture || { kind:"unknown" };
     const games = capture.games || [];
     const game = capture.kind === "game" ? (capture.id ? capture : games[0]) : capture.kind === "unknown" ? capture.partial : null;
-    if (game && game.id) return { key:"game:" + game.id, id:game.id, kind:"game", name:game.name || RK_T("Unknown game") };
-    if (capture.kind === "desktop") return { key:"desktop", id:"desktop", kind:"desktop", name:RK_T("Desktop") };
-    if (capture.kind === "mixed") return { key:"mixed", id:"mixed", kind:"game", name:RK_T("Mixed games") };
-    return { key:"unknown", id:"unknown", kind:"unknown", name:RK_T("Unassigned") };
+    if (game && game.id) return { key:"game:" + game.id, id:game.id, kind:"game", name:game.name || RK_M("clips.unknownGame") };
+    if (capture.kind === "desktop") return { key:"desktop", id:"desktop", kind:"desktop", name:RK_M("clips.desktop") };
+    if (capture.kind === "mixed") return { key:"mixed", id:"mixed", kind:"game", name:RK_M("clips.mixedGames") };
+    return { key:"unknown", id:"unknown", kind:"unknown", name:RK_M("clips.unassigned") };
   }
   // why a clip has no game, in words, from the reason the helper found for most of it; a clip set to unassigned by hand says so, and an older clip with no reason says nothing more
   const REASONS = {
-    "multiple-captures": () => RK_T("several capture sources were showing and none clearly showed the game"),
-    "no-visible-capture": () => RK_T("no capture source was showing in the scene"),
-    "capture-not-live": () => RK_T("the capture source had no picture"),
-    "capture-target-not-focused": () => RK_T("the captured window was not the one in focus"),
-    "foreground-unavailable": () => RK_T("the window in focus could not be read"),
-    "shown-window-unreadable": () => RK_T("the window on screen could not be read"),
-    "display-not-found": () => RK_T("the captured display could not be found"),
-    "no-evidence": () => RK_T("ReplayKit was not watching while it was recorded"),
+    "multiple-captures": () => RK_M("clips.severalCaptureSourcesWereShowingAnd"),
+    "no-visible-capture": () => RK_M("clips.noCaptureSourceWasShowingIn"),
+    "capture-not-live": () => RK_M("clips.theCaptureSourceHadNoPicture"),
+    "capture-target-not-focused": () => RK_M("clips.theCapturedWindowWasNotThe"),
+    "foreground-unavailable": () => RK_M("clips.theWindowInFocusCouldNot"),
+    "shown-window-unreadable": () => RK_M("clips.theWindowOnScreenCouldNot"),
+    "display-not-found": () => RK_M("clips.theCapturedDisplayCouldNotBe"),
+    "no-evidence": () => RK_M("clips.replaykitWasNotWatchingWhileIt"),
   };
   function unassignedLabel(capture, name) {
-    if (capture.manual) return RK_T("{name} (set by you)", { name });
-    if (capture.why === "not-recognised") return RK_T("{name}: {app} is not a known game", { name, app: capture.app ? capture.app : RK_T("the app on screen") });
-    return REASONS[capture.why] ? RK_T("{name}: {reason}", { name, reason: REASONS[capture.why]() }) : name;
+    if (capture.manual) return RK_M("clips.nameSetByYou", { name });
+    if (capture.why === "not-recognised") return RK_M("clips.nameAppIsNotAKnown", { name, app: capture.app ? capture.app : RK_M("clips.theAppOnScreen") });
+    return REASONS[capture.why] ? RK_M("clips.nameReason", { name, reason: REASONS[capture.why]() }) : name;
   }
   // the game icon of a card; on a clip or screenshot card it opens the game picker as well, with the newest copy of the item so a renamed clip is changed by its new name
   function badge(parent, item, options) {
@@ -153,23 +153,23 @@ window.RKClipGames = (function () {
     const key = JSON.stringify(item.capture || null) + (changeable ? "|change" : "");
     if (old && old.dataset.capture === key) { old._item = item; return; }
     if (old) old.remove();
-    const capture = item.capture || { kind:"unknown", name:"Unassigned" };
+    const capture = item.capture || { kind:"unknown", name:RK_M("clips.unassigned") };
     const contained = capture.kind === "unknown" && (capture.games || []).length > 0;
     const game = contained && capture.partial ? capture.partial : contained ? { id:"" } : capture;
     // a roblox clip made in a known experience says which one, and shows its icon, while it is still grouped and filed as roblox
     const experience = capture.experience && capture.experience.id ? capture.experience : null;
-    const withPlace = name => experience && experience.name ? RK_T("{game} - {place}", { game: name, place: experience.name }) : name;
+    const withPlace = name => experience && experience.name ? RK_M("clips.gamePlace", { game: name, place: experience.name }) : name;
     // only a game has a name of its own; desktop, mixed and unassigned are words of the page
-    const shownName = capture.kind === "game" ? (capture.name || RK_T("Unassigned")) : RK_T(capture.name || "Unassigned");
-    const label = contained ? RK_T("Contains {games}", { games: capture.games.map(g => capture.partial && g.id === capture.partial.id ? withPlace(g.name) : g.name).join(" · ") }) : capture.kind === "unknown" ? unassignedLabel(capture, shownName) : capture.kind === "game" ? withPlace(shownName) : shownName;
+    const shownName = capture.kind === "game" ? (capture.name || RK_M("clips.unassigned")) : capture.kind === "desktop" ? RK_M("clips.desktop") : capture.kind === "mixed" ? RK_M("clips.mixed") : RK_M("clips.unassigned");
+    const label = contained ? RK_M("clips.containsGames", { games: capture.games.map(g => capture.partial && g.id === capture.partial.id ? withPlace(g.name) : g.name).join(" · ") }) : capture.kind === "unknown" ? unassignedLabel(capture, shownName) : capture.kind === "game" ? withPlace(shownName) : shownName;
     const node = document.createElement("span");
     node.className = "clip-game-badge" + (changeable ? " is-changeable" : "");
     node.dataset.capture = key;
     node._item = item;
     node.setAttribute("role", changeable ? "button" : "img");
-    node.setAttribute("aria-label", changeable ? RK_T("{label}, change game", { label }) : label);
-    let tip = contained ? RK_T("{label}. Other parts of this clip could not be assigned.", { label }) : label;
-    if (changeable) tip = RK_T("{label} · Click to change", { label: tip });
+    node.setAttribute("aria-label", changeable ? RK_M("clips.labelChangeGame", { label }) : label);
+    let tip = contained ? RK_M("clips.labelOtherPartsOfThisClip", { label }) : label;
+    if (changeable) tip = RK_M("clips.labelClickToChange", { label: tip });
     node.dataset.tooltip = tip;
     if (!parent.closest("button")) node.tabIndex = 0;
     node.addEventListener("focus", () => { if (window.RKTooltip) RKTooltip.show(node); });
@@ -194,18 +194,18 @@ window.RKClipGames = (function () {
     const current = group(item);
     const dialog = document.createElement("dialog");
     dialog.className = "game-picker";
-    dialog.setAttribute("aria-label", "Change game");
+    dialog.setAttribute("aria-label", RK_M("clips.changeGame"));
     const top = document.createElement("header"); top.className = "game-picker-top";
-    const title = document.createElement("h1"); title.textContent = "Change game";
-    const close = document.createElement("button"); close.type = "button"; close.className = "game-picker-x"; close.setAttribute("aria-label", "Close"); close.innerHTML = icon("editor/close");
+    const title = document.createElement("h1"); title.textContent = RK_M("clips.changeGame");
+    const close = document.createElement("button"); close.type = "button"; close.className = "game-picker-x"; close.setAttribute("aria-label", RK_M("common.close")); close.innerHTML = icon("editor/close");
     const sub = document.createElement("p"); sub.className = "game-picker-sub"; sub.setAttribute("translate", "no"); sub.textContent = String(item.name || "").replace(/\.[^.]+$/, "");
     close.addEventListener("click", () => dialog.close()); top.append(title, close, sub);
-    const search = document.createElement("input"); search.className = "game-picker-search"; search.placeholder = "Search games"; search.setAttribute("aria-label", "Search games");
+    const search = document.createElement("input"); search.className = "game-picker-search"; search.placeholder = RK_M("clips.searchGames"); search.setAttribute("aria-label", RK_M("clips.searchGames"));
     const list = document.createElement("div"); list.className = "game-picker-list";
     const status = document.createElement("p"); status.className = "game-picker-status"; status.setAttribute("role", "status");
-    const reset = document.createElement("button"); reset.type = "button"; reset.className = "game-picker-choice game-picker-reset"; reset.textContent = "Reset to default";
+    const reset = document.createElement("button"); reset.type = "button"; reset.className = "game-picker-choice game-picker-reset"; reset.textContent = RK_M("common.resetToDefault");
     reset.disabled = !item.capture?.canReset;
-    reset.title = reset.disabled ? "No saved original game assignment to restore" : "Restore the game recorded with this clip";
+    reset.title = reset.disabled ? RK_M("clips.noSavedOriginalGameAssignmentTo") : RK_M("clips.restoreTheGameRecordedWithThis");
     reset.addEventListener("click", () => choose("", "", "", true));
     dialog.append(top, search, list, reset, status); document.body.append(dialog);
     let generation = 0, timer, owned = null, saving = false, selectedId = current.id;
@@ -265,11 +265,11 @@ window.RKClipGames = (function () {
       if (saving) return;
       generation++;
       busy(true);
-      status.textContent = "Removing game…";
+      status.textContent = RK_M("clips.removingGame");
       try {
         const response = await fetch(helper + "/games/remove?id=" + encodeURIComponent(id), {method:"POST",cache:"no-store"});
         const data = await response.json();
-        if (!response.ok || !data.ok) throw Error(data.message || "Game could not be removed.");
+        if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeRemoved"));
         owned = null;
         busy(false);
         await load();
@@ -278,11 +278,11 @@ window.RKClipGames = (function () {
     async function choose(id, name, universe, restore) {
       if (saving) return;
       busy(true);
-      status.textContent = "Saving…";
+      status.textContent = RK_M("clips.saving");
       try {
         const response = await fetch(helper + (restore ? "/games/reset" : "/games/set") + "?file=" + encodeURIComponent(item.name) + "&id=" + encodeURIComponent(id || "") + (name ? "&name=" + encodeURIComponent(name) : "") + (universe ? "&universe=" + encodeURIComponent(universe) : "") + (screenshot ? "&screenshot=1" : ""), {method:"POST",cache:"no-store"});
         const data = await response.json();
-        if (!response.ok || !data.ok) throw Error(data.message || "Game could not be changed.");
+        if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gameCouldNotBeChanged"));
         window.dispatchEvent(new CustomEvent("replaykit:game-tags-changed")); dialog.close();
       } catch (error) {
         status.textContent = error.message;
@@ -303,13 +303,13 @@ window.RKClipGames = (function () {
       if (target === list && owned.some(game => game.id === id)) {
         const entry = document.createElement("div"); entry.className = "game-picker-entry";
         const remove = document.createElement("button"); remove.type = "button"; remove.className = "game-picker-remove";
-        remove.setAttribute("aria-label", RK_T("Remove {name} from Your games", { name })); remove.title = "Remove from Your games; clips keep their game tags";
+        remove.setAttribute("aria-label", RK_M("clips.removeNameFromYourGames", { name })); remove.title = RK_M("clips.removeFromYourGamesTooltip");
         remove.innerHTML = icon("action/trash");
         remove.addEventListener("click", event => { event.preventDefault(); event.stopPropagation(); removeGame(id); });
         entry.append(button, remove); target.append(entry);
       } else target.append(button);
       if (children?.length) {
-        const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", RK_T("{name} experiences", { name }));
+        const sublist = document.createElement("div"); sublist.className = "game-picker-sublist"; sublist.setAttribute("role", "group"); sublist.setAttribute("aria-label", RK_M("clips.nameExperiences", { name }));
         sublist.hidden = !search.value.trim(); button.setAttribute("aria-expanded", String(!sublist.hidden));
         button.insertAdjacentHTML("beforeend", '<svg class="game-picker-caret" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg>');
         const expand = on => { sublist.hidden = !on; button.setAttribute("aria-expanded", String(on)); };
@@ -320,7 +320,7 @@ window.RKClipGames = (function () {
         });
         sublist.addEventListener("keydown", event => { if (event.key === "ArrowLeft") { event.preventDefault(); expand(false); button.focus(); } });
         target.append(sublist);
-        row(RK_T("{name} (any experience)", { name }), id, kind, null, sublist);
+        row(RK_M("clips.nameAnyExperience", { name }), id, kind, null, sublist);
         children.forEach(child => row(child.name, id, kind, null, sublist, child));
       } else button.addEventListener("click", () => choose(id, custom, experience?.universe));
     }
@@ -330,10 +330,10 @@ window.RKClipGames = (function () {
       const needle = query.toLocaleLowerCase();
       try {
         if (!owned) {
-          status.textContent = "Loading games…";
+          status.textContent = RK_M("clips.loadingGames");
           const response = await fetch(helper + "/games/library", {cache:"no-store"});
           const data = await response.json();
-          if (!response.ok || !data.ok) throw Error("Games could not be loaded.");
+          if (!response.ok || !data.ok) throw Error(RK_M("clips.gamesCouldNotBeLoaded"));
           if (seq !== generation || !dialog.open || saving) return;
           // the games of the clips there are now plus every game a clip ever had, so a game stays here after its clips are deleted
           const byId = new Map();
@@ -347,7 +347,7 @@ window.RKClipGames = (function () {
         if (query) {
           const response = await fetch(helper + "/games/search?q=" + encodeURIComponent(query), {cache:"no-store"});
           const data = await response.json();
-          if (!response.ok || !data.ok) throw Error("Games could not be loaded.");
+          if (!response.ok || !data.ok) throw Error(RK_M("clips.gamesCouldNotBeLoaded"));
           const ownedSteam = new Set(owned.filter(game => game.steamAppId && gameName(game).includes(needle))
             .map(game => game.steamAppId));
           found = (data.games || []).filter(game => !ownedSteam.has(game.steamAppId));
@@ -363,17 +363,17 @@ window.RKClipGames = (function () {
         const mine = owned.filter(game => available.has(game.id) && (matching(game) || (game.experiences || []).some(matching)));
         const shown = new Set(mine.map(game => game.id));
         if (!needle || "desktop".includes(needle) || "unassigned".includes(needle)) {
-          if (!needle || "desktop".includes(needle)) row("Desktop", "desktop", "desktop");
-          if (!needle || "unassigned".includes(needle)) row("Unassigned", "unknown", "unknown");
+          if (!needle || "desktop".includes(needle)) row(RK_M("clips.desktop"), "desktop", "desktop");
+          if (!needle || "unassigned".includes(needle)) row(RK_M("clips.unassigned"), "unknown", "unknown");
         }
-        if (mine.length || !query) section("Your games");
+        if (mine.length || !query) section(RK_M("clips.yourGames"));
         mine.forEach(game => row(game.name, game.id, "game", null, list, null, (game.experiences || []).filter(child => matching(game) || matching(child))));
         const others = choices.filter(game => !shown.has(game.id) && matching(game));
-        if (others.length) { section("All games"); others.forEach(game => row(game.name, game.id, "game")); }
-        if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section("Not listed"); row(RK_T("Use “{name}”", { name: query }), "", "game", query); }
-        if (!list.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = "No games match."; list.append(empty); }
+        if (others.length) { section(RK_M("clips.allGames")); others.forEach(game => row(game.name, game.id, "game")); }
+        if (query && ![...mine, ...others].some(game => gameName(game) === needle)) { section(RK_M("clips.notListed")); row(RK_M("clips.useName", { name: query }), "", "game", query); }
+        if (!list.children.length) { const empty = document.createElement("div"); empty.className = "game-picker-empty"; empty.textContent = RK_M("clips.noGamesMatch"); list.append(empty); }
         list.querySelectorAll("img[data-artwork]").forEach(image => artworkObserver.observe(image));
-        status.textContent = "Games you record or pick stay in this list. Your video is not changed.";
+        status.textContent = RK_M("clips.gamesYouRecordOrPickStay");
       } catch (error) { if (seq === generation) status.textContent = error.message; }
     }
     search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 180); });
@@ -383,9 +383,9 @@ window.RKClipGames = (function () {
     const gamesEl = document.getElementById("clip-game-filter"), typesEl = document.getElementById("clip-type-filter");
     if (!gamesEl || !typesEl) return null;
     let state = {game:"all",type:"all",favorites:false,linked:false}, folder = "", counts = {}, gameRows = [], libraryCounts = {}, refreshAt = 0, libraryReady = false, refreshGeneration = 0;
-    const typeNames = {all:"All types",clips:"Clips",favorites:"Favorites",linked:"Linked",screenshots:"Screenshots",gifs:"GIFs",drafts:"Drafts"};
+    const typeNames = {all:RK_M("clips.allTypes"),clips:RK_M("common.clips"),favorites:RK_M("clips.favorites"),linked:RK_M("clips.linked"),screenshots:RK_M("common.screenshots"),gifs:RK_M("clips.gifs"),drafts:RK_M("clips.drafts")};
     const typeIcons = {all:"toggle/grid",clips:"nav/clips",favorites:"toggle/star",linked:"nav/linked",screenshots:"nav/screenshots",gifs:"nav/gifs",drafts:"action/open-editor"};
-    const games = RKCombo.bind(gamesEl, value => {state.game = value; paintGameIcon(); notify();}, {menuKeys:true,live:true,search:"Search games",beforeOpen:()=>paintGames()});
+    const games = RKCombo.bind(gamesEl, value => {state.game = value; paintGameIcon(); notify();}, {menuKeys:true,live:true,search:RK_M("clips.searchGames"),beforeOpen:()=>paintGames()});
     const types = RKCombo.bind(typesEl, value => {setType(value); notify();}, {menuKeys:true,beforeOpen:()=>paintTypes()});
     function paintGameIcon() {
       const button = gamesEl.querySelector(".combo-button");
@@ -394,14 +394,14 @@ window.RKClipGames = (function () {
       button.insertAdjacentHTML("afterbegin", picture(state.game));
     }
     function paintGames() {
-      games.setOptions([{value:"all",label:"All games",icon:picture("all")}, ...gameRows.map(game => ({value:game.id,label:game.name,detail:String(game.count),icon:picture(game.id),raw:!["desktop","mixed","unknown"].includes(game.id)}))]);
+      games.setOptions([{value:"all",label:RK_M("clips.allGames"),icon:picture("all")}, ...gameRows.map(game => ({value:game.id,label:game.name,detail:String(game.count),icon:picture(game.id),raw:!["desktop","mixed","unknown"].includes(game.id)}))]);
       games.value = state.game;
       if (games.value !== state.game && libraryReady) state.game = "all";
       paintGameIcon();
     }
     function markTypes() {
       typesEl.classList.toggle("has-filters", state.favorites || state.linked);
-      typesEl.querySelector(".combo-button").dataset.tooltip = [state.favorites ? RK_T("Favorites only") : "",state.linked ? RK_T("Linked only") : ""].filter(Boolean).join(" · ");
+      typesEl.querySelector(".combo-button").dataset.tooltip = [state.favorites ? RK_M("clips.favoritesOnly") : "",state.linked ? RK_M("clips.linkedOnly") : ""].filter(Boolean).join(" · ");
       const button = typesEl.querySelector(".combo-button");
       let leading = button.querySelector(":scope > .clip-type-icon");
       if (!leading) {
@@ -435,16 +435,17 @@ window.RKClipGames = (function () {
       if (!enabled || (!force && Date.now() - refreshAt < 10000)) return;
       refreshAt = Date.now();
       const run = ++refreshGeneration, owner = folder;
+      let response, data;
       try {
-        const response = await fetch(helper + "/games/library", {cache:"no-store"}); const data = await response.json();
-        if (run !== refreshGeneration || owner !== folder) return;
-        if (!response.ok || !data.ok) return;
-        libraryReady = true;
-        libraryCounts = {clips:data.clips,screenshots:data.screenshots};
-        const key = JSON.stringify(data.games || []);
-        if (key !== JSON.stringify(gameRows)) {gameRows = data.games || []; paintGames();}
-        if (!typesEl.classList.contains("is-open")) paintTypes();
-      } catch (_) {}
+        response = await fetch(helper + "/games/library", {cache:"no-store"}); data = await response.json();
+      } catch (_) { return; }
+      if (run !== refreshGeneration || owner !== folder) return;
+      if (!response.ok || !data.ok) return;
+      libraryReady = true;
+      libraryCounts = {clips:data.clips,screenshots:data.screenshots};
+      const key = JSON.stringify(data.games || []);
+      if (key !== JSON.stringify(gameRows)) {gameRows = data.games || []; paintGames();}
+      if (!typesEl.classList.contains("is-open")) paintTypes();
     }
     paint(); refresh(true);
     window.addEventListener("replaykit:game-tags-changed", () => refresh(true));
@@ -477,7 +478,7 @@ window.RKClipGames = (function () {
     const row = document.createElement("div"); row.className = "menu-item change-game-item";
     row.innerHTML = symbol("all");
     const svg = row.querySelector("svg"); if (svg) svg.classList.add("menu-item-icon");
-    const label = document.createElement("span"); label.textContent = "Change game"; row.append(label);
+    const label = document.createElement("span"); label.textContent = RK_M("clips.changeGame"); row.append(label);
     row.addEventListener("click", event => {
       event.stopPropagation(); closeMenus();
       const item = current();

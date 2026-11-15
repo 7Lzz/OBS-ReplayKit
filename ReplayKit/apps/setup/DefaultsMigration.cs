@@ -72,11 +72,11 @@ namespace ReplayKitSetup
             try
             {
                 var marker = JObject.Parse(File.ReadAllText(MarkerPath));
-                if (!(marker["steps"] is JArray steps)) throw new JsonException("The defaults marker has no valid steps list.");
+                if (!(marker["steps"] is JArray steps)) throw new JsonException(SetupLocale.Message("setup.theDefaultsMarkerHasNoValid"));
                 foreach (var id in steps)
                 {
                     string value = id.Type == JTokenType.String ? id.Value<string>() : null;
-                    if (string.IsNullOrEmpty(value)) throw new JsonException("The defaults marker contains an invalid step.");
+                    if (string.IsNullOrEmpty(value)) throw new JsonException(SetupLocale.Message("setup.theDefaultsMarkerContainsAnInvalid"));
                     done.Add(value);
                 }
                 return done;

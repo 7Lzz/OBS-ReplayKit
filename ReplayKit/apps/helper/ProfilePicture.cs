@@ -29,7 +29,7 @@ namespace ReplayKitHelper
         internal static void Save(string source)
         {
             var info = new FileInfo(source);
-            if (!info.Exists || info.Length == 0 || info.Length > MaxSourceBytes) throw new InvalidDataException("Pick an image file smaller than 32 MB.");
+            if (!info.Exists || info.Length == 0 || info.Length > MaxSourceBytes) throw new InvalidDataException(Locales.Message("share.pickAnImageFileSmallerThan"));
             // read into memory first, since gdi+ keeps the file it decodes from locked for as long as the image lives
             using (var memory = new MemoryStream(File.ReadAllBytes(source)))
             using (var image = Image.FromStream(memory, false, true))
@@ -44,7 +44,7 @@ namespace ReplayKitHelper
                     else if (orientation == 8) image.RotateFlip(RotateFlipType.Rotate270FlipNone);
                 }
                 int square = Math.Min(image.Width, image.Height);
-                if (square < 1) throw new InvalidDataException("The image is empty.");
+                if (square < 1) throw new InvalidDataException(Locales.Message("share.theImageIsEmpty"));
                 int target = Math.Min(Side, square);
                 using (var canvas = new Bitmap(target, target, PixelFormat.Format32bppArgb))
                 {

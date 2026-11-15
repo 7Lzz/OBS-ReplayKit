@@ -23,10 +23,10 @@
 </style>
 <div class="form-row tight">
   <div></div>
-  <div class="check-row"><input type="checkbox" id="ovcFlip" aria-label="Flip horizontally"><span>Flip horizontally</span></div>
+  <div class="check-row"><input type="checkbox" id="ovcFlip" aria-label="Flip horizontally" data-i18n-aria-label="settings.flipHorizontally"><span data-i18n="settings.flipHorizontally"></span></div>
 </div>
 <div class="form-row">
-  <div class="label">Overlay</div>
+  <div class="label" data-i18n="common.overlay"></div>
   <div class="field-wrap">
     <div class="combo" data-self-wired id="ovcStyle" tabindex="0" role="combobox" aria-expanded="false">
       <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
@@ -35,7 +35,7 @@
   </div>
 </div>
 <div class="form-row" id="ovcModeRow" hidden>
-  <div class="label">Bongo Cat mode</div>
+  <div class="label" data-i18n="settings.bongoCatMode"></div>
   <div class="field-wrap">
     <div class="combo" data-self-wired id="ovcMode" tabindex="0" role="combobox" aria-expanded="false">
       <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
@@ -44,80 +44,70 @@
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Opacity</div>
+  <div class="label" data-i18n="common.opacity"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="ovcOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcOpacity" type="range" data-limit="overlayOpacity" step="1" aria-label="Overlay opacity slider"></div>
+      <input class="text-input volume-value" id="ovcOpacityValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay opacity" data-i18n-aria-label="settings.overlayOpacity">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcOpacity" type="range" data-limit="overlayOpacity" step="1" aria-label="Overlay opacity slider" data-i18n-aria-label="settings.overlayOpacitySlider"></div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayOpacity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayOpacity" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Size</div>
+  <div class="label" data-i18n="common.size"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="ovcScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider"></div>
+      <input class="text-input volume-value" id="ovcScaleValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay size" data-i18n-aria-label="settings.overlaySize">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcScale" type="range" data-limit="overlayScale" step="1" aria-label="Overlay size slider" data-i18n-aria-label="settings.overlaySizeSlider"></div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayScale" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayScale" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Rotation</div>
+  <div class="label" data-i18n="common.rotation"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="ovcRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider"></div>
+      <input class="text-input volume-value" id="ovcRotationValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay rotation in degrees" data-i18n-aria-label="settings.overlayRotationInDegrees">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcRotation" type="range" data-limit="overlayRotation" step="1" aria-label="Overlay rotation slider" data-i18n-aria-label="settings.overlayRotationSlider"></div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayRotation" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayRotation" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Hue Shift</div>
+  <div class="label" data-i18n="settings.hueShift"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="ovcHueValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcHue" type="range" data-limit="overlayHueShift" step="1" aria-label="Overlay hue shift slider"></div>
+      <input class="text-input volume-value" id="ovcHueValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Overlay hue shift" data-i18n-aria-label="settings.overlayHueShift">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="ovcHue" type="range" data-limit="overlayHueShift" step="1" aria-label="Overlay hue shift slider" data-i18n-aria-label="settings.overlayHueShiftSlider"></div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayHueShift" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayHueShift" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Color Multiply<span class="control-note">Darkens and tints the overlay. White keeps the colors as they are.</span></div>
+  <div class="label"><span data-i18n="settings.colorMultiply"></span><span class="control-note" data-i18n="settings.darkensAndTintsTheOverlayWhite"></span></div>
   <div class="field-wrap">
     <div class="color-control">
-      <button class="color-picker" id="ovcMul" type="button" aria-label="Overlay color multiply"></button>
-      <input class="text-input color-value" id="ovcMulValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex">
+      <button class="color-picker" id="ovcMul" type="button" aria-label="Overlay color multiply" data-i18n-aria-label="settings.overlayColorMultiply"></button>
+      <input class="text-input color-value" id="ovcMulValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color multiply hex" data-i18n-aria-label="settings.overlayColorMultiplyHex">
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayColorMultiply" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayColorMultiply" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row">
-  <div class="label">Color Add<span class="control-note">Brightens and tints the overlay. Black keeps the colors as they are.</span></div>
+  <div class="label"><span data-i18n="settings.colorAdd"></span><span class="control-note" data-i18n="settings.brightensAndTintsTheOverlayBlack"></span></div>
   <div class="field-wrap">
     <div class="color-control">
-      <button class="color-picker" id="ovcAdd" type="button" aria-label="Overlay color add"></button>
-      <input class="text-input color-value" id="ovcAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex">
+      <button class="color-picker" id="ovcAdd" type="button" aria-label="Overlay color add" data-i18n-aria-label="settings.overlayColorAdd"></button>
+      <input class="text-input color-value" id="ovcAddValue" type="text" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Overlay color add hex" data-i18n-aria-label="settings.overlayColorAddHex">
     </div>
-    <button class="icon-btn field-reset" type="button" data-reset="overlayColorAdd" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-reset="overlayColorAdd" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <script>
 (function () {
-  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error("The settings defaults and limits were not served with this page."); var DEF = {}; ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd"].forEach(function (k) { DEF[k] = SCHEMA[k]; });
-  var STYLES = [
-    { value:"input_overlay", label:"WASD / mouse", blurb:"Simple keyboard and mouse overlay." },
-    { value:"bongo_cat", label:"Bongo Cat", blurb:"Animated keyboard and mouse overlay." },
-    { value:"off", label:"Off", blurb:"No input overlay in the OBS scene." },
-  ];
-  // the same list the settings page gets from the helper options
-  var MODES = [
-    { value:"standard", label:"Standard", blurb:"Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space." },
-    { value:"keyboard", label:"Keyboard", blurb:"Two paws on the arrow keys, R, Left Ctrl and Left Shift." },
-    { value:"feixue", label:"Feixue", blurb:"Game panel with W, A, S, D and Space, and a mouse paw." },
-    { value:"mania", label:"Mania", blurb:"Rhythm game keys Z, X, comma and period." },
-  ];
+  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error(RK_M("settings.theSettingsDefaultsAndLimitsWere")); var DEF = {}; ["overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd"].forEach(function (k) { DEF[k] = SCHEMA[k]; });
+  // the overlay styles and the bongo cat modes come from the helper options the host page loaded, the same lists the settings page shows
+  var STYLES = [], MODES = [];
   var host = { get:function(k){ return DEF[k]; }, set:function(){}, onChange:function(){} };
   var st = Object.assign({}, DEF);
 
@@ -177,7 +167,8 @@
     });
     document.addEventListener("click", close);
     return function render() {
-      var cur = options.find(function (o) { return o.value === st[key]; }) || options[fallback];
+      var cur = options.find(function (o) { return o.value === st[key]; }) || options[fallback] || options[0];
+      if (!cur) { label.textContent = ""; menu.innerHTML = ""; return; }
       label.textContent = cur.label;
       menu.innerHTML = options.map(function (o) {
         var blurb = o.blurb ? '<span class="option-blurb">- ' + o.blurb + '</span>' : "";
@@ -275,7 +266,13 @@
   }
 
   window.RKOverlay = {
-    init: function (h) { if (h) host = Object.assign(host, h); pull(); paint(); },
+    init: function (h) {
+      if (h) host = Object.assign(host, h);
+      if (h && h.styles) STYLES.splice.apply(STYLES, [0, STYLES.length].concat(h.styles));
+      if (h && h.modes) MODES.splice.apply(MODES, [0, MODES.length].concat(h.modes));
+      pull();
+      paint();
+    },
     collect: function () { return Object.assign({}, st); },
     refresh: function () { pull(); paint(); },
   };

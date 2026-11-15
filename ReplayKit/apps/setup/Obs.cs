@@ -79,10 +79,10 @@ namespace ReplayKitSetup
                         using (var safety = http.SendAsync(check).GetAwaiter().GetResult())
                         {
                             if (!safety.IsSuccessStatusCode)
-                                throw new IOException("The running ReplayKit helper does not support graceful-only shutdown.");
+                                throw new IOException(SetupLocale.Message("setup.theRunningReplaykitHelperDoesNot"));
                             var supported = JObject.Parse(safety.Content.ReadAsStringAsync().GetAwaiter().GetResult())["gracefulOnly"];
                             if (supported?.Type != JTokenType.Boolean || !supported.Value<bool>())
-                                throw new IOException("The running ReplayKit helper does not support graceful-only shutdown.");
+                                throw new IOException(SetupLocale.Message("setup.theRunningReplaykitHelperDoesNot"));
                         }
                     }
                     // the reason lets the helper stop obs itself if a normal close stalls, instead of leaving it running with a notice in the bell
@@ -145,7 +145,7 @@ namespace ReplayKitSetup
                 }
             }
             finally { foreach (var process in processes) process.Dispose(); }
-            if (AnyObsRunning()) throw new IOException("OBS or its helper/browser processes are still running after termination. No update files were replaced; restart Windows before trying again.");
+            if (AnyObsRunning()) throw new IOException(SetupLocale.Message("setup.obsOrItsHelperBrowserProcesses"));
             return killed;
         }
 

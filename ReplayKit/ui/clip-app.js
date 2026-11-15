@@ -94,38 +94,38 @@ const CLIP_HOVER_PROFILES = {
   applyGameRecognition();
 
   async function loadReplayKitSettings() {
+    let res, data;
     try {
-      const res = await fetch(HELPER + "/settings?t=" + Date.now(), { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.ok && data.settings) {
-        replayKitSettings.editorAutoplay = !!data.settings.editorAutoplay;
-        replayKitSettings.editorLoopPreview = !!data.settings.editorLoopPreview;
-        replayKitSettings.editorSeekStep = Number(data.settings.editorSeekStep) > 0 ? Number(data.settings.editorSeekStep) : 5;
-        replayKitSettings.editorWheelZoom = data.settings.editorWheelZoom !== false;
-        replayKitSettings.editorZoomScaling = data.settings.editorZoomScaling === "sharp" ? "sharp" : "smooth";
-        document.documentElement.dataset.editorZoom = replayKitSettings.editorZoomScaling;
-        replayKitSettings.clipAntialiasing = ["msaa", "fxaa"].includes(data.settings.clipAntialiasing) ? data.settings.clipAntialiasing : "none";
-        if (window.RKVideoFx) RKVideoFx.setMode(replayKitSettings.clipAntialiasing);
-        const cardDateFormat = CARD_DATE_FORMATS.has(data.settings.cardDateFormat) ? data.settings.cardDateFormat : "date";
-        if (cardDateFormat !== replayKitSettings.cardDateFormat) {
-          replayKitSettings.cardDateFormat = cardDateFormat;
-          refreshCardDates();
-        }
-        const gameRecognition = data.settings.gameRecognition !== false;
-        if (gameRecognition !== replayKitSettings.gameRecognition) {
-          replayKitSettings.gameRecognition = gameRecognition;
-          try { localStorage.setItem(GAME_RECOGNITION_KEY, gameRecognition ? "1" : "0"); } catch {}
-          applyGameRecognition();
-          if (screenshotGallery) screenshotGallery.paint();
-          if (loadedClips.length) renderLoadedClips(loadedClips);
-        }
-        const showCodecTags = !!data.settings.showCodecTags;
-        if (showCodecTags !== replayKitSettings.showCodecTags) {
-          replayKitSettings.showCodecTags = showCodecTags;
-          document.querySelectorAll(".card").forEach((card) => syncCodecBadge(card));
-        }
-      }
-    } catch (_) {}
+      res = await fetch(HELPER + "/settings?t=" + Date.now(), { cache: "no-store" });
+      data = await res.json().catch(() => ({}));
+    } catch (_) { return; }
+    if (!res.ok || !data.ok || !data.settings) return;
+    replayKitSettings.editorAutoplay = !!data.settings.editorAutoplay;
+    replayKitSettings.editorLoopPreview = !!data.settings.editorLoopPreview;
+    replayKitSettings.editorSeekStep = Number(data.settings.editorSeekStep) > 0 ? Number(data.settings.editorSeekStep) : 5;
+    replayKitSettings.editorWheelZoom = data.settings.editorWheelZoom !== false;
+    replayKitSettings.editorZoomScaling = data.settings.editorZoomScaling === "sharp" ? "sharp" : "smooth";
+    document.documentElement.dataset.editorZoom = replayKitSettings.editorZoomScaling;
+    replayKitSettings.clipAntialiasing = ["msaa", "fxaa"].includes(data.settings.clipAntialiasing) ? data.settings.clipAntialiasing : "none";
+    if (window.RKVideoFx) RKVideoFx.setMode(replayKitSettings.clipAntialiasing);
+    const cardDateFormat = CARD_DATE_FORMATS.has(data.settings.cardDateFormat) ? data.settings.cardDateFormat : "date";
+    if (cardDateFormat !== replayKitSettings.cardDateFormat) {
+      replayKitSettings.cardDateFormat = cardDateFormat;
+      refreshCardDates();
+    }
+    const gameRecognition = data.settings.gameRecognition !== false;
+    if (gameRecognition !== replayKitSettings.gameRecognition) {
+      replayKitSettings.gameRecognition = gameRecognition;
+      try { localStorage.setItem(GAME_RECOGNITION_KEY, gameRecognition ? "1" : "0"); } catch {}
+      applyGameRecognition();
+      if (screenshotGallery) screenshotGallery.paint();
+      if (loadedClips.length) renderLoadedClips(loadedClips);
+    }
+    const showCodecTags = !!data.settings.showCodecTags;
+    if (showCodecTags !== replayKitSettings.showCodecTags) {
+      replayKitSettings.showCodecTags = showCodecTags;
+      document.querySelectorAll(".card").forEach((card) => syncCodecBadge(card));
+    }
   }
   loadReplayKitSettings();
   window.addEventListener("focus", loadReplayKitSettings);
@@ -218,7 +218,7 @@ const CLIP_HOVER_PROFILES = {
     if (btn) {
       if (!btn.querySelector(".vol-wave-1")) btn.innerHTML = VOLUME_ICON;
       btn.dataset.level = String(volumeLevel());
-      btn.dataset.tooltip = volumeLevel() === 0 ? "Unmute (M)" : "Mute (M)";
+      btn.dataset.tooltip = volumeLevel() === 0 ? RK_M("clips.unmuteM") : RK_M("clips.muteM");
     }
     if (slider) slider.value = Math.round(VolumeState.volume * 100);
   }
@@ -280,12 +280,12 @@ const CLIP_HOVER_PROFILES = {
   const restHeadingLabelEl = document.getElementById("rest-heading-label");
   // content for the heading above the main grid. "all" is the existing all-tab-plus-favorites case (grid icon, paired with the favorites split below); the other three give each single-filter tab its own header the same way.
   const FILTER_SECTION_HEADING = {
-    all:       { icon: ICON.CLIPS, label: "All clips" },
-    clips:     { icon: ICON.CLIPS, label: "Clips" },
-    favorites: { icon: ICON.STAR, label: "Favorites" },
-    linked:    { icon: ICON.LINKED, label: "Linked" },
-    local:     { icon: ICON.CLIPS, label: "All clips" },
-    drafts:    { icon: ICON.OPEN_EDITOR, label: "Edit drafts" },
+    all:       { icon: ICON.CLIPS, label: RK_M("common.allClips") },
+    clips:     { icon: ICON.CLIPS, label: RK_M("common.clips") },
+    favorites: { icon: ICON.STAR, label: RK_M("clips.favorites") },
+    linked:    { icon: ICON.LINKED, label: RK_M("clips.linked") },
+    local:     { icon: ICON.CLIPS, label: RK_M("common.allClips") },
+    drafts:    { icon: ICON.OPEN_EDITOR, label: RK_M("clips.editDrafts") },
   };
   const gridEl = document.getElementById("grid");
   const topSpacerEl = document.getElementById("top-spacer");
@@ -307,17 +307,17 @@ const CLIP_HOVER_PROFILES = {
   const LEGACY_FAVORITES_STORAGE_KEY = "streamable.favoriteClips.v1";
   const CLIP_SORT_VALUES = new Set(["newest", "oldest", "shortest", "longest", "smallest", "biggest"]);
   const CLIP_SORT_LABELS = {
-    newest: "Newest",
-    oldest: "Oldest",
-    shortest: "Shortest",
-    longest: "Longest",
-    smallest: "Smallest",
-    biggest: "Biggest",
+    newest: RK_M("clips.newest"),
+    oldest: RK_M("clips.oldest"),
+    shortest: RK_M("clips.shortest"),
+    longest: RK_M("clips.longest"),
+    smallest: RK_M("clips.smallest"),
+    biggest: RK_M("clips.biggest"),
   };
   // sort values that live under a collapsible row in the menu -- the row shows "Length: Shortest" etc. when one is active.
   const CLIP_SORT_GROUPS = {
-    length: { base: "Length", members: ["shortest", "longest"] },
-    filesize: { base: "File size", members: ["smallest", "biggest"] },
+    length: { base: RK_M("common.length"), members: ["shortest", "longest"] },
+    filesize: { base: RK_M("common.fileSize"), members: ["smallest", "biggest"] },
   };
   const CLIP_STATE_URL = HELPER + "/clips/state";
   const localState = new Map();
@@ -362,18 +362,18 @@ const CLIP_HOVER_PROFILES = {
     try {
       const saved = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
       if (saved !== null) {
-        if (saved.length > 256) throw new Error("Invalid section preferences");
+        if (saved.length > 256) throw new Error(RK_M("clips.invalidSectionPreferences"));
         const sections = JSON.parse(saved);
-        if (!Array.isArray(sections) || sections.length > SECTION_KEYS.size || sections.some(key => !SECTION_KEYS.has(key))) throw new Error("Invalid section preferences");
+        if (!Array.isArray(sections) || sections.length > SECTION_KEYS.size || sections.some(key => !SECTION_KEYS.has(key))) throw new Error(RK_M("clips.invalidSectionPreferences"));
         sections.filter(key => ["favorites", "linked", "drafts", "screenshots", "gifs", "clips"].includes(key)).forEach(key => collapsedSections.add(key));
       }
     } catch {
-      setTimeout(() => showToast("Could not read your saved section preferences.", "error", "Clips"), 0);
+      setTimeout(() => showToast(RK_M("clips.couldNotReadYourSavedSection"), "error", RK_M("common.clips")), 0);
     }
   }
-  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("screenshots"), notify:message => showToast(escapeHtml(message), "bad", "Screenshots"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const screenshotGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("screenshots"), notify:message => showToast(escapeHtml(message), "bad", RK_M("common.screenshots")), changed:() => renderLoadedClips(loadedClips)}) : null;
   // the gifs exported from the clip menu: the same gallery as the screenshots, over the GIFs folder
-  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("gifs"), notify:message => showToast(escapeHtml(message), "bad", "GIFs"), changed:() => renderLoadedClips(loadedClips)}) : null;
+  const gifGallery = !HOME_MODE && window.RKScreenshots ? RKScreenshots.create({kind:"gif", helper:HELPER, formatSize, formatAge:formatClipDate, icons:ICON, resize:bindCardResize, flip:rkFlip, openMenu:openCardMenuAt, closeMenus:closeAllMenus, relabel:relabelDeleteButtons, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, filter:row => !gameFilters || gameFilters.matches(row, false), collapsed:() => sectionCollapsed("gifs"), notify:message => showToast(escapeHtml(message), "bad", RK_M("clips.gifs")), changed:() => renderLoadedClips(loadedClips)}) : null;
   const mediaGalleries = [screenshotGallery, gifGallery].filter(Boolean);
   // the gallery that is the whole view of a filter, for the screenshots and gifs filters
   const galleryFor = (filter) => filter === "screenshots" ? screenshotGallery : filter === "gifs" ? gifGallery : null;
@@ -390,7 +390,7 @@ const CLIP_HOVER_PROFILES = {
       if (activePreview === video) activePreview = null;
       abortVideoLoad(video);
     },
-  }, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", "Deleted history"); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
+  }, openMenu:openCardMenuAt, closeMenus:closeAllMenus, armDelete:armDeleteButton, resetDeletes:resetAllArmedDeleteButtons, hovers:applyClipHovers, toast:(message) => { showToast(escapeHtml(message), "info"); scheduleToastHide(2400); }, notify:message => { showToast(escapeHtml(message), "bad", RK_M("common.deletedHistory")); scheduleToastHide(TOAST_ERROR_MS); }, history:setTrashOn, restored:(kind) => { if (kind === "screenshot") { if (screenshotGallery) screenshotGallery.refresh(); } else if (kind === "gif") { if (gifGallery) gifGallery.refresh(); } else { clipsPageVersion = ""; scheduleNextPoll(0); } }}) : null;
   let allClips = [];
   let clipSectionRows = [];
   let allClipsSignature = "";
@@ -786,20 +786,23 @@ const CLIP_HOVER_PROFILES = {
   // the list the helper keeps, read when the page starts, when it is shown again and after anything that changes a draft; it is read after the writes of this page and only the newest read counts, and a draft kept or dropped while it was on its way makes it old, so it is read again
   async function refreshDrafts() {
     const seq = ++draftReadSeq;
+    let data = null;
+    await draftWrites;
+    const epoch = draftEpoch;
     try {
-      await draftWrites;
-      const epoch = draftEpoch;
       const res = await fetch(HELPER + "/drafts?t=" + Date.now(), { cache: "no-store" });
       if (!res.ok || seq !== draftReadSeq) return;
-      const data = await res.json();
-      if (seq !== draftReadSeq) return;
+      data = await res.json();
+    } catch {}
+    if (seq !== draftReadSeq) return;
+    if (data) {
       if (epoch !== draftEpoch) { refreshDrafts(); return; }
       draftsByName.clear();
-      for (const row of (Array.isArray(data && data.drafts) ? data.drafts : [])) {
+      for (const row of (Array.isArray(data.drafts) ? data.drafts : [])) {
         if (row && row.name) draftsByName.set(String(row.name), { savedAt: Number(row.savedAt) || 0, duration: Number(row.duration) || 0 });
       }
       draftsChanged();
-    } catch {}
+    }
     draftsLoaded = true;
     updateTabs(loadedClips);
   }
@@ -906,14 +909,14 @@ const CLIP_HOVER_PROFILES = {
     if (!card) return;
     const drafted = hasDraft(name);
     const label = card.querySelector(".trim-clip-item > span");
-    if (label) label.textContent = drafted ? "Continue editing" : "Edit clip";
+    if (label) label.textContent = drafted ? RK_M("clips.continueEditing") : RK_M("clips.editClip");
     const discard = card.querySelector(".discard-draft-item");
     if (discard) discard.style.display = drafted ? "" : "none";
     // on the drafts tab the trash of a card lets go of the draft and leaves the clip alone, so it says so
     const trash = card.querySelector(".title-actions > .delete-btn");
     if (trash) {
       const inDrafts = activeFilter === "drafts" && drafted;
-      if (inDrafts) trash.dataset.deleteLabel = "Delete draft";
+      if (inDrafts) trash.dataset.deleteLabel = RK_M("clips.deleteDraft");
       else delete trash.dataset.deleteLabel;
     }
     card.querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
@@ -1009,7 +1012,7 @@ const CLIP_HOVER_PROFILES = {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) { refresh = true; throw new Error(data.message || "Could not save favorites"); }
+      if (!res.ok || !data.ok) { refresh = true; throw new Error(data.message || RK_M("clips.couldNotSaveFavorites")); }
       if (folderKey === favoriteFolderKey) favoriteRevision = data.revision;
       if (folderKey === favoriteFolderKey && change === favoriteChange) saveFavoriteNames();
       if (migratingFavorites && folderKey === favoriteFolderKey) {
@@ -1018,7 +1021,7 @@ const CLIP_HOVER_PROFILES = {
         localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
       }
     } catch {
-      showToast("Could not save favorites. Try again.", "error");
+      showToast(RK_M("clips.couldNotSaveFavoritesTryAgain"), "error");
       scheduleToastHide(TOAST_ERROR_MS);
     } finally {
       favoriteSaving = false;
@@ -1035,7 +1038,7 @@ const CLIP_HOVER_PROFILES = {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       if (run !== favoriteHydration || change !== favoriteChange) return;
-      if (!data || !data.ok || !/^[A-F0-9]{64}$/.test(data.folderKey || "")) throw new Error("Invalid favorites folder");
+      if (!data || !data.ok || !/^[A-F0-9]{64}$/.test(data.folderKey || "")) throw new Error(RK_M("clips.invalidFavoritesFolder"));
       const state = data && data.state ? data.state : {};
       const serverExists = !!(data && data.exists);
       const serverFavorites = normalizeFavoriteList(state.favorites);
@@ -1113,7 +1116,7 @@ const CLIP_HOVER_PROFILES = {
         const labelEl = groupEl.querySelector(".clip-sort-grouprow .clip-sort-label");
         const activeMember = g.members.indexOf(activeSort) >= 0 ? activeSort : "";
         groupEl.classList.toggle("has-active", !!activeMember);
-        if (labelEl) labelEl.textContent = activeMember ? RK_T("{group}: {sort}", { group: RK_T(g.base), sort: RK_T(clipSortLabel(activeMember)) }) : RK_T(g.base);
+        if (labelEl) labelEl.textContent = activeMember ? RK_M("common.groupSort", { group: g.base, sort: clipSortLabel(activeMember) }) : g.base;
       }
     }
   }
@@ -1194,13 +1197,13 @@ const CLIP_HOVER_PROFILES = {
   }
 
   function emptyMessageForFilter() {
-    if (clipSearchQuery.trim()) return "No clips match your search.";
-    if (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.favorites || gameFilters.state.linked)) return "No clips match these filters.";
-    if (activeFilter === "favorites") return "No favorite clips yet.";
-    if (activeFilter === "linked") return "No linked clips yet.";
-    if (activeFilter === "local") return "No local-only clips.";
-    if (activeFilter === "drafts") return "No edit drafts yet. Edits you leave unfinished are kept here.";
-    return "No clips found.";
+    if (clipSearchQuery.trim()) return RK_M("clips.noClipsMatchYourSearch");
+    if (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.favorites || gameFilters.state.linked)) return RK_M("clips.noClipsMatchTheseFilters");
+    if (activeFilter === "favorites") return RK_M("clips.noFavoriteClipsYet");
+    if (activeFilter === "linked") return RK_M("clips.noLinkedClipsYet");
+    if (activeFilter === "local") return RK_M("clips.noLocalOnlyClips");
+    if (activeFilter === "drafts") return RK_M("clips.noEditDraftsYetEditsYou");
+    return RK_M("clips.noClipsFound");
   }
 
   // a clip that is being saved gets a card of its own at the front of the newest-first list, in the look of a card whose clip is still being processed, and the clip takes that very spot once it is written; the plugin says at once when the save starts and how it ended, and the helper keeps the save as well for a page that opened, came back or was not there when the plugin spoke
@@ -1255,12 +1258,12 @@ const CLIP_HOVER_PROFILES = {
   function buildSaveGhost() {
     const ghost = document.createElement("div");
     ghost.className = "save-ghost";
-    ghost.setAttribute("aria-label", "Saving clip");
+    ghost.setAttribute("aria-label", RK_M("clips.savingClip"));
     ghost.innerHTML = `
-      <div class="preview"><div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div></div>
+      <div class="preview"><div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span data-i18n="clips.processing"></span></div></div>
       <div class="body">
-        <div class="title-row"><span class="name">Saving clip&hellip;</span></div>
-        <div class="meta"><span class="age">Just now</span></div>
+        <div class="title-row"><span class="name" data-i18n="clips.savingClip2"></span></div>
+        <div class="meta"><span class="age" data-i18n="clips.justNow"></span></div>
       </div>`;
     return ghost;
   }
@@ -1344,12 +1347,12 @@ const CLIP_HOVER_PROFILES = {
       button.hidden = activeFilter !== "all";
       const label = button.parentElement.querySelector("span").textContent;
       button.setAttribute("aria-expanded", String(expanded));
-      button.setAttribute("aria-label", expanded ? RK_T("Collapse {name}", { name: label }) : RK_T("Expand {name}", { name: label }));
+      button.setAttribute("aria-label", expanded ? RK_M("clips.collapseName", { name: label }) : RK_M("clips.expandName", { name: label }));
     });
-    if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? "Search screenshots" : activeFilter === "gifs" ? "Search GIFs" : "Search clips");
+    if (clipSearchInput) clipSearchInput.setAttribute("aria-label", activeFilter === "screenshots" ? RK_M("clips.searchScreenshots") : activeFilter === "gifs" ? RK_M("clips.searchGifs") : RK_M("common.searchClips"));
     const folder = document.getElementById("clip-folder-btn");
     if (folder) {
-      const label = activeFilter === "screenshots" ? "Open screenshots folder" : activeFilter === "gifs" ? "Open GIFs folder" : "Open clips folder";
+      const label = activeFilter === "screenshots" ? RK_M("clips.openScreenshotsFolder") : activeFilter === "gifs" ? RK_M("clips.openGifsFolder") : RK_M("common.openClipsFolder");
       folder.setAttribute("aria-label", label);
       folder.dataset.tooltip = label;
     }
@@ -1366,7 +1369,7 @@ const CLIP_HOVER_PROFILES = {
       else next.add(key);
       if (!temporary) {
         try { localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify(Array.from(next))); }
-        catch { showToast("Could not save your section preferences.", "error", "Clips"); return; }
+        catch { showToast(RK_M("clips.couldNotSaveYourSectionPreferences"), "error", RK_M("common.clips")); return; }
       }
       sections.clear();
       next.forEach(section => sections.add(section));
@@ -1439,7 +1442,7 @@ const CLIP_HOVER_PROFILES = {
   // the subtitles of the games, one per run, kept in the virtual list next to its cards
   function saveCollapsedGames() {
     try { if (favoriteFolderKey) localStorage.setItem("rk-collapsed-games:" + favoriteFolderKey, JSON.stringify([...collapsedGameGroups])); }
-    catch (error) { console.warn("Collapsed game groups could not be saved", error); }
+    catch (error) { console.warn(RK_M("clips.collapsedGameGroupsCouldNotBe"), error); }
   }
 
   function paintGroupHeadings(layout) {
@@ -1467,7 +1470,7 @@ const CLIP_HOVER_PROFILES = {
       el.querySelector(".game-group-name").textContent = group.name;
       el.querySelector(".game-group-count").textContent = String(group.count);
       el.setAttribute("aria-expanded", String(!group.collapsed));
-      el.setAttribute("aria-label", group.collapsed ? RK_T("Expand {name} clips", { name: group.name }) : RK_T("Collapse {name} clips", { name: group.name }));
+      el.setAttribute("aria-label", group.collapsed ? RK_M("clips.expandNameClips", { name: group.name }) : RK_M("clips.collapseNameClips", { name: group.name }));
       el.style.setProperty("--group-y", group.top + "px");
     }
     for (const leftover of existing.values()) leftover.remove();
@@ -1491,10 +1494,10 @@ const CLIP_HOVER_PROFILES = {
   function uploadBlockReason(clip) {
     if (!clip) return null;
     const cap = uploadLimits.maxUploadBytes;
-    if (cap > 0 && Number(clip.size) > cap) return RK_T("Over {size}", { size: formatSize(cap) });
+    if (cap > 0 && Number(clip.size) > cap) return RK_M("clips.overSize", { size: formatSize(cap) });
     const maxSeconds = uploadLimits.maxDurationSec;
     const duration = Number(clip.duration);
-    if (maxSeconds > 0 && isFinite(duration) && duration > maxSeconds) return RK_T("Longer than {minutes} min", { minutes: Math.round(maxSeconds / 60) });
+    if (maxSeconds > 0 && isFinite(duration) && duration > maxSeconds) return RK_M("clips.longerThanMinutesMin", { minutes: Math.round(maxSeconds / 60) });
     return null;
   }
 
@@ -1507,14 +1510,14 @@ const CLIP_HOVER_PROFILES = {
 
   function formatTimeAgo(unixSec) {
     const diff = Math.max(0, Math.floor(Date.now() / 1000 - unixSec));
-    if (diff < 5) return RK_T("just now");
-    if (diff < 60) return RK_T("{count} seconds ago", { count: diff });
-    if (diff < 120) return RK_T("a minute ago");
-    if (diff < 3600) return RK_T("{count} minutes ago", { count: Math.floor(diff / 60) });
-    if (diff < 7200) return RK_T("an hour ago");
-    if (diff < 86400) return RK_T("{count} hours ago", { count: Math.floor(diff / 3600) });
-    if (diff < 172800) return RK_T("a day ago");
-    return RK_T("{count} days ago", { count: Math.floor(diff / 86400) });
+    if (diff < 5) return RK_M("common.justNow");
+    if (diff < 60) return RK_M("clips.countSecondsAgo", { count: diff });
+    if (diff < 120) return RK_M("clips.aMinuteAgo");
+    if (diff < 3600) return RK_M("clips.countMinutesAgo", { count: Math.floor(diff / 60) });
+    if (diff < 7200) return RK_M("clips.anHourAgo");
+    if (diff < 86400) return RK_M("clips.countHoursAgo", { count: Math.floor(diff / 3600) });
+    if (diff < 172800) return RK_M("clips.aDayAgo");
+    return RK_M("clips.countDaysAgo", { count: Math.floor(diff / 86400) });
   }
 
   // the date line of a card in the format picked in the Appearance tab, the time ago by default
@@ -1540,9 +1543,9 @@ const CLIP_HOVER_PROFILES = {
     const remaining = retSec - (Math.floor(Date.now() / 1000) - uploadedAt);
     if (remaining <= 0) return null;
     const h = Math.floor(remaining / 3600);
-    if (h >= 24) return RK_T("{days}d {hours}h", { days: Math.floor(h / 24), hours: h % 24 });
-    if (h >= 1) return RK_T("{hours}h {minutes}m", { hours: h, minutes: Math.floor((remaining % 3600) / 60) });
-    return RK_T("{minutes}m", { minutes: Math.max(1, Math.floor(remaining / 60)) });
+    if (h >= 24) return RK_M("clips.daysDHoursH", { days: Math.floor(h / 24), hours: h % 24 });
+    if (h >= 1) return RK_M("clips.hoursHMinutesM", { hours: h, minutes: Math.floor((remaining % 3600) / 60) });
+    return RK_M("common.minutesM", { minutes: Math.max(1, Math.floor(remaining / 60)) });
   }
 
   let toastTimer = 0;
@@ -1574,6 +1577,20 @@ const CLIP_HOVER_PROFILES = {
       toastTimer = 0;
       toastEl.classList.remove("is-shown");
     }, delay);
+  }
+  // for a click that only asks the helper to do something, so a refusal or a helper that did not answer shows instead of nothing happening
+  async function postAction(url) {
+    let res, data;
+    try {
+      res = await fetch(url, { method: "POST", cache: "no-store" });
+      data = await res.json().catch(() => ({}));
+    } catch (_) {
+      showToast(escapeHtml(RK_M("clips.replaykitCouldNotBeReached")), "bad");
+      return false;
+    }
+    if (res.ok && data.ok !== false) return true;
+    showToast(escapeHtml(data.message || ("HTTP " + res.status)), "bad");
+    return false;
   }
 
   // an error is told in a popup that waits to be read, the way the confirm sheets of obs do; what merely happened (saved, deleted, copied) stays a toast that goes by itself
@@ -1611,9 +1628,9 @@ const CLIP_HOVER_PROFILES = {
     let body = String(html == null ? "" : html);
     if (!title) {
       const m = /^([^:<>&]{3,48}): ([\s\S]+)$/.exec(body);
-      if (m) { title = m[1]; body = m[2]; } else title = "Something went wrong";
+      if (m) { title = m[1]; body = m[2]; } else title = RK_M("clips.somethingWentWrong");
     }
-    body = body.replace(/Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed/gi, "ReplayKit's helper did not answer");
+    body = body.replace(/Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed/gi, RK_M("clips.replaykitSHelperDidNotAnswer"));
     return { title, body };
   }
 
@@ -1986,7 +2003,7 @@ const CLIP_HOVER_PROFILES = {
       grip.innerHTML = CARD_GRIP_SVG;
       card.appendChild(grip);
     }
-    grip.dataset.tooltip = "Drag to resize cards, double-click to reset";
+    grip.dataset.tooltip = RK_M("clips.dragToResizeCardsDoubleClick");
     grip.addEventListener("pointerdown", (event) => startCardResize(event, card));
     grip.addEventListener("click", (event) => event.stopPropagation());
   }
@@ -2069,8 +2086,8 @@ const CLIP_HOVER_PROFILES = {
     const active = isTheaterPreview(preview);
     const enterIcon = button.querySelector(".theater-enter-icon");
     const exitIcon = button.querySelector(".theater-exit-icon");
-    button.dataset.tooltip = active ? "Exit theater mode (T)" : "Theater mode (T)";
-    button.setAttribute("aria-label", button.title);
+    button.dataset.tooltip = active ? RK_M("clips.exitTheaterModeT") : RK_M("clips.theaterModeT");
+    button.setAttribute("aria-label", button.dataset.tooltip);
     if (enterIcon) enterIcon.style.display = active ? "none" : "";
     if (exitIcon) exitIcon.style.display = active ? "" : "none";
   }
@@ -2644,8 +2661,8 @@ const CLIP_HOVER_PROFILES = {
 
   function clipBusyMessage(busyWith) {
     return busyWith === "compressing"
-      ? RK_T("This clip is being compressed right now. Edit it once that has finished, or cancel it first.")
-      : RK_T("This clip is being uploaded right now. Edit it once that has finished, or cancel it first.");
+      ? RK_M("clips.thisClipIsBeingCompressedRight")
+      : RK_M("clips.thisClipIsBeingUploadedRight");
   }
 
   // the one way into the editor from a card: a clip that is being uploaded or compressed is told so instead
@@ -2653,7 +2670,7 @@ const CLIP_HOVER_PROFILES = {
     if (!clip) return;
     const busyWith = clipBusyWith(clip.name);
     if (busyWith) {
-      showToast(clipBusyMessage(busyWith), "bad", "The clip is busy");
+      showToast(clipBusyMessage(busyWith), "bad", RK_M("clips.theClipIsBusy"));
       return;
     }
     openEditor(clip);
@@ -2693,7 +2710,7 @@ const CLIP_HOVER_PROFILES = {
         anyUploading = false;
       }
       if (!suppressToast) {
-        showToast("Upload cancelled", "info");
+        showToast(RK_M("clips.uploadCancelled"), "info");
         scheduleToastHide(2500);
       }
       // build with encodeURIComponent, NOT URLSearchParams -- the latter encodes spaces as "+", which the helpers Uri.UnescapeDataString leaves as literal "+", so a clip name with spaces (every replay clip) never matched the running job and the cancel silently no-opd.
@@ -2872,7 +2889,7 @@ const CLIP_HOVER_PROFILES = {
     const fav = isFavorite(name);
     if (btn) {
       btn.classList.toggle("is-favorite", fav);
-      btn.dataset.tooltip = fav ? "Remove favorite" : "Favorite clip";
+      btn.dataset.tooltip = fav ? RK_M("clips.removeFavorite") : RK_M("clips.favoriteClip");
       btn.setAttribute("aria-label", btn.dataset.tooltip);
       btn.innerHTML = `<svg viewBox="0 0 24 24">${fav ? ICON.STAR : ICON.STAR_BORDER}</svg>`;
     }
@@ -2881,8 +2898,8 @@ const CLIP_HOVER_PROFILES = {
     const label = menuItem.querySelector(".menu-item-label");
     const icon = menuItem.querySelector("svg");
     menuItem.classList.toggle("is-favorite", fav);
-    menuItem.setAttribute("aria-label", fav ? "Remove favorite" : "Favorite");
-    if (label) label.textContent = fav ? "Remove favorite" : "Favorite";
+    menuItem.setAttribute("aria-label", fav ? RK_M("clips.removeFavorite") : RK_M("clips.favorite"));
+    if (label) label.textContent = fav ? RK_M("clips.removeFavorite") : RK_M("clips.favorite");
     if (icon) icon.innerHTML = fav ? ICON.STAR : ICON.STAR_BORDER;
   }
 
@@ -2892,15 +2909,15 @@ const CLIP_HOVER_PROFILES = {
     card.classList.toggle("is-selected", selected);
     const btn = card.querySelector(".select-clip-btn");
     if (btn) {
-      btn.dataset.tooltip = selected ? "Deselect clip" : "Select clip";
+      btn.dataset.tooltip = selected ? RK_M("clips.deselectClip") : RK_M("clips.selectClip");
       btn.setAttribute("aria-label", btn.dataset.tooltip);
       btn.setAttribute("aria-pressed", selected ? "true" : "false");
     }
     const menuItem = card.querySelector(".select-menu-item");
     if (!menuItem) return;
     const label = menuItem.querySelector(".menu-item-label");
-    menuItem.setAttribute("aria-label", selected ? "Deselect clip" : "Select clip");
-    if (label) label.textContent = selected ? "Deselect" : "Select";
+    menuItem.setAttribute("aria-label", selected ? RK_M("clips.deselectClip") : RK_M("clips.selectClip"));
+    if (label) label.textContent = selected ? RK_M("common.deselect") : RK_M("clips.select");
     const icon = menuItem.querySelector(".menu-item-icon");
     if (icon) icon.innerHTML = selected ? ICON.DESELECT : ICON.SELECT;
   }
@@ -2963,17 +2980,17 @@ const CLIP_HOVER_PROFILES = {
     btn.setAttribute("aria-label", deleteLabelFor(btn));
     const toTrash = trashOn && !btn.dataset.deleteLabel;
     const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = toTrash ? "Move to trash" : "Delete";
+    if (label) label.textContent = toTrash ? RK_M("clips.moveToTrash") : RK_M("common.delete");
     const confirm = btn.querySelector(".delete-confirm-text");
-    if (confirm) confirm.textContent = toTrash ? "Trash?" : "Delete?";
+    if (confirm) confirm.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
   }
 
   // while deleted history is on a delete only moves the clip or screenshot into the trash, so its buttons say so; a button with a label of its own (a draft, the trash itself) keeps it
   let trashOn = true;
   function deleteLabelFor(btn) {
     if (btn.dataset.deleteLabel) return btn.dataset.deleteLabel;
-    if (trashOn) return "Move to trash";
-    return btn.dataset.deleteKind === "screenshot" ? "Delete screenshot" : btn.dataset.deleteKind === "gif" ? "Delete GIF" : "Delete clip";
+    if (trashOn) return RK_M("clips.moveToTrash");
+    return btn.dataset.deleteKind === "screenshot" ? RK_M("clips.deleteScreenshot") : btn.dataset.deleteKind === "gif" ? RK_M("clips.deleteGif") : RK_M("clips.deleteClip");
   }
   function relabelDeleteButtons(root) {
     (root || document).querySelectorAll(".delete-btn:not(.is-armed)").forEach(resetDeleteButton);
@@ -2996,10 +3013,10 @@ const CLIP_HOVER_PROFILES = {
     resetDeleteButton(btn);
     btn.classList.add("is-armed");
     const toTrash = trashOn && !btn.dataset.deleteLabel;
-    btn.dataset.tooltip = toTrash ? "Click again to move to trash" : "Click again to delete";
+    btn.dataset.tooltip = toTrash ? RK_M("clips.clickAgainToMoveToTrash") : RK_M("common.clickAgainToDelete");
     btn.setAttribute("aria-label", btn.dataset.tooltip);
     const label = btn.querySelector(".menu-item-label");
-    if (label) label.textContent = toTrash ? "Trash?" : "Delete?";
+    if (label) label.textContent = toTrash ? RK_M("clips.trash") : RK_M("common.delete2");
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
@@ -3025,7 +3042,7 @@ const CLIP_HOVER_PROFILES = {
   }
 
   // the parts of the card below without what is in them, for the loading placeholder (stageGhostCards), so it takes the size the card css gives a real one
-  const GHOST_CARD = '<div class="card"><div class="preview" data-skel></div><div class="body"><div class="title-row"><span class="name">A clip that is loading</span><span class="icon-mini-btn edit-btn"></span></div><div class="meta"><span class="size">00.0 MB</span><span class="dot"></span><span class="age">2 days ago</span></div></div><div class="actions"><span class="action-link-btn">Create Link</span></div></div>';
+  const GHOST_CARD = '<div class="card"><div class="preview" data-skel></div><div class="body"><div class="title-row"><span class="name" data-i18n="clips.aClipThatIsLoading"></span><span class="icon-mini-btn edit-btn"></span></div><div class="meta"><span class="size" data-i18n="clips.n000Mb"></span><span class="dot"></span><span class="age" data-i18n="clips.n2DaysAgo"></span></div></div><div class="actions"><span class="action-link-btn" data-i18n="clips.createLink"></span></div></div>';
   function buildCard(clip) {
     const card = document.createElement("div");
     card.className = "card rk-hover-card" + (selectedClipNames.has(clip.name) ? " is-selected" : "");
@@ -3055,11 +3072,11 @@ const CLIP_HOVER_PROFILES = {
         <button class="locate-btn" type="button" data-tooltip="${locateLabel}" aria-label="${locateLabel}">
           <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/open-external}}</svg>
         </button>
-        <div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>Processing&hellip;</span></div>
-        <button class="select-clip-btn" type="button" data-tooltip="Select clip" aria-label="Select clip" aria-pressed="false">
+        <div class="processing-overlay" aria-hidden="true"><div class="processing-spinner"></div><span>${escapeHtml(RK_M("clips.processing"))}</span></div>
+        <button class="select-clip-btn" type="button" data-tooltip="${escapeHtml(RK_M("clips.selectClip"))}" aria-label="${escapeHtml(RK_M("clips.selectClip"))}" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-app-3}}</svg>
         </button>
-        <button class="favorite-btn" type="button" data-tooltip="Favorite clip" aria-label="Favorite clip">
+        <button class="favorite-btn" type="button" data-tooltip="${escapeHtml(RK_M("clips.favoriteClip"))}" aria-label="${escapeHtml(RK_M("clips.favoriteClip"))}">
           <svg viewBox="0 0 24 24">${isFavorite(clip.name) ? ICON.STAR : ICON.STAR_BORDER}</svg>
         </button>
         <div class="play-overlay"></div>
@@ -3085,70 +3102,70 @@ const CLIP_HOVER_PROFILES = {
       <div class="body">
         <div class="title-row">
           <span class="name" translate="no">${nameEsc}</span>
-          <button class="icon-mini-btn edit-btn" data-tooltip="Rename" type="button">
+          <button class="icon-mini-btn edit-btn" data-tooltip="${escapeHtml(RK_M("common.rename"))}" type="button">
             <svg viewBox="0 0 24 24">${ICON.EDIT}</svg>
           </button>
           <div class="title-actions">
-            <button class="icon-mini-btn delete-btn" data-tooltip="Delete clip" aria-label="Delete clip" type="button">
+            <button class="icon-mini-btn delete-btn" data-tooltip="${escapeHtml(RK_M("clips.deleteClip"))}" aria-label="${escapeHtml(RK_M("clips.deleteClip"))}" type="button">
               <svg viewBox="0 0 24 24">${ICON.TRASH}</svg>
-              <span class="delete-confirm-text">Delete?</span>
+              <span class="delete-confirm-text">${escapeHtml(RK_M("common.delete2"))}</span>
             </button>
             <div class="menu-container">
-              <button class="icon-mini-btn menu-btn" data-tooltip="More options" type="button">
+              <button class="icon-mini-btn menu-btn" data-tooltip="${escapeHtml(RK_M("common.moreOptions"))}" type="button">
                 <svg viewBox="0 0 24 24">${ICON.MORE}</svg>
               </button>
               <div class="menu-dropdown" data-skel="skip">
-                <div class="menu-heading">Share</div>
+                <div class="menu-heading">${escapeHtml(RK_M("clips.share"))}</div>
                 <div class="menu-item share-menu-item link-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.LINK}</svg>
-                  <span class="menu-item-label">Create Link</span>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.createLink"))}</span>
                 </div>
                 <div class="menu-item share-menu-item clipboard-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CLIPBOARD}</svg>
-                  <span>Copy to clipboard</span>
+                  <span>${escapeHtml(RK_M("clips.copyToClipboard"))}</span>
                 </div>
-                <div class="menu-heading">Edit</div>
+                <div class="menu-heading">${escapeHtml(RK_M("common.edit"))}</div>
                 <div class="menu-item trim-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.CONTENT_CUT}</svg>
-                  <span>Edit clip</span>
+                  <span>${escapeHtml(RK_M("clips.editClip"))}</span>
                 </div>
                 <div class="menu-item discard-draft-item" style="display:none">
                   <svg class="menu-item-icon" viewBox="0 0 16 16">${ICON.RESET}</svg>
-                  <span>Delete draft</span>
+                  <span>${escapeHtml(RK_M("clips.deleteDraft"))}</span>
                 </div>
                 <div class="menu-item rename-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EDIT}</svg>
-                  <span>Edit name</span>
+                  <span>${escapeHtml(RK_M("clips.editName"))}</span>
                 </div>
                 <div class="menu-item export-gif-item" role="menuitem">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.EXPORT_GIF}</svg>
-                  <span class="menu-item-label">Export GIF</span>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.exportGif"))}</span>
                 </div>
                 <div class="menu-item compress-clip-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.COMPRESS}</svg>
-                  <span>Compress&hellip;</span>
+                  <span>${escapeHtml(RK_M("clips.compressEllipsis"))}</span>
                 </div>
-                <div class="menu-heading">Organize</div>
+                <div class="menu-heading">${escapeHtml(RK_M("clips.organize"))}</div>
                 <div class="menu-item favorite-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.STAR_BORDER}</svg>
-                  <span class="menu-item-label">Favorite</span>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.favorite"))}</span>
                 </div>
                 <div class="menu-item select-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.SELECT}</svg>
-                  <span class="menu-item-label">Select</span>
+                  <span class="menu-item-label">${escapeHtml(RK_M("clips.select"))}</span>
                 </div>
                 <div class="menu-item duplicate-menu-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.DUPLICATE}</svg>
-                  <span>Duplicate</span>
+                  <span>${escapeHtml(RK_M("editor.duplicate"))}</span>
                 </div>
                 <div class="menu-item open-folder-item">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.FOLDER_OPEN}</svg>
-                  <span>Open file location</span>
+                  <span>${escapeHtml(RK_M("clips.openFileLocation"))}</span>
                 </div>
                 <div class="menu-separator"></div>
-                <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" aria-label="Delete clip">
+                <div class="menu-item delete-menu-item delete-btn" role="button" tabindex="0" aria-label="${escapeHtml(RK_M("clips.deleteClip"))}">
                   <svg class="menu-item-icon" viewBox="0 0 24 24">${ICON.TRASH}</svg>
-                  <span class="menu-item-label">Delete</span>
+                  <span class="menu-item-label">${escapeHtml(RK_M("common.delete"))}</span>
                 </div>
               </div>
             </div>
@@ -3161,7 +3178,7 @@ const CLIP_HOVER_PROFILES = {
         </div>
       </div>
       <div class="actions"></div>
-      <div class="card-resize" data-tooltip="Drag to resize clips, double-click to reset">${CARD_GRIP_SVG}</div>
+      <div class="card-resize" data-tooltip="${escapeHtml(RK_M("clips.dragToResizeCardsDoubleClick"))}">${CARD_GRIP_SVG}</div>
     `;
     syncCodecBadge(card, clip);
 
@@ -3270,7 +3287,7 @@ const CLIP_HOVER_PROFILES = {
         playIconHide.style.display = "";
       }
       // the tip names what the click will do, same as the icon
-      playToggleBtn.dataset.tooltip = video.paused ? "Play" : "Pause";
+      playToggleBtn.dataset.tooltip = video.paused ? RK_M("clips.play") : RK_M("clips.pause");
     }
     if (playToggleBtn) {
       playToggleBtn.addEventListener("click", (e) => {
@@ -3497,7 +3514,7 @@ const CLIP_HOVER_PROFILES = {
       const exitIcon  = fullscreenBtn.querySelector(".fs-exit-icon");
       if (enterIcon) enterIcon.style.display = inFs ? "none" : "";
       if (exitIcon)  exitIcon.style.display  = inFs ? ""     : "none";
-      fullscreenBtn.dataset.tooltip = inFs ? "Exit fullscreen (F)" : "Fullscreen (F)";
+      fullscreenBtn.dataset.tooltip = inFs ? RK_M("common.exitFullscreenF") : RK_M("common.fullscreenF");
       // leaving fullscreen also closes any open settings popup so a re-entry starts clean.
       if (!inFs) settingsWrap && settingsWrap.classList.remove("is-open");
     });
@@ -3809,11 +3826,7 @@ const CLIP_HOVER_PROFILES = {
     openFolderEl.addEventListener("click", async (e) => {
       e.stopPropagation();
       closeCardMenu(menuDropdown);
-      try {
-        await fetch(HELPER + "/open-folder?file=" + encodeURIComponent(card.dataset.name), {
-          method: "POST", cache: "no-store",
-        });
-      } catch {}
+      await postAction(HELPER + "/open-folder?file=" + encodeURIComponent(card.dataset.name));
     });
     // both delete entry points use the same two-click confirmation. The menu keeps its first-click state visible, while the card button uses its compact inline confirmation.
     function handleDeleteAction(e, trigger) {
@@ -3837,7 +3850,7 @@ const CLIP_HOVER_PROFILES = {
         const draftName = card.dataset.name;
         if (draftName) {
           forgetDraft(draftName);
-          showToast("Draft deleted", "info");
+          showToast(RK_M("clips.draftDeleted"), "info");
           scheduleToastHide(2400);
         }
         return;
@@ -3853,18 +3866,18 @@ const CLIP_HOVER_PROFILES = {
       const duration = Number(card.dataset.duration) || durationCache.get(name);
       gifExports.add(name);
       closeCardMenu(menuDropdown);
-      showToast("Exporting GIF…", "info");
+      showToast(RK_M("clips.exportingGif"), "info");
       try {
         const query = "file=" + encodeURIComponent(name) + "&start=0&end=" + encodeURIComponent(duration);
         const response = await fetch(HELPER + "/gifs/export?" + query, {method:"POST"});
         const data = await response.json();
-        if (!response.ok || !data.ok) throw Error(data.message || "GIF export failed");
+        if (!response.ok || !data.ok) throw Error(data.message || RK_M("clips.gifExportFailed"));
         window.dispatchEvent(new Event("replaykit:gif-saved"));
         // the helper shows the result in the popup over the obs window, from any view; a toast stands in only where that popup cannot show (the classic layout)
         if (data.popup) hideToast();
-        else { showToast("Saved to the GIFs section.", "info", "GIF exported"); scheduleToastHide(2400); }
+        else { showToast(RK_M("clips.savedToTheGifsSection"), "info", RK_M("clips.gifExported")); scheduleToastHide(2400); }
       } catch (error) {
-        showToast(escapeHtml(error.message), "bad", "GIF export failed");
+        showToast(escapeHtml(error.message), "bad", RK_M("clips.gifExportFailed"));
         scheduleToastHide(TOAST_ERROR_MS);
       } finally {
         gifExports.delete(name);
@@ -3881,7 +3894,7 @@ const CLIP_HOVER_PROFILES = {
       const name = card.dataset.name;
       if (!name) return;
       forgetDraft(name);
-      showToast("Draft deleted", "info");
+      showToast(RK_M("clips.draftDeleted"), "info");
       scheduleToastHide(2400);
     });
     card.querySelector(".duplicate-menu-item").addEventListener("click", async (e) => {
@@ -3897,10 +3910,10 @@ const CLIP_HOVER_PROFILES = {
         // force a fresh, non-merged clips fetch so the copy shows up on the next tick.
         clipsPageVersion = "";
         scheduleNextPoll(0);
-        showToast(RK_T("Duplicated {name}", { name: '<span translate="no">' + escapeHtml(displayClipName(name)) + "</span>" }), "info");
+        showToast(RK_M("clips.duplicatedName", { name: '<span translate="no">' + escapeHtml(displayClipName(name)) + "</span>" }), "info");
         scheduleToastHide(2200);
       } catch (err) {
-        showToast(RK_T("Duplicate failed: {error}", { error: escapeHtml(err.message || err) }));
+        showToast(RK_M("clips.duplicateFailedError", { error: escapeHtml(err.message || err) }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
     });
@@ -3915,10 +3928,10 @@ const CLIP_HOVER_PROFILES = {
                                 { method: "POST", cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
-        showToast("Copied to clipboard - paste anywhere to share the file", "info");
+        showToast(RK_M("clips.copiedToClipboardPasteAnywhereTo"), "info");
         scheduleToastHide(3000);
       } catch (err) {
-        showToast(RK_T("Clipboard copy failed: {error}", { error: err.message || err }));
+        showToast(RK_M("common.clipboardCopyFailedError", { error: err.message || err }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
     });
@@ -3969,12 +3982,12 @@ const CLIP_HOVER_PROFILES = {
       renderLoadedClips(loadedClips);
       refreshBulkSelectionUi();
       const shownName = '<span translate="no">' + escapeHtml(displayClipName(filename)) + "</span>";
-      showToast(data.kept ? RK_T("Moved {name} to the trash", { name: shownName }) : RK_T("Deleted {name}", { name: shownName }), "info");
+      showToast(data.kept ? RK_M("clips.movedNameToTheTrash", { name: shownName }) : RK_M("clips.deletedName", { name: shownName }), "info");
       scheduleToastHide(data.kept ? 3200 : 1800);
       window.dispatchEvent(new Event("replaykit:deleted-changed"));
       scheduleNextPoll(250);
     } catch (e) {
-      showToast(RK_T("Delete failed: {error}", { error: escapeHtml(e.message || e) }));
+      showToast(RK_M("clips.deleteFailedError", { error: escapeHtml(e.message || e) }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -3995,7 +4008,7 @@ const CLIP_HOVER_PROFILES = {
       input.classList.add("is-rejected");
       if (!told) {
         told = true;
-        showToast(escapeHtml(RK_T("Names can’t contain \\ / : * ? \" < > |")), "info");
+        showToast(escapeHtml(RK_M("clips.namesCanTContainChars", { chars: "\\ / : * ? \" < > |" })), "info");
         scheduleToastHide(2600);
       }
     });
@@ -4004,8 +4017,8 @@ const CLIP_HOVER_PROFILES = {
   // the part of a typed name that is kept (windows drops trailing dots and spaces), and what is wrong with it when something is
   function cleanTypedName(value) { return String(value || "").trim().replace(/[. ]+$/, ""); }
   function nameProblem(base) {
-    if (RESERVED_NAME.test(base)) return RK_T("“{name}” is a name Windows keeps for itself.", { name: base });
-    if (base.length > 180) return "That name is too long.";
+    if (RESERVED_NAME.test(base)) return RK_M("clips.nameIsANameWindowsKeeps", { name: base });
+    if (base.length > 180) return RK_M("clips.thatNameIsTooLong");
     return "";
   }
   // a name that cannot be used is said in a toast that leaves the typing alone (an error popup would take the keys and the focus from the box) and the box is outlined until it is typed in again
@@ -4051,7 +4064,7 @@ const CLIP_HOVER_PROFILES = {
     try {
       let res;
       try { res = await fetch(HELPER + "/rename?file=" + encodeURIComponent(name) + "&to=" + encodeURIComponent(to) + (view ? "&view=" + encodeURIComponent(view) : ""), { method:"POST", cache:"no-store", signal:abort.signal }); }
-      catch (e) { throw new Error(e && e.name === "AbortError" ? "ReplayKit took too long to answer. The list will show the clip’s name once it does." : "ReplayKit could not be reached."); }
+      catch (e) { throw new Error(e && e.name === "AbortError" ? RK_M("clips.replaykitTookTooLongToAnswer2") : RK_M("clips.replaykitCouldNotBeReached")); }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       finalName = data.name || to;
@@ -4059,7 +4072,7 @@ const CLIP_HOVER_PROFILES = {
       transferFavorite(name, finalName);
       hydrateClipUiState();
       if (finalName !== to) {
-        showToast(RK_T("A clip named “{from}” already exists, so this clip was renamed to “{to}”.", { from: '<span translate="no">' + escapeHtml(displayClipName(to)) + "</span>", to: '<span translate="no">' + escapeHtml(displayClipName(finalName)) + "</span>" }), "info");
+        showToast(RK_M("clips.aClipNamedFromAlreadyExists", { from: '<span translate="no">' + escapeHtml(displayClipName(to)) + "</span>", to: '<span translate="no">' + escapeHtml(displayClipName(finalName)) + "</span>" }), "info");
         scheduleToastHide(5000);
       }
       return finalName;
@@ -4127,7 +4140,7 @@ const CLIP_HOVER_PROFILES = {
     input.className = "name-edit-input";
     input.value = baseName;
     input.spellcheck = false;
-    input.setAttribute("aria-label", "Clip name");
+    input.setAttribute("aria-label", RK_M("common.clipName"));
     guardNameInput(input);
 
     let extSpan = null;
@@ -4190,7 +4203,7 @@ const CLIP_HOVER_PROFILES = {
         saving = false;
         input.readOnly = false;
         input.classList.remove("is-saving");
-        rejectName(input, RK_T("Couldn’t rename: {error}", { error: e.message || e }));
+        rejectName(input, RK_M("clips.couldnTRenameError", { error: e.message || e }));
         if (viaEnter && input.isConnected) { input.focus(); input.select(); return; }
         settled = true;
         swapBackToNameSpan();
@@ -4211,7 +4224,7 @@ const CLIP_HOVER_PROFILES = {
     const name = card.dataset.name;
     const duration = (video && Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0) || Number(card.dataset.duration) || durationCache.get(name) || 0;
     if (!name || !video || button.classList.contains("is-busy")) return;
-    if (duration < 0.5) { showToast("This clip is too short for a screenshot.", "info"); scheduleToastHide(2600); return; }
+    if (duration < 0.5) { showToast(RK_M("clips.thisClipIsTooShortFor"), "info"); scheduleToastHide(2600); return; }
     const time = Math.max(0, Math.min(duration - 0.001, video.currentTime || 0));
     button.classList.add("is-busy");
     button.disabled = true;
@@ -4223,10 +4236,10 @@ const CLIP_HOVER_PROFILES = {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
       window.dispatchEvent(new Event("replaykit:screenshot-saved"));
-      showToast(RK_T("Screenshot saved in Screenshots as {name}", { name: '<span translate="no">' + escapeHtml(data.name || "") + "</span>" }), "info");
+      showToast(RK_M("common.screenshotSavedInScreenshotsAsName", { name: '<span translate="no">' + escapeHtml(data.name || "") + "</span>" }), "info");
       scheduleToastHide(3000);
     } catch (error) {
-      showToast(RK_T("Couldn’t save the screenshot: {error}", { error: escapeHtml(error.message || error) }), "info");
+      showToast(RK_M("clips.couldnTSaveTheScreenshotError", { error: escapeHtml(error.message || error) }), "info");
       scheduleToastHide(TOAST_ERROR_MS);
     } finally {
       button.classList.remove("is-busy");
@@ -4270,7 +4283,7 @@ const CLIP_HOVER_PROFILES = {
         }
       }
       if (Date.now() - started > 4000) {
-        if (!card) { showToast("That GIF is no longer in the GIFs folder.", "bad", "GIFs"); scheduleToastHide(TOAST_ERROR_MS); }
+        if (!card) { showToast(RK_M("clips.thatGifIsNoLongerIn"), "bad", RK_M("clips.gifs")); scheduleToastHide(TOAST_ERROR_MS); }
         return;
       }
       gifRevealTimer = setTimeout(step, 120);
@@ -4279,11 +4292,11 @@ const CLIP_HOVER_PROFILES = {
   }
   function gifUnavailable(card) {
     const name = card.dataset.name;
-    if (gifExports.has(name)) return "GIF export is in progress.";
+    if (gifExports.has(name)) return RK_M("clips.gifExportIsInProgress");
     const duration = Number(card.dataset.duration) || durationCache.get(name);
-    if (!name || !duration) return "Clip duration is unavailable.";
-    if (duration > 15) return "GIFs are limited to 15 seconds.";
-    if (duration < 0.5) return "GIFs must be at least 0.5 seconds.";
+    if (!name || !duration) return RK_M("clips.clipDurationIsUnavailable");
+    if (duration > 15) return RK_M("clips.gifsAreLimitedTo15Seconds");
+    if (duration < 0.5) return RK_M("clips.gifsMustBeAtLeast0");
     return "";
   }
 
@@ -4648,7 +4661,7 @@ const CLIP_HOVER_PROFILES = {
         bar.classList.toggle("is-finalizing", finalizing);
         bar.classList.toggle("is-queued", !!queuedCompression);
         const phaseLabel = bar.querySelector(".progress-phase");
-        if (phaseLabel) phaseLabel.textContent = queuedCompression ? "Queued" : "";
+        if (phaseLabel) phaseLabel.textContent = queuedCompression ? RK_M("clips.queued") : "";
         updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), uploadPct);
         return;
       }
@@ -4679,14 +4692,14 @@ const CLIP_HOVER_PROFILES = {
       // coerce to a real boolean -- CEF treats classList.toggle(cls, undefined) as a plain toggle, so `false || undefined` was flipping is-disabled ON for every eligible (never-linked) clip.
       const menuBlockReason = showCopy ? null : uploadBlockReason(clip);
       linkMenuItem.classList.toggle("is-disabled", !!(busy || linkLocked || menuBlockReason));
-      const linkText = showCopy ? "Copy Link"
-        : menuBlockReason ? RK_T("{reason} -- Streamable will not accept this clip", { reason: menuBlockReason })
-        : processing ? "Processing on Streamable"
-        : failed ? "Processing failed"
-        : busy ? "Creating link" : "Create Link";
+      const linkText = showCopy ? RK_M("clips.copyLink")
+        : menuBlockReason ? RK_M("clips.reasonStreamableWillNotAcceptThis", { reason: menuBlockReason })
+        : processing ? RK_M("clips.processingOnStreamable")
+        : failed ? RK_M("clips.processingFailed")
+        : busy ? RK_M("clips.creatingLink") : RK_M("clips.createLink");
       linkMenuItem.setAttribute("aria-label", linkText);
       // the full reason stays in the aria label -- putting it in the visible label too is what was ballooning the menus height when it wrapped across lines
-      if (label) label.textContent = menuBlockReason ? "Create Link" : linkText;
+      if (label) label.textContent = menuBlockReason ? RK_M("clips.createLink") : linkText;
       if (icon) icon.innerHTML = showCopy ? COPY_ICON : ICON.LINK;
     }
 
@@ -4706,8 +4719,8 @@ const CLIP_HOVER_PROFILES = {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn action-link-btn draft-open-btn";
-      btn.dataset.tooltip = "Pick up your unsaved edits";
-      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.OPEN_EDITOR}</svg><span class="btn-label">Open in editor</span>`;
+      btn.dataset.tooltip = RK_M("clips.pickUpYourUnsavedEdits");
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.OPEN_EDITOR}</svg><span class="btn-label">${escapeHtml(RK_M("clips.openInEditor"))}</span>`;
       btn.addEventListener("click", () => {
         const host = btn.closest(".card");
         requestOpenEditor(host ? currentClipForCard(host) : clip);
@@ -4717,21 +4730,21 @@ const CLIP_HOVER_PROFILES = {
       dot.className = "dot link-status-dot";
       const note = document.createElement("span");
       note.className = "link-status is-draft";
-      note.textContent = "Unsaved edits";
+      note.textContent = RK_M("clips.unsavedEdits");
       meta.appendChild(dot);
       meta.appendChild(note);
     } else if (showTranscodeBar) {
       // streamable transcodes server-side after the upload; the link is not offered until it is playable. amber bar tracks transcode_percent.
       const bar = document.createElement("div");
       bar.className = "btn is-progress is-transcode";
-      bar.title = "Processing on Streamable";
+      bar.title = RK_M("clips.processingOnStreamable");
       bar.innerHTML = '<span class="progress-track"><span class="progress-fill"></span></span>';
       actions.appendChild(bar);
       updateDisplayProgress(clip.name, bar.querySelector(".progress-fill"), transPct, 4.5);
     } else if (showCopy) {
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
-      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${COPY_ICON}</svg><span class="btn-label">Copy Link</span>`;
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${COPY_ICON}</svg><span class="btn-label">${escapeHtml(RK_M("clips.copyLink"))}</span>`;
       btn.dataset.url = clip.streamable_url;
       btn.addEventListener("click", async () => {
         const ok = await copyText(btn.dataset.url);
@@ -4739,7 +4752,7 @@ const CLIP_HOVER_PROFILES = {
         const label = btn.querySelector(".btn-label");
         const orig  = label.textContent;
         btn.classList.add("is-flashing");
-        label.textContent = "Link Copied";
+        label.textContent = RK_M("clips.linkCopied");
         setTimeout(() => {
           btn.classList.remove("is-flashing");
           label.textContent = orig;
@@ -4748,7 +4761,7 @@ const CLIP_HOVER_PROFILES = {
       actions.appendChild(btn);
 
       if (timedOut) {
-        addMetaStatus("Status check timed out", true);
+        addMetaStatus(RK_M("clips.statusCheckTimedOut"), true);
       } else {
         const expiry = formatExpiry(clip.uploaded_at, clip.retention_days);
         if (expiry) {
@@ -4756,7 +4769,7 @@ const CLIP_HOVER_PROFILES = {
           const retSec = (clip.retention_days || 2) * 86400;
           const remaining = retSec - (Math.floor(Date.now() / 1000) - clip.uploaded_at);
           const threshold = retSec > 7 * 86400 ? 24 * 3600 : 6 * 3600;
-          addMetaStatus(RK_T("Link {time} left", { time: expiry }), remaining < threshold);
+          addMetaStatus(RK_M("clips.linkTimeLeft", { time: expiry }), remaining < threshold);
         }
       }
     } else if (state === "compressing" || state === "uploading") {
@@ -4768,7 +4781,7 @@ const CLIP_HOVER_PROFILES = {
         btn.className = "btn is-progress";
         btn.innerHTML =
           '<span class="progress-track"><span class="progress-fill"></span></span><span class="progress-phase"></span>' +
-          '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel">' +
+          '<button type="button" class="progress-cancel" aria-label="Cancel" title="Cancel" data-i18n-title="common.cancel" data-i18n-aria-label="common.cancel">' +
           '<svg viewBox="5 5 14 14" aria-hidden="true">' + CANCEL_ICON + '</svg></button>';
         // resolve the clip + its live job at click time from the card -- a recycled card node can outlive the clip this listener was built for.
         const xBtn = btn.querySelector(".progress-cancel");
@@ -4785,18 +4798,18 @@ const CLIP_HOVER_PROFILES = {
       }
       btn.classList.toggle("is-finalizing", finalizing);
       btn.classList.toggle("is-queued", !!queuedCompression);
-      btn.querySelector(".progress-phase").textContent = queuedCompression ? "Queued" : "";
+      btn.querySelector(".progress-phase").textContent = queuedCompression ? RK_M("clips.queued") : "";
       updateDisplayProgress(clip.name, btn.querySelector(".progress-fill"), uploadPct);
     } else {
       const btn = document.createElement("button");
       btn.className = "btn action-link-btn";
-      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">Create Link</span>`;
+      btn.innerHTML = `<svg class="btn-icon" viewBox="0 0 24 24">${ICON.LINK}</svg><span class="btn-label">${escapeHtml(RK_M("clips.createLink"))}</span>`;
       // Streamable would reject this one anyway -- lock the button and say why instead of letting the upload run and fail.
       const blockReason = uploadBlockReason(clip);
       if (blockReason) {
         btn.disabled = true;
         btn.classList.add("is-blocked");
-        btn.title = RK_T("{reason} -- Streamable will not accept this clip. Trim or compress it first.", { reason: blockReason });
+        btn.title = RK_M("clips.reasonStreamableWillNotAcceptThis2", { reason: blockReason });
       } else {
         btn.addEventListener("click", () => onCreateLink(clip.name, btn));
       }
@@ -4804,12 +4817,12 @@ const CLIP_HOVER_PROFILES = {
       if (blockReason) addMetaStatus(blockReason, true);
       // a failed transcode still has a (dead) streamable_url on the clip -- Create Link above retries; the X drops the dead link + the "Processing failed" note.
       if (failed) {
-        addMetaStatus("Processing failed", true);
+        addMetaStatus(RK_M("clips.processingFailed"), true);
         const x = document.createElement("button");
         x.type = "button";
         x.className = "link-remove-btn";
-        x.title = "Remove link";
-        x.setAttribute("aria-label", "Remove link");
+        x.title = RK_M("clips.removeLink");
+        x.setAttribute("aria-label", RK_M("clips.removeLink"));
         x.innerHTML = '<svg viewBox="5 5 14 14" aria-hidden="true">' + CANCEL_ICON + '</svg>';
         x.addEventListener("click", async (e) => {
           e.stopPropagation();
@@ -4837,7 +4850,7 @@ const CLIP_HOVER_PROFILES = {
     btn.classList.add("is-busy");
     // the button now has an <svg> + <span class="btn-label"> inside, so we swap only the label text -- otherwise textcontent would also wipe out the link icon.
     const label = btn.querySelector(".btn-label") || btn;
-    label.textContent = "Sending...";
+    label.textContent = RK_M("clips.sending");
     const pending = { requestId: "", startedAt: Date.now() };
     // a fresh Create Link overrides any pending cancel grace for this clip.
     cancelledUploads.delete(filename);
@@ -4878,7 +4891,7 @@ const CLIP_HOVER_PROFILES = {
           anyUploading = localState.size > 0;
           btn.classList.remove("is-busy");
           btn.disabled = false;
-          label.textContent = "Create Link";
+          label.textContent = RK_M("clips.createLink");
           rerenderCard(filename);
           // "too big" -> offer the temp-compress path; "too long" -> nothing to do but trim, say so; "busy" -> the cap is full, say so plainly instead of a scary error; otherwise the generic toast.
           if (e && e.tooBig) {
@@ -4886,13 +4899,13 @@ const CLIP_HOVER_PROFILES = {
           } else if (e && e.tooLong) {
             const d = e.durationSec || 0;
             const mmss = Math.floor(d / 60) + ":" + String(Math.round(d % 60)).padStart(2, "0");
-            showToast(RK_T("It is {duration} long and the limit is 10 minutes. Trim it shorter first.", { duration: mmss }), "bad", "Clip is too long for Streamable");
+            showToast(RK_M("clips.itIsDurationLongAndThe", { duration: mmss }), "bad", RK_M("clips.clipIsTooLongForStreamable"));
             scheduleToastHide(TOAST_ERROR_MS);
           } else if (e && e.busy) {
-            showToast("Try that clip again in a moment.", "bad", "Upload queue is full");
+            showToast(RK_M("clips.tryThatClipAgainInA"), "bad", RK_M("clips.uploadQueueIsFull"));
             scheduleToastHide(TOAST_ERROR_MS);
           } else {
-            showToast(RK_T("Couldn't create link: {error}", { error: e.message || RK_T("Unknown error") }));
+            showToast(RK_M("clips.couldnTCreateLinkError", { error: e.message || RK_M("clips.unknownError") }));
             scheduleToastHide(TOAST_ERROR_MS);
           }
           return;
@@ -5029,12 +5042,12 @@ const CLIP_HOVER_PROFILES = {
         if (loadedClips.length > 0 || (gameFilters && (gameFilters.state.game !== "all" || gameFilters.state.favorites || gameFilters.state.linked))) {
           emptyEl.innerHTML = escapeHtml(emptyMessageForFilter());
           if (activeFilter !== "all" && activeFilter !== "drafts" && clipsNextOffset < clipsTotal) {
-            emptyEl.innerHTML += "<div class=\"hint\">Loading more clips for this filter...</div>";
+            emptyEl.innerHTML += "<div class=\"hint\" data-i18n='clips.loadingMoreClipsForThisFilter'></div>";
             loadMoreClipsIfNeeded(true);
           }
         } else {
-          emptyEl.innerHTML = "No clips yet.<div class=\"hint\">"
-            + "Save a clip with your clip hotkey, or pick a different clip folder in ReplayKit Settings.</div>";
+          emptyEl.innerHTML = "<span data-i18n='clips.noClipsYet'></span><div class=\"hint\">"
+            + "<span data-i18n='clips.saveAClipWithYourClip'></span></div>";
         }
       }
       return;
@@ -5095,12 +5108,12 @@ const CLIP_HOVER_PROFILES = {
     const name = escapeHtml(displayClipName(clip.name));
     const facts = [];
     const duration = Number(clip.duration) || durationCache.get(clip.name) || 0;
-    if (duration > 0) facts.push(["Length", formatDuration(duration)]);
+    if (duration > 0) facts.push([RK_M("common.length"), formatDuration(duration)]);
     const width = Number(clip.width) || 0;
     const height = Number(clip.height) || 0;
     const fps = Number(clip.fps) || 0;
-    if (width > 0 && height > 0) facts.push(["Resolution", fps > 0 ? RK_T("{width} × {height} · {fps} fps", { width, height, fps: Math.round(fps) }) : RK_T("{width} × {height}", { width, height })]);
-    facts.push(["Size", formatSize(clip.size)]);
+    if (width > 0 && height > 0) facts.push([RK_M("editor.resolution"), fps > 0 ? RK_M("clips.widthHeightFpsFps", { width, height, fps: Math.round(fps) }) : RK_M("clips.widthHeight", { width, height })]);
+    facts.push([RK_M("common.size"), formatSize(clip.size)]);
     return '<div class="home-hero-name" translate="no">' + name + "</div>"
       + '<div class="home-hero-age age" data-mtime="' + (Number(clip.mtime) || 0) + '">' + formatClipDate(clip.mtime) + "</div>"
       + '<dl class="home-hero-facts">' + facts.map(([label, value]) => "<dt>" + label + "</dt><dd>" + escapeHtml(value) + "</dd>").join("") + "</dl>";
@@ -5126,7 +5139,7 @@ const CLIP_HOVER_PROFILES = {
       renderCardRow(homeFavsEl, []);
       emptyEl.style.display = "block";
       emptyEl.classList.remove("error");
-      emptyEl.innerHTML = "No clips yet.<div class=\"hint\">Save a clip with your clip hotkey, or pick a different clip folder in ReplayKit Settings.</div>";
+      emptyEl.innerHTML = "<span data-i18n='clips.noClipsYet'></span><div class=\"hint\" data-i18n='clips.saveAClipWithYourClip'></div>";
     } else {
       emptyEl.style.display = "none";
       homeShelvesEl.classList.add("is-shown");
@@ -5155,7 +5168,7 @@ const CLIP_HOVER_PROFILES = {
   }
 
   // until the first list is in, the clip area is held under a placeholder measured from stand-in cards (GHOST_CARD), so it has the shape the cards will have; the stand-ins are taken out again before anything else runs, since every list of this page reads .card
-  const GHOST_CLIP = { name: "The latest clip is loading.mp4", mtime: 0, size: 0, duration: 60, width: 1920, height: 1080, fps: 60 };
+  const GHOST_CLIP = { name: RK_M("clips.theLatestClipIsLoadingMp4"), mtime: 0, size: 0, duration: 60, width: 1920, height: 1080, fps: 60 };
   let clipsLoading = false;
 
   function stageGhostCards() {
@@ -5218,7 +5231,7 @@ const CLIP_HOVER_PROFILES = {
       .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); })
       .catch((e) => {
         try { localStorage.removeItem(OPEN_FILTER_KEY); } catch {}
-        showToast(RK_T("Could not open Clips: {error}", { error: escapeHtml(e.message) }));
+        showToast(RK_M("common.couldNotOpenClipsError", { error: escapeHtml(e.message) }));
         scheduleToastHide(TOAST_ERROR_MS);
       });
   }
@@ -5321,7 +5334,7 @@ const CLIP_HOVER_PROFILES = {
         syncBulkUploadButtons();
       }
       if (uploadError) {
-        showToast(RK_T("Upload failed: {error}", { error: uploadError }));
+        showToast(RK_M("clips.uploadFailedError", { error: uploadError }));
         scheduleToastHide(TOAST_ERROR_MS);
       }
       // the placeholder goes with the first list and with nothing before it: the drafts, the clip state and the favorites draw the list again as they come in, and an empty list drawn by them is not the library being empty
@@ -5344,11 +5357,11 @@ const CLIP_HOVER_PROFILES = {
       restHeadingEl.classList.remove("is-shown");
       emptyEl.style.display = "block";
       emptyEl.classList.add("error");
-      emptyEl.innerHTML = "ReplayKit is not responding."
-        + "<div class=\"hint\">Restart OBS to reconnect.</div>";
+      emptyEl.innerHTML = escapeHtml(RK_M("home.replaykitIsNotResponding"))
+        + "<div class=\"hint\" data-i18n='clips.restartObsToReconnect'></div>";
       helperFailures += 1;
       if (helperFailures === HELPER_FAILURES_BEFORE_POPUP) {
-        showErrorPopup("The helper that loads the clips is not answering, so nothing can load right now. OBS usually starts it again by itself within about half a minute. If this stays, restart OBS.", "ReplayKit is not responding", "helper-offline");
+        showErrorPopup(RK_M("clips.theHelperThatLoadsTheClips"), RK_M("clips.replaykitIsNotResponding"), "helper-offline");
       }
       resolveFirstRender();
     } finally {
@@ -5369,14 +5382,14 @@ const CLIP_HOVER_PROFILES = {
     clipFoldersStatusEl.hidden = !active;
     if (active) {
       clipFoldersWatchedPass = Number(state.pass) || 0;
-      clipFoldersTextEl.textContent = RK_T("Sorting clips into folders · {done} of {total}", { done: Number(state.done) || 0, total: Number(state.total) || 0 });
+      clipFoldersTextEl.textContent = RK_M("clips.sortingClipsIntoFoldersDoneOf", { done: Number(state.done) || 0, total: Number(state.total) || 0 });
       return;
     }
     if (!state || !clipFoldersWatchedPass || Number(state.pass) !== clipFoldersWatchedPass) return;
     clipFoldersWatchedPass = 0;
     const moved = Number(state.moved) || 0;
     if (moved > 0) {
-      showToast(escapeHtml(moved === 1 ? RK_T("Sorted 1 clip into its folder.") : RK_T("Sorted {count} clips into their folders.", { count: moved })), "info");
+      showToast(escapeHtml(moved === 1 ? RK_M("clips.sorted1ClipIntoItsFolder") : RK_M("clips.sortedCountClipsIntoTheirFolders", { count: moved })), "info");
       scheduleToastHide(2400);
     }
   }
@@ -5824,8 +5837,8 @@ const CLIP_HOVER_PROFILES = {
   function openCompressModal(filename, sizeMb, capMb) {
     pendingCompressFile = filename;
     compressBody.innerHTML =
-      "<p>" + RK_T("{file} is <b>{size} MB</b>, which is over Streamable's <b>{cap} MB</b> limit for your current plan.", { file: '<code translate="no">' + escapeHtml(filename) + "</code>", size: sizeMb, cap: capMb }) + "</p>" +
-      "<p>Create a temporary compressed copy and upload that instead?</p>";
+      "<p>" + RK_MH("clips.fileIsSizeMbWhichIs", { file: '<code translate="no">' + escapeHtml(filename) + "</code>", size: sizeMb, cap: capMb }) + "</p>" +
+      "<p data-i18n='clips.createATemporaryCompressedCopyAnd'></p>";
     compressVeil.classList.add("is-open");
   }
   function closeCompressModal() {
@@ -5858,10 +5871,10 @@ const CLIP_HOVER_PROFILES = {
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
-      showToast(RK_T("Compressing temp copy for {name}.", { name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
+      showToast(RK_M("clips.compressingTempCopyForName", { name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
       scheduleToastHide(3500);
     } catch (e) {
-      showToast(RK_T("Couldn't start compression: {error}", { error: e.message || e }));
+      showToast(RK_M("clips.couldnTStartCompressionError", { error: e.message || e }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   });
@@ -5902,7 +5915,7 @@ const CLIP_HOVER_PROFILES = {
     const heights = COMPRESS_DS_LADDER.filter((h) => h < srcH);
     compressDsSelect.setOptions(heights.map((h) => {
       const w = srcW && srcH ? Math.round((srcW * h / srcH) / 2) * 2 : 0;
-      return { value:String(h), label:w ? RK_T("{width} × {height}", { width: w, height: h }) : RK_T("{height}p", { height: h }) };
+      return { value:String(h), label:w ? RK_M("clips.widthHeight", { width: w, height: h }) : RK_M("clips.heightP", { height: h }) };
     }));
     if (!heights.length) return false;
     return true;
@@ -5997,7 +6010,7 @@ const CLIP_HOVER_PROFILES = {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         if (data && data.alreadyCompressed) {
-          showToast(data.message || "Already compressed.", "info");
+          showToast(data.message || RK_M("clips.alreadyCompressed"), "info");
           scheduleToastHide(4000);
           return;
         }
@@ -6008,12 +6021,12 @@ const CLIP_HOVER_PROFILES = {
       anyUploading = true;
       scheduleNextPoll(POLL_FAST_MS);
       rerenderCard(file);
-      let label = mode === "fast" ? RK_T("Compressing (fast)") : RK_T("Compressing (smaller)");
-      if (scaleHeight > 0) label = RK_T("{label} -> {height}p", { label, height: scaleHeight });
-      showToast(RK_T("{label} - {name}", { label, name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
+      let label = mode === "fast" ? RK_M("clips.compressingFast") : RK_M("clips.compressingSmaller");
+      if (scaleHeight > 0) label = RK_M("clips.labelHeightP", { label, height: scaleHeight });
+      showToast(RK_M("clips.labelName", { label, name: '<span translate="no">' + escapeHtml(file) + "</span>" }), "info");
       scheduleToastHide(3000);
     } catch (err) {
-      showToast(RK_T("Couldn't start compress: {error}", { error: err.message || err }));
+      showToast(RK_M("clips.couldnTStartCompressError", { error: err.message || err }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6041,7 +6054,7 @@ const CLIP_HOVER_PROFILES = {
   // compress all: bulk fast-compress of every clip that isnt already marked. client-side queue with busy-retry so the servers concurrency limiter (steady-state + cpu-gated burst) does the actual scheduling without us having to mirror its state. fast mode only -- bulk compress on smaller would take hours on a typical folder; users who want max compression on a specific clip still have the per-card 3-dot menu.
   const clipFolderBtn = document.getElementById("clip-folder-btn");
   if (clipFolderBtn) clipFolderBtn.addEventListener("click", () => {
-    fetch(HELPER + (activeFilter === "screenshots" ? "/open-screenshot-folder" : activeFilter === "gifs" ? "/open-gif-folder" : "/open-clip-folder"), { method: "POST", cache: "no-store" }).catch(() => {});
+    postAction(HELPER + (activeFilter === "screenshots" ? "/open-screenshot-folder" : activeFilter === "gifs" ? "/open-gif-folder" : "/open-clip-folder"));
   });
 
   const compressAllBtn        = document.getElementById("compress-all-btn");
@@ -6098,24 +6111,24 @@ const CLIP_HOVER_PROFILES = {
 
   // single source of truth for BOTH the upload icon (#bulk-upload) and the "Stop uploads" text button. stop mode = scheduling (bulkUploadRunning) OR clips this batch handed to the helper are still uploading (bulkUploadInFlight). in stop mode both buttons stay live so either one cancels the whole batch; outside it the icon is the normal Upload trigger. verbose form for the icons floating tooltip (no width limit).
   function bulkStopLabel() {
-    if (bulkUploadAbort) return "Stopping...";
+    if (bulkUploadAbort) return RK_M("common.stopping");
     const up = bulkUploadInFlight.size;
     const queued = bulkUploadQueued.size;
     if (bulkUploadRunning || queued > 0) {
       return queued > 0
-        ? RK_T("Stop — {uploading} uploading, {queued} queued", { uploading: up, queued })
-        : RK_T("Stop uploads ({count})", { count: up });
+        ? RK_M("clips.stopUploadingUploadingQueuedQueued", { uploading: up, queued })
+        : RK_M("clips.stopUploadsCount", { count: up });
     }
-    return up === 1 ? RK_T("Cancel 1 upload") : RK_T("Cancel {count} uploads", { count: up });
+    return up === 1 ? RK_M("clips.cancel1Upload") : RK_M("clips.cancelCountUploads", { count: up });
   }
   // terse form for the #bulk-upload-stop text button, which shares the toolbar row with Clear + Sort.
   function bulkStopLabelShort() {
-    if (bulkUploadAbort) return "Stopping...";
+    if (bulkUploadAbort) return RK_M("common.stopping");
     const up = bulkUploadInFlight.size;
     const queued = bulkUploadQueued.size;
-    if (queued > 0) return RK_T("Stop ({count} queued)", { count: queued });
-    if (bulkUploadRunning) return RK_T("Stop uploads");
-    return up === 1 ? RK_T("Cancel 1 upload") : RK_T("Cancel {count} uploads", { count: up });
+    if (queued > 0) return RK_M("clips.stopCountQueued", { count: queued });
+    if (bulkUploadRunning) return RK_M("clips.stopUploads");
+    return up === 1 ? RK_M("clips.cancel1Upload") : RK_M("clips.cancelCountUploads", { count: up });
   }
   function syncBulkUploadButtons() {
     const stopMode = bulkUploadRunning || bulkUploadInFlight.size > 0;
@@ -6136,8 +6149,8 @@ const CLIP_HOVER_PROFILES = {
     } else {
       const uploadable = selectedUploadCandidates().length;
       bulkUploadBtn.disabled = selectedClipNames.size > 0 && uploadable === 0;
-      tip = uploadable ? "Upload" : "No selected clips need uploading";
-      aria = uploadable ? "Upload selected clips" : tip;
+      tip = uploadable ? RK_M("clips.upload") : RK_M("clips.noSelectedClipsNeedUploading");
+      aria = uploadable ? RK_M("clips.uploadSelectedClips") : tip;
     }
     bulkUploadBtn.dataset.tooltip = tip;
     bulkUploadBtn.setAttribute("aria-label", aria);
@@ -6163,7 +6176,7 @@ const CLIP_HOVER_PROFILES = {
       cancelActiveUpload(name, (job && job.requestId) || (pend && pend.requestId) || "", true);
     });
     if (inflight.length) {
-      showToast(inflight.length === 1 ? RK_T("Cancelled 1 upload.") : RK_T("Cancelled {count} uploads.", { count: inflight.length }), "info");
+      showToast(inflight.length === 1 ? RK_M("clips.cancelled1Upload") : RK_M("clips.cancelledCountUploads", { count: inflight.length }), "info");
       scheduleToastHide(2500);
     }
     if (!bulkUploadRunning) bulkUploadAbort = false;
@@ -6269,12 +6282,12 @@ const CLIP_HOVER_PROFILES = {
     refreshBulkSelectionUi();
     if (started) {
       showToast(started === 1
-        ? (aborted ? RK_T("Upload: queued 1 selected clip before stopping.") : RK_T("Upload: queued 1 selected clip."))
-        : (aborted ? RK_T("Upload: queued {count} selected clips before stopping.", { count: started }) : RK_T("Upload: queued {count} selected clips.", { count: started })), "info");
+        ? (aborted ? RK_M("clips.uploadQueued1SelectedClipBefore") : RK_M("clips.uploadQueued1SelectedClip"))
+        : (aborted ? RK_M("clips.uploadQueuedCountSelectedClipsBefore", { count: started }) : RK_M("clips.uploadQueuedCountSelectedClips", { count: started })), "info");
       scheduleToastHide(3500);
     }
     if (failed.length) {
-      showToast(failed.length === 1 ? RK_T("Retry the clip.") : RK_T("Retry the clips."), "bad", failed.length === 1 ? RK_T("1 selected clip was not queued for upload") : RK_T("{count} selected clips were not queued for upload", { count: failed.length }));
+      showToast(failed.length === 1 ? RK_M("clips.retryTheClip") : RK_M("clips.retryTheClips"), "bad", failed.length === 1 ? RK_M("clips.n1SelectedClipWasNotQueued") : RK_M("clips.countSelectedClipsWereNotQueued", { count: failed.length }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6284,26 +6297,25 @@ const CLIP_HOVER_PROFILES = {
     compressAllBtn.classList.toggle("is-running", state === "running");
     compressAllBtn.classList.toggle("is-disabled", state === "disabled");
     if (state === "running" && info) {
-      compressAllLabelEl.innerHTML = RK_T("Stop {progress}", { progress: '<span class="progress">(' + info.done + " / " + info.total + ")</span>" });
-      compressAllBtn.title = "Click to stop scheduling new compresses. "
-        + "In-flight encodes will finish.";
+      compressAllLabelEl.innerHTML = RK_M("clips.stopProgress", { progress: '<span class="progress">(' + info.done + " / " + info.total + ")</span>" });
+      compressAllBtn.title = RK_M("clips.clickToStopSchedulingNewCompresses");
     } else if (state === "disabled") {
-      compressAllLabelEl.textContent = "Compress All";
-      compressAllBtn.title = "Every clip is already compressed.";
+      compressAllLabelEl.textContent = RK_M("clips.compressAll2");
+      compressAllBtn.title = RK_M("clips.everyClipIsAlreadyCompressed");
     } else {
-      compressAllLabelEl.textContent = "Compress All";
-      compressAllBtn.title = "Fast-compress every clip that isn't already compressed.";
+      compressAllLabelEl.textContent = RK_M("clips.compressAll2");
+      compressAllBtn.title = RK_M("clips.fastCompressEveryClipThatIsn");
     }
     if (!bulkCompressBtn) return;
     if (state === "running" && info) {
       bulkCompressBtn.classList.add("is-running");
-      bulkCompressBtn.dataset.tooltip = RK_T("Stop compression queue ({done} / {total})", { done: info.done, total: info.total });
+      bulkCompressBtn.dataset.tooltip = RK_M("clips.stopCompressionQueueDoneTotal", { done: info.done, total: info.total });
       bulkCompressBtn.setAttribute("aria-label", bulkCompressBtn.dataset.tooltip);
       bulkCompressBtn.disabled = false;
     } else {
       const available = selectedCompressCandidates().length;
       bulkCompressBtn.classList.remove("is-running");
-      bulkCompressBtn.dataset.tooltip = available ? "Compress" : "No selected clips can be compressed";
+      bulkCompressBtn.dataset.tooltip = available ? RK_M("common.compress") : RK_M("clips.noSelectedClipsCanBeCompressed");
       bulkCompressBtn.setAttribute("aria-label", bulkCompressBtn.dataset.tooltip);
       bulkCompressBtn.disabled = selectedClipNames.size > 0 && available === 0;
     }
@@ -6326,19 +6338,19 @@ const CLIP_HOVER_PROFILES = {
     const total = allClips.length;
     const skipped = total - candidates.length;
     compressAllBody.innerHTML =
-      "<p>" + (candidates.length === 1 ? RK_T("Fast-compress <b>1</b> clip.") : RK_T("Fast-compress <b>{count}</b> clips.", { count: candidates.length })) + "</p>"
+      "<p>" + (candidates.length === 1 ? RK_MH("clips.fastCompress1Clip") : RK_MH("clips.fastCompressCountClips", { count: candidates.length })) + "</p>"
       + (skipped > 0
-          ? "<p>" + (skipped === 1 ? RK_T("<b>1</b> clip will be skipped (already compressed or busy).") : RK_T("<b>{count}</b> clips will be skipped (already compressed or busy).", { count: skipped })) + "</p>"
+          ? "<p>" + (skipped === 1 ? RK_MH("clips.n1ClipWillBeSkippedAlready") : RK_MH("clips.countClipsWillBeSkippedAlready", { count: skipped })) + "</p>"
           : "")
-      + "<p>" + RK_T("Each clip's original file will be replaced. Only Fast mode runs in bulk — for Smaller, use a clip's 3-dot menu individually.") + "</p>";
-    compressAllGo.textContent = "Compress all";
+      + "<p>" + RK_M("clips.eachClipSOriginalFileWill") + "</p>";
+    compressAllGo.textContent = RK_M("clips.compressAll");
     compressAllGo.disabled = (candidates.length === 0);
     compressAllVeil.classList.add("is-open");
   }
   function closeCompressAllModal() {
     compressAllVeil.classList.remove("is-open");
     pendingBulkCompressQueue = null;
-    compressAllGo.textContent = "Compress all";
+    compressAllGo.textContent = RK_M("clips.compressAll");
   }
 
   function openSelectedCompressModal() {
@@ -6347,12 +6359,12 @@ const CLIP_HOVER_PROFILES = {
     pendingBulkCompressQueue = candidates.slice();
     const skipped = selectedClipNames.size - candidates.length;
     compressAllBody.innerHTML =
-      "<p>" + (candidates.length === 1 ? RK_T("Fast-compress <b>1</b> selected clip.") : RK_T("Fast-compress <b>{count}</b> selected clips.", { count: candidates.length })) + "</p>"
+      "<p>" + (candidates.length === 1 ? RK_MH("clips.fastCompress1SelectedClip") : RK_MH("clips.fastCompressCountSelectedClips", { count: candidates.length })) + "</p>"
       + (skipped > 0
-          ? "<p>" + (skipped === 1 ? RK_T("<b>1</b> selected clip was skipped because it is already compressed or busy.") : RK_T("<b>{count}</b> selected clips were skipped because they are already compressed or busy.", { count: skipped })) + "</p>"
+          ? "<p>" + (skipped === 1 ? RK_MH("clips.n1SelectedClipWasSkippedBecause") : RK_MH("clips.countSelectedClipsWereSkippedBecause", { count: skipped })) + "</p>"
           : "")
-      + "<p>Each source clip is replaced with a smaller fast-compressed version. Clips are queued through ReplayKit's existing limiter, so they do not all encode at once.</p>";
-    compressAllGo.textContent = "Compress selected";
+      + "<p data-i18n='clips.eachSourceClipIsReplacedWith'></p>";
+    compressAllGo.textContent = RK_M("clips.compressSelected");
     compressAllGo.disabled = false;
     compressAllVeil.classList.add("is-open");
   }
@@ -6411,8 +6423,8 @@ const CLIP_HOVER_PROFILES = {
     refreshCompressAllButton();
     if (done > 0) {
       showToast(done === 1
-        ? RK_T("{label}: scheduled 1 clip for compression.", { label: RK_T(operationLabel || "Compress All") })
-        : RK_T("{label}: scheduled {count} clips for compression.", { label: RK_T(operationLabel || "Compress All"), count: done }), "info");
+        ? RK_M("clips.labelScheduled1ClipForCompression", { label: operationLabel || RK_M("clips.compressAll2") })
+        : RK_M("clips.labelScheduledCountClipsForCompression", { label: operationLabel || RK_M("clips.compressAll2"), count: done }), "info");
       scheduleToastHide(4000);
     }
   }
@@ -6444,7 +6456,7 @@ const CLIP_HOVER_PROFILES = {
   });
   compressAllGo.addEventListener("click", () => {
     const queue = pendingBulkCompressQueue ? pendingBulkCompressQueue.slice() : compressAllCandidates();
-    const label = pendingBulkCompressQueue ? "Compress selected" : "Compress All";
+    const label = pendingBulkCompressQueue ? RK_M("clips.compressSelected") : RK_M("clips.compressAll2");
     closeCompressAllModal();
     if (queue.length === 0) return;
     runCompressAll(queue, label);
@@ -6457,8 +6469,8 @@ const CLIP_HOVER_PROFILES = {
     if (bulkDeleteArmTimer) { clearTimeout(bulkDeleteArmTimer); bulkDeleteArmTimer = 0; }
     if (!bulkDeleteBtn) return;
     bulkDeleteBtn.classList.remove("is-armed");
-    bulkDeleteBtn.dataset.tooltip = trashOn ? "Move to trash" : "Delete";
-    bulkDeleteBtn.setAttribute("aria-label", trashOn ? "Move selected clips to trash" : "Delete selected clips");
+    bulkDeleteBtn.dataset.tooltip = trashOn ? RK_M("clips.moveToTrash") : RK_M("common.delete");
+    bulkDeleteBtn.setAttribute("aria-label", trashOn ? RK_M("clips.moveSelectedClipsToTrash") : RK_M("clips.deleteSelectedClips"));
   }
 
   async function deleteSelectedClips() {
@@ -6472,7 +6484,7 @@ const CLIP_HOVER_PROFILES = {
     let firstFailure = "";
     for (let i = 0; i < names.length; i++) {
       if (bulkDeleteBtn) {
-        bulkDeleteBtn.dataset.tooltip = RK_T(trashOn ? "Moving to trash {done} / {total}" : "Deleting {done} / {total}", { done: i + 1, total: names.length });
+        bulkDeleteBtn.dataset.tooltip = (trashOn ? RK_M("clips.movingToTrashDoneTotal", { done: i + 1, total: names.length }) : RK_M("clips.deletingDoneTotal", { done: i + 1, total: names.length }));
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
       }
       try {
@@ -6480,7 +6492,7 @@ const CLIP_HOVER_PROFILES = {
           method: "POST", cache: "no-store",
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.message || "Delete failed");
+        if (!res.ok || !data.ok) throw new Error(data.message || RK_M("clips.deleteFailed"));
         deleted.push(names[i]);
         if (data.kept) trashed++;
       } catch (err) {
@@ -6512,12 +6524,12 @@ const CLIP_HOVER_PROFILES = {
     if (deleted.length) {
       const toTrash = trashed === deleted.length;
       showToast(deleted.length === 1
-        ? (toTrash ? RK_T("Moved 1 selected clip to the trash.") : RK_T("Deleted 1 selected clip."))
-        : (toTrash ? RK_T("Moved {count} selected clips to the trash.", { count: deleted.length }) : RK_T("Deleted {count} selected clips.", { count: deleted.length })), "info");
+        ? (toTrash ? RK_M("clips.moved1SelectedClipToThe") : RK_M("clips.deleted1SelectedClip"))
+        : (toTrash ? RK_M("clips.movedCountSelectedClipsToThe", { count: deleted.length }) : RK_M("clips.deletedCountSelectedClips", { count: deleted.length })), "info");
       scheduleToastHide(3000);
     }
     if (failed.length) {
-      showToast(escapeHtml(firstFailure), "bad", failed.length === 1 ? RK_T("1 clip was not deleted") : RK_T("{count} clips were not deleted", { count: failed.length }));
+      showToast(escapeHtml(firstFailure), "bad", failed.length === 1 ? RK_M("clips.n1ClipWasNotDeleted") : RK_M("clips.countClipsWereNotDeleted", { count: failed.length }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -6557,7 +6569,7 @@ const CLIP_HOVER_PROFILES = {
       if (!bulkDeleteArmed) {
         bulkDeleteArmed = true;
         bulkDeleteBtn.classList.add("is-armed");
-        bulkDeleteBtn.dataset.tooltip = RK_T(trashOn ? "Confirm move to trash ({count})" : "Confirm delete ({count})", { count: selectedClipNames.size });
+        bulkDeleteBtn.dataset.tooltip = (trashOn ? RK_M("clips.confirmMoveToTrashCount", { count: selectedClipNames.size }) : RK_M("clips.confirmDeleteCount", { count: selectedClipNames.size }));
         bulkDeleteBtn.setAttribute("aria-label", bulkDeleteBtn.dataset.tooltip);
         bulkDeleteArmTimer = setTimeout(resetBulkDeleteButton, 3000);
         return;
@@ -6598,7 +6610,7 @@ const CLIP_HOVER_PROFILES = {
     const res = await fetch(HELPER + "/editor/session", { method:"POST", cache:"no-store", keepalive:!!keepalive,
       headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
     const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.message || "The editor clip could not be protected.");
+    if (!res.ok || !data.ok) throw new Error(data.message || RK_M("clips.theEditorClipCouldNotBe"));
   }
   function protectEditorSources(names) {
     const body = editorSessionBody("add", names);
@@ -6614,7 +6626,7 @@ const CLIP_HOVER_PROFILES = {
   function releaseEditorSources() {
     const body = editorSessionBody("clear");
     editorSessionWrites = editorSessionWrites.catch(() => {}).then(() => editorSessionRegistered ? sendEditorSession(body, true) : undefined);
-    editorSessionWrites.catch((err) => showToast(escapeHtml(err.message), "bad", "Editor"));
+    editorSessionWrites.catch((err) => showToast(escapeHtml(err.message), "bad", RK_M("common.editor")));
   }
   window.addEventListener("pagehide", () => {
     if (editorSessionRegistered) navigator.sendBeacon(HELPER + "/editor/session", new Blob([JSON.stringify(editorSessionBody("clear"))], { type:"application/json" }));
@@ -6630,11 +6642,11 @@ const CLIP_HOVER_PROFILES = {
   function loadEditor() {
     if (editorLoad) return editorLoad;
     editorLoad = fetch(HELPER + "/editor-view", { cache: "no-store" }).then(async (res) => {
-      if (!res.ok) throw new Error("Editor resources could not be loaded");
+      if (!res.ok) throw new Error(RK_M("clips.editorResourcesCouldNotBeLoaded"));
       const doc = new DOMParser().parseFromString(await res.text(), "text/html");
       const editor = doc.getElementById("trim-veil"), saving = doc.getElementById("save-veil");
-      if (!editor || !saving || !doc.querySelector("script")) throw new Error("Editor resources are incomplete");
-      if (doc.querySelector("script[src]")) throw new Error("Unexpected editor resource");
+      if (!editor || !saving || !doc.querySelector("script")) throw new Error(RK_M("clips.editorResourcesAreIncomplete"));
+      if (doc.querySelector("script[src]")) throw new Error(RK_M("clips.unexpectedEditorResource"));
       editorScope = new AbortController();
       window.__rkEditorScope = { signal: editorScope.signal };
       trimVeil.replaceChildren(...Array.from(editor.childNodes));
@@ -6647,7 +6659,7 @@ const CLIP_HOVER_PROFILES = {
         document.head.appendChild(copy);
         editorNodes.push(copy);
       }
-      if (!editorApi()) throw new Error("Editor initialization failed");
+      if (!editorApi()) throw new Error(RK_M("clips.editorInitializationFailed"));
       applyClipHovers(trimVeil);
       applyClipHovers(saveVeil);
       editorUsedAt = Date.now();
@@ -6696,8 +6708,8 @@ const CLIP_HOVER_PROFILES = {
   function publishQuickActions() {
     const api = editorApi();
     const editing = !!api && trimVeil.classList.contains("is-open");
-    if (!window.RKEmbedded) document.title = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") ? "Clips - Editor" : "Clips";
-    const actions = editing ? api.quickActions() : [{ id:"open-folder", label:"Open clips folder", icon:"action/folder-open" }];
+    if (!window.RKEmbedded) document.title = trimVeil.classList.contains("is-open") || trimProcessingVeil.classList.contains("is-open") ? RK_M("clips.clipsEditor") : RK_M("common.clips");
+    const actions = editing ? api.quickActions() : [{ id:"open-folder", label:RK_M("common.openClipsFolder"), icon:"action/folder-open" }];
     const body = JSON.stringify({ actions });
     if (body === quickSent) return;
     quickSent = body;
@@ -6707,7 +6719,7 @@ const CLIP_HOVER_PROFILES = {
   window.__rkQuickAction = function (id) {
     const api = editorApi();
     if (api && trimVeil.classList.contains("is-open")) { api.quickAction(id); return; }
-    if (id === "open-folder") fetch(HELPER + "/open-clip-folder", { method:"POST", cache:"no-store" }).catch(() => {});
+    if (id === "open-folder") postAction(HELPER + "/open-clip-folder");
     // the deleted history is an action of the plugin in every view, which brings the window to this page and then asks for it here
     else if (id === "deleted-history" && deletedGallery) deletedGallery.open();
   };
@@ -6758,21 +6770,21 @@ const CLIP_HOVER_PROFILES = {
     const request = ++editorRequest;
     trimProcessingVeil.classList.add("is-open");
     drawEditorSkeleton(null);
-    document.getElementById("trim-processing-stage").textContent = "Preparing the editor";
+    document.getElementById("trim-processing-stage").textContent = RK_M("clips.preparingTheEditor");
     try {
       await protectEditorSources([clip.name]);
       if (request !== editorRequest) return;
       await loadEditor();
       if (request !== editorRequest) return;
       const blocked = clipBusyWith(clip.name);
-      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(clipBusyMessage(blocked), "bad", "Editor"); return; }
+      if (blocked) { trimProcessingVeil.classList.remove("is-open"); releaseEditorSources(); showToast(clipBusyMessage(blocked), "bad", RK_M("common.editor")); return; }
       editorApi().open(clip);
       if (!trimProcessingVeil.classList.contains("has-bones")) drawEditorSkeleton(trimVeil);
     } catch (err) {
       if (request !== editorRequest) return;
       trimProcessingVeil.classList.remove("is-open");
       releaseEditorSources();
-      showToast(escapeHtml(err.message || "The editor could not be loaded. Reopen ReplayKit and try again."), "bad", "Editor");
+      showToast(escapeHtml(err.message || RK_M("clips.theEditorCouldNotBeLoaded")), "bad", RK_M("common.editor"));
     }
   }
 
@@ -6836,7 +6848,7 @@ const CLIP_HOVER_PROFILES = {
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "[]");
       if (Array.isArray(saved)) order = [...new Set([...saved.filter(id => Object.hasOwn(sections,id)), ...order])];
-    } catch (error) { console.warn("Library section order could not be read", error); }
+    } catch (error) { console.warn(RK_M("clips.librarySectionOrderCouldNotBe"), error); }
     function arrange() {
       for (const id of order)
         for (const node of sections[id]) scrollAreaEl.appendChild(document.getElementById(node));
@@ -6847,7 +6859,7 @@ const CLIP_HOVER_PROFILES = {
       arrange();
       queueVirtualRender(true);
       try { localStorage.setItem(key, JSON.stringify(order)); }
-      catch (error) { console.warn("Library section order could not be saved", error); }
+      catch (error) { console.warn(RK_M("clips.librarySectionOrderCouldNotBe2"), error); }
     }
     const headingOf = id => {
       const first = document.getElementById(sections[id][0]);
@@ -6944,8 +6956,8 @@ const CLIP_HOVER_PROFILES = {
       const handle = document.createElement("button");
       handle.type = "button";
       handle.className = "icon-mini-btn section-drag";
-      handle.setAttribute("aria-label", RK_T("Reorder {name}", { name: heading.querySelector("span").textContent }));
-      handle.dataset.tooltip = "Drag to reorder, or use Up and Down.";
+      handle.setAttribute("aria-label", RK_M("clips.reorderName", { name: heading.querySelector("span").textContent }));
+      handle.dataset.tooltip = RK_M("clips.dragToReorderOrUseUp");
       heading.prepend(handle);
       handle.addEventListener("pointerdown", event => {
         if (event.button !== 0 || sorting) return;

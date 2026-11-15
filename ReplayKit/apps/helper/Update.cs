@@ -67,9 +67,9 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) when (ex is JsonException || ex is IOException || ex is UnauthorizedAccessException)
             {
-                throw new InvalidOperationException("Installed ReplayKit version file is invalid.");
+                throw new InvalidOperationException(Locales.Message("update.installedReplaykitVersionFileIsInvalid"));
             }
-            throw new InvalidOperationException("Installed ReplayKit version file is missing version.");
+            throw new InvalidOperationException(Locales.Message("update.installedReplaykitVersionFileIsMissing"));
         }
 
         public static string NormalizeVersion(string version)
@@ -156,7 +156,7 @@ namespace ReplayKitHelper
             string url = "https://api.github.com/repos/" + Owner + "/" + Repo + "/releases/latest";
             var release = InvokeGitHubApi(url);
             string tagName = release["tag_name"]?.Value<string>();
-            if (string.IsNullOrEmpty(tagName)) throw new InvalidOperationException("Latest release did not include a tag name.");
+            if (string.IsNullOrEmpty(tagName)) throw new InvalidOperationException(Locales.Message("update.latestReleaseDidNotIncludeA"));
             var installer = GetReleaseAsset(release, InstallerAsset);
             string installerUrl = installer?["browser_download_url"]?.Value<string>();
             if (installer == null || string.IsNullOrEmpty(installerUrl))
@@ -282,7 +282,7 @@ namespace ReplayKitHelper
                         ["releaseNotes"] = "",
                         ["updateAvailable"] = false,
                         ["hashRequired"] = true,
-                        ["message"] = "No GitHub Release has been published yet.",
+                        ["message"] = Locales.Message("update.noGithubReleaseHasBeenPublished"),
                     };
                 }
                 return new JObject { ["ok"] = false, ["message"] = ex.Message, ["releaseUrl"] = ReleasePage };
@@ -301,7 +301,7 @@ namespace ReplayKitHelper
         public static JObject PreviewBadge(string version)
         {
             version = (version ?? "").Trim();
-            if (version.Length > 0 && !Regex.IsMatch(version, @"^[0-9A-Za-z.\-]{1,32}$")) return new JObject { ["ok"] = false, ["message"] = "Bad version." };
+            if (version.Length > 0 && !Regex.IsMatch(version, @"^[0-9A-Za-z.\-]{1,32}$")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.badVersion") };
             readyVersion = version;
             WriteUpdateDebug("sdk: badge " + (version.Length > 0 ? "shows " + version : "cleared"));
             return new JObject { ["ok"] = true, ["updateReady"] = version };
@@ -394,7 +394,7 @@ namespace ReplayKitHelper
                 return new JObject
                 {
                     ["ok"] = true, ["prompt"] = false, ["startupCheck"] = true,
-                    ["alreadyChecked"] = true, ["message"] = "Startup update check already ran.",
+                    ["alreadyChecked"] = true, ["message"] = Locales.Message("update.startupUpdateCheckAlreadyRan"),
                 };
             }
 
@@ -460,7 +460,7 @@ namespace ReplayKitHelper
 
         public static JObject SetUpdatePromptDismissed(string version)
         {
-            if (string.IsNullOrWhiteSpace(version)) throw new InvalidOperationException("Missing update version.");
+            if (string.IsNullOrWhiteSpace(version)) throw new InvalidOperationException(Locales.Message("update.missingUpdateVersion"));
             string normalized = NormalizeVersion(version);
             SettingsStore.Update(settings => settings["lastUpdatePromptVersion"] = normalized);
             return new JObject { ["ok"] = true, ["version"] = normalized };
@@ -571,14 +571,14 @@ namespace ReplayKitHelper
             try
             {
                 int pid = Native.SpawnDetached(cmdLine, Constants.REPLAYKIT_TEMP_ROOT);
-                if (pid <= 0) throw new InvalidOperationException("SpawnDetached returned 0 for the update window.");
+                if (pid <= 0) throw new InvalidOperationException(Locales.Message("update.spawndetachedReturned0ForTheUpdate"));
                 WriteUpdateDebug("update window spawned detached pid=" + pid);
                 return new JObject { ["ok"] = true, ["processId"] = pid };
             }
             catch (Exception ex)
             {
                 WriteUpdateDebug("update window spawn failed: " + ex.Message);
-                return new JObject { ["ok"] = false, ["message"] = Locales.T("Could not open the update window: {error}", "error", ex.Message) };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.couldNotOpenTheUpdateWindow", "error", ex.Message) };
             }
         }
 
@@ -588,9 +588,9 @@ namespace ReplayKitHelper
             string full = Path.GetFullPath(path).TrimEnd('\\');
             string name = Path.GetFileName(full);
             if (!Regex.IsMatch(name ?? "", "^" + Regex.Escape(ReplayKitShared.TempLayout.UpdateFolderPrefix) + "[a-f0-9]{32}$", RegexOptions.IgnoreCase))
-                throw new InvalidOperationException("Update temp folder name is invalid.");
+                throw new InvalidOperationException(Locales.Message("update.updateTempFolderNameIsInvalid"));
             if (!full.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Update temp folder resolved outside %TEMP%\\ReplayKit.");
+                throw new InvalidOperationException(Locales.Message("update.updateTempFolderResolvedOutsideTemp"));
         }
 
         // the names of the folders this process made in %TEMP%\ReplayKit, read and written under UpdateCheckLock
@@ -680,7 +680,7 @@ namespace ReplayKitHelper
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || uri.Scheme != Uri.UriSchemeHttps ||
                 !string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Update download URL must use GitHub HTTPS.");
+                throw new InvalidOperationException(Locales.Message("update.updateDownloadUrlMustUseGithub"));
             long limit = Path.GetFileName(path) == ChecksumsAsset ? 64 * 1024 : 128L * 1024 * 1024;
             string temp = path + ".part";
             try
@@ -690,9 +690,9 @@ namespace ReplayKitHelper
                 {
                     response.EnsureSuccessStatusCode();
                     if (response.RequestMessage.RequestUri.Scheme != Uri.UriSchemeHttps)
-                        throw new InvalidDataException("Update download redirected outside HTTPS.");
+                        throw new InvalidDataException(Locales.Message("update.updateDownloadRedirectedOutsideHttps"));
                     if (response.Content.Headers.ContentLength > limit)
-                        throw new InvalidDataException("Update download exceeds the size limit.");
+                        throw new InvalidDataException(Locales.Message("update.updateDownloadExceedsTheSizeLimit"));
                     long expected = response.Content.Headers.ContentLength ?? 0L;
                     if (report) SetProgressBytes(0, expected);
                     using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
@@ -704,7 +704,7 @@ namespace ReplayKitHelper
                         while ((count = stream.ReadAsync(buffer, 0, buffer.Length, timeout.Token).GetAwaiter().GetResult()) > 0)
                         {
                             total += count;
-                            if (total > limit) throw new InvalidDataException("Update download exceeds the size limit.");
+                            if (total > limit) throw new InvalidDataException(Locales.Message("update.updateDownloadExceedsTheSizeLimit"));
                             fileStream.Write(buffer, 0, count);
                             if (report) SetProgressBytes(total, expected);
                         }
@@ -824,7 +824,7 @@ namespace ReplayKitHelper
                 string cmdLine = ProcessArgs.Quote(installerPath) + " " + ProcessArgs.Join(argList.ToArray());
                 WriteUpdateDebug("StartUpdater (admin, detached): " + cmdLine);
                 int installerPid = Native.SpawnDetached(cmdLine, tempDir);
-                if (installerPid <= 0) throw new InvalidOperationException("SpawnDetached returned 0 for installer");
+                if (installerPid <= 0) throw new InvalidOperationException(Locales.Message("update.spawndetachedReturned0ForInstaller"));
                 StartUpdateWatchdog(installerPid, obsPath, targetVersion, releaseUrl);
                 return new JObject { ["ok"] = true, ["processId"] = installerPid };
             }
@@ -844,7 +844,7 @@ namespace ReplayKitHelper
             int pid;
             using (var proc = Process.Start(psi))
             {
-                if (proc == null) throw new InvalidOperationException("The installer did not start.");
+                if (proc == null) throw new InvalidOperationException(Locales.Message("update.theInstallerDidNotStart"));
                 pid = proc.Id;
             }
             StartUpdateWatchdog(pid, obsPath, targetVersion, releaseUrl);
@@ -856,7 +856,7 @@ namespace ReplayKitHelper
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(release.ChecksumsUrl)) throw new InvalidOperationException(Locales.T("The release is missing {file}.", "file", ChecksumsAsset));
+                if (string.IsNullOrWhiteSpace(release.ChecksumsUrl)) throw new InvalidOperationException(Locales.Message("update.theReleaseIsMissingFile", "file", ChecksumsAsset));
                 string installerPath = Path.Combine(tempDir, InstallerAsset);
                 string checksumsPath = Path.Combine(tempDir, ChecksumsAsset);
                 SetProgressStage("download");
@@ -868,11 +868,11 @@ namespace ReplayKitHelper
                 if (!checksums.TryGetValue(InstallerAsset, out string expectedInstallerHash))
                     throw new InvalidOperationException(ChecksumsAsset + " did not list a hash for " + InstallerAsset + ".");
                 if (!VerifySha256(installerPath, expectedInstallerHash))
-                    throw new InvalidOperationException("Downloaded installer hash did not match the release hash.");
+                    throw new InvalidOperationException(Locales.Message("update.downloadedInstallerHashDidNotMatch"));
 
                 long installerBytes = new FileInfo(installerPath).Length;
                 if (installerBytes < MinInstallerBytes)
-                    throw new InvalidOperationException(Locales.T("The {version} installer is incomplete ({size} MB) -- it was published without its bundled ReplayKit files.", "version", release.LatestVersion, "size", installerBytes / (1024 * 1024)) + incompleteHint);
+                    throw new InvalidOperationException(Locales.Message("update.theVersionInstallerIsIncompleteSize", "version", release.LatestVersion, "size", installerBytes / (1024 * 1024)) + incompleteHint);
                 return installerPath;
             }
             catch
@@ -892,7 +892,7 @@ namespace ReplayKitHelper
             bool claimed;
             lock (Server.State.UpdateCheckLock)
             {
-                if (Server.State.UpdateApplyInProgress) return new JObject { ["ok"] = false, ["message"] = "An update is already being applied." };
+                if (Server.State.UpdateApplyInProgress) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.anUpdateIsAlreadyBeingApplied") };
                 Server.State.UpdateApplyInProgress = true;
                 claimed = true;
             }
@@ -916,17 +916,17 @@ namespace ReplayKitHelper
                         ["ok"] = true, ["updateAvailable"] = false,
                         ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
                         ["releaseUrl"] = releaseUrl,
-                        ["message"] = "ReplayKit is already up to date.",
+                        ["message"] = Locales.Message("update.replaykitIsAlreadyUpToDate"),
                     };
                 }
-                if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException(Locales.T("Latest release is missing {file}.", "file", ChecksumsAsset));
+                if (string.IsNullOrWhiteSpace(latest.ChecksumsUrl)) throw new InvalidOperationException(Locales.Message("update.latestReleaseIsMissingFile", "file", ChecksumsAsset));
 
                 string tempDir = CreateUpdateTemp();
                 JObject started;
                 string previousResult = null;
                 try
                 {
-                    string installerPath = DownloadVerifiedInstaller(latest, tempDir, " " + Locales.T("OBS was left running; try again once a fixed release is out."));
+                    string installerPath = DownloadVerifiedInstaller(latest, tempDir, " " + Locales.Message("update.obsWasLeftRunningTryAgain"));
                     previousResult = ClearInstallResult();
                     SetProgressStage("install");
                     started = StartUpdater(installerPath, tempDir, latest.LatestVersion, releaseUrl);
@@ -945,7 +945,7 @@ namespace ReplayKitHelper
                     ["installedVersion"] = installed, ["latestVersion"] = latest.LatestVersion,
                     ["releaseUrl"] = releaseUrl,
                     ["processId"] = started["processId"],
-                    ["message"] = Locales.T("ReplayKit {version} is installing. OBS will restart.", "version", latest.LatestVersion),
+                    ["message"] = Locales.Message("update.replaykitVersionIsInstallingObsWill", "version", latest.LatestVersion),
                 };
             }
             catch (Exception ex)

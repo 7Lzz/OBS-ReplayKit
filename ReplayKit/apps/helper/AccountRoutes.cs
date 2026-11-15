@@ -81,7 +81,7 @@ namespace ReplayKitHelper
                 {
                     ["signedIn"] = a.SignedIn,
                     ["username"] = "",
-                    ["displayName"] = a.SignedIn ? "Signed in" : "",
+                    ["displayName"] = a.SignedIn ? Locales.Message("common.signedIn") : "",
                     ["maskedUsername"] = a.SignedIn ? masked : "",
                     ["plan"] = a.Plan,
                     ["sizeCap"] = a.SizeCap,
@@ -125,7 +125,7 @@ namespace ReplayKitHelper
                 {
                     // gdi+ reports a file it cannot decode as out of memory or an argument error
                     Log.Write(path + ": " + ex.GetType().Name + ": " + ex.Message);
-                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["message"] = ex is InvalidDataException ? ex.Message : "That file could not be used as a picture." });
+                    HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = false, ["message"] = ex is InvalidDataException ? ex.Message : Locales.Message("common.thatFileCouldNotBeUsed") });
                     return false;
                 }
                 PipeClient.SendAccountChanged();
@@ -137,9 +137,16 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try { AuthCore.StreamableBackgroundLogout(); } catch (Exception ex) { Log.Write("Background logout failed: " + ex.Message); }
-                AuthCore.ClearAuth();
-                StreamableSignIn.ClearProfile();
+                bool cleared = AuthCore.ClearAuth();
+                cleared = StreamableSignIn.ClearProfile() && cleared;
                 AppConfig.ClearClipsCache();
+                if (!cleared)
+                {
+                    // the dock and the account menu both sign out, so the helper says it did not finish whichever one asked
+                    DonePopups.Show("warning", Locales.Message("common.signOut"), new JObject { ["text"] = Locales.Message("share.signInCouldNotBeCleared") });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("share.signInCouldNotBeCleared") });
+                    return false;
+                }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
             }

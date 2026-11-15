@@ -134,12 +134,12 @@ namespace ReplayKitSetup
             };
             using (var process = System.Diagnostics.Process.Start(start))
             {
-                if (process == null) throw new IOException("Could not start OBS theme preparation.");
+                if (process == null) throw new IOException(SetupLocale.Message("setup.couldNotStartObsThemePreparation"));
                 var error = process.StandardError.ReadToEndAsync();
                 if (!process.WaitForExit(15000))
                 {
                     process.Kill();
-                    throw new IOException("OBS theme preparation timed out.");
+                    throw new IOException(SetupLocale.Message("setup.obsThemePreparationTimedOut"));
                 }
                 if (process.ExitCode != 0) throw new IOException(error.GetAwaiter().GetResult().Trim());
             }
@@ -308,10 +308,11 @@ namespace ReplayKitSetup
             {
                 if (Directory.Exists(localeDir) && (File.GetAttributes(localeDir) & FileAttributes.ReparsePoint) == 0)
                 {
-                    foreach (string file in Directory.EnumerateFiles(localeDir, "*.json"))
+                    // the english-keyed tables of earlier releases sat here, one per language; the messages that replaced them live in the messages folder below, which this leaves alone
+                    foreach (string file in Directory.EnumerateFiles(localeDir, "*.json", SearchOption.TopDirectoryOnly))
                     {
                         string code = Path.GetFileNameWithoutExtension(file);
-                        if (!LanguageMatch.IsCode(code) || LanguageMatch.IsSupported(code)) continue;
+                        if (!LanguageMatch.IsCode(code)) continue;
                         File.Delete(file);
                         removed++;
                         log?.Invoke("removed legacy locale: " + code);
@@ -559,7 +560,7 @@ namespace ReplayKitSetup
             if (!Directory.Exists(runtimeSrc)) throw new DirectoryNotFoundException($"ReplayKit runtime assets not found: {runtimeSrc}");
             string helperSource = Path.Combine(runtimeSrc, "scripts", "helper", "OBSReplayKit.exe");
             if (!File.Exists(helperSource) || new FileInfo(helperSource).Length < 256 * 1024)
-                throw new InvalidDataException("The bundled ReplayKit helper is missing or incomplete.");
+                throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitHelperIsMissing"));
             // obs is brought to the one supported version before any file is copied: the plugins and the process host of this release are made for it, so an obs that cannot get there leaves the old replaykit as it was
             ObsDownloader.EnsureObsVersion(log);
             if (!ObsVersions.IsInstalledSupported())
@@ -571,7 +572,7 @@ namespace ReplayKitSetup
             string backupRoot = Path.Combine(transactionRoot, "backup");
             var files = Directory.EnumerateFiles(runtimeSrc, "*", SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
-            if (files.Count == 0) throw new InvalidDataException("The bundled ReplayKit runtime is empty.");
+            if (files.Count == 0) throw new InvalidDataException(SetupLocale.Message("setup.theBundledReplaykitRuntimeIsEmpty"));
 
             int count = 0, unchanged = 0;
             var stagedFiles = new List<(string FileRel, string Rel, string Staged, string Target)>();
@@ -713,12 +714,12 @@ namespace ReplayKitSetup
 
             try
             {
-                if (!InstallObsFfmpeg(log)) problems.Add("FFmpeg and FFprobe");
+                if (!InstallObsFfmpeg(log)) problems.Add(SetupLocale.Message("setup.ffmpegAndFfprobe"));
             }
             catch (Exception ex)
             {
                 log?.Invoke($"warn: ffmpeg refresh failed: {ex.Message}");
-                problems.Add("FFmpeg and FFprobe");
+                problems.Add(SetupLocale.Message("setup.ffmpegAndFfprobe"));
             }
 
             try
@@ -741,12 +742,12 @@ namespace ReplayKitSetup
 
             try
             {
-                if (!BongoCat.InstallBongoCat(log)) problems.Add("Bongo Cat files and saved sources");
+                if (!BongoCat.InstallBongoCat(log)) problems.Add(SetupLocale.Message("setup.bongoCatFilesAndSavedSources"));
             }
             catch (Exception ex)
             {
                 log?.Invoke($"warn: Bongo Cat refresh failed: {ex.Message}");
-                problems.Add("Bongo Cat files and saved sources");
+                problems.Add(SetupLocale.Message("setup.bongoCatFilesAndSavedSources"));
             }
 
             // the desktop audio plugin was only ever put in by a full setup, so an updating install kept the 2022 build with its known crash and never got a fix to the build replaykit ships. it compares the installed dll with the bundled one and does nothing when they match; obs is closed here

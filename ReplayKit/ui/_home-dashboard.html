@@ -133,12 +133,12 @@
     var week = Array.isArray(sum.week) ? sum.week : [];
     var thisWeek = week.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
     var sep = '<span class="hm-sep">&middot;</span>';
-    return [sum.clipCount === 1 ? RK_T("<b>1</b> clip") : RK_T("<b>{count}</b> clips", { count: sum.clipCount }), RK_T("<b>{count}</b> this week", { count: thisWeek })].join(sep);
+    return [sum.clipCount === 1 ? RK_MH("common.n1Clip") : RK_MH("common.countClips", { count: sum.clipCount }), RK_MH("home.countThisWeek", { count: thisWeek })].join(sep);
   }
 
   function headHtml() {
-    return '<div class="hm-head"><div class="hm-head-main"><h1 class="hm-h1">Home</h1><p class="hm-facts">' + factsHtml() + '</p></div>' +
-      '<div class="hm-links"><button type="button" class="hm-link" data-act="open-folder">Open folder</button></div></div>';
+    return '<div class="hm-head"><div class="hm-head-main"><h1 class="hm-h1" data-i18n="common.home"></h1><p class="hm-facts">' + factsHtml() + '</p></div>' +
+      '<div class="hm-links"><button type="button" class="hm-link" data-act="open-folder" data-i18n="home.openFolder"></button></div></div>';
   }
 
   // only what needs attention gets a bar
@@ -147,26 +147,26 @@
     var sum = S.summary;
     var st = state();
     if (st === "helper") {
-      list.push({ id: "helper", tone: "error", title: "ReplayKit is not responding.", text: "The background helper stopped answering and normally comes back within a few seconds. If this stays, restart OBS.", label: "Try again", act: "retry", keep: true });
+      list.push({ id: "helper", tone: "error", title: RK_M("home.replaykitIsNotResponding"), text: RK_M("home.theBackgroundHelperStoppedAnsweringAnd"), label: RK_M("common.tryAgain"), act: "retry", keep: true });
     } else if (st === "error") {
-      list.push({ id: "obs", tone: "error", title: "Cannot reach OBS.", text: "ReplayKit lost its connection to OBS, so clips cannot be saved right now. Restarting OBS usually fixes it. Your clips are not affected.", label: "Restart OBS", act: "restart-obs", primary: true, keep: true });
+      list.push({ id: "obs", tone: "error", title: RK_M("home.cannotReachObs"), text: RK_M("home.replaykitLostItsConnectionToObs"), label: RK_M("common.restartObs"), act: "restart-obs", primary: true, keep: true });
     }
     if (sum && sum.clipDirExists === false) {
-      list.push({ id: "folder", tone: "error", title: "Clips folder not found.", text: "ReplayKit cannot save clips until the folder is back. Check that its drive is connected, or choose another folder in Settings.", label: "Open settings", act: "open-settings" });
+      list.push({ id: "folder", tone: "error", title: RK_M("home.clipsFolderNotFound"), text: RK_M("home.replaykitCannotSaveClipsUntilThe"), label: RK_M("home.openSettings"), act: "open-settings" });
     } else if (sum && sum.freeBytes >= 0 && sum.freeBytes < LOW_SPACE_BYTES) {
-      list.push({ id: "space", tone: "warn", title: "Low disk space.", text: sum.drive ? RK_T("Only {size} left on {drive}. New clips may fail to save.", { size: fmtBytes(sum.freeBytes), drive: sum.drive }) : RK_T("Only {size} left. New clips may fail to save.", { size: fmtBytes(sum.freeBytes) }), label: "Free up space", act: "open-storage" });
+      list.push({ id: "space", tone: "warn", title: RK_M("home.lowDiskSpace"), text: sum.drive ? RK_M("home.onlySizeLeftOnDriveNew", { size: fmtBytes(sum.freeBytes), drive: sum.drive }) : RK_M("home.onlySizeLeftNewClipsMay", { size: fmtBytes(sum.freeBytes) }), label: RK_M("home.freeUpSpace"), act: "open-storage" });
     }
     if (S.storage && S.storage.state === "over") {
-      list.push({ id: "storage-over", tone: "warn", title: "Over your storage limit.", text: RK_T("Your clips take {size} more than the limit you set. Nothing is deleted unless you say so.", { size: S.storage.overText }), label: "Free up space", act: "open-storage" });
+      list.push({ id: "storage-over", tone: "warn", title: RK_M("home.overYourStorageLimit"), text: RK_M("home.yourClipsTakeSizeMoreThan", { size: S.storage.overText }), label: RK_M("home.freeUpSpace"), act: "open-storage" });
     }
     if (S.update && S.updateDismissed !== S.update.latest) {
-      list.push({ id: "update", tone: "info", title: RK_T("ReplayKit {version} is available.", { version: S.update.latest }), text: "OBS restarts once to finish the update. Your clips are not touched.", label: "Update now", act: "update-now", later: true, primary: true });
+      list.push({ id: "update", tone: "info", title: RK_M("home.replaykitVersionIsAvailable", { version: S.update.latest }), text: RK_M("home.obsRestartsOnceToFinishThe"), label: RK_M("home.updateNow"), act: "update-now", later: true, primary: true });
     }
     return list.filter(function (b) { return b.keep || !S.dismissed[b.id]; });
   }
   function barsHtml() {
     return bars().map(function (b) {
-      var dismiss = b.keep ? "" : '<button type="button" class="hm-x" data-act="' + (b.later ? "update-later" : "dismiss") + '" data-name="' + b.id + '" aria-label="' + (b.later ? "Later" : "Dismiss") + '">' + ICON_X + "</button>";
+      var dismiss = b.keep ? "" : '<button type="button" class="hm-x" data-act="' + (b.later ? "update-later" : "dismiss") + '" data-name="' + b.id + '" aria-label="' + (b.later ? RK_M("home.later") : RK_M("home.dismiss")) + '">' + ICON_X + "</button>";
       return '<div class="hm-bar" data-tone="' + b.tone + '">' + (b.tone === "info" ? ICON_INFO : ICON_ALERT) + '<div class="hm-bar-body"><span class="hm-bar-title">' + esc(b.title) + '</span> <span class="hm-bar-text">' + esc(b.text) + '</span></div><div class="hm-bar-actions"><button type="button" class="hm-btn' + (b.primary ? " primary" : "") + '" data-act="' + b.act + '">' + esc(b.label) + "</button>" + dismiss + "</div></div>";
     }).join("");
   }
@@ -212,13 +212,13 @@
   }
 
   var ACTIONS = {
-    "restart-obs": function () { post("/ui-confirm", { kind: "restart-obs" }).catch(function (e) { say(RK_T("Could not ask to restart OBS: {error}", { error: e.message })); }); },
+    "restart-obs": function () { post("/ui-confirm", { kind: "restart-obs" }).catch(function (e) { say(RK_M("home.couldNotAskToRestartObs", { error: e.message })); }); },
     "open-folder": function () { post("/open-clip-folder").catch(function (e) { say(e.message); }); },
-    "open-storage": function () { post("/storage/open").catch(function (e) { say(RK_T("Could not open the storage card: {error}", { error: e.message })); }); },
-    "open-settings": function () { post("/open-settings-window").catch(function (e) { say(RK_T("Could not open Settings: {error}", { error: e.message })); }); },
+    "open-storage": function () { post("/storage/open").catch(function (e) { say(RK_M("home.couldNotOpenTheStorageCard", { error: e.message })); }); },
+    "open-settings": function () { post("/open-settings-window").catch(function (e) { say(RK_M("home.couldNotOpenSettingsError", { error: e.message })); }); },
     "retry": function () { S.helperFailSince = 0; pollState(); pollSummary(); },
     "dismiss": function (el) { S.dismissed[el.dataset.name] = true; paint(); },
-    "update-now": function () { if (S.update) post("/update/open-prompt?version=" + encodeURIComponent(S.update.latest)).catch(function (e) { say(RK_T("Could not start the update: {error}", { error: e.message })); }); },
+    "update-now": function () { if (S.update) post("/update/open-prompt?version=" + encodeURIComponent(S.update.latest)).catch(function (e) { say(RK_M("home.couldNotStartTheUpdateError", { error: e.message })); }); },
     "update-later": function () { if (S.update) { S.updateDismissed = S.update.latest; lsSet("rkHomeUpdateDismissed", S.update.latest); paint(); } },
   };
 

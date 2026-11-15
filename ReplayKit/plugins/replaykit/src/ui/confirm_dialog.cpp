@@ -92,7 +92,7 @@ public:
 		auto *btnRow = new QHBoxLayout();
 		btnRow->setSpacing(8);
 		btnRow->addStretch();
-		auto *cancel = new QPushButton(Tr("Cancel"), card);
+		auto *cancel = new QPushButton(TrMessage("common.cancel"), card);
 		auto *ok = new QPushButton(okText, card);
 		ok->setObjectName("rkOk");
 		ok->setCursor(Qt::PointingHandCursor);

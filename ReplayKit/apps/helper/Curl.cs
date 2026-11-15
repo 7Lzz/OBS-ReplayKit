@@ -36,7 +36,7 @@ namespace ReplayKitHelper
                 var stderr = proc.StandardError.ReadToEndAsync();
                 proc.WaitForExit();
                 cancellationToken.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException("Network worker exceeded its time limit.");
+                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("share.networkWorkerExceededItsTimeLimit"));
                 return new Result { ExitCode = proc.ExitCode, Stdout = stdout.GetAwaiter().GetResult(), Stderr = stderr.GetAwaiter().GetResult() };
             }
         }

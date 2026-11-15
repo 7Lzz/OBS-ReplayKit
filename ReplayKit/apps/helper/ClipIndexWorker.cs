@@ -158,7 +158,7 @@ namespace ReplayKitHelper
         private static void WriteIndexFile(string path, JObject entries)
         {
             string parent = Path.GetDirectoryName(path);
-            if (string.IsNullOrWhiteSpace(parent)) throw new InvalidOperationException("Invalid index path.");
+            if (string.IsNullOrWhiteSpace(parent)) throw new InvalidOperationException(Locales.Message("clips.invalidIndexPath"));
             Directory.CreateDirectory(parent);
             var payload = new JObject
             {

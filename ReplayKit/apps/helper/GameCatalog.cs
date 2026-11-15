@@ -51,9 +51,9 @@ namespace ReplayKitHelper
         {
             var index = new Index();
             string file = Path.Combine(AppConfig.GetReplayKitRoot(), "data", "games.json");
-            if (!File.Exists(file) || new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException("The bundled game catalog is missing or invalid.");
+            if (!File.Exists(file) || new FileInfo(file).Length > 4 * 1024 * 1024) throw new InvalidDataException(Locales.Message("clips.theBundledGameCatalogIsMissing"));
             var games = JObject.Parse(File.ReadAllText(file))["games"] as JArray;
-            if (games == null || games.Count > 30000) throw new InvalidDataException("The bundled game catalog is invalid.");
+            if (games == null || games.Count > 30000) throw new InvalidDataException(Locales.Message("clips.theBundledGameCatalogIsInvalid"));
             foreach (var raw in games)
             {
                 string id = raw["id"]?.Value<string>(), name = raw["name"]?.Value<string>();
@@ -130,6 +130,24 @@ namespace ReplayKitHelper
 
         internal static Game Known(string name) => Catalog.Value.Names.TryGetValue(name, out var games) && games.Count == 1 ? games[0] : null;
 
+        private static readonly Lazy<Dictionary<string, List<Game>>> PlainNames = new Lazy<Dictionary<string, List<Game>>>(() =>
+        {
+            var plain = new Dictionary<string, List<Game>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var game in Catalog.Value.Games.Values)
+            {
+                string key = PlainName(game.Name);
+                if (key.Length == 0) continue;
+                if (!plain.TryGetValue(key, out var list)) plain[key] = list = new List<Game>();
+                list.Add(game);
+            }
+            return plain;
+        }, LazyThreadSafetyMode.PublicationOnly);
+
+        private static string PlainName(string name) => Regex.Replace(Regex.Replace(name ?? "", "[™®©]", ""), @"\s+", " ").Trim();
+
+        // the catalog game a launcher name stands for when the names differ only by a trademark sign, spaces or case, or the game has no exe the catalog knows; only for borrowing its art, never for the id a clip is filed under, so the games already sorted keep their groups
+        internal static Game ArtTwin(string name) => PlainNames.Value.TryGetValue(PlainName(name), out var games) && games.Count == 1 ? games[0] : null;
+
         internal static Game BySteamId(uint appId) => Catalog.Value.Steam.TryGetValue(appId, out var game) ? game : null;
 
         internal static uint SteamAppIdFor(string id)
@@ -151,7 +169,7 @@ namespace ReplayKitHelper
         internal static Game Custom(string name)
         {
             name = (name ?? "").Trim();
-            if (name.Length == 0 || name.Length > 100 || name.Any(char.IsControl)) throw new ArgumentException("Enter a game name of 1–100 characters.");
+            if (name.Length == 0 || name.Length > 100 || name.Any(char.IsControl)) throw new ArgumentException(Locales.Message("clips.enterAGameNameOf1"));
             var game = CustomGame(name);
             Remember(game);
             return game;
@@ -168,7 +186,7 @@ namespace ReplayKitHelper
         private static void Remember(Game game) => ClipStore.Update(CustomFile, db =>
         {
             if (db[game.Id]?["name"]?.Value<string>() == game.Name) return false;
-            if (db.Count >= 1000 && db[game.Id] == null) throw new InvalidDataException("Too many saved games.");
+            if (db.Count >= 1000 && db[game.Id] == null) throw new InvalidDataException(Locales.Message("clips.tooManySavedGames"));
             // the name is all that changes, so a game that was played stays marked as played
             var row = db[game.Id] as JObject ?? new JObject();
             row["name"] = game.Name;
@@ -213,10 +231,10 @@ namespace ReplayKitHelper
 
         internal static void Remove(string id)
         {
-            var game = Get(id) ?? throw new ArgumentException("Unknown game.");
+            var game = Get(id) ?? throw new ArgumentException(Locales.Message("clips.unknownGame2"));
             ClipStore.Update(CustomFile, db =>
             {
-                if (db[id] == null && db.Count >= 1000) throw new InvalidDataException("Too many saved games.");
+                if (db[id] == null && db.Count >= 1000) throw new InvalidDataException(Locales.Message("clips.tooManySavedGames"));
                 var row = db[id] as JObject ?? new JObject { ["name"] = game.Name };
                 db[id] = row;
                 foreach (var entry in db.Properties().Where(p => p.Value is JObject && (p.Name == id || p.Name.StartsWith("custom-", StringComparison.Ordinal) &&
@@ -232,7 +250,7 @@ namespace ReplayKitHelper
         internal static JArray Search(string query)
         {
             string text = (query ?? "").Trim();
-            if (text.Length > 100) throw new ArgumentException("Search is too long.");
+            if (text.Length > 100) throw new ArgumentException(Locales.Message("clips.searchIsTooLong"));
             var custom = ClipStore.Read(CustomFile, db => db.Properties().Where(p => ValidId(p.Name)).Select(p => new Game { Id = p.Name, Name = p.Value["name"]?.Value<string>() ?? "Game" }).ToList(), 1024 * 1024);
             return new JArray(Catalog.Value.Games.Values.Concat(SteamGames.Games()).Concat(custom)
                 .GroupBy(game => game.Id).Select(group => group.First())

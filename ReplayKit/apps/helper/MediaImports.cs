@@ -70,7 +70,7 @@ namespace ReplayKitHelper
                 if (!File.Exists(path)) return Fail(name, "That file was not found");
                 using (var input = File.OpenRead(path))
                 {
-                    if (input.Length <= 0) return Fail(name, "That file is empty");
+                    if (input.Length <= 0) return Fail(name, Locales.Message("editor.thatFileIsEmpty"));
                     if (input.Length > MaxBytes) return Fail(name, "That file is larger than 50 MB");
                     return Receive(name, (output, hash) =>
                     {
@@ -96,7 +96,7 @@ namespace ReplayKitHelper
         {
             status = 200;
             string name = NameFrom(fileName);
-            if (req.UploadReader == null || req.UploadLength <= 0) { status = 400; return Fail(name, "That file is empty"); }
+            if (req.UploadReader == null || req.UploadLength <= 0) { status = 400; return Fail(name, Locales.Message("editor.thatFileIsEmpty")); }
             if (req.UploadLength > MaxBytes) { status = 413; return Fail(name, "That file is larger than 50 MB"); }
             try
             {
@@ -108,7 +108,7 @@ namespace ReplayKitHelper
             {
                 Log.Write("MediaImports: upload of " + name + " failed: " + ex.Message);
                 status = 400;
-                return Fail(name, "The file could not be received");
+                return Fail(name, Locales.Message("editor.theFileCouldNotBeReceived"));
             }
         }
 
@@ -165,7 +165,7 @@ namespace ReplayKitHelper
             if (dot > 0) name = name.Substring(0, dot);
             name = Regex.Replace(Regex.Replace(name, @"\p{C}+", " "), @"\s+", " ").Trim();
             if (name.Length > 60) name = name.Substring(0, 60).Trim();
-            return name.Length == 0 ? "Image" : name;
+            return name.Length == 0 ? Locales.Message("editor.image") : name;
         }
     }
 }

@@ -72,7 +72,7 @@ namespace ReplayKitHelper
             {
                 using var reader = JobCoordinator.ReadSource(sourcePath);
                 if (!File.Exists(ffprobe)) return new KeyframeScanResult { Ok = false, Message = "ffprobe.exe not found" };
-                if (!File.Exists(sourcePath)) return new KeyframeScanResult { Ok = false, Message = "Source clip not found" };
+                if (!File.Exists(sourcePath)) return new KeyframeScanResult { Ok = false, Message = Locales.Message("common.sourceClipNotFound") };
 
                 var sw = Stopwatch.StartNew();
                 var packetTimes = new List<double>();
@@ -138,7 +138,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                return new KeyframeScanResult { Ok = false, Message = Locales.T("Could not read keyframes: {error}", "error", ex.Message) };
+                return new KeyframeScanResult { Ok = false, Message = Locales.Message("editor.couldNotReadKeyframesError", "error", ex.Message) };
             }
         }
     }

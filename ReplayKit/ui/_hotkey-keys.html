@@ -16,8 +16,8 @@
     function keyLabel(obsKey) {
       const named = {
         OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space",
-        OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc", OBS_KEY_TAB:"Tab",
-        OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
+        OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:RK_M("editor.esc"), OBS_KEY_TAB:"Tab",
+        OBS_KEY_DELETE:RK_M("keys.delete"), OBS_KEY_BACKSPACE:RK_M("editor.backspace"),
         OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
       };
       if (named[obsKey]) return named[obsKey];

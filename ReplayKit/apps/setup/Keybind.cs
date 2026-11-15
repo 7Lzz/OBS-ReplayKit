@@ -230,7 +230,7 @@ namespace ReplayKitSetup
                 }
             }
             if (!first) sb.Append(',');
-            if (!(combo["key"] is string key)) throw new ArgumentException("Hotkey key must be a string.");
+            if (!(combo["key"] is string key)) throw new ArgumentException(SetupLocale.Message("setup.hotkeyKeyMustBeAString"));
             sb.Append("\"key\":").Append(JsonConvert.ToString(key));
             sb.Append('}');
             return sb.ToString();

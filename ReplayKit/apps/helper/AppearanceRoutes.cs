@@ -59,7 +59,7 @@ namespace ReplayKitHelper
             if (path == "/appearance/icons")
             {
                 // the Appearance tabs picker grid: OBS Default + bundled presets + the users saved custom picks. replaykit.ico remains an internal fallback, not a selectable app icon.
-                var icons = new JArray { new JObject { ["id"] = "default", ["label"] = "Default", ["url"] = "/obs-icon.svg?v=4" } };
+                var icons = new JArray { new JObject { ["id"] = "default", ["label"] = Locales.Message("settings.default"), ["url"] = "/obs-icon.svg?v=4" } };
                 try
                 {
                     if (Directory.Exists(Constants.APP_ICONS_DIR))
@@ -132,7 +132,7 @@ namespace ReplayKitHelper
                 string raw = Q("file", "");
                 if (!raw.StartsWith("user/", StringComparison.Ordinal))
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only saved custom icons can be removed." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.onlySavedCustomIconsCanBe") });
                     return false;
                 }
                 string file = Path.GetFileName(raw);
@@ -218,7 +218,11 @@ namespace ReplayKitHelper
                 string rawCustom = Q("custom", "");
                 if (!string.IsNullOrEmpty(rawCustom))
                 {
-                    try { s["themeCustom"] = JObject.Parse(rawCustom); s["theme"] = "custom"; } catch { }
+                    JObject custom;
+                    try { custom = JObject.Parse(rawCustom); }
+                    catch (Newtonsoft.Json.JsonException) { HttpResponse.SendText(stream, 400, "Bad Request", "custom must be a json object"); return false; }
+                    s["themeCustom"] = custom;
+                    s["theme"] = "custom";
                 }
                 // the settings tab asks with preview=1 while the theme is being edited, so the native chrome shows the same candidate
                 if (Q("preview", "") == "1")
@@ -244,7 +248,7 @@ namespace ReplayKitHelper
                 catch { payload = null; }
                 if (payload == null)
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Missing theme colours." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.missingThemeColours") });
                     return false;
                 }
                 string id;
@@ -266,7 +270,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/appearance/pick-color: " + ex.Message);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Desktop color picker failed: {error}", "error", ex.Message) });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.desktopColorPickerFailedError", "error", ex.Message) });
                 }
                 return false;
             }
@@ -277,7 +281,7 @@ namespace ReplayKitHelper
                 string raw = Q("id", "");
                 if (!raw.StartsWith("user/", StringComparison.Ordinal))
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only saved themes can be removed." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.onlySavedThemesCanBeRemoved") });
                     return false;
                 }
                 string name = Path.GetFileNameWithoutExtension(Path.GetFileName(raw.Substring(5)));

@@ -32,7 +32,7 @@ namespace ReplayKitHelper
         public static JObject Describe(string clipName, bool lowPriority = false)
         {
             var clip = Clips.GetSafeClipPath(clipName);
-            if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
+            if (clip == null || !File.Exists(clip.Full)) return Fail(Locales.Message("common.clipNotFound"));
             string key = ClipCache.KeyFor(clip.Name, new FileInfo(clip.Full), "film" + Frames);
             string dir = Path.Combine(Root, key);
             var result = new JObject { ["ok"] = true, ["key"] = key, ["ready"] = false, ["count"] = Frames };

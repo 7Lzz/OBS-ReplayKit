@@ -73,7 +73,7 @@ namespace ReplayKitHelper
             string dir = Path.Combine(Path.GetFullPath(libraryRoot), FolderName);
             Directory.CreateDirectory(dir);
             var info = new DirectoryInfo(dir);
-            if ((info.Attributes & FileAttributes.ReparsePoint) != 0) throw new IOException("The deleted history folder cannot be a link.");
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0) throw new IOException(Locales.Message("storage.theDeletedHistoryFolderCannotBe"));
             if ((info.Attributes & FileAttributes.Hidden) == 0) info.Attributes |= FileAttributes.Hidden;
             var file = new FileInfo(path);
             string id = Guid.NewGuid().ToString("N");
@@ -175,7 +175,7 @@ namespace ReplayKitHelper
         // puts the file back where it was deleted from, under its own name unless another file took it since, with its row of the clips db
         public static JObject Restore(string id)
         {
-            if (!ValidId(id)) return Fail("That deleted item was not found.");
+            if (!ValidId(id)) return Fail(Locales.Message("storage.thatDeletedItemWasNotFound"));
             lock (Gate)
             {
                 Heal();
@@ -184,7 +184,7 @@ namespace ReplayKitHelper
                 if (string.IsNullOrEmpty(stored) || !File.Exists(stored))
                 {
                     if (entry != null) Forget(id);
-                    return Fail("That deleted item is no longer there.");
+                    return Fail(Locales.Message("storage.thatDeletedItemIsNoLonger"));
                 }
                 string kind = KindOf(entry);
                 bool gif = kind == "gif";
@@ -193,19 +193,19 @@ namespace ReplayKitHelper
                 string folder = entry["folder"]?.Value<string>() ?? "";
                 string name = entry["name"]?.Value<string>() ?? "";
                 bool validName = gif ? GifExports.ValidName(name) : screenshot ? Screenshots.ValidName(name) : Clips.GetSafeFilename(name) != null;
-                if (!Path.IsPathRooted(folder) || !validName) return Fail("Where that item came from is unknown.");
+                if (!Path.IsPathRooted(folder) || !validName) return Fail(Locales.Message("storage.whereThatItemCameFromIs"));
                 Directory.CreateDirectory(folder);
-                if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) return Fail("The folder it came from is a link now.");
+                if ((File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) return Fail(Locales.Message("storage.theFolderItCameFromIs"));
                 string root = screenshot ? Path.GetDirectoryName(folder) : Clips.LibraryRoot(folder);
                 // a game folder that was removed once it was empty joins the library again
                 if (!screenshot && !string.Equals(Path.GetFullPath(folder).TrimEnd('\\'), Path.GetFullPath(root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                     Clips.RegisterFolder(root, Path.GetFileName(folder.TrimEnd('\\')));
                 string restored = FreeName(folder, name, screenshot);
-                if (restored == null) return Fail("There is no free name to restore that item under.");
+                if (restored == null) return Fail(Locales.Message("storage.thereIsNoFreeNameTo"));
                 string target = Path.Combine(folder, restored);
                 // a rename or a save can take the name between the check and the move
                 try { File.Move(stored, target); }
-                catch (IOException) when (File.Exists(target)) { return Fail("Another clip just took that name. Try restoring it again."); }
+                catch (IOException) when (File.Exists(target)) { return Fail(Locales.Message("storage.anotherClipJustTookThatName")); }
                 Forget(id);
                 var record = entry["record"] as JObject;
                 if (gif) { }
@@ -236,12 +236,12 @@ namespace ReplayKitHelper
 
         public static JObject Remove(string id)
         {
-            if (!ValidId(id)) return Fail("That deleted item was not found.");
+            if (!ValidId(id)) return Fail(Locales.Message("storage.thatDeletedItemWasNotFound"));
             lock (Gate)
             {
                 Heal();
                 var entry = ClipStore.Read(StorePath(), db => (db[id] as JObject)?.DeepClone() as JObject);
-                if (entry == null) return Fail("That deleted item was not found.");
+                if (entry == null) return Fail(Locales.Message("storage.thatDeletedItemWasNotFound"));
                 DeleteStored(entry);
                 Forget(id);
                 return new JObject { ["ok"] = true };
@@ -270,7 +270,7 @@ namespace ReplayKitHelper
         {
             string stored = entry["stored"]?.Value<string>();
             if (string.IsNullOrEmpty(stored) || !File.Exists(stored)) return;
-            if ((File.GetAttributes(stored) & FileAttributes.ReparsePoint) != 0) throw new IOException("A deleted item is a link.");
+            if ((File.GetAttributes(stored) & FileAttributes.ReparsePoint) != 0) throw new IOException(Locales.Message("storage.aDeletedItemIsALink"));
             File.Delete(stored);
         }
 

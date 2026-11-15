@@ -46,13 +46,20 @@ namespace ReplayKitHelper
             }
         }
 
-        public static void ClearAuthBlob()
+        // false when a saved sign-in file is still there, so a sign out can say it did not finish instead of signing back in on the next start
+        public static bool ClearAuthBlob()
         {
-            try { if (File.Exists(Constants.AUTH_FILE)) File.Delete(Constants.AUTH_FILE); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
-            string jar = GetAuthCookieJarPath();
-            try { if (File.Exists(jar)) File.Delete(jar); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
+            bool cleared = true;
+            foreach (string file in new[] { Constants.AUTH_FILE, GetAuthCookieJarPath() })
+            {
+                try { if (File.Exists(file)) File.Delete(file); }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Log.Write("Clear sign-in file " + Path.GetFileName(file) + ": " + ex.Message);
+                    cleared = false;
+                }
+            }
+            return cleared;
         }
 
         public static void StreamableBackgroundLogout()
@@ -127,7 +134,7 @@ namespace ReplayKitHelper
             }
         }
 
-        public static void ClearAuth()
+        public static bool ClearAuth()
         {
             lock (Server.State.AuthLock)
             {
@@ -139,7 +146,7 @@ namespace ReplayKitHelper
                     SizeCap = Constants.ANON_SIZE_CAP,
                     RetentionDays = Constants.ANON_RETENTION_DAYS,
                 };
-                ClearAuthBlob();
+                return ClearAuthBlob();
             }
         }
 

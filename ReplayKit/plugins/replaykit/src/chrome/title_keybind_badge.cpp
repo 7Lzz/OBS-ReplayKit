@@ -90,9 +90,9 @@ QList<QPair<QString, QString>> TitleKeybindBadge::Entries() const
 {
 	QList<QPair<QString, QString>> entries;
 	if (!m_clipLabel.isEmpty())
-		entries.append({Tr("Clip"), m_clipLabel});
+		entries.append({TrMessage("common.clip"), m_clipLabel});
 	if (!m_recordLabel.isEmpty())
-		entries.append({Tr("Recording"), m_recordLabel});
+		entries.append({TrMessage("common.recording"), m_recordLabel});
 	return entries;
 }
 

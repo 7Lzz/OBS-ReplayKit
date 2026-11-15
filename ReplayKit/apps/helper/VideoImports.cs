@@ -58,7 +58,7 @@ namespace ReplayKitHelper
         {
             string name = Path.GetFileNameWithoutExtension(path ?? "");
             if (name.Length > 80) name = name.Substring(0, 80);
-            if (name.Length == 0) name = "Video";
+            if (name.Length == 0) name = Locales.Message("editor.video");
             try
             {
                 if (!Usable(path)) return Fail(name, "That file cannot be used");
@@ -66,7 +66,7 @@ namespace ReplayKitHelper
                 if (!info.Exists) return Fail(name, "That file was not found");
                 if ((info.Attributes & FileAttributes.ReparsePoint) != 0) return Fail(name, "That file cannot be used");
                 if (!Extensions.Contains(info.Extension.ToLowerInvariant())) return Fail(name, "Only MP4, MOV, MKV and WebM videos can be added");
-                if (info.Length <= 0) return Fail(name, "That file is empty");
+                if (info.Length <= 0) return Fail(name, Locales.Message("editor.thatFileIsEmpty"));
                 var probe = Trim.ProbeVideo(info.FullName);
                 if (probe == null || probe.Duration <= 0 || probe.Width <= 0 || probe.Height <= 0) return Fail(name, "That video could not be read");
                 string id;

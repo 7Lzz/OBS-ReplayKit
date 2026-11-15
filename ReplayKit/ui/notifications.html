@@ -216,16 +216,16 @@
 <div class="panel">
  <div class="clip is-opening">
   <div class="head">
-    <span class="head-title">Notifications</span>
+    <span class="head-title" data-i18n="common.notifications"></span>
     <span class="head-count" id="unreadCount" hidden>0</span>
   </div>
-  <div class="list" id="list"><div class="empty">Loading&hellip;</div></div>
+  <div class="list" id="list"><div class="empty" data-i18n="notifications.loading"></div></div>
   <div class="foot">
     <span class="foot-note" id="footNote"></span>
     <div class="foot-actions">
-      <button class="foot-btn" type="button" id="whatsNew">What's new</button>
-      <button class="foot-btn" type="button" id="markAll">Mark all read</button>
-      <button class="foot-btn is-danger" type="button" id="clearAll">Clear</button>
+      <button class="foot-btn" type="button" id="whatsNew" data-i18n="notifications.whatSNew"></button>
+      <button class="foot-btn" type="button" id="markAll" data-i18n="notifications.markAllRead"></button>
+      <button class="foot-btn is-danger" type="button" id="clearAll" data-i18n="common.clear"></button>
     </div>
   </div>
  </div>
@@ -281,11 +281,11 @@
     const then = Date.parse(iso);
     if (!Number.isFinite(then)) return "";
     const secs = Math.max(0, (Date.now() - then) / 1000);
-    if (secs < 60) return RK_T("just now");
-    if (secs < 3600) return RK_T("{count}m ago", { count: Math.floor(secs / 60) });
-    if (secs < 86400) return RK_T("{count}h ago", { count: Math.floor(secs / 3600) });
+    if (secs < 60) return RK_M("common.justNow");
+    if (secs < 3600) return RK_M("notifications.countMAgo", { count: Math.floor(secs / 60) });
+    if (secs < 86400) return RK_M("notifications.countHAgo", { count: Math.floor(secs / 3600) });
     const d = Math.floor(secs / 86400);
-    if (d < 30) return RK_T("{count}d ago", { count: d });
+    if (d < 30) return RK_M("notifications.countDAgo", { count: d });
     return new Date(then).toLocaleDateString();
   }
 
@@ -298,7 +298,7 @@
     countEl.textContent = String(unread);
     markAllEl.disabled = unread === 0;
     clearAllEl.disabled = items.length === 0;
-    noteEl.textContent = items.length ? (items.length === 1 ? RK_T("1 notification") : RK_T("{count} notifications", { count: items.length })) : "";
+    noteEl.textContent = items.length ? (items.length === 1 ? RK_M("notifications.n1Notification") : RK_M("notifications.countNotifications", { count: items.length })) : "";
   }
 
   function render() {
@@ -306,7 +306,7 @@
     if (!items.length) {
       listEl.innerHTML = '<div class="empty">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/bell}}</svg>' +
-        "Nothing new.<br>Update notices show up here.</div>";
+        "<span data-i18n='notifications.nothingNew'></span><br><span data-i18n='notifications.updateNoticesShowUpHere'></span></div>";
       return;
     }
     listEl.innerHTML = items.map((item) => {
@@ -318,8 +318,8 @@
         '<div class="item-head">' +
           '<span class="item-title">' + escapeHtml(item.title || "") + "</span>" +
           '<div class="item-actions">' +
-            '<button class="item-icon-btn item-delete-btn" type="button" data-tooltip="Delete" aria-label="Delete notification">' + TRASH_ICON + '<span class="delete-confirm-text">Delete?</span></button>' +
-            '<button class="item-icon-btn item-menu-btn" type="button" data-tooltip="More options" aria-label="More options">' + MORE_ICON + "</button>" +
+            '<button class="item-icon-btn item-delete-btn" type="button" data-tooltip="Delete" aria-label="Delete notification" data-i18n-aria-label="notifications.deleteNotification" data-i18n-data-tooltip="common.delete">' + TRASH_ICON + '<span class="delete-confirm-text" data-i18n="common.delete2"></span></button>' +
+            '<button class="item-icon-btn item-menu-btn" type="button" data-tooltip="More options" aria-label="More options" data-i18n-aria-label="common.moreOptions" data-i18n-data-tooltip="common.moreOptions">' + MORE_ICON + "</button>" +
             '<span class="item-time">' + escapeHtml(relativeTime(item.createdUtc)) + "</span>" +
           "</div>" +
           (notes ? CHEVRON : '<span class="item-chevron-gap"></span>') +
@@ -336,7 +336,7 @@
       items = Array.isArray(data.items) ? data.items : [];
       render();
     } catch (e) {
-      listEl.innerHTML = '<div class="empty">Could not load notifications.</div>';
+      listEl.innerHTML = '<div class="empty" data-i18n="notifications.couldNotLoadNotifications"></div>';
     }
   }
 
@@ -359,14 +359,14 @@
     const row = rowFor(id);
     if (row) { row.classList.toggle("is-read", read); row.classList.toggle("is-unread", !read); }
     renderCounts();
-    helperJson("notifications/" + (read ? "read" : "unread") + "?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => {});
+    helperJson("notifications/" + (read ? "read" : "unread") + "?id=" + encodeURIComponent(id), { method:"POST" }).catch(load);
   }
 
   function deleteItem(id) {
     items = items.filter((i) => i.id !== id);
     if (openId === id) openId = "";
     render();
-    helperJson("notifications/dismiss?id=" + encodeURIComponent(id), { method:"POST" }).catch(() => {});
+    helperJson("notifications/dismiss?id=" + encodeURIComponent(id), { method:"POST" }).catch(load);
   }
 
   // two-click delete, same pattern as clips.html armDeleteButton/resetDeleteButton -- first click arms (widens to show "Delete?"), a second click while armed actually deletes, and an unattended arm disarms itself after 3s
@@ -374,8 +374,8 @@
     if (!btn) return;
     if (btn._deleteArmTimer) { clearTimeout(btn._deleteArmTimer); btn._deleteArmTimer = 0; }
     btn.classList.remove("is-armed");
-    btn.dataset.tooltip = "Delete";
-    btn.setAttribute("aria-label", "Delete notification");
+    btn.dataset.tooltip = RK_M("common.delete");
+    btn.setAttribute("aria-label", RK_M("notifications.deleteNotification"));
   }
 
   function resetAllArmedDeleteButtons(exceptBtn) {
@@ -385,8 +385,8 @@
   function armDeleteButton(btn) {
     resetDeleteButton(btn);
     btn.classList.add("is-armed");
-    btn.dataset.tooltip = "Click again to delete";
-    btn.setAttribute("aria-label", "Click again to delete");
+    btn.dataset.tooltip = RK_M("common.clickAgainToDelete");
+    btn.setAttribute("aria-label", RK_M("common.clickAgainToDelete"));
     btn._deleteArmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
   }
 
@@ -410,10 +410,10 @@
     resetAllArmedDeleteButtons();
     ctxTargetId = id;
     const parts = [item.read
-      ? '<div class="ctx-item" data-action="unread">' + UNREAD_ICON + "<span>Mark as unread</span></div>"
-      : '<div class="ctx-item" data-action="read">' + READ_ICON + "<span>Mark as read</span></div>"];
-    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>" + escapeHtml(item.linkLabel || "Open release page") + "</span></div>");
-    parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete">' + TRASH_ICON + "<span>Delete</span></div>");
+      ? '<div class="ctx-item" data-action="unread">' + UNREAD_ICON + "<span data-i18n='notifications.markAsUnread'></span></div>"
+      : '<div class="ctx-item" data-action="read">' + READ_ICON + "<span data-i18n='notifications.markAsRead'></span></div>"];
+    if (item.url) parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item" data-action="open-link">' + LINK_ICON + "<span>" + escapeHtml(item.linkLabel || RK_M("notifications.openReleasePage")) + "</span></div>");
+    parts.push('<div class="ctx-separator"></div>', '<div class="ctx-item is-danger" data-action="delete">' + TRASH_ICON + "<span data-i18n='common.delete'></span></div>");
     ctxMenu.innerHTML = parts.join("");
     ctxMenu.classList.add("is-open");
     const width = ctxMenu.offsetWidth || 180;
@@ -519,7 +519,7 @@
         setItemOpen(row, data.id, true);
       }
     } catch (e) {
-      noteEl.textContent = "Could not load release notes for the installed version.";
+      noteEl.textContent = RK_M("notifications.couldNotLoadReleaseNotesFor");
     } finally {
       whatsNewEl.disabled = false;
     }
@@ -528,14 +528,14 @@
   markAllEl.addEventListener("click", () => {
     items.forEach((i) => { i.read = true; });
     render();
-    helperJson("notifications/read-all", { method:"POST" }).catch(() => {});
+    helperJson("notifications/read-all", { method:"POST" }).catch(load);
   });
 
   clearAllEl.addEventListener("click", () => {
     items = [];
     openId = "";
     render();
-    helperJson("notifications/clear", { method:"POST" }).catch(() => {});
+    helperJson("notifications/clear", { method:"POST" }).catch(load);
   });
 
   // called by the native plugin every time the panel is shown -- the window is reused, so a fresh open has to re-read the list and restart the drop-open itself rather than relying on a page load.

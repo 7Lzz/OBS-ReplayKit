@@ -926,14 +926,14 @@ namespace ReplayKitHelper
             byte[] blob;
             using (Stream stream = typeof(RnnoiseModel).Assembly.GetManifestResourceStream(ResourceName))
             {
-                if (stream == null) throw new InvalidOperationException("The noise suppression model is missing from this build.");
+                if (stream == null) throw new InvalidOperationException(Locales.Message("settings.theNoiseSuppressionModelIsMissing"));
                 using (var copy = new MemoryStream())
                 {
                     stream.CopyTo(copy);
                     blob = copy.ToArray();
                 }
             }
-            if (blob.Length != ExpectedBytes) throw new InvalidOperationException("The noise suppression model is the wrong size.");
+            if (blob.Length != ExpectedBytes) throw new InvalidOperationException(Locales.Message("settings.theNoiseSuppressionModelIsThe"));
 
             int at = 0;
             var model = new RnnoiseModel();
@@ -943,7 +943,7 @@ namespace ReplayKitHelper
             model.DenoiseGru = ReadGru(blob, ref at, 114, 96, ActivationRelu);
             model.DenoiseOutput = ReadDense(blob, ref at, 96, 22, ActivationSigmoid);
             model.VadOutput = ReadDense(blob, ref at, 24, 1, ActivationSigmoid);
-            if (at != ExpectedBytes) throw new InvalidOperationException("The noise suppression model did not parse cleanly.");
+            if (at != ExpectedBytes) throw new InvalidOperationException(Locales.Message("settings.theNoiseSuppressionModelDidNot"));
             return model;
         }
 

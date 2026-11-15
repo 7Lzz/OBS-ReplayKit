@@ -162,7 +162,7 @@ namespace ReplayKitHelper
 
         public static string GetMaskedIdentity(string value)
         {
-            if (string.IsNullOrWhiteSpace(value)) return "Signed in";
+            if (string.IsNullOrWhiteSpace(value)) return Locales.Message("common.signedIn");
             string v = value.Trim();
             int at = v.IndexOf('@');
             if (at > 0)

@@ -20,7 +20,7 @@ ShellNavButton::ShellNavButton(Kind kind, QWidget *parent) : ShellTitleButton(kW
 {
 	const bool back = kind == Kind::Back;
 	m_svg = new QSvgRenderer(IconPath(back ? QStringLiteral("nav/history-back.svg") : QStringLiteral("nav/history-forward.svg")), this);
-	SetTip(back ? Tr("Back (Alt + Left)") : Tr("Forward (Alt + Right)"));
+	SetTip(back ? TrMessage("shell.backAltLeft") : TrMessage("shell.forwardAltRight"));
 	setCursor(Qt::ArrowCursor);
 }
 

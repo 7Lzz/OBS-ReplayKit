@@ -24,7 +24,7 @@
   let drawn = 0;
   function find(raw) {
     const url = new URL(raw, location.href);
-    if (url.origin !== location.origin || !Object.hasOwn(hooks, url.pathname)) throw new Error("Unknown popup page");
+    if (url.origin !== location.origin || !Object.hasOwn(hooks, url.pathname)) throw new Error(RK_M("shell.unknownPopupPage"));
     return { page: pages.get(url.pathname), url };
   }
   function report() { document.title = "rk-popup-ready:" + Array.from(pages).filter(([, p]) => p.ready).map(([path]) => path).sort().join(",") + "|" + drawn; }

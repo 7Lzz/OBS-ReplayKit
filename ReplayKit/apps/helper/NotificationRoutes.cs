@@ -43,7 +43,7 @@ namespace ReplayKitHelper
                 string id = Q("id");
                 if (path == "/notifications/read-all") HttpResponse.SendJson(stream, 200, Notifications.MarkAllRead());
                 else if (path == "/notifications/clear") HttpResponse.SendJson(stream, 200, Notifications.Clear());
-                else if (string.IsNullOrWhiteSpace(id)) HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Missing id." });
+                else if (string.IsNullOrWhiteSpace(id)) HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("notifications.missingId") });
                 else if (path == "/notifications/read") HttpResponse.SendJson(stream, 200, Notifications.MarkRead(id));
                 else if (path == "/notifications/unread") HttpResponse.SendJson(stream, 200, Notifications.MarkUnread(id));
                 else HttpResponse.SendJson(stream, 200, Notifications.Dismiss(id));
@@ -55,7 +55,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string id = Q("id");
-                if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Invalid id." }); return false; }
+                if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("notifications.invalidId") }); return false; }
                 PipeClient.SendNotificationReader(id);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -91,7 +91,7 @@ namespace ReplayKitHelper
                 // scoped to github release pages and the driver pages of the three gpu makers on purpose -- this is not a general "open any url/file" primitive, only ever used for the link a notification itself carries
                 bool validUrl = !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
                     uri.Scheme == Uri.UriSchemeHttps && (string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase) || GpuDrivers.IsDriverPage(uri));
-                if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Only a release page or a graphics driver page can be opened this way." }); return false; }
+                if (!validUrl) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("notifications.onlyAReleasePageOrA") }); return false; }
                 try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true }); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;

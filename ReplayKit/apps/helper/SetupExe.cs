@@ -89,7 +89,7 @@ namespace ReplayKitHelper
         }
 
         private static string Describe(Inspection seen) =>
-            seen.State == "missing" ? "ReplayKit's setup file is missing."
+            seen.State == "missing" ? Locales.Message("settings.replaykitSSetupFileIsMissing")
             : seen.State == "incomplete" ? "ReplayKit's setup file is incomplete (" + (seen.Size / (1024 * 1024)) + " MB)."
             : "ReplayKit's setup file does not match the copy that was cached, so it is not run.";
 
@@ -131,9 +131,9 @@ namespace ReplayKitHelper
 
                 Log.Write("setup file downloaded again from release " + release.TagName + " and cached at " + ExePath);
                 try { Notifications.DismissKey(NoticeKey); } catch (Exception ex) { Log.Write("setup file notice: " + ex.Message); }
-                try { Notifications.Add("info", "setup-file-restored", Locales.T("ReplayKit setup file restored"), Locales.T("The setup file that Install and Uninstall in Settings use was missing, so it was downloaded again from GitHub release {version} and checked against its published hash.", "version", release.LatestVersion)); }
+                try { Notifications.Add("info", "setup-file-restored", Locales.Message("update.replaykitSetupFileRestored"), Locales.Message("update.theSetupFileThatInstallAnd", "version", release.LatestVersion)); }
                 catch (Exception ex) { Log.Write("setup file notice: " + ex.Message); }
-                return Done(Locales.T("The setup file was downloaded again from release {version}.", "version", release.LatestVersion));
+                return Done(Locales.Message("update.theSetupFileWasDownloadedAgain", "version", release.LatestVersion));
             }
         }
 
@@ -211,7 +211,7 @@ namespace ReplayKitHelper
                         return;
                     }
                     Log.Write("setup file check: " + seen.State);
-                    Notifications.Add("warn", NoticeKey, seen.State == "missing" ? Locales.T("ReplayKit setup file is missing") : Locales.T("ReplayKit setup file is damaged"), Locales.T("Install and Uninstall in Settings > Advanced need it. They download it again by themselves, or use Download again there."));
+                    Notifications.Add("warn", NoticeKey, seen.State == "missing" ? Locales.Message("update.replaykitSetupFileIsMissing") : Locales.Message("update.replaykitSetupFileIsDamaged"), Locales.Message("update.installAndUninstallInSettingsAdvanced"));
                 }
                 catch (Exception ex) { Log.Write("setup file check: " + ex.Message); }
             });

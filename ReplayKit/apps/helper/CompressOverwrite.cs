@@ -17,7 +17,7 @@ namespace ReplayKitHelper
             if (scaleHeight < 120 || scaleHeight > 4320) scaleHeight = 0;
 
             if (selected == null || !File.Exists(selected.Full))
-                return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") };
 
             using (var reservation = JobCoordinator.TryReserve(requestId, selected.Name, selected.Full, "compress-overwrite", out string busy))
             {
@@ -28,13 +28,13 @@ namespace ReplayKitHelper
                 DateTime sourceWriteTime = current.LastWriteTimeUtc;
                 if ((expectedSize.HasValue && sourceSize != expectedSize.Value) ||
                     (expectedWriteTime.HasValue && sourceWriteTime != expectedWriteTime.Value))
-                    return new JObject { ["ok"] = false, ["message"] = "The selected clip changed; select it again." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theSelectedClipChangedSelectIt") };
 
                 try { CompressionHistory.Prepare(); }
                 catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
                 {
                     Log.Write("Compression history: " + ex.Message);
-                    return new JObject { ["ok"] = false, ["message"] = "Compression history could not be opened or saved. Check ReplayKit's saved state folder before compressing." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.compressionHistoryCouldNotBeOpened") };
                 }
 
                 var caps = Compression.GetHelperCapabilities();
@@ -44,12 +44,12 @@ namespace ReplayKitHelper
                 if (string.IsNullOrWhiteSpace(ffmpeg) || !File.Exists(ffmpeg))
                     return new JObject { ["ok"] = false, ["message"] = "ffmpeg.exe not found in clip folder" };
                 if (string.IsNullOrEmpty(mode == "fast" ? fastEncoder : smallerEncoder))
-                    return new JObject { ["ok"] = false, ["message"] = "No compatible compression encoder is available on this PC." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.noCompatibleCompressionEncoderIsAvailable") };
                 string ffprobe = caps["ffprobe"]?.Value<string>();
 
                 var metadata = Compression.GetVideoMetadata(ffprobe, ffmpeg, selected.Full);
                 if (metadata.Duration < 1)
-                    return new JObject { ["ok"] = false, ["message"] = "Could not read video duration" };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.couldNotReadVideoDuration") };
                 double duration = metadata.Duration;
 
                 string ext = Path.GetExtension(selected.Name);

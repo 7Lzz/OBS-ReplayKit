@@ -101,25 +101,25 @@
   <main class="hero">
     <img class="hero-art" id="heroArt" src="/update-art" alt="" />
     <div class="hero-copy">
-      <h1 class="hero-title" id="title">Updating ReplayKit</h1>
-      <div class="hero-line" id="line1">Sit tight.</div>
-      <div class="hero-line" id="line2">OBS restarts when it is done.</div>
+      <h1 class="hero-title" id="title" data-i18n="update.updatingReplaykit"></h1>
+      <div class="hero-line" id="line1" data-i18n="update.sitTight"></div>
+      <div class="hero-line" id="line2" data-i18n="common.obsRestartsWhenItIsDone"></div>
     </div>
   </main>
   <footer class="foot">
     <div class="foot-fill" id="fill"></div>
     <div class="brand">
       <img src="/obs-icon.svg?v=3" alt="" />
-      <span>ReplayKit</span>
+      <span data-i18n="common.replaykit"></span>
     </div>
     <div class="stat">
       <div class="stat-text">
-        <div class="stat-line" id="statLine">Checking for updates...</div>
+        <div class="stat-line" id="statLine" data-i18n="update.checkingForUpdates"></div>
         <div class="stat-detail" id="statDetail"></div>
       </div>
       <div class="stat-pct" id="statPct"></div>
-      <button class="retry" type="button" id="retryBtn" hidden>Try again</button>
-      <button class="retry" type="button" id="closeBtn" hidden>Close</button>
+      <button class="retry" type="button" id="retryBtn" hidden data-i18n="common.tryAgain"></button>
+      <button class="retry" type="button" id="closeBtn" hidden data-i18n="common.close"></button>
       <div class="spinner" id="spinner"></div>
     </div>
   </footer>
@@ -240,12 +240,12 @@
         if (p.stage === "download") {
           const pct = p.total > 0 ? (p.done / p.total) * 70 : -1;
           const speed = p.bytesPerSecond > 0 ? (p.bytesPerSecond / (1024 * 1024)).toFixed(1) + " MB/s" : "";
-          const size = p.total > 0 ? RK_T("{done} of {total}", { done: formatBytes(p.done), total: formatBytes(p.total) }) : formatBytes(p.done);
-          setStatus("Downloading ReplayKit update", speed ? RK_T("{speed} ({size})", { speed: speed, size: size }) : size, pct);
+          const size = p.total > 0 ? RK_M("update.doneOfTotal", { done: formatBytes(p.done), total: formatBytes(p.total) }) : formatBytes(p.done);
+          setStatus(RK_M("update.downloadingReplaykitUpdate"), speed ? RK_M("update.speedSize", { speed: speed, size: size }) : size, pct);
         } else if (p.stage === "verify") {
-          setStatus("Verifying download", "", 76);
+          setStatus(RK_M("update.verifyingDownload"), "", 76);
         } else if (p.stage === "install") {
-          setStatus("Installing update", "", 82);
+          setStatus(RK_M("update.installingUpdate"), "", 82);
         }
       } catch (_) {}
     }, 400);
@@ -264,19 +264,19 @@
         if (body && body.present) {
           clearInterval(timer);
           if (body.installOk) onComplete();
-          else onFail(body.message || "The installer reported a failure.");
+          else onFail(body.message || RK_M("update.theInstallerReportedAFailure"));
           return;
         }
         percent = Math.min(percent + 0.7, seenHelperDown ? 97 : 90);
-        setStatus(seenHelperDown ? "Copying ReplayKit files" : "Installing update", "", percent);
+        setStatus(seenHelperDown ? RK_M("update.copyingReplaykitFiles") : RK_M("update.installingUpdate"), "", percent);
       } catch (_) {
         seenHelperDown = true;
         percent = Math.min(percent + 0.7, 97);
-        setStatus("Closing OBS to apply files", "", percent);
+        setStatus(RK_M("update.closingObsToApplyFiles"), "", percent);
       }
       if (Date.now() - started > 180000) {
         clearInterval(timer);
-        onFail("The installer did not finish within 3 minutes.");
+        onFail(RK_M("update.theInstallerDidNotFinishWithin"));
       }
     }, 1500);
   }
@@ -284,8 +284,8 @@
   // every failure lands here, so a stuck-looking bar is never the end state and there is always a way forward
   function failUpdate(message) {
     stopProgressPolling();
-    setHero("Update failed", message || "The update could not be applied.", "Retry or run the ReplayKit installer again.", true);
-    setStatus("Update failed", "", 100, "bad");
+    setHero(RK_M("update.updateFailed"), message || RK_M("update.theUpdateCouldNotBeApplied"), RK_M("update.retryOrRunTheReplaykitInstaller"), true);
+    setStatus(RK_M("update.updateFailed"), "", 100, "bad");
     els.retryBtn.hidden = false;
     els.closeBtn.hidden = false;
   }
@@ -293,21 +293,21 @@
   async function installUpdate() {
     els.retryBtn.hidden = true;
     els.closeBtn.hidden = true;
-    setStatus("Preparing download", "", 2);
+    setStatus(RK_M("update.preparingDownload"), "", 2);
     startProgressPolling();
     try {
       const data = await helperJson("update/apply", { method:"POST" });
       stopProgressPolling();
       if (data.updateAvailable === false && !data.installing) {
-        setHero("ReplayKit is up to date", "You are on the latest version.", "");
-        setStatus("Up to date", "", 100, "done");
+        setHero(RK_M("common.replaykitIsUpToDate"), RK_M("update.youAreOnTheLatestVersion"), "");
+        setStatus(RK_M("update.upToDate"), "", 100, "done");
         setTimeout(closeWindow, 1400);
         return;
       }
-      setStatus("Installing update", "", 82);
+      setStatus(RK_M("update.installingUpdate"), "", 82);
       watchInstall(() => {
-        setHero(latest && latest.repairRequired ? "Repair complete" : "Update complete", RK_T("ReplayKit {version} is installed.", { version: latest && latest.latestVersion ? latest.latestVersion : "" }), "OBS is back up.");
-        setStatus("Done", "", 100, "done");
+        setHero(latest && latest.repairRequired ? RK_M("update.repairComplete") : RK_M("update.updateComplete"), RK_M("update.replaykitVersionIsInstalled", { version: latest && latest.latestVersion ? latest.latestVersion : "" }), RK_M("update.obsIsBackUp"));
+        setStatus(RK_M("common.done"), "", 100, "done");
         setTimeout(closeWindow, 1500);
       }, failUpdate);
     } catch (e) {
@@ -320,25 +320,25 @@
   async function runPreview() {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const total = 24 * 1024 * 1024;
-    setHero("ReplayKit 9.9.9", RK_T("Installing version {version}.", { version: "9.9.9" }), "OBS restarts when it is done.");
-    setStatus("Preparing download", "", 2);
+    setHero(RK_M("update.replaykit999"), RK_M("update.installingVersionVersion", { version: "9.9.9" }), RK_M("common.obsRestartsWhenItIsDone"));
+    setStatus(RK_M("update.preparingDownload"), "", 2);
     await wait(700);
     for (let done = 0; done <= total; done += total / 28) {
       const speed = (7 + Math.random() * 4).toFixed(1) + " MB/s";
-      setStatus("Downloading ReplayKit update", RK_T("{speed} ({size})", { speed: speed, size: RK_T("{done} of {total}", { done: formatBytes(done), total: formatBytes(total) }) }),
+      setStatus(RK_M("update.downloadingReplaykitUpdate"), RK_M("update.speedSize", { speed: speed, size: RK_M("update.doneOfTotal", { done: formatBytes(done), total: formatBytes(total) }) }),
                 (done / total) * 70);
       await wait(110);
     }
-    setStatus("Verifying download", "", 76);
+    setStatus(RK_M("update.verifyingDownload"), "", 76);
     await wait(900);
-    setStatus("Installing update", "", 82);
+    setStatus(RK_M("update.installingUpdate"), "", 82);
     await wait(900);
-    setStatus("Closing OBS to apply files", "", 90);
+    setStatus(RK_M("update.closingObsToApplyFiles"), "", 90);
     await wait(1100);
-    setStatus("Copying ReplayKit files", "", 97);
+    setStatus(RK_M("update.copyingReplaykitFiles"), "", 97);
     await wait(900);
-    setHero("Update complete", RK_T("ReplayKit {version} is installed.", { version: "9.9.9" }), "OBS is back up.");
-    setStatus("Done", "", 100, "done");
+    setHero(RK_M("update.updateComplete"), RK_M("update.replaykitVersionIsInstalled", { version: "9.9.9" }), RK_M("update.obsIsBackUp"));
+    setStatus(RK_M("common.done"), "", 100, "done");
   }
 
   async function start() {
@@ -349,7 +349,7 @@
       if (prev.present && !prev.seen) {
         await helperJson("update/install-result/ack", { method:"POST" }).catch(() => {});
         if (!prev.installOk) {
-          setHero("The last update did not finish", prev.message || "The update stopped before it was applied.", "Trying again now.", true);
+          setHero(RK_M("update.theLastUpdateDidNotFinish"), prev.message || RK_M("update.theUpdateStoppedBeforeItWas"), RK_M("update.tryingAgainNow"), true);
         }
       }
     } catch (_) {}
@@ -358,13 +358,13 @@
       const data = await helperJson("update/check?t=" + Date.now());
       latest = data;
       if (!data.updateAvailable && !data.repairRequired) {
-        setHero("ReplayKit is up to date", data.message || RK_T("Version {version} is the latest.", { version: data.installedVersion || "" }), "");
-        setStatus("Up to date", "", 100, "done");
+        setHero(RK_M("common.replaykitIsUpToDate"), data.message || RK_M("update.versionVersionIsTheLatest", { version: data.installedVersion || "" }), "");
+        setStatus(RK_M("update.upToDate"), "", 100, "done");
         setTimeout(closeWindow, 1600);
         return;
       }
       // no prompt: the update installs itself, the window only reports what is happening
-      setHero(data.repairRequired ? "Repairing ReplayKit" : (data.releaseName || RK_T("ReplayKit {version}", { version: data.latestVersion })), data.repairRequired ? "Repairing your ReplayKit installation." : RK_T("Installing version {version}.", { version: data.latestVersion }), "OBS restarts when it is done.", false, !data.repairRequired && !!data.releaseName);
+      setHero(data.repairRequired ? RK_M("update.repairingReplaykit") : (data.releaseName || RK_M("common.replaykitVersion", { version: data.latestVersion })), data.repairRequired ? RK_M("update.repairingYourReplaykitInstallation") : RK_M("update.installingVersionVersion", { version: data.latestVersion }), RK_M("common.obsRestartsWhenItIsDone"), false, !data.repairRequired && !!data.releaseName);
       installUpdate();
     } catch (e) {
       failUpdate(e.message || String(e));

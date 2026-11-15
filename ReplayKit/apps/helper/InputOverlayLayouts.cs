@@ -303,11 +303,40 @@ namespace ReplayKitHelper
             return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full) ? full : null;
         }
 
+        // game and key names stay as the shared table writes them, the plain words are in the language of obs
+        private static string ShownLabel(Layout l)
+        {
+            switch (l.Id)
+            {
+                case Custom: return Locales.Message("settings.layoutCustom");
+                case "buttons": return Locales.Message("settings.layoutButtons");
+                case "off": return Locales.Message("settings.off");
+                default: return l.Label;
+            }
+        }
+
+        private static string Blurb(string id)
+        {
+            switch (id)
+            {
+                case "wasd-minimal": return Locales.Message("settings.layoutWasdBlurb");
+                case "wasd-full": return Locales.Message("settings.layoutWasdFullBlurb");
+                case "wasd-valorant": return Locales.Message("settings.layoutValorantBlurb");
+                case "wasd-valorant-micro": return Locales.Message("settings.layoutValorantSmallBlurb");
+                case "wasd-numbers": return Locales.Message("settings.layoutNumbersBlurb");
+                case "wasd-numbers-small": return Locales.Message("settings.layoutNumbersSmallBlurb");
+                case Custom: return Locales.Message("settings.layoutCustomBlurb");
+                case "buttons": return Locales.Message("settings.layoutButtonsBlurb");
+                case "off": return Locales.Message("settings.layoutMouseOffBlurb");
+                default: return "";
+            }
+        }
+
         // what the settings page offers and needs to draw the picked layouts the way obs does
         public static JObject Options() => new JObject
         {
-            ["keyboards"] = new JArray(Keyboards.Select(l => new JObject { ["value"] = l.Id, ["label"] = l.Label, ["blurb"] = l.Blurb, ["json"] = l.Json, ["sheet"] = l.Sheet })),
-            ["mice"] = new JArray(Mice.Select(l => new JObject { ["value"] = l.Id, ["label"] = l.Label, ["blurb"] = l.Blurb, ["json"] = l.Json, ["sheet"] = l.Sheet })),
+            ["keyboards"] = new JArray(Keyboards.Select(l => new JObject { ["value"] = l.Id, ["label"] = ShownLabel(l), ["blurb"] = Blurb(l.Id), ["json"] = l.Json, ["sheet"] = l.Sheet })),
+            ["mice"] = new JArray(Mice.Select(l => new JObject { ["value"] = l.Id, ["label"] = ShownLabel(l), ["blurb"] = Blurb(l.Id), ["json"] = l.Json, ["sheet"] = l.Sheet })),
             ["customKeys"] = CustomKeyTable(),
             ["group"] = new JObject { ["width"] = GroupWidth, ["height"] = GroupHeight, ["gap"] = Gap },
         };

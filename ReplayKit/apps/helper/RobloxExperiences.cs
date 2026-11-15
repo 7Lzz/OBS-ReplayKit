@@ -160,11 +160,11 @@ namespace ReplayKitHelper
 
         internal static JObject Select(string universe)
         {
-            if (!ValidUniverse(universe)) throw new ArgumentException("Invalid Roblox experience.");
+            if (!ValidUniverse(universe)) throw new ArgumentException(Locales.Message("clips.invalidRobloxExperience"));
             Load();
             lock (Gate)
             {
-                if (!Cache.TryGetValue(universe, out var known) || string.IsNullOrWhiteSpace(known.Name)) throw new ArgumentException("Unknown Roblox experience.");
+                if (!Cache.TryGetValue(universe, out var known) || string.IsNullOrWhiteSpace(known.Name)) throw new ArgumentException(Locales.Message("clips.unknownRobloxExperience"));
                 var experience = new JObject { ["universe"] = universe, ["name"] = known.Name };
                 if (known.Icon != null) experience["icon"] = known.Icon;
                 return experience;
@@ -305,7 +305,7 @@ namespace ReplayKitHelper
             {
                 if (!response.IsSuccessStatusCode) throw new HttpRequestException("HTTP " + (int)response.StatusCode);
                 string text = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                if (text.Length > 1024 * 1024) throw new InvalidDataException("Answer too large.");
+                if (text.Length > 1024 * 1024) throw new InvalidDataException(Locales.Message("clips.answerTooLarge"));
                 return JObject.Parse(text);
             }
         }
@@ -360,20 +360,20 @@ namespace ReplayKitHelper
         // the picture only from the roblox image servers over https, decoded and drawn again so nothing but pixels is kept; named after a hash of its address, so a new icon is a new file and never replaces the one older clips show
         private static string SaveIcon(string universe, string url)
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri source) || source.Scheme != Uri.UriSchemeHttps || !source.Host.EndsWith(".rbxcdn.com", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("No usable experience icon.");
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri source) || source.Scheme != Uri.UriSchemeHttps || !source.Host.EndsWith(".rbxcdn.com", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException(Locales.Message("clips.noUsableExperienceIcon"));
             string version;
             using (var sha = System.Security.Cryptography.SHA256.Create())
                 version = string.Concat(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(url)).Take(8).Select(b => b.ToString("x2")));
             Directory.CreateDirectory(GameCatalog.IconDir);
-            if ((File.GetAttributes(GameCatalog.IconDir) & FileAttributes.ReparsePoint) != 0) throw new IOException("The icon folder is a link.");
+            if ((File.GetAttributes(GameCatalog.IconDir) & FileAttributes.ReparsePoint) != 0) throw new IOException(Locales.Message("clips.theIconFolderIsALink"));
             string target = Path.Combine(GameCatalog.IconDir, IconId(universe, version) + ".png");
             if (File.Exists(target)) return version;
             byte[] bytes;
             using (var response = Send(source))
             {
-                if (!response.IsSuccessStatusCode || (response.Content.Headers.ContentLength ?? 0) > 1024 * 1024) throw new HttpRequestException("Icon unavailable.");
+                if (!response.IsSuccessStatusCode || (response.Content.Headers.ContentLength ?? 0) > 1024 * 1024) throw new HttpRequestException(Locales.Message("clips.iconUnavailable"));
                 bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
-                if (bytes.Length == 0 || bytes.Length > 1024 * 1024) throw new InvalidDataException("Icon too large.");
+                if (bytes.Length == 0 || bytes.Length > 1024 * 1024) throw new InvalidDataException(Locales.Message("clips.iconTooLarge"));
             }
             string part = target + "." + Guid.NewGuid().ToString("N") + ".part";
             try

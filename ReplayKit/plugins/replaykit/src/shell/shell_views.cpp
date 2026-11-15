@@ -256,7 +256,7 @@ constexpr int kHostLoadRetries = 3;
 constexpr int kHelperNoticeMs = 6000;
 QString HelperWaitTitle()
 {
-	return Tr("Waiting for the ReplayKit helper");
+	return TrMessage("shell.waitingForTheReplaykitHelper");
 }
 
 void ShellHelperNotice(bool waiting)
@@ -265,7 +265,7 @@ void ShellHelperNotice(bool waiting)
 	if (!curtain)
 		return;
 	if (waiting && !curtain->HasMessage())
-		curtain->SetMessage(HelperWaitTitle(), Tr("If this stays, antivirus may have removed OBSReplayKit.exe: restore it, or run the ReplayKit installer again"));
+		curtain->SetMessage(HelperWaitTitle(), TrMessage("shell.ifThisStaysAntivirusMayHave"));
 	else if (!waiting && curtain->Message() == HelperWaitTitle())
 		curtain->SetMessage(QString(), QString());
 }
@@ -379,12 +379,12 @@ void ShellUpdateTitle()
 		return;
 	QString page;
 	switch (g_shellView) {
-	case ShellView::Home: page = g_homeEditor ? Tr("Editor") : Tr("Home"); break;
-	case ShellView::Clips: page = g_clipsEditor ? Tr("Editor") : Tr("Clips"); break;
-	case ShellView::Projector: page = Tr("Projector"); break;
-	case ShellView::Settings: page = Tr("Settings"); break;
-	case ShellView::ObsSettings: page = Tr("OBS Settings"); break;
-	case ShellView::Setup: page = Tr("Setup"); break;
+	case ShellView::Home: page = g_homeEditor ? TrMessage("common.editor") : TrMessage("common.home"); break;
+	case ShellView::Clips: page = g_clipsEditor ? TrMessage("common.editor") : TrMessage("common.clips"); break;
+	case ShellView::Projector: page = TrMessage("common.projector"); break;
+	case ShellView::Settings: page = TrMessage("shell.settings"); break;
+	case ShellView::ObsSettings: page = TrMessage("common.obsSettings"); break;
+	case ShellView::Setup: page = TrMessage("shell.setup"); break;
 	}
 	g_shellTitle->SetPage(page);
 }

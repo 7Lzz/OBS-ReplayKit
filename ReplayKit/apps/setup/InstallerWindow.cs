@@ -11,7 +11,7 @@ namespace ReplayKitSetup
             if (!WebView2Runtime.Ensure(null))
             {
                 ShowFatalError(
-                    SetupLocale.T("OBS ReplayKit setup needs the Microsoft WebView2 runtime and it could not be installed automatically.\n\nInstall \"Microsoft Edge WebView2 Runtime\" from microsoft.com, then run this installer again."),
+                    SetupLocale.Message("setup.obsReplaykitSetupNeedsTheMicrosoft"),
                     null);
                 return 1;
             }
@@ -21,9 +21,9 @@ namespace ReplayKitSetup
 
         public static void ShowFatalError(string details, string logPath)
         {
-            string msg = SetupLocale.T("OBS ReplayKit setup hit an unexpected error.");
-            if (!string.IsNullOrEmpty(logPath)) msg += "\n\n" + SetupLocale.T("Details were written to:\n{path}", "path", logPath);
-            try { Native.MessageBoxW(IntPtr.Zero, msg, SetupLocale.T("OBS ReplayKit Setup"), 0x10 /* MB_ICONERROR */); }
+            string msg = SetupLocale.Message("setup.obsReplaykitSetupHitAnUnexpected");
+            if (!string.IsNullOrEmpty(logPath)) msg += "\n\n" + SetupLocale.Message("setup.detailsWereWrittenToPath", "path", logPath);
+            try { Native.MessageBoxW(IntPtr.Zero, msg, SetupLocale.Message("setup.windowTitle"), 0x10 /* MB_ICONERROR */); }
             catch (Exception) { }
         }
     }

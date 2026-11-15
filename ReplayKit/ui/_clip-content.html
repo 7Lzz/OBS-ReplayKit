@@ -1,63 +1,63 @@
   <div class="scroll-area">
     <div class="hm-root" id="hm-root"></div>
     <div class="home-shelves" id="home-shelves">
-      <section class="home-section" aria-label="Latest clip">
-        <div class="home-head"><h2 class="home-kicker">Latest clip</h2></div>
+      <section class="home-section" aria-label="Latest clip" data-i18n-aria-label="clips.latestClip">
+        <div class="home-head"><h2 class="home-kicker" data-i18n="clips.latestClip"></h2></div>
         <div class="home-hero"><div class="home-hero-player" id="home-hero"></div><div class="home-hero-info" id="home-hero-info"></div></div>
       </section>
-      <section class="home-section" id="home-recent-section" aria-label="Recent clips">
-        <div class="home-head"><h2 class="home-h2">Recent</h2><button type="button" class="home-see" data-see="all">See all<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
+      <section class="home-section" id="home-recent-section" aria-label="Recent clips" data-i18n-aria-label="clips.recentClips">
+        <div class="home-head"><h2 class="home-h2" data-i18n="clips.recent"></h2><button type="button" class="home-see" data-see="all"><span data-i18n="common.seeAll"></span><svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
         <div class="home-row" id="home-recent"></div>
       </section>
-      <section class="home-section" id="home-favs-section" aria-label="Favorite clips" hidden>
-        <div class="home-head"><h2 class="home-h2">Favorites</h2><button type="button" class="home-see" data-see="favorites">See all<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
+      <section class="home-section" id="home-favs-section" aria-label="Favorite clips" hidden data-i18n-aria-label="clips.favoriteClips">
+        <div class="home-head"><h2 class="home-h2" data-i18n="clips.favorites"></h2><button type="button" class="home-see" data-see="favorites"><span data-i18n="common.seeAll"></span><svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:clip-content-1}}</svg></button></div>
         <div class="home-row" id="home-favs"></div>
       </section>
     </div>
     <!-- favorites sub-section, only rendered when the all filter is active and the user has at least one favorite -- the grid below (id="grid") is the virtualized list of non-favorites in that case, otherwise the full filtered list; both grids live inside the same scroll-area so they scroll together. rest-headings icon/label are rewritten per tab in render() (FILTER_SECTION_HEADING) -- "all clips" is only paired with this favorites split, the other three tabs get their own heading standalone. -->
     <div class="section-heading" id="favorites-heading">
       <svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:toggle/star}}</svg>
-      <span>Favorites</span>
-      <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      <span data-i18n="clips.favorites"></span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="favorites" aria-label="Collapse Favorites" aria-expanded="true" aria-controls="favorites-grid" data-i18n-aria-label="clips.collapseFavorites"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="favorites-grid"></div>
     <!-- linked and drafts sections of the all filter: plain rows like the favorites, and a clip shows in the first of favorites, linked, drafts it belongs to and not again under all clips -->
     <div class="section-heading" id="linked-heading">
-      <svg data-i="nav/linked" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Linked</span>
-      <button class="icon-mini-btn section-toggle" type="button" data-section="linked" aria-label="Collapse Linked" aria-expanded="true" aria-controls="linked-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      <svg data-i="nav/linked" viewBox="0 0 24 24" aria-hidden="true"></svg><span data-i18n="clips.linked"></span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="linked" aria-label="Collapse Linked" aria-expanded="true" aria-controls="linked-grid" data-i18n-aria-label="clips.collapseLinked"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="linked-grid"></div>
     <div class="section-heading" id="drafts-heading">
-      <svg data-i="action/open-editor" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Drafts</span>
-      <button class="icon-mini-btn section-toggle" type="button" data-section="drafts" aria-label="Collapse Drafts" aria-expanded="true" aria-controls="drafts-grid"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      <svg data-i="action/open-editor" viewBox="0 0 24 24" aria-hidden="true"></svg><span data-i18n="clips.drafts"></span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="drafts" aria-label="Collapse Drafts" aria-expanded="true" aria-controls="drafts-grid" data-i18n-aria-label="clips.collapseDrafts"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
     </div>
     <div class="grid favorites-grid" id="drafts-grid"></div>
     <section id="screenshots-area" hidden>
       <div class="section-heading is-shown" id="screenshots-heading">
-        <svg data-i="nav/screenshots" viewBox="0 0 24 24" aria-hidden="true"></svg><span>Screenshots</span>
-        <button class="icon-mini-btn section-toggle" type="button" data-section="screenshots" aria-label="Collapse Screenshots" aria-expanded="true" aria-controls="screenshots-grid screenshots-empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+        <svg data-i="nav/screenshots" viewBox="0 0 24 24" aria-hidden="true"></svg><span data-i18n="common.screenshots"></span>
+        <button class="icon-mini-btn section-toggle" type="button" data-section="screenshots" aria-label="Collapse Screenshots" aria-expanded="true" aria-controls="screenshots-grid screenshots-empty" data-i18n-aria-label="clips.collapseScreenshots"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
       </div>
       <div class="grid" id="screenshots-grid"></div>
-      <div class="empty" id="screenshots-empty" role="status">Loading screenshots...</div>
+      <div class="empty" id="screenshots-empty" role="status" data-i18n="clips.loadingScreenshots"></div>
     </section>
     <section id="gifs-area" hidden>
       <div class="section-heading is-shown" id="gifs-heading">
-        <svg data-i="nav/gifs" viewBox="0 0 24 24" aria-hidden="true"></svg><span>GIFs</span>
-        <button class="icon-mini-btn section-toggle" type="button" data-section="gifs" aria-label="Collapse GIFs" aria-expanded="true" aria-controls="gifs-grid gifs-empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+        <svg data-i="nav/gifs" viewBox="0 0 24 24" aria-hidden="true"></svg><span data-i18n="clips.gifs"></span>
+        <button class="icon-mini-btn section-toggle" type="button" data-section="gifs" aria-label="Collapse GIFs" aria-expanded="true" aria-controls="gifs-grid gifs-empty" data-i18n-aria-label="clips.collapseGifs"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
       </div>
       <div class="grid" id="gifs-grid"></div>
-      <div class="empty" id="gifs-empty" role="status">Loading GIFs...</div>
+      <div class="empty" id="gifs-empty" role="status" data-i18n="clips.loadingGifs"></div>
     </section>
     <div class="section-heading" id="rest-heading">
       <svg data-i="nav/clips" viewBox="0 0 24 24" aria-hidden="true" id="rest-heading-icon"></svg>
-      <span id="rest-heading-label">All clips</span>
-      <button class="icon-mini-btn section-toggle" type="button" data-section="clips" aria-label="Collapse All clips" aria-expanded="true" aria-controls="grid top-spacer bottom-spacer empty"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-      <label class="group-games" id="group-games" data-tooltip="Sort all clips into a section per game" hidden><span>By game</span><input type="checkbox" class="rk-switch" id="group-games-switch" aria-label="Sort all clips by game"></label>
+      <span id="rest-heading-label" data-i18n="common.allClips"></span>
+      <button class="icon-mini-btn section-toggle" type="button" data-section="clips" aria-label="Collapse All clips" aria-expanded="true" aria-controls="grid top-spacer bottom-spacer empty" data-i18n-aria-label="clips.collapseAllClips"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+      <label class="group-games" id="group-games" data-tooltip="Sort all clips into a section per game" hidden data-i18n-data-tooltip="clips.sortAllClipsIntoASection"><span data-i18n="clips.byGame"></span><input type="checkbox" class="rk-switch" id="group-games-switch" aria-label="Sort all clips by game" data-i18n-aria-label="clips.sortAllClipsByGame"></label>
     </div>
     <div class="virtual-spacer" id="top-spacer"></div>
     <div class="grid" id="grid" style="display:none"></div>
     <div class="virtual-spacer" id="bottom-spacer"></div>
-    <div class="empty" id="empty">Looking for clips...</div>
+    <div class="empty" id="empty" data-i18n="clips.lookingForClips"></div>
   </div>
   <div class="toast" id="toast"></div>
   <div class="modal-veil popup-veil" id="popup-veil">
@@ -68,7 +68,7 @@
       </div>
       <div class="body popup-body" id="popup-body"></div>
       <div class="row">
-        <button class="btn primary" type="button" id="popup-ok">OK</button>
+        <button class="btn primary" type="button" id="popup-ok" data-i18n="common.ok"></button>
       </div>
     </div>
   </div>

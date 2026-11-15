@@ -32,14 +32,14 @@ namespace ReplayKitHelper
             IntPtr parsed = IntPtr.Zero;
             try
             {
-                if (commandLine == null || commandLine.Length > 32767) throw new ArgumentException("Invalid host command line.");
+                if (commandLine == null || commandLine.Length > 32767) throw new ArgumentException(Locales.Message("helper.invalidHostCommandLine"));
                 parsed = CommandLineToArgvW(commandLine, out int count);
-                if (parsed == IntPtr.Zero || count < 2) throw new ArgumentException("Missing helper role.");
+                if (parsed == IntPtr.Zero || count < 2) throw new ArgumentException(Locales.Message("helper.missingHelperRole"));
                 var args = new string[count];
                 for (int i = 0; i < count; i++) args[i] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(parsed, i * IntPtr.Size));
                 if (args[1] != "--replaykit-helper" || !string.Equals(Path.GetFullPath(args[0]),
                     Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName), StringComparison.OrdinalIgnoreCase))
-                    throw new ArgumentException("Invalid helper host.");
+                    throw new ArgumentException(Locales.Message("helper.invalidHelperHost"));
                 ProcessHost.Hosted = true;
                 // a runtime started by a native host has no entry assembly to read the target framework from, so .net 4.8 keeps its legacy tls defaults (ssl3 and tls 1.0) that github and streamable refuse; these must be set before anything touches the network
                 AppContext.SetSwitch("Switch.System.Net.DontEnableSystemDefaultTlsVersions", false);

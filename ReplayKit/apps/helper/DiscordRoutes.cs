@@ -45,9 +45,9 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(req.Body)) throw new InvalidOperationException("Missing share preview body.");
+                    if (string.IsNullOrWhiteSpace(req.Body)) throw new InvalidOperationException(Locales.Message("screenshare.missingSharePreviewBody"));
                     var incoming = JObject.Parse(req.Body);
-                    if (incoming["enabled"]?.Type != JTokenType.Boolean) throw new InvalidOperationException("Share preview enabled must be a JSON boolean.");
+                    if (incoming["enabled"]?.Type != JTokenType.Boolean) throw new InvalidOperationException(Locales.Message("screenshare.sharePreviewEnabledMustBeA"));
                     var result = SettingsLiveApply.SetSharePreviewEnabled(incoming["enabled"].Value<bool>());
                     int code = result["ok"]?.Value<bool>() == true ? 200 : 503;
                     HttpResponse.SendJson(stream, code, result);

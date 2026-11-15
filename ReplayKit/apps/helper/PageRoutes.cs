@@ -36,7 +36,7 @@ namespace ReplayKitHelper
             if (path == "/home-view") { HttpResponse.ServeHtml(stream, "home.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/clips-view$|^/clips\.html$")) { HttpResponse.ServeHtml(stream, QFlag("home") ? "home.html" : "clips.html", framed); return false; }
             if (path == "/popup-view") { HttpResponse.ServeHtml(stream, "popup.html"); return false; }
-            if (path == "/editor-view") { HttpResponse.ServeHtml(stream, "editor.html"); return false; }
+            if (path == "/editor-view") { HttpResponse.ServeHtml(stream, "editor.html", fragment: true); return false; }
             if (Regex.IsMatch(path, @"^/settings-view$|^/settings\.html$")) { HttpResponse.ServeHtml(stream, "settings.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/setup-view$|^/setup\.html$")) { HttpResponse.ServeHtml(stream, "setup.html", framed); return false; }
             if (Regex.IsMatch(path, @"^/shell-view$|^/shell\.html$")) { HttpResponse.ServeHtml(stream, "shell.html"); return false; }

@@ -17,7 +17,7 @@ namespace ReplayKitHelper
             private string Token()
             {
                 structural = false;
-                if (++tokens > 100000) throw new InvalidDataException("Steam metadata is too complex.");
+                if (++tokens > 100000) throw new InvalidDataException(Locales.Message("clips.steamMetadataIsTooComplex"));
                 while (at < text.Length)
                 {
                     if (char.IsWhiteSpace(text[at])) { at++; continue; }
@@ -36,23 +36,23 @@ namespace ReplayKitHelper
                     if (next == '\\' && at < text.Length && (text[at] == '\\' || text[at] == '"')) next = text[at++];
                     value.Append(next);
                 }
-                throw new InvalidDataException("Invalid Steam text string.");
+                throw new InvalidDataException(Locales.Message("clips.invalidSteamTextString"));
             }
             internal JObject Object(int depth = 0)
             {
-                if (depth > 32) throw new InvalidDataException("Steam metadata is too deep.");
+                if (depth > 32) throw new InvalidDataException(Locales.Message("clips.steamMetadataIsTooDeep"));
                 var result = new JObject();
                 while (true)
                 {
                     string key = Token();
                     if (key == null || structural && key == "}")
                     {
-                        if ((depth == 0) != (key == null)) throw new InvalidDataException("Invalid Steam text object.");
+                        if ((depth == 0) != (key == null)) throw new InvalidDataException(Locales.Message("clips.invalidSteamTextObject"));
                         return result;
                     }
-                    if (structural || result.Property(key, StringComparison.OrdinalIgnoreCase) != null) throw new InvalidDataException("Invalid Steam text field.");
+                    if (structural || result.Property(key, StringComparison.OrdinalIgnoreCase) != null) throw new InvalidDataException(Locales.Message("clips.invalidSteamTextField"));
                     string value = Token();
-                    if (value == null || structural && value == "}") throw new InvalidDataException("Invalid Steam text field.");
+                    if (value == null || structural && value == "}") throw new InvalidDataException(Locales.Message("clips.invalidSteamTextField"));
                     result[key] = structural ? (JToken)Object(depth + 1) : new JValue(value);
                 }
             }
@@ -65,7 +65,7 @@ namespace ReplayKitHelper
             {
                 var buffer = new char[1024 * 1024 + 1];
                 int length = reader.ReadBlock(buffer, 0, buffer.Length);
-                if (length == buffer.Length) throw new InvalidDataException("Steam text metadata is too large.");
+                if (length == buffer.Length) throw new InvalidDataException(Locales.Message("clips.steamTextMetadataIsTooLarge"));
                 return new TextReader(new string(buffer, 0, length)).Object();
             }
         }
@@ -76,7 +76,7 @@ namespace ReplayKitHelper
             try
             {
                 if (stream.Length <= limit && (File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) return stream;
-                throw new InvalidDataException("Steam metadata is too large or redirected.");
+                throw new InvalidDataException(Locales.Message("clips.steamMetadataIsTooLargeOr"));
             }
             catch { stream.Dispose(); throw; }
         }
@@ -90,12 +90,12 @@ namespace ReplayKitHelper
                 if (next == 0) return new UTF8Encoding(false, true).GetString(bytes.ToArray());
                 bytes.Add(next);
             }
-            throw new InvalidDataException("Steam metadata string is too long.");
+            throw new InvalidDataException(Locales.Message("clips.steamMetadataStringIsTooLong"));
         }
 
         private static JObject Binary(BinaryReader reader, string[] strings, ref int tokens, int depth = 0)
         {
-            if (depth > 32) throw new InvalidDataException("Steam metadata is too deep.");
+            if (depth > 32) throw new InvalidDataException(Locales.Message("clips.steamMetadataIsTooDeep"));
             var result = new JObject();
             while (++tokens <= 100000)
             {
@@ -103,17 +103,17 @@ namespace ReplayKitHelper
                 if (type == 8) return result;
                 string key;
                 if (strings == null) key = String(reader);
-                else { uint index = reader.ReadUInt32(); if (index >= strings.Length) throw new InvalidDataException("Invalid Steam string index."); key = strings[index]; }
+                else { uint index = reader.ReadUInt32(); if (index >= strings.Length) throw new InvalidDataException(Locales.Message("clips.invalidSteamStringIndex")); key = strings[index]; }
                 JToken value;
                 if (type == 0) value = Binary(reader, strings, ref tokens, depth + 1);
                 else if (type == 1) value = new JValue(String(reader));
                 else if (type == 2 || type == 3 || type == 4 || type == 6) value = new JValue(reader.ReadUInt32());
                 else if (type == 7 || type == 10) value = new JValue(reader.ReadUInt64());
-                else throw new InvalidDataException("Unsupported Steam binary type.");
-                if (result.Property(key, StringComparison.OrdinalIgnoreCase) != null) throw new InvalidDataException("Duplicate Steam metadata field.");
+                else throw new InvalidDataException(Locales.Message("clips.unsupportedSteamBinaryType"));
+                if (result.Property(key, StringComparison.OrdinalIgnoreCase) != null) throw new InvalidDataException(Locales.Message("clips.duplicateSteamMetadataField"));
                 result[key] = value;
             }
-            throw new InvalidDataException("Steam metadata is too complex.");
+            throw new InvalidDataException(Locales.Message("clips.steamMetadataIsTooComplex"));
         }
 
         internal static Dictionary<uint, JObject> Apps(string file, HashSet<uint> wanted)
@@ -124,16 +124,16 @@ namespace ReplayKitHelper
             using (var reader = new BinaryReader(input))
             {
                 uint magic = reader.ReadUInt32(), version = magic & 255;
-                if ((magic >> 8) != 0x075644 || version < 39 || version > 41 || reader.ReadUInt32() != 1) throw new InvalidDataException("Unsupported Steam app cache.");
+                if ((magic >> 8) != 0x075644 || version < 39 || version > 41 || reader.ReadUInt32() != 1) throw new InvalidDataException(Locales.Message("clips.unsupportedSteamAppCache"));
                 string[] strings = null;
                 long limit = input.Length;
                 if (version == 41)
                 {
                     long table = reader.ReadInt64();
-                    if (table < 16 || table > input.Length - 4) throw new InvalidDataException("Invalid Steam string table.");
+                    if (table < 16 || table > input.Length - 4) throw new InvalidDataException(Locales.Message("clips.invalidSteamStringTable"));
                     input.Position = table;
                     uint count = reader.ReadUInt32();
-                    if (count > 200000) throw new InvalidDataException("Steam string table is too large.");
+                    if (count > 200000) throw new InvalidDataException(Locales.Message("clips.steamStringTableIsTooLarge"));
                     strings = new string[count];
                     for (int i = 0; i < strings.Length; i++) strings[i] = String(reader);
                     input.Position = 16;
@@ -146,10 +146,10 @@ namespace ReplayKitHelper
                     uint size = reader.ReadUInt32();
                     long end = input.Position + size;
                     int header = version >= 40 ? 60 : 40;
-                    if (size < header || end > limit) throw new InvalidDataException("Invalid Steam app record.");
+                    if (size < header || end > limit) throw new InvalidDataException(Locales.Message("clips.invalidSteamAppRecord"));
                     if (wanted.Contains(id))
                     {
-                        if (size > 2 * 1024 * 1024) throw new InvalidDataException("Steam app record is too large.");
+                        if (size > 2 * 1024 * 1024) throw new InvalidDataException(Locales.Message("clips.steamAppRecordIsTooLarge"));
                         input.Position += header;
                         byte[] bytes = reader.ReadBytes((int)size - header);
                         using (var data = new MemoryStream(bytes))
@@ -157,13 +157,13 @@ namespace ReplayKitHelper
                         {
                             int tokens = 0;
                             var app = Binary(fields, strings, ref tokens);
-                            if (data.Position != data.Length) throw new InvalidDataException("Invalid Steam app payload.");
+                            if (data.Position != data.Length) throw new InvalidDataException(Locales.Message("clips.invalidSteamAppPayload"));
                             result[id] = app["appinfo"] as JObject ?? app;
                         }
                     }
                     input.Position = end;
                 }
-                throw new InvalidDataException("Invalid Steam cache footer.");
+                throw new InvalidDataException(Locales.Message("clips.invalidSteamCacheFooter"));
             }
         }
     }

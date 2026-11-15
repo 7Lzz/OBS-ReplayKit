@@ -14,7 +14,7 @@ namespace ReplayKitSetup
             {
                 if (meta.Key == "ReplayKitVersion" && !string.IsNullOrEmpty(meta.Value)) return meta.Value;
             }
-            throw new InvalidOperationException("This setup was built without its ReplayKit version.");
+            throw new InvalidOperationException(SetupLocale.Message("setup.thisSetupWasBuiltWithoutIts"));
         }
     }
 }

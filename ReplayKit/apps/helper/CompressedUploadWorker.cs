@@ -50,7 +50,7 @@ namespace ReplayKitHelper
                 proc.WaitForExit();
                 string stderr = stderrTask.Result;
                 token.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException("Compression exceeded its time limit.");
+                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.compressionExceededItsTimeLimit"));
                 if (!string.IsNullOrEmpty(stderr)) Log.Write("compress-upload " + phase + " stderr: " + stderr, "compress", requestId);
                 UploadState.SetUploadState(requestId: requestId, state: "compressing", phase: phase, percent: endPercent);
                 if (proc.ExitCode != 0) throw new InvalidOperationException(phase + " failed (exit=" + proc.ExitCode + ")");
@@ -75,7 +75,7 @@ namespace ReplayKitHelper
 
                 if (!File.Exists(tempPath)) throw new InvalidOperationException("ffmpeg did not create a compressed file");
                 var fi = new FileInfo(tempPath);
-                if (fi.Length <= 0) throw new InvalidOperationException("Compressed file is empty");
+                if (fi.Length <= 0) throw new InvalidOperationException(Locales.Message("storage.compressedFileIsEmpty"));
                 if (capBytes > 0 && fi.Length > capBytes)
                 {
                     long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);

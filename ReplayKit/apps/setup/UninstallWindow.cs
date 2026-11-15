@@ -82,7 +82,7 @@ namespace ReplayKitSetup
             const uint style = 0x00040000 | 0x00080000 | 0x00020000; // WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX
             _hwnd = Native.CreateWindowExW(0, ClassName, SetupLocale.Message("setup.uninstallTitle"), style, x, y, w, h,
                 IntPtr.Zero, IntPtr.Zero, hInst, IntPtr.Zero);
-            if (_hwnd == IntPtr.Zero) throw new InvalidOperationException("Could not create the uninstall window.");
+            if (_hwnd == IntPtr.Zero) throw new InvalidOperationException(SetupLocale.Message("setup.couldNotCreateTheUninstallWindow"));
 
             ApplyBorderlessChrome();
             SetIconFromExe();
@@ -127,7 +127,7 @@ namespace ReplayKitSetup
             catch (Exception ex)
             {
                 WriteErrorLog(ex);
-                InstallerApp.ShowFatalError(SetupLocale.T("The uninstall window could not start.\n\n{error}", "error", ex), null);
+                InstallerApp.ShowFatalError(SetupLocale.Message("setup.theUninstallWindowCouldNotStart", "error", ex), null);
                 Native.DestroyWindow(_hwnd);
             }
         }
@@ -168,7 +168,7 @@ namespace ReplayKitSetup
             if (_running) return;
             _running = true;
 
-            var progress = new BridgeProgress(this);
+            var progress = new PageProgress(PostToPage);
             _worker = new Thread(() =>
             {
                 int code = 1;
@@ -217,7 +217,7 @@ namespace ReplayKitSetup
         private void OnFlowFailed(string message)
         {
             _done = true;
-            string shown = SetupLocale.T("{message}  (log: {path})", "message", SetupLocale.T(message ?? "unknown error"), "path", SetupLog.Path);
+            string shown = SetupLocale.Message("setup.messageLogPath", "message", message ?? SetupLocale.Message("setup.unknownError"), "path", SetupLog.Path);
             PostToPage(new JObject { ["type"] = "failed", ["message"] = shown });
         }
 
@@ -420,59 +420,6 @@ namespace ReplayKitSetup
             public override void Post(SendOrPostCallback d, object state) => _w.Enqueue(() => d(state));
             public override void Send(SendOrPostCallback d, object state) => d(state);
             public override SynchronizationContext CreateCopy() => this;
-        }
-
-        // IInstallProgress that pushes every callback to uninstall_prompt.html as a json message. arrives on the worker thread; PostToPage marshals to the message thread. same shape as SetupWindow.BridgeProgress.
-        private sealed class BridgeProgress : IInstallProgress
-        {
-            private readonly UninstallWindow _w;
-            private int _completed;
-
-            public BridgeProgress(UninstallWindow w) { _w = w; }
-
-            public int TotalSteps { get; set; }
-            public List<string> Issues { get; } = new List<string>();
-
-            public void Render(int completed, string title, string detail, string state)
-            {
-                _completed = completed;
-                int total = Math.Max(TotalSteps, 1);
-                double pct = 100.0 * Math.Min(completed, total) / total;
-                var o = new JObject { ["type"] = "step", ["percent"] = pct, ["state"] = state ?? "", ["title"] = title };
-                o["detail"] = detail ?? "";
-                _w.PostToPage(o);
-                SetupLog.Line($"[{completed}/{total}] {(string.IsNullOrEmpty(state) ? "working" : state)}: {title}"
-                              + (string.IsNullOrEmpty(detail) ? "" : " - " + detail));
-            }
-
-            public void LogLine(string message)
-            {
-                string text = (message ?? "").Trim();
-                if (text.Length == 0) return;
-                SetupLog.Line(text);
-                _w.PostToPage(new JObject { ["type"] = "log", ["line"] = text });
-                if (Apply.LooksLikeIssue(text)) AddIssue(text);
-            }
-
-            public void AddIssue(string message)
-            {
-                string cleaned = string.Join(" ", (message ?? "").Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
-                if (cleaned.Length > 160) cleaned = cleaned.Substring(0, 157) + "...";
-                if (cleaned.Length == 0 || Issues.Contains(cleaned)) return;
-                Issues.Add(cleaned);
-                // what made the run incomplete is in the log, not only in the count at its end
-                SetupLog.Line("issue: " + cleaned);
-            }
-
-            public void SubProgress(double fraction, string detail)
-            {
-                int total = Math.Max(TotalSteps, 1);
-                double frac = Math.Max(0.0, Math.Min(1.0, fraction));
-                double pct = 100.0 * (_completed / (double)total + frac / total);
-                var o = new JObject { ["type"] = "step", ["percent"] = pct, ["state"] = "" };
-                if (!string.IsNullOrEmpty(detail)) o["detail"] = detail;
-                _w.PostToPage(o);
-            }
         }
     }
 }

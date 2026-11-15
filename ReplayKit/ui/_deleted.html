@@ -28,14 +28,14 @@
 <dialog class="screenshot-dialog deleted-dialog" id="deleted-dialog" aria-labelledby="deleted-title" tabindex="-1">
   <div class="screenshot-dialog-head">
     <svg data-i="action/trash" viewBox="0 0 24 24" aria-hidden="true"></svg>
-    <h2 id="deleted-title">Deleted history</h2>
+    <h2 id="deleted-title" data-i18n="common.deletedHistory"></h2>
     <span class="deleted-note" id="deleted-note"></span>
-    <button class="btn danger-action deleted-empty-btn" type="button" id="deleted-empty-all" hidden>Empty</button>
-    <button class="icon-mini-btn" type="button" id="deleted-close" aria-label="Close deleted history" data-tooltip="Close"><svg data-i="editor/close" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+    <button class="btn danger-action deleted-empty-btn" type="button" id="deleted-empty-all" hidden data-i18n="clips.empty"></button>
+    <button class="icon-mini-btn" type="button" id="deleted-close" aria-label="Close deleted history" data-tooltip="Close" data-i18n-aria-label="clips.closeDeletedHistory" data-i18n-data-tooltip="common.close"><svg data-i="editor/close" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
   </div>
   <div class="deleted-body">
     <div class="grid" id="deleted-grid"></div>
-    <div class="empty" id="deleted-empty" role="status">Loading deleted clips...</div>
+    <div class="empty" id="deleted-empty" role="status" data-i18n="clips.loadingDeletedClips"></div>
   </div>
 </dialog>
 <script>
@@ -62,11 +62,11 @@ window.RKDeleted = {
       size.className = "size";
       size.textContent = options.formatSize(row.size);
       const kind = document.createElement("span");
-      kind.textContent = row.kind === "screenshot" ? "Screenshot" : row.kind === "gif" ? "GIF" : "Clip";
+      kind.textContent = row.kind === "screenshot" ? RK_M("clips.screenshot") : row.kind === "gif" ? "GIF" : RK_M("common.clip");
       const left = document.createElement("span");
       const n = daysLeft(row);
       left.className = "left" + (n <= 1 ? " is-soon" : "");
-      left.textContent = n <= 0 ? RK_T("Deleted for good soon") : n === 1 ? RK_T("1 day left") : RK_T("{count} days left", { count: n });
+      left.textContent = n <= 0 ? RK_M("clips.deletedForGoodSoon") : n === 1 ? RK_M("clips.n1DayLeft") : RK_M("clips.countDaysLeft", { count: n });
       const dot = () => { const d = document.createElement("span"); d.className = "dot"; return d; };
       target.append(size, dot(), kind, dot(), left);
       // a gif belongs to no game, as on its card in the GIFs section
@@ -100,7 +100,7 @@ window.RKDeleted = {
       picture.querySelectorAll(".settings-wrap, .snap-btn, .theater-btn").forEach(control => control.remove());
       picture.tabIndex = 0;
       picture.setAttribute("role", "group");
-      picture.setAttribute("aria-label", RK_T("Playback preview: {name}", { name: row.name }));
+      picture.setAttribute("aria-label", RK_M("clips.playbackPreviewName", { name: row.name }));
       options.player.volume(card);
       const bar = picture.querySelector(".progress-bar");
       const fill = picture.querySelector(".progress-fill");
@@ -118,7 +118,7 @@ window.RKDeleted = {
         }
         play.querySelector(".pt-play").style.display = video.paused ? "" : "none";
         play.querySelector(".pt-pause").style.display = video.paused ? "none" : "";
-        play.dataset.tooltip = video.paused ? "Play" : "Pause";
+        play.dataset.tooltip = video.paused ? RK_M("clips.play") : RK_M("clips.pause");
       }
       function tick() { update(); frame = video.paused ? 0 : requestAnimationFrame(tick); }
       function start() {
@@ -162,7 +162,7 @@ window.RKDeleted = {
       video.addEventListener("seeked", update);
       video.addEventListener("play", () => { update(); if (!frame) frame = requestAnimationFrame(tick); });
       video.addEventListener("pause", () => { if (frame) cancelAnimationFrame(frame); frame = 0; update(); });
-      video.addEventListener("error", () => { card.stopPreview(true); options.notify("This deleted clip could not be played."); });
+      video.addEventListener("error", () => { card.stopPreview(true); options.notify(RK_M("clips.thisDeletedClipCouldNotBe")); });
       function toggle() { if (!video.hasAttribute("src") || video.paused) start(); else video.pause(); }
       play.addEventListener("click", event => { event.stopPropagation(); toggle(); });
       picture.addEventListener("click", event => {
@@ -171,12 +171,12 @@ window.RKDeleted = {
       fullscreen.addEventListener("click", event => {
         event.stopPropagation();
         const operation = isFullscreen() ? document.exitFullscreen || document.webkitExitFullscreen : picture.requestFullscreen || picture.webkitRequestFullscreen;
-        if (!operation) { options.notify("Fullscreen is unavailable."); return; }
+        if (!operation) { options.notify(RK_M("clips.fullscreenIsUnavailable")); return; }
         const entering = !isFullscreen();
         try {
           const result = operation.call(entering ? picture : document);
-          if (result && result.catch) result.catch(() => options.notify("Fullscreen could not be changed."));
-        } catch (error) { options.notify("Fullscreen could not be changed."); return; }
+          if (result && result.catch) result.catch(() => options.notify(RK_M("clips.fullscreenCouldNotBeChanged")));
+        } catch (error) { options.notify(RK_M("clips.fullscreenCouldNotBeChanged")); return; }
         fullscreen.blur();
         picture.focus({preventScroll:true});
         if (entering) start();
@@ -185,7 +185,7 @@ window.RKDeleted = {
         const active = isFullscreen();
         fullscreen.querySelector(".fs-enter-icon").style.display = active ? "none" : "";
         fullscreen.querySelector(".fs-exit-icon").style.display = active ? "" : "none";
-        fullscreen.dataset.tooltip = active ? "Exit fullscreen (F)" : "Fullscreen (F)";
+        fullscreen.dataset.tooltip = active ? RK_M("common.exitFullscreenF") : RK_M("common.fullscreenF");
         fullscreen.setAttribute("aria-label", fullscreen.dataset.tooltip);
         if (!active && !card.matches(":hover")) card.stopPreview(false);
       }
@@ -228,7 +228,7 @@ window.RKDeleted = {
     async function act(kind, id) {
       const response = await fetch(options.helper + "/deleted/" + kind + (id ? "?id=" + encodeURIComponent(id) + "&t=" : "?t=") + Date.now(), {method:"POST", cache:"no-store"});
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.message || "That could not be done");
+      if (!response.ok || !data.ok) throw new Error(data.message || RK_M("clips.thatCouldNotBeDone"));
       return data;
     }
     async function restore(row, button) {
@@ -237,7 +237,7 @@ window.RKDeleted = {
       if (button) button.disabled = true;
       try {
         const done = await act("restore", row.id);
-        options.toast(RK_T("Restored {name}", { name: baseName(done.name || row.name) }));
+        options.toast(RK_M("clips.restoredName", { name: baseName(done.name || row.name) }));
         options.restored(done.kind || row.kind);
         refresh();
       } catch (error) { options.notify(error.message); }
@@ -262,12 +262,12 @@ window.RKDeleted = {
       body.innerHTML =
         '<div class="title-row"><span class="name" translate="no"></span>' +
         '<div class="title-actions">' +
-          '<button class="icon-mini-btn delete-btn" data-delete-label="Delete for good" data-tooltip="Delete for good" aria-label="Delete for good" type="button">' + svg(icons.TRASH) + '<span class="delete-confirm-text">Delete?</span></button>' +
-          '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button">' + svg(icons.MORE) + "</button>" +
+          '<button class="icon-mini-btn delete-btn" data-delete-label="Delete for good" data-tooltip="Delete for good" aria-label="Delete for good" type="button" data-i18n-aria-label="clips.deleteForGood" data-i18n-data-tooltip="clips.deleteForGood">' + svg(icons.TRASH) + '<span class="delete-confirm-text" data-i18n="common.delete2"></span></button>' +
+          '<div class="menu-container"><button class="icon-mini-btn menu-btn" data-tooltip="More options" aria-label="More options" type="button" data-i18n-aria-label="common.moreOptions" data-i18n-data-tooltip="common.moreOptions">' + svg(icons.MORE) + "</button>" +
             '<div class="menu-dropdown">' +
-              '<div class="menu-item" data-act="restore">' + svg(icons.RESTORE).replace("<svg", '<svg class="menu-item-icon"') + "<span>Restore</span></div>" +
+              '<div class="menu-item" data-act="restore">' + svg(icons.RESTORE).replace("<svg", '<svg class="menu-item-icon"') + "<span data-i18n='clips.restore'></span></div>" +
               '<div class="menu-separator"></div>' +
-              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-label="Delete for good" role="button" tabindex="0" aria-label="Delete for good">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label">Delete</span></div>' +
+              '<div class="menu-item delete-menu-item delete-btn" data-act="delete" data-delete-label="Delete for good" role="button" tabindex="0" aria-label="Delete for good" data-i18n-aria-label="clips.deleteForGood">' + svg(icons.TRASH).replace("<svg", '<svg class="menu-item-icon"') + '<span class="menu-item-label" data-i18n="common.delete"></span></div>' +
             "</div></div>" +
         "</div></div>" +
         '<div class="meta"></div>';
@@ -278,7 +278,7 @@ window.RKDeleted = {
       const restoreButton = document.createElement("button");
       restoreButton.type = "button";
       restoreButton.className = "btn action-link-btn";
-      restoreButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.RESTORE + '</svg><span class="btn-label">Restore</span>';
+      restoreButton.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">' + icons.RESTORE + '</svg><span class="btn-label" data-i18n="clips.restore"></span>';
       restoreButton.addEventListener("click", event => { event.stopPropagation(); restore(row, restoreButton); });
       actions.appendChild(restoreButton);
       card.append(picture, body, actions);
@@ -319,7 +319,7 @@ window.RKDeleted = {
       return card;
     }
     function paintHeading() {
-      note.textContent = days > 0 ? (days === 1 ? RK_T("Kept for 1 day") : RK_T("Kept for {count} days", { count: days })) : "";
+      note.textContent = days > 0 ? (days === 1 ? RK_M("clips.keptFor1Day") : RK_M("clips.keptForCountDays", { count: days })) : "";
       emptyAll.hidden = !rows.length;
     }
     function paintButton() {
@@ -328,7 +328,7 @@ window.RKDeleted = {
       button.hidden = !loaded || days <= 0;
       badge.hidden = !rows.length;
       badge.textContent = rows.length > 99 ? "99+" : String(rows.length);
-      const label = rows.length ? RK_T("Deleted history ({count})", { count: rows.length }) : RK_T("Deleted history");
+      const label = rows.length ? RK_M("clips.deletedHistoryCount", { count: rows.length }) : RK_M("common.deletedHistory");
       button.dataset.tooltip = label;
       button.setAttribute("aria-label", label);
     }
@@ -350,8 +350,8 @@ window.RKDeleted = {
         cards.forEach((card, id) => { if (!keep.has(id)) { if (card.stopPreview) card.stopPreview(true); card.remove(); cards.delete(id); } });
       }
       empty.hidden = rows.length > 0;
-      empty.textContent = !loaded ? "Loading deleted clips..."
-        : days === 1 ? RK_T("Nothing here. Clips, screenshots and GIFs you delete stay here for 1 day before they're gone for good.") : RK_T("Nothing here. Clips, screenshots and GIFs you delete stay here for {count} days before they're gone for good.", { count: days });
+      empty.textContent = !loaded ? RK_M("clips.loadingDeletedClips")
+        : days === 1 ? RK_M("clips.nothingHereClipsScreenshotsAndGifs") : RK_M("clips.nothingHereClipsScreenshotsAndGifs2", { count: days });
     }
     // the page asks for the list from several places as it starts and as things change, so asks that come while a read is out are folded into one more read after it
     let reading = null, readAgain = false;
@@ -368,7 +368,7 @@ window.RKDeleted = {
       try {
         const response = await fetch(options.helper + "/deleted?t=" + Date.now(), {cache:"no-store"});
         const data = await response.json();
-        if (!response.ok || !data.ok || !Array.isArray(data.items)) throw new Error("Could not load deleted items");
+        if (!response.ok || !data.ok || !Array.isArray(data.items)) throw new Error(RK_M("clips.couldNotLoadDeletedItems"));
         if (run !== epoch) return;
         const next = data.items.filter(row => row && typeof row.id === "string" && typeof row.name === "string" && Number.isFinite(row.size) && Number.isFinite(row.deletedAt) && Number.isFinite(row.expiresAt));
         const listed = JSON.stringify(next) + "|" + data.days;
@@ -386,7 +386,7 @@ window.RKDeleted = {
         stopPreviews(); grid.replaceChildren(); cards.clear();
         paintButton();
         empty.hidden = false;
-        empty.textContent = "The deleted items could not be loaded.";
+        empty.textContent = RK_M("clips.theDeletedItemsCouldNotBe");
       }
     }
     // emptying is the one action here that takes everything at once, so it asks twice like a delete does
@@ -394,14 +394,14 @@ window.RKDeleted = {
     function disarmEmpty() {
       clearTimeout(emptyArmTimer);
       emptyAll.classList.remove("is-armed");
-      emptyAll.textContent = "Empty";
-      emptyAll.dataset.tooltip = "Delete everything here for good";
+      emptyAll.textContent = RK_M("clips.empty");
+      emptyAll.dataset.tooltip = RK_M("clips.deleteEverythingHereForGood");
     }
     emptyAll.addEventListener("click", async () => {
       if (!emptyAll.classList.contains("is-armed")) {
         emptyAll.classList.add("is-armed");
-        emptyAll.textContent = "Empty?";
-        emptyAll.dataset.tooltip = "Click again to delete everything here";
+        emptyAll.textContent = RK_M("clips.empty2");
+        emptyAll.dataset.tooltip = RK_M("clips.clickAgainToDeleteEverythingHere");
         emptyArmTimer = setTimeout(disarmEmpty, 3000);
         return;
       }

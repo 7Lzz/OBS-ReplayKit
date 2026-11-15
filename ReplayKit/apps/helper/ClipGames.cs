@@ -221,7 +221,7 @@ namespace ReplayKitHelper
                 string kind = capture?["kind"]?.Value<string>() ?? "unknown";
                 bool screenshot = Path.GetExtension(file["name"]?.Value<string>() ?? "").Equals(".png", StringComparison.OrdinalIgnoreCase);
                 var choices = (capture?["games"] as JArray ?? new JArray()).OfType<JObject>().Select(g => (JObject)g.DeepClone()).ToList();
-                if (kind != "game") choices.Add(new JObject { ["id"] = kind, ["name"] = kind == "desktop" ? "Desktop" : kind == "mixed" ? "Mixed" : "Unassigned" });
+                if (kind != "game") choices.Add(new JObject { ["id"] = kind, ["name"] = kind == "desktop" ? Locales.Message("clips.desktop") : kind == "mixed" ? Locales.Message("clips.mixed") : Locales.Message("clips.unassigned") });
                 foreach (var choice in choices)
                 {
                     string id = choice["id"].Value<string>();
@@ -347,14 +347,14 @@ namespace ReplayKitHelper
 
         internal static void Correct(string file, string id, string customName, double duration, string universe = "")
         {
-            if (!File.Exists(file)) throw new FileNotFoundException("Clip not found.");
+            if (!File.Exists(file)) throw new FileNotFoundException(Locales.Message("common.clipNotFound2"));
             GameCatalog.Game game = null;
             if (!string.IsNullOrWhiteSpace(customName)) game = GameCatalog.Custom(customName);
-            else if (id != "desktop" && id != "unknown") game = GameCatalog.Get(id) ?? throw new ArgumentException("Unknown game.");
-            if (universe.Length > 0 && game?.Id != RobloxExperiences.RobloxId) throw new ArgumentException("An experience must belong to Roblox.");
+            else if (id != "desktop" && id != "unknown") game = GameCatalog.Get(id) ?? throw new ArgumentException(Locales.Message("clips.unknownGame2"));
+            if (universe.Length > 0 && game?.Id != RobloxExperiences.RobloxId) throw new ArgumentException(Locales.Message("clips.anExperienceMustBelongToRoblox"));
             var experience = universe.Length > 0 ? RobloxExperiences.Select(universe) : null;
             if (duration <= 0) duration = Path.GetExtension(file).Equals(".png", StringComparison.OrdinalIgnoreCase) ? .001 : (Trim.ProbeVideo(file)?.Duration ?? 0);
-            if (!CaptureTimeline.Number(duration) || duration <= 0) throw new ArgumentException("The clip length is unavailable.");
+            if (!CaptureTimeline.Number(duration) || duration <= 0) throw new ArgumentException(Locales.Message("clips.theClipLengthIsUnavailable"));
             var rows = new JArray();
             CaptureTimeline.Add(rows, 0, duration, game != null ? "game" : id, game?.Id ?? "", game?.Name ?? "");
             var previous = Read(file);
@@ -369,7 +369,7 @@ namespace ReplayKitHelper
         internal static void Reset(string file)
         {
             var capture = Read(file);
-            if (!(capture?["original"] is JObject original)) throw new ArgumentException("The original game assignment is unavailable.");
+            if (!(capture?["original"] is JObject original)) throw new ArgumentException(Locales.Message("clips.theOriginalGameAssignmentIsUnavailable"));
             Write(file, original);
         }
 

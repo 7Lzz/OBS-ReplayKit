@@ -20,14 +20,14 @@ namespace ReplayKitHelper
 
         public static JObject StartCleanupFromSettings(string body)
         {
-            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing uninstall confirmation.");
+            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException(Locales.Message("update.missingUninstallConfirmation"));
             var incoming = JObject.Parse(body);
-            if (incoming["confirm"]?.Value<string>() != "confirm") throw new InvalidOperationException("Invalid uninstall confirmation.");
+            if (incoming["confirm"]?.Value<string>() != "confirm") throw new InvalidOperationException(Locales.Message("update.invalidUninstallConfirmation"));
             bool keepUserSettings = true;
             var keepToken = incoming["keepUserSettings"];
             if (keepToken != null)
             {
-                if (keepToken.Type != JTokenType.Boolean) throw new InvalidOperationException("Keep user settings must be a JSON boolean.");
+                if (keepToken.Type != JTokenType.Boolean) throw new InvalidOperationException(Locales.Message("update.keepUserSettingsMustBeA"));
                 keepUserSettings = keepToken.Value<bool>();
             }
 
@@ -35,7 +35,7 @@ namespace ReplayKitHelper
             var removeObsToken = incoming["removeObs"];
             if (removeObsToken != null)
             {
-                if (removeObsToken.Type != JTokenType.Boolean) throw new InvalidOperationException("Remove OBS must be a JSON boolean.");
+                if (removeObsToken.Type != JTokenType.Boolean) throw new InvalidOperationException(Locales.Message("update.removeObsMustBeAJson"));
                 removeObs = removeObsToken.Value<bool>();
             }
 
@@ -43,7 +43,7 @@ namespace ReplayKitHelper
             string setupExe = Path.GetFullPath(GetSetupExecutable());
             string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
             if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Invalid setup executable path.");
+                throw new InvalidOperationException(Locales.Message("update.invalidSetupExecutablePath"));
             // a missing or damaged copy is downloaded again, checked against the release hash, before anything is started
             SetupExe.Ensure(true);
 
@@ -55,9 +55,9 @@ namespace ReplayKitHelper
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int uninstallPid = Native.SpawnDetached(cmdLine, cacheDir);
-                if (uninstallPid <= 0) throw new InvalidOperationException("Could not start ReplayKit uninstall.");
+                if (uninstallPid <= 0) throw new InvalidOperationException(Locales.Message("update.couldNotStartReplaykitUninstall"));
                 Log.Write("ReplayKit uninstall started detached as PID " + uninstallPid + ".");
-                return new JObject { ["ok"] = true, ["processId"] = uninstallPid, ["message"] = "Uninstall started. Follow the progress window." };
+                return new JObject { ["ok"] = true, ["processId"] = uninstallPid, ["message"] = Locales.Message("update.uninstallStartedFollowTheProgressWindow") };
             }
 
             var psi = new ProcessStartInfo
@@ -69,9 +69,9 @@ namespace ReplayKitHelper
                 Verb = "runas",
             };
             var proc = Process.Start(psi);
-            if (proc == null) throw new InvalidOperationException("Could not start ReplayKit uninstall.");
+            if (proc == null) throw new InvalidOperationException(Locales.Message("update.couldNotStartReplaykitUninstall"));
             Log.Write("ReplayKit uninstall started elevated as PID " + proc.Id + ".");
-            return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = "Uninstall started. Follow the progress window." };
+            return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = Locales.Message("update.uninstallStartedFollowTheProgressWindow") };
         }
 
         // narrower siblings of StartCleanupFromSettings -- install / remove just the OBS Stream Audio virtual cable instead of touching the whole ReplayKit install, for the Share Preview audio row next to the main uninstall.
@@ -85,7 +85,7 @@ namespace ReplayKitHelper
             string setupExe = Path.GetFullPath(GetSetupExecutable());
             string cachePrefix = cacheDir.TrimEnd('\\') + "\\";
             if (!setupExe.StartsWith(cachePrefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Invalid setup executable path.");
+                throw new InvalidOperationException(Locales.Message("update.invalidSetupExecutablePath"));
             SetupExe.Ensure(true);
 
             // flip the runtime setting now so Share Preview is really on/off after the OBS relaunch -- the setup exe only writes its own prefs.json, and the helper reads discord_screenshare_enabled from replaykit_settings.json.
@@ -101,14 +101,14 @@ namespace ReplayKitHelper
 
             string verb = install ? "--install-discord-screenshare" : "--uninstall-discord-screenshare";
             string what = install ? "install" : "removal";
-            string message = install ? Locales.T("Installing Discord screenshare support. OBS will close.") : Locales.T("Removing Discord screenshare support. OBS will close.");
+            string message = install ? Locales.Message("common.installingDiscordScreenshareSupportObsWill") : Locales.Message("common.removingDiscordScreenshareSupportObsWill");
             var argList = new List<string> { verb, "--start-delay-ms", "900" };
 
             if (Elevation.IsAdmin())
             {
                 string cmdLine = ProcessArgs.Quote(setupExe) + " " + ProcessArgs.Join(argList.ToArray());
                 int pid = Native.SpawnDetached(cmdLine, cacheDir);
-                if (pid <= 0) throw new InvalidOperationException(install ? Locales.T("Could not start Discord screenshare install.") : Locales.T("Could not start Discord screenshare removal."));
+                if (pid <= 0) throw new InvalidOperationException(install ? Locales.Message("update.couldNotStartDiscordScreenshareInstall") : Locales.Message("update.couldNotStartDiscordScreenshareRemoval"));
                 Log.Write("Discord screenshare " + what + " started detached as PID " + pid + ".");
                 return new JObject { ["ok"] = true, ["processId"] = pid, ["message"] = message };
             }
@@ -122,7 +122,7 @@ namespace ReplayKitHelper
                 Verb = "runas",
             };
             var proc = Process.Start(psi);
-            if (proc == null) throw new InvalidOperationException(install ? Locales.T("Could not start Discord screenshare install.") : Locales.T("Could not start Discord screenshare removal."));
+            if (proc == null) throw new InvalidOperationException(install ? Locales.Message("update.couldNotStartDiscordScreenshareInstall") : Locales.Message("update.couldNotStartDiscordScreenshareRemoval"));
             Log.Write("Discord screenshare " + what + " started elevated as PID " + proc.Id + ".");
             return new JObject { ["ok"] = true, ["processId"] = proc.Id, ["message"] = message };
         }

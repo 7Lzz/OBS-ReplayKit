@@ -304,9 +304,9 @@ namespace ReplayKitHelper
         {
             value = StripWrappingQuotes(value);
             if (string.IsNullOrWhiteSpace(value)) return "";
-            if (value.Length > 4096) throw new InvalidOperationException("Clip folder path is too long.");
+            if (value.Length > 4096) throw new InvalidOperationException(Locales.Message("settings.clipFolderPathIsTooLong"));
             string expanded = Environment.ExpandEnvironmentVariables(value);
-            if (!Path.IsPathRooted(expanded)) throw new InvalidOperationException("Clip folder must be an absolute path.");
+            if (!Path.IsPathRooted(expanded)) throw new InvalidOperationException(Locales.Message("settings.clipFolderMustBeAnAbsolute"));
             return Path.GetFullPath(expanded);
         }
 
@@ -351,16 +351,16 @@ namespace ReplayKitHelper
             var options = new JArray(new JObject
             {
                 ["value"] = "primary",
-                ["label"] = "Primary display",
-                ["blurb"] = primary != null ? "Now " + primary.Name : "Follows the display Windows calls primary.",
+                ["label"] = Locales.Message("common.primaryDisplay"),
+                ["blurb"] = primary != null ? Locales.Message("settings.displayNowName", "name", primary.Name) : Locales.Message("settings.displayFollowsPrimary"),
             });
             bool currentListed = current == "primary";
             foreach (var d in displays)
             {
-                options.Add(new JObject { ["value"] = d.Id, ["label"] = d.Name + (d.Width > 0 ? " (" + d.Width + "x" + d.Height + ")" : ""), ["blurb"] = d.Primary ? "Primary" : "" });
+                options.Add(new JObject { ["value"] = d.Id, ["label"] = d.Name + (d.Width > 0 ? " (" + d.Width + "x" + d.Height + ")" : ""), ["blurb"] = d.Primary ? Locales.Message("settings.displayPrimary") : "" });
                 if (string.Equals(d.Id, current, StringComparison.OrdinalIgnoreCase)) currentListed = true;
             }
-            if (!currentListed) options.Add(new JObject { ["value"] = current, ["label"] = "Display not connected", ["blurb"] = "Shown again when it is plugged back in." });
+            if (!currentListed) options.Add(new JObject { ["value"] = current, ["label"] = Locales.Message("settings.displayNotConnected"), ["blurb"] = Locales.Message("settings.displayShownAgain") });
             return options;
         }
 
@@ -465,7 +465,7 @@ namespace ReplayKitHelper
                     token = data?["token"]?.ToString() ?? data?["value"]?.ToString() ?? "";
                 }
                 var entry = ConvertFromObsWindowToken(token);
-                if (entry == null) throw new InvalidOperationException("Invalid Auto Game List entry.");
+                if (entry == null) throw new InvalidOperationException(Locales.Message("settings.invalidAutoGameListEntry"));
                 string entryToken = entry["token"].Value<string>();
                 if (seen.Contains(entryToken)) continue;
                 seen.Add(entryToken);
@@ -911,7 +911,7 @@ namespace ReplayKitHelper
             try
             {
                 var fi = new FileInfo(path);
-                if (fi.Length > 65536) throw new InvalidOperationException("Settings file is too large.");
+                if (fi.Length > 65536) throw new InvalidOperationException(Locales.Message("settings.settingsFileIsTooLarge"));
                 string json = File.ReadAllText(path);
                 if (string.IsNullOrWhiteSpace(json)) return Normalize(new JObject());
                 JObject raw;
@@ -939,7 +939,7 @@ namespace ReplayKitHelper
                     catch (Newtonsoft.Json.JsonException) { }
                     Native.MoveFileReplace(path, aside);
                     Log.Write("Read-ReplayKitSettings: the settings file was not json (" + error.Message + "), kept it as " + aside + " and went back to the defaults.");
-                    try { Notifications.Add("warning", "settings-unreadable", Locales.T("ReplayKit settings were reset"), Locales.T("The settings file could not be read, so ReplayKit went back to its defaults. The old file was kept as {file} in the user-data folder of ReplayKit.", "file", Path.GetFileName(aside))); }
+                    try { Notifications.Add("warning", "settings-unreadable", Locales.Message("settings.replaykitSettingsWereReset"), Locales.Message("settings.theSettingsFileCouldNotBe", "file", Path.GetFileName(aside))); }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("settings reset notice: " + ex.Message); }
                 }
             }
@@ -1067,15 +1067,15 @@ namespace ReplayKitHelper
             if (string.IsNullOrWhiteSpace(raw)) return null;
             if (raw.Length > 512 || Regex.IsMatch(raw, @"[\x00-\x1F]")) throw new InvalidOperationException("Invalid game window token.");
             var parts = raw.Split(new[] { ':' }, 3);
-            if (parts.Length < 3) throw new InvalidOperationException("Invalid game window token.");
+            if (parts.Length < 3) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
 
             string title = ConvertFromObsWindowTokenPart(parts[0]).Trim();
             string className = ConvertFromObsWindowTokenPart(parts[1]).Trim();
             string exe = ConvertFromObsWindowTokenPart(parts[2]).Trim();
-            if (title.Length > 160 || className.Length > 120 || exe.Length > 96) throw new InvalidOperationException("Invalid game window token.");
+            if (title.Length > 160 || className.Length > 120 || exe.Length > 96) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowToken"));
             if (Regex.IsMatch(title + className + exe, @"[\x00-\x1F]")) throw new InvalidOperationException("Invalid game window token.");
-            if (!Regex.IsMatch(exe, @"^[^\\/:*?""<>|]+\.exe$")) throw new InvalidOperationException("Invalid game window executable.");
-            if (TestBlockedGameWindowExe(exe)) throw new InvalidOperationException("That application cannot be added to the Auto Game List.");
+            if (!Regex.IsMatch(exe, @"^[^\\/:*?""<>|]+\.exe$")) throw new InvalidOperationException(Locales.Message("settings.invalidGameWindowExecutable"));
+            if (TestBlockedGameWindowExe(exe)) throw new InvalidOperationException(Locales.Message("settings.thatApplicationCannotBeAddedTo"));
 
             string cleanToken = NewObsWindowToken(title, className, exe);
             return new JObject
@@ -1155,7 +1155,7 @@ namespace ReplayKitHelper
             int numerator = preset["video"]?["fpsNumerator"]?.Value<int>() ?? 0;
             int denominator = preset["video"]?["fpsDenominator"]?.Value<int>() ?? 0;
             if (numerator < 1 || denominator < 1) {
-                warnings.Add("OBS video settings were applied, but the fractional FPS value was invalid.");
+                warnings.Add(Locales.Message("settings.obsVideoSettingsWereAppliedBut"));
                 return;
             }
             foreach (var update in new[] {
@@ -1163,7 +1163,7 @@ namespace ReplayKitHelper
                 new[] { "FPSDen", denominator.ToString() },
             }) {
                 var result = SetObsProfileParameterSafe("Video", update[0], update[1]);
-                if (!result.Ok) warnings.Add(Locales.T("OBS did not accept Video.{update}: {error}", "update", update[0], "error", result.Message));
+                if (!result.Ok) warnings.Add(Locales.Message("settings.obsDidNotAcceptVideoUpdate", "update", update[0], "error", result.Message));
             }
         }
 
@@ -1190,7 +1190,7 @@ namespace ReplayKitHelper
             string current = scenes.Data?["currentProgramSceneName"]?.Value<string>();
             if (!string.IsNullOrEmpty(current)) return new JObject { ["ok"] = true, ["name"] = current };
             if (scenes.Data?["scenes"] is JArray list && list.Count > 0) return new JObject { ["ok"] = true, ["name"] = list[0]["sceneName"]?.Value<string>() };
-            return new JObject { ["ok"] = false, ["message"] = "No OBS scene is available." };
+            return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.noObsSceneIsAvailable") };
         }
 
         internal static JObject GetSceneItems(string sceneName)
@@ -1447,7 +1447,7 @@ namespace ReplayKitHelper
 
         internal static JObject GetSceneItemIndexValue(string sceneName, JObject item)
         {
-            if (item == null) return new JObject { ["ok"] = false, ["message"] = "Scene item is missing.", ["index"] = -1 };
+            if (item == null) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.sceneItemIsMissing"), ["index"] = -1 };
             var value = item["sceneItemIndex"];
             if (value != null && value.Type != JTokenType.Null)
             {

@@ -299,7 +299,7 @@
     try {
       if (name === "settings" && settingsPage) f.el.contentWindow.__rkGoToPage(settingsPage);
       f.el.contentWindow.focus();
-    } catch (_) {}
+    } catch (e) { rkReportError(e); }
     if (name === "settings") settingsPage = "";
     ackSoon(name);
     rememberSoon(name);
@@ -454,7 +454,7 @@
     try {
       var w = f.el.contentWindow;
       if (typeof w.__rkReselect === "function") w.__rkReselect();
-    } catch (_) {}
+    } catch (e) { rkReportError(e); }
   }
 
   // the plugin asks now and then whether this page still runs, and the answer goes through the helper; a page whose renderer died stays silent, and the plugin reloads it
@@ -483,7 +483,7 @@
     var f = frames.settings;
     try {
       if (f && f.loaded && typeof f.el.contentWindow.__rkConfirmLeave === "function") { f.el.contentWindow.__rkConfirmLeave(target); return; }
-    } catch (_) {}
+    } catch (e) { rkReportError(e); }
     fetch(HELPER + "/shell/leave-settings?to=" + encodeURIComponent(target), { method: "POST", cache: "no-store" }).catch(function () {});
   }
 
@@ -513,7 +513,7 @@
     var f = frames[view];
     try {
       if (f && f.loaded && typeof f.el.contentWindow.__rkQuickAction === "function") f.el.contentWindow.__rkQuickAction(String(id));
-    } catch (_) {}
+    } catch (e) { rkReportError(e); }
   }
 
   // a clip is being saved: the clips view puts a card in for it until the clip is written
@@ -521,7 +521,7 @@
     var f = frames.clips;
     try {
       if (f && f.loaded && typeof f.el.contentWindow.__rkClipSaving === "function") f.el.contentWindow.__rkClipSaving(String(state), String(name || ""));
-    } catch (_) {}
+    } catch (e) { rkReportError(e); }
   }
 
   window.RKShell = { quickAction: quickAction, clipSaving: clipSaving, show: show, park: park, confirmLeave: confirmLeave, leave: leave, enter: enter, reselect: reselect, ping: ping, windowShown: windowShown, busy: busy, leaveFullscreen: leaveFullscreen, focus: focusActive, sleep: sleep, timing: function () { return JSON.stringify(marks); } };

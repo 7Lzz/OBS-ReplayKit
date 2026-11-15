@@ -96,10 +96,10 @@
   <div class="clip">
     <div class="head">
       <span class="head-left" data-control-row>
-        <span class="head-title" id="title">Clipping</span>
-        <input type="checkbox" class="rk-switch" id="clipSwitch" aria-label="Clipping" title="Turn clipping on or off" hidden>
+        <span class="head-title" id="title" data-i18n="common.clipping"></span>
+        <input type="checkbox" class="rk-switch" id="clipSwitch" aria-label="Clipping" title="Turn clipping on or off" hidden data-i18n-title="controls.turnClippingOnOrOff" data-i18n-aria-label="common.clipping">
       </span>
-      <button class="manage" type="button" id="manage">Manage Hotkeys
+      <button class="manage" type="button" id="manage"><span data-i18n="controls.manageHotkeys"></span>
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{{glyph:hotkey-menu-1}}</svg>
       </button>
     </div>
@@ -124,8 +124,8 @@
   const HELPER = location.origin;
   const CAPTURE_TIMEOUT_MS = 10000;
   const KINDS = {
-    clip: { title:"Clipping", field:"clipKeybind", link:"Clip settings" },
-    record: { title:"Recording", field:"recordingKeybind", link:"Recording settings" },
+    clip: { title:RK_M("common.clipping"), field:"clipKeybind", link:RK_M("controls.clipSettings") },
+    record: { title:RK_M("common.recording"), field:"recordingKeybind", link:RK_M("controls.recordingSettings") },
   };
   const els = {
     title:document.getElementById("title"), manage:document.getElementById("manage"), info:document.getElementById("infoText"),
@@ -154,15 +154,15 @@
 
   function lengthText(seconds) {
     const v = Math.max(0, Math.round(seconds || 0));
-    if (v < 60) return RK_T("{seconds}s", { seconds: v });
+    if (v < 60) return RK_M("controls.secondsS", { seconds: v });
     const m = Math.floor(v / 60), s = v % 60;
-    return s === 0 ? RK_T("{minutes}m", { minutes: m }) : RK_T("{minutes}m {seconds}s", { minutes: m, seconds: s });
+    return s === 0 ? RK_M("common.minutesM", { minutes: m }) : RK_M("controls.minutesMSecondsS", { minutes: m, seconds: s });
   }
 
   function infoText() {
-    if (kind === "clip" && clipShown() === false) return "Clipping is off, nothing is being kept";
-    if (kind === "clip") return RK_T("Save the last {length} of gameplay", { length: lengthText(settings.replaySeconds || 90) });
-    return "Start and stop a recording of any length";
+    if (kind === "clip" && clipShown() === false) return RK_M("controls.clippingIsOffNothingIsBeing");
+    if (kind === "clip") return RK_M("controls.saveTheLastLengthOfGameplay", { length: lengthText(settings.replaySeconds || 90) });
+    return RK_M("controls.startAndStopARecordingOf");
   }
 
   function render() {
@@ -171,11 +171,11 @@
     els.info.textContent = infoText();
     els.linkText.textContent = def.link;
     const label = RKHotkeys.comboToLabel(settings[def.field]);
-    let text = label || "Click to set a hotkey";
+    let text = label || RK_M("controls.clickToSetAHotkey");
     let state = label ? "" : "is-empty";
-    if (phase === "arming") { text = "Connecting..."; state = "is-hint is-busy"; }
-    else if (phase === "listening") { text = "Press a key combination"; state = "is-listening"; }
-    else if (phase === "saving") { text = "Saving..."; state = "is-hint is-busy"; }
+    if (phase === "arming") { text = RK_M("settings.connecting"); state = "is-hint is-busy"; }
+    else if (phase === "listening") { text = RK_M("controls.pressAKeyCombination"); state = "is-listening"; }
+    else if (phase === "saving") { text = RK_M("clips.saving"); state = "is-hint is-busy"; }
     else if (flashText) { text = flashText; state = "is-error"; }
     // a key combination is not ui text, so it stays out of the translator
     if (label && text === label) els.keyLabel.setAttribute("translate", "no"); else els.keyLabel.removeAttribute("translate");
@@ -225,7 +225,7 @@
     }
     if (!ok) {
       phase = "idle";
-      flash("Could not pause the OBS hotkeys");
+      flash(RK_M("controls.couldNotPauseTheObsHotkeys"));
       return;
     }
     captureActive = true;
@@ -264,7 +264,7 @@
       if (mine !== generation) return;
       if (captureActive) { captureActive = false; setCapture(false); }
       phase = "idle";
-      flash("Could not save the hotkey");
+      flash(RK_M("controls.couldNotSaveTheHotkey"));
     }
   }
 
@@ -304,7 +304,7 @@
       clipWant = null;
       clipSending = false;
       ++clipEpoch;
-      flash(asked ? "Could not turn clipping on" : "Could not turn clipping off");
+      flash(asked ? RK_M("controls.couldNotTurnClippingOn") : RK_M("controls.couldNotTurnClippingOff"));
       // the change was refused or did not get there in time, so what obs has is what the switch shows
       await readClipState(true);
       clipQuietUntil = Date.now() + 1200;

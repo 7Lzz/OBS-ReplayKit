@@ -46,7 +46,7 @@ namespace ReplayKitHelper
         {
             statusCode = 0;
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri destination) || destination.Scheme != Uri.UriSchemeHttps)
-                throw new InvalidOperationException("Upload destination must use HTTPS.");
+                throw new InvalidOperationException(Locales.Message("share.uploadDestinationMustUseHttps"));
             string boundary = "----ReplayKit" + Guid.NewGuid().ToString("N");
             string fileName = Path.GetFileName(filePath).Replace("\"", "").Replace("\r", "").Replace("\n", "");
             long fileLen = new FileInfo(filePath).Length;
@@ -180,7 +180,7 @@ namespace ReplayKitHelper
             WriteStatus(requestId, progressBase, progressSpan, "uploading", "preparing", 8);
             try
             {
-                if (!File.Exists(clipPath)) throw new InvalidOperationException(Locales.T("Clip not found: {clipPath}", "clipPath", clipPath));
+                if (!File.Exists(clipPath)) throw new InvalidOperationException(Locales.Message("share.clipNotFoundClippath", "clipPath", clipPath));
                 var clipItem = new FileInfo(clipPath);
                 // a clip with separate audio tracks goes up as a copy with the mix only, so the site gets exactly one audio track whatever it does with extra ones; the copy is a stream copy and takes seconds
                 if (Mp4Tracks.CountAudio(clipPath) > 1)
@@ -193,7 +193,7 @@ namespace ReplayKitHelper
                     string mixOnlyCopy = Path.Combine(mixOnlyDir, Path.GetFileName(clipPath));
                     WriteStatus(requestId, progressBase, progressSpan, "uploading", "preparing", 8);
                     var copy = Compression.InvokeNativeCapture(ffmpeg, new[] { "-y", "-hide_banner", "-loglevel", "error", "-i", clipPath, "-map", "0:v:0", "-map", "0:a:0", "-c", "copy", "-movflags", "+faststart", mixOnlyCopy }, cancelToken, 30 * 60 * 1000);
-                    if (copy.ExitCode != 0 || !File.Exists(mixOnlyCopy)) throw new InvalidOperationException(Locales.T("The clip could not be prepared for upload (ffmpeg exit {code}).", "code", copy.ExitCode));
+                    if (copy.ExitCode != 0 || !File.Exists(mixOnlyCopy)) throw new InvalidOperationException(Locales.Message("share.theClipCouldNotBePrepared", "code", copy.ExitCode));
                     clipItem = new FileInfo(mixOnlyCopy);
                 }
                 long size = clipItem.Length;
@@ -206,7 +206,7 @@ namespace ReplayKitHelper
                 // The job owns the starting session, even if the account changes during compression.
                 bool signedIn = false;
                 if (requireAuth && string.IsNullOrWhiteSpace(authCookies))
-                    throw new InvalidOperationException("Signed-in Streamable session is unavailable. Sign out and sign in again.");
+                    throw new InvalidOperationException(Locales.Message("share.signedInStreamableSessionIsUnavailable"));
                 if (!string.IsNullOrWhiteSpace(authCookies))
                 {
                     try
@@ -217,7 +217,7 @@ namespace ReplayKitHelper
                     }
                     catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                     {
-                        throw new InvalidOperationException(Locales.T("Could not prepare signed-in Streamable session: {error}", "error", ex.Message));
+                        throw new InvalidOperationException(Locales.Message("share.couldNotPrepareSignedInStreamable", "error", ex.Message));
                     }
                 }
 
@@ -239,12 +239,12 @@ namespace ReplayKitHelper
                 var r1 = Curl.Run(step1Args.ToArray(), cancelToken);
                 if (r1.ExitCode != 0 || string.IsNullOrWhiteSpace(r1.Stdout))
                 {
-                    throw new InvalidOperationException(Locales.T("Step 1 curl failed (exit={code}).", "code", r1.ExitCode));
+                    throw new InvalidOperationException(Locales.Message("share.step1CurlFailedExitCode", "code", r1.ExitCode));
                 }
                 var data = JObject.Parse(r1.Stdout);
                 string shortcode = data["shortcode"]?.Value<string>();
                 if (string.IsNullOrEmpty(shortcode))
-                    throw new InvalidOperationException("Step 1 response missing shortcode.");
+                    throw new InvalidOperationException(Locales.Message("share.step1ResponseMissingShortcode"));
                 Log.Write("shortcode: " + shortcode, "upload", requestId);
 
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
@@ -253,7 +253,7 @@ namespace ReplayKitHelper
                 Log.Write("Step 2: uploading to S3...", "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "uploading", 8);
                 string s3Url = data["url"]?.Value<string>();
-                if (string.IsNullOrWhiteSpace(s3Url)) throw new InvalidOperationException("Step 1 response missing the S3 upload url.");
+                if (string.IsNullOrWhiteSpace(s3Url)) throw new InvalidOperationException(Locales.Message("share.step1ResponseMissingTheS3"));
                 var s3Fields = data["fields"] as JObject ?? new JObject();
 
                 int s3Status = 0;
@@ -280,7 +280,7 @@ namespace ReplayKitHelper
                     }
                 }
                 if (s3Status < 200 || s3Status >= 300)
-                    throw new InvalidOperationException(Locales.T("S3 upload failed: HTTP {s3Status}.", "s3Status", s3Status));
+                    throw new InvalidOperationException(Locales.Message("share.s3UploadFailedHttpS3status", "s3Status", s3Status));
                 Log.Write("S3: HTTP " + s3Status, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "finalizing", 100);
 
@@ -309,14 +309,14 @@ namespace ReplayKitHelper
                 if (cancelToken.IsCancellationRequested) return new UploadOutcome { Ok = false, Message = "Cancelled" };
                 if (r3.ExitCode != 0 || string.IsNullOrWhiteSpace(r3.Stdout))
                 {
-                    throw new InvalidOperationException(Locales.T("Transcode trigger curl failed (exit={code}).", "code", r3.ExitCode));
+                    throw new InvalidOperationException(Locales.Message("share.transcodeTriggerCurlFailedExitCode", "code", r3.ExitCode));
                 }
                 var tcLines = r3.Stdout.Split('\n');
                 if (!int.TryParse(tcLines[tcLines.Length - 1].Trim(), out int tcStatus))
-                    throw new InvalidOperationException("Transcode trigger returned an unreadable status.");
+                    throw new InvalidOperationException(Locales.Message("share.transcodeTriggerReturnedAnUnreadableStatus"));
                 if (tcStatus < 200 || tcStatus >= 300)
                 {
-                    throw new InvalidOperationException(Locales.T("Transcode trigger failed: HTTP {tcStatus}.", "tcStatus", tcStatus));
+                    throw new InvalidOperationException(Locales.Message("share.transcodeTriggerFailedHttpTcstatus", "tcStatus", tcStatus));
                 }
                 Log.Write("transcode: HTTP " + tcStatus, "upload", requestId);
                 WriteStatus(requestId, progressBase, progressSpan, "uploading", "copying link", 100);

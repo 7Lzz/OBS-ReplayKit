@@ -156,8 +156,8 @@ namespace ReplayKitHelper
             }
 
             if (u == null || !JobCoordinator.Cancel(u.RequestId))
-                return new CancelResult { Ok = false, Message = "Operation has already finished or committed" };
-            return new CancelResult { Ok = true, Message = "Cancellation requested" };
+                return new CancelResult { Ok = false, Message = Locales.Message("share.operationHasAlreadyFinishedOrCommitted") };
+            return new CancelResult { Ok = true, Message = Locales.Message("share.cancellationRequested") };
         }
 
         private static IEnumerable<string> SafeEnumerateFiles(string dir, string pattern = "*")

@@ -31,7 +31,7 @@ namespace ReplayKitHelper
             // the local command channel of sdk mode: the list of commands, running one, and the answer of the plugin to one it was sent. nothing of it answers while development mode and sdk mode are not both on
             if (path == "/sdk" || path == "/sdk/run" || path == "/sdk/reply")
             {
-                if (!Sdk.Enabled()) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = "SDK mode is off." }); return false; }
+                if (!Sdk.Enabled()) { HttpResponse.SendJson(stream, 403, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.sdkModeIsOff") }); return false; }
                 if (path == "/sdk")
                 {
                     if (req.Method != "GET") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "GET required"); return false; }
@@ -47,7 +47,7 @@ namespace ReplayKitHelper
                 }
                 JObject call;
                 try { call = string.IsNullOrWhiteSpace(req.Body) ? new JObject() : JObject.Parse(req.Body); }
-                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad json." }); return false; }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badJson2") }); return false; }
                 HttpResponse.SendJson(stream, 200, Sdk.Execute(call["command"]?.ToString(), call["args"] as JObject));
                 return false;
             }

@@ -23,10 +23,10 @@ namespace ReplayKitSetup
                 if (parts.Any(p => p.Length == 0 || p == "." || p == ".." || p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
                     throw new InvalidDataException("Unsafe bundled archive path: " + name);
                 string target = Path.GetFullPath(Path.Combine(directory, Path.Combine(parts)));
-                if (!target.StartsWith(directory, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Bundled file escapes its install directory.");
+                if (!target.StartsWith(directory, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException(SetupLocale.Message("setup.bundledFileEscapesItsInstallDirectory"));
                 files.Add((entry, relative, target));
             }
-            if (files.Count == 0) throw new InvalidDataException("The bundled archive contains no installable files.");
+            if (files.Count == 0) throw new InvalidDataException(SetupLocale.Message("setup.theBundledArchiveContainsNoInstallable"));
             return files;
         }
 

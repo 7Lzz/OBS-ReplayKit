@@ -87,7 +87,7 @@ namespace ReplayKitHelper
                         var body = string.IsNullOrWhiteSpace(req.Body) ? new JObject() : JObject.Parse(req.Body);
                         if (body["mode"] != null && body["mode"].Type != JTokenType.String)
                         {
-                            HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Compression mode must be a string." });
+                            HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.compressionModeMustBeAString") });
                             return false;
                         }
                         var started = Storage.StartCompress(body["names"] as JArray, body["mode"]?.Value<string>());

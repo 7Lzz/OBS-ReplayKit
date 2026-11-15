@@ -37,12 +37,28 @@ namespace ReplayKitHelper
                 return false;
             }
 
+            if (path == "/page-error")
+            {
+                // the cef of obs keeps the console of a dock to itself, so _page-errors.html sends the script errors of a page here
+                if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
+                JObject body;
+                try { body = JObject.Parse(req.Body ?? ""); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false }); return false; }
+                string page = (body["page"] as JValue)?.Value as string ?? "";
+                string message = (body["message"] as JValue)?.Value as string ?? "";
+                if (page.Length > 200) page = page.Substring(0, 200);
+                if (message.Length > 4000) message = message.Substring(0, 4000);
+                Log.Write("page error " + page + ": " + message.Replace("\r", "").Replace("\n", " | "), "page");
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
+                return false;
+            }
+
             if (path == "/open-log-folder")
             {
                 // for the Advanced tab "Open log folder" button -- same shape as /open-clip-folder above, just pointed at the log dir instead of the clip dir. created eagerly at helper startup, so this should only 404 if something deleted it out from under a running helper.
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string root = Path.GetFullPath(Constants.LOG_DIR);
-                if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Log folder not found" }); return false; }
+                if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.logFolderNotFound") }); return false; }
                 try
                 {
                     var existing = Explorer.GetExplorerHwndForPath(root);
@@ -73,9 +89,9 @@ namespace ReplayKitHelper
                 // the detached relauncher starts obs only after the original process exits normally
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string obsPath = ObsProcess.GetRunningObsPath();
-                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
+                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") }); return false; }
                 ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/restart-obs");
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is restarting." });
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsRestarting") });
                 ObsProcess.StopObsForRestart("/restart-obs", true);
                 return false;
             }
@@ -91,7 +107,7 @@ namespace ReplayKitHelper
             {
                 // requests a normal exit; a stalled shutdown is reported without killing obs
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS is closing." });
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsIsClosing") });
                 // the installer says when the close is for an update
                 ObsProcess.StopObsForRestart("/exit-obs", Q("reason") == "update" || Update.InstallerRunning());
                 return false;
@@ -102,13 +118,18 @@ namespace ReplayKitHelper
                 // clears the sign-in state and requests a normal restart before the unlocked profile is cleaned
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string obsPath = ObsProcess.GetRunningObsPath();
-                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." }); return false; }
-                try { AuthCore.ClearAuthBlob(); } catch { }
-                try { AuthCore.ClearAuth(); } catch { }
-                StreamableSignIn.ClearProfile();
+                if (obsPath == null) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") }); return false; }
+                // a restart that left the old sign-in behind would bring it straight back, so it does not go ahead
+                bool cleared = AuthCore.ClearAuth();
+                cleared = StreamableSignIn.ClearProfile() && cleared;
+                if (!cleared)
+                {
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("share.signInCouldNotBeCleared") });
+                    return false;
+                }
                 Server.State.RestartAfterCleanObsPath = obsPath;
                 Log.Write("/restart-obs-clean: cleared ReplayKit's Streamable profile and will relaunch from '" + obsPath + "'.");
-                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = "OBS will restart with a clean Streamable session." });
+                HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["message"] = Locales.Message("helper.obsWillRestartWithAClean") });
 
                 // allow the response to flush before closing obs
                 ObsProcess.StopObsForRestart("/restart-obs-clean", true);

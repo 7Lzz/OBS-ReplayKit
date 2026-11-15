@@ -11,37 +11,37 @@
         <div class="editor-lead">
           <div class="title-row editor-title">
             <span class="name" id="trim-clip-name" translate="no"></span>
-            <button class="icon-mini-btn edit-btn" type="button" id="trim-rename" data-tooltip="Rename" aria-label="Rename clip"><svg data-i="action/edit" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
-            <span class="trim-draft-note" id="trim-draft-note" aria-live="polite">Draft saved</span>
+            <button class="icon-mini-btn edit-btn" type="button" id="trim-rename" data-tooltip="Rename" aria-label="Rename clip" data-i18n-aria-label="editor.renameClip" data-i18n-data-tooltip="common.rename"><svg data-i="action/edit" viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+            <span class="trim-draft-note" id="trim-draft-note" aria-live="polite" data-i18n="editor.draftSaved"></span>
           </div>
         </div>
         <div class="editor-frame-tools">
-          <div class="combo editor-aspect" id="editor-aspect" role="combobox" aria-label="Aspect ratio" aria-expanded="false">
-            <button class="combo-button" type="button" aria-label="Aspect ratio" aria-haspopup="listbox"><span class="combo-label">Landscape</span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
-            <div class="combo-menu" role="listbox" aria-label="Aspect ratio"></div>
+          <div class="combo editor-aspect" id="editor-aspect" role="combobox" aria-label="Aspect ratio" aria-expanded="false" data-i18n-aria-label="editor.aspectRatio">
+            <button class="combo-button" type="button" aria-label="Aspect ratio" aria-haspopup="listbox" data-i18n-aria-label="editor.aspectRatio"><span class="combo-label" data-i18n="editor.landscape"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
+            <div class="combo-menu" role="listbox" aria-label="Aspect ratio" data-i18n-aria-label="editor.aspectRatio"></div>
           </div>
-          <button class="icon-btn editor-screenshot" type="button" id="editor-screenshot" aria-label="Save screenshot" data-tooltip="Save a screenshot of this frame"><svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="editor-screenshot-spinner" aria-hidden="true"></span></button>
+          <button class="icon-btn editor-screenshot" type="button" id="editor-screenshot" aria-label="Save screenshot" data-tooltip="Save a screenshot of this frame" data-i18n-aria-label="editor.saveScreenshot" data-i18n-data-tooltip="editor.saveAScreenshotOfThisFrame"><svg data-i="editor/screenshot" viewBox="0 0 24 24" aria-hidden="true"></svg><span class="editor-screenshot-spinner" aria-hidden="true"></span></button>
         </div>
         <div class="editor-actions">
           <!-- leaving with edits asks what becomes of them in a menu that hangs off the button, the way the sort menu hangs off its trigger -->
           <div class="clip-sort-wrap editor-exit" id="editor-exit">
-            <button class="btn editor-exit-btn" type="button" id="editor-exit-btn" aria-haspopup="menu" aria-expanded="false">Exit<svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg></button>
-            <div class="clip-sort-menu" role="menu" aria-label="Exit the editor">
-              <div class="clip-sort-heading">Your edits</div>
-              <button class="clip-sort-item" type="button" role="menuitem" data-exit="keep" id="editor-exit-keep"><span class="clip-sort-label">Save as draft</span></button>
-              <button class="clip-sort-item" type="button" role="menuitem" data-exit="discard"><span class="clip-sort-label">Discard draft</span></button>
+            <button class="btn editor-exit-btn" type="button" id="editor-exit-btn" aria-haspopup="menu" aria-expanded="false"><span data-i18n="editor.exit"></span><svg class="clip-sort-chevron" viewBox="0 0 24 24" aria-hidden="true">{{glyph:nav/caret-down}}</svg></button>
+            <div class="clip-sort-menu" role="menu" aria-label="Exit the editor" data-i18n-aria-label="editor.exitTheEditor">
+              <div class="clip-sort-heading" data-i18n="editor.yourEdits"></div>
+              <button class="clip-sort-item" type="button" role="menuitem" data-exit="keep" id="editor-exit-keep"><span class="clip-sort-label" data-i18n="editor.saveAsDraft"></span></button>
+              <button class="clip-sort-item" type="button" role="menuitem" data-exit="discard"><span class="clip-sort-label" data-i18n="editor.discardDraft"></span></button>
             </div>
           </div>
-          <button class="btn primary" type="button" id="trim-render">Render video</button>
+          <button class="btn primary" type="button" id="trim-render" data-i18n="editor.renderVideo"></button>
         </div>
       </header>
       <div class="editor-body">
         <div class="modal-veil render-veil" id="render-veil">
           <div class="modal render-modal" id="render-modal" role="dialog" aria-modal="true" aria-labelledby="render-title">
-            <h2 id="render-title">Render settings</h2>
-            <div class="render-label" id="render-res-label">Resolution</div>
+            <h2 id="render-title" data-i18n="editor.renderSettings"></h2>
+            <div class="render-label" id="render-res-label" data-i18n="editor.resolution"></div>
             <div class="render-choices" id="render-heights" role="radiogroup" aria-labelledby="render-res-label">
-              <button type="button" class="render-choice" role="radio" data-height="0">Original</button>
+              <button type="button" class="render-choice" role="radio" data-height="0" data-i18n="editor.original"></button>
               <button type="button" class="render-choice" role="radio" data-height="720">720p</button>
               <button type="button" class="render-choice" role="radio" data-height="1080">1080p</button>
               <button type="button" class="render-choice" role="radio" data-height="1440">1440p</button>
@@ -49,28 +49,28 @@
             </div>
             <div class="render-pair">
               <div>
-                <div class="render-label">Frame rate</div>
-                <div class="combo" id="render-fps" role="combobox" aria-label="Frame rate" aria-expanded="false">
+                <div class="render-label" data-i18n="common.frameRate"></div>
+                <div class="combo" id="render-fps" role="combobox" aria-label="Frame rate" aria-expanded="false" data-i18n-aria-label="common.frameRate">
                   <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
-                  <div class="combo-menu" role="listbox" aria-label="Frame rate"></div>
+                  <div class="combo-menu" role="listbox" aria-label="Frame rate" data-i18n-aria-label="common.frameRate"></div>
                 </div>
               </div>
               <div>
-                <div class="render-label">Bitrate</div>
-                <div class="combo" id="render-bitrate" role="combobox" aria-label="Bitrate" aria-expanded="false">
+                <div class="render-label" data-i18n="editor.bitrate"></div>
+                <div class="combo" id="render-bitrate" role="combobox" aria-label="Bitrate" aria-expanded="false" data-i18n-aria-label="editor.bitrate">
                   <button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
-                  <div class="combo-menu" role="listbox" aria-label="Bitrate"></div>
+                  <div class="combo-menu" role="listbox" aria-label="Bitrate" data-i18n-aria-label="editor.bitrate"></div>
                 </div>
               </div>
             </div>
             <div class="compress-downsample-row render-replace-row">
-              <input type="checkbox" class="rk-switch" id="render-replace" aria-label="Replace the original" checked>
-              <span>Replace the original<span class="render-replace-note">The clip is replaced on disk, which can't be undone.</span></span>
+              <input type="checkbox" class="rk-switch" id="render-replace" aria-label="Replace the original" checked data-i18n-aria-label="editor.replaceTheOriginal">
+              <span><span data-i18n="editor.replaceTheOriginal"></span><span class="render-replace-note" data-i18n="editor.theClipIsReplacedOnDisk"></span></span>
             </div>
             <div class="render-meta"><span id="render-size"></span><span id="render-length"></span></div>
             <div class="row">
-              <button class="btn" type="button" id="render-cancel">Cancel</button>
-              <button class="btn primary" type="button" id="render-go">Render</button>
+              <button class="btn" type="button" id="render-cancel" data-i18n="common.cancel"></button>
+              <button class="btn primary" type="button" id="render-go" data-i18n="editor.render"></button>
             </div>
           </div>
         </div>
@@ -95,7 +95,7 @@
           <div class="preview-controls trim-preview-controls">
             <div class="controls-left">
               <button class="trim-playpause-btn play-toggle-btn" id="trim-playpause" type="button"
-                      aria-label="Play/Pause">
+                      aria-label="Play/Pause" data-i18n-aria-label="editor.playPause">
                 <svg viewBox="0 0 24 24" id="trim-playpause-icon"></svg>
               </button>
               <div class="trim-volume-control volume-control">
@@ -108,7 +108,7 @@
               <span class="time-display"><span id="trim-current-time">0:00</span> / <span id="trim-total-time">0:00</span></span>
             </div>
             <div class="controls-right">
-              <button class="icon-btn" id="trim-fullscreen" type="button" aria-label="Toggle fullscreen">
+              <button class="icon-btn" id="trim-fullscreen" type="button" aria-label="Toggle fullscreen" data-i18n-aria-label="editor.toggleFullscreen">
                 <svg viewBox="0 0 24 24" id="trim-fullscreen-icon">{{glyph:player/fullscreen}}</svg>
               </button>
             </div>
@@ -124,22 +124,22 @@
         <aside class="editor-side">
           <section class="editor-card tl-props" id="tl-props" hidden></section>
           <section class="editor-card" hidden>
-            <div class="editor-card-title">Options</div>
+            <div class="editor-card-title" data-i18n="editor.options"></div>
           <div class="trim-mode-row">
-            <input type="checkbox" class="rk-switch" id="trim-precise" aria-label="Frame-accurate cut">
-            <span>Frame-accurate cut</span>
-            <span class="control-note">Turn this on to cut exactly where you place the handles. It takes longer, because the video has to be saved again. When it&#x27;s off, cuts are instant, but a clip may start slightly earlier than you chose.</span>
+            <input type="checkbox" class="rk-switch" id="trim-precise" aria-label="Frame-accurate cut" data-i18n-aria-label="editor.frameAccurateCut">
+            <span data-i18n="editor.frameAccurateCut"></span>
+            <span class="control-note" data-i18n="editor.turnThisOnToCutExactly"></span>
           </div>
-          <div class="trim-mode-row" title="Drops the audio stream from the edited output.">
-            <input type="checkbox" class="rk-switch" id="trim-remove-audio" aria-label="Remove audio">
-            <span>Remove audio</span>
+          <div class="trim-mode-row" title="Drops the audio stream from the edited output." data-i18n-title="editor.dropsTheAudioStreamFromThe">
+            <input type="checkbox" class="rk-switch" id="trim-remove-audio" aria-label="Remove audio" data-i18n-aria-label="editor.removeAudio">
+            <span data-i18n="editor.removeAudio"></span>
           </div>
           </section>
         </aside>
-        <nav class="ed-rail ed-rail-r" id="ed-right-rail" aria-label="Selection"></nav>
+        <nav class="ed-rail ed-rail-r" id="ed-right-rail" aria-label="Selection" data-i18n-aria-label="editor.selection"></nav>
       </div>
       <div class="editor-bottom" id="editor-bottom">
-        <div class="tl-resizer" id="tl-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline"></div>
+        <div class="tl-resizer" id="tl-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" data-i18n-aria-label="editor.resizeTheTimeline"></div>
         <div class="tl-card">
         <div class="tl-toolbar" id="tl-toolbar"></div>
         <div class="tl-area">
@@ -149,14 +149,14 @@
             <div class="tl-axis" id="tl-axis">
              <div class="tl-ruler">
               <div class="trim-time-ruler" id="trim-time-ruler" aria-hidden="true"></div>
-              <div class="trim-scrubber" id="trim-scrubber" aria-label="Scrub timeline"></div>
+              <div class="trim-scrubber" id="trim-scrubber" aria-label="Scrub timeline" data-i18n-aria-label="editor.scrubTimeline"></div>
               <div class="trim-playhead" id="trim-playhead" aria-hidden="true"></div>
              </div>
              <div class="tl-tracks" id="tl-tracks">
-              <div class="trim-scrubber tl-scrub-gap" id="trim-scrubber-gap" aria-label="Scrub timeline"></div>
+              <div class="trim-scrubber tl-scrub-gap" id="trim-scrubber-gap" aria-label="Scrub timeline" data-i18n-aria-label="editor.scrubTimeline"></div>
               <div class="tl-layers" id="tl-layers" hidden></div>
               <div class="tl-subs" id="tl-subs" hidden></div>
-              <div class="trim-timeline" aria-label="Trim timeline" data-skel>
+              <div class="trim-timeline" aria-label="Trim timeline" data-skel data-i18n-aria-label="editor.trimTimeline">
                <div class="trim-filmstrip" id="trim-filmstrip" aria-hidden="true"></div>
                <div class="trim-outside trim-outside-start" id="trim-outside-start"></div>
                <div class="trim-outside trim-outside-end" id="trim-outside-end"></div>
@@ -164,8 +164,8 @@
                 <div class="trim-bar-track"></div>
                 <div class="trim-bar-range" id="trim-range-fill"></div>
                 <div class="trim-keyframe-marks" id="trim-keyframe-marks"></div>
-                <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0" aria-label="Trim start">
-                <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100" aria-label="Trim end">
+                <input type="range" id="trim-start" min="0" max="100" step="0.01" value="0" aria-label="Trim start" data-i18n-aria-label="editor.trimStart">
+                <input type="range" id="trim-end"   min="0" max="100" step="0.01" value="100" aria-label="Trim end" data-i18n-aria-label="editor.trimEnd">
                </div>
               </div>
               <div class="tl-lanes" id="tl-lanes" hidden></div>
@@ -184,12 +184,12 @@
 
   <div class="modal-veil" id="save-veil">
     <div class="modal save-modal" id="save-modal" role="alertdialog" aria-modal="true" aria-labelledby="save-title" aria-describedby="save-note">
-      <h2 id="save-title">Saving a copy</h2>
+      <h2 id="save-title" data-i18n="editor.savingACopy"></h2>
       <div class="clip-name" id="save-clip-name" translate="no"></div>
       <div class="save-track is-waiting" id="save-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="save-fill" id="save-fill"></div></div>
-      <div class="save-line"><span id="save-stage">Starting</span><span class="save-percent" id="save-percent"></span></div>
-      <div class="body save-note" id="save-note">Editing is locked until this is done.</div>
-      <div class="row"><button class="btn" type="button" id="save-cancel">Cancel save</button></div>
+      <div class="save-line"><span id="save-stage" data-i18n="editor.starting"></span><span class="save-percent" id="save-percent"></span></div>
+      <div class="body save-note" id="save-note" data-i18n="editor.editingIsLockedUntilThisIs"></div>
+      <div class="row"><button class="btn" type="button" id="save-cancel" data-i18n="editor.cancelSave"></button></div>
     </div>
   </div>
 
@@ -205,12 +205,12 @@ window.__rkEditorApi = (function () {
   let aspectControl = null;
   let aspectOptions = "";
   const editorFrames = [
-    { value:"9:16", name:"Portrait", w:9, h:16 },
-    { value:"16:9", name:"Landscape", w:16, h:9 },
-    { value:"16:10", name:"Widescreen", w:8, h:5 },
-    { value:"21:9", name:"Ultrawide", w:7, h:3 },
-    { value:"4:3", name:"Standard", w:4, h:3 },
-    { value:"1:1", name:"Square", w:1, h:1 },
+    { value:"9:16", name:RK_M("editor.portrait"), w:9, h:16 },
+    { value:"16:9", name:RK_M("editor.landscape"), w:16, h:9 },
+    { value:"16:10", name:RK_M("editor.widescreen"), w:8, h:5 },
+    { value:"21:9", name:RK_M("editor.ultrawide"), w:7, h:3 },
+    { value:"4:3", name:RK_M("common.standard"), w:4, h:3 },
+    { value:"1:1", name:RK_M("editor.square"), w:1, h:1 },
   ];
 
   function sourceEditorFrame() {
@@ -233,12 +233,12 @@ window.__rkEditorApi = (function () {
     const row = document.createElement("label");
     row.className = "combo-toggle";
     const text = document.createElement("span");
-    text.textContent = "Black bars";
+    text.textContent = RK_M("editor.blackBars");
     const box = document.createElement("input");
     box.type = "checkbox";
     box.className = "rk-switch";
     box.checked = blackBarsOn();
-    box.setAttribute("aria-label", "Show black bars around the frame");
+    box.setAttribute("aria-label", RK_M("editor.showBlackBarsAroundTheFrame"));
     box.addEventListener("change", () => {
       try { localStorage.setItem(BLACK_BARS_KEY, box.checked ? "1" : "0"); } catch (_) {}
       paintBlackBars();
@@ -534,7 +534,7 @@ window.__rkEditorApi = (function () {
       trimPreciseBeforeSpeed = trimPrecise.checked;
       trimPrecise.checked = true;
       trimPrecise.disabled = true;
-      if (row) row.dataset.tooltip = retimed ? "A copy at another speed is always made again frame by frame." : subtitled ? "A copy with subtitles is always made again frame by frame, since they are drawn into the picture." : looked ? "A copy with colour, filters, effects or layers is always made again frame by frame." : "A copy with the video cut into pieces, or with audio reaching past it, is always made again frame by frame.";
+      if (row) row.dataset.tooltip = retimed ? RK_M("editor.aCopyAtAnotherSpeedIs") : subtitled ? RK_M("editor.aCopyWithSubtitlesIsAlways") : looked ? RK_M("editor.aCopyWithColourFiltersEffects") : RK_M("editor.aCopyWithTheVideoCut");
       trimPrecise.dispatchEvent(new Event("change"));
     } else if (!needed && trimPreciseBeforeSpeed !== null) {
       trimPrecise.disabled = false;
@@ -1126,7 +1126,7 @@ window.__rkEditorApi = (function () {
       if (seq === trimSnapRequestSeq) {
         skipTrimSnapPoints();
         if (!trimPrecise.checked) {
-          showToast("Fast trim snap points unavailable; using normal fast trim.", "info");
+          showToast(RK_M("editor.fastTrimSnapPointsUnavailable"), "info");
           scheduleToastHide(3000);
         }
       }
@@ -1184,7 +1184,7 @@ window.__rkEditorApi = (function () {
     screenshotBtn.disabled = !valid || !free;
     document.getElementById("trim-rename").disabled = !free;
     document.querySelector("#editor-aspect .combo-button").disabled = !free;
-    if (importing) trimRender.dataset.tooltip = "Wait until the audio has been added";
+    if (importing) trimRender.dataset.tooltip = RK_M("editor.waitUntilTheAudioHasBeen");
     else delete trimRender.dataset.tooltip;
     if (window.__rkPublishQuickActions) window.__rkPublishQuickActions();
   }
@@ -1230,7 +1230,7 @@ window.__rkEditorApi = (function () {
     placeTrimControls();
     if (!trimFullscreenIcon) return;
     trimFullscreenIcon.innerHTML = isTrimFullscreen() ? ICON.FULLSCREEN_EXIT : ICON.FULLSCREEN;
-    trimFullscreen.dataset.tooltip = isTrimFullscreen() ? "Exit fullscreen (F)" : "Fullscreen (F)";
+    trimFullscreen.dataset.tooltip = isTrimFullscreen() ? RK_M("common.exitFullscreenF") : RK_M("common.fullscreenF");
   }
 
 
@@ -1252,7 +1252,7 @@ window.__rkEditorApi = (function () {
     trimDraftArmed = false;
     trimDraftSent = "";
     trimLanes.resetZoom();
-    trimProcessingStage.textContent = "Reading the clip";
+    trimProcessingStage.textContent = RK_M("editor.readingTheClip");
     resetVideoZoom(trimVideo);
     trimClipName.textContent = clip.name;
     trimRender.disabled = true;
@@ -1290,13 +1290,13 @@ window.__rkEditorApi = (function () {
       updateSeekFill();
       syncTrimTimeDisplay();
       // the preview frames, the audio tracks with their waveforms and the keyframes are all prepared while the loading screen is up, and the editor shows once every one of them is in -- otherwise the timeline fills in piece by piece in front of the user, which is what this screen exists to hide. each part guards itself against a clip that was closed or replaced meanwhile.
-      trimProcessingStage.textContent = "Building the preview";
+      trimProcessingStage.textContent = RK_M("editor.buildingThePreview");
       const filmstripPromise = buildTrimFilmstrip(clip, dur, (done, total) => {
-        trimProcessingStage.textContent = RK_T("Building the preview {done}/{total}", { done: done, total: total });
+        trimProcessingStage.textContent = RK_M("editor.buildingThePreviewDoneTotal", { done: done, total: total });
       });
       const lanesPromise = trimLanes.load(clip.name, {
         stage: (text) => { if (trimSourceClip === clip) trimProcessingStage.textContent = text; },
-        note: (text) => showToast(escapeHtml(text), "bad", "The audio could not be loaded"),
+        note: (text) => showToast(escapeHtml(text), "bad", RK_M("editor.theAudioCouldNotBeLoaded")),
       });
       editorTools.prepare();
       if (!trimPrecise.checked) {
@@ -1319,11 +1319,11 @@ window.__rkEditorApi = (function () {
       let corrected = false;
       const draft = await draftPromise;
       if (draft) {
-        trimProcessingStage.textContent = "Putting your edits back";
+        trimProcessingStage.textContent = RK_M("editor.puttingYourEditsBack");
         const snap = draft.edit?.snap;
         const refs = [...(snap?.vsegs || []), ...(snap?.layers || []).filter((v) => v.kind === "clip")].map((v) => v.ref).filter(Boolean);
         try { if (refs.length) await protectEditorSources([...new Set(refs)]); }
-        catch (err) { closeTrimModal(); showToast(escapeHtml(err.message), "bad", "Editor"); return; }
+        catch (err) { closeTrimModal(); showToast(escapeHtml(err.message), "bad", RK_M("common.editor")); return; }
         if (trimSourceClip !== clip) return;
         const result = await restoreTrimDraft(clip, draft, dur);
         restored = !!result;
@@ -1339,7 +1339,7 @@ window.__rkEditorApi = (function () {
       trimDraftArmed = true;
       if (corrected) scheduleTrimDraft();
       if (restored) {
-        showToast("Your unsaved edits are back", "info");
+        showToast(RK_M("editor.yourUnsavedEditsAreBack"), "info");
         scheduleToastHide(3200);
       }
       if (replayKitSettings.editorAutoplay && !editorHeldAway && !document.hidden) togglePlayback();
@@ -1640,7 +1640,7 @@ window.__rkEditorApi = (function () {
     input.type = "text";
     input.className = "name-edit-input";
     input.value = base;
-    input.setAttribute("aria-label", "Clip name");
+    input.setAttribute("aria-label", RK_M("common.clipName"));
     const extSpan = document.createElement("span");
     extSpan.className = "name-edit-ext";
     extSpan.setAttribute("translate", "no");
@@ -1679,7 +1679,7 @@ window.__rkEditorApi = (function () {
         editorTools.renamed(name);
         trimDraftSent = "";
       } catch (err) {
-        showToast(RK_T("The clip could not be renamed: {error}", { error: escapeHtml(err.message || String(err)) }), "bad", "Rename");
+        showToast(RK_M("editor.theClipCouldNotBeRenamed", { error: escapeHtml(err.message || String(err)) }), "bad", RK_M("common.rename"));
         scheduleToastHide(TOAST_ERROR_MS);
       } finally {
         trimRenaming = false;
@@ -1792,7 +1792,7 @@ window.__rkEditorApi = (function () {
   }
 
   function tellTrimDraftKept() {
-    showToast("Your edits are kept in Drafts", "info");
+    showToast(RK_M("editor.yourEditsAreKeptInDrafts"), "info");
     scheduleToastHide(3200);
   }
 
@@ -1802,7 +1802,7 @@ window.__rkEditorApi = (function () {
     if (!edit || edit.v !== 1 || !edit.snap) return false;
     if (Math.abs((Number(edit.duration) || 0) - dur) > 0.35) {
       forgetDraft(clip.name);
-      showToast("The draft of this clip was dropped, since the clip is not the one it was kept for.", "bad", "Draft dropped");
+      showToast(RK_M("editor.theDraftOfThisClipWas"), "bad", RK_M("editor.draftDropped"));
       return false;
     }
     trimRemoveAudio.checked = false;
@@ -1813,7 +1813,7 @@ window.__rkEditorApi = (function () {
     if (trimSourceClip !== clip) return false;
     syncTrimReencodeLock();
     if (!result.ok) {
-      showToast("The draft of this clip could not be put back, and it is still kept.", "bad", "Draft not restored");
+      showToast(RK_M("editor.theDraftOfThisClipCould"), "bad", RK_M("editor.draftNotRestored"));
       return false;
     }
     trimVideo.currentTime = Number(trimStart.value) || 0;
@@ -1821,7 +1821,7 @@ window.__rkEditorApi = (function () {
     updateSeekFill();
     updateTrimUi();
     if (result.dropped.length) {
-      showToast(RK_T("Audio that was added to this edit is no longer there, so it was left out:") + "<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", "Some audio is missing");
+      showToast(RK_M("editor.audioThatWasAddedToThis") + "<br>" + result.dropped.map(escapeHtml).join("<br>"), "bad", RK_M("editor.someAudioIsMissing"));
     }
     return result;
   }
@@ -1884,12 +1884,12 @@ window.__rkEditorApi = (function () {
     if (known) saveTrack.setAttribute("aria-valuenow", String(percent));
     else saveTrack.removeAttribute("aria-valuenow");
     savePercent.textContent = known ? Math.round(percent) + "%" : "";
-    saveStage.textContent = save.stopping ? "Stopping" : finishing ? "Finishing up" : save.mode === "screenshot" ? "Rendering screenshot"
-      : save.phase === "preparing" ? "Preparing video" : !known ? "Starting render" : save.precise ? "Rendering video" : "Cutting the clip";
+    saveStage.textContent = save.stopping ? RK_M("editor.stopping") : finishing ? RK_M("editor.finishingUp") : save.mode === "screenshot" ? RK_M("editor.renderingScreenshot")
+      : save.phase === "preparing" ? RK_M("editor.preparingVideo") : !known ? RK_M("editor.startingRender") : save.precise ? RK_M("editor.renderingVideo") : RK_M("editor.cuttingTheClip");
     // once the file is being put in place there is nothing left to take back
     saveCancel.hidden = finishing;
     saveCancel.disabled = save.stopping;
-    saveCancel.textContent = save.stopping ? "Stopping..." : "Cancel save";
+    saveCancel.textContent = save.stopping ? RK_M("common.stopping") : RK_M("editor.cancelSave");
   }
 
   function beginTrimSave(clipName, mode, precise) {
@@ -1905,7 +1905,7 @@ window.__rkEditorApi = (function () {
     }
     if (document.activeElement && document.activeElement !== document.body) { try { document.activeElement.blur(); } catch {} }
     trimVeil.inert = true;
-    saveTitle.textContent = mode === "screenshot" ? "Saving a screenshot" : mode === "overwrite" ? "Rendering over the original" : "Rendering video";
+    saveTitle.textContent = mode === "screenshot" ? RK_M("editor.savingAScreenshot") : mode === "overwrite" ? RK_M("editor.renderingOverTheOriginal") : RK_M("editor.renderingVideo");
     saveClipName.textContent = clipName;
     saveClipName.title = clipName;
     paintTrimSave(save);
@@ -1937,27 +1937,28 @@ window.__rkEditorApi = (function () {
     while (trimSaving === save) {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), SAVE_POLL_TIMEOUT_MS);
+      let status = null;
       try {
         const res = await fetch(HELPER + "/status?t=" + Date.now(), { cache: "no-store", signal: ctl.signal });
         lastAnswer = Date.now();
-        const status = res.ok ? await res.json().catch(() => null) : null;
-        if (trimSaving !== save) return;
-        const jobs = status && Array.isArray(status.jobs) ? status.jobs : [];
-        const job = jobs.find((j) => j && j.kind === "trim" && j.active && j.clipName === save.clipName);
-        if (job) {
-          save.requestId = job.requestId || save.requestId;
-          save.percent = Math.max(save.percent, Number(job.percent) || 0);
-          save.phase = job.phase || "";
-          paintTrimSave(save);
-        }
+        status = res.ok ? await res.json().catch(() => null) : null;
       } catch {} finally {
         clearTimeout(timer);
+      }
+      if (trimSaving !== save) return;
+      const jobs = status && Array.isArray(status.jobs) ? status.jobs : [];
+      const job = jobs.find((j) => j && j.kind === "trim" && j.active && j.clipName === save.clipName);
+      if (job) {
+        save.requestId = job.requestId || save.requestId;
+        save.percent = Math.max(save.percent, Number(job.percent) || 0);
+        save.phase = job.phase || "";
+        paintTrimSave(save);
       }
       if (trimSaving === save && Date.now() - lastAnswer > SAVE_LOST_MS) {
         // what the helper says about this save later belongs to no editor any more
         save.abandoned = true;
         endTrimSave(save);
-        showToast("Trim failed: ReplayKit's helper stopped answering, so the save may not have finished. Check the clip before editing it again.");
+        showToast(RK_M("editor.trimFailedReplaykitSHelperStopped"));
         scheduleToastHide(TOAST_ERROR_MS);
         return;
       }
@@ -1998,13 +1999,13 @@ window.__rkEditorApi = (function () {
     const transform = trimLanes.mainTransform();
     const precise = transform.w !== 1 || transform.rotate !== 0 || trimPrecise.checked || !!videoPlan || !!trimLanes.subtitlePlan() || !!lookPlan || !!layerPlan || trimLanes.aspect() !== "original" || rendered;
     if (!precise && !trimSnapSkipped && !isTrimSnapActive()) {
-      showToast("Wait a moment or turn on Frame-accurate.", "bad", "Fast trim is not ready yet");
+      showToast(RK_M("editor.waitAMomentOrTurnOn"), "bad", RK_M("editor.fastTrimIsNotReadyYet"));
       scheduleToastHide(TOAST_ERROR_MS);
       return;
     }
     // audio that is still being added is not in a row yet, so the copy would be made without it and nothing would say so
     if (trimLanes.busy()) {
-      showToast("Wait until the audio has been added, then save.", "bad", "Audio is still loading");
+      showToast(RK_M("editor.waitUntilTheAudioHasBeen2"), "bad", RK_M("editor.audioIsStillLoading"));
       scheduleToastHide(TOAST_ERROR_MS);
       return;
     }
@@ -2055,7 +2056,7 @@ window.__rkEditorApi = (function () {
       if (data.cancelled) {
         // nothing was written, and the editor is as it was left
         endTrimSave(save);
-        showToast("Save cancelled, nothing was changed", "info");
+        showToast(RK_M("editor.saveCancelledNothingWasChanged"), "info");
         scheduleToastHide(3000);
         return;
       }
@@ -2064,7 +2065,7 @@ window.__rkEditorApi = (function () {
       }
       endTrimSave(save);
       if (screenshot) {
-        showToast(RK_T("Screenshot saved in Screenshots as {name}", { name: escapeHtml(data.name) }), "info");
+        showToast(RK_M("common.screenshotSavedInScreenshotsAsName", { name: escapeHtml(data.name) }), "info");
         window.dispatchEvent(new Event("replaykit:screenshot-saved"));
         scheduleToastHide(3500);
         return;
@@ -2080,15 +2081,15 @@ window.__rkEditorApi = (function () {
       // under this name there is another file now, and a favorite that was read earlier still describes the old one
       if (mode === "overwrite" && isFavorite(sourceName)) refreshFavoriteClips();
       const msg = mode === "overwrite"
-        ? RK_T("Overwrote {name}", { name: escapeHtml(sourceName) })
-        : RK_T("Saved as {name}", { name: escapeHtml(data.name) });
+        ? RK_M("editor.overwroteName", { name: escapeHtml(sourceName) })
+        : RK_M("editor.savedAsName", { name: escapeHtml(data.name) });
       showToast(msg, "info");
       scheduleToastHide(3500);
       scheduleNextPoll(50);
     } catch (e) {
       if (save && save.abandoned) return;
       endTrimSave(save || trimSaving);
-      showToast(RK_T("Trim failed: {error}", { error: e.message || e }));
+      showToast(RK_M("editor.trimFailedError", { error: e.message || e }));
       scheduleToastHide(TOAST_ERROR_MS);
     }
   }
@@ -2108,8 +2109,8 @@ window.__rkEditorApi = (function () {
   // the render settings: the size of the picture by its short side, the frame rate and the bitrate, each Original to keep what the video has, and whether the render replaces the clip. what was picked stays for the next render while the editor is loaded
   const renderFps = RKCombo.bind(document.getElementById("render-fps"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
   const renderBitrate = RKCombo.bind(document.getElementById("render-bitrate"), () => paintRenderSettings(), { menuKeys:true, signal:EDITOR_SIGNAL });
-  renderFps.setOptions([["0", "Original"], ["24", "24 FPS"], ["30", "30 FPS"], ["60", "60 FPS"], ["120", "120 FPS"], ["144", "144 FPS"]].map(([value, label]) => ({ value, label })));
-  renderBitrate.setOptions([["0", "Auto", "The same quality as the clip, at the size it needs"], ["5", "5 Mbps"], ["10", "10 Mbps"], ["15", "15 Mbps"], ["20", "20 Mbps"], ["30", "30 Mbps"], ["50", "50 Mbps"]].map(([value, label, description]) => ({ value, label, description:description || "" })));
+  renderFps.setOptions([["0", RK_M("editor.original")], ["24", "24 FPS"], ["30", "30 FPS"], ["60", "60 FPS"], ["120", "120 FPS"], ["144", "144 FPS"]].map(([value, label]) => ({ value, label })));
+  renderBitrate.setOptions([["0", RK_M("editor.autoBitrate"), RK_M("editor.theSameQualityAsTheClip")], ["5", RK_M("editor.n5Mbps")], ["10", RK_M("editor.n10Mbps")], ["15", RK_M("editor.n15Mbps")], ["20", RK_M("editor.n20Mbps")], ["30", RK_M("editor.n30Mbps")], ["50", RK_M("editor.n50Mbps")]].map(([value, label, description]) => ({ value, label, description:description || "" })));
   renderFps.value = "0";
   renderBitrate.value = "0";
   let renderHeight = 0;
@@ -2127,10 +2128,10 @@ window.__rkEditorApi = (function () {
       b.classList.toggle("is-selected", on);
       b.setAttribute("aria-checked", on ? "true" : "false");
     });
-    document.getElementById("render-size").textContent = RK_T("Resolution: {width} \u00d7 {height}", { width: w, height: h });
+    document.getElementById("render-size").textContent = RK_M("editor.resolutionWidthHeight", { width: w, height: h });
     const plan = trimLanes.videoPlan(true);
     const seconds = plan ? plan.window.end - plan.window.start : trimDuration() / trimLanes.videoSpeed();
-    document.getElementById("render-length").textContent = RK_T("Duration: {time}", { time: formatDuration(seconds) || "0:00" });
+    document.getElementById("render-length").textContent = RK_M("editor.durationTime", { time: formatDuration(seconds) || "0:00" });
   }
   function openRenderSettings() {
     if (trimRender.disabled || trimSaving) return;
@@ -2182,12 +2183,12 @@ window.__rkEditorApi = (function () {
     // what the quick action menu under the logo offers while the editor is open, and a pick from it, which does what the button of the same name does
     quickActions() {
       return [
-        { id:"exit", label:"Exit editor", icon:"quick/exit", disabled:!!trimSaving },
-        { id:"undo", label:"Undo", icon:"quick/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
-        { id:"redo", label:"Redo", icon:"quick/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
-        { id:"screenshot", label:"Screenshot this frame", icon:"quick/screenshot", disabled:screenshotBtn.disabled },
-        { id:"render", label:"Render video", icon:"quick/render", disabled:trimRender.disabled },
-        { id:"import", label:"Import audio", icon:"quick/import-audio", disabled:!!trimSaving || trimLanes.busy() },
+        { id:"exit", label:RK_M("editor.exitEditor"), icon:"quick/exit", disabled:!!trimSaving },
+        { id:"undo", label:RK_M("common.undo"), icon:"quick/undo", disabled:!!trimSaving || !trimLanes.canUndo() },
+        { id:"redo", label:RK_M("common.redo"), icon:"quick/redo", disabled:!!trimSaving || !trimLanes.canRedo() },
+        { id:"screenshot", label:RK_M("editor.screenshotThisFrame"), icon:"quick/screenshot", disabled:screenshotBtn.disabled },
+        { id:"render", label:RK_M("editor.renderVideo"), icon:"quick/render", disabled:trimRender.disabled },
+        { id:"import", label:RK_M("picker.importAudio"), icon:"quick/import-audio", disabled:!!trimSaving || trimLanes.busy() },
       ];
     },
     quickAction(id) {

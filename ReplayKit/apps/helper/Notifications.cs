@@ -55,7 +55,7 @@ namespace ReplayKitHelper
         // key identifies the thing being announced (an update version, say) so re-announcing it refreshes the existing row. a refresh deliberately leaves `read` alone -- re-checking for an update the user already dismissed must not light the badge up again. url is optional (a github release page, say) and only used to offer an "open release page" action -- items without one just skip that menu entry.
         public static JObject Add(string kind, string key, string title, string body, string url = "", string linkLabel = null)
         {
-            if (string.IsNullOrWhiteSpace(title)) return new JObject { ["ok"] = false, ["message"] = "Notification needs a title." };
+            if (string.IsNullOrWhiteSpace(title)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("notifications.notificationNeedsATitle") };
             lock (Gate)
             {
                 var items = ReadItems();
@@ -209,7 +209,7 @@ namespace ReplayKitHelper
         public static void AnnounceUpdate(string version, string notes, string releaseUrl = "")
         {
             if (string.IsNullOrWhiteSpace(version)) return;
-            Add("update", "update:" + version, Locales.T("Update ReplayKit {version}", "version", version), notes ?? "", releaseUrl ?? "");
+            Add("update", "update:" + version, Locales.Message("notifications.updateReplaykitVersion", "version", version), notes ?? "", releaseUrl ?? "");
         }
     }
 }

@@ -49,11 +49,11 @@ namespace ReplayKitHelper
                     var body = JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body);
                     long id = body["id"]?.Value<long?>() ?? -1;
                     string state = body["state"]?.Value<string>() ?? "";
-                    if (id < 0 || (state != "start" && state != "failed")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save notice was not valid." }); return false; }
+                    if (id < 0 || (state != "start" && state != "failed")) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.theSaveNoticeWasNotValid") }); return false; }
                     if (state == "start") ClipBuffer.MarkSaveStarted(id); else ClipBuffer.MarkSaveEnded(id, "");
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 }
-                catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is FormatException || ex is OverflowException || ex is ArgumentException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save notice was not valid." }); }
+                catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is FormatException || ex is OverflowException || ex is ArgumentException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.theSaveNoticeWasNotValid") }); }
                 return false;
             }
 
@@ -65,7 +65,7 @@ namespace ReplayKitHelper
                     var result = ClipBuffer.SaveSegments(JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body));
                     HttpResponse.SendJson(stream, result["ok"]?.Value<bool>() == true ? 200 : 409, result);
                 }
-                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "The save request was not valid." }); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.theSaveRequestWasNotValid") }); }
                 return false;
             }
 
@@ -74,7 +74,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 try { HttpResponse.SendJson(stream, 200, GpuDrivers.Report(JObject.Parse(string.IsNullOrWhiteSpace(req.Body) ? "{}" : req.Body))); }
-                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad report" }); }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badReport") }); }
                 return false;
             }
 
@@ -128,7 +128,7 @@ namespace ReplayKitHelper
                         if (!rbReached)
                         {
                             body["ok"] = false;
-                            body["message"] = rbWantOn ? Locales.T("OBS did not start the replay buffer in time.") : Locales.T("OBS did not stop the replay buffer in time.");
+                            body["message"] = rbWantOn ? Locales.Message("helper.obsDidNotStartTheReplay") : Locales.Message("helper.obsDidNotStopTheReplay");
                         }
                         HttpResponse.SendJson(stream, rbReached ? 200 : 409, body);
                         return false;

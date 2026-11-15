@@ -30,7 +30,7 @@ namespace ReplayKitHelper
                 catch (Exception ex) { Log.Write("MicTest: default device name: " + ex.Message); }
 
                 var options = new JArray();
-                var first = new JObject { ["value"] = MicDevices.DefaultId, ["label"] = "Default" };
+                var first = new JObject { ["value"] = MicDevices.DefaultId, ["label"] = Locales.Message("settings.default") };
                 if (!string.IsNullOrEmpty(defaultName)) first["blurb"] = defaultName;
                 options.Add(first);
                 foreach (var device in MicDevices.ListActive())
@@ -40,16 +40,16 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 Log.Write("MicTest.GetDevicesPayload: " + ex.Message);
-                return Fail(Locales.T("Could not list microphones: {error}", "error", ex.Message));
+                return Fail(Locales.Message("settings.couldNotListMicrophonesError", "error", ex.Message));
             }
         }
 
         // (re)starts a session; a running one is replaced, so changing the device or switching between monitor and playback is just another start.
         public static JObject Start(string deviceId, int volumePercent, bool noiseSuppression, int sensitivityDb, bool playback)
         {
-            if (!MicDevices.IsValidId(deviceId)) return Fail("That microphone is not valid.");
-            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.T("Volume must be between 0 and {VolumeMax}.", "VolumeMax", VolumeMax));
-            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.T("Input sensitivity must be between {SensitivityMin} and {SensitivityMax}.", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
+            if (!MicDevices.IsValidId(deviceId)) return Fail(Locales.Message("common.thatMicrophoneIsNotValid"));
+            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.Message("settings.volumeMustBeBetween0And", "VolumeMax", VolumeMax));
+            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.Message("settings.inputSensitivityMustBeBetweenSensitivitymin", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
 
             try
             {
@@ -57,7 +57,7 @@ namespace ReplayKitHelper
                 if (deviceId != MicDevices.DefaultId)
                 {
                     var match = MicDevices.ListActive().FirstOrDefault(d => string.Equals(d.Id, deviceId, StringComparison.OrdinalIgnoreCase));
-                    if (match == null) return Fail("That microphone is not connected.");
+                    if (match == null) return Fail(Locales.Message("settings.thatMicrophoneIsNotConnected"));
                     deviceId = match.Id;
                 }
                 // only playback makes sound from this process, so only playback needs the desktop audio exclusion
@@ -75,18 +75,18 @@ namespace ReplayKitHelper
             catch (Exception ex)
             {
                 Log.Write("MicTest.Start: " + ex.Message);
-                return Fail(Locales.T("Could not start the microphone test: {error}", "error", ex.Message));
+                return Fail(Locales.Message("settings.couldNotStartTheMicrophoneTest", "error", ex.Message));
             }
         }
 
         // the page pushes its current (possibly unsaved) values here, so the preview follows the controls the moment they move.
         public static JObject SetParams(int volumePercent, bool noiseSuppression, int sensitivityDb)
         {
-            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.T("Volume must be between 0 and {VolumeMax}.", "VolumeMax", VolumeMax));
-            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.T("Input sensitivity must be between {SensitivityMin} and {SensitivityMax}.", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
+            if (volumePercent < 0 || volumePercent > VolumeMax) return Fail(Locales.Message("settings.volumeMustBeBetween0And", "VolumeMax", VolumeMax));
+            if (sensitivityDb < SensitivityMin || sensitivityDb > SensitivityMax) return Fail(Locales.Message("settings.inputSensitivityMustBeBetweenSensitivitymin", "SensitivityMin", SensitivityMin, "SensitivityMax", SensitivityMax));
             lock (Gate)
             {
-                if (_session == null || !_session.IsRunning) return Fail("The microphone test is not running.");
+                if (_session == null || !_session.IsRunning) return Fail(Locales.Message("settings.theMicrophoneTestIsNotRunning"));
                 _session.SetParams(AudioVolume.ToGain(volumePercent), noiseSuppression, sensitivityDb);
                 return new JObject { ["ok"] = true };
             }

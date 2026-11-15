@@ -76,7 +76,7 @@ namespace ReplayKitHelper
         private static string SteamIconUrl(uint appId, string hash) =>
             "https://shared.fastly.steamstatic.com/community_assets/images/apps/" + appId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + hash + ".jpg";
 
-        // where the art of a game can be seen on the web, for the discord presence, which shows images by address only: the icon discord keeps for a catalog game, else the steam icon when the catalog knows its hash; null when the art exists only on this pc
+        // where the art of a game can be seen on the web, for the discord presence, which shows images by address only: the icon discord keeps for a catalog game, else the steam icon, read from the store page when the catalog has no hash for it; null when the art exists only on this pc. it may wait on the network, so only the presence thread calls it
         internal static string PublicUrl(GameCatalog.Game game)
         {
             if (game == null) return null;
@@ -86,7 +86,12 @@ namespace ReplayKitHelper
             var source = steam != 0 ? GameCatalog.BySteamId(steam) ?? game : game;
             // a steam library game is a steam- id of its own, while the catalog entry with the same app id holds the discord icon
             if (source.IconHash != null) return DiscordIconUrl(source.Id, source.IconHash, 512);
-            return steam != 0 && source.SteamIconHash != null ? SteamIconUrl(steam, source.SteamIconHash) : null;
+            // a game a launcher named a little differently from the catalog, or one the catalog only knows by name
+            var twin = source == game ? GameCatalog.ArtTwin(game.Name) : null;
+            if (twin?.IconHash != null) return DiscordIconUrl(twin.Id, twin.IconHash, 512);
+            if (steam == 0) return null;
+            string hash = source.SteamIconHash ?? ScrapedSteamIconHash(steam);
+            return hash != null ? SteamIconUrl(steam, hash) : null;
         }
 
         private static byte[] Artwork(string name, string type, Func<byte[]> download)
@@ -190,21 +195,29 @@ namespace ReplayKitHelper
 
         private static byte[] FetchSteam(uint appId, string hash)
         {
-            string id = appId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (hash == null)
-            {
-                byte[] page = Fetch("https://store.steampowered.com/app/" + id + "/", "text/html",
-                    SteamStore, prefixBytes: 128 * 1024);
-                if (page != null) hash = SteamIconHash(Encoding.UTF8.GetString(page), appId);
-                if (hash == null)
-                {
-                    page = Fetch("https://steamcommunity.com/app/" + id, "text/html",
-                        SteamCommunity, prefixBytes: 64 * 1024);
-                    if (page != null) hash = SteamIconHash(Encoding.UTF8.GetString(page), appId);
-                }
-            }
+            hash = hash ?? ScrapedSteamIconHash(appId);
             if (hash == null) return null;
             return Fetch(SteamIconUrl(appId, hash), "image/jpeg", Steam);
+        }
+
+        private static readonly TimeSpan ScrapeRetry = TimeSpan.FromMinutes(30);
+        private static readonly ConcurrentDictionary<uint, (string Hash, DateTime At)> Scraped = new ConcurrentDictionary<uint, (string, DateTime)>();
+
+        // the icon hash of a steam game the catalog has none for, read from its store page and then its community page; a found hash is kept for the session and a miss is asked again after a while
+        private static string ScrapedSteamIconHash(uint appId)
+        {
+            if (Scraped.TryGetValue(appId, out var known) && (known.Hash != null || DateTime.UtcNow - known.At < ScrapeRetry)) return known.Hash;
+            string id = appId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string hash = null;
+            byte[] page = Fetch("https://store.steampowered.com/app/" + id + "/", "text/html", SteamStore, prefixBytes: 128 * 1024);
+            if (page != null) hash = SteamIconHash(Encoding.UTF8.GetString(page), appId);
+            if (hash == null)
+            {
+                page = Fetch("https://steamcommunity.com/app/" + id, "text/html", SteamCommunity, prefixBytes: 64 * 1024);
+                if (page != null) hash = SteamIconHash(Encoding.UTF8.GetString(page), appId);
+            }
+            Scraped[appId] = (hash, DateTime.UtcNow);
+            return hash;
         }
 
         private static byte[] Fetch(string url, string type, Provider provider, int prefixBytes = 0)

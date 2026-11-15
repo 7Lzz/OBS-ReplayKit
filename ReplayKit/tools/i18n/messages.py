@@ -1,4 +1,4 @@
-"""Validate and package ReplayKit's explicit messages."""
+"""Validate and package ReplayKit's messages."""
 import argparse
 import hashlib
 import json
@@ -15,8 +15,11 @@ PLURALS = {
     "fr": {"one", "many", "other"}, "ja": {"other"}, "pt": {"one", "many", "other"},
     "ru": {"one", "few", "many", "other"}, "zh": {"other"},
 }
-CALL = re.compile(r'\b(RK_M|(?:Locales|SetupLocale)\.Message|TrMessage)\(\s*"([^"]+)"')
-ATTRIBUTE = re.compile(r'\bdata-i18n(?:-title|-placeholder|-aria-label|-data-tooltip|-alt)?\s*=\s*"([^"]+)"')
+CALL = re.compile(r'\b(RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage)\(\s*"([^"]+)"')
+# an id the checker cannot read could name a message that does not exist, which would show the raw id as text
+COMPUTED_CALL = re.compile(r'(?<!QString )\b(?:RK_MH?|(?:Locales|SetupLocale)\.Message|SetupLocale\.Pair|TrMessage)\(\s*(?!")')
+ATTRIBUTE = re.compile(r'\bdata-i18n(?:-title|-placeholder|-aria-label|-data-tooltip|-alt)?\s*=\s*(["\'])([^"\']+)\1')
+# the english-keyed lookups the messages replaced; one that comes back would show english text again
 LEGACY_CALL = re.compile(r'\b(?:RK_T|(?:Locales|SetupLocale)\.T|Tr)\(')
 
 
@@ -73,19 +76,28 @@ def problem(text, plural, language, placeholders=None):
 def references(catalog):
     paths = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "ui").glob("*.js"))
     paths += sorted((ROOT / "apps").glob("*/*.cs")) + sorted((ROOT / "apps/setup").glob("*.html"))
-    paths += sorted((ROOT / "plugins/replaykit/src").rglob("*.cpp"))
+    paths += sorted((ROOT / "plugins/replaykit/src").rglob("*.cpp")) + sorted((ROOT / "plugins/replaykit/src").rglob("*.hpp"))
+    used = set()
     for path in paths:
+        if path.name == "helper-endpoint.js":
+            continue
         rel = path.relative_to(ROOT)
         source = path.read_text(encoding="utf-8-sig")
-        if re.search(r"<html\b[^>]*\bdata-i18n-explicit\b", source) and LEGACY_CALL.search(source):
-            yield f"{rel}: explicit pages must use message IDs"
+        legacy = LEGACY_CALL.search(source)
+        if legacy:
+            yield f"{rel}:{source.count(chr(10), 0, legacy.start()) + 1}: text must use a message ID"
+        for computed in COMPUTED_CALL.finditer(source):
+            yield f"{rel}:{source.count(chr(10), 0, computed.start()) + 1}: a message ID must be written out, not computed"
         for matcher in (CALL, ATTRIBUTE):
             for match in matcher.finditer(source):
                 ident = match[match.lastindex]
+                used.add(ident)
                 if ident not in catalog:
                     yield f"{rel}:{source.count(chr(10), 0, match.start()) + 1}: unknown message {ident}"
-                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] not in ("RK_M", "Locales.Message", "SetupLocale.Message")):
+                elif isinstance(catalog[ident]["text"], dict) and (matcher is ATTRIBUTE or match[1] not in ("RK_M", "RK_MH", "Locales.Message", "SetupLocale.Message", "SetupLocale.Pair")):
                     yield f"{rel}: plural message {ident} requires RK_M, Locales.Message or SetupLocale.Message with a numeric count"
+    for ident in sorted(set(catalog) - used):
+        yield f"en-US {ident}: unused message"
 
 
 def compile_messages(destination=None):
@@ -139,9 +151,36 @@ def compile_messages(destination=None):
     print(f"Validated {len(catalog)} message IDs across {len(codes)} languages.")
 
 
-def seed_obs(directory):
-    from i18n import read_obs_ini, strip_accelerator
+def write_dock_scripts(directory):
+    """the english catalog and the page runtime as scripts beside the dock pages, for a dock opened from disk before the helper answers."""
+    catalog = read(SOURCE / "en-US.json")
+    english = json.dumps({ident: entry["text"] for ident, entry in catalog.items()}, ensure_ascii=False, sort_keys=True)
+    # escape < so no message can close the script it is loaded as
+    english = english.replace("<", "\\u003c")
+    runtime = re.search(r"<script>([\s\S]*?)</script>", (ROOT / "ui/_i18n.html").read_text(encoding="utf-8"))
+    if runtime is None:
+        raise ValueError("ui/_i18n.html holds no runtime script")
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "messages-en.js").write_text(f'window.RK_LANG="en-US";window.RK_MESSAGES={english};\n', encoding="utf-8", newline="\n")
+    (directory / "i18n-runtime.js").write_text(runtime[1].strip() + "\n", encoding="utf-8", newline="\n")
 
+
+def read_obs_ini(path):
+    out = {}
+    if not Path(path).exists():
+        return out
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
+        match = re.match(r'^([A-Za-z0-9_.\-]+)="(.*)"\s*$', line.strip())
+        if match:
+            out[match[1]] = match[2].replace('\\"', '"')
+    return out
+
+
+def strip_accelerator(text):
+    return re.sub(r"&(?!&)", "", text).replace("&&", "&")
+
+
+def seed_obs(directory):
     catalog = read(SOURCE / "en-US.json")
     for code in languages():
         if code == "en-US":
@@ -166,10 +205,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, help="write runtime catalogs into the installer staging directory")
     parser.add_argument("--seed-obs", type=Path, help="fill missing messages that declare a matching OBS key from an OBS locale folder")
+    parser.add_argument("--dock", type=Path, help="write the english catalog and the page runtime as scripts into the staged dock folder")
     args = parser.parse_args()
     try:
         if args.seed_obs is not None:
             seed_obs(args.seed_obs)
         compile_messages(args.output)
+        if args.dock is not None:
+            write_dock_scripts(args.dock)
     except (OSError, ValueError) as error:
         parser.exit(1, f"{error}\n")

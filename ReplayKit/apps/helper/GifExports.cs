@@ -15,11 +15,11 @@ namespace ReplayKitHelper
         {
             string root = Path.GetFullPath(AppConfig.GetClipDir());
             string folder = Path.Combine(root, "GIFs");
-            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Clip folder not found");
-            if (File.Exists(folder)) throw new IOException("The GIF folder is occupied by a file");
+            if (!Directory.Exists(root)) throw new DirectoryNotFoundException(Locales.Message("common.clipFolderNotFound"));
+            if (File.Exists(folder)) throw new IOException(Locales.Message("editor.theGifFolderIsOccupiedBy"));
             if (create) Directory.CreateDirectory(folder);
             if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("The GIF folder cannot be a link");
+                throw new IOException(Locales.Message("editor.theGifFolderCannotBeA"));
             return folder;
         }
 
@@ -67,11 +67,11 @@ namespace ReplayKitHelper
         {
             to = (to ?? "").Trim();
             if (!Path.GetExtension(to).Equals(".gif", StringComparison.OrdinalIgnoreCase)) to += ".gif";
-            if (!ValidName(to)) throw new ArgumentException("That name cannot be used");
+            if (!ValidName(to)) throw new ArgumentException(Locales.Message("common.thatNameCannotBeUsed"));
             string target = Path.Combine(Path.GetDirectoryName(path), to);
             if (string.Equals(target, path, StringComparison.Ordinal)) return to;
             // a change of case only is the same file to windows, so it is moved on its own
-            if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException("A GIF with that name already exists");
+            if (File.Exists(target) && !string.Equals(target, path, StringComparison.OrdinalIgnoreCase)) throw new IOException(Locales.Message("editor.aGifWithThatNameAlready"));
             ClipFiles.MoveWhenFree(path, target);
             return to;
         }
@@ -94,14 +94,14 @@ namespace ReplayKitHelper
             double duration = end - start;
             if (double.IsNaN(start) || double.IsInfinity(start) || double.IsNaN(duration) || double.IsInfinity(duration) ||
                 start < 0 || duration < MinSeconds || duration > MaxSeconds)
-                throw new ArgumentException("Select between 0.5 and 15 seconds for a GIF.");
+                throw new ArgumentException(Locales.Message("editor.selectBetween05And15"));
             var source = Clips.GetSafeClipPath(name);
-            if (source == null || !File.Exists(source.Full)) throw new ArgumentException("Clip not found.");
+            if (source == null || !File.Exists(source.Full)) throw new ArgumentException(Locales.Message("common.clipNotFound2"));
             string id = UploadState.NewRequestId();
             using var reservation = JobCoordinator.TryReserve(id, source.Name, source.Full, "gif", out string busy);
             if (reservation == null) throw new InvalidOperationException(busy);
             string ffmpeg = Compression.GetToolPaths()["ffmpeg"]?.Value<string>();
-            if (!File.Exists(ffmpeg)) throw new IOException("FFmpeg is unavailable.");
+            if (!File.Exists(ffmpeg)) throw new IOException(Locales.Message("editor.ffmpegIsUnavailable"));
             string folder = Folder(true);
             string temporary = Path.Combine(folder, "_replaykit_" + Guid.NewGuid().ToString("N") + ".gif");
             string stem = Path.GetFileNameWithoutExtension(source.Name);
@@ -123,7 +123,7 @@ namespace ReplayKitHelper
                 if (result.ExitCode != 0 || !File.Exists(temporary) || new FileInfo(temporary).Length == 0)
                 {
                     Log.Write("GIF export failed (exit " + result.ExitCode + "): " + string.Join(" ", result.Output.Where(line => line.Length > 0).Take(3)));
-                    throw new IOException("The selected video could not be exported as a GIF.");
+                    throw new IOException(Locales.Message("editor.theSelectedVideoCouldNotBe"));
                 }
                 for (int suffix = 1; suffix <= 9999; suffix++)
                 {
@@ -133,9 +133,9 @@ namespace ReplayKitHelper
                     try { File.Move(temporary, target); return output; }
                     catch (IOException) when (File.Exists(target)) { }
                 }
-                throw new IOException("No available GIF filename.");
+                throw new IOException(Locales.Message("editor.noAvailableGifFilename"));
             }
-            catch (TimeoutException) { throw new IOException("The GIF took too long to export."); }
+            catch (TimeoutException) { throw new IOException(Locales.Message("editor.theGifTookTooLongTo")); }
             finally
             {
                 try { if (File.Exists(temporary)) File.Delete(temporary); }

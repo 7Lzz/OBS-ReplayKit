@@ -1,178 +1,99 @@
-<!-- explicit messages are rendered by RK_M and data-i18n bindings; the text observer only serves pages that still use the legacy catalog -->
+<!-- the messages of the page: RK_M and RK_MH for text a script builds, data-i18n bindings for markup -->
 <script>
 (function () {
   if (window.RK_I18N) return;
   var ATTRS = ["title", "placeholder", "aria-label", "data-tooltip", "alt"];
-  // text inside these is code, user content or the window title the plugin finds windows by, never ui text
-  var TEXT_SKIP = "script,style,textarea,title,noscript,[translate=\"no\"],[contenteditable=\"true\"],[contenteditable=\"\"]";
-  var ATTR_SKIP = "[translate=\"no\"]";
-  var letters = /[A-Za-z]/;
   var has = Object.prototype.hasOwnProperty;
-  var table = window.RK_STRINGS && typeof window.RK_STRINGS === "object" ? window.RK_STRINGS : null;
   var messages = window.RK_MESSAGES || {};
   var lang = typeof window.RK_LANG === "string" ? window.RK_LANG : "en-US";
-  var explicit = document.documentElement.hasAttribute("data-i18n-explicit");
   var messageSelector = ["[data-i18n]"].concat(ATTRS.map(function (name) { return "[data-i18n-" + name + "]"; })).join(", ");
   var plurals, numbers, languageRequest = 0;
-  // the english source of every text and attribute this changed, so a later switch of language starts from the english text again and a write of its own is never translated twice
-  var textSeen = new WeakMap();
-  var attrSeen = new WeakMap();
-  var observer = null;
-
-  function lookup(english) {
-    if (!table || !english) return null;
-    var t = has.call(table, english) ? table[english] : null;
-    return typeof t === "string" && t ? t : null;
-  }
 
   function fill(text, vars) {
     if (!vars) return text;
     return text.replace(/\{([A-Za-z0-9_]+)\}/g, function (match, key) { return has.call(vars, key) && vars[key] != null ? String(vars[key]) : match; });
   }
 
-  function T(english, vars) {
-    var source = english == null ? "" : String(english);
-    return fill(lookup(source) || source, vars);
+  // the text of a message for these values, its plural form picked and its count formatted, before the values go in
+  function pick(id, vars) {
+    var text = has.call(messages, id) ? messages[id] : id;
+    if (typeof text === "string") return { text: text, vars: vars };
+    var count = vars && vars.count;
+    if (typeof count !== "number" || !Number.isFinite(count)) return { text: text.other, vars: vars };
+    if (!plurals) plurals = new Intl.PluralRules(lang);
+    if (!numbers) numbers = new Intl.NumberFormat(lang);
+    return { text: text[plurals.select(count)] || text.other, vars: Object.assign({}, vars, { count: numbers.format(count) }) };
   }
 
   function M(id, vars) {
-    var text = has.call(messages, id) ? messages[id] : id;
-    if (typeof text === "string") return fill(text, vars);
-    var count = vars && vars.count;
-    if (typeof count !== "number" || !Number.isFinite(count)) return fill(text.other, vars);
-    if (!plurals) plurals = new Intl.PluralRules(lang);
-    if (!numbers) numbers = new Intl.NumberFormat(lang);
-    return fill(text[plurals.select(count)] || text.other, Object.assign({}, vars, { count: numbers.format(count) }));
+    var p = pick(id, vars);
+    return fill(p.text, p.vars);
   }
 
-  function renderMessages() {
-    document.querySelectorAll(messageSelector).forEach(function (element) {
-      var id = element.getAttribute("data-i18n");
-      if (id && has.call(messages, id)) element.textContent = M(id);
-      ATTRS.forEach(function (name) {
-        var attributeId = element.getAttribute("data-i18n-" + name);
-        if (attributeId && has.call(messages, attributeId)) element.setAttribute(name, M(attributeId));
-      });
-    });
+  // a message as html: its text is escaped, its **runs** turn bold, and the values go in as the caller gives them, so a caller escapes what is not markup
+  function H(id, vars) {
+    var p = pick(id, vars);
+    var safe = p.text.replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; });
+    return fill(safe.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"), p.vars);
   }
 
-  // the translation of a whole text, keeping the white space around it
-  function translated(source) {
-    if (!letters.test(source)) return source;
-    var trimmed = source.trim();
-    var t = lookup(trimmed);
-    if (!t) return source;
-    var lead = source.slice(0, source.indexOf(trimmed));
-    return lead + t + source.slice(lead.length + trimmed.length);
-  }
+  // the language and ids an element last rendered with: a bound element a script moves keeps whatever text the script gave it since, and only a new id or a new language renders it again
+  var rendered = new WeakMap();
 
-  function translateText(node) {
-    var data = node.data;
-    var seen = textSeen.get(node);
-    var source = seen && seen.out === data ? seen.src : data;
-    if (!seen && !letters.test(source)) return;
-    var out = translated(source);
-    if (out === source) textSeen.delete(node);
-    else textSeen.set(node, { src: source, out: out });
-    if (data !== out) node.data = out;
-  }
-
-  function translateAttr(el, name) {
-    if (el.hasAttribute("data-i18n-" + name)) return;
-    var value = el.getAttribute(name);
-    if (value == null) return;
-    var map = attrSeen.get(el);
-    var seen = map && map[name];
-    var source = seen && seen.out === value ? seen.src : value;
-    if (!seen && !letters.test(source)) return;
-    var out = translated(source);
-    if (out === source) { if (map) delete map[name]; }
-    else { if (!map) attrSeen.set(el, map = {}); map[name] = { src: source, out: out }; }
-    if (value !== out) el.setAttribute(name, out);
-  }
-
-  function attrsOf(el) {
-    for (var i = 0; i < ATTRS.length; i++) if (el.hasAttribute(ATTRS[i])) translateAttr(el, ATTRS[i]);
-  }
-
-  // an element whose own text is never translated still gets its attributes translated, a textarea its placeholder for one, unless it is marked translate="no"
-  function walk(root) {
-    if (root.nodeType === 3) { var host = root.parentElement; if (host && !host.closest(TEXT_SKIP) && !host.hasAttribute("data-i18n")) translateText(root); return; }
-    if (root.nodeType !== 1 && root.nodeType !== 9 && root.nodeType !== 11) return;
-    if (root.nodeType === 1) {
-      if (!root.closest(ATTR_SKIP)) attrsOf(root);
-      if (root.closest(TEXT_SKIP)) return;
+  function renderElement(element) {
+    var id = element.getAttribute("data-i18n");
+    var key = lang + "|" + id + "|" + ATTRS.map(function (name) { return element.getAttribute("data-i18n-" + name); }).join("|");
+    if (rendered.get(element) === key) return;
+    rendered.set(element, key);
+    if (id && has.call(messages, id)) {
+      var text = M(id);
+      if (element.textContent !== text) element.textContent = text;
     }
-    var walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-      acceptNode: function (n) {
-        if (n.nodeType === 3) return n.parentElement.hasAttribute("data-i18n") ? NodeFilter.FILTER_SKIP : NodeFilter.FILTER_ACCEPT;
-        if (n.matches(ATTR_SKIP)) return NodeFilter.FILTER_REJECT;
-        attrsOf(n);
-        return n.matches(TEXT_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
-      },
+    ATTRS.forEach(function (name) {
+      var attributeId = element.getAttribute("data-i18n-" + name);
+      if (attributeId && has.call(messages, attributeId)) element.setAttribute(name, M(attributeId));
     });
-    var node;
-    while ((node = walker.nextNode())) translateText(node);
   }
 
-  function onMutations(records) {
-    for (var i = 0; i < records.length; i++) {
-      var r = records[i];
-      if (r.type === "characterData") {
-        var parent = r.target.parentElement;
-        if (parent && !parent.closest(TEXT_SKIP) && !parent.hasAttribute("data-i18n")) translateText(r.target);
-      } else if (r.type === "attributes") {
-        if (!r.target.closest(ATTR_SKIP)) translateAttr(r.target, r.attributeName);
-      } else {
-        for (var j = 0; j < r.addedNodes.length; j++) {
-          var added = r.addedNodes[j];
-          if (!added.isConnected) continue;
-          var host = added.parentElement;
-          if (host && host.closest(ATTR_SKIP)) continue;
-          walk(added);
-        }
+  function renderMessages(root) {
+    root = root && root.nodeType === 1 ? root : document;
+    if (root.nodeType === 1 && root.matches(messageSelector)) renderElement(root);
+    root.querySelectorAll(messageSelector).forEach(renderElement);
+  }
+
+  // keyed text renders the moment the parser or a script adds it, or a script points an element at another message, so no label waits for domcontentloaded or stays empty in markup a script builds
+  function watchMessages() {
+    new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (r.type === "attributes") { renderElement(r.target); continue; }
+        for (var j = 0; j < r.addedNodes.length; j++) if (r.addedNodes[j].nodeType === 1) renderMessages(r.addedNodes[j]);
       }
-    }
+    }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-i18n"].concat(ATTRS.map(function (name) { return "data-i18n-" + name; })) });
   }
 
-  function watch() {
-    if (observer) return;
-    observer = new MutationObserver(onMutations);
-    observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
-  }
-
-  // switches the page to another language without loading it again, for a picker that shows its choice before it is saved; resolves once the page shows it
+  // switches the page to another language without loading it again, for a picker that shows its choice before it is saved; bound text renders again here, and a page redraws the text its scripts built on the rk-language event
   function use(code) {
     if (typeof code !== "string" || !/^[a-z]{2,3}-[A-Za-z]{2,4}$/.test(code)) return Promise.reject(new Error("Unknown language."));
     var request = ++languageRequest;
     return fetch("/locale/messages.json?lang=" + encodeURIComponent(code), { cache: "no-store" }).then(function (res) {
-        if (!res.ok) throw new Error("The strings of " + code + " could not be loaded.");
-        return res.json();
-    }).then(function (strings) {
+      if (!res.ok) throw new Error("The messages of " + code + " could not be loaded.");
+      return res.json();
+    }).then(function (loaded) {
       if (request !== languageRequest) return;
-      table = strings.legacy;
-      messages = strings.messages;
+      messages = loaded;
       lang = code;
       plurals = numbers = null;
       document.documentElement.lang = code;
       renderMessages();
-      if (!explicit) {
-        if (table && code !== "en-US") watch();
-        walk(document);
-        if (code === "en-US" && observer) { observer.disconnect(); observer = null; }
-      }
+      document.dispatchEvent(new CustomEvent("rk-language", { detail: { lang: code } }));
     });
   }
 
-  window.RK_T = T;
   window.RK_M = M;
-  window.RK_I18N = { t: T, use: use, lang: function () { return lang; } };
+  window.RK_MH = H;
+  window.RK_I18N = { use: use, lang: function () { return lang; } };
   document.documentElement.lang = lang;
-  document.addEventListener("DOMContentLoaded", renderMessages);
-  if (table && !explicit && lang !== "en-US") {
-    watch();
-    // a safety pass once the parser is done, for anything it added before the observer saw it
-    document.addEventListener("DOMContentLoaded", function () { walk(document); });
-  }
+  watchMessages();
 })();
 </script>

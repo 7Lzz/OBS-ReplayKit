@@ -49,7 +49,7 @@ namespace ReplayKitHelper
                         if (int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int one)) tracks.Add(one);
                         else parsed = false;
                     }
-                    if (!parsed) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad request" }); return false; }
+                    if (!parsed) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badRequest") }); return false; }
                     var started = Speech.StartTranscribe(Q("file"), from, to, tracks, Q("language"), Q("model"));
                     HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 400, started);
                 }
@@ -95,7 +95,7 @@ namespace ReplayKitHelper
                     {
                         JObject edit;
                         try { edit = JObject.Parse(req.Body); }
-                        catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad edit" }); return false; }
+                        catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badEdit") }); return false; }
                         var saved = EditDrafts.Save(Q("file"), edit);
                         HttpResponse.SendJson(stream, saved.Value<bool>("ok") ? 200 : 400, saved);
                         return false;
@@ -119,12 +119,12 @@ namespace ReplayKitHelper
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 JObject body;
                 try { body = JObject.Parse(req.Body ?? ""); }
-                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badEditorSession") }); return false; }
                 string view = body["view"]?.Type == JTokenType.String ? body.Value<string>("view") : null;
                 string id = body["id"]?.Type == JTokenType.String ? body.Value<string>("id") : null;
                 string action = body["action"]?.Type == JTokenType.String ? body.Value<string>("action") : null;
                 if ((view != "clips" && view != "home") || !Guid.TryParseExact(id, "D", out _))
-                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badEditorSession") }); return false; }
                 if (action == "register")
                 {
                     JobCoordinator.RegisterEditor(view, id);
@@ -133,17 +133,17 @@ namespace ReplayKitHelper
                 }
                 if (body["revision"]?.Type != JTokenType.Integer || !long.TryParse(body["revision"].ToString(), out long revision) || revision <= 0 ||
                     (action != "add" && action != "clear"))
-                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor session." }); return false; }
+                { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badEditorSession") }); return false; }
                 var paths = new List<string>();
                 if (action == "add")
                 {
                     if (!(body["names"] is JArray names) || names.Count == 0 || names.Count > 128)
-                    { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad editor sources." }); return false; }
+                    { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badEditorSources") }); return false; }
                     foreach (var name in names)
                     {
                         var selected = name.Type == JTokenType.String ? Clips.GetEditorSource(name.Value<string>()) : null;
                         if (selected == null || !File.Exists(selected.Full))
-                        { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "An editor source is unavailable." }); return false; }
+                        { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.anEditorSourceIsUnavailable") }); return false; }
                         paths.Add(selected.Full);
                     }
                 }
@@ -208,7 +208,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var clip = Clips.GetEditorSource(Q("name"));
-                if (clip == null || !File.Exists(clip.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "That clip was not found" }); return false; }
+                if (clip == null || !File.Exists(clip.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.thatClipWasNotFound") }); return false; }
                 HttpResponse.SendJson(stream, 200, AudioImports.BeginFromPath(clip.Full));
                 return false;
             }
@@ -310,20 +310,20 @@ namespace ReplayKitHelper
                         lookEdit = editBody["look"] != null && editBody["look"].Type != JTokenType.Null ? editBody["look"] : null;
                         layerEdit = editBody["layers"] != null && editBody["layers"].Type != JTokenType.Null ? editBody["layers"] : null;
                     }
-                    catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad audio edit" }); return false; }
+                    catch (Newtonsoft.Json.JsonException) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badAudioEdit") }); return false; }
                 }
                 try
                 {
                     double videoSpeed = 1;
                     if (!string.IsNullOrEmpty(Q("speed")) && !double.TryParse(Q("speed"), NumberStyles.Float, CultureInfo.InvariantCulture, out videoSpeed))
                     {
-                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad speed" });
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badSpeed") });
                         return false;
                     }
                     double frameTime = -1;
                     if (mode == "screenshot" && !double.TryParse(Q("time"), NumberStyles.Float, CultureInfo.InvariantCulture, out frameTime))
                     {
-                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad screenshot time" });
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.badScreenshotTime") });
                         return false;
                     }
                     // the render settings of the editor, each left out to keep what the video has
@@ -333,7 +333,7 @@ namespace ReplayKitHelper
                     var render = new Trim.RenderOptions { Height = renderHeight, Fps = renderFps, BitrateKbps = renderKbps };
                     if (!double.TryParse(Q("pictureScale", "1"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureScale) ||
                         !double.TryParse(Q("pictureRotation", "0"), NumberStyles.Float, CultureInfo.InvariantCulture, out double pictureRotation))
-                        throw new ArgumentException("Invalid video transform.");
+                        throw new ArgumentException(Locales.Message("editor.invalidVideoTransform"));
                     var result = Trim.InvokeClipTrim(file, startSec, endSec, mode, precise, removeAudio, audioEdit, videoSpeed, videoEdit, subtitleEdit, lookEdit, layerEdit, Q("aspect", "original"), frameTime, render, pictureScale, pictureRotation);
                     HttpResponse.SendJson(stream, result.Ok ? 200 : 400, TrimResultToJson(result));
                 }
@@ -372,16 +372,16 @@ namespace ReplayKitHelper
                 int.TryParse(Q("scaleHeight"), out int scaleHeight);
                 // compress-history rules (enforced server-side as defense in depth; the dock ui also disables the relevant card): clip already marked slow (libx265 medium) -> reject entirely, its the best mode and re-running anything would just degrade quality without size gain. clip already marked fast (libx264 fast) + fast again requested -> reject, re-fast-compressing produces no meaningful gain. re-running with smaller is allowed (fast -> slow is a valid upgrade path).
                 var selected = Clips.GetSafeClipPath(file);
-                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
+                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") }); return false; }
                 string existingMode = Compression.GetCompressMarker(selected.Full).Mode;
                 if (existingMode == "slow")
                 {
-                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already at maximum compression (slow mode).", ["alreadyCompressed"] = true, ["existingMode"] = "slow" });
+                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.alreadyAtMaximumCompressionSlowMode"), ["alreadyCompressed"] = true, ["existingMode"] = "slow" });
                     return false;
                 }
                 if (existingMode == "fast" && mode == "fast")
                 {
-                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = "Already fast-compressed. Choose Smaller for further reduction.", ["alreadyCompressed"] = true, ["existingMode"] = "fast" });
+                    HttpResponse.SendJson(stream, 409, new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.alreadyFastCompressedChooseSmallerFor"), ["alreadyCompressed"] = true, ["existingMode"] = "fast" });
                     return false;
                 }
                 try

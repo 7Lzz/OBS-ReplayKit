@@ -1,4 +1,4 @@
-// the strings of the native chrome in the language obs runs in, from obs-replayKit\locale\<code>.json, the same files the pages translate from: a json object of english text to its translation; a string a file does not have stays english
+// the messages of the native chrome in the language obs runs in, from obs-replayKit\locale\messages\<code>.json, the same catalogs the pages render from; a message a catalog lacks stays english
 #pragma once
 
 #include <QString>
@@ -8,11 +8,10 @@
 
 namespace rk {
 
-// reads the table of the language obs settled on before any module loaded; called once from obs_module_load
+// reads the messages of the language obs settled on before any module loaded; called once from obs_module_load
 void LocaleLoad();
-QString Tr(const char *english);
-// Tr with every {name} placeholder filled from vars
-QString Tr(const char *english, std::initializer_list<std::pair<const char *, QString>> vars);
 QString TrMessage(const char *id, std::initializer_list<std::pair<const char *, QString>> vars = {});
+// a clip length written the way the pages write it: 45 s, 2 min, 1 min 30 s in the words of the language
+QString LengthText(int seconds);
 
 } // namespace rk

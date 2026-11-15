@@ -18,9 +18,9 @@ namespace ReplayKitSetup
             ValidateUri(response.RequestMessage.RequestUri, allowedHosts);
             long announced = response.Content.Headers.ContentLength ?? 0;
             if (limit <= 0 || expectedLength < 0 || announced > limit || expectedLength > limit)
-                throw new InvalidDataException("Download exceeds the size limit.");
+                throw new InvalidDataException(SetupLocale.Message("setup.downloadExceedsTheSizeLimit"));
             if (announced > 0 && expectedLength > 0 && announced != expectedLength)
-                throw new InvalidDataException("Download size does not match the release metadata.");
+                throw new InvalidDataException(SetupLocale.Message("setup.downloadSizeDoesNotMatchThe"));
             long expected = expectedLength > 0 ? expectedLength : announced;
             bool created = false;
             bool complete = false;
@@ -36,13 +36,13 @@ namespace ReplayKitSetup
                 {
                     total += read;
                     if (total > limit || (expected > 0 && total > expected))
-                        throw new InvalidDataException("Download exceeds the expected size.");
+                        throw new InvalidDataException(SetupLocale.Message("setup.downloadExceedsTheExpectedSize"));
                     destination.Write(buffer, 0, read);
                     progress?.Invoke(total, expected);
                 }
                 deadline.Token.ThrowIfCancellationRequested();
                 if (total == 0 || (expected > 0 && total != expected))
-                    throw new InvalidDataException("Download was incomplete.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.downloadWasIncomplete"));
                 destination.Flush(true);
                 complete = true;
             }
@@ -56,7 +56,7 @@ namespace ReplayKitSetup
         {
             if (uri == null || uri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(uri.UserInfo) ||
                 (allowedHosts != null && !allowedHosts.Contains(uri.Host)))
-                throw new InvalidDataException("Download URL is not trusted.");
+                throw new InvalidDataException(SetupLocale.Message("setup.downloadUrlIsNotTrusted"));
         }
     }
 }

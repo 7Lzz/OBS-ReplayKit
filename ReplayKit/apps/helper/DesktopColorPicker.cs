@@ -85,7 +85,7 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
-                if (active) throw new InvalidOperationException("A color picker is already active.");
+                if (active) throw new InvalidOperationException(Locales.Message("helper.aColorPickerIsAlreadyActive"));
                 active = true;
             }
 
@@ -278,7 +278,7 @@ namespace ReplayKitHelper
             {
                 _area = area;
                 _snapshot = snapshot;
-                Text = Locales.T("ReplayKit color picker");
+                Text = Locales.Message("helper.replaykitColorPicker");
                 FormBorderStyle = FormBorderStyle.None;
                 ShowInTaskbar = false;
                 StartPosition = FormStartPosition.Manual;

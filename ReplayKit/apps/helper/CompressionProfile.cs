@@ -76,7 +76,7 @@ namespace ReplayKitHelper
                 case "libx264":
                     return new[] { "-c:v", encoder, "-preset", mode == "fast" ? "veryfast" : "medium", "-crf", mode == "fast" ? "23" : "21", "-threads", Math.Max(1, workers).ToString(System.Globalization.CultureInfo.InvariantCulture) };
                 default:
-                    throw new InvalidOperationException("No compatible compression encoder is available.");
+                    throw new InvalidOperationException(Locales.Message("storage.noCompatibleCompressionEncoderIsAvailable2"));
             }
         }
     }

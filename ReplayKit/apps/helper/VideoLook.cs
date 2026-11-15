@@ -125,7 +125,7 @@ namespace ReplayKitHelper
             }
             catch (BadLook ex)
             {
-                error = Locales.T("Bad video look: {error}", "error", ex.Message);
+                error = Locales.Message("editor.badVideoLookError", "error", ex.Message);
                 return null;
             }
         }

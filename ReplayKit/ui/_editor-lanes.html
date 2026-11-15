@@ -562,8 +562,8 @@
     var prefs = loadPrefs();
     var st = fresh();
     var seq = 0;
-    var IMPORT_TIP = "Add audio from files (or drop files here)";
-    var IMPORT_TITLE = "Audio could not be added";
+    var IMPORT_TIP = RK_M("editor.addAudioFromFilesOrDrop");
+    var IMPORT_TITLE = RK_M("editor.audioCouldNotBeAdded");
     var eng = { ctx: null, master: null, pool: {}, busy: {}, timer: 0, off: false };
     var laneRecs = {};
     var segEls = {};
@@ -624,7 +624,7 @@
     function srcDuration(src) { var p = st.peaks[src]; return p ? p.duration : Infinity; }
     function labelOf(src) {
       for (var i = 0; i < st.tracks.length; i++) if (st.tracks[i].index === src) return st.tracks[i].label;
-      return "Audio";
+      return RK_M("common.audio");
     }
     // the names of the tracks in a set of parts, once each and in the order of the tracks, so the same tracks always give the same name
     function uniqueLabels(parts) {
@@ -638,6 +638,13 @@
       return out;
     }
     function pieceLabel(s) { return uniqueLabels(s.parts).join(" & "); }
+    // a label is the english track data the edit keeps, so it is turned into the shown name of each track only where it is drawn
+    function shownLabel(label) {
+      return label.split(" & ").map(function (part) {
+        for (var i = 0; i < st.tracks.length; i++) if (st.tracks[i].label === part && st.tracks[i].name) return st.tracks[i].name;
+        return part;
+      }).join(" & ");
+    }
     // a row is named after what is in it, so a row that holds two tracks is called after both
     function laneLabel(lane) {
       var all = [];
@@ -666,7 +673,7 @@
     function vSpeed(v) { return v && v.speed != null ? v.speed : st.vspeed; }
     function vLen(v) { return (v.srcEnd - v.srcStart) / vSpeed(v); }
     function vEnd(v) { return v.at + vLen(v); }
-    function videoLabel(v) { var speed = v ? vSpeed(v) : st.vspeed; return speed === 1 ? RK_T("Video") : RK_T("Video {speed}x", { speed: r3(speed) }); }
+    function videoLabel(v) { var speed = v ? vSpeed(v) : st.vspeed; return speed === 1 ? RK_M("editor.video") : RK_M("editor.videoSpeedX", { speed: r3(speed) }); }
     function findV(id) {
       if (!id) return null;
       for (var i = 0; i < st.vsegs.length; i++) if (st.vsegs[i].id === id) return { seg: st.vsegs[i], index: i };
@@ -970,7 +977,7 @@
         var picked = !!selectedGap && selectedGap.key === key;
         gapNodes[key].classList.toggle("is-selected", picked);
         gapNodes[key].setAttribute("aria-pressed", picked ? "true" : "false");
-        gapNodes[key].setAttribute("aria-label", picked ? "Remove empty space" : "Select empty space");
+        gapNodes[key].setAttribute("aria-label", picked ? RK_M("editor.removeEmptySpace") : RK_M("editor.selectEmptySpace"));
       });
       reportKind();
       var group = linkGroup(st.selected);
@@ -1001,7 +1008,7 @@
     var SUB_TITLE_MAX = 40;
     // the fonts the helper offers, the same list the font of the interface is picked from
     var SUB_FONTS = window.RK_FONTS;
-    if (!SUB_FONTS) throw new Error("The font list was not served with this page.");
+    if (!SUB_FONTS) throw new Error(RK_M("common.theFontListWasNotServed"));
     // sizes are pixels of a 1080p picture, so the look is the same at any size the clip is saved at
     var SUB_RANGES = { size: [16, 200], borderWidth: [0, 20], radius: [0, 60], padX: [0, 80], padY: [0, 60], rotate: [-180, 180] };
     var SUB_SHADOW = { offset: 6, blur: 12, alpha: 0.8 };
@@ -1055,7 +1062,7 @@
       if (row.auto && row.title) return row.title;
       var first = rowCues(row.id)[0];
       var text = first ? first.text.trim().replace(/\s+/g, " ") : "";
-      return text ? text.slice(0, SUB_TITLE_MAX) : RK_T("Subtitle");
+      return text ? text.slice(0, SUB_TITLE_MAX) : RK_M("editor.subtitle");
     }
     // rows left without a cue by a delete, a merge or an undo are gone, the way an emptied row of audio is
     function dropEmptyRows() {
@@ -1325,7 +1332,7 @@
         var label = node.firstChild;
         if (label.textContent !== c.text) label.textContent = c.text;
         // an unsure cue says what to do with it in the app tooltip; a plain one shows its text on the block itself
-        if (c.unsure) node.dataset.tooltip = "Might be misheard. Select it and open Check on the right.";
+        if (c.unsure) node.dataset.tooltip = RK_M("editor.mightBeMisheardSelectItAnd");
         else delete node.dataset.tooltip;
         node.removeAttribute("title");
       });
@@ -1626,18 +1633,18 @@
       var ri = st.subRows.indexOf(row);
       var items = [];
       if (cue) {
-        items.push({ label: "Merge with the next subtitle", icon: "editor/mix", disabled: !nextInRow(cue), action: function () { mergeNext(cue); } });
+        items.push({ label: RK_M("editor.mergeWithTheNextSubtitle"), icon: "editor/mix", disabled: !nextInRow(cue), action: function () { mergeNext(cue); } });
       }
       st.subRows.forEach(function (other) {
-        if (other !== row) items.push({ label: RK_T("Merge row into {name}", { name: rowTitle(other) }), icon: "editor/mix", action: function () { mergeRows(row.id, other.id); } });
+        if (other !== row) items.push({ label: RK_M("editor.mergeRowIntoName", { name: rowTitle(other) }), icon: "editor/mix", action: function () { mergeRows(row.id, other.id); } });
       });
       if (items.length) items.push("-");
       items.push(
-        { label: "Move the row up", icon: "editor/arrow-up", disabled: ri === 0, action: function () { moveRow(row.id, -1); } },
-        { label: "Move the row down", icon: "editor/arrow-down", disabled: ri === st.subRows.length - 1, action: function () { moveRow(row.id, 1); } },
+        { label: RK_M("editor.moveTheRowUp"), icon: "editor/arrow-up", disabled: ri === 0, action: function () { moveRow(row.id, -1); } },
+        { label: RK_M("editor.moveTheRowDown"), icon: "editor/arrow-down", disabled: ri === st.subRows.length - 1, action: function () { moveRow(row.id, 1); } },
         "-");
-      if (cue) items.push({ label: "Delete subtitle", icon: "action/trash", key: "Backspace", danger: true, action: doDelete });
-      items.push({ label: "Delete the row", icon: "action/trash", danger: true, action: function () { removeRow(row.id); } });
+      if (cue) items.push({ label: RK_M("editor.deleteSubtitle"), icon: "action/trash", key: RK_M("editor.backspace"), danger: true, action: doDelete });
+      items.push({ label: RK_M("editor.deleteTheRow"), icon: "action/trash", danger: true, action: function () { removeRow(row.id); } });
       showMenu(e.clientX, e.clientY, items);
     }
 
@@ -1697,7 +1704,7 @@
         var num = function (v, lo, hi, d) { v = Number(v); return isFinite(v) ? clamp(v, lo, hi) : d; };
         out.push({
           id: typeof l.id === "string" && /^E\d+$/.test(l.id) ? l.id : newId("E"),
-          kind: l.kind, ref: l.ref, name: String(l.name || (l.kind === "clip" ? "Clip" : "Image")).slice(0, 80),
+          kind: l.kind, ref: l.ref, name: String(l.name || (l.kind === "clip" ? RK_M("common.clip") : RK_M("editor.image"))).slice(0, 80),
           at: r3(at), end: r3(end), src: r3(num(l.src, 0, 86400, 0)), dur: r3(num(l.dur, 0, 86400, 0)),
           x: num(l.x, -0.5, 1.5, 0.5), y: num(l.y, -0.5, 1.5, 0.5), w: num(l.w, LAYER_RANGES.w[0], LAYER_RANGES.w[1], 1),
           aspect: num(l.aspect, 0.01, 100, 0.5625), opacity: num(l.opacity, 0, 1, 1), gif: !!l.gif, rotate: Math.round(num(l.rotate, -180, 180, 0)),
@@ -2346,7 +2353,7 @@
               select("");
               selectedGap = { key: key, kind: kind, row: id, start: gap.start, end: gap.end };
               paintSelection(); refreshToolbar();
-              showMenu(e.clientX, e.clientY, [{ label: "Remove empty space", icon: "action/trash", danger: true, key: "Delete", action: removeGap }]);
+              showMenu(e.clientX, e.clientY, [{ label: RK_M("editor.removeEmptySpace"), icon: "action/trash", danger: true, key: RK_M("keys.delete"), action: removeGap }]);
             });
           }
           if (node.parentNode !== host) host.appendChild(node);
@@ -2355,7 +2362,7 @@
           var picked = !!selectedGap && selectedGap.key === key;
           node.classList.toggle("is-selected", picked);
           node.setAttribute("aria-pressed", picked ? "true" : "false");
-          node.setAttribute("aria-label", picked ? "Remove empty space" : "Select empty space");
+          node.setAttribute("aria-label", picked ? RK_M("editor.removeEmptySpace") : RK_M("editor.selectEmptySpace"));
         });
       }
       row(dom.timeline, "video", "");
@@ -2598,7 +2605,7 @@
     // whether one more row fits, which the plan of the saved copy limits; a note says so when it does not
     function roomForRow() {
       if (restRows().length < MAX_LANES) return true;
-      if (opts.notify) opts.notify(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES }));
+      if (opts.notify) opts.notify(RK_M("editor.aClipCanHoldCountRows", { count: MAX_LANES }));
       return false;
     }
 
@@ -2883,10 +2890,10 @@
       for (var i = 0; i < pieces.length; i++) {
         var s = pieces[i];
         count += s.parts.length;
-        if (s.fadeIn > 0.001 || s.fadeOut > 0.001) return "Take the fades off the tracks to combine them.";
-        if (Math.abs(s.speed - first.speed) > 1e-6 || s.pitch !== first.pitch) return "Give the tracks the same speed to combine them.";
+        if (s.fadeIn > 0.001 || s.fadeOut > 0.001) return RK_M("editor.takeTheFadesOffTheTracks");
+        if (Math.abs(s.speed - first.speed) > 1e-6 || s.pitch !== first.pitch) return RK_M("editor.giveTheTracksTheSameSpeed");
       }
-      if (count > MAX_PARTS) return RK_T("A combined track can hold {count} tracks at most.", { count: MAX_PARTS });
+      if (count > MAX_PARTS) return RK_M("editor.aCombinedTrackCanHoldCount", { count: MAX_PARTS });
       return "";
     }
 
@@ -3093,7 +3100,7 @@
       // the label is a track name or an imported file name, so the guard reads the last label set and not the translated text in the dom
       if (chipLabel.dataset.label !== label) {
         chipLabel.dataset.label = label;
-        chipLabel.textContent = label;
+        chipLabel.textContent = shownLabel(label);
         node.firstChild.firstChild.innerHTML = icon(chipIcon(seg));
       }
     }
@@ -3611,17 +3618,17 @@
       tb.textContent = "";
       var left = el("div", "tl-side");
       left.appendChild(group(
-        button("split", "action/content-cut", "Split at the playhead (S)", doSplit),
-        button("del", "action/trash", "Delete (Backspace)", doDelete),
-        button("deselect", "editor/deselect", "Deselect (Esc)", function () { select(""); }),
-        button("markIn", "editor/mark-in", "Start the cut here ([)", markIn),
-        button("markOut", "editor/mark-out", "End the cut here (])", markOut),
-        button("waves", "editor/waveform", "Show the waveforms", function () { prefs.waves = !prefs.waves; savePrefs(); refreshToolbar(); drawSoon(); })
+        button("split", "action/content-cut", RK_M("editor.splitAtThePlayheadS"), doSplit),
+        button("del", "action/trash", RK_M("editor.deleteBackspace"), doDelete),
+        button("deselect", "editor/deselect", RK_M("editor.deselectEsc"), function () { select(""); }),
+        button("markIn", "editor/mark-in", RK_M("editor.startTheCutHere"), markIn),
+        button("markOut", "editor/mark-out", RK_M("editor.endTheCutHere"), markOut),
+        button("waves", "editor/waveform", RK_M("editor.showTheWaveforms"), function () { prefs.waves = !prefs.waves; savePrefs(); refreshToolbar(); drawSoon(); })
       ));
       els.del.classList.add("tl-delete");
       els.deselect.classList.add("tl-deselect");
       els.busy = el("div", "tl-busy");
-      els.busy.textContent = "Importing audio";
+      els.busy.textContent = RK_M("editor.importingAudio");
       left.appendChild(els.busy);
       tb.appendChild(left);
       var time = el("div", "tl-time");
@@ -3633,24 +3640,24 @@
       els.total = total;
       // the host adds its volume and fullscreen buttons to this group
       var playGroup = group(
-        button("stop", "editor/stop", "Stop", function () { opts.stop(); }),
-        button("play", "editor/play", "Play and pause (Space)", function () { opts.togglePlay(); }),
+        button("stop", "editor/stop", RK_M("common.stop"), function () { opts.stop(); }),
+        button("play", "editor/play", RK_M("editor.playAndPauseSpace"), function () { opts.togglePlay(); }),
         time
       );
       playGroup.classList.add("tl-play-group");
       tb.appendChild(playGroup);
       var right = el("div", "tl-side tl-side-end");
       right.appendChild(group(
-        button("undo", "editor/undo", "Undo (Ctrl+Z)", undo),
-        button("redo", "editor/redo", "Redo (Ctrl+Shift+Z)", redo)
+        button("undo", "editor/undo", RK_M("common.undoCtrlZ"), undo),
+        button("redo", "editor/redo", RK_M("common.redoCtrlShiftZ"), redo)
       ));
       right.appendChild(el("span", "tl-sep"));
       right.appendChild(group(
-        button("snap", "editor/magnet", "Snap to edges and the playhead", function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
-        button("trimAudioWithVideo", "editor/trim-audio", "Trim the audio with the video", toggleTrimAudioWithVideo),
-        button("fit", "editor/fit-timeline", "Fit to zoom (0)", fitView),
-        button("zoomOut", "editor/zoom-out", "Zoom out (-)", function () { setZoom(st.zoom / ZOOM_STEP); }),
-        button("zoomIn", "editor/zoom-in", "Zoom in (+)", function () { setZoom(st.zoom * ZOOM_STEP); })
+        button("snap", "editor/magnet", RK_M("editor.snapToEdgesAndThePlayhead"), function () { prefs.snap = !prefs.snap; savePrefs(); refreshToolbar(); }),
+        button("trimAudioWithVideo", "editor/trim-audio", RK_M("editor.trimTheAudioWithTheVideo"), toggleTrimAudioWithVideo),
+        button("fit", "editor/fit-timeline", RK_M("editor.fitToZoom0"), fitView),
+        button("zoomOut", "editor/zoom-out", RK_M("editor.zoomOut"), function () { setZoom(st.zoom / ZOOM_STEP); }),
+        button("zoomIn", "editor/zoom-in", RK_M("editor.zoomIn"), function () { setZoom(st.zoom * ZOOM_STEP); })
       ));
       tb.appendChild(right);
     }
@@ -3727,19 +3734,19 @@
       value.type = "text";
       value.inputMode = "decimal";
       value.autocomplete = "off";
-      value.setAttribute("aria-label", RK_T(cfg.label));
+      value.setAttribute("aria-label", cfg.label);
       var wrap = el("div", "tl-slider-wrap");
       var slide = el("input", "tl-slider rk-range");
       slide.type = "range";
       slide.min = String(cfg.min);
       slide.max = String(cfg.max);
       slide.step = String(cfg.step);
-      slide.setAttribute("aria-label", RK_T("{label} slider", { label: RK_T(cfg.label) }));
+      slide.setAttribute("aria-label", RK_M("editor.labelSlider", { label: cfg.label }));
       wrap.appendChild(slide);
       var reset = el("button", "tl-reset");
       reset.type = "button";
-      reset.setAttribute("aria-label", RK_T("Reset {label}", { label: RK_T(cfg.label).toLowerCase() }));
-      reset.dataset.tooltip = "Reset to default";
+      reset.setAttribute("aria-label", RK_M("editor.resetLabel", { label: cfg.label.toLowerCase() }));
+      reset.dataset.tooltip = RK_M("common.resetToDefault");
       reset.innerHTML = icon("action/reset");
       var head = el("div", "tl-field-head");
       head.appendChild(label);
@@ -3778,7 +3785,7 @@
         return { v: v, b: b };
       });
       var row = makeRow(box, {
-        label: "Speed", min: SPEED_MIN, max: SPEED_MAX, step: SPEED_STEP, before: strip,
+        label: RK_M("common.speed"), min: SPEED_MIN, max: SPEED_MAX, step: SPEED_STEP, before: strip,
         format: function (v) { return r3(v) + "x"; },
         toSlide: function (v) { return v; },
         fromSlide: function (x) { return x; },
@@ -3797,7 +3804,7 @@
       var label = el("div", "trim-mode-row");
       var input = el("input", "rk-switch");
       input.type = "checkbox";
-      input.setAttribute("aria-label", RK_T(text));
+      input.setAttribute("aria-label", text);
       var span = el("span");
       span.textContent = text;
       label.appendChild(input);
@@ -3821,7 +3828,7 @@
       els.source.setAttribute("translate", "no");
       var close = el("button", "tl-x");
       close.type = "button";
-      close.setAttribute("aria-label", "Close");
+      close.setAttribute("aria-label", RK_M("common.close"));
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { setPanelClosed(true); });
       head.appendChild(els.propsTitle);
@@ -3834,7 +3841,7 @@
       els.audioBox = audio;
       root.appendChild(audio);
       els.vol = makeRow(audio, {
-        label: "Volume", min: 0, max: 200, step: 1,
+        label: RK_M("editor.volume"), min: 0, max: 200, step: 1,
         format: function (v) { return Math.round(v) + "%"; },
         toSlide: function (v) { return v; },
         fromSlide: function (x) { return x; },
@@ -3844,17 +3851,17 @@
       var fadeFormat = function (v) { return r3(v) + "s"; };
       var same = function (v) { return v; };
       els.fin = makeRow(audio, {
-        label: "Fade in", min: 0, max: 10, step: 0.1, format: fadeFormat, toSlide: same, fromSlide: same,
+        label: RK_M("editor.fadeIn"), min: 0, max: 10, step: 0.1, format: fadeFormat, toSlide: same, fromSlide: same,
         write: function (v) { editPiece(function (s) { s.fadeIn = r3(clamp(v, 0, 3600)); clampFades(s); }); },
         reset: 0,
       });
       els.fout = makeRow(audio, {
-        label: "Fade out", min: 0, max: 10, step: 0.1, format: fadeFormat, toSlide: same, fromSlide: same,
+        label: RK_M("editor.fadeOut"), min: 0, max: 10, step: 0.1, format: fadeFormat, toSlide: same, fromSlide: same,
         write: function (v) { editPiece(function (s) { s.fadeOut = r3(clamp(v, 0, 3600)); clampFades(s); }); },
         reset: 0,
       });
       els.speed = makeSpeedRow(audio, function (v) { editPiece(function (s) { setSpeed(s, v); }); });
-      els.pitch = checkRow(audio, "Preserve pitch", function (on) { editPiece(function (s) { s.pitch = on; }); commit(); }, "Keeps the sound at its normal pitch when you change the speed, so faster parts don't sound high and squeaky.");
+      els.pitch = checkRow(audio, RK_M("editor.preservePitch"), function (on) { editPiece(function (s) { s.pitch = on; }); commit(); }, RK_M("editor.keepsTheSoundAtItsNormal"));
 
       // the properties of a layer
       var lay = el("div", "tl-box");
@@ -3864,33 +3871,33 @@
       var pct = function (v) { return Math.round(v) + "%"; };
       var same = function (v) { return v; };
       els.lsize = makeRow(lay, {
-        label: "Size", min: 2, max: 200, step: 1, format: pct, toSlide: same, fromSlide: same,
+        label: RK_M("common.size"), min: 2, max: 200, step: 1, format: pct, toSlide: same, fromSlide: same,
         write: function (v) { editLayer(function (l) { l.w = clamp(v / 100, LAYER_RANGES.w[0], LAYER_RANGES.w[1]); }); },
         reset: 100,
       });
       els.llen = makeRow(lay, {
-        label: "Length", min: LAYER_MIN, max: 60, step: 0.1, format: function (v) { return r3(v) + "s"; }, toSlide: same, fromSlide: same,
+        label: RK_M("common.length"), min: LAYER_MIN, max: 60, step: 0.1, format: function (v) { return r3(v) + "s"; }, toSlide: same, fromSlide: same,
         write: function (v) { editLayer(function (l) { l.end = r3(clamp(l.at + v, l.at + LAYER_MIN, layerEndMax(l))); }); syncLayers(); },
         reset: 5,
       });
       els.lrotate = makeRow(lay, {
-        label: "Rotation", min: -180, max: 180, step: 1, format: function (v) { return Math.round(v) + "\u00b0"; }, toSlide: same, fromSlide: same,
+        label: RK_M("common.rotation"), min: -180, max: 180, step: 1, format: function (v) { return Math.round(v) + "\u00b0"; }, toSlide: same, fromSlide: same,
         write: function (v) { editLayer(function (l) { l.rotate = Math.round(clamp(v, -180, 180)); }); },
         reset: 0,
       });
       els.lopacity = makeRow(lay, {
-        label: "Opacity", min: 0, max: 100, step: 1, format: pct, toSlide: same, fromSlide: same,
+        label: RK_M("common.opacity"), min: 0, max: 100, step: 1, format: pct, toSlide: same, fromSlide: same,
         write: function (v) { editLayer(function (l) { l.opacity = clamp(v / 100, 0, 1); }); },
         reset: 100,
       });
       var centre = el("button", "btn tl-wide");
       centre.type = "button";
-      centre.textContent = "Center on the video";
+      centre.textContent = RK_M("editor.centerOnTheVideo");
       centre.addEventListener("click", function () { editLayer(function (l) { l.x = 0.5; l.y = 0.5; }); commit(); });
       lay.appendChild(centre);
       var drop = el("button", "btn tl-wide");
       drop.type = "button";
-      drop.textContent = "Remove layer";
+      drop.textContent = RK_M("editor.removeLayer");
       drop.addEventListener("click", function () { doDelete(); });
       lay.appendChild(drop);
 
@@ -3900,7 +3907,7 @@
       vid.hidden = true;
       root.appendChild(vid);
       els.vspeed = makeSpeedRow(vid, function (v) { setVideoSpeed(v); });
-      els.vpitchRow = checkRow(vid, "Preserve pitch", function (on) {
+      els.vpitchRow = checkRow(vid, RK_M("editor.preservePitch"), function (on) {
         var pick = localVideo();
         if (pick) {
           pick.pitch = on;
@@ -3914,8 +3921,8 @@
         if (st.vspeed !== 1 && st.vlink) allSegs().forEach(function (h) { h.seg.pitch = on; });
         commit();
         tick(true);
-      }, "Keeps the sound at its normal pitch when the video speeds up, so voices don't sound high and squeaky.");
-      els.vlinkRow = checkRow(vid, "Change the audio speed too", function (on) { relink(on); }, "Changes the sound's speed along with the video, so the sound stays lined up with the picture. Saving takes about as long as the clip when you change the speed, cut the video into pieces, or let the audio run past the video.");
+      }, RK_M("editor.keepsTheSoundAtItsNormal2"));
+      els.vlinkRow = checkRow(vid, RK_M("editor.changeTheAudioSpeedToo"), function (on) { relink(on); }, RK_M("editor.changesTheSoundSSpeedAlong"));
     }
 
     // the furthest a layer may reach: the end of the timeline, and for a clip the end of its file
@@ -4017,7 +4024,7 @@
       els.videoBox.hidden = !isVideo;
       els.layerBox.hidden = !layer;
       if (layer) {
-        els.propsTitle.textContent = layer.kind === "clip" ? "Video" : "Layer";
+        els.propsTitle.textContent = layer.kind === "clip" ? RK_M("editor.video") : RK_M("editor.layer");
         els.source.textContent = layer.name;
         els.lsize.show(layer.w * 100);
         els.llen.slide.max = String(r3(Math.max(LAYER_MIN + 0.1, layerEndMax(layer) - layer.at)));
@@ -4027,7 +4034,7 @@
         return;
       }
       if (isVideo) {
-        els.propsTitle.textContent = "Video";
+        els.propsTitle.textContent = RK_M("editor.video");
         var pickV = selectedV();
         els.source.textContent = pickV && pickV.seg.ref ? pickV.seg.name : "";
         var local = localVideo();
@@ -4040,8 +4047,8 @@
         return;
       }
       var s = hit.seg;
-      els.propsTitle.textContent = "Audio";
-      els.source.textContent = s.muted ? RK_T("{name} (muted)", { name: pieceLabel(s) }) : pieceLabel(s);
+      els.propsTitle.textContent = RK_M("common.audio");
+      els.source.textContent = s.muted ? RK_M("editor.nameMuted", { name: shownLabel(pieceLabel(s)) }) : shownLabel(pieceLabel(s));
       var len = segLen(s);
       els.fin.slide.max = String(r3(Math.min(10, Math.max(0.1, len))));
       els.fout.slide.max = String(r3(Math.min(10, Math.max(0.1, len))));
@@ -4093,7 +4100,7 @@
       var end = vEnd(v), ratio = speed / old;
       var linked = v.audioLink == null ? st.vlink : v.audioLink;
       if (linked && allSegs().some(function (h) { return h.seg.at < end && segEnd(h.seg) > v.at && (h.seg.speed * ratio < 0.0625 || h.seg.speed * ratio > 16); })) {
-        opts.notify("This speed would put the linked audio outside its supported range.", "bad", "Video speed");
+        opts.notify(RK_M("editor.thisSpeedWouldPutTheLinked"), "bad", RK_M("editor.videoSpeed"));
         renderProps();
         return;
       }
@@ -4128,7 +4135,7 @@
       if (pick) { setPieceSpeed(pick, v); return; }
       if (Math.abs(v - st.vspeed) < 1e-6) { renderProps(); return; }
       if (st.vsegs.some(function (piece) { var rate = vSpeed(piece) * v / st.vspeed; return rate < SPEED_MIN || rate > SPEED_MAX; })) {
-        opts.notify("This speed would put a video piece outside its supported range. Change that piece's speed first.", "bad", "Video speed");
+        opts.notify(RK_M("editor.thisSpeedWouldPutAVideo"), "bad", RK_M("editor.videoSpeed"));
         renderProps();
         return;
       }
@@ -4215,7 +4222,7 @@
 
     function showMenu(x, y, items) {
       closeMenu();
-      if (st.selected || selectedGap || subPicked.length) items = items.concat(["-", { label: "Deselect", icon: "editor/deselect", key: "Esc", action: function () { select(""); } }]);
+      if (st.selected || selectedGap || subPicked.length) items = items.concat(["-", { label: RK_M("common.deselect"), icon: "editor/deselect", key: RK_M("editor.esc"), action: function () { select(""); } }]);
       var box = el("div", "tl-menu");
       items.forEach(function (it) {
         if (it === "-") { box.appendChild(el("div", "menu-separator")); return; }
@@ -4248,21 +4255,21 @@
         select(hit.seg.id);
         var s = hit.seg;
         var items = [
-          { label: "Split at the playhead", icon: "action/content-cut", key: "S", disabled: !canSplitAt(s, nowT()), action: doSplit },
-          { label: "Duplicate", icon: "action/duplicate", key: "Ctrl+D", action: doDuplicate },
-          { label: "Put in a row of its own", icon: "editor/arrow-down", disabled: hit.lane.segments.length < 2, action: doOwnRow },
-          { label: "Copy", icon: "action/content-copy", key: "Ctrl+C", action: doCopy },
-          { label: "Paste here", icon: "editor/paste", key: "Ctrl+V", disabled: !st.clipboard, action: function () { doPaste(hit.laneIndex, t); } },
+          { label: RK_M("editor.splitAtThePlayhead"), icon: "action/content-cut", key: "S", disabled: !canSplitAt(s, nowT()), action: doSplit },
+          { label: RK_M("editor.duplicate"), icon: "action/duplicate", key: "Ctrl+D", action: doDuplicate },
+          { label: RK_M("editor.putInARowOfIts"), icon: "editor/arrow-down", disabled: hit.lane.segments.length < 2, action: doOwnRow },
+          { label: RK_M("editor.copy"), icon: "action/content-copy", key: "Ctrl+C", action: doCopy },
+          { label: RK_M("editor.pasteHere"), icon: "editor/paste", key: "Ctrl+V", disabled: !st.clipboard, action: function () { doPaste(hit.laneIndex, t); } },
           "-",
-          { label: s.muted ? "Unmute" : "Mute", icon: "player/volume-muted", key: "M", action: doMute },
-          { label: "Mute the whole row", icon: "player/volume-muted", action: function () { doMuteLane(hit.laneIndex); } },
+          { label: s.muted ? RK_M("editor.unmute") : RK_M("editor.mute"), icon: "player/volume-muted", key: "M", action: doMute },
+          { label: RK_M("editor.muteTheWholeRow"), icon: "player/volume-muted", action: function () { doMuteLane(hit.laneIndex); } },
         ];
-        if (s.parts.length > 1) items.push({ label: "Separate the tracks", icon: "editor/unmix", action: doUngroup });
+        if (s.parts.length > 1) items.push({ label: RK_M("editor.separateTheTracks"), icon: "editor/unmix", action: doUngroup });
         items.push("-",
-          { label: "Move the row up", icon: "editor/arrow-up", disabled: hit.laneIndex === 0, action: function () { doMoveLane(hit.laneIndex, -1); } },
-          { label: "Move the row down", icon: "editor/arrow-down", disabled: hit.laneIndex === st.lanes.length - 1, action: function () { doMoveLane(hit.laneIndex, 1); } },
+          { label: RK_M("editor.moveTheRowUp"), icon: "editor/arrow-up", disabled: hit.laneIndex === 0, action: function () { doMoveLane(hit.laneIndex, -1); } },
+          { label: RK_M("editor.moveTheRowDown"), icon: "editor/arrow-down", disabled: hit.laneIndex === st.lanes.length - 1, action: function () { doMoveLane(hit.laneIndex, 1); } },
           "-",
-          { label: "Delete", icon: "action/trash", key: "Backspace", danger: true, action: doDelete });
+          { label: RK_M("common.delete"), icon: "action/trash", key: RK_M("editor.backspace"), danger: true, action: doDelete });
         showMenu(e.clientX, e.clientY, items);
         return;
       }
@@ -4270,10 +4277,10 @@
         var li = st.lanes.findIndex(function (l) { return l.id === laneNode.dataset.lane; });
         select("");
         showMenu(e.clientX, e.clientY, [
-          { label: "Paste here", icon: "editor/paste", key: "Ctrl+V", disabled: !st.clipboard, action: function () { doPaste(li, t); } },
-          { label: "Mute the whole row", icon: "player/volume-muted", action: function () { doMuteLane(li); } },
-          { label: "Move the row up", icon: "editor/arrow-up", disabled: li === 0, action: function () { doMoveLane(li, -1); } },
-          { label: "Move the row down", icon: "editor/arrow-down", disabled: li === st.lanes.length - 1, action: function () { doMoveLane(li, 1); } },
+          { label: RK_M("editor.pasteHere"), icon: "editor/paste", key: "Ctrl+V", disabled: !st.clipboard, action: function () { doPaste(li, t); } },
+          { label: RK_M("editor.muteTheWholeRow"), icon: "player/volume-muted", action: function () { doMuteLane(li); } },
+          { label: RK_M("editor.moveTheRowUp"), icon: "editor/arrow-up", disabled: li === 0, action: function () { doMoveLane(li, -1); } },
+          { label: RK_M("editor.moveTheRowDown"), icon: "editor/arrow-down", disabled: li === st.lanes.length - 1, action: function () { doMoveLane(li, 1); } },
         ]);
       }
     }
@@ -4373,7 +4380,7 @@
       if (!L.solo && restRows().length >= MAX_LANES) {
         if (!L.capNoted && opts.notify) {
           L.capNoted = true;
-          opts.notify(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES }));
+          opts.notify(RK_M("editor.aClipCanHoldCountRows", { count: MAX_LANES }));
         }
         return { kind: "stay" };
       }
@@ -4755,9 +4762,9 @@
       if (!v) { select("video"); return; }
       select(v.id);
       showMenu(e.clientX, e.clientY, [
-        { label: "Split at the playhead", icon: "action/content-cut", key: "S", disabled: !canSplitV(v, nowT()), action: doSplit },
+        { label: RK_M("editor.splitAtThePlayhead"), icon: "action/content-cut", key: "S", disabled: !canSplitV(v, nowT()), action: doSplit },
         "-",
-        { label: "Delete", icon: "action/trash", key: "Backspace", danger: true, action: doDelete },
+        { label: RK_M("common.delete"), icon: "action/trash", key: RK_M("editor.backspace"), danger: true, action: doDelete },
       ]);
     }
 
@@ -4864,9 +4871,9 @@
       return new Promise(function (resolve, reject) {
         var a = item.audio;
         if (a.readyState >= 1) { resolve(); return; }
-        var timer = setTimeout(function () { reject(new Error("A track did not load")); }, 15000);
+        var timer = setTimeout(function () { reject(new Error(RK_M("editor.aTrackDidNotLoad"))); }, 15000);
         a.addEventListener("loadedmetadata", function () { clearTimeout(timer); resolve(); }, { once: true });
-        a.addEventListener("error", function () { clearTimeout(timer); reject(new Error("A track could not be read")); }, { once: true });
+        a.addEventListener("error", function () { clearTimeout(timer); reject(new Error(RK_M("editor.aTrackCouldNotBeRead"))); }, { once: true });
       });
     }
 
@@ -4936,7 +4943,7 @@
 
     function startEngine(mine) {
       var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return Promise.reject(new Error("This window cannot play the tracks."));
+      if (!Ctx) return Promise.reject(new Error(RK_M("editor.thisWindowCannotPlayTheTracks")));
       eng.ctx = new Ctx();
       eng.master = eng.ctx.createGain();
       eng.master.connect(eng.ctx.destination);
@@ -5294,7 +5301,7 @@
     function waitImport(id, mine) {
       return askImport(id).then(function (info) {
         if (mine !== seq) return null;
-        if (!info || !info.ok || info.state === "failed") throw new Error((info && info.message) || "The audio could not be imported");
+        if (!info || !info.ok || info.state === "failed") throw new Error((info && info.message) || RK_M("editor.theAudioCouldNotBeImported"));
         if (info.state === "ready") return info;
         return new Promise(function (resolve) { setTimeout(resolve, 300); }).then(function () { return waitImport(id, mine); });
       });
@@ -5303,7 +5310,7 @@
     // sends the bytes of a dropped file; the answer holds the id the helper made for it
     function upload(file) {
       return fetch(opts.helper + "/import-audio/upload?name=" + encodeURIComponent(file.name), { method: "POST", cache: "no-store", body: file })
-        .catch(function () { throw new Error("The file could not be sent"); })
+        .catch(function () { throw new Error(RK_M("editor.theFileCouldNotBeSent")); })
         .then(function (res) {
           return res.json().catch(function () { return {}; }).then(function (data) {
             if (!res.ok || !data.ok) throw new Error(data.message || ("HTTP " + res.status));
@@ -5328,7 +5335,7 @@
         if (mine !== seq) return false;
         if (!known) {
           st.nextImport += 1;
-          st.tracks.push({ index: src, label: info.name || "Audio", importId: info.id });
+          st.tracks.push({ index: src, label: info.name || RK_M("common.audio"), importId: info.id });
           st.peaks[src] = peaks;
         }
         return loadItem(ensureItem(src)).then(function () {
@@ -5350,7 +5357,7 @@
           return true;
         }, function () {
           if (mine === seq && !known) forgetTrack(src);
-          throw new Error("The audio could not be played here");
+          throw new Error(RK_M("editor.theAudioCouldNotBePlayed"));
         });
       });
     }
@@ -5364,7 +5371,7 @@
           return job.begin()
             .then(function (id) { return waitImport(id, mine); })
             .then(function (info) { return info ? placeImport(info, at, mine) : false; })
-            .catch(function (err) { problems.push(RK_T("{name}: {error}", { name: job.name, error: (err && err.message) || RK_T("The audio could not be imported") })); })
+            .catch(function (err) { problems.push(RK_M("editor.nameError", { name: job.name, error: (err && err.message) || RK_M("editor.theAudioCouldNotBeImported") })); })
             .then(function () {
               if (mine !== seq) return;
               st.importing = Math.max(0, st.importing - 1);
@@ -5378,7 +5385,7 @@
     function pickAudio() {
       if (!st.ready || st.picking) return;
       var room = importRoom();
-      if (room < 1) { importNote(RK_T("A clip can hold {count} rows at most.", { count: MAX_LANES })); return; }
+      if (room < 1) { importNote(RK_M("editor.aClipCanHoldCountRows", { count: MAX_LANES })); return; }
       var mine = seq;
       st.picking = true;
       refreshToolbar();
@@ -5391,16 +5398,16 @@
           refreshToolbar();
           notifyBusy();
           if (!data || !data.ok) {
-            if (data && !data.cancelled) importNote(data.message || RK_T("The audio could not be imported"));
+            if (data && !data.cancelled) importNote(data.message || RK_M("editor.theAudioCouldNotBeImported"));
             return null;
           }
           var jobs = [];
           var problems = [];
           (data.files || []).forEach(function (f) {
-            if (!f.ok) { problems.push(RK_T("{name}: {error}", { name: f.name || RK_T("File"), error: f.message || RK_T("The audio could not be imported") })); return; }
+            if (!f.ok) { problems.push(RK_M("editor.nameError", { name: f.name || RK_M("common.file"), error: f.message || RK_M("editor.theAudioCouldNotBeImported") })); return; }
             jobs.push({ name: f.name, begin: function () { return Promise.resolve(f.id); } });
           });
-          if (data.skipped > 0) problems.push(data.skipped === 1 ? RK_T("A clip can hold {max} rows at most, so 1 file was left out", { max: MAX_LANES }) : RK_T("A clip can hold {max} rows at most, so {count} files were left out", { max: MAX_LANES, count: data.skipped }));
+          if (data.skipped > 0) problems.push(data.skipped === 1 ? RK_M("editor.aClipCanHoldMaxRows", { max: MAX_LANES }) : RK_M("editor.aClipCanHoldMaxRows2", { max: MAX_LANES, count: data.skipped }));
           if (!jobs.length) { if (problems.length) reportProblems(problems); return null; }
           st.importing += jobs.length;
           setBusy();
@@ -5411,14 +5418,14 @@
           st.picking = false;
           refreshToolbar();
           notifyBusy();
-          importNote("The audio could not be imported");
+          importNote(RK_M("editor.theAudioCouldNotBeImported"));
         });
     }
 
     // files dropped on the editor: sent to the helper one after the other, each into a row of its own at the place it was dropped on the timeline, or at the playhead when it was dropped anywhere else
     function dropFiles(files, folders, clientX, clientY) {
-      if (!st.ready) { importNote("Audio cannot be added to this clip"); return; }
-      if (!files.length) { if (folders) importNote("Folders cannot be added, drop the files in them"); return; }
+      if (!st.ready) { importNote(RK_M("editor.audioCannotBeAddedToThis")); return; }
+      if (!files.length) { if (folders) importNote(RK_M("editor.foldersCannotBeAddedDropThe")); return; }
       var at = null;
       var rect = dom.frame.getBoundingClientRect();
       if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) at = timeAtClient(clientX);
@@ -5427,12 +5434,12 @@
       var problems = [];
       var left = 0;
       files.forEach(function (file) {
-        if (!file.size) { problems.push(RK_T("{name}: the file is empty", { name: file.name })); return; }
-        if (file.size > MAX_IMPORT_BYTES) { problems.push(RK_T("{name}: the file is larger than 512 MB", { name: file.name })); return; }
+        if (!file.size) { problems.push(RK_M("editor.nameTheFileIsEmpty", { name: file.name })); return; }
+        if (file.size > MAX_IMPORT_BYTES) { problems.push(RK_M("editor.nameTheFileIsLargerThan", { name: file.name })); return; }
         if (jobs.length >= room) { left += 1; return; }
         jobs.push({ name: file.name, begin: function () { return upload(file); } });
       });
-      if (left > 0) problems.push(left === 1 ? RK_T("A clip can hold {max} rows at most, so 1 file was left out", { max: MAX_LANES }) : RK_T("A clip can hold {max} rows at most, so {count} files were left out", { max: MAX_LANES, count: left }));
+      if (left > 0) problems.push(left === 1 ? RK_M("editor.aClipCanHoldMaxRows", { max: MAX_LANES }) : RK_M("editor.aClipCanHoldMaxRows2", { max: MAX_LANES, count: left }));
       if (!jobs.length) { if (problems.length) reportProblems(problems); return; }
       st.importing += jobs.length;
       setBusy();
@@ -5477,7 +5484,7 @@
         els.drop.classList.toggle("is-on", !!on);
         // a clip that cannot take audio says so, and the overlay is plainer
         els.drop.classList.toggle("is-off", !st.ready);
-        els.dropLabel.textContent = st.ready ? "Drop audio files to add them" : "Audio cannot be added to this clip";
+        els.dropLabel.textContent = st.ready ? RK_M("editor.dropAudioFilesToAddThem") : RK_M("editor.audioCannotBeAddedToThis");
       }
       if (on) dropTimer = window.setTimeout(function () { dropShow(false); }, 1500);
       else dragDepth = 0;
@@ -5556,24 +5563,24 @@
         st.initial = signature();
         return false;
       }
-      stage("Preparing the audio");
+      stage(RK_M("editor.preparingTheAudio"));
       return ask(name).then(function step(info) {
         if (mine !== seq) return false;
-        if (!info || !info.ok) return failed("The audio of this clip could not be read");
+        if (!info || !info.ok) return failed(RK_M("editor.theAudioOfThisClipCould"));
         // a clip without audio still takes audio from outside, as long as its file can be read; one that cannot be read may hold audio that is not seen, so it is left alone
         var silent = !info.tracks || !info.tracks.length;
         if (silent && !info.readable) return false;
-        if (info.error) return failed("The audio tracks could not be prepared");
+        if (info.error) return failed(RK_M("editor.theAudioTracksCouldNotBe"));
         if (!silent && !info.ready) {
           return new Promise(function (resolve) { setTimeout(resolve, 400); }).then(function () { return mine === seq ? ask(name).then(step) : false; });
         }
         st.key = info.key || "";
         st.tracks = info.tracks || [];
-        stage("Drawing the waveforms");
+        stage(RK_M("editor.drawingTheWaveforms"));
         return Promise.all(st.tracks.map(function (t) { return fetchPeaks(t.index).then(function (p) { if (mine === seq) st.peaks[t.index] = p; }); }))
           .then(function () {
             if (mine !== seq) return false;
-            stage("Loading the tracks");
+            stage(RK_M("editor.loadingTheTracks"));
             return startEngine(mine);
           })
           .then(function (ok) {
@@ -5587,7 +5594,7 @@
             refreshToolbar();
             return true;
           })
-          .catch(function (err) { return failed(err && err.message ? err.message : "The audio tracks could not be loaded"); });
+          .catch(function (err) { return failed(err && err.message ? err.message : RK_M("editor.theAudioTracksCouldNotBe2")); });
       });
     }
 
@@ -5748,7 +5755,7 @@
       return wanted.reduce(function (chain, imp) {
         return chain.then(function () {
           if (mine !== seq) return null;
-          if (!st.ready) { dropped.push(imp.label || "Audio"); return null; }
+          if (!st.ready) { dropped.push(imp.label || RK_M("common.audio")); return null; }
           return askImport(imp.id)
             .then(function (info) {
               if (!info || !info.ok || info.state !== "ready") throw new Error("gone");
@@ -5757,7 +5764,7 @@
             .then(function (peaks) {
               if (mine !== seq) return null;
               if (!trackOf(imp.index)) {
-                st.tracks.push({ index: imp.index, label: imp.label || "Audio", importId: imp.id });
+                st.tracks.push({ index: imp.index, label: imp.label || RK_M("common.audio"), importId: imp.id });
                 st.peaks[imp.index] = peaks;
                 st.nextImport = Math.max(st.nextImport, imp.index - IMPORT_BASE + 1);
               }
@@ -5766,7 +5773,7 @@
             .catch(function () {
               if (mine !== seq) return;
               forgetTrack(imp.index);
-              dropped.push(imp.label || "Audio");
+              dropped.push(imp.label || RK_M("common.audio"));
             });
         });
       }, Promise.resolve()).then(function () {
@@ -5814,7 +5821,7 @@
       els.anchor = els.dimStart;
       [els.dimStart, els.dimEnd].forEach(function (n) { dom.lanes.appendChild(n); });
       els.empty = el("div", "tl-empty");
-      els.empty.textContent = "No audio rows. Drop an audio file here or press the import button.";
+      els.empty.textContent = RK_M("editor.noAudioRowsDropAnAudio");
       dom.lanes.insertBefore(els.empty, els.dimStart);
       els.drop = el("div", "tl-drop");
       els.drop.setAttribute("aria-hidden", "true");
@@ -5995,7 +6002,7 @@
       },
       // cues made from the words of the speech engine, in seconds of the timeline, as a new row named after what was listened to; the rows already there stay, and undo takes the new one back in one step
       addRow: function (title, cues) {
-        var row = { id: newId("R"), auto: true, title: String(title || RK_T("Subtitles")).slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
+        var row = { id: newId("R"), auto: true, title: String(title || RK_M("editor.subtitles")).slice(0, SUB_TITLE_MAX), style: defaultRowStyle() };
         var made = cleanSubs(cues.map(function (c) { return { id: newId("C"), row: row.id, at: c.at, end: c.end, text: c.text, words: c.words, unsure: c.unsure === true, alts: c.alts }; }), [row]);
         if (!made.length) return "";
         st.subRows.push(row);
@@ -6060,7 +6067,7 @@
       checkpoint: function () { commit(); },
       sourceToTimeline: function (srcT) { return sourceToTimeline(srcT); },
       // the audio tracks of the clip itself (not the files brought in), which the speech engine can listen to
-      sourceTracks: function () { return st.tracks.filter(function (t) { return !t.importId; }).map(function (t) { return { index: t.index, label: t.label }; }); },
+      sourceTracks: function () { return st.tracks.filter(function (t) { return !t.importId; }).map(function (t) { return { index: t.index, label: t.label, name: t.name }; }); },
       // the part of the source video the saved copy shows, in seconds of the video, which is what the speech engine listens to
       sourceRange: function () {
         if (videoEdited()) {
@@ -6125,7 +6132,7 @@
         setBusy();
         return waitImport(id, mine)
           .then(function (info) { return info ? placeImport(info, at, mine, link) : false; })
-          .catch(function (err) { importNote((err && err.message) || RK_T("The recording could not be added")); return false; })
+          .catch(function (err) { importNote((err && err.message) || RK_M("editor.theRecordingCouldNotBeAdded")); return false; })
           .then(function (placed) {
             if (mine === seq) { st.importing = Math.max(0, st.importing - 1); setBusy(); }
             return placed;

@@ -81,19 +81,19 @@ namespace ReplayKitHelper
             error = null;
             var plan = new AudioPlan();
             var lanes = json?["lanes"] as JArray;
-            if (lanes == null || lanes.Count > MaxLanes) { error = "Bad audio edit"; return null; }
+            if (lanes == null || lanes.Count > MaxLanes) { error = Locales.Message("editor.badAudioEdit"); return null; }
             // the files brought in from outside the clip are listed by number and id; whether a file is still there is for the one who renders to check
             var importsToken = json["imports"];
             if (importsToken != null && importsToken.Type != JTokenType.Null)
             {
                 var imports = importsToken as JArray;
-                if (imports == null || imports.Count > MaxImports) { error = "Bad audio edit"; return null; }
+                if (imports == null || imports.Count > MaxImports) { error = Locales.Message("editor.badAudioEdit"); return null; }
                 foreach (var importToken in imports)
                 {
                     var io = importToken as JObject;
                     int importSrc = io?.Value<int?>("src") ?? -1;
                     string importId = io?.Value<string>("id");
-                    if (importSrc < ImportBase || importSrc >= ImportBase + 100000 || !AudioImports.IsId(importId) || plan.Imports.Any(i => i.Src == importSrc)) { error = "Bad audio edit"; return null; }
+                    if (importSrc < ImportBase || importSrc >= ImportBase + 100000 || !AudioImports.IsId(importId) || plan.Imports.Any(i => i.Src == importSrc)) { error = Locales.Message("editor.badAudioEdit"); return null; }
                     plan.Imports.Add(new Import { Src = importSrc, Id = importId });
                 }
             }
@@ -104,7 +104,7 @@ namespace ReplayKitHelper
                 laneNumber++;
                 var laneJson = laneToken as JObject;
                 var segments = laneJson?["segments"] as JArray;
-                if (segments == null) { error = "Bad audio edit"; return null; }
+                if (segments == null) { error = Locales.Message("editor.badAudioEdit"); return null; }
                 string label = UnsafeLabel.Replace(laneJson.Value<string>("label") ?? "", "").Trim();
                 if (label.Length > 60) label = label.Substring(0, 60).Trim();
                 if (label.Length == 0) label = "Track " + laneNumber;
@@ -113,7 +113,7 @@ namespace ReplayKitHelper
                 foreach (var segToken in segments)
                 {
                     var o = segToken as JObject;
-                    if (o == null || ++total > MaxSegments) { error = "Bad audio edit"; return null; }
+                    if (o == null || ++total > MaxSegments) { error = Locales.Message("editor.badAudioEdit"); return null; }
                     var seg = new Segment
                     {
                         At = o.Value<double?>("at") ?? double.NaN,
@@ -154,7 +154,7 @@ namespace ReplayKitHelper
                         && seg.Volume >= 0 && seg.Volume <= 4
                         && seg.FadeIn >= 0 && seg.FadeIn <= 3600 && seg.FadeOut >= 0 && seg.FadeOut <= 3600
                         && seg.Speed >= 0.0625 && seg.Speed <= 16;
-                    if (!valid) { error = "Bad audio edit"; return null; }
+                    if (!valid) { error = Locales.Message("editor.badAudioEdit"); return null; }
                     if (laneMuted || o.Value<bool?>("muted") == true || seg.Volume == 0) continue;
                     lane.Segments.Add(seg);
                 }

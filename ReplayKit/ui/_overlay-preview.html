@@ -48,11 +48,11 @@
 </style>
 <div class="ovp-wrap">
   <div class="ovp-hint">
-    <span class="ovp-hint-text">Drag to position</span>
-    <span class="control-note">Drag to move, use the corners to resize, or drag the round handle to rotate. Rotation snaps near 90-degree angles. Hold Shift to disable snapping. Press Ctrl+Z to undo a move, resize or rotation. Changes are applied when you press Apply.</span>
+    <span class="ovp-hint-text" data-i18n="settings.dragToPosition"></span>
+    <span class="control-note" data-i18n="settings.dragToMoveUseTheCorners"></span>
   </div>
   <div class="ovp-screen" id="ovpScreen">
-    <div class="ovp-off" id="ovpOff" hidden>Input overlay is off</div>
+    <div class="ovp-off" id="ovpOff" hidden data-i18n="settings.inputOverlayIsOff"></div>
     <div class="ovp-stage" id="ovpStage">
       <div class="ovp-layer" id="ovpWasd"><div class="ovp-sprite" id="ovpWasdInner"></div></div>
       <div class="ovp-layer" id="ovpMouse"><div class="ovp-sprite" id="ovpMouseInner"></div></div>
@@ -601,10 +601,13 @@
   // obs owns the real position, so poll it while the section is on screen -- moving the item in the projector shows up here without a reload. skipped mid-drag so it cannot fight the pointer.
   async function pollPosition(run) {
     if (!running || run !== posRun) return;
-    if (!drag && !resize && !turn && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
-      try {
-        var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
-        var d = await r.json();
+    try {
+      if (!drag && !resize && !turn && !posDirty && document.visibilityState === "visible" && RKWindow.up() && screenEl.offsetParent !== null) {
+        var d = null;
+        try {
+          var r = await fetch(HELPER + "/overlay/position?t=" + Date.now(), { cache: "no-store" });
+          d = await r.json();
+        } catch (_) {}
         if (!running || run !== posRun) return;
         if (d && d.ok && !drag && !resize && !turn && !posDirty) {
           var changed = false;
@@ -628,9 +631,10 @@
           }
           if (changed) layout();
         }
-      } catch (_) {}
+      }
+    } finally {
+      if (running && run === posRun) posTimer = setTimeout(function () { pollPosition(run); }, 1200);
     }
-    if (running && run === posRun) posTimer = setTimeout(function () { pollPosition(run); }, 1200);
   }
 
   function curScalePct() { var s = getStyle() || {}; return s.overlayScale; }

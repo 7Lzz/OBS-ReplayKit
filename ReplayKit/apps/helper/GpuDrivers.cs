@@ -58,7 +58,7 @@ namespace ReplayKitHelper
         public static JObject Report(JObject body)
         {
             var ids = (body?["available"] as JArray)?.Select(t => t?.Value<string>()).Where(s => !string.IsNullOrWhiteSpace(s) && s.Length < 80).ToList();
-            if (ids == null || ids.Count == 0) return new JObject { ["ok"] = false, ["message"] = "No encoders were reported." };
+            if (ids == null || ids.Count == 0) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.noEncodersWereReported") };
             int pid = body["obsPid"]?.Type == JTokenType.Integer ? body["obsPid"].Value<int>() : 0;
             string missing = body["missing"]?.Value<string>() ?? "";
             string fallback = body["fallback"]?.Value<string>() ?? "";
@@ -85,7 +85,7 @@ namespace ReplayKitHelper
         private static string Describe(string encoderId)
         {
             string id = (encoderId ?? "").ToLowerInvariant();
-            if (id.Contains("x264")) return Locales.T("your processor (x264)");
+            if (id.Contains("x264")) return Locales.Message("settings.yourProcessorX264");
             var maker = MakerOf(id);
             string codec = id.Contains("hevc") || id.Contains("h265") ? "H.265" : "H.264";
             return maker == null ? encoderId : maker.Name + " " + codec + " (" + (maker == Nvidia ? "NVENC" : maker == Amd ? "AMF" : "Quick Sync") + ")";
@@ -96,22 +96,22 @@ namespace ReplayKitHelper
             var maker = MakerOf(missing);
             string gpu = maker?.Name ?? "graphics";
             string now = string.IsNullOrEmpty(fallback)
-                ? Locales.T("ReplayKit could not find another encoder to switch to, so clips cannot be recorded until the driver is fixed.")
-                : Locales.T("To keep clipping working, ReplayKit switched recording to {encoder} for now.", "encoder", Describe(fallback)) +
-                  (fallback.IndexOf("x264", StringComparison.OrdinalIgnoreCase) >= 0 ? " " + Locales.T("Encoding on the processor can lower your frame rate in games.") : "");
+                ? Locales.Message("settings.replaykitCouldNotFindAnotherEncoder")
+                : Locales.Message("settings.toKeepClippingWorkingReplaykitSwitched", "encoder", Describe(fallback)) +
+                  (fallback.IndexOf("x264", StringComparison.OrdinalIgnoreCase) >= 0 ? " " + Locales.Message("settings.encodingOnTheProcessorCanLower") : "");
             string how = maker == null
-                ? Locales.T("Update your graphics driver from the website of your graphics card maker, then restart OBS.")
-                : Locales.T("Install or open **{app}**, update the {maker} graphics driver, then restart your PC. ReplayKit switches back to the {maker} encoder by itself once it loads.", "app", maker.App, "maker", maker.Name);
-            string body = Locales.T("OBS could not load the {encoder} encoder. This almost always means the {gpu} graphics driver is out of date.", "encoder", Describe(missing), "gpu", gpu) + "\n\n" + now + "\n\n" + how;
-            Notifications.Announce("warning", "encoder-driver", Locales.T("Update your {gpu} graphics driver", "gpu", gpu), body,
+                ? Locales.Message("settings.updateYourGraphicsDriverFromThe")
+                : Locales.Message("settings.installOrOpenAppUpdateThe", "app", maker.App, "maker", maker.Name);
+            string body = Locales.Message("settings.obsCouldNotLoadTheEncoder", "encoder", Describe(missing), "gpu", gpu) + "\n\n" + now + "\n\n" + how;
+            Notifications.Announce("warning", "encoder-driver", Locales.Message("settings.updateYourGpuGraphicsDriver", "gpu", gpu), body,
                 new JObject
                 {
                     ["icon"] = "warning",
-                    ["text"] = Locales.T("OBS could not load the {encoder} encoder. Your {gpu} graphics driver is most likely out of date.", "encoder", Describe(missing), "gpu", gpu),
+                    ["text"] = Locales.Message("settings.obsCouldNotLoadTheEncoder2", "encoder", Describe(missing), "gpu", gpu),
                     ["detail"] = now,
-                    ["action"] = maker == null ? null : new JObject { ["label"] = Locales.T("Get {app}", "app", maker.App), ["kind"] = "link", ["url"] = maker.Url },
+                    ["action"] = maker == null ? null : new JObject { ["label"] = Locales.Message("settings.getApp", "app", maker.App), ["kind"] = "link", ["url"] = maker.Url },
                 },
-                maker?.Url ?? "", maker == null ? null : Locales.T("Get {app}", "app", maker.App));
+                maker?.Url ?? "", maker == null ? null : Locales.Message("settings.getApp", "app", maker.App));
         }
     }
 }

@@ -23,7 +23,7 @@ namespace ReplayKitHelper
                 {
                     try { held = mutex.WaitOne(TimeSpan.FromSeconds(10)); }
                     catch (AbandonedMutexException) { held = true; }
-                    if (!held) throw new IOException("Clip database is busy.");
+                    if (!held) throw new IOException(Locales.Message("clips.clipDatabaseIsBusy"));
                     return action(full);
                 }
                 finally { if (held) mutex.ReleaseMutex(); }
@@ -37,7 +37,7 @@ namespace ReplayKitHelper
             {
                 using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    if (file.Length > maxBytes) throw new InvalidDataException("The saved state file is too large.");
+                    if (file.Length > maxBytes) throw new InvalidDataException(Locales.Message("clips.theSavedStateFileIsToo"));
                     using (var reader = new StreamReader(file, Encoding.UTF8, true)) return JObject.Parse(reader.ReadToEnd());
                 }
             }
@@ -92,7 +92,7 @@ namespace ReplayKitHelper
         {
             string key = FolderKey(folder);
             created = false;
-            if (db["_folders"] != null && !(db["_folders"] is JObject)) throw new Newtonsoft.Json.JsonException("Invalid clip folder metadata.");
+            if (db["_folders"] != null && !(db["_folders"] is JObject)) throw new Newtonsoft.Json.JsonException(Locales.Message("clips.invalidClipFolderMetadata"));
             var folders = db["_folders"] as JObject;
             if (folders == null)
             {
@@ -102,7 +102,7 @@ namespace ReplayKitHelper
                 db["_folders"] = folders;
                 created = true;
             }
-            if (folders[key] != null && !(folders[key] is JObject)) throw new Newtonsoft.Json.JsonException("Invalid clip folder metadata.");
+            if (folders[key] != null && !(folders[key] is JObject)) throw new Newtonsoft.Json.JsonException(Locales.Message("clips.invalidClipFolderMetadata"));
             if (folders[key] == null)
             {
                 folders[key] = new JObject();

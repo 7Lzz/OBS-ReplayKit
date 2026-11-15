@@ -231,27 +231,27 @@
   var EDITOR_SIGNAL = window.__rkEditorScope && window.__rkEditorScope.signal;
 
   var LANGUAGES = [
-    ["auto", "Detect automatically"], ["en", "English"], ["es", "Spanish"], ["pt", "Portuguese"], ["fr", "French"], ["de", "German"], ["it", "Italian"],
-    ["nl", "Dutch"], ["pl", "Polish"], ["ru", "Russian"], ["uk", "Ukrainian"], ["tr", "Turkish"], ["ar", "Arabic"], ["hi", "Hindi"], ["ja", "Japanese"],
-    ["ko", "Korean"], ["zh", "Chinese"], ["vi", "Vietnamese"], ["id", "Indonesian"], ["th", "Thai"], ["sv", "Swedish"],
+    ["auto", RK_M("editor.detectAutomatically")], ["en", RK_M("wizard.english")], ["es", RK_M("editor.langSpanish")], ["pt", RK_M("editor.langPortuguese")], ["fr", RK_M("editor.langFrench")], ["de", RK_M("editor.langGerman")], ["it", RK_M("editor.langItalian")],
+    ["nl", RK_M("editor.langDutch")], ["pl", RK_M("editor.langPolish")], ["ru", RK_M("editor.langRussian")], ["uk", RK_M("editor.langUkrainian")], ["tr", RK_M("editor.langTurkish")], ["ar", RK_M("editor.langArabic")], ["hi", RK_M("editor.langHindi")], ["ja", RK_M("editor.langJapanese")],
+    ["ko", RK_M("editor.langKorean")], ["zh", RK_M("editor.langChinese")], ["vi", RK_M("editor.langVietnamese")], ["id", RK_M("editor.langIndonesian")], ["th", RK_M("editor.langThai")], ["sv", RK_M("editor.langSwedish")],
   ];
   // how much goes on screen at once: a few words, a short phrase, or close to a sentence
   var LENGTHS = { short: { chars: 16, dur: 1.6 }, normal: { chars: 32, dur: 3 }, long: { chars: 48, dur: 5 } };
   var PREFS_KEY = "rk-editor-tools";
   // the shapes of the elements tab, as paths in a box of their own size; each is drawn in the colour picked and laid over the video as a picture
   var SHAPES = [
-    ["square", "Square", [100, 100], "M8 8h84v84H8z"],
-    ["rounded", "Rounded square", [100, 100], "M26 8h48a18 18 0 0 1 18 18v48a18 18 0 0 1-18 18H26A18 18 0 0 1 8 74V26A18 18 0 0 1 26 8z"],
-    ["rect", "Rectangle", [160, 90], "M6 6h148v78H6z"],
-    ["circle", "Circle", [100, 100], "M50 6a44 44 0 1 0 .01 0z"],
-    ["ring", "Ring", [100, 100], "M50 6a44 44 0 1 0 .01 0zM50 18a32 32 0 1 1-.01 0z", "evenodd"],
-    ["triangle", "Triangle", [100, 100], "M50 8l44 82H6z"],
-    ["star", "Star", [100, 100], "M50 5l13.2 28.5 31.3 3.6-23.1 21.4 6.2 30.8L50 73.8 22.4 89.3l6.2-30.8L5.5 37.1l31.3-3.6z"],
-    ["heart", "Heart", [100, 100], "M50 88C22 66 6 51 6 32 6 18 17 8 30 8c9 0 16 5 20 12 4-7 11-12 20-12 13 0 24 10 24 24 0 19-16 34-44 56z"],
-    ["arrow", "Arrow", [100, 100], "M6 38h50V14l38 36-38 36V62H6z"],
-    ["line", "Line", [200, 20], "M4 4h192v12H4z"],
-    ["bubble", "Speech bubble", [100, 100], "M18 8h64a12 12 0 0 1 12 12v40a12 12 0 0 1-12 12H44L24 92V72h-6A12 12 0 0 1 6 60V20A12 12 0 0 1 18 8z"],
-    ["diamond", "Diamond", [100, 100], "M50 4l46 46-46 46L4 50z"],
+    ["square", RK_M("editor.square"), [100, 100], "M8 8h84v84H8z"],
+    ["rounded", RK_M("editor.roundedSquare"), [100, 100], "M26 8h48a18 18 0 0 1 18 18v48a18 18 0 0 1-18 18H26A18 18 0 0 1 8 74V26A18 18 0 0 1 26 8z"],
+    ["rect", RK_M("editor.shapeRectangle"), [160, 90], "M6 6h148v78H6z"],
+    ["circle", RK_M("editor.shapeCircle"), [100, 100], "M50 6a44 44 0 1 0 .01 0z"],
+    ["ring", RK_M("editor.shapeRing"), [100, 100], "M50 6a44 44 0 1 0 .01 0zM50 18a32 32 0 1 1-.01 0z", "evenodd"],
+    ["triangle", RK_M("editor.shapeTriangle"), [100, 100], "M50 8l44 82H6z"],
+    ["star", RK_M("editor.star"), [100, 100], "M50 5l13.2 28.5 31.3 3.6-23.1 21.4 6.2 30.8L50 73.8 22.4 89.3l6.2-30.8L5.5 37.1l31.3-3.6z"],
+    ["heart", RK_M("editor.shapeHeart"), [100, 100], "M50 88C22 66 6 51 6 32 6 18 17 8 30 8c9 0 16 5 20 12 4-7 11-12 20-12 13 0 24 10 24 24 0 19-16 34-44 56z"],
+    ["arrow", RK_M("editor.shapeArrow"), [100, 100], "M6 38h50V14l38 36-38 36V62H6z"],
+    ["line", RK_M("editor.shapeLine"), [200, 20], "M4 4h192v12H4z"],
+    ["bubble", RK_M("editor.speechBubble"), [100, 100], "M18 8h64a12 12 0 0 1 12 12v40a12 12 0 0 1-12 12H44L24 92V72h-6A12 12 0 0 1 6 60V20A12 12 0 0 1 18 8z"],
+    ["diamond", RK_M("editor.shapeDiamond"), [100, 100], "M50 4l46 46-46 46L4 50z"],
   ];
   // the stickers: the animated emoji of google noto (cc by 4.0), each a still svg for its tile, an animated webp while it is hovered and a gif for the saved copy, by the codepoint that names its folder; only ones the set animates are listed
   var NOTO = "https://fonts.gstatic.com/s/e/notoemoji/latest/";
@@ -259,86 +259,86 @@
   // static 3d stickers: the fluent emoji of microsoft (mit), from a pinned commit of their repository on jsdelivr, by the folder name of each
   var FLUENT = "https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets/";
   var FLUENT_3D = [
-    "Face with tears of joy",
-    "Rolling on the floor laughing",
-    "Loudly crying face",
-    "Fire",
-    "Skull",
-    "Trophy",
-    "Crown",
-    "Party popper",
-    "Rocket",
-    "Hundred points",
-    "Ghost",
-    "Video game",
-    "Smiling face with sunglasses",
-    "Exploding head",
-    "Partying face",
-    "Face screaming in fear",
-    "Thinking face",
-    "Eyes",
-    "Collision",
-    "Alien",
-    "Robot",
-    "Pile of poo",
-    "Gem stone",
-    "Bomb",
-    "Police car light",
-    "High voltage",
-    "Star",
-    "Glowing star",
-    "Red heart",
-    "Broken heart",
-    "Check mark button",
-    "Cross mark",
-    "Red question mark",
-    "Warning",
-    "Money bag",
-    "Money with wings",
-    "Clown face",
-    "Nerd face",
-    "Pleading face",
-    "Hot face",
-    "Cold face",
-    "Sleeping face",
-    "Face vomiting",
-    "Unicorn",
-    "Cat face",
-    "Dog face",
-    "Penguin",
-    "Pizza",
-    "Hamburger",
-    "Popcorn",
-    "Birthday cake",
-    "Wrapped gift",
-    "Balloon",
-    "Rainbow",
-    "Snowflake",
-    "Light bulb",
-    "Brain",
-    "Sparkles",
-    "Musical notes",
-    "Headphone",
-    "Game die",
-    "Joystick",
-    "Crossed swords",
-    "Shield",
-    "Hourglass done",
-    "Stopwatch",
-    "Megaphone",
-    "Bell",
-    "Locked",
-    "Key",
-    "Gear",
-    "Magic wand",
-    "Crystal ball",
-    "Teddy bear",
-    "Moai",
-    "Goat",
-    "Chicken",
-    "Frog",
-    "Hot beverage",
-    "Cookie",
+    ["Face with tears of joy", RK_M("editor.faceWithTearsOfJoy")],
+    ["Rolling on the floor laughing", RK_M("editor.rollingOnTheFloorLaughing")],
+    ["Loudly crying face", RK_M("editor.loudlyCryingFace")],
+    ["Fire", RK_M("editor.emojiFire")],
+    ["Skull", RK_M("editor.emojiSkull")],
+    ["Trophy", RK_M("editor.emojiTrophy")],
+    ["Crown", RK_M("editor.emojiCrown")],
+    ["Party popper", RK_M("editor.partyPopper")],
+    ["Rocket", RK_M("editor.emojiRocket")],
+    ["Hundred points", RK_M("editor.hundredPoints")],
+    ["Ghost", RK_M("editor.emojiGhost")],
+    ["Video game", RK_M("editor.videoGame")],
+    ["Smiling face with sunglasses", RK_M("editor.smilingFaceWithSunglasses")],
+    ["Exploding head", RK_M("editor.explodingHead")],
+    ["Partying face", RK_M("editor.partyingFace")],
+    ["Face screaming in fear", RK_M("editor.faceScreamingInFear")],
+    ["Thinking face", RK_M("editor.thinkingFace")],
+    ["Eyes", RK_M("editor.emojiEyes")],
+    ["Collision", RK_M("editor.emojiCollision")],
+    ["Alien", RK_M("editor.emojiAlien")],
+    ["Robot", RK_M("editor.emojiRobot")],
+    ["Pile of poo", RK_M("editor.pileOfPoo")],
+    ["Gem stone", RK_M("editor.gemStone")],
+    ["Bomb", RK_M("editor.emojiBomb")],
+    ["Police car light", RK_M("editor.policeCarLight")],
+    ["High voltage", RK_M("editor.highVoltage")],
+    ["Star", RK_M("editor.star")],
+    ["Glowing star", RK_M("editor.glowingStar")],
+    ["Red heart", RK_M("editor.redHeart")],
+    ["Broken heart", RK_M("editor.brokenHeart")],
+    ["Check mark button", RK_M("editor.checkMarkButton")],
+    ["Cross mark", RK_M("editor.crossMark")],
+    ["Red question mark", RK_M("editor.redQuestionMark")],
+    ["Warning", RK_M("editor.emojiWarning")],
+    ["Money bag", RK_M("editor.moneyBag")],
+    ["Money with wings", RK_M("editor.moneyWithWings")],
+    ["Clown face", RK_M("editor.clownFace")],
+    ["Nerd face", RK_M("editor.nerdFace")],
+    ["Pleading face", RK_M("editor.pleadingFace")],
+    ["Hot face", RK_M("editor.hotFace")],
+    ["Cold face", RK_M("editor.coldFace")],
+    ["Sleeping face", RK_M("editor.sleepingFace")],
+    ["Face vomiting", RK_M("editor.faceVomiting")],
+    ["Unicorn", RK_M("editor.emojiUnicorn")],
+    ["Cat face", RK_M("editor.catFace")],
+    ["Dog face", RK_M("editor.dogFace")],
+    ["Penguin", RK_M("editor.emojiPenguin")],
+    ["Pizza", RK_M("editor.emojiPizza")],
+    ["Hamburger", RK_M("editor.emojiHamburger")],
+    ["Popcorn", RK_M("editor.emojiPopcorn")],
+    ["Birthday cake", RK_M("editor.birthdayCake")],
+    ["Wrapped gift", RK_M("editor.wrappedGift")],
+    ["Balloon", RK_M("editor.emojiBalloon")],
+    ["Rainbow", RK_M("editor.emojiRainbow")],
+    ["Snowflake", RK_M("editor.emojiSnowflake")],
+    ["Light bulb", RK_M("editor.lightBulb")],
+    ["Brain", RK_M("editor.emojiBrain")],
+    ["Sparkles", RK_M("editor.emojiSparkles")],
+    ["Musical notes", RK_M("editor.musicalNotes")],
+    ["Headphone", RK_M("editor.emojiHeadphone")],
+    ["Game die", RK_M("editor.gameDie")],
+    ["Joystick", RK_M("editor.emojiJoystick")],
+    ["Crossed swords", RK_M("editor.crossedSwords")],
+    ["Shield", RK_M("editor.emojiShield")],
+    ["Hourglass done", RK_M("editor.hourglassDone")],
+    ["Stopwatch", RK_M("editor.emojiStopwatch")],
+    ["Megaphone", RK_M("editor.emojiMegaphone")],
+    ["Bell", RK_M("editor.emojiBell")],
+    ["Locked", RK_M("editor.emojiLocked")],
+    ["Key", RK_M("editor.emojiKey")],
+    ["Gear", RK_M("editor.emojiGear")],
+    ["Magic wand", RK_M("editor.magicWand")],
+    ["Crystal ball", RK_M("editor.crystalBall")],
+    ["Teddy bear", RK_M("editor.teddyBear")],
+    ["Moai", RK_M("editor.emojiMoai")],
+    ["Goat", RK_M("editor.emojiGoat")],
+    ["Chicken", RK_M("editor.emojiChicken")],
+    ["Frog", RK_M("editor.emojiFrog")],
+    ["Hot beverage", RK_M("editor.hotBeverage")],
+    ["Cookie", RK_M("editor.emojiCookie")],
   ];
   // text stickers drawn by the editor itself in a few styles: [text, style, main colour, second colour]
   var TEXT_STICKERS = [
@@ -352,25 +352,25 @@
     ["TOO EASY", "outline", "#ffffff", "#5e35b1"], ["CRINGE", "outline", "#c6ff00", "#2b3300"], ["BIG PLAY", "outline", "#40c4ff", "#00243a"], ["NEW RECORD", "pill", "#ffab00", "#1a1100"],
   ];
   var STICKERS = [
-    ["1f602", "Joy", "laughing lol"], ["1f923", "Rolling on the floor", "laughing rofl lol"], ["1f62d", "Crying", "sob sad"], ["1f525", "Fire", "lit hot"], ["1f480", "Skull", "dead dying"],
-    ["1f44d", "Thumbs up", "like yes good"], ["1f389", "Party popper", "celebrate tada"], ["1f60e", "Cool", "sunglasses"], ["1f631", "Scream", "shocked scared"], ["1f914", "Thinking", "hmm"],
-    ["1f440", "Eyes", "look watching"], ["1f4a5", "Boom", "explosion collision"], ["1f92f", "Mind blown", "exploding head"], ["1f973", "Party face", "celebrate birthday"], ["1f60d", "Heart eyes", "love"],
-    ["1f970", "In love", "hearts smiling"], ["1f97a", "Pleading", "puppy eyes please"], ["1f644", "Eye roll", "whatever"], ["1f62c", "Grimace", "awkward yikes"], ["1f913", "Nerd", "glasses smart"],
-    ["1f921", "Clown", "joker"], ["1f92e", "Vomiting", "sick gross"], ["1f634", "Sleeping", "tired zzz"], ["1f975", "Hot face", "sweating"], ["1f976", "Cold face", "freezing"],
-    ["1f47b", "Ghost", "boo spooky"], ["1f47d", "Alien", "ufo"], ["1f916", "Robot", "bot"], ["1f4a9", "Poop", "pile"], ["1f3c6", "Trophy", "win winner"],
-    ["1f451", "Crown", "king queen"], ["1f48e", "Gem", "diamond"], ["1f680", "Rocket", "launch"], ["1f3af", "Bullseye", "target"], ["1f4a3", "Bomb", "explode"],
-    ["1f6a8", "Siren", "alarm police"], ["26a1", "Lightning", "zap electric"], ["2b50", "Star", "favorite"], ["1f31f", "Glowing star", "sparkle shine"], ["1f499", "Blue heart", "love"],
-    ["1f494", "Broken heart", "sad love"], ["1f4aa", "Flexed biceps", "strong muscle"], ["1f449", "Pointing right", "this here"], ["2705", "Check", "yes done"], ["274c", "Cross", "no wrong"],
-    ["2753", "Question", "what"], ["2757", "Exclamation", "important"], ["26a0", "Warning", "caution"], ["1f44f", "Clapping", "applause"], ["1f64f", "Folded hands", "please pray thanks"],
-    ["1f4af", "Hundred", "100 perfect"], ["1f621", "Angry", "rage mad"], ["1f44b", "Waving", "hello hi bye"], ["1f918", "Rock on", "metal horns"], ["1f91d", "Handshake", "deal"],
-    ["1f4b8", "Money with wings", "cash spend"], ["1f911", "Money face", "rich"], ["1f92b", "Shushing", "quiet secret"], ["1f971", "Yawning", "bored tired"], ["1f62e", "Surprised", "wow oh"],
-    ["1f633", "Flushed", "embarrassed"], ["1f924", "Drooling", "hungry want"], ["1f608", "Devil", "evil smiling"], ["1f47e", "Space invader", "game monster"], ["1f984", "Unicorn", "magic"],
-    ["1f431", "Cat", "kitty"], ["1f427", "Penguin", "bird"], ["1f40d", "Snake", "sneaky"], ["1f985", "Eagle", "bird"], ["1f988", "Shark", "fish"],
-    ["1f383", "Jack o lantern", "halloween pumpkin"], ["1f382", "Birthday cake", "party"], ["1f381", "Gift", "present"], ["1f388", "Balloon", "party"], ["1f38a", "Confetti ball", "party celebrate"],
-    ["1f308", "Rainbow", "pride"], ["1f327", "Rain", "cloud weather"], ["2744", "Snowflake", "cold winter"], ["1f30b", "Volcano", "eruption"], ["1f30a", "Wave", "ocean water"],
-    ["1f340", "Four leaf clover", "luck"], ["1f339", "Rose", "flower"], ["1f355", "Pizza", "food"], ["1f354", "Burger", "food"], ["1f37f", "Popcorn", "movie"],
-    ["2615", "Coffee", "hot drink"], ["1f942", "Cheers", "toast drink"], ["1f3b8", "Guitar", "music rock"], ["1f941", "Drum", "music"], ["1f4f8", "Camera flash", "photo"],
-    ["1f4a1", "Light bulb", "idea"], ["1f512", "Lock", "locked secure"], ["1f9e0", "Brain", "smart think"],
+    ["1f602", RK_M("editor.emojiJoy"), "laughing lol"], ["1f923", RK_M("editor.rollingOnTheFloor"), "laughing rofl lol"], ["1f62d", RK_M("editor.emojiCrying"), "sob sad"], ["1f525", RK_M("editor.emojiFire"), "lit hot"], ["1f480", RK_M("editor.emojiSkull"), "dead dying"],
+    ["1f44d", RK_M("editor.thumbsUp"), "like yes good"], ["1f389", RK_M("editor.partyPopper"), "celebrate tada"], ["1f60e", RK_M("editor.emojiCool"), "sunglasses"], ["1f631", RK_M("editor.emojiScream"), "shocked scared"], ["1f914", RK_M("editor.emojiThinking"), "hmm"],
+    ["1f440", RK_M("editor.emojiEyes"), "look watching"], ["1f4a5", RK_M("editor.emojiBoom"), "explosion collision"], ["1f92f", RK_M("editor.mindBlown"), "exploding head"], ["1f973", RK_M("editor.partyFace"), "celebrate birthday"], ["1f60d", RK_M("editor.heartEyes"), "love"],
+    ["1f970", RK_M("editor.inLove"), "hearts smiling"], ["1f97a", RK_M("editor.emojiPleading"), "puppy eyes please"], ["1f644", RK_M("editor.eyeRoll"), "whatever"], ["1f62c", RK_M("editor.emojiGrimace"), "awkward yikes"], ["1f913", RK_M("editor.emojiNerd"), "glasses smart"],
+    ["1f921", RK_M("editor.emojiClown"), "joker"], ["1f92e", RK_M("editor.emojiVomiting"), "sick gross"], ["1f634", RK_M("editor.emojiSleeping"), "tired zzz"], ["1f975", RK_M("editor.hotFace"), "sweating"], ["1f976", RK_M("editor.coldFace"), "freezing"],
+    ["1f47b", RK_M("editor.emojiGhost"), "boo spooky"], ["1f47d", RK_M("editor.emojiAlien"), "ufo"], ["1f916", RK_M("editor.emojiRobot"), "bot"], ["1f4a9", RK_M("editor.emojiPoop"), "pile"], ["1f3c6", RK_M("editor.emojiTrophy"), "win winner"],
+    ["1f451", RK_M("editor.emojiCrown"), "king queen"], ["1f48e", RK_M("editor.emojiGem"), "diamond"], ["1f680", RK_M("editor.emojiRocket"), "launch"], ["1f3af", RK_M("editor.emojiBullseye"), "target"], ["1f4a3", RK_M("editor.emojiBomb"), "explode"],
+    ["1f6a8", RK_M("editor.emojiSiren"), "alarm police"], ["26a1", RK_M("editor.emojiLightning"), "zap electric"], ["2b50", RK_M("editor.star"), "favorite"], ["1f31f", RK_M("editor.glowingStar"), "sparkle shine"], ["1f499", RK_M("editor.blueHeart"), "love"],
+    ["1f494", RK_M("editor.brokenHeart"), "sad love"], ["1f4aa", RK_M("editor.flexedBiceps"), "strong muscle"], ["1f449", RK_M("editor.pointingRight"), "this here"], ["2705", RK_M("editor.emojiCheck"), "yes done"], ["274c", RK_M("editor.emojiCross"), "no wrong"],
+    ["2753", RK_M("editor.emojiQuestion"), "what"], ["2757", RK_M("editor.emojiExclamation"), "important"], ["26a0", RK_M("editor.emojiWarning"), "caution"], ["1f44f", RK_M("editor.emojiClapping"), "applause"], ["1f64f", RK_M("editor.foldedHands"), "please pray thanks"],
+    ["1f4af", RK_M("editor.emojiHundred"), RK_M("editor.n100Perfect")], ["1f621", RK_M("editor.emojiAngry"), "rage mad"], ["1f44b", RK_M("editor.emojiWaving"), "hello hi bye"], ["1f918", RK_M("editor.rockOn"), "metal horns"], ["1f91d", RK_M("editor.emojiHandshake"), "deal"],
+    ["1f4b8", RK_M("editor.moneyWithWings"), "cash spend"], ["1f911", RK_M("editor.moneyFace"), "rich"], ["1f92b", RK_M("editor.emojiShushing"), "quiet secret"], ["1f971", RK_M("editor.emojiYawning"), "bored tired"], ["1f62e", RK_M("editor.emojiSurprised"), "wow oh"],
+    ["1f633", RK_M("editor.emojiFlushed"), "embarrassed"], ["1f924", RK_M("editor.emojiDrooling"), "hungry want"], ["1f608", RK_M("editor.emojiDevil"), "evil smiling"], ["1f47e", RK_M("editor.spaceInvader"), "game monster"], ["1f984", RK_M("editor.emojiUnicorn"), "magic"],
+    ["1f431", RK_M("editor.emojiCat"), "kitty"], ["1f427", RK_M("editor.emojiPenguin"), "bird"], ["1f40d", RK_M("editor.emojiSnake"), "sneaky"], ["1f985", RK_M("editor.emojiEagle"), "bird"], ["1f988", RK_M("editor.emojiShark"), "fish"],
+    ["1f383", RK_M("editor.jackOLantern"), "halloween pumpkin"], ["1f382", RK_M("editor.birthdayCake"), "party"], ["1f381", RK_M("editor.emojiGift"), "present"], ["1f388", RK_M("editor.emojiBalloon"), "party"], ["1f38a", RK_M("editor.confettiBall"), "party celebrate"],
+    ["1f308", RK_M("editor.emojiRainbow"), "pride"], ["1f327", RK_M("editor.emojiRain"), "cloud weather"], ["2744", RK_M("editor.emojiSnowflake"), "cold winter"], ["1f30b", RK_M("editor.emojiVolcano"), "eruption"], ["1f30a", RK_M("editor.emojiWave"), "ocean water"],
+    ["1f340", RK_M("editor.fourLeafClover"), "luck"], ["1f339", RK_M("editor.emojiRose"), "flower"], ["1f355", RK_M("editor.emojiPizza"), "food"], ["1f354", RK_M("editor.emojiBurger"), "food"], ["1f37f", RK_M("editor.emojiPopcorn"), "movie"],
+    ["2615", RK_M("editor.emojiCoffee"), "hot drink"], ["1f942", RK_M("editor.emojiCheers"), "toast drink"], ["1f3b8", RK_M("editor.guitar"), "music rock"], ["1f941", RK_M("editor.drum"), "music"], ["1f4f8", RK_M("editor.cameraFlash"), "photo"],
+    ["1f4a1", RK_M("editor.lightBulb"), "idea"], ["1f512", RK_M("editor.emojiLock"), "locked secure"], ["1f9e0", RK_M("editor.emojiBrain"), "smart think"],
   ];
 
   // the longest take the helper records, in minutes
@@ -469,7 +469,7 @@
   var measureCtx = null;
   var layoutCache = new Map();
   if (document.fonts && document.fonts.load) {
-    document.fonts.load('100px "Fredoka One"').then(function () { layoutCache.clear(); }).catch(function () {});
+    document.fonts.load(RK_M("editor.n100pxFredokaOne")).then(function () { layoutCache.clear(); }).catch(function () {});
   }
   function layoutText(text, style, aspect) {
     var key = [text, style.font, style.size, style.bold, style.italic, style.padX, hexAlpha(style.bg) > 0, aspect.toFixed(4)].join("|");
@@ -658,7 +658,7 @@
       var sub = prefs.tab === "subtitles" && view !== "home";
       var elPage = prefs.tab === "elements" && elView !== "home";
       els.back.hidden = !sub && !elPage;
-      els.title.textContent = sub ? (view === "auto" ? "Auto generate" : "Add manually") : elPage ? "Stickers" : { elements: "Elements", subtitles: "Subtitles", audio: "Audio", record: "Record" }[prefs.tab];
+      els.title.textContent = sub ? (view === "auto" ? RK_M("editor.autoGenerate") : RK_M("editor.addManually")) : elPage ? RK_M("editor.stickers") : { elements: RK_M("editor.elements"), subtitles: RK_M("editor.subtitles"), audio: RK_M("common.audio"), record: RK_M("common.record") }[prefs.tab];
       Object.keys(els.views).forEach(function (k) { els.views[k].hidden = k !== view; });
       if (els.elHome) {
         els.elHome.hidden = elPage;
@@ -672,8 +672,8 @@
       Object.keys(els.views).forEach(function (k) { pane.appendChild(els.views[k]); });
 
       var start = el("div", "ed-bigs");
-      start.appendChild(bigButton(SPARKLE_ICON, "Auto generate subtitles", "Writes them from the clip audio", function () { setView("auto"); }));
-      start.appendChild(bigButton(icon("action/edit"), "Add manually", "Type your own at the playhead", function () {
+      start.appendChild(bigButton(SPARKLE_ICON, RK_M("editor.autoGenerateSubtitles"), RK_M("editor.writesThemFromTheClipAudio"), function () { setView("auto"); }));
+      start.appendChild(bigButton(icon("action/edit"), RK_M("editor.addManually"), RK_M("editor.typeYourOwnAtThePlayhead"), function () {
         setView("manual");
         addManual();
       }));
@@ -682,36 +682,36 @@
       var auto = els.views.auto;
       els.lang = makeCombo(function (v) { prefs.language = v; savePrefs(); });
       els.lang.setOptions(LANGUAGES, prefs.language);
-      auto.appendChild(row("Language", els.lang));
+      auto.appendChild(row(RK_M("common.language"), els.lang));
       // several tracks can be listened to together, such as discord and the microphone without the game; all audio stands alone
       els.listen = makeCombo(function () {}, null, { multi: true, only: ["0"] });
-      els.listenRow = row("Listen to", els.listen, "Pick the tracks with the voices, so the game is left out when it drowns them. Selecting an audio track picks it here; selecting the video uses all audio.");
+      els.listenRow = row(RK_M("editor.listenTo"), els.listen, RK_M("editor.listenToHint"));
       auto.appendChild(els.listenRow);
-      els.length = picker([["short", "Short"], ["normal", "Normal"], ["long", "Long"]], prefs.length, function (v) { prefs.length = v; savePrefs(); els.length.paint(v); });
-      auto.appendChild(row("Length", els.length, "How many words show at once."));
+      els.length = picker([["short", RK_M("editor.lengthShort")], ["normal", RK_M("editor.lengthNormal")], ["long", RK_M("editor.lengthLong")]], prefs.length, function (v) { prefs.length = v; savePrefs(); els.length.paint(v); });
+      auto.appendChild(row(RK_M("common.length"), els.length, RK_M("editor.howManyWordsShowAtOnce")));
       if (prefs.accuracy !== "fast") prefs.accuracy = "accurate";
       // the note says what the picked one does, the way the choices of settings explain themselves
-      var ACCURACY_NOTES = { fast: "Finishes sooner, which helps on slower PCs, but mishears more words.", accurate: "Hears speech best and times the words most closely. Takes longer on slower PCs." };
-      els.accuracy = picker([["fast", "Fast"], ["accurate", "Accurate"]], prefs.accuracy, function (v) {
+      var ACCURACY_NOTES = { fast: RK_M("editor.finishesSoonerWhichHelpsOnSlower"), accurate: RK_M("editor.hearsSpeechBestAndTimesThe") };
+      els.accuracy = picker([["fast", RK_M("common.fast")], ["accurate", RK_M("editor.accurate")]], prefs.accuracy, function (v) {
         prefs.accuracy = v;
         savePrefs();
         els.accuracy.paint(v);
         els.accuracyNote.textContent = ACCURACY_NOTES[v];
       });
-      var accuracyRow = row("Accuracy", els.accuracy, ACCURACY_NOTES[prefs.accuracy]);
+      var accuracyRow = row(RK_M("editor.accuracy"), els.accuracy, ACCURACY_NOTES[prefs.accuracy]);
       els.accuracyNote = accuracyRow.querySelector(".control-note");
       auto.appendChild(accuracyRow);
       els.generate = el("button", "btn primary ed-gen");
       els.generate.type = "button";
       els.genFill = el("span", "ed-gen-fill");
-      els.genLabel = el("span", "ed-gen-label", "Generate subtitles");
+      els.genLabel = el("span", "ed-gen-label", RK_M("editor.generateSubtitles"));
       // the button carries the icon of the choice that led to it, like the add buttons of the other tools
       var genIcon = el("span", "ed-gen-icon");
       genIcon.innerHTML = SPARKLE_ICON;
       els.genCancel = el("span", "ed-gen-cancel");
       els.genCancel.setAttribute("role", "button");
-      els.genCancel.setAttribute("aria-label", "Stop generating");
-      els.genCancel.dataset.tooltip = "Stop";
+      els.genCancel.setAttribute("aria-label", RK_M("editor.stopGenerating"));
+      els.genCancel.dataset.tooltip = RK_M("common.stop");
       els.genCancel.innerHTML = icon("editor/close");
       els.generate.appendChild(els.genFill);
       els.generate.appendChild(genIcon);
@@ -729,10 +729,10 @@
       els.add = el("button", "btn primary");
       els.add.type = "button";
       els.add.innerHTML = icon("action/edit");
-      els.add.appendChild(document.createTextNode("Add subtitle"));
+      els.add.appendChild(document.createTextNode(RK_M("editor.addSubtitle")));
       els.add.addEventListener("click", addManual);
       manual.appendChild(els.add);
-      manual.appendChild(el("p", "ed-status", "Each one is added at the playhead in a row of its own. Click it on the timeline to edit it on the right."));
+      manual.appendChild(el("p", "ed-status", RK_M("editor.eachOneIsAddedAtThe")));
     }
 
     function addManual() {
@@ -816,10 +816,10 @@
       input.maxLength = 9;
       input.spellcheck = false;
       input.autocomplete = "off";
-      input.setAttribute("aria-label", RK_T(label));
+      input.setAttribute("aria-label", label);
       var dot = el("button", "ed-colordot");
       dot.type = "button";
-      dot.setAttribute("aria-label", RK_T("Choose {label}", { label: RK_T(label).toLowerCase() }));
+      dot.setAttribute("aria-label", RK_M("editor.chooseLabel", { label: label.toLowerCase() }));
       box.appendChild(input);
       box.appendChild(dot);
       var current = "#000000";
@@ -893,30 +893,30 @@
       var card = el("section", "editor-card ed-sub-edit");
       card.hidden = true;
       var head = el("div", "ed-sub-head");
-      els.subTitle = el("div", "editor-card-title", "Subtitle");
+      els.subTitle = el("div", "editor-card-title", RK_M("editor.subtitle"));
       head.appendChild(els.subTitle);
       els.subTime = el("span", "ed-sub-time", "");
       head.appendChild(els.subTime);
       var close = el("button", "ed-x");
       close.type = "button";
-      close.setAttribute("aria-label", "Close");
+      close.setAttribute("aria-label", RK_M("common.close"));
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { subs.select(""); });
       head.appendChild(close);
       card.appendChild(head);
       var pickRow = el("div", "ed-btns ed-pickrow");
-      els.subPickRow = el("button", "btn", "Select the whole row");
+      els.subPickRow = el("button", "btn", RK_M("editor.selectTheWholeRow"));
       els.subPickRow.type = "button";
       els.subPickRow.addEventListener("click", function () { if (editRow) subs.pickRow(editRow); });
       pickRow.appendChild(els.subPickRow);
       card.appendChild(pickRow);
 
 
-      var text = section("Text");
+      var text = section(RK_M("common.text"));
       els.textSec = text;
       els.subText = el("textarea", "ed-sub-text");
       els.subText.maxLength = 300;
-      els.subText.placeholder = "Type the subtitle";
+      els.subText.placeholder = RK_M("editor.typeTheSubtitle");
       // typing changes the subtitle at once, and becomes one step of undo once it pauses or the box is left
       els.subText.addEventListener("input", function () {
         if (!editing) return;
@@ -930,9 +930,9 @@
       });
       text.appendChild(els.subText);
       var nav = el("div", "ed-btns");
-      els.subPrev = el("button", "btn", "Previous");
+      els.subPrev = el("button", "btn", RK_M("editor.previous"));
       els.subPrev.type = "button";
-      els.subNext = el("button", "btn", "Next");
+      els.subNext = el("button", "btn", RK_M("wizard.next"));
       els.subNext.type = "button";
       els.subPrev.addEventListener("click", function () { step(-1); });
       els.subNext.addEventListener("click", function () { step(1); });
@@ -940,81 +940,81 @@
       nav.appendChild(els.subNext);
       text.appendChild(nav);
       var more = el("div", "ed-btns");
-      els.subMerge = el("button", "btn", "Merge with next");
+      els.subMerge = el("button", "btn", RK_M("editor.mergeWithNext"));
       els.subMerge.type = "button";
-      els.subMerge.dataset.tooltip = "Joins this subtitle and the next one in its row. Right-click a row to merge whole rows.";
+      els.subMerge.dataset.tooltip = RK_M("editor.joinsThisSubtitleAndTheNext");
       els.subMerge.addEventListener("click", function () { if (editing) subs.mergeNext(editing); });
       more.appendChild(els.subMerge);
       text.appendChild(more);
       card.appendChild(text);
 
-      var typo = section("Typography", "Changes every subtitle in this row.");
+      var typo = section(RK_M("editor.typography"), RK_M("editor.changesEverySubtitleInThisRow"));
       els.font = makeCombo(function (v) { writeStyle({ font: v }); });
       // the entries are font names, which are never translated
       els.font.setAttribute("translate", "no");
       els.font.querySelector(".combo-menu").setAttribute("translate", "no");
       els.font.setOptions(subs.fonts().map(function (f) { return [f, f, f]; }), "Arial");
-      typo.appendChild(row("Font", els.font));
-      els.color = colorField("color", "Text color");
-      typo.appendChild(row("Color", els.color));
-      els.size = slider("size", "Size");
-      typo.appendChild(row("Size", els.size));
-      els.rotate = slider("rotate", "Rotation");
-      typo.appendChild(row("Rotation", els.rotate));
+      typo.appendChild(row(RK_M("settings.font"), els.font));
+      els.color = colorField("color", RK_M("common.textColor"));
+      typo.appendChild(row(RK_M("editor.color"), els.color));
+      els.size = slider("size", RK_M("common.size"));
+      typo.appendChild(row(RK_M("common.size"), els.size));
+      els.rotate = slider("rotate", RK_M("common.rotation"));
+      typo.appendChild(row(RK_M("common.rotation"), els.rotate));
       var styles = el("div", "ed-toggles");
-      els.bold = toggle("<b>B</b>", "Bold", function () { writeStyle({ bold: !els.bold.classList.contains("is-active") }); });
-      els.italic = toggle("<i>I</i>", "Italic", function () { writeStyle({ italic: !els.italic.classList.contains("is-active") }); });
+      els.bold = toggle("<b>B</b>", RK_M("editor.bold"), function () { writeStyle({ bold: !els.bold.classList.contains("is-active") }); });
+      els.italic = toggle("<i>I</i>", RK_M("editor.italic"), function () { writeStyle({ italic: !els.italic.classList.contains("is-active") }); });
       styles.appendChild(els.bold);
       styles.appendChild(els.italic);
-      typo.appendChild(row("Style", styles));
+      typo.appendChild(row(RK_M("editor.style"), styles));
       var aligns = el("div", "ed-toggles");
-      var ALIGN_NAMES = { left: RK_T("Align left"), center: RK_T("Align center"), right: RK_T("Align right") };
+      var ALIGN_NAMES = { left: RK_M("editor.alignLeft"), center: RK_M("editor.alignCenter"), right: RK_M("editor.alignRight") };
       els.aligns = ["left", "center", "right"].map(function (a) {
         var b = toggle(ALIGN_ICONS[a], ALIGN_NAMES[a], function () { writeStyle({ align: a }); });
         b.dataset.value = a;
         aligns.appendChild(b);
         return b;
       });
-      typo.appendChild(row("Alignment", aligns));
-      els.position = picker([["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]], "bottom", function (v) { writeStyle({ position: v, x: null, y: null }); });
-      typo.appendChild(row("Position", els.position));
+      typo.appendChild(row(RK_M("editor.alignment"), aligns));
+      els.position = picker([["top", RK_M("editor.top")], ["middle", RK_M("editor.middle")], ["bottom", RK_M("editor.bottom")]], "bottom", function (v) { writeStyle({ position: v, x: null, y: null }); });
+      typo.appendChild(row(RK_M("editor.position"), els.position));
       card.appendChild(typo);
 
-      var word = section("Spoken word", "Colours each word while it is said.");
-      els.wordOn = switchRow("Highlight the word being said", function (on) { writeStyle({ wordOn: on }); });
+      var word = section(RK_M("editor.spokenWord"), RK_M("editor.coloursEachWordWhileItIs"));
+      els.wordOn = switchRow(RK_M("editor.highlightTheWordBeingSaid"), function (on) { writeStyle({ wordOn: on }); });
       word.appendChild(els.wordOn);
-      els.wordFx = picker([["word", "Word"], ["fill", "Fill"]], "word", function (v) { writeStyle({ wordFx: v }); });
-      els.wordFxRow = row("Animation", els.wordFx, "Word lights up one word at a time. Fill sweeps the colour through the words as they are said.");
+      els.wordFx = picker([["word", RK_M("editor.wordByWord")], ["fill", RK_M("editor.fill")]], "word", function (v) { writeStyle({ wordFx: v }); });
+      els.wordFxRow = row(RK_M("editor.animation"), els.wordFx, RK_M("editor.wordLightsUpOneWordAt"));
       word.appendChild(els.wordFxRow);
-      els.word = colorField("word", "Word color");
-      els.wordRow = row("Color", els.word);
+      els.word = colorField("word", RK_M("editor.wordColor"));
+      els.wordRow = row(RK_M("editor.color"), els.word);
       word.appendChild(els.wordRow);
       els.wordSec = word;
       card.appendChild(word);
 
-      var border = section("Border");
-      els.borderColor = colorField("borderColor", "Border color");
-      border.appendChild(row("Color", els.borderColor));
-      els.borderWidth = slider("borderWidth", "Thickness");
-      border.appendChild(row("Thickness", els.borderWidth));
+      var border = section(RK_M("settings.border"));
+      els.borderColor = colorField("borderColor", RK_M("common.borderColor"));
+      border.appendChild(row(RK_M("editor.color"), els.borderColor));
+      els.borderWidth = slider("borderWidth", RK_M("editor.thickness"));
+      border.appendChild(row(RK_M("editor.thickness"), els.borderWidth));
       card.appendChild(border);
 
-      var back = section("Background");
-      els.bg = colorField("bg", "Background color");
-      back.appendChild(row("Color", els.bg));
-      els.radius = slider("radius", "Radius");
-      els.radiusRow = row("Radius", els.radius);
+      var back = section(RK_M("settings.background"));
+      els.bg = colorField("bg", RK_M("common.backgroundColor"));
+      back.appendChild(row(RK_M("editor.color"), els.bg));
+      els.radius = slider("radius", RK_M("editor.radius"));
+      els.radiusRow = row(RK_M("editor.radius"), els.radius);
       back.appendChild(els.radiusRow);
-      els.padX = slider("padX", "Padding horizontal");
-      els.padXRow = row("Padding H", els.padX);
+      els.padX = slider("padX", RK_M("editor.paddingHorizontal"));
+      els.padXRow = row(RK_M("editor.paddingH"), els.padX);
       back.appendChild(els.padXRow);
-      els.padY = slider("padY", "Padding vertical");
-      els.padYRow = row("Padding V", els.padY);
+      els.padY = slider("padY", RK_M("editor.paddingVertical"));
+      els.padYRow = row(RK_M("editor.paddingV"), els.padY);
       back.appendChild(els.padYRow);
       card.appendChild(back);
 
-      var shadow = section("Shadow");
-      els.shadow = switchRow("Drop shadow", function (on) { writeStyle({ shadow: on }); });
+      var shadow = section(RK_M("editor.shadow"));
+      els.shadow = switchRow(RK_M("editor.dropShadow"), function (on) { writeStyle({ shadow: on }); });
       shadow.appendChild(els.shadow);
       card.appendChild(shadow);
 
@@ -1033,11 +1033,11 @@
     }
 
     function buildAudio(pane) {
-      var s = section("Music and sounds");
+      var s = section(RK_M("editor.musicAndSounds"));
       els.importBtn = el("button", "btn primary");
       els.importBtn.type = "button";
       els.importBtn.innerHTML = icon("editor/import-audio");
-      els.importBtn.appendChild(document.createTextNode("Import audio"));
+      els.importBtn.appendChild(document.createTextNode(RK_M("picker.importAudio")));
       els.importBtn.addEventListener("click", function () { lanes.importAudio(); });
       s.appendChild(els.importBtn);
       els.importNote = el("p", "ed-status", "");
@@ -1045,8 +1045,8 @@
       pane.appendChild(s);
     }
 
-    var LIB_SORT_GROUPS = { length: { base: "Length", members: ["shortest", "longest"] }, filesize: { base: "File size", members: ["smallest", "biggest"] } };
-    var LIB_SORT_LABELS = { newest: "Newest", oldest: "Oldest", longest: "Longest", shortest: "Shortest", biggest: "Biggest", smallest: "Smallest" };
+    var LIB_SORT_GROUPS = { length: { base: RK_M("common.length"), members: ["shortest", "longest"] }, filesize: { base: RK_M("common.fileSize"), members: ["smallest", "biggest"] } };
+    var LIB_SORT_LABELS = { newest: RK_M("clips.newest"), oldest: RK_M("clips.oldest"), longest: RK_M("clips.longest"), shortest: RK_M("clips.shortest"), biggest: RK_M("clips.biggest"), smallest: RK_M("clips.smallest") };
     var LIB_SORT_ICON = "<svg class=\"clip-sort-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:clip-toolbar-clip-sort-icon}}</svg>";
     var LIB_SORT_CHEVRON = "<svg class=\"clip-sort-chevron\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:nav/caret-down}}</svg>";
     var LIB_SORT_CHECK = "<svg class=\"clip-sort-check\" viewBox=\"0 0 24 24\" aria-hidden=\"true\">{{glyph-quoted:action/check}}</svg>";
@@ -1060,13 +1060,13 @@
       trigger.type = "button";
       trigger.setAttribute("aria-haspopup", "menu");
       trigger.setAttribute("aria-expanded", "false");
-      trigger.setAttribute("aria-label", "Sort by");
-      trigger.setAttribute("data-tooltip", "Sort by");
+      trigger.setAttribute("aria-label", RK_M("common.sortBy"));
+      trigger.setAttribute("data-tooltip", RK_M("common.sortBy"));
       trigger.innerHTML = LIB_SORT_ICON + LIB_SORT_CHEVRON;
       var menu = el("div", "clip-sort-menu");
       menu.setAttribute("role", "menu");
-      menu.setAttribute("aria-label", "Sort clips");
-      menu.appendChild(el("div", "clip-sort-heading", "Sort by"));
+      menu.setAttribute("aria-label", RK_M("common.sortClips"));
+      menu.appendChild(el("div", "clip-sort-heading", RK_M("common.sortBy")));
       var items = [];
       function item(value, sub) {
         var b = el("button", "clip-sort-item" + (sub ? " clip-sort-subitem" : ""));
@@ -1123,7 +1123,7 @@
           var group = LIB_SORT_GROUPS[g.dataset.group];
           var member = group.members.indexOf(sort) >= 0 ? sort : "";
           g.classList.toggle("has-active", !!member);
-          g.querySelector(".clip-sort-grouprow .clip-sort-label").textContent = member ? RK_T("{group}: {sort}", { group: RK_T(group.base), sort: RK_T(LIB_SORT_LABELS[member]) }) : group.base;
+          g.querySelector(".clip-sort-grouprow .clip-sort-label").textContent = member ? RK_M("common.groupSort", { group: group.base, sort: LIB_SORT_LABELS[member] }) : group.base;
         });
       }
       function close() {
@@ -1155,14 +1155,14 @@
       veil.hidden = true;
       var card = el("div", "ed-lib");
       card.setAttribute("role", "dialog");
-      card.setAttribute("aria-label", "Library");
+      card.setAttribute("aria-label", RK_M("editor.library"));
       var head = el("div", "ed-lib-head");
-      head.appendChild(el("div", "ed-lib-title", "Library"));
+      head.appendChild(el("div", "ed-lib-title", RK_M("editor.library")));
       head.appendChild(el("span", "ed-lib-divider"));
       var folder = el("button", "clip-sort-trigger clip-folder-btn");
       folder.type = "button";
-      folder.setAttribute("aria-label", "Add a video from the computer");
-      folder.setAttribute("data-tooltip", "Add a video from the computer");
+      folder.setAttribute("aria-label", RK_M("editor.addAVideoFromTheComputer"));
+      folder.setAttribute("data-tooltip", RK_M("editor.addAVideoFromTheComputer"));
       folder.innerHTML = LIB_FOLDER_ICON;
       folder.addEventListener("click", pickVideo);
       head.appendChild(folder);
@@ -1172,15 +1172,15 @@
       search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>';
       var input = el("input");
       input.type = "text";
-      input.placeholder = "Search";
+      input.placeholder = RK_M("common.search");
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", "Search clips");
+      input.setAttribute("aria-label", RK_M("common.searchClips"));
       search.appendChild(input);
       head.appendChild(search);
       var close = el("button", "ed-x");
       close.type = "button";
-      close.setAttribute("aria-label", "Close");
+      close.setAttribute("aria-label", RK_M("common.close"));
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", closeLibrary);
       head.appendChild(close);
@@ -1188,11 +1188,11 @@
       var body = el("div", "ed-lib-body");
       var favHead = el("div", "ed-lib-head-row");
       favHead.innerHTML = icon("toggle/star");
-      favHead.appendChild(el("span", "", "Favorites"));
+      favHead.appendChild(el("span", "", RK_M("clips.favorites")));
       var favGrid = el("div", "ed-lib-grid");
       var restHead = el("div", "ed-lib-head-row");
       restHead.innerHTML = icon("toggle/grid");
-      restHead.appendChild(el("span", "", "All clips"));
+      restHead.appendChild(el("span", "", RK_M("common.allClips")));
       var grid = el("div", "ed-lib-grid");
       var empty = el("p", "ed-lib-empty", "");
       [favHead, favGrid, restHead, grid, empty].forEach(function (n) { body.appendChild(n); });
@@ -1225,7 +1225,7 @@
       lib.sort = "newest";
       lib.sortMenu.close();
       lib.sortMenu.paint();
-      lib.empty.textContent = "Loading clips...";
+      lib.empty.textContent = RK_M("editor.loadingClips");
       lib.grid.textContent = "";
       lib.favGrid.textContent = "";
       lib.body.scrollTop = 0;
@@ -1238,7 +1238,7 @@
         lib.cards.forEach(function (c) { c.favorite = favs.indexOf(c.clipName) >= 0; });
         sortLibrary();
       }).catch(function () {
-        lib.empty.textContent = "The clips could not be listed.";
+        lib.empty.textContent = RK_M("editor.theClipsCouldNotBeListed");
       });
     }
 
@@ -1260,9 +1260,9 @@
       if (!clip) return;
       fetch(o.helper + "/import-video/pick", { method: "POST", cache: "no-store" }).then(function (res) { return res.json(); }).then(function (r) {
         if (!r || r.cancelled || !clip) return;
-        if (!r.ok || typeof r.ref !== "string") throw new Error(r.message || "The video could not be added");
-        addClipLayer({ name: r.ref, duration: r.duration, width: r.width, height: r.height }, r.name || "Video");
-      }).catch(function (err) { o.notify((err && err.message) || "The video could not be added", "bad", "Library"); });
+        if (!r.ok || typeof r.ref !== "string") throw new Error(r.message || RK_M("editor.theVideoCouldNotBeAdded"));
+        addClipLayer({ name: r.ref, duration: r.duration, width: r.width, height: r.height }, r.name || RK_M("editor.video"));
+      }).catch(function (err) { o.notify((err && err.message) || RK_M("editor.theVideoCouldNotBeAdded"), "bad", RK_M("editor.library")); });
     }
 
     function closeLibrary() {
@@ -1308,17 +1308,17 @@
       var split = lib.favGrid.children.length > 0;
       lib.favHead.hidden = lib.favGrid.hidden = !split || favShown === 0;
       lib.restHead.hidden = !split || shown - favShown === 0;
-      lib.empty.textContent = lib.clips.length === 0 ? "There are no clips in the clip folder yet." : shown === 0 ? "No clips match that." : "";
+      lib.empty.textContent = lib.clips.length === 0 ? RK_M("editor.thereAreNoClipsInThe") : shown === 0 ? RK_M("editor.noClipsMatchThat") : "";
     }
 
     async function addClipLayer(c, title) {
       var source = clip;
       try { await o.protect([c.name]); }
-      catch (err) { o.notify((err && err.message) || "The clip is processing.", "bad", "Library"); return; }
+      catch (err) { o.notify((err && err.message) || RK_M("editor.theClipIsProcessing"), "bad", RK_M("editor.library")); return; }
       if (!clip || clip !== source) return;
       var id = lanes.addLayer({ kind: "clip", ref: c.name, name: title, len: c.duration, dur: c.duration, aspect: c.width > 0 && c.height > 0 ? c.height / c.width : 0.5625, w: 1 });
       closeLibrary();
-      if (!id) { o.notify("There is no room for another layer.", "bad", "Library"); return; }
+      if (!id) { o.notify(RK_M("editor.thereIsNoRoomForAnother"), "bad", RK_M("editor.library")); return; }
       // the sound of the clip comes in as a row of its own linked to the clip, so it follows it; a clip without sound adds none
       helperJson("/import-audio/clip?name=" + encodeURIComponent(c.name), "POST").then(function (r) {
         if (r && r.ok && r.id) return lanes.placeImportAt(r.id, null, id);
@@ -1332,28 +1332,28 @@
       search.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">{{glyph:action/search}}</svg>';
       var input = el("input");
       input.type = "text";
-      input.placeholder = "Search elements";
+      input.placeholder = RK_M("editor.searchElements");
       input.autocomplete = "off";
       input.spellcheck = false;
-      input.setAttribute("aria-label", "Search elements");
+      input.setAttribute("aria-label", RK_M("editor.searchElements"));
       search.appendChild(input);
       pane.appendChild(search);
 
-      var files = section("GIFs and images");
+      var files = section(RK_M("common.gifsAndImages"));
       var add = el("button", "btn primary");
       add.type = "button";
       add.innerHTML = icon("editor/image");
-      add.appendChild(document.createTextNode("Add a GIF or image"));
+      add.appendChild(document.createTextNode(RK_M("picker.importMedia")));
       add.addEventListener("click", pickMedia);
       files.appendChild(add);
-      files.appendChild(el("p", "ed-status", "GIF, PNG or JPEG files from your computer."));
+      files.appendChild(el("p", "ed-status", RK_M("editor.gifPngOrJpegFilesFrom")));
       pane.appendChild(files);
 
-      var shapes = section("Shapes");
+      var shapes = section(RK_M("editor.shapes"));
       prefs.shapeColor = /^#[0-9a-f]{6}$/i.test(prefs.shapeColor || "") ? prefs.shapeColor : "#ffffff";
-      els.shapeColor = colorField("shapeColor", "Shape color");
+      els.shapeColor = colorField("shapeColor", RK_M("editor.shapeColor"));
       els.shapeColor.show(prefs.shapeColor);
-      shapes.appendChild(row("Color", els.shapeColor));
+      shapes.appendChild(row(RK_M("editor.color"), els.shapeColor));
       var shapeGrid = el("div", "ed-el-grid");
       var tiles = [];
       SHAPES.forEach(function (sh) {
@@ -1372,15 +1372,15 @@
       shapes.appendChild(shapeGrid);
       pane.appendChild(shapes);
 
-      var stickers = section("Stickers");
-      var seeAll = el("button", "ed-link ed-seeall", "See all");
+      var stickers = section(RK_M("editor.stickers"));
+      var seeAll = el("button", "ed-link ed-seeall", RK_M("common.seeAll"));
       seeAll.type = "button";
       seeAll.addEventListener("click", function () { setElView("stickers"); });
       stickers.head.appendChild(seeAll);
       // every sticker as one list of kind and data, so the home page and the page of all of them draw from the same
       var list = [];
       TEXT_STICKERS.forEach(function (d) { list.push({ kind: "text", data: d, name: d[0], search: d[0] + " text word" }); });
-      FLUENT_3D.forEach(function (n) { list.push({ kind: "3d", data: n, name: n, search: n + " 3d" }); });
+      FLUENT_3D.forEach(function (n) { list.push({ kind: "3d", data: n[0], name: n[1], search: n[0] + " " + n[1] + " 3d" }); });
       STICKERS.forEach(function (st) { list.push({ kind: "animated", data: st, name: st[1], search: st[1] + " " + st[2] + " animated gif" }); });
       var stickerGrid = el("div", "ed-st-grid");
       var featured = [];
@@ -1408,13 +1408,13 @@
       pageSearch.innerHTML = search.querySelector("svg").outerHTML;
       var pageInput = el("input");
       pageInput.type = "text";
-      pageInput.placeholder = "Search stickers";
+      pageInput.placeholder = RK_M("editor.searchStickers");
       pageInput.autocomplete = "off";
       pageInput.spellcheck = false;
-      pageInput.setAttribute("aria-label", "Search stickers");
+      pageInput.setAttribute("aria-label", RK_M("editor.searchStickers"));
       pageSearch.appendChild(pageInput);
       page.appendChild(pageSearch);
-      var groups = [["text", "Text"], ["3d", "3D"], ["animated", "Animated"]].map(function (k) {
+      var groups = [["text", RK_M("common.text")], ["3d", "3D"], ["animated", RK_M("editor.animated")]].map(function (k) {
         var head = el("div", "ed-st-kind", k[1]);
         var grid = el("div", "ed-st-grid");
         var tiles = list.filter(function (x) { return x.kind === k[0]; }).map(function (x) { var t = stickerTile(x); grid.appendChild(t); return t; });
@@ -1424,7 +1424,7 @@
       });
       var pageNone = el("p", "ed-status", "");
       page.appendChild(pageNone);
-      page.appendChild(el("p", "ed-el-credit", "3D stickers are Fluent Emoji by Microsoft (MIT), animated ones are Noto Emoji by Google (CC BY 4.0). They load from the internet the first time."));
+      page.appendChild(el("p", "ed-el-credit", RK_M("editor.n3dStickersAreFluentEmojiBy")));
 
       var home = el("div", "ed-el-home");
       while (pane.firstChild) home.appendChild(pane.firstChild);
@@ -1445,7 +1445,7 @@
         shapes.hidden = !!q && els.shapeTiles.every(function (t) { return t.hidden; });
         stickers.hidden = !!q && shown === 0;
         files.hidden = !!q && "gif image picture file png jpeg".indexOf(q) < 0;
-        none.textContent = shapes.hidden && stickers.hidden && files.hidden ? "No elements match that." : "";
+        none.textContent = shapes.hidden && stickers.hidden && files.hidden ? RK_M("editor.noElementsMatchThat") : "";
       }
       input.addEventListener("input", paintHome);
       pageInput.addEventListener("input", function () {
@@ -1457,7 +1457,7 @@
           g.head.hidden = g.grid.hidden = any === 0;
           shown += any;
         });
-        pageNone.textContent = shown ? "" : "No stickers match that.";
+        pageNone.textContent = shown ? "" : RK_M("editor.noStickersMatchThat");
       });
       paintHome();
     }
@@ -1558,7 +1558,7 @@
       img.alt = "";
       img.loading = "lazy";
       if (x.kind === "text") {
-        (document.fonts ? document.fonts.load('120px "Fredoka One"') : Promise.resolve()).catch(function () {}).then(function () { img.src = drawTextSticker(x.data, 220).toDataURL("image/png"); });
+        (document.fonts ? document.fonts.load(RK_M("editor.n120pxFredokaOne")) : Promise.resolve()).catch(function () {}).then(function () { img.src = drawTextSticker(x.data, 220).toDataURL("image/png"); });
       } else if (x.kind === "3d") {
         img.src = fluentUrl(x.data);
       } else {
@@ -1579,18 +1579,18 @@
 
     // a picture the page drew goes to the helper as png and comes back as a layer
     function uploadPicture(canvas, name, aspect) {
-      return new Promise(function (resolve, reject) { canvas.toBlob(function (b) { if (b) resolve(b); else reject(new Error("The picture could not be made")); }, "image/png"); })
+      return new Promise(function (resolve, reject) { canvas.toBlob(function (b) { if (b) resolve(b); else reject(new Error(RK_M("editor.thePictureCouldNotBeMade"))); }, "image/png"); })
         .then(function (blob) { return fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(name), { method: "POST", cache: "no-store", body: blob }); })
         .then(function (res) { return res.json(); })
         .then(function (r) {
-          if (!r || !r.ok) throw new Error((r && r.message) || "The element could not be added");
-          if (!lanes.addLayer({ kind: "media", ref: r.id, name: name, aspect: aspect, w: 0.25 })) throw new Error("There is no room for another layer.");
+          if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theElementCouldNotBeAdded"));
+          if (!lanes.addLayer({ kind: "media", ref: r.id, name: name, aspect: aspect, w: 0.25 })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
         });
     }
 
     function busy(tile, promise) {
       tile.classList.add("is-busy");
-      return promise.catch(function (err) { o.notify((err && err.message) || "The element could not be added", "bad", "Elements"); })
+      return promise.catch(function (err) { o.notify((err && err.message) || RK_M("editor.theElementCouldNotBeAdded"), "bad", RK_M("editor.elements")); })
         .then(function () { tile.classList.remove("is-busy"); });
     }
 
@@ -1609,10 +1609,10 @@
 
     // a text sticker goes to the helper as the png it is drawn into, a 3d one as its png and an animated one as its gif, so the saved copy plays it too
     function addSticker(x, tile) {
-      var failed = function () { throw new Error("The sticker could not be loaded. Check the internet connection."); };
+      var failed = function () { throw new Error(RK_M("editor.theStickerCouldNotBeLoaded")); };
       var made;
       if (x.kind === "text") {
-        made = (document.fonts ? document.fonts.load('120px "Fredoka One"') : Promise.resolve()).catch(function () {}).then(function () {
+        made = (document.fonts ? document.fonts.load(RK_M("editor.n120pxFredokaOne")) : Promise.resolve()).catch(function () {}).then(function () {
           var c = drawTextSticker(x.data, 720);
           return new Promise(function (resolve) { c.toBlob(resolve, "image/png"); }).then(function (b) { return { blob: b, aspect: c.height / c.width }; });
         });
@@ -1621,12 +1621,12 @@
         made = fetch(url, { cache: "force-cache" }).then(function (res) { if (!res.ok) failed(); return res.blob(); }, failed).then(function (b) { return { blob: b, aspect: 1 }; });
       }
       busy(tile, made.then(function (m) {
-        if (!m.blob) throw new Error("The sticker could not be made");
+        if (!m.blob) throw new Error(RK_M("editor.theStickerCouldNotBeMade"));
         return fetch(o.helper + "/import-media/upload?name=" + encodeURIComponent(x.name), { method: "POST", cache: "no-store", body: m.blob })
           .then(function (res) { return res.json(); })
           .then(function (r) {
-            if (!r || !r.ok) throw new Error((r && r.message) || "The sticker could not be added");
-            if (!lanes.addLayer({ kind: "media", ref: r.id, name: x.name, aspect: m.aspect, w: x.kind === "text" ? 0.28 : 0.2, gif: !!r.gif })) throw new Error("There is no room for another layer.");
+            if (!r || !r.ok) throw new Error((r && r.message) || RK_M("editor.theStickerCouldNotBeAdded"));
+            if (!lanes.addLayer({ kind: "media", ref: r.id, name: x.name, aspect: m.aspect, w: x.kind === "text" ? 0.28 : 0.2, gif: !!r.gif })) throw new Error(RK_M("editor.thereIsNoRoomForAnother"));
           });
       }));
     }
@@ -1636,22 +1636,22 @@
       // closing the picker without a file answers ok false and cancelled, which is not an error
       fetch(o.helper + "/import-media/pick", { method: "POST", cache: "no-store" }).then(function (res) { return res.json(); }).then(function (r) {
         if (!r || r.cancelled) return;
-        if (!r.ok || !Array.isArray(r.files)) throw new Error(r.message || "The files could not be added");
+        if (!r.ok || !Array.isArray(r.files)) throw new Error(r.message || RK_M("editor.theFilesCouldNotBeAdded"));
         var bad = [];
         r.files.reduce(function (chain, f) {
           return chain.then(function () {
-            if (!f.ok) { bad.push(RK_T("{name}: {error}", { name: f.name, error: f.message })); return null; }
+            if (!f.ok) { bad.push(RK_M("editor.nameError", { name: f.name, error: f.message })); return null; }
             return new Promise(function (resolve) {
               var img = new Image();
               img.onload = function () { resolve(img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1); };
               img.onerror = function () { resolve(1); };
               img.src = o.helper + "/import-media/file?id=" + encodeURIComponent(f.id);
             }).then(function (aspect) {
-              if (!lanes.addLayer({ kind: "media", ref: f.id, name: f.name, aspect: aspect, w: 0.3, gif: !!f.gif })) bad.push(RK_T("{name}: there is no room for another layer", { name: f.name }));
+              if (!lanes.addLayer({ kind: "media", ref: f.id, name: f.name, aspect: aspect, w: 0.3, gif: !!f.gif })) bad.push(RK_M("editor.nameThereIsNoRoomFor", { name: f.name }));
             });
           });
-        }, Promise.resolve()).then(function () { if (bad.length) o.notify(bad.join("\n"), "bad", "Elements"); });
-      }).catch(function (err) { o.notify((err && err.message) || "The files could not be added", "bad", "Elements"); });
+        }, Promise.resolve()).then(function () { if (bad.length) o.notify(bad.join("\n"), "bad", RK_M("editor.elements")); });
+      }).catch(function (err) { o.notify((err && err.message) || RK_M("editor.theFilesCouldNotBeAdded"), "bad", RK_M("editor.elements")); });
     }
 
     function buildRecord(pane) {
@@ -1666,15 +1666,15 @@
       els.wave = el("div", "ed-wave");
       for (var i = 0; i < WAVE_BARS; i++) els.wave.appendChild(el("i"));
       box.appendChild(els.wave);
-      els.recHint = el("div", "ed-rec-hint", "Record your voice");
+      els.recHint = el("div", "ed-rec-hint", RK_M("editor.recordYourVoice"));
       box.appendChild(els.recHint);
       els.recBtn = el("button", "ed-rec-btn");
       els.recBtn.type = "button";
-      els.recBtn.setAttribute("aria-label", "Start recording");
+      els.recBtn.setAttribute("aria-label", RK_M("common.startRecording"));
       els.recBtn.appendChild(el("i"));
       els.recBtn.addEventListener("click", function () { if (rec.on) stopRecording(true); else startRecording(); });
       box.appendChild(els.recBtn);
-      els.recLabel = el("div", "ed-rec-label", "Start Recording");
+      els.recLabel = el("div", "ed-rec-label", RK_M("common.startRecording2"));
       box.appendChild(els.recLabel);
       var hear = el("label", "ed-check");
       els.hear = el("input");
@@ -1683,7 +1683,7 @@
       els.hear.checked = prefs.hear;
       els.hear.addEventListener("change", function () { prefs.hear = els.hear.checked; savePrefs(); });
       hear.appendChild(els.hear);
-      hear.appendChild(el("span", "", "Hear the clip while recording"));
+      hear.appendChild(el("span", "", RK_M("editor.hearTheClipWhileRecording")));
       box.appendChild(hear);
       pane.appendChild(box);
       paintTime(0);
@@ -1693,24 +1693,24 @@
     function build() {
       root.textContent = "";
       els.rail = el("nav", "ed-rail");
-      els.rail.appendChild(tab("library", "editor/library", "Library"));
-      els.rail.appendChild(tab("elements", "editor/image", "Elements"));
-      els.rail.appendChild(tab("subtitles", "editor/subtitles", "Subtitles"));
-      els.rail.appendChild(tab("audio", "editor/audio", "Audio"));
-      els.rail.appendChild(tab("record", "editor/microphone", "Record"));
+      els.rail.appendChild(tab("library", "editor/library", RK_M("editor.library")));
+      els.rail.appendChild(tab("elements", "editor/image", RK_M("editor.elements")));
+      els.rail.appendChild(tab("subtitles", "editor/subtitles", RK_M("editor.subtitles")));
+      els.rail.appendChild(tab("audio", "editor/audio", RK_M("common.audio")));
+      els.rail.appendChild(tab("record", "editor/microphone", RK_M("common.record")));
       els.panel = el("section", "ed-tools");
       var head = el("div", "ed-tools-head");
       els.back = el("button", "ed-x ed-back");
       els.back.type = "button";
-      els.back.setAttribute("aria-label", "Back");
-      els.back.dataset.tooltip = "Back";
+      els.back.setAttribute("aria-label", RK_M("common.back"));
+      els.back.dataset.tooltip = RK_M("common.back");
       els.back.innerHTML = BACK_ICON;
       els.back.addEventListener("click", function () { if (prefs.tab === "elements") setElView("home"); else setView("home"); });
       head.appendChild(els.back);
       els.title = el("div", "ed-tools-title", "");
       var close = el("button", "ed-x");
       close.type = "button";
-      close.setAttribute("aria-label", "Close the panel");
+      close.setAttribute("aria-label", RK_M("editor.closeThePanel"));
       close.innerHTML = icon("editor/close");
       close.addEventListener("click", function () { prefs.open = false; savePrefs(); paintTabs(); });
       head.appendChild(els.title);
@@ -1746,10 +1746,10 @@
       followTrack();
       var state = lanes.importState();
       els.importBtn.disabled = !state.ready || state.picking;
-      els.importNote.textContent = !state.ready ? "Audio cannot be added to this clip." : state.importing > 0 ? "Adding audio..." : "";
+      els.importNote.textContent = !state.ready ? RK_M("editor.audioCannotBeAddedToThis2") : state.importing > 0 ? RK_M("editor.addingAudio") : "";
       // a running job keeps the button live so its cross can stop it
       els.generate.disabled = !job.busy && (!clip || !clip.audio);
-      els.autoStatus.textContent = clip && !clip.audio ? "This clip has no audio to listen to." : "";
+      els.autoStatus.textContent = clip && !clip.audio ? RK_M("editor.thisClipHasNoAudioTo") : "";
     }
 
     // a track of the clip clicked on the timeline while the subtitles tab is open becomes what auto subtitles listen to
@@ -1784,7 +1784,7 @@
       card.classList.remove("is-closing");
       card.hidden = false;
       var many = subs.picked().length;
-      els.subTitle.textContent = many > 1 ? RK_T("{count} subtitles", { count: many }) : RK_T("Subtitle");
+      els.subTitle.textContent = many > 1 ? RK_M("editor.countSubtitles", { count: many }) : RK_M("editor.subtitle");
       els.textSec.hidden = many > 1;
       els.subTime.textContent = many > 1 ? "" : fmt(cue.at) + " - " + fmt(cue.end);
       if (document.activeElement !== els.subText && els.subText.value !== cue.text) els.subText.value = cue.text;
@@ -1833,7 +1833,7 @@
       els.generate.setAttribute("aria-busy", on ? "true" : "false");
       if (!on) {
         els.genFill.style.width = "0%";
-        els.genLabel.textContent = "Generate subtitles";
+        els.genLabel.textContent = RK_M("editor.generateSubtitles");
         return;
       }
       var p = Math.max(0, Math.min(100, pct || 0));
@@ -1843,7 +1843,7 @@
         p = Math.max(p, 90 * (1 - Math.exp(-t / job.listenTau)));
       }
       els.genFill.style.width = p + "%";
-      els.genLabel.textContent = RK_T(text) + (job.listenAt || p <= 0 ? "..." : " " + Math.round(p) + "%");
+      els.genLabel.textContent = text + (job.listenAt || p <= 0 ? "..." : " " + Math.round(p) + "%");
     }
 
     function endJob() {
@@ -1870,7 +1870,7 @@
       var run = ++job.run;
       job.busy = true;
       refresh();
-      setProgress("Getting ready", 0);
+      setProgress(RK_M("editor.gettingReady"), 0);
       var model = prefs.accuracy;
       helperJson("/speech/status?model=" + model).then(function (st) {
         if (run !== job.run) return null;
@@ -1880,7 +1880,7 @@
       }).catch(function (err) {
         if (run !== job.run) return;
         endJob();
-        o.notify((err && err.message) || "Subtitles could not be made", "bad", "Auto subtitles");
+        o.notify((err && err.message) || RK_M("editor.subtitlesCouldNotBeMade"), "bad", RK_M("editor.autoSubtitles"));
       });
     }
 
@@ -1888,8 +1888,8 @@
       return helperJson("/speech/status?model=" + model).then(function (st) {
         if (run !== job.run) return null;
         if (st.installed) return transcribe(run, model);
-        if (!st.installing) throw new Error(st.error || "The speech engine could not be downloaded.");
-        setProgress(RK_T("Downloading {size} MB", { size: st.downloadMb }), st.percent);
+        if (!st.installing) throw new Error(st.error || RK_M("editor.theSpeechEngineCouldNotBe"));
+        setProgress(RK_M("editor.downloadingSizeMb", { size: st.downloadMb }), st.percent);
         return new Promise(function (resolve, reject) { poll(function () { waitInstall(run, model).then(resolve, reject); }, 500); });
       });
     }
@@ -1898,11 +1898,11 @@
       var range = subs.sourceRange();
       var tracks = els.listenRow.hidden ? "0" : els.listen.value() || "0";
       var names = tracks.split(",").map(function (v) { var t = (clip.tracks || []).find(function (x) { return String(x.index) === v; }); return t ? t.label : ""; });
-      var title = tracks === "0" || names.indexOf("") >= 0 ? RK_T("Subtitles") : names.join(" + ");
+      var title = tracks === "0" || names.indexOf("") >= 0 ? RK_M("editor.subtitles") : names.join(" + ");
       // a guess at how long listening takes until the engine reports, from a two minute clip taking about 5 seconds on fast and 19 on accurate
       job.listenAt = performance.now();
       job.listenTau = Math.max(4, (range.end - range.start) * (model === "fast" ? 0.05 : 0.17));
-      setProgress("Listening", 0);
+      setProgress(RK_M("editor.listening"), 0);
       return helperJson("/speech/transcribe?file=" + encodeURIComponent(clip.name) + "&start=" + range.start.toFixed(3) + "&end=" + range.end.toFixed(3) + "&tracks=" + encodeURIComponent(tracks) + "&language=" + encodeURIComponent(els.lang.value()) + "&model=" + model, "POST")
         .then(function (started) {
           if (run !== job.run) { helperJson("/speech/cancel?id=" + encodeURIComponent(started.id), "POST").catch(function () {}); return null; }
@@ -1914,24 +1914,24 @@
     function waitJob(run, title) {
       return helperJson("/speech/job?id=" + encodeURIComponent(job.id)).then(function (j) {
         if (run !== job.run) return null;
-        if (j.state === "error") throw new Error(j.message || "The clip could not be listened to.");
+        if (j.state === "error") throw new Error(j.message || RK_M("editor.theClipCouldNotBeListened"));
         if (j.state !== "done") {
-          setProgress(j.state === "preparing" || j.state === "queued" ? "Getting the audio" : j.state === "checking" ? "Checking unclear words" : "Listening", j.percent);
+          setProgress(j.state === "preparing" || j.state === "queued" ? RK_M("editor.gettingTheAudio") : j.state === "checking" ? RK_M("editor.checkingUnclearWords") : RK_M("editor.listening"), j.percent);
           return new Promise(function (resolve, reject) { poll(function () { waitJob(run, title).then(resolve, reject); }, 400); });
         }
         var cues = groupWords(j.words || [], function (t) { return subs.sourceToTimeline(t); }, prefs.length, j.alternatives);
         endJob();
         var rowId = cues.length ? subs.addRow(title, cues) : "";
         if (!rowId) {
-          o.notify("No speech was found in this part of the clip.", "info");
+          o.notify(RK_M("editor.noSpeechWasFoundInThis"), "info");
           return null;
         }
         // the new subtitles come in selected, the first one shown, so their style can be set for all of them at once
         var made = subs.list().filter(function (c) { return c.row === rowId; });
         if (made.length) { subs.select(made[0].id); subs.pickRow(rowId); }
         var unsure = cues.filter(function (c) { return c.unsure; }).length;
-        var check = unsure === 1 ? " " + RK_T("One might be misheard. It is marked in orange; select it and open Check on the right.") : unsure > 1 ? " " + RK_T("{count} might be misheard. They are marked in orange; select them and open Check on the right.", { count: unsure }) : "";
-        o.notify(RK_T("{count} subtitles added in a new row. Undo takes them back.", { count: cues.length }) + check + (j.warning ? " " + j.warning : ""), "info");
+        var check = unsure === 1 ? " " + RK_M("editor.oneMightBeMisheardItIs") : unsure > 1 ? " " + RK_M("editor.countMightBeMisheardTheyAre", { count: unsure }) : "";
+        o.notify(RK_M("editor.countSubtitlesAddedInANew", { count: cues.length }) + check + (j.warning ? " " + j.warning : ""), "info");
         return null;
       });
     }
@@ -1951,17 +1951,17 @@
 
     function paintRecord() {
       els.recBtn.classList.toggle("is-on", rec.on);
-      els.recBtn.setAttribute("aria-label", rec.on ? "Stop recording" : "Start recording");
+      els.recBtn.setAttribute("aria-label", rec.on ? RK_M("common.stopRecording") : RK_M("common.startRecording"));
       els.recBtn.disabled = rec.starting || !lanes.importState().ready && !rec.on;
-      els.recLabel.textContent = rec.on ? "Stop Recording" : "Start Recording";
-      els.recHint.textContent = rec.on ? "Recording..." : "Record your voice";
+      els.recLabel.textContent = rec.on ? RK_M("common.stopRecording2") : RK_M("common.startRecording2");
+      els.recHint.textContent = rec.on ? RK_M("editor.recordingEllipsis") : RK_M("editor.recordYourVoice");
       var t = els.rail.querySelector('[data-tab="record"]');
       if (t) t.classList.toggle("is-recording", rec.on);
     }
 
     function startRecording() {
       if (rec.on || rec.starting || !clip) return;
-      if (!lanes.importState().ready) { o.notify("Audio cannot be added to this clip.", "bad", "Record"); return; }
+      if (!lanes.importState().ready) { o.notify(RK_M("editor.audioCannotBeAddedToThis2"), "bad", RK_M("common.record")); return; }
       rec.starting = true;
       paintRecord();
       var device = els.mic.value();
@@ -1987,7 +1987,7 @@
       }).catch(function (err) {
         rec.starting = false;
         paintRecord();
-        o.notify((err && err.message) || "The microphone could not be started.", "bad", "Record");
+        o.notify((err && err.message) || RK_M("editor.theMicrophoneCouldNotBeStarted"), "bad", RK_M("common.record"));
       });
     }
 
@@ -2022,7 +2022,7 @@
         if (!r.kept || !clip) return;
         return lanes.placeImportAt(r.import.id, at);
       }).catch(function (err) {
-        o.notify((err && err.message) || "The recording could not be added.", "bad", "Record");
+        o.notify((err && err.message) || RK_M("editor.theRecordingCouldNotBeAdded2"), "bad", RK_M("common.record"));
       });
     }
 
@@ -2034,14 +2034,14 @@
           var devices = m.devices || [];
           var hit = devices.find(function (x) { return x.value === id; });
           var name = hit ? (hit.value === "default" && hit.blurb ? hit.blurb : hit.label) : "";
-          var list = [["", "Settings microphone", "", (name ? RK_T("{name}. Uses Settings > Audio processing.", { name: name }) : RK_T("Uses Settings > Audio processing."))]];
+          var list = [["", RK_M("editor.settingsMicrophone"), "", (name ? RK_M("editor.nameUsesSettingsAudioProcessing", { name: name }) : RK_M("editor.usesSettingsAudioProcessing"))]];
           devices.forEach(function (x) {
-            list.push([x.value, x.value === "default" ? "Windows default" : x.label, "", RK_T("{name}. Records this device directly.", { name: x.blurb || x.label }), x.value !== "default"]);
+            list.push([x.value, x.value === "default" ? RK_M("editor.windowsDefault") : x.label, "", RK_M("editor.nameRecordsThisDeviceDirectly", { name: x.blurb || x.label }), x.value !== "default"]);
           });
           els.mic.setOptions(list, prefs.mic);
         });
       }).catch(function () {
-        els.mic.setOptions([["", "Settings microphone", "", "Uses noise suppression and input sensitivity from Settings > Audio."]], "");
+        els.mic.setOptions([["", RK_M("editor.settingsMicrophone"), "", "Uses noise suppression and input sensitivity from Settings > Audio."]], "");
       });
     }
 
@@ -2054,8 +2054,8 @@
       prepare();
       clip = info;
       // everything the clip hears is the default; a clip with tracks of its own can be listened to one track at a time, which helps when the game drowns out the voice
-      var tracks = (info.tracks || []).map(function (t) { return [String(t.index), t.label]; });
-      els.listen.setOptions([["0", "All audio"]].concat(tracks), "0");
+      var tracks = (info.tracks || []).map(function (t) { return [String(t.index), t.name || t.label]; });
+      els.listen.setOptions([["0", RK_M("editor.allAudio")]].concat(tracks), "0");
       els.listenRow.hidden = tracks.length < 2;
       lastTrack = null;
       loadMics();

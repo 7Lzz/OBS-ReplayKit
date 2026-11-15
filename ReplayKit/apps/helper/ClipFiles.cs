@@ -69,7 +69,7 @@ namespace ReplayKitHelper
             var suffix = Regex.Match(name, @"^(.+) \(([0-9]+)\)$");
             if (suffix.Success && long.TryParse(suffix.Groups[2].Value, out long previous) && previous >= 2)
             {
-                if (previous > long.MaxValue - 10000) throw new ArgumentException("The numbered name is too large.");
+                if (previous > long.MaxValue - 10000) throw new ArgumentException(Locales.Message("clips.theNumberedNameIsTooLarge"));
                 name = suffix.Groups[1].Value;
                 number = previous + 1;
             }
@@ -78,7 +78,7 @@ namespace ReplayKitHelper
                 string candidate = name + " (" + number.ToString(CultureInfo.InvariantCulture) + ")" + extension;
                 if (!taken(candidate)) return candidate;
             }
-            throw new ArgumentException("No available numbered name was found.");
+            throw new ArgumentException(Locales.Message("clips.noAvailableNumberedNameWasFound"));
         }
 
         public static void Replace(string requestId, string temporary, string source, long expectedSize, DateTime expectedWriteTime)
@@ -88,7 +88,7 @@ namespace ReplayKitHelper
             {
                 var token = JobCoordinator.Token(requestId);
                 token.ThrowIfCancellationRequested();
-                if (new FileInfo(temporary).Length == 0) throw new IOException("Encoder output is empty.");
+                if (new FileInfo(temporary).Length == 0) throw new IOException(Locales.Message("clips.encoderOutputIsEmpty"));
                 if (!string.Equals(Path.GetPathRoot(temporary), Path.GetPathRoot(source), StringComparison.OrdinalIgnoreCase))
                 {
                     staged = Path.Combine(Path.GetDirectoryName(source), "_replaykit_finalize_" + Guid.NewGuid().ToString("N") + Path.GetExtension(source));
@@ -109,7 +109,7 @@ namespace ReplayKitHelper
                 {
                     var current = new FileInfo(source);
                     if (!current.Exists || current.Length != expectedSize || current.LastWriteTimeUtc != expectedWriteTime)
-                        throw new IOException("The source clip changed during processing; the original was left untouched.");
+                        throw new IOException(Locales.Message("clips.theSourceClipChangedDuringProcessing"));
                     Native.MoveFileReplace(staged, source);
                 });
             }

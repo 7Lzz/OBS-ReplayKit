@@ -110,9 +110,9 @@ namespace ReplayKitHelper
             {
                 ObsWebSocket.AllowConnect();
                 Server.State.RestartAfterCleanObsPath = null;
-                string message = Locales.T("OBS did not close safely. ReplayKit left it running instead of forcing it to stop. Close OBS normally before trying again.");
+                string message = Locales.Message("helper.obsDidNotCloseSafelyReplaykit");
                 Log.Write(reason + ": " + message);
-                Notifications.Add("warning", "obs-close-timeout", Locales.T("OBS could not close safely"), message);
+                Notifications.Add("warning", "obs-close-timeout", Locales.Message("helper.obsCouldNotCloseSafely"), message);
                 return;
             }
             Server.State.Shutdown = true;

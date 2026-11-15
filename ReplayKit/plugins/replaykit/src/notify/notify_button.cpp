@@ -111,7 +111,7 @@ void NotifyButton::ShowTip()
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
 	QRect pillGlobal(mapToGlobal(QPoint(0, 0)), QSize(kPillWidth, height()));
-	g_notifyTip->ShowFor(Tr("Notifications"), pillGlobal);
+	g_notifyTip->ShowFor(TrMessage("common.notifications"), pillGlobal);
 }
 
 void NotifyButton::HideTip()

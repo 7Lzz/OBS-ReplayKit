@@ -44,7 +44,7 @@ void ReportActionFailure(const QString &title, const std::string &response)
 	if (JsonBoolField(response, "ok", false))
 		return;
 	std::string message = ExtractJsonStringField(response, "message");
-	QString text = message.empty() ? Tr("ReplayKit did not answer. Restart OBS and try again.") : QString::fromStdString(message);
+	QString text = message.empty() ? TrMessage("capture.replaykitDidNotAnswerRestartObs") : QString::fromStdString(message);
 	QMetaObject::invokeMethod(
 		g_callbacks,
 		[title, text]() {
@@ -71,17 +71,15 @@ void HandleConfirmRequest(const std::string &kind)
 	std::string route;
 	if (kind == "sharepreview-setup") {
 		ok = ShowReplayKitConfirm(
-			Tr("Set up Discord screenshare?"),
-			Tr("This installs an audio cable driver and a hidden OBS projector window so Discord "
-				    "and other apps can screen-share OBS's output.\n\nOBS will close while it installs."),
-			Tr("Set Up"), false);
+			TrMessage("capture.setUpDiscordScreenshare"),
+			TrMessage("capture.thisInstallsAnAudioCableDriver"),
+			TrMessage("capture.setUp"), false);
 		route = "/install-discord-screenshare";
 	} else if (kind == "streamable-relogin") {
 		ok = ShowReplayKitConfirm(
-			Tr("Force re-login to Streamable?"),
-			Tr("This closes OBS, wipes the Streamable cookies, and relaunches OBS as admin so you "
-				    "can sign in as a different account.\n\nSave any unsaved scene work first."),
-			Tr("Continue"), true);
+			TrMessage("capture.forceReLoginToStreamable"),
+			TrMessage("capture.thisClosesObsWipesTheStreamable"),
+			TrMessage("capture.continue"), true);
 		route = "/restart-obs-clean";
 	}
 	if (!ok || route.empty())
@@ -90,8 +88,7 @@ void HandleConfirmRequest(const std::string &kind)
 	const bool setup = kind == "sharepreview-setup";
 	RunAsync([route, setup]() {
 		std::string response = HttpRequest("POST", route.c_str(), nullptr, setup ? 180000 : 8000);
-		if (setup)
-			ReportActionFailure(Tr("Discord screenshare setup"), response);
+		ReportActionFailure(setup ? TrMessage("capture.discordScreenshareSetup") : TrMessage("capture.forceReLoginToStreamable"), response);
 	});
 }
 
@@ -128,8 +125,8 @@ void RestartObs()
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
 	ShowLifecycleConfirm(
-		Tr("Restart OBS"),
-		Tr("This will close and reopen OBS. Any active recording or stream will be stopped. Continue?"),
+		TrMessage("common.restartObs"),
+		TrMessage("capture.thisWillCloseAndReopenObs"),
 		"/restart-obs");
 }
 
@@ -149,8 +146,8 @@ void ConfirmedExit()
 	if (g_menuShownTimer.isValid() && g_menuShownTimer.elapsed() < kMenuClickDebounceMs)
 		return;
 	ShowLifecycleConfirm(
-		Tr("Exit OBS"),
-		Tr("This will close OBS. Any active recording or stream will be stopped. Continue?"),
+		TrMessage("capture.exitObs"),
+		TrMessage("capture.thisWillCloseObsAnyActive"),
 		"/exit-obs");
 }
 

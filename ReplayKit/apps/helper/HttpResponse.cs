@@ -121,7 +121,7 @@ namespace ReplayKitHelper
 
         private static readonly Regex HeadOpen = new Regex(@"<head(\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-        // the language of obs, its strings and the runtime that translates the page (_i18n.html), first thing in <head> so every text the parser adds is seen; english pages get the runtime alone, so RK_T always exists and a page reads as it always did
+        // the error reporter of the page (_page-errors.html), then the language of obs, its messages and the runtime that renders them (_i18n.html), first thing in <head> so every bound text the parser adds renders as it arrives
         private static string InjectLocale(string html)
         {
             Match head = HeadOpen.Match(html);
@@ -131,12 +131,9 @@ namespace ReplayKitHelper
             catch (Exception ex) { Log.Write("HttpResponse.InjectLocale: " + ex.Message); }
             var sb = new StringBuilder();
             sb.Append("<script>window.RK_LANG=").Append(JsonConvert.SerializeObject(code)).Append(";</script>");
-            bool explicitPage = html.IndexOf("data-i18n-explicit", StringComparison.Ordinal) >= 0;
-            sb.Append("<script src=\"/locale/strings.js?lang=").Append(Uri.EscapeDataString(code))
-                .Append("&amp;v=").Append(Locales.BundleVersion(code, explicitPage));
-            if (explicitPage) sb.Append("&amp;explicit=1");
-            sb.Append("\"></script>");
-            sb.Append("<!--#include i18n-->");
+            sb.Append("<script src=\"/locale/messages.js?lang=").Append(Uri.EscapeDataString(code))
+                .Append("&amp;v=").Append(Locales.BundleVersion(code)).Append("\"></script>");
+            sb.Append("<!--#include page-errors--><!--#include i18n-->");
             return html.Insert(head.Index + head.Length, sb.ToString());
         }
 
@@ -302,7 +299,8 @@ namespace ReplayKitHelper
 
         private static string LimitText(JToken value) => value.Value<double>().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-        public static void ServeHtml(Stream stream, string filename, bool sameOriginFrame = false)
+        // fragment: a page the clips page splices into itself (the editor) runs on the messages and error reporter that page already has, and its loader refuses any script tag with a src
+        public static void ServeHtml(Stream stream, string filename, bool sameOriginFrame = false, bool fragment = false)
         {
             var candidates = new[]
             {
@@ -316,7 +314,9 @@ namespace ReplayKitHelper
                 {
                     try
                     {
-                        string html = InjectNoTab(InjectLanguageList(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(InjectLocale(File.ReadAllText(f))))))))))));
+                        string source = File.ReadAllText(f);
+                        if (!fragment) source = InjectLocale(source);
+                        string html = InjectNoTab(InjectLanguageList(InjectFontList(InjectSettingLimits(InjectSettingDefaults(InjectDockIcons(InjectFontStyle(InjectThemeStyle(ExpandGlyphs(InjectPartials(source))))))))));
                         if (html.Contains("__RK_CLIP_APP_VERSION__"))
                         {
                             using (var hash = SHA256.Create())
@@ -343,7 +343,7 @@ namespace ReplayKitHelper
                 string path = Path.Combine(root, "clip-app.js");
                 if (File.Exists(path)) return path;
             }
-            throw new FileNotFoundException("Clip browser script was not found.");
+            throw new FileNotFoundException(Locales.Message("helper.clipBrowserScriptWasNotFound"));
         }
 
         public static void ServeDockScript(Stream stream)

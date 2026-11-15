@@ -52,14 +52,20 @@ namespace ReplayKitHelper
             lock (Gate) { return StatusLocked(); }
         }
 
-        public static void ClearProfile()
+        // false when the browser profile of the sign-in window is still there: the window is open and holds it, or it could not be deleted
+        public static bool ClearProfile()
         {
             lock (Gate)
             {
-                if (_windowOpen) return;
+                if (_windowOpen) return false;
             }
             try { if (Directory.Exists(ProfileDirectory)) Directory.Delete(ProfileDirectory, true); }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Log.Write("Clear Streamable profile: " + ex.Message); }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Log.Write("Clear Streamable profile: " + ex.Message);
+                return false;
+            }
+            return true;
         }
 
         private static JObject StatusLocked()
@@ -73,7 +79,7 @@ namespace ReplayKitHelper
                         ["ok"] = true,
                         ["signedIn"] = true,
                         ["username"] = "",
-                        ["displayName"] = "Signed in",
+                        ["displayName"] = Locales.Message("common.signedIn"),
                         ["maskedUsername"] = Constants.GetMaskedIdentity(Server.State.Auth.Username),
                         ["plan"] = Server.State.Auth.Plan,
                         ["sizeCap"] = Server.State.Auth.SizeCap,
@@ -96,7 +102,7 @@ namespace ReplayKitHelper
             {
                 Directory.CreateDirectory(ProfileDirectory);
                 Application.EnableVisualStyles();
-                using (var form = new Form { Text = Locales.T("Sign in to Streamable"), Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
+                using (var form = new Form { Text = Locales.Message("common.signInToStreamable"), Width = 560, Height = 760, StartPosition = FormStartPosition.Manual, TopMost = true })
                 using (var browser = new WebView2 { Dock = DockStyle.Fill })
                 // one-shot watchdog: if the form is somehow still not visible a moment after Shown, force it. this is a self-healing backstop, not the primary fix -- it exists because a hidden top-level window with no error logged anywhere is otherwise undiagnosable from the outside.
                 using (var visibilityWatchdog = new System.Windows.Forms.Timer { Interval = 800 })
@@ -172,7 +178,7 @@ namespace ReplayKitHelper
                         }
                         catch (Exception ex)
                         {
-                            SetError(Locales.T("Could not open the secure Streamable sign-in window: {error}", "error", ex.Message));
+                            SetError(Locales.Message("share.couldNotOpenTheSecureStreamable", "error", ex.Message));
                             form.Close();
                         }
                     };
@@ -196,7 +202,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                SetError(Locales.T("Streamable sign-in failed: {error}", "error", ex.Message));
+                SetError(Locales.Message("share.streamableSignInFailedError", "error", ex.Message));
                 SetClosed();
             }
         }

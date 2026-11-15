@@ -61,20 +61,20 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditorPresets.List: " + ex.Message);
-                return Fail("The presets could not be read");
+                return Fail(Locales.Message("editor.thePresetsCouldNotBeRead"));
             }
         }
 
         // the whole list of one kind as the editor has it now; a list with anything in it that is not a preset is refused rather than trimmed, so nothing is lost without a word
         public static JObject Save(string kind, string body)
         {
-            if (Array.IndexOf(Kinds, kind) < 0) return Fail("Unknown kind of preset");
+            if (Array.IndexOf(Kinds, kind) < 0) return Fail(Locales.Message("editor.unknownKindOfPreset"));
             JArray list;
             try { list = JObject.Parse(body ?? "")["presets"] as JArray; }
-            catch (JsonException) { return Fail("Bad presets"); }
-            if (list == null || list.Count > MaxPresets) return Fail(list == null ? "Bad presets" : "There are too many presets. Delete some first.");
+            catch (JsonException) { return Fail(Locales.Message("editor.badPresets")); }
+            if (list == null || list.Count > MaxPresets) return Fail(list == null ? Locales.Message("editor.badPresets") : "There are too many presets. Delete some first.");
             var kept = CleanList(list);
-            if (kept.Count != list.Count) return Fail("Bad presets");
+            if (kept.Count != list.Count) return Fail(Locales.Message("editor.badPresets"));
             try
             {
                 ClipStore.Update(StorePath(), db =>
@@ -86,7 +86,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditorPresets.Save: " + ex.Message);
-                return Fail("The presets could not be saved");
+                return Fail(Locales.Message("editor.thePresetsCouldNotBeSaved"));
             }
             return List();
         }

@@ -444,11 +444,11 @@ namespace ReplayKitHelper
                 WriteDockThemeCss(settings);
                 return;
             }
-            if (ApplyToObs(settings) != "theme") throw new IOException("Could not prepare the selected OBS theme.");
+            if (ApplyToObs(settings) != "theme") throw new IOException(Locales.Message("settings.couldNotPrepareTheSelectedObs"));
             ApplyPendingTheme();
             string expected = id == "default" ? "" : "com.replaykit.theme." + Slug(id);
             if (File.Exists(PendingThemeMarker) || (ReadObsThemeKey(ini) ?? "") != expected)
-                throw new IOException("The selected OBS theme could not be saved before launch.");
+                throw new IOException(Locales.Message("settings.theSelectedObsThemeCouldNot"));
         }
 
         // startup reconciler -- only touches disk if the current themes .ovt is missing or out of date or user.ini points somewhere else, so a normal launch (helper starts after obs has already read user.ini) writes nothing.

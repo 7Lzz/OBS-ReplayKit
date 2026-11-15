@@ -56,7 +56,7 @@ namespace ReplayKitHelper
         // how an import stands: working while the file is turned into audio, ready once it can be played and mixed, failed with the reason when it cannot be
         public static JObject Describe(string id)
         {
-            if (!IsId(id)) return Fail("Unknown audio import");
+            if (!IsId(id)) return Fail(Locales.Message("editor.unknownAudioImport"));
             string dir = Path.Combine(Root, id);
             lock (Gate)
             {
@@ -72,7 +72,7 @@ namespace ReplayKitHelper
                     Jobs.Remove(id);
                 }
             }
-            if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker))) return Fail("This audio is no longer available. Add it again.");
+            if (!File.Exists(Path.Combine(dir, ClipCache.DoneMarker))) return Fail(Locales.Message("editor.thisAudioIsNoLongerAvailable"));
             Used(dir);
             var info = ReadInfo(dir);
             var ready = State(id, info.Value<string>("name"), "ready");
@@ -124,7 +124,7 @@ namespace ReplayKitHelper
                     return Skipped(name, "That file cannot be used");
                 var info = new FileInfo(path);
                 if (!info.Exists) return Skipped(name, "That file was not found");
-                if (info.Length <= 0) return Skipped(name, "That file is empty");
+                if (info.Length <= 0) return Skipped(name, Locales.Message("editor.thatFileIsEmpty"));
                 return Begin(ClipCache.KeyFor(info.FullName, info, "import"), name, info.FullName, null);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
@@ -151,8 +151,8 @@ namespace ReplayKitHelper
         {
             status = 200;
             string name = NameFrom(fileName);
-            if (req.UploadReader == null || req.UploadLength <= 0) { status = 400; return Fail("That file is empty"); }
-            if (req.UploadLength > MaxUploadBytes) { status = 413; return Fail("That file is larger than 512 MB"); }
+            if (req.UploadReader == null || req.UploadLength <= 0) { status = 400; return Fail(Locales.Message("editor.thatFileIsEmpty")); }
+            if (req.UploadLength > MaxUploadBytes) { status = 413; return Fail(Locales.Message("editor.thatFileIsLargerThan512")); }
             string staging = Path.Combine(Root, "u" + Guid.NewGuid().ToString("N"));
             string file = Path.Combine(staging, "upload" + ExtensionFrom(fileName));
             string id;
@@ -171,7 +171,7 @@ namespace ReplayKitHelper
                 DeleteStaging(staging);
                 Log.Write("AudioImports: upload of " + name + " failed: " + ex.Message);
                 status = 400;
-                return Fail("The file could not be received");
+                return Fail(Locales.Message("editor.theFileCouldNotBeReceived"));
             }
             return Begin(id, name, file, staging);
         }
@@ -250,13 +250,13 @@ namespace ReplayKitHelper
             {
                 string text = string.Join(" ", run.Output).Trim();
                 Log.Write("AudioImports: ffmpeg exit " + run.ExitCode + " for " + job.Name + ": " + (text.Length > 300 ? text.Substring(0, 300) : text));
-                throw new ImportException(NoAudio.IsMatch(text) ? "That file has no audio" : "That file could not be read as audio");
+                throw new ImportException(NoAudio.IsMatch(text) ? Locales.Message("editor.thatFileHasNoAudio") : "That file could not be read as audio");
             }
-            if (!File.Exists(audio) || new FileInfo(audio).Length == 0 || !File.Exists(raw)) throw new ImportException("That file has no audio");
+            if (!File.Exists(audio) || new FileInfo(audio).Length == 0 || !File.Exists(raw)) throw new ImportException(Locales.Message("editor.thatFileHasNoAudio"));
             double duration = ClipAudioTracks.WritePeaks(raw, Path.Combine(dir, PeaksName));
             File.Delete(raw);
-            if (duration < MinSeconds) throw new ImportException("That audio is too short to use");
-            if (duration > MaxSeconds) throw new ImportException("That audio is longer than an hour");
+            if (duration < MinSeconds) throw new ImportException(Locales.Message("editor.thatAudioIsTooShortTo"));
+            if (duration > MaxSeconds) throw new ImportException(Locales.Message("editor.thatAudioIsLongerThanAn"));
             var info = new JObject { ["name"] = job.Name, ["duration"] = Math.Round(duration, 3) };
             File.WriteAllText(Path.Combine(dir, InfoName), info.ToString(Newtonsoft.Json.Formatting.None), new UTF8Encoding(false));
             File.WriteAllText(Path.Combine(dir, ClipCache.DoneMarker), "ok");
@@ -284,7 +284,7 @@ namespace ReplayKitHelper
             if (dot > 0) name = name.Substring(0, dot);
             name = Regex.Replace(Regex.Replace(name, @"\p{C}+", " "), @"\s+", " ").Trim();
             if (name.Length > 60) name = name.Substring(0, 60).Trim();
-            return name.Length == 0 ? "Audio" : name;
+            return name.Length == 0 ? Locales.Message("common.audio") : name;
         }
 
         // the extension helps ffmpeg tell formats apart that look alike, so it is kept when it is plain letters and digits

@@ -79,7 +79,7 @@ namespace ReplayKitHelper
 
         public static JObject Execute(string name, JObject args)
         {
-            if (name == null || !NamePattern.IsMatch(name)) return Fail("Bad command name.");
+            if (name == null || !NamePattern.IsMatch(name)) return Fail(Locales.Message("helper.badCommandName"));
             Command command;
             lock (Gate) Commands.TryGetValue(name, out command);
             if (command != null)
@@ -105,10 +105,10 @@ namespace ReplayKitHelper
                 // ascii only, so nothing in the line can be read by the pipe as the end of it
                 string json = JsonConvert.SerializeObject(args, Formatting.None, new JsonSerializerSettings { StringEscapeHandling = StringEscapeHandling.EscapeNonAscii });
                 if (json.Length + name.Length + 32 > PipeClient.MaxLineChars) return Fail("args are too large to pass to the plugin.");
-                if (!PipeClient.SendSdk(id, name, json)) return Fail("The plugin is not connected.");
-                if (!waiting.Done.Wait(8000)) return Fail("The plugin did not answer in time.");
+                if (!PipeClient.SendSdk(id, name, json)) return Fail(Locales.Message("helper.thePluginIsNotConnected"));
+                if (!waiting.Done.Wait(8000)) return Fail(Locales.Message("helper.thePluginDidNotAnswerIn"));
                 try { return JObject.Parse(waiting.Body); }
-                catch (JsonException) { return Fail("The plugin answered with something that is not json."); }
+                catch (JsonException) { return Fail(Locales.Message("helper.thePluginAnsweredWithSomethingThat")); }
             }
             finally
             {
@@ -202,9 +202,9 @@ namespace ReplayKitHelper
         private static JObject ObsLogTail(JObject args)
         {
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "obs-studio", "logs");
-            if (!Directory.Exists(dir)) return Fail("The obs log folder was not found.");
+            if (!Directory.Exists(dir)) return Fail(Locales.Message("helper.theObsLogFolderWasNot"));
             var newest = new DirectoryInfo(dir).GetFiles("*.txt").OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault();
-            if (newest == null) return Fail("There is no obs log yet.");
+            if (newest == null) return Fail(Locales.Message("helper.thereIsNoObsLogYet"));
             return Tail(newest.FullName, LinesOf(args, 80), args["filter"]?.ToString());
         }
     }

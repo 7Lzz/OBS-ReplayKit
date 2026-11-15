@@ -20,7 +20,7 @@ namespace ReplayKitSetup
             string fullRoot = Path.GetFullPath(root).TrimEnd('\\', '/');
             string path = Path.GetFullPath(Path.Combine(fullRoot, relative));
             if (!path.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("A process host path escapes its folder.");
+                throw new InvalidDataException(SetupLocale.Message("setup.aProcessHostPathEscapesIts"));
             for (string current = path; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
             {
                 FileAttributes attributes;
@@ -40,7 +40,7 @@ namespace ReplayKitSetup
         }
 
         private static string CurrentVersion() =>
-            ObsVersions.InstalledVersion()?.ToString(3) ?? throw new IOException("OBS Studio is missing.");
+            ObsVersions.InstalledVersion()?.ToString(3) ?? throw new IOException(SetupLocale.Message("setup.obsStudioIsMissing"));
 
         private static JObject Read(string folder, string version)
         {
@@ -72,7 +72,7 @@ namespace ReplayKitSetup
             var manifest = Read(folder, version);
             foreach (var file in (JArray)manifest["Files"])
                 if (Hash(PathAt(folder, (string)file["Path"])) != (string)file["Sha256"])
-                    throw new InvalidDataException("A bundled process host file failed verification.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.aBundledProcessHostFileFailed"));
             return (folder, manifest);
         }
 
@@ -90,7 +90,7 @@ namespace ReplayKitSetup
                     try { image = process.MainModule.FileName; }
                     catch (InvalidOperationException) when (process.HasExited) { continue; }
                     if (Path.GetFullPath(image).StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                        throw new IOException("Close OBS and its browser and helper processes before changing the process host.");
+                        throw new IOException(SetupLocale.Message("setup.closeObsAndItsBrowserAnd"));
                 }
             }
         }
@@ -102,7 +102,7 @@ namespace ReplayKitSetup
             try
             {
                 File.Copy(source, temporary);
-                if (Hash(temporary) != expected) throw new IOException("Process host copy verification failed.");
+                if (Hash(temporary) != expected) throw new IOException(SetupLocale.Message("setup.processHostCopyVerificationFailed"));
                 if (File.Exists(target)) File.Replace(temporary, target, null);
                 else File.Move(temporary, target);
             }
@@ -142,7 +142,7 @@ namespace ReplayKitSetup
                 {
                     var old = ((JArray)previous["Files"]).OfType<JObject>().Single(item => (string)item["Path"] == relative);
                     if ((string)old["OriginalSha256"] != original || Hash(saved) != original)
-                        throw new InvalidDataException("The original OBS backup failed verification.");
+                        throw new InvalidDataException(SetupLocale.Message("setup.theOriginalObsBackupFailedVerification"));
                     if (current != original && current != (string)old["Sha256"])
                         throw new IOException("An OBS host file changed outside ReplayKit: " + target);
                 }
@@ -241,7 +241,7 @@ namespace ReplayKitSetup
                 if (current != (string)file["Sha256"] && current != original)
                     throw new IOException("An OBS host file changed outside ReplayKit: " + target);
                 if (original != null && Hash(PathAt(backup, relative)) != original)
-                    throw new InvalidDataException("The original OBS backup failed verification.");
+                    throw new InvalidDataException(SetupLocale.Message("setup.theOriginalObsBackupFailedVerification"));
             }
             Change(files, file =>
             {
@@ -262,7 +262,7 @@ namespace ReplayKitSetup
             var current = Bundle().Manifest;
             var browser = ((JArray)current["Files"]).OfType<JObject>().Single(file => file["OriginalSha256"]?.Type == JTokenType.String);
             if (Hash(PathAt(Root, (string)browser["Path"])) != (string)browser["OriginalSha256"])
-                throw new IOException("The current OBS browser is not the original supported file. Repair OBS Studio before removing ReplayKit.");
+                throw new IOException(SetupLocale.Message("setup.theCurrentObsBrowserIsNot"));
             string launcher = PathAt(Root, "bin/64bit/replaykit-host/obs64.exe");
             string launcherHash = Hash(launcher);
             foreach (var line in ObsVersions.Lines.Where(item => item.Tested.ToString(3) != version))
@@ -290,7 +290,7 @@ namespace ReplayKitSetup
                 log?.Invoke("removed verified OBS " + older + " process roles; the current OBS " + version + " browser was preserved");
                 return true;
             }
-            throw new IOException("The process role backup is missing. Repair OBS Studio before removing ReplayKit.");
+            throw new IOException(SetupLocale.Message("setup.theProcessRoleBackupIsMissing"));
         }
     }
 }

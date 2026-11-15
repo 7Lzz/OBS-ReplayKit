@@ -35,7 +35,7 @@ namespace ReplayKitHelper
             }
             else
             {
-                if (!MicDevices.IsValidId(device)) return Fail("That microphone is not valid.");
+                if (!MicDevices.IsValidId(device)) return Fail(Locales.Message("common.thatMicrophoneIsNotValid"));
                 deviceId = device;
             }
 
@@ -80,7 +80,7 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
-                if (_session == null) return Fail("Nothing is being recorded.");
+                if (_session == null) return Fail(Locales.Message("editor.nothingIsBeingRecorded"));
                 _session.Stop();
                 double seconds = _session.RecordedSeconds;
                 _session = null;

@@ -59,8 +59,8 @@ namespace ReplayKitHelper
         public static JArray Options()
         {
             return new JArray(
-                new JObject { ["value"] = Disk, ["label"] = "Disk", ["blurb"] = "Keeps the buffer on your drive. Uses very little RAM, but writes to the drive while clipping is on." },
-                new JObject { ["value"] = Memory, ["label"] = "Memory", ["blurb"] = "Keeps the buffer in RAM. Saves clips fastest but uses the most RAM. If Disk causes stutters, slow saves or clips that fail to save, Memory can help." });
+                new JObject { ["value"] = Disk, ["label"] = Locales.Message("wizard.disk"), ["blurb"] = Locales.Message("settings.bufferDiskBlurb") },
+                new JObject { ["value"] = Memory, ["label"] = Locales.Message("wizard.memory"), ["blurb"] = Locales.Message("settings.bufferMemoryBlurb") });
         }
 
         // the plugin says whenever its disk buffer starts or stops, and again on every settings poll
@@ -79,7 +79,7 @@ namespace ReplayKitHelper
                 if (requestType != "SaveReplayBuffer") return null;
                 var status = ObsWebSocket.InvokeRequest("GetReplayBufferStatus");
                 if (!status.Ok) { status.RequestType = requestType; return status; }
-                if (status.Data?["outputActive"]?.Value<bool>() != true) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = "Clipping is off." };
+                if (status.Data?["outputActive"]?.Value<bool>() != true) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
                 if (PipeClient.SendClipSave()) return Answer(requestType, true);
                 Log.Write("Native capture tagging unavailable; OBS handles the replay save directly.");
                 return null;
@@ -97,7 +97,7 @@ namespace ReplayKitHelper
                 case "ToggleReplayBuffer":
                     return PipeClient.SendClipBuffer("toggle") ? Answer(requestType, !active) : PluginGone(requestType);
                 default:
-                    if (!active) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = "Clipping is off." };
+                    if (!active) return new ObsWebSocketResult { Ok = false, RequestType = requestType, Code = 501, Message = Locales.Message("clips.clippingIsOff") };
                     return PipeClient.SendClipSave() ? Answer(requestType, true) : PluginGone(requestType);
             }
         }
@@ -106,7 +106,7 @@ namespace ReplayKitHelper
             new ObsWebSocketResult { Ok = true, RequestType = requestType, Code = 100, Data = new JObject { ["outputActive"] = active } };
 
         private static ObsWebSocketResult PluginGone(string requestType) =>
-            new ObsWebSocketResult { Ok = false, Unavailable = true, RequestType = requestType, Message = "ReplayKit's OBS plugin is not connected." };
+            new ObsWebSocketResult { Ok = false, Unavailable = true, RequestType = requestType, Message = Locales.Message("clips.replaykitSObsPluginIsNot") };
 
         private static JObject Fail(string message) => new JObject { ["ok"] = false, ["message"] = message };
 
@@ -153,7 +153,7 @@ namespace ReplayKitHelper
             // the save sound already went out on the press, so a clip that did not make it says so where it stays seen
             if (result["ok"]?.Value<bool>() != true && result["message"]?.Value<string>() != BusyMessage)
             {
-                try { Notifications.Add("warning", "clip-save-failed", Locales.T("A clip was not saved"), result["message"]?.Value<string>() ?? Locales.T("The clip could not be saved.")); }
+                try { Notifications.Add("warning", "clip-save-failed", Locales.Message("clips.aClipWasNotSaved"), result["message"]?.Value<string>() ?? Locales.Message("clips.theClipCouldNotBeSaved")); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is InvalidOperationException || ex is Newtonsoft.Json.JsonException) { Log.Write("clip save notice: " + ex.Message); }
             }
             return result;
@@ -165,16 +165,16 @@ namespace ReplayKitHelper
             var segments = body?["segments"] as JArray;
             int seconds = body?["seconds"]?.Value<int?>() ?? 0;
             string name = body?["name"]?.Value<string>() ?? "";
-            if (segments == null || segments.Count == 0 || segments.Count > MaxSegments) return Fail("There is no buffered video to save yet.");
-            if (seconds < 1 || seconds > 3600) return Fail("The clip length is not valid.");
+            if (segments == null || segments.Count == 0 || segments.Count > MaxSegments) return Fail(Locales.Message("clips.thereIsNoBufferedVideoTo"));
+            if (seconds < 1 || seconds > 3600) return Fail(Locales.Message("clips.theClipLengthIsNotValid"));
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (name.Length == 0 || name.Length > 200 || name != Path.GetFileName(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || (ext != ".mp4" && ext != ".mkv" && ext != ".mov"))
-                return Fail("The clip name is not valid.");
+                return Fail(Locales.Message("clips.theClipNameIsNotValid"));
             bool discordClosed = ext == ".mp4" && SavedClipAudio.DiscordClosed();
             // the game folder the clip goes in, empty for the clip folder itself; its name is the one the clip name starts with
             string folder = body?["folder"]?.Value<string>() ?? "";
             if (folder.Length > 0 && (!Clips.IsGameFolderName(folder) || !name.StartsWith(folder + " ", StringComparison.OrdinalIgnoreCase)))
-                return Fail("The game folder is not valid.");
+                return Fail(Locales.Message("clips.theGameFolderIsNotValid"));
 
             Directory.CreateDirectory(DiskDir);
             string root = LongPath(Path.GetFullPath(DiskDir)).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -183,9 +183,9 @@ namespace ReplayKitHelper
             {
                 string path;
                 try { path = LongPath(Path.GetFullPath(item?.Value<string>() ?? "")); }
-                catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return Fail("A buffered piece has a bad path."); }
+                catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException) { return Fail(Locales.Message("clips.aBufferedPieceHasABad")); }
                 if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !string.Equals(Path.GetExtension(path), ".mp4", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
-                    return Fail("A buffered piece is missing.");
+                    return Fail(Locales.Message("clips.aBufferedPieceIsMissing"));
                 files.Add(path);
             }
 
@@ -196,7 +196,7 @@ namespace ReplayKitHelper
                 try { Directory.CreateDirectory(clipDir); Log.Write("clip folder was missing, made it again: " + clipDir); }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException) { Log.Write("clip folder could not be made: " + ex.Message); }
             }
-            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail(Locales.T("The clip folder {clipDir} was not found and could not be made, so the clip was lost. Check that its drive is connected, or pick another folder in Settings.", "clipDir", clipDir));
+            if (string.IsNullOrWhiteSpace(clipDir) || !Directory.Exists(clipDir)) return Fail(Locales.Message("clips.theClipFolderClipdirWasNot", "clipDir", clipDir));
             string ffmpeg = Compression.FindCompressionFfmpeg();
             string ffprobe = Compression.FindCompressionFfprobe();
             if (!File.Exists(ffmpeg) || !File.Exists(ffprobe)) return Fail("ffmpeg is missing, so the clip could not be saved.");
@@ -212,7 +212,7 @@ namespace ReplayKitHelper
                 foreach (string file in files)
                 {
                     double length = ProbeSeconds(ffprobe, file);
-                    if (length < 0) return Fail("A buffered piece could not be read.");
+                    if (length < 0) return Fail(Locales.Message("clips.aBufferedPieceCouldNotBe"));
                     lengths.Add(length);
                 }
                 string codec = ProbeVideoCodec(ffprobe, files[files.Count - 1]);
@@ -237,7 +237,7 @@ namespace ReplayKitHelper
                 if (folder.Length > 0)
                 {
                     Directory.CreateDirectory(targetDir);
-                    if ((File.GetAttributes(targetDir) & FileAttributes.ReparsePoint) != 0) return Fail("The game folder cannot be a link.");
+                    if ((File.GetAttributes(targetDir) & FileAttributes.ReparsePoint) != 0) return Fail(Locales.Message("clips.theGameFolderCannotBeA"));
                 }
                 string target = UniquePath(Path.Combine(targetDir, name));
                 part = target + ".rkpart";
@@ -255,7 +255,7 @@ namespace ReplayKitHelper
                 if (run.ExitCode != 0 || !File.Exists(part))
                 {
                     Log.Write("clip buffer save: ffmpeg exit " + run.ExitCode + ": " + string.Join(" | ", run.Output.Take(5)));
-                    return Fail("The clip could not be written.");
+                    return Fail(Locales.Message("clips.theClipCouldNotBeWritten"));
                 }
                 SavedClipAudio.RemoveSilentDiscord(part, ffmpeg, discordClosed);
                 File.Move(part, target);
@@ -272,7 +272,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
                 Log.Write("clip buffer save: " + ex.Message);
-                return Fail(Locales.T("The clip could not be written: {error}", "error", ex.Message));
+                return Fail(Locales.Message("clips.theClipCouldNotBeWritten2", "error", ex.Message));
             }
             finally
             {
@@ -347,7 +347,7 @@ namespace ReplayKitHelper
                 string next = Path.Combine(dir, stem + " (" + i + ")" + ext);
                 if (!File.Exists(next) && !Clips.NameTaken(Path.GetFileName(next))) return next;
             }
-            throw new IOException("No free clip name was found.");
+            throw new IOException(Locales.Message("clips.noFreeClipNameWasFound"));
         }
 
         private static void TryDelete(string path)

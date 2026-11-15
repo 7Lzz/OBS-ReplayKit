@@ -209,14 +209,14 @@ private:
 	// the lock says Locked while it holds and Lock while it does not, and the wider word is what the button is sized for so it never changes width
 	QString Label(bool preview) const
 	{
-		return preview ? Tr("Preview") : (m_on ? TrMessage("projector.locked") : TrMessage("projector.lock"));
+		return preview ? TrMessage("common.preview") : (m_on ? TrMessage("projector.locked") : TrMessage("projector.lock"));
 	}
 
 	static qreal TextWidth(const QString &text) { return QFontMetricsF(LabelFont()).horizontalAdvance(text); }
 
 	static int WidthFor(Kind kind)
 	{
-		const qreal text = kind == Kind::Preview ? TextWidth(Tr("Preview")) : qMax(TextWidth(TrMessage("projector.lock")), TextWidth(TrMessage("projector.locked")));
+		const qreal text = kind == Kind::Preview ? TextWidth(TrMessage("common.preview")) : qMax(TextWidth(TrMessage("projector.lock")), TextWidth(TrMessage("projector.locked")));
 		return qCeil(11 + kIconSide + 8 + text + 12 + (kind == Kind::Preview ? kSwitchW + 12 : 0));
 	}
 
@@ -259,9 +259,9 @@ private:
 	void UpdateTip()
 	{
 		if (m_kind == Kind::Preview)
-			SetTip(m_held ? Tr("Studio Mode keeps the preview on") : m_on ? Tr("Turn the preview off") : Tr("Turn the preview on"));
+			SetTip(m_held ? TrMessage("shell.studioModeKeepsThePreviewOn") : m_on ? TrMessage("shell.turnThePreviewOff") : TrMessage("shell.turnThePreviewOn"));
 		else
-			SetTip(m_on ? Tr("Unlock the preview") : Tr("Lock the preview so the scene and the overlay cannot be moved by accident"));
+			SetTip(m_on ? TrMessage("shell.unlockThePreview") : TrMessage("shell.lockThePreviewSoTheScene"));
 	}
 
 	Kind m_kind;

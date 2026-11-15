@@ -11,20 +11,28 @@ using ReplayKitShared;
 
 namespace ReplayKitSetup
 {
-    // the language of the setup windows: the language of obs (or the windows one) read from the translation files inside the exe, never from the network or the helper; any problem leaves the table empty so the windows stay english
-    internal static class SetupLocale
+    // the language of the setup windows: the language of obs (or the windows one) read from the message catalogs inside the exe, never from the network or the helper; any problem leaves the windows english
+    public static class SetupLocale
     {
         private const string BundleResource = "ReplayKitSetup.assets.bundle.zip";
         private const string RuntimeResource = "ReplayKitSetup._i18n.html";
         private const string LocaleDir = "obs-studio/obs-replayKit/locale/";
         private const long MaxLocaleBytes = 4 * 1024 * 1024;
-        private static readonly Regex Placeholder = new Regex(@"\{([A-Za-z0-9_]+)\}", RegexOptions.CultureInvariant);
         private static readonly Regex HeadOpen = new Regex(@"<head(\s[^>]*)?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly object Gate = new object();
         private static bool loaded;
         private static string code = LanguageMatch.English;
-        private static Dictionary<string, string> table = new Dictionary<string, string>(StringComparer.Ordinal);
         private static JObject messages = new JObject();
+        private static JObject english = new JObject();
+        private static Dictionary<string, string> englishOfShown;
+
+        // a text as the windows show it and as the setup log writes it, so the log a user sends stays english whatever language the installer ran in
+        public readonly struct Text
+        {
+            public readonly string Shown;
+            public readonly string English;
+            public Text(string shown, string english) { Shown = shown; English = english; }
+        }
 
         internal static string Message(string id, params object[] pairs)
         {
@@ -32,19 +40,31 @@ namespace ReplayKitSetup
             return MessageCatalog.Text(messages[id], id, code, pairs);
         }
 
-        // the english text in the current language, with {name} placeholders filled from the name/value pairs; an unknown text stays english
-        public static string T(string english, params object[] pairs)
+        internal static Text Pair(string id, params object[] pairs)
         {
-            if (english == null) return "";
             Ensure();
-            string text = table.TryGetValue(english, out string translated) ? translated : english;
-            if (pairs == null || pairs.Length < 2) return text;
-            var vars = new Dictionary<string, string>(StringComparer.Ordinal);
-            for (int i = 0; i + 1 < pairs.Length; i += 2) vars[Convert.ToString(pairs[i])] = Convert.ToString(pairs[i + 1]);
-            return Placeholder.Replace(text, m => vars.TryGetValue(m.Groups[1].Value, out string v) ? v : m.Value);
+            return new Text(MessageCatalog.Text(messages[id], id, code, pairs), MessageCatalog.Text(english[id], id, LanguageMatch.English, pairs));
         }
 
-        // puts the table and the page runtime right after <head> so the first text the parser adds is already translated
+        // the english of a whole message the windows showed, such as an error a step threw; text that is no single message comes back as it is
+        internal static string ToEnglish(string shown)
+        {
+            Ensure();
+            if (string.IsNullOrEmpty(shown) || code == LanguageMatch.English) return shown;
+            lock (Gate)
+            {
+                if (englishOfShown == null)
+                {
+                    englishOfShown = new Dictionary<string, string>(StringComparer.Ordinal);
+                    foreach (var entry in messages.Properties())
+                        if (entry.Value.Type == JTokenType.String && english[entry.Name]?.Type == JTokenType.String && !englishOfShown.ContainsKey(entry.Value.Value<string>()))
+                            englishOfShown[entry.Value.Value<string>()] = english[entry.Name].Value<string>();
+                }
+                return englishOfShown.TryGetValue(shown, out string text) ? text : shown;
+            }
+        }
+
+        // puts the messages and the page runtime right after <head> so the first bound text the parser adds renders as it arrives
         public static string Inject(string html)
         {
             try
@@ -54,8 +74,7 @@ namespace ReplayKitSetup
                 if (!head.Success) return html;
                 string runtime = ReadRuntime();
                 if (runtime == null) return html;
-                string block = "<script>window.RK_LANG=" + JsonString(code) + ";window.RK_STRINGS=" + TableJson() +
-                    ";window.RK_MESSAGES=" + Newtonsoft.Json.JsonConvert.SerializeObject(messages,
+                string block = "<script>window.RK_LANG=" + JsonString(code) + ";window.RK_MESSAGES=" + Newtonsoft.Json.JsonConvert.SerializeObject(messages,
                         new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }) +
                     ";</script>" + runtime;
                 return html.Insert(head.Index + head.Length, block);
@@ -77,7 +96,6 @@ namespace ReplayKitSetup
                 catch (Exception ex)
                 {
                     code = LanguageMatch.English;
-                    table = new Dictionary<string, string>(StringComparer.Ordinal);
                     SetupLog.Line("translations not loaded, using english: " + ex.Message);
                 }
             }
@@ -90,17 +108,13 @@ namespace ReplayKitSetup
             using var zip = new ZipArchive(resource, ZipArchiveMode.Read);
             string messagePath = LocaleDir + MessageCatalog.Folder + "/";
             ReadMessages(zip, messagePath, LanguageMatch.English);
-            var files = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
-            foreach (ZipArchiveEntry entry in zip.Entries)
-            {
-                if (!entry.FullName.StartsWith(LocaleDir, StringComparison.Ordinal) || !entry.FullName.EndsWith(".json", StringComparison.Ordinal)) continue;
-                string name = entry.FullName.Substring(LocaleDir.Length, entry.FullName.Length - LocaleDir.Length - ".json".Length);
-                if (LanguageMatch.IsSupported(name)) files[name] = entry;
-            }
             string chosen = ObsLanguage();
             if (chosen == null)
             {
-                var codes = files.Keys.ToList();
+                var codes = zip.Entries
+                    .Where(entry => entry.FullName.StartsWith(messagePath, StringComparison.Ordinal) && entry.FullName.EndsWith(".json", StringComparison.Ordinal))
+                    .Select(entry => entry.FullName.Substring(messagePath.Length, entry.FullName.Length - messagePath.Length - ".json".Length))
+                    .Where(LanguageMatch.IsSupported).ToList();
                 if (!codes.Contains(LanguageMatch.English)) codes.Add(LanguageMatch.English);
                 string exe = Obs.FindObsExe();
                 if (exe != null)
@@ -110,23 +124,19 @@ namespace ReplayKitSetup
                 }
                 chosen = LanguageMatch.WindowsDefault(codes);
             }
-            if (LanguageMatch.IsSupported(chosen) && chosen != LanguageMatch.English)
-                ReadMessages(zip, messagePath, chosen);
-            if (!files.TryGetValue(chosen, out ZipArchiveEntry file) || string.Equals(chosen, LanguageMatch.English, StringComparison.OrdinalIgnoreCase)) return;
-            if (file.Length > MaxLocaleBytes) throw new InvalidDataException("translation file is too large");
-            using Stream stream = file.Open();
-            table = MessageCatalog.ReadTable(stream);
-            code = chosen;
+            if (!LanguageMatch.IsSupported(chosen) || chosen == LanguageMatch.English) return;
+            if (ReadMessages(zip, messagePath, chosen)) code = chosen;
         }
 
-        private static void ReadMessages(ZipArchive zip, string path, string language)
+        private static bool ReadMessages(ZipArchive zip, string path, string language)
         {
             var entry = zip.GetEntry(path + language + ".json");
-            if (entry == null || entry.Length > MaxLocaleBytes) return;
+            if (entry == null || entry.Length > MaxLocaleBytes) return false;
             using Stream stream = entry.Open();
             var catalog = MessageCatalog.Read(stream);
-            if (language == LanguageMatch.English) messages = catalog;
+            if (language == LanguageMatch.English) { messages = catalog; english = (JObject)catalog.DeepClone(); }
             else MessageCatalog.Overlay(messages, catalog);
+            return true;
         }
 
         // [General] Language of the obs user.ini, read only; null when it is missing or not a language code
@@ -162,19 +172,6 @@ namespace ReplayKitSetup
             if (stream == null) return null;
             using var reader = new StreamReader(stream, Encoding.UTF8);
             return reader.ReadToEnd();
-        }
-
-        private static string TableJson()
-        {
-            var sb = new StringBuilder("{");
-            bool first = true;
-            foreach (KeyValuePair<string, string> pair in table)
-            {
-                if (!first) sb.Append(',');
-                first = false;
-                sb.Append(JsonString(pair.Key)).Append(':').Append(JsonString(pair.Value));
-            }
-            return sb.Append('}').ToString();
         }
 
         // json string safe inside a script element: angle brackets, ampersands and the line separators are escaped so nothing can close the script

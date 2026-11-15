@@ -243,7 +243,7 @@ namespace ReplayKitHelper
         // keep false is for the deletes whose point is the space they free, which a clip kept in deleted history would not give back
         internal static DeleteResult DeleteClip(SafeClipPath selected, long? size = null, DateTime? writeTime = null, bool keep = true)
         {
-            if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = "Clip not found" };
+            if (selected == null || !File.Exists(selected.Full)) return new DeleteResult { Status = 404, Message = Locales.Message("common.clipNotFound") };
             string root = LibraryRoot(Path.GetDirectoryName(selected.Full));
             bool kept = false;
             string requestId = UploadState.NewRequestId();
@@ -259,7 +259,7 @@ namespace ReplayKitHelper
                         if (safe == null || !string.Equals(safe.Full, selected.Full, StringComparison.OrdinalIgnoreCase) ||
                             !current.Exists || (size.HasValue && current.Length != size.Value) ||
                             (writeTime.HasValue && current.LastWriteTimeUtc != writeTime.Value))
-                            throw new IOException("The selected clip changed; review the library again.");
+                            throw new IOException(Locales.Message("common.theSelectedClipChangedReviewThe"));
                         // its row of the clips db goes with it, so a restore gets back its link, game and compression marker
                         var record = keep ? ClipStore.ReadFolder(AppConfig.GetDbPath(), root, db => (db[selected.Name] as JObject)?.DeepClone() as JObject) : null;
                         kept = keep && DeletedHistory.Keep(selected.Full, "clip", root, record);
@@ -483,7 +483,7 @@ namespace ReplayKitHelper
         public static JObject DuplicateClip(SafeClipPath src)
         {
             if (src == null || !File.Exists(src.Full))
-                return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") };
             try
             {
                 string dir = Path.GetDirectoryName(src.Full);
@@ -784,7 +784,7 @@ namespace ReplayKitHelper
             {
                 string folder = AppConfig.GetClipDir();
                 if (!string.Equals(folderKey, ClipStore.FolderKey(folder), StringComparison.Ordinal))
-                    throw new InvalidOperationException("The clip folder changed. Reload the favorites before saving.");
+                    throw new InvalidOperationException(Locales.Message("clips.theClipFolderChangedReloadThe"));
                 var safe = new JObject
                 {
                     ["favorites"] = new JArray(NormalizeFavoriteClipNames(state?["favorites"])),
@@ -795,7 +795,7 @@ namespace ReplayKitHelper
                 ClipStore.UpdateFolder(path, folder, data =>
                 {
                     if (!string.Equals(state?.Value<string>("revision"), ClipUiRevision(data), StringComparison.Ordinal))
-                        throw new InvalidOperationException("Favorites changed in another view. Reload them before saving.");
+                        throw new InvalidOperationException(Locales.Message("clips.favoritesChangedInAnotherViewReload"));
                     data["favorites"] = safe["favorites"].DeepClone();
                     data["sort"] = safe["sort"].DeepClone();
                     return true;
@@ -870,10 +870,10 @@ namespace ReplayKitHelper
 
         public static JObject SaveClipUiStateFromJson(string body)
         {
-            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Clip state body is required.");
+            if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException(Locales.Message("clips.clipStateBodyIsRequired"));
             JObject incoming;
             try { incoming = JObject.Parse(body); }
-            catch (JsonException) { throw new InvalidOperationException("Invalid clip state."); }
+            catch (JsonException) { throw new InvalidOperationException(Locales.Message("clips.invalidClipState")); }
             var state = SaveClipUiState(incoming, incoming.Value<string>("folderKey"));
             return new JObject { ["ok"] = true, ["revision"] = ClipUiRevision(state), ["state"] = state };
         }

@@ -58,20 +58,20 @@ namespace ReplayKitHelper
 
         internal static string AudioPickerTitle => Locales.Message("picker.importAudio");
         // the containers of video are listed too, since the sound of a video file can be taken out and used
-        internal static string AudioFilter => Locales.T("Audio files") + "|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|" + AllFiles;
+        internal static string AudioFilter => Locales.Message("helper.audioFiles") + "|*.mp3;*.wav;*.ogg;*.oga;*.opus;*.flac;*.m4a;*.aac;*.wma;*.aif;*.aiff;*.mka;*.mp2;*.ac3;*.amr;*.au;*.caf;*.webm;*.mp4;*.mov;*.mkv|" + AllFiles;
 
         internal static string MediaPickerTitle => Locales.Message("picker.importMedia");
-        internal static string MediaFilter => Locales.T("GIFs and images") + "|*.gif;*.png;*.jpg;*.jpeg|" + AllFiles;
+        internal static string MediaFilter => Locales.Message("common.gifsAndImages") + "|*.gif;*.png;*.jpg;*.jpeg|" + AllFiles;
 
         internal static string VideoPickerTitle => Locales.Message("picker.importVideo");
-        internal static string ImagesFilter => Locales.T("Images") + "|*.png;*.jpg;*.jpeg;*.bmp;*.gif|" + AllFiles;
+        internal static string ImagesFilter => Locales.Message("common.images") + "|*.png;*.jpg;*.jpeg;*.bmp;*.gif|" + AllFiles;
 
-        internal static string IconFilter => Locales.T("Images (*.ico;*.png;*.jpg;*.bmp)") + "|*.ico;*.png;*.jpg;*.jpeg;*.bmp|" + AllFiles;
+        internal static string IconFilter => Locales.Message("helper.imagesIcoPngJpgBmp") + "|*.ico;*.png;*.jpg;*.jpeg;*.bmp|" + AllFiles;
 
-        internal static string VideoFilter => Locales.T("Videos") + "|*.mp4;*.m4v;*.mov;*.mkv;*.webm|" + AllFiles;
+        internal static string VideoFilter => Locales.Message("common.videos") + "|*.mp4;*.m4v;*.mov;*.mkv;*.webm|" + AllFiles;
 
         // the catch-all filter entry shared by every picker, pattern kept
-        private static string AllFiles => Locales.T("All files (*.*)") + "|*.*";
+        private static string AllFiles => Locales.Message("helper.allFiles") + "|*.*";
 
         internal static string[] PickAudioFiles() => PickFiles(AudioPickerTitle, AudioFilter);
 

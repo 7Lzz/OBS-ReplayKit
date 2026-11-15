@@ -20,8 +20,8 @@ namespace ReplayKitHelper
         {
             if (!(sourceEnd > sourceStart) || !(processedEnd > processedStart) ||
                 (ranges.Count > 0 && (sourceStart < ranges[ranges.Count - 1].SourceEnd || processedStart < ranges[ranges.Count - 1].ProcessedEnd)))
-                throw new InvalidDataException("The speech detector returned inconsistent speech ranges.");
-            if (ranges.Count >= 20000) throw new InvalidDataException("The speech map is too large.");
+                throw new InvalidDataException(Locales.Message("editor.theSpeechDetectorReturnedInconsistentSpeech"));
+            if (ranges.Count >= 20000) throw new InvalidDataException(Locales.Message("editor.theSpeechMapIsTooLarge"));
             ranges.Add(new Range { SourceStart = sourceStart, SourceEnd = sourceEnd, ProcessedStart = processedStart, ProcessedEnd = processedEnd });
         }
 
@@ -29,7 +29,7 @@ namespace ReplayKitHelper
         public int PieceAt(double processed)
         {
             if (ranges.Count == 0 || double.IsNaN(processed) || double.IsInfinity(processed))
-                throw new InvalidDataException("Speech-word timings could not be aligned with the original audio.");
+                throw new InvalidDataException(Locales.Message("editor.speechWordTimingsCouldNotBe"));
             int low = 0, high = ranges.Count;
             while (low < high)
             {
@@ -52,7 +52,7 @@ namespace ReplayKitHelper
         // the stretch of the clip audio a piece covers, in seconds of what was listened to
         public void SourceRange(int index, out double start, out double end)
         {
-            if (index < 0 || index >= ranges.Count) throw new InvalidDataException("Unknown speech range.");
+            if (index < 0 || index >= ranges.Count) throw new InvalidDataException(Locales.Message("editor.unknownSpeechRange"));
             start = ranges[index].SourceStart;
             end = ranges[index].SourceEnd;
         }

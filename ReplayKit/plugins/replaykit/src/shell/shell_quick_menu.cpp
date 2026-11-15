@@ -44,13 +44,13 @@ QJsonArray GlobalActions()
 {
 	const bool clipping = ClipBufferActive();
 	QJsonArray out{
-		Action(QStringLiteral("save-clip"), Tr("Save clip"), QStringLiteral("quick/save-clip"), !clipping),
-		obs_frontend_recording_active() ? Action(QStringLiteral("record"), Tr("Stop recording"), QStringLiteral("quick/stop"))
-						: Action(QStringLiteral("record"), Tr("Start recording"), QStringLiteral("quick/record")),
-		Action(QStringLiteral("screenshot"), Tr("Take screenshot"), QStringLiteral("quick/screenshot")),
+		Action(QStringLiteral("save-clip"), TrMessage("shell.saveClip"), QStringLiteral("quick/save-clip"), !clipping),
+		obs_frontend_recording_active() ? Action(QStringLiteral("record"), TrMessage("common.stopRecording"), QStringLiteral("quick/stop"))
+						: Action(QStringLiteral("record"), TrMessage("common.startRecording"), QStringLiteral("quick/record")),
+		Action(QStringLiteral("screenshot"), TrMessage("shell.takeScreenshot"), QStringLiteral("quick/screenshot")),
 	};
 	if (g_deletedHistoryOn && !ShellEditorOpen(g_shellView) && !ShellEditorOpen(ShellView::Clips))
-		out.append(Action(QStringLiteral("deleted-history"), Tr("Deleted history"), QStringLiteral("action/trash")));
+		out.append(Action(QStringLiteral("deleted-history"), TrMessage("common.deletedHistory"), QStringLiteral("action/trash")));
 	return out;
 }
 
@@ -59,13 +59,13 @@ QJsonArray ViewActions(const QString &view, const std::string &pageList)
 {
 	QJsonArray out;
 	if (view == QLatin1String("projector")) {
-		out.append(Action(QStringLiteral("preview"), ShellPreviewTarget() ? Tr("Turn preview off") : Tr("Turn preview on"),
+		out.append(Action(QStringLiteral("preview"), ShellPreviewTarget() ? TrMessage("shell.turnPreviewOff") : TrMessage("shell.turnPreviewOn"),
 				  ShellPreviewTarget() ? QStringLiteral("nav/projector-eye-off") : QStringLiteral("nav/projector-eye")));
 		return out;
 	}
 	if (view == QLatin1String("obs-settings")) {
-		out.append(Action(QStringLiteral("obs-save"), Tr("Save"), QStringLiteral("action/save")));
-		out.append(Action(QStringLiteral("obs-cancel"), Tr("Cancel"), QStringLiteral("editor/close")));
+		out.append(Action(QStringLiteral("obs-save"), TrMessage("common.save"), QStringLiteral("action/save")));
+		out.append(Action(QStringLiteral("obs-cancel"), TrMessage("common.cancel"), QStringLiteral("editor/close")));
 		return out;
 	}
 	// the helper answers with the whole http response, and the list is the body after the headers
@@ -180,7 +180,7 @@ void ShellQuickMenu::Open(ShellTitleButton *button, const std::string &pageList)
 	const int height = 2 + kHeadH + kListPad * 2 + rows * kRowH + qMax(0, int(groups.size()) - 1) * kSepH;
 	m_panel->SetSize(QSize(kMenuWidth, height));
 
-	const QJsonObject menu{{"view", view}, {"title", Tr("Quick actions")}, {"groups", groups}};
+	const QJsonObject menu{{"view", view}, {"title", TrMessage("common.quickActions")}, {"groups", groups}};
 	const QString json = QString::fromUtf8(QJsonDocument(menu).toJson(QJsonDocument::Compact));
 	// joined rather than filled in with arg, since the encoded list is full of %2C and %22 that arg would take for its own markers
 	const QString url = HelperUrl(QStringLiteral("/quick-actions-view#menu=")) + QString::fromLatin1(QUrl::toPercentEncoding(json)) +

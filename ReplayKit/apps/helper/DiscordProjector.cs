@@ -59,7 +59,7 @@ namespace ReplayKitHelper
         public static SizeResult GetObsCanvasSize()
         {
             var videoSettings = ObsWebSocket.InvokeRequest("GetVideoSettings", null, 3000);
-            if (!videoSettings.Ok) return new SizeResult { Ok = false, Message = Locales.T("OBS video settings unavailable: {error}", "error", videoSettings.Message) };
+            if (!videoSettings.Ok) return new SizeResult { Ok = false, Message = Locales.Message("screenshare.obsVideoSettingsUnavailableError", "error", videoSettings.Message) };
 
             int baseWidth = GetObjectInt(videoSettings.Data, "baseWidth");
             int baseHeight = GetObjectInt(videoSettings.Data, "baseHeight");
@@ -69,7 +69,7 @@ namespace ReplayKitHelper
             int outputHeight = GetObjectInt(videoSettings.Data, "outputHeight");
             if (outputWidth > 0 && outputHeight > 0) return new SizeResult { Ok = true, Width = outputWidth, Height = outputHeight, Source = "obs_output" };
 
-            return new SizeResult { Ok = false, Message = "OBS video settings did not include a valid canvas or output size." };
+            return new SizeResult { Ok = false, Message = Locales.Message("screenshare.obsVideoSettingsDidNotInclude") };
         }
 
         public static SizeResult ResolveProjectorWindowSize(JObject settings, MonitorWorkArea workArea, bool preferSourceMonitor)
@@ -98,7 +98,7 @@ namespace ReplayKitHelper
             string fallbackWarning = canvas.Message + " Falling back to Windows primary monitor size.";
             if (width <= 0) width = sourceWidth;
             if (height <= 0) height = sourceHeight;
-            if (width < 1 || height < 1) return new SizeResult { Ok = false, Message = "Could not resolve a valid projector window size." };
+            if (width < 1 || height < 1) return new SizeResult { Ok = false, Message = Locales.Message("screenshare.couldNotResolveAValidProjector") };
             return new SizeResult { Ok = true, Width = width, Height = height, Source = "primary_monitor_fallback", Warnings = new List<string> { fallbackWarning } };
         }
 
@@ -123,8 +123,8 @@ namespace ReplayKitHelper
         {
             System.Windows.Forms.Screen[] screens;
             try { screens = System.Windows.Forms.Screen.AllScreens; }
-            catch (Exception ex) when (ex is InvalidOperationException || ex is ExternalException) { return new MonitorWorkArea { Ok = false, Message = Locales.T("Could not read monitor work areas: {error}", "error", ex.Message) }; }
-            if (screens.Length < 1) return new MonitorWorkArea { Ok = false, Message = "No real monitor work area was reported by Windows." };
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ExternalException) { return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.couldNotReadMonitorWorkAreas", "error", ex.Message) }; }
+            if (screens.Length < 1) return new MonitorWorkArea { Ok = false, Message = Locales.Message("screenshare.noRealMonitorWorkAreaWas") };
 
             int idx = monitorIndex <= 0 ? screens.Length - 1 : Math.Max(1, monitorIndex) - 1;
             if (idx >= screens.Length) idx = screens.Length - 1;
@@ -235,7 +235,7 @@ namespace ReplayKitHelper
         public static ParkedRect GetDiscordProjectorParkedRect(MonitorWorkArea workArea, int windowWidth, int windowHeight, string edge, int visiblePixels)
         {
             int left = workArea.Left, top = workArea.Top, right = workArea.Right, bottom = workArea.Bottom;
-            if (right <= left || bottom <= top) throw new InvalidOperationException("Monitor work area is invalid.");
+            if (right <= left || bottom <= top) throw new InvalidOperationException(Locales.Message("screenshare.monitorWorkAreaIsInvalid"));
 
             string edgeValue = (edge ?? "").Trim().ToLowerInvariant();
             if (edgeValue != "right" && edgeValue != "left" && edgeValue != "top" && edgeValue != "bottom")
@@ -256,7 +256,7 @@ namespace ReplayKitHelper
             }
             int sourceWidth = workArea.HasSourceBounds ? workArea.SourceBoundsWidth : screenWidth;
             int sourceHeight = workArea.HasSourceBounds ? workArea.SourceBoundsHeight : screenHeight;
-            if (sourceWidth < 1 || sourceHeight < 1) throw new InvalidOperationException("Projector source monitor bounds are invalid.");
+            if (sourceWidth < 1 || sourceHeight < 1) throw new InvalidOperationException(Locales.Message("screenshare.projectorSourceMonitorBoundsAreInvalid"));
             int autoWidth = Math.Max(1, sourceWidth);
             int autoHeight = Math.Max(1, sourceHeight);
             int width = windowWidth <= 0 ? Math.Max(1, autoWidth) : Math.Max(1, windowWidth);
@@ -294,7 +294,7 @@ namespace ReplayKitHelper
                 .ThenBy(c => c.Preference)
                 .ThenBy(c => c.Corner, StringComparer.Ordinal)
                 .FirstOrDefault();
-            if (best == null) throw new InvalidOperationException("Could not resolve a safe projector parking corner.");
+            if (best == null) throw new InvalidOperationException(Locales.Message("screenshare.couldNotResolveASafeProjector"));
 
             int hostX = screenLeft;
             int hostY = screenTop;
@@ -324,7 +324,7 @@ namespace ReplayKitHelper
         public static InspectRect GetDiscordProjectorInspectRect(MonitorWorkArea workArea, int windowWidth, int windowHeight)
         {
             int left = workArea.Left, top = workArea.Top, right = workArea.Right, bottom = workArea.Bottom;
-            if (right <= left || bottom <= top) throw new InvalidOperationException("Monitor work area is invalid.");
+            if (right <= left || bottom <= top) throw new InvalidOperationException(Locales.Message("screenshare.monitorWorkAreaIsInvalid"));
 
             int workWidth = Math.Max(1, right - left);
             int workHeight = Math.Max(1, bottom - top);
@@ -422,7 +422,7 @@ namespace ReplayKitHelper
             if (Server.State.ReplaykitDiscordProjectorPendingBaseline == null)
             {
                 var candidates = GetObsWindowCandidates();
-                if (candidates == null) return new OpenProjectorResult { Ok = false, Message = "OBS projector window information is unavailable." };
+                if (candidates == null) return new OpenProjectorResult { Ok = false, Message = Locales.Message("screenshare.obsProjectorWindowInformationIsUnavailable") };
                 Server.State.ReplaykitDiscordProjectorPendingBaseline = candidates;
             }
             var baseline = Server.State.ReplaykitDiscordProjectorPendingBaseline;
@@ -432,7 +432,7 @@ namespace ReplayKitHelper
             if (!PipeClient.OpenShareProjectorAndWait(5000))
             {
                 Log.Write("warn: the native plugin did not open the share projector");
-                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.T("Opening OBS Windowed Projector failed: {error}", "error", "the native plugin did not answer") };
+                return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = false, Message = Locales.Message("screenshare.openingObsWindowedProjectorFailedError", "error", "the native plugin did not answer") };
             }
 
             // 24x250ms=6s -- a slow pc that misses a shorter window would report "not found" while obs was still mid-create, leaving that projector un-renamed and un-hidden until some later cycle happened to trip over it. matching against baseline (not title text) so this works regardless of obss ui language -- a non-english install localizes the windows own title, but never localizes what obs process it belongs to or when it appeared, which is all this actually checks now.
@@ -443,7 +443,7 @@ namespace ReplayKitHelper
                 if (newHwnd != 0)
                 {
                     if (!ProjectorNative.PreParkProjectorWindow(newHwnd, title))
-                        return new OpenProjectorResult { Ok = false, Message = "The OBS projector window could not be confirmed or parked." };
+                        return new OpenProjectorResult { Ok = false, Message = Locales.Message("screenshare.theObsProjectorWindowCouldNot") };
                     int extra = ProjectorNative.CloseDuplicateProjectorWindows(title, newHwnd);
                     if (extra > 0) Log.Write("Closed " + extra + " leaked Discord projector window(s)");
                     CloseStrayProjectorWindows(baseline, newHwnd);
@@ -453,7 +453,7 @@ namespace ReplayKitHelper
                 }
             }
             Log.Write("warn: OBS Windowed Projector opened but never appeared for title '" + title + "' after 6s (still watching -- next check will catch it late instead of opening another)");
-            return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = "OBS Windowed Projector was opened, but its window could not be found." };
+            return new OpenProjectorResult { Ok = false, Hwnd = 0, Opened = true, Message = Locales.Message("screenshare.obsWindowedProjectorWasOpenedBut") };
         }
 
         private static JObject ParkedRectToJson(ParkedRect r) => new JObject
@@ -517,7 +517,7 @@ namespace ReplayKitHelper
             {
                 disablePending = false;
                 if (ProjectorNative.OperationPending())
-                    return new JObject { ["ok"] = false, ["message"] = "The previous projector window change is still finishing." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
                 Server.State.ReplaykitDiscordProjectorInspectMode = false;
 
                 var warnings = new List<string>();
@@ -562,7 +562,7 @@ namespace ReplayKitHelper
                 bool parked = alreadyPlaced || ProjectorNative.RestoreResizeTitleChromeGhosted(open.Hwnd, title, rect.X, rect.Y, rect.Width, rect.Height, true);
                 if (!parked)
                 {
-                    string msg = "The OBS projector window change did not finish with a valid sharing window.";
+                    string msg = Locales.Message("screenshare.theObsProjectorWindowChangeDid");
                     Log.Write("warn: " + msg);
                     warnings.Add(msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["warnings"] = new JArray(warnings) };
@@ -572,7 +572,7 @@ namespace ReplayKitHelper
                 const bool hideProjectorTaskbar = true;
                 if (hideProjectorTaskbar && !ProjectorNative.SetProjectorTaskbarHidden(open.Hwnd, true))
                 {
-                    string msg = "OBS projector window was moved, but Windows rejected the taskbar-hide request.";
+                    string msg = Locales.Message("screenshare.obsProjectorWindowWasMovedBut");
                     warnings.Add(msg);
                     Log.Write("warn: " + msg);
                 }
@@ -600,15 +600,15 @@ namespace ReplayKitHelper
             parkedWindow = null;
             if (settings == null) settings = ReplaykitSettings.ReadSettings();
             string mode = settings["discord_output_mode"]?.Value<string>() ?? "";
-            if (mode != "projector") return new JObject { ["ok"] = false, ["message"] = "Discord projector is not the active Share Preview mode.", ["warnings"] = new JArray() };
+            if (mode != "projector") return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordProjectorIsNotTheActive"), ["warnings"] = new JArray() };
             if (!(settings["discord_screenshare_enabled"]?.Value<bool>() ?? true))
-                return new JObject { ["ok"] = false, ["message"] = "Discord screenshare support is disabled.", ["warnings"] = new JArray() };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.discordScreenshareSupportIsDisabled"), ["warnings"] = new JArray() };
 
             lock (Server.State.ProjectorLock)
             {
                 disablePending = false;
                 if (ProjectorNative.OperationPending())
-                    return new JObject { ["ok"] = false, ["message"] = "The previous projector window change is still finishing." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
                 var warnings = new List<string>();
                 string title = string.IsNullOrWhiteSpace(titleOverride) ? GetProjectorShareTitle(settings) : titleOverride;
                 var open = OpenIfMissing(settings, title);
@@ -644,7 +644,7 @@ namespace ReplayKitHelper
                 bool moved = ProjectorNative.RestoreResizeTitleAndChrome(open.Hwnd, title, rect.X, rect.Y, rect.Width, rect.Height, false);
                 if (!moved)
                 {
-                    string msg = "OBS projector window was found, but Windows rejected the move/resize request.";
+                    string msg = Locales.Message("screenshare.obsProjectorWindowWasFoundBut");
                     warnings.Add(msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["warnings"] = new JArray(warnings) };
                 }
@@ -672,12 +672,12 @@ namespace ReplayKitHelper
                 if (ProjectorNative.OperationPending())
                 {
                     disablePending = true;
-                    return new JObject { ["ok"] = false, ["message"] = "The previous projector window change is still finishing." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.thePreviousProjectorWindowChangeIs") };
                 }
                 if (GetObsWindowCandidates() == null)
                 {
                     disablePending = true;
-                    return new JObject { ["ok"] = false, ["message"] = "OBS projector window information is unavailable." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("screenshare.obsProjectorWindowInformationIsUnavailable") };
                 }
                 disablePending = false;
                 Server.State.ReplaykitDiscordProjectorInspectMode = false;
@@ -702,7 +702,7 @@ namespace ReplayKitHelper
                     }
                 }
 
-                string msg = "OBS projector window was found, but it did not close after repeated attempts.";
+                string msg = Locales.Message("screenshare.obsProjectorWindowWasFoundBut2");
                 warnings.Add(msg);
                 return new JObject { ["ok"] = false, ["hwnd"] = hwnd, ["title"] = title, ["message"] = msg, ["warnings"] = new JArray(warnings) };
             }
@@ -784,12 +784,12 @@ namespace ReplayKitHelper
             }
             catch (Exception ex) when (ex is System.Security.SecurityException || ex is IOException || ex is InvalidOperationException)
             {
-                return new AudioDeviceResult { Ok = false, Message = Locales.T("Could not inspect OBS Stream Audio playback endpoint: {error}", "error", ex.Message) };
+                return new AudioDeviceResult { Ok = false, Message = Locales.Message("screenshare.couldNotInspectObsStreamAudio", "error", ex.Message) };
             }
 
             var selected = candidates.OrderBy(c => c.Rank).ThenBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault();
             if (selected.Id == null)
-                return new AudioDeviceResult { Ok = false, Message = "OBS Stream Audio playback endpoint is not active. Install or enable VB-Audio Cable, then re-run Share Preview." };
+                return new AudioDeviceResult { Ok = false, Message = Locales.Message("screenshare.obsStreamAudioPlaybackEndpointIs") };
             return new AudioDeviceResult { Ok = true, Id = selected.Id, Source = "obs_stream_audio", Name = selected.Name };
         }
 

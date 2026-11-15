@@ -114,7 +114,7 @@ namespace ReplayKitHelper
                     ? Path.GetFullPath(Path.Combine(appData, "obs-studio"))
                     : Path.GetFullPath(Path.Combine(AppConfig.GetUserProfile(), "AppData", "Roaming", "obs-studio"));
                 if (!string.Equals(resolvedRoot, expectedRoot, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("OBS config root did not resolve to the expected AppData path.");
+                    throw new InvalidOperationException(Locales.Message("settings.obsConfigRootDidNotResolve"));
 
                 string confirmOnExit = disabled ? "false" : "true";
                 var changed = new List<string>();
@@ -143,7 +143,7 @@ namespace ReplayKitHelper
             var allowed = new HashSet<string> { "/requestsoverride", "PROCESS", "obs64.exe", "DISPLAY", "SYSTEM", "AWAYMODE" };
             foreach (var arg in arguments)
             {
-                if (!allowed.Contains(arg)) return new JObject { ["ok"] = false, ["message"] = "Invalid power configuration request." };
+                if (!allowed.Contains(arg)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.invalidPowerConfigurationRequest") };
             }
             try
             {
@@ -209,7 +209,7 @@ namespace ReplayKitHelper
                 using var process = Process.Start(psi);
                 if (process == null) return new JObject { ["ok"] = false, ["message"] = "powercfg could not start." };
                 if (!process.WaitForExit(120000)) return new JObject { ["ok"] = false, ["message"] = "powercfg did not finish." };
-                return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = Locales.T("powercfg exited {code}.", "code", process.ExitCode) };
+                return process.ExitCode == 0 ? new JObject { ["ok"] = true } : new JObject { ["ok"] = false, ["message"] = Locales.Message("settings.powercfgExitedCode", "code", process.ExitCode) };
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
@@ -229,14 +229,14 @@ namespace ReplayKitHelper
                 string appData = Environment.GetEnvironmentVariable("APPDATA");
                 if (!string.IsNullOrEmpty(appData)) folder = Path.Combine(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
             }
-            if (string.IsNullOrWhiteSpace(folder)) throw new InvalidOperationException("Windows Startup folder was not found.");
+            if (string.IsNullOrWhiteSpace(folder)) throw new InvalidOperationException(Locales.Message("settings.windowsStartupFolderWasNotFound"));
             return Path.Combine(folder, "OBS ReplayKit.lnk");
         }
 
         internal static string GetObsStartupTarget()
         {
             string obs = Constants.ResolveObsExe();
-            if (string.IsNullOrEmpty(obs) || !File.Exists(obs)) throw new InvalidOperationException("OBS executable was not found.");
+            if (string.IsNullOrEmpty(obs) || !File.Exists(obs)) throw new InvalidOperationException(Locales.Message("settings.obsExecutableWasNotFound"));
             return obs;
         }
 
@@ -262,7 +262,7 @@ namespace ReplayKitHelper
                 shortcut.Arguments = ObsLaunch.Arguments;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(obsPath);
                 shortcut.IconLocation = obsPath + ",0";
-                shortcut.Description = Locales.T("Start OBS ReplayKit when Windows signs in.");
+                shortcut.Description = Locales.Message("settings.startObsReplaykitWhenWindowsSigns");
                 shortcut.Save();
             }
             finally
@@ -323,7 +323,7 @@ namespace ReplayKitHelper
             var result = GetObsProfileParameterSafe(category, name);
             if (!result.Ok) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = result.Message };
             var value = result.Data?["parameterValue"];
-            if (value == null || value.Type == JTokenType.Null) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = Locales.T("OBS did not return {category}.{name}.", "category", category, "name", name) };
+            if (value == null || value.Type == JTokenType.Null) return new JObject { ["ok"] = false, ["value"] = "", ["message"] = Locales.Message("settings.obsDidNotReturnCategoryName", "category", category, "name", name) };
             return new JObject { ["ok"] = true, ["value"] = value.Value<string>(), ["message"] = "" };
         }
 
@@ -335,9 +335,9 @@ namespace ReplayKitHelper
             deviceId = (deviceId ?? "").Trim();
             deviceName = (deviceName ?? "").Trim();
             if (string.IsNullOrWhiteSpace(deviceId) || string.IsNullOrWhiteSpace(deviceName))
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = "OBS monitoring device id/name is missing." };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.obsMonitoringDeviceIdNameIs") };
             if (deviceId.Length > 512 || deviceName.Length > 256 || Regex.IsMatch(deviceId, @"[\x00-\x1F]") || Regex.IsMatch(deviceName, @"[\x00-\x1F]"))
-                return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = "OBS monitoring device id/name is invalid." };
+                return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.obsMonitoringDeviceIdNameIs2") };
 
             int attempts = Math.Max(1, Math.Min(10, maxAttempts));
             string lastMessage = "";
@@ -380,7 +380,7 @@ namespace ReplayKitHelper
                 lastMessage = "OBS still reports monitoring device '" + actualName + "' (" + actualId + ").";
             }
 
-            return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.T("Could not set OBS monitoring device to {device} after {attempts} attempts. {error}", "device", deviceName, "attempts", attempts, "error", lastMessage) };
+            return new JObject { ["ok"] = false, ["applied"] = new JArray(), ["message"] = Locales.Message("settings.couldNotSetObsMonitoringDevice", "device", deviceName, "attempts", attempts, "error", lastMessage) };
         }
 
         // -- keybind <-> basic.ini hotkey json --
@@ -445,7 +445,7 @@ namespace ReplayKitHelper
             var result = ObsWebSocket.InvokeRequest("GetVersion");
             if (!result.Ok) return result;
             if (!Version.TryParse(result.Data?["obsVersion"]?.Value<string>(), out var version))
-                return new ObsWebSocketResult { Ok = false, Message = "OBS version is invalid." };
+                return new ObsWebSocketResult { Ok = false, Message = Locales.Message("settings.obsVersionIsInvalid") };
             return GetObsProfileParameterSafe("Hotkeys", version.Major >= 33 ? "OBSBasic.SaveReplayBuffer" : "ReplayBuffer");
         }
 

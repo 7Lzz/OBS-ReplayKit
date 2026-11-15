@@ -49,7 +49,7 @@ protected:
 private:
 	static QFont LabelFont();
 	void SizeToLabel();
-	QString Label() const { return (m_kind == Kind::Obs ? Tr("OBS {version} Available", {{"version", m_version}}) : Tr("ReplayKit {version} Available", {{"version", m_version}})); }
+	QString Label() const { return (m_kind == Kind::Obs ? TrMessage("shell.obsVersionAvailable", {{"version", m_version}}) : TrMessage("shell.replaykitVersionAvailable", {{"version", m_version}})); }
 
 	Kind m_kind;
 	QString m_version;

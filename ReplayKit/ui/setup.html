@@ -219,94 +219,95 @@
 <!-- color picker lives outside .shell so its injected style/div/script are not extra grid children of the 3-row shell -->
 <!--#include color-picker-->
 <!--#include tooltip-->
+<!--#include hotkey-keys-->
 <div class="shell">
   <div class="wiz-head">
     <div class="wiz-tabs" id="crumbs">
       <button class="tab" type="button" data-step="1">
         <svg data-i="nav/tab-welcome" viewBox="0 0 24 24" aria-hidden="true"></svg>
-        <span class="tab-text">Welcome</span>
+        <span class="tab-text" data-i18n="wizard.welcome"></span>
       </button>
       <button class="tab" type="button" data-step="2">
         <svg data-i="nav/tab-output" viewBox="0 0 16 16" aria-hidden="true"></svg>
-        <span class="tab-text">Recording</span>
+        <span class="tab-text" data-i18n="common.recording"></span>
       </button>
       <button class="tab" type="button" data-step="3">
         <svg data-i="action/content-cut" viewBox="0 0 24 24" aria-hidden="true"></svg>
-        <span class="tab-text">Clip length</span>
+        <span class="tab-text" data-i18n="wizard.clipLength"></span>
       </button>
       <button class="tab" type="button" data-step="4">
         <svg data-i="audio/microphone" viewBox="0 0 24 24" aria-hidden="true"></svg>
-        <span class="tab-text">Microphone</span>
+        <span class="tab-text" data-i18n="common.microphone"></span>
       </button>
       <button class="tab" type="button" data-step="5">
         <svg data-i="nav/tab-hotkeys" viewBox="0 0 16 16" aria-hidden="true"></svg>
-        <span class="tab-text">Hotkeys</span>
+        <span class="tab-text" data-i18n="common.hotkeys"></span>
       </button>
       <button class="tab" type="button" data-step="6">
         <svg data-i="nav/tab-overlay" viewBox="0 0 16 16" aria-hidden="true"></svg>
-        <span class="tab-text">Overlay</span>
+        <span class="tab-text" data-i18n="common.overlay"></span>
       </button>
       <button class="tab" type="button" data-step="7">
         <svg data-i="nav/tab-appearance" viewBox="0 0 16 16" aria-hidden="true"></svg>
-        <span class="tab-text">Appearance</span>
+        <span class="tab-text" data-i18n="common.appearance"></span>
       </button>
     </div>
   </div>
 
   <div class="box">
     <section class="panel" data-step="1" hidden>
-      <div class="box-title">Welcome to OBS ReplayKit</div>
-      <div class="box-lead">A few quick choices and you are set. Everything here can be changed later in ReplayKit Settings, which opens from the OBS window or the tray menu.</div>
+      <div class="box-title" data-i18n="wizard.welcomeToObsReplaykit"></div>
+      <div class="box-lead" data-i18n="wizard.aFewQuickChoicesAndYou"></div>
       <div class="form-row">
-        <div class="label">Language <span class="control-note">The language of ReplayKit and OBS. OBS restarts in it when you finish.</span></div>
-        <div class="field-wrap"><div class="combo" id="language" tabindex="0" role="combobox" aria-expanded="false" aria-label="Language"><button class="combo-button" type="button"><span class="combo-label" translate="no"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox" translate="no"></div></div></div>
+        <div class="label"><span data-i18n="common.language"></span> <span class="control-note" data-i18n="wizard.theLanguageOfReplaykitAndObs"></span></div>
+        <div class="field-wrap"><div class="combo" id="language" tabindex="0" role="combobox" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><button class="combo-button" type="button"><span class="combo-label" translate="no"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox" translate="no"></div></div></div>
       </div>
     </section>
 
     <section class="panel" data-step="2" hidden>
-      <div class="box-title">Recording</div>
+      <div class="box-title" data-i18n="common.recording"></div>
       <div class="form-row">
-        <div class="label">Recording Path</div>
+        <div class="label" data-i18n="common.recordingPath"></div>
         <div class="field-wrap">
           <input class="text-input" id="clipDir" type="text" spellcheck="false" placeholder="C:\Users\You\Videos" translate="no">
-          <button class="icon-btn field-browse" type="button" id="browseClipDir" title="Choose folder">
+          <button class="icon-btn field-browse" type="button" id="browseClipDir" title="Choose folder" data-i18n-title="common.chooseFolder">
             <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
           </button>
         </div>
       </div>
       <div class="form-row">
-        <div class="label">Display</div>
-        <div class="field-wrap"><div class="combo" id="captureDisplay" tabindex="0" role="combobox" aria-expanded="false" aria-label="Display to capture"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
+        <div class="label" data-i18n="common.display"></div>
+        <div class="field-wrap"><div class="combo" id="captureDisplay" tabindex="0" role="combobox" aria-expanded="false" aria-label="Display to capture" data-i18n-aria-label="common.displayToCapture"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
       </div>
       <div class="form-row">
-        <div class="label">Recording Quality</div>
+        <div class="label" data-i18n="common.recordingQuality"></div>
         <div class="field-wrap"><div class="combo" id="recordingPreset" tabindex="0" role="combobox" aria-expanded="false"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div></div>
       </div>
       <div class="form-row">
         <div></div>
-        <div class="field-wrap"><button class="btn" type="button" id="toggleAdvanced" aria-expanded="false" aria-controls="recordingAdvanced">Show advanced</button></div>
+        <div class="field-wrap"><button class="btn" type="button" id="toggleAdvanced" aria-expanded="false" aria-controls="recordingAdvanced" data-i18n="wizard.showAdvanced"></button></div>
       </div>
       <div id="recordingAdvanced" hidden>
         <div class="form-row">
-          <div class="label">Recording Buffer <span class="control-note">Stores recent gameplay until you save a clip. Disk uses very little RAM and writes to your drive while clipping is on. Memory saves clips fastest but uses more RAM, and can help if Disk causes problems.</span></div>
+          <div class="label"><span data-i18n="common.recordingBuffer"></span> <span class="control-note" data-i18n="common.storesRecentGameplayUntilYouSave"></span></div>
           <div class="field-wrap">
-            <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false" aria-label="Recording buffer"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+            <div class="combo" id="recordingBuffer" tabindex="0" role="combobox" aria-expanded="false" aria-label="Recording buffer" data-i18n-aria-label="wizard.recordingBuffer"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
           </div>
         </div>
       </div>
     </section>
 
     <section class="panel" data-step="3" hidden>
-      <div class="box-title">Clip Length</div>
-      <div class="box-lead">How long each clip is when you press the save hotkey.</div>
+      <div class="box-title" data-i18n="common.clipLength"></div>
+      <div class="box-lead" data-i18n="wizard.howLongEachClipIsWhen"></div>
       <div class="form-row">
-        <div class="label">Clip Length</div>
+        <div class="label" data-i18n="common.clipLength"></div>
         <div class="field-wrap">
           <div class="spin">
             <input class="spin-input" id="replaySeconds" type="text" inputmode="numeric" autocomplete="off">
             <div class="spin-buttons">
-              <button class="spin-btn" type="button" data-spin="up" aria-label="Increase clip length"><svg data-i="nav/chevron-up" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-              <button class="spin-btn" type="button" data-spin="down" aria-label="Decrease clip length"><svg data-i="nav/chevron-down" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+              <button class="spin-btn" type="button" data-spin="up" aria-label="Increase clip length" data-i18n-aria-label="common.increaseClipLength"><svg data-i="nav/chevron-up" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+              <button class="spin-btn" type="button" data-spin="down" aria-label="Decrease clip length" data-i18n-aria-label="common.decreaseClipLength"><svg data-i="nav/chevron-down" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
             </div>
           </div>
         </div>
@@ -314,72 +315,72 @@
     </section>
 
     <section class="panel" data-step="4" hidden>
-      <div class="box-title">Microphone</div>
-      <div class="box-lead">Pick the microphone ReplayKit records and check how you sound. Mic Test lets you hear yourself, and the sensitivity bar shows what gets cut off.</div>
+      <div class="box-title" data-i18n="common.microphone"></div>
+      <div class="box-lead" data-i18n="wizard.pickTheMicrophoneReplaykitRecordsAnd"></div>
       <!--#include mic-controls-->
     </section>
 
     <section class="panel" data-step="5" hidden>
-      <div class="box-title">Hotkeys</div>
-      <div class="box-lead">Click a field, then press the key combo you want. These are global OBS hotkeys.</div>
+      <div class="box-title" data-i18n="common.hotkeys"></div>
+      <div class="box-lead" data-i18n="wizard.clickAFieldThenPressThe"></div>
       <div class="hotkey-grid">
-        <div class="hotkey-section">Clipping</div>
+        <div class="hotkey-section" data-i18n="common.clipping"></div>
         <div class="hotkey-row">
-          <div class="label">Save Clip</div>
-          <div class="hotkey-input" id="clipKeybind" translate="no" tabindex="0" role="textbox" aria-label="Save Clip hotkey"></div>
+          <div class="label" data-i18n="common.saveClip"></div>
+          <div class="hotkey-input" id="clipKeybind" translate="no" tabindex="0" role="textbox" data-i18n-aria-label="settings.saveClipHotkey"></div>
           <div class="hotkey-actions">
-            <button class="icon-btn" type="button" data-reset="clipKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-            <button class="icon-btn" type="button" data-clear="clipKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-reset="clipKeybind" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="clipKeybind" title="Clear hotkey" data-i18n-title="common.clearHotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
         </div>
-        <div class="hotkey-section">Recording</div>
+        <div class="hotkey-section" data-i18n="common.recording"></div>
         <div class="hotkey-row">
-          <div class="label">Start / Stop Recording</div>
-          <div class="hotkey-input" id="recordingKeybind" translate="no" tabindex="0" role="textbox" aria-label="Start or Stop Recording hotkey"></div>
+          <div class="label" data-i18n="common.startStopRecording"></div>
+          <div class="hotkey-input" id="recordingKeybind" translate="no" tabindex="0" role="textbox" data-i18n-aria-label="settings.recordingHotkey"></div>
           <div class="hotkey-actions">
-            <button class="icon-btn" type="button" data-reset="recordingKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-            <button class="icon-btn" type="button" data-clear="recordingKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-reset="recordingKeybind" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="recordingKeybind" title="Clear hotkey" data-i18n-title="common.clearHotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
         </div>
-        <div class="hotkey-section">Clips</div>
+        <div class="hotkey-section" data-i18n="common.clips"></div>
         <div class="hotkey-row">
-          <div class="label">Open Clips</div>
-          <div class="hotkey-input" id="openClipsKeybind" translate="no" tabindex="0" role="textbox" aria-label="Open clips hotkey"></div>
+          <div class="label" data-i18n="common.openClips"></div>
+          <div class="hotkey-input" id="openClipsKeybind" translate="no" tabindex="0" role="textbox" data-i18n-aria-label="settings.openClipsHotkey"></div>
           <div class="hotkey-actions">
-            <button class="icon-btn" type="button" data-reset="openClipsKeybind" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
-            <button class="icon-btn" type="button" data-clear="openClipsKeybind" title="Clear hotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-reset="openClipsKeybind" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+            <button class="icon-btn" type="button" data-clear="openClipsKeybind" title="Clear hotkey" data-i18n-title="common.clearHotkey"><svg data-i="action/backspace" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
           </div>
         </div>
       </div>
     </section>
 
     <section class="panel" data-step="6" hidden>
-      <div class="box-title">Overlay</div>
-      <div class="box-lead">Pick an input overlay and tune it &mdash; the preview reacts to your keyboard and mouse.</div>
+      <div class="box-title" data-i18n="common.overlay"></div>
+      <div class="box-lead" data-i18n="wizard.pickAnInputOverlayAndTune"></div>
       <div class="form-row is-stacked-row">
-        <div class="label" style="line-height:32px">Preview</div>
+        <div class="label" style="line-height:32px" data-i18n="common.preview"></div>
         <div class="field-wrap" style="flex-direction:column; align-items:stretch"><!--#include live2d-bongo--><!--#include overlay-preview--></div>
       </div>
       <!--#include overlay-controls-->
     </section>
 
     <section class="panel" data-step="7" hidden>
-      <div class="box-title">Appearance</div>
-      <div class="box-lead">Theme the ReplayKit windows and OBS. This window previews live; OBS restarts once at the end.</div>
+      <div class="box-title" data-i18n="common.appearance"></div>
+      <div class="box-lead" data-i18n="wizard.themeTheReplaykitWindowsAndObs"></div>
       <!--#include appearance-panel-->
     </section>
 
     <section class="panel" data-step="done" hidden>
       <svg class="done-mark" viewBox="0 0 64 64" aria-hidden="true">{{glyph:setup-done-mark}}</svg>
-      <div class="done-title">All set</div>
-      <div class="done-msg" id="doneMsg">ReplayKit is ready. This window will close on its own.</div>
+      <div class="done-title" data-i18n="wizard.allSet"></div>
+      <div class="done-msg" id="doneMsg" data-i18n="wizard.replaykitIsReadyThisWindowWill"></div>
     </section>
   </div>
 
   <footer class="footer">
     <span class="status" id="status"></span>
-    <button class="btn" type="button" id="backBtn" disabled>Back</button>
-    <button class="btn is-primary" type="button" id="nextBtn">Next</button>
+    <button class="btn" type="button" id="backBtn" disabled data-i18n="common.back"></button>
+    <button class="btn is-primary" type="button" id="nextBtn" data-i18n="wizard.next"></button>
   </footer>
   <!--#include window-chrome-->
   <!--#include shell-nav-->
@@ -418,11 +419,11 @@
   const HELPER = location.origin;
   const TOTAL_STEPS = 7;
   // the replay range comes from the settings schema of the helper, written into the page as it is served
-  if (!window.RK_SETTING_LIMITS) throw new Error("The settings limits were not served with this page.");
+  if (!window.RK_SETTING_LIMITS) throw new Error(RK_M("common.theSettingsLimitsWereNotServed"));
   const REPLAY_SECONDS_MIN = window.RK_SETTING_LIMITS.replaySeconds.min;
   const REPLAY_SECONDS_MAX = window.RK_SETTING_LIMITS.replaySeconds.max;
   // the reset value comes from the settings schema of the helper, which writes it into the page as it serves it
-  if (!window.RK_SETTING_DEFAULTS) throw new Error("The settings defaults were not served with this page.");
+  if (!window.RK_SETTING_DEFAULTS) throw new Error(RK_M("common.theSettingsDefaultsWereNotServed"));
   const DEFAULT_CLIP_KEYBIND = window.RK_SETTING_DEFAULTS.clipKeybind;
 
   async function helperJson(path, options) {
@@ -576,13 +577,19 @@
     const code = comboValue(els.language);
     if (!code || code === state.language) return;
     state.language = code;
-    if (window.RK_I18N) RK_I18N.use(code).catch(() => setStatus(RK_T("This language could not be shown yet. It will be used after OBS restarts."), "bad"));
+    if (window.RK_I18N) RK_I18N.use(code).catch(() => setStatus(RK_M("wizard.thisLanguageCouldNotBeShown"), "bad"));
+  });
+  // the picked language shows at once on the text this page builds as well, not only on its bound markup; text the helper sent follows after the restart
+  document.addEventListener("rk-language", () => {
+    els.nextBtn.textContent = step === TOTAL_STEPS ? RK_M("wizard.finish") : RK_M("wizard.next");
+    els.toggleAdvanced.textContent = els.recordingAdvanced.hidden ? RK_M("wizard.showAdvanced") : RK_M("wizard.hideAdvanced");
+    syncHotkeyFields();
   });
   els.toggleAdvanced.addEventListener("click", () => {
     const open = els.recordingAdvanced.hidden;
     els.recordingAdvanced.hidden = !open;
     els.toggleAdvanced.setAttribute("aria-expanded", open ? "true" : "false");
-    els.toggleAdvanced.textContent = open ? "Hide advanced" : "Show advanced";
+    els.toggleAdvanced.textContent = open ? RK_M("wizard.hideAdvanced") : RK_M("wizard.showAdvanced");
   });
 
   // ---- clip length (mm:ss like settings.html) ----
@@ -613,50 +620,8 @@
     btn.addEventListener("click", () => commitReplaySeconds(readReplaySeconds() + (btn.dataset.spin === "up" ? 5 : -5)));
   });
 
-  // ---- hotkeys (verbatim behaviour from settings.html) ----
-  function keyLabel(obsKey) {
-    const named = {
-      OBS_KEY_BACKSLASH:"\\", OBS_KEY_SLASH:"/", OBS_KEY_SPACE:"Space", OBS_KEY_RETURN:"Enter", OBS_KEY_ESCAPE:"Esc",
-      OBS_KEY_TAB:"Tab", OBS_KEY_DELETE:"Delete", OBS_KEY_BACKSPACE:"Backspace",
-      OBS_KEY_UP:"Up", OBS_KEY_DOWN:"Down", OBS_KEY_LEFT:"Left", OBS_KEY_RIGHT:"Right",
-    };
-    if (named[obsKey]) return named[obsKey];
-    if (obsKey && obsKey.startsWith("OBS_KEY_")) return obsKey.slice(8).replace(/_/g, " ");
-    return obsKey || "";
-  }
-  function comboToLabel(combo) {
-    combo = combo || {};
-    if (!combo.key) return "";
-    const parts = [];
-    if (combo.control) parts.push("Ctrl");
-    if (combo.alt) parts.push("Alt");
-    if (combo.shift) parts.push("Shift");
-    if (combo.command) parts.push("Win");
-    parts.push(keyLabel(combo.key));
-    return parts.join(" + ");
-  }
-  function obsKeyFromEvent(e) {
-    const k = e.key;
-    if (!k || ["Shift","Control","Alt","Meta"].includes(k)) return "";
-    const byCode = {
-      Backslash:"OBS_KEY_BACKSLASH", Slash:"OBS_KEY_SLASH", Minus:"OBS_KEY_MINUS", Equal:"OBS_KEY_EQUAL",
-      BracketLeft:"OBS_KEY_BRACKETLEFT", BracketRight:"OBS_KEY_BRACKETRIGHT", Semicolon:"OBS_KEY_SEMICOLON",
-      Quote:"OBS_KEY_APOSTROPHE", Comma:"OBS_KEY_COMMA", Period:"OBS_KEY_PERIOD", Backquote:"OBS_KEY_QUOTELEFT",
-    };
-    if (byCode[e.code]) return byCode[e.code];
-    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return "OBS_KEY_" + k.toUpperCase();
-    if (/^[a-z]$/i.test(k)) return "OBS_KEY_" + k.toUpperCase();
-    if (/^[0-9]$/.test(k)) return "OBS_KEY_" + k;
-    const byKey = {
-      "\\":"OBS_KEY_BACKSLASH", "|":"OBS_KEY_BACKSLASH", "/":"OBS_KEY_SLASH", "?":"OBS_KEY_SLASH", " ":"OBS_KEY_SPACE",
-      "Enter":"OBS_KEY_RETURN", "Escape":"OBS_KEY_ESCAPE", "Tab":"OBS_KEY_TAB", "Delete":"OBS_KEY_DELETE",
-      "Backspace":"OBS_KEY_BACKSPACE", "ArrowUp":"OBS_KEY_UP", "ArrowDown":"OBS_KEY_DOWN",
-      "ArrowLeft":"OBS_KEY_LEFT", "ArrowRight":"OBS_KEY_RIGHT", "-":"OBS_KEY_MINUS", "=":"OBS_KEY_EQUAL",
-      "[":"OBS_KEY_BRACKETLEFT", "]":"OBS_KEY_BRACKETRIGHT", ";":"OBS_KEY_SEMICOLON", "'":"OBS_KEY_APOSTROPHE",
-      ",":"OBS_KEY_COMMA", ".":"OBS_KEY_PERIOD", "`":"OBS_KEY_QUOTELEFT",
-    };
-    return byKey[k] || "";
-  }
+  // the key names and the reading of a pressed key are the ones the settings and the hotkey menu use (_hotkey-keys.html)
+  const { comboToLabel, obsKeyFromEvent } = RKHotkeys;
 
   const hotkeyFields = {
     clipKeybind: { el:els.clipKeybind, defaultValue:DEFAULT_CLIP_KEYBIND },
@@ -673,7 +638,7 @@
     const url = HELPER + "/settings/hotkey-capture?active=" + (active ? "1" : "0") + "&t=" + Date.now();
     const request = fetch(url, { method:"POST", cache:"no-store", keepalive:!!keepalive })
       .then((res) => res.json()).then((body) => {
-        if (!body || body.ok !== true) throw new Error((body && body.message) || "Hotkey capture failed");
+        if (!body || body.ok !== true) throw new Error((body && body.message) || RK_M("common.hotkeyCaptureFailed"));
         // what the helper now holds, even when the field was left meanwhile: the release queued behind this request only goes out while this says active, and skipping it left the obs hotkeys blanked until obs restarted
         hotkeyCaptureActive = !!active;
         return true;
@@ -692,14 +657,14 @@
     const field = hotkeyFields[name];
     activeHotkeyField = name;
     const before = comboToLabel(state[name]);
-    field.el.textContent = "Connecting...";
+    field.el.textContent = RK_M("settings.connecting");
     field.el.classList.add("is-empty");
     if (hotkeyCaptureTimer) { clearTimeout(hotkeyCaptureTimer); hotkeyCaptureTimer = null; }
     setHotkeyCapture(true, false).then((ok) => {
       if (document.activeElement !== field.el || activeHotkeyField !== name) return;
       if (comboToLabel(state[name]) !== before) { syncHotkeyField(name); return; }
-      if (!ok) { field.el.textContent = "Could not pause OBS hotkey"; field.el.classList.add("is-empty"); return; }
-      field.el.textContent = "Listening...";
+      if (!ok) { field.el.textContent = RK_M("common.couldNotPauseObsHotkey"); field.el.classList.add("is-empty"); return; }
+      field.el.textContent = RK_M("settings.listening");
       field.el.classList.add("is-empty");
       hotkeyCaptureTimer = setTimeout(() => { hotkeyCaptureTimer = null; if (activeHotkeyField === name) field.el.blur(); }, HOTKEY_CAPTURE_TIMEOUT_MS);
     });
@@ -768,7 +733,7 @@
     els.backBtn.hidden = done;
     els.nextBtn.hidden = done;
     els.backBtn.disabled = done || n <= 1;
-    els.nextBtn.textContent = n === TOTAL_STEPS ? "Finish" : "Next";
+    els.nextBtn.textContent = n === TOTAL_STEPS ? RK_M("wizard.finish") : RK_M("wizard.next");
     // the fake overlay projector only listens to input + renders while the Overlay step is on screen
     if (window.RKOverlayPreview) { if (n === 6) { RKOverlayPreview.refresh(); RKOverlayPreview.start(); } else RKOverlayPreview.stop(); }
     // the mic level monitor and any running test only live while this step is on screen, so leaving it ends both
@@ -796,10 +761,11 @@
   });
 
   async function finish() {
+    if (!settingsRead) { setStatus(RK_M("wizard.settingsCouldNotBeRead"), "bad"); return; }
     els.nextBtn.disabled = true;
     els.backBtn.disabled = true;
     setTabsDisabled(true);
-    setStatus("Saving...");
+    setStatus(RK_M("clips.saving"));
     const payload = {
       language: state.language,
       clipDir: state.clipDir,
@@ -829,14 +795,14 @@
       const restarting = res && res.restartRequired;
       showStep("done");
       els.doneMsg.textContent = restarting
-        ? "ReplayKit is ready. OBS will restart now to finish applying your choices."
-        : "ReplayKit is ready. This window will close on its own.";
+        ? RK_M("wizard.replaykitIsReadyObsWillRestart")
+        : RK_M("wizard.replaykitIsReadyThisWindowWill");
       setTimeout(closeWindow, restarting ? 1200 : 2400);
     } catch (e) {
       els.nextBtn.disabled = false;
       els.backBtn.disabled = false;
       setTabsDisabled(false);
-      setStatus(RK_T("Could not save: {error}. Press Finish to try again.", { error: String(e.message || e).replace(/[.\s]+$/, "") }), "bad");
+      setStatus(RK_M("wizard.couldNotSaveErrorPressFinish", { error: String(e.message || e).replace(/[.\s]+$/, "") }), "bad");
     }
   }
 
@@ -849,10 +815,21 @@
   }
   window.addEventListener("pagehide", () => { releaseHotkeyCapture(true); });
 
+  let settingsRead = false;
+  // finishing writes every field of the wizard, so without the real settings it would save the starting values of this page over them; the page starts again once the helper answers
+  function waitForSettings() {
+    setStatus(RK_M("wizard.settingsCouldNotBeRead"), "bad");
+    setTimeout(async function retry() {
+      try { await helperJson("settings?t=" + Date.now()); } catch (_) { setTimeout(retry, 2000); return; }
+      location.reload();
+    }, 2000);
+  }
+
   async function init() {
     let opts = {};
-    try {
-      const s = await helperJson("settings?t=" + Date.now());
+    let s = null;
+    try { s = await helperJson("settings?t=" + Date.now()); } catch (_) {}
+    if (s) {
       opts = s.options || {};
       if (s.defaultClipDir) els.clipDir.placeholder = s.defaultClipDir;
       const g = s.settings || {};
@@ -870,22 +847,23 @@
         "overlayStyle","bongoMode","overlayFlipH","overlayOpacity","overlayScale","overlayRotation","overlayHueShift","overlayColorMultiply","overlayColorAdd","overlayPosition",
         "theme","themeCustom","appIcon","appIconCustomPath","appIconRecordingDot",
       ].forEach((k) => { if (g[k] !== undefined && g[k] !== null) state[k] = g[k]; });
-    } catch (_) {}
+      settingsRead = true;
+    } else waitForSettings();
     // noise suppression starts ticked even when obs has no filter yet; finishing the wizard is what applies it
     state.micNoiseSuppression = true;
 
     // the languages obs ships, each under its own name, with the english name to jump to by letter as well
-    fillCombo(els.language, (window.RK_LANGUAGES || [{ code:"en-US", name:"English", englishName:"English" }]).map((l) => ({ value:l.code, label:l.name, alias:l.englishName })));
+    fillCombo(els.language, (window.RK_LANGUAGES || [{ code:"en-US", name:RK_M("wizard.english"), englishName:RK_M("wizard.english") }]).map((l) => ({ value:l.code, label:l.name, alias:l.englishName })));
     setComboValue(els.language, state.language, false);
     fillCombo(els.recordingPreset, opts.recordingPresets || [
-      { value:"performance", label:"Performance", blurb:"720p30. Lowest load." },
-      { value:"balanced", label:"Balanced", blurb:"1080p60. Recommended." },
-      { value:"quality", label:"Quality", blurb:"Higher-quality target." },
+      { value:"performance", label:RK_M("wizard.performance"), blurb:RK_M("wizard.n720p30LowestLoad") },
+      { value:"balanced", label:RK_M("wizard.balanced"), blurb:RK_M("wizard.n1080p60Recommended") },
+      { value:"quality", label:RK_M("wizard.quality"), blurb:RK_M("wizard.higherQualityTarget") },
     ]);
     setComboValue(els.recordingPreset, state.recordingPreset, false);
-    fillCombo(els.captureDisplay, opts.captureDisplays || [{ value:"primary", label:"Primary display" }]);
+    fillCombo(els.captureDisplay, opts.captureDisplays || [{ value:"primary", label:RK_M("common.primaryDisplay") }]);
     setComboValue(els.captureDisplay, state.captureDisplay, false);
-    fillCombo(els.recordingBuffer, opts.recordingBuffers || [{ value:"disk", label:"Disk" }, { value:"memory", label:"Memory" }]);
+    fillCombo(els.recordingBuffer, opts.recordingBuffers || [{ value:"disk", label:RK_M("wizard.disk") }, { value:"memory", label:RK_M("wizard.memory") }]);
     setComboValue(els.recordingBuffer, state.recordingBuffer, false);
 
     els.clipDir.value = state.clipDir;
@@ -895,7 +873,7 @@
     const hostGet = (k) => state[k];
     const hostSet = (k, v) => { state[k] = v; };
     if (window.RKMic) RKMic.init({ get:hostGet, set:hostSet, onChange:() => {} });
-    if (window.RKOverlay) RKOverlay.init({ get:hostGet, set:hostSet, onChange:() => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); } });
+    if (window.RKOverlay) RKOverlay.init({ get:hostGet, set:hostSet, styles:opts.overlays || [], modes:opts.bongoModes || [], onChange:() => { if (window.RKOverlayPreview) RKOverlayPreview.refresh(); } });
     // stored per style, becuase the two overlays are nothing alike in size and one shared corner would put the other one off the canvas
     if (window.RKOverlayPreview) RKOverlayPreview.init(() => state, (x, y) => {
       const style = state.overlayStyle;

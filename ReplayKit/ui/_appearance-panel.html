@@ -117,80 +117,80 @@
   .icon-tile-edit svg { width:10px; height:10px; fill:currentColor; }
 </style>
 <div class="box">
-  <div class="box-title">Theme</div>
+  <div class="box-title" data-i18n="settings.theme"></div>
         <div class="form-row">
-          <div class="label">Theme</div>
+          <div class="label" data-i18n="settings.theme"></div>
           <div class="field-wrap is-stacked">
             <div class="icon-grid" id="themeGrid"></div>
             <div class="theme-preview-row">
-              <button class="btn" type="button" id="openThemeClipsBtn" data-tooltip="Open the Clips window to see this theme on real clips">Preview in Clips</button>
+              <button class="btn" type="button" id="openThemeClipsBtn" data-tooltip="Open the Clips window to see this theme on real clips" data-i18n-data-tooltip="settings.openTheClipsWindowToSee" data-i18n="settings.previewInClips"></button>
             </div>
           </div>
         </div>
         <div class="form-row" id="themeCustomRow" hidden>
-          <div class="label">Custom theme</div>
+          <div class="label" data-i18n="settings.customTheme"></div>
           <div class="field-wrap is-stacked">
             <div class="theme-section">
-              <div class="theme-section-title"><span>Base colors <span class="control-note">Click a color square to change that color.</span></span></div>
+              <div class="theme-section-title"><span><span data-i18n="settings.baseColors"></span> <span class="control-note" data-i18n="settings.clickAColorSquareToChange"></span></span></div>
               <div class="theme-editor" id="themeEditor">
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color"></button><span>Background</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color"></button><span>Panel</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="field" aria-label="Field color"></button><span>Field</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="text" aria-label="Text color"></button><span>Text</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color"></button><span>Accent</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color"></button><span>Border</span></div>
-                <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color"></button><span>Danger</span></div>
-                <div class="theme-pick" data-tooltip="Title bar and sidebar"><button class="color-picker" type="button" data-k="bar" aria-label="Title bar and sidebar color"></button><span>Bars</span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="bg" aria-label="Background color" data-i18n-aria-label="common.backgroundColor"></button><span data-i18n="settings.background"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="panel" aria-label="Panel color" data-i18n-aria-label="settings.panelColor"></button><span data-i18n="settings.panel"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="field" aria-label="Field color" data-i18n-aria-label="settings.fieldColor"></button><span data-i18n="settings.field"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="text" aria-label="Text color" data-i18n-aria-label="common.textColor"></button><span data-i18n="common.text"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="accent" aria-label="Accent color" data-i18n-aria-label="settings.accentColor"></button><span data-i18n="settings.accent"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="border" aria-label="Border color" data-i18n-aria-label="common.borderColor"></button><span data-i18n="settings.border"></span></div>
+                <div class="theme-pick"><button class="color-picker" type="button" data-k="danger" aria-label="Danger color" data-i18n-aria-label="settings.dangerColor"></button><span data-i18n="settings.danger"></span></div>
+                <div class="theme-pick" data-tooltip="Title bar and sidebar" data-i18n-data-tooltip="settings.titleBarAndSidebar"><button class="color-picker" type="button" data-k="bar" aria-label="Title bar and sidebar color" data-i18n-aria-label="settings.titleBarAndSidebarColor"></button><span data-i18n="settings.bars"></span></div>
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Gradients <span class="control-note">Lets an area fade between colors instead of using one solid color.</span></span></div>
-              <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient"></div>
-              <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel">Use a gradient for Background</span></div>
+              <div class="theme-section-title"><span><span data-i18n="settings.gradients"></span> <span class="control-note" data-i18n="settings.letsAnAreaFadeBetweenColors"></span></span></div>
+              <div class="grad-targets" id="themeGradientTargets" role="tablist" aria-label="Which surface to give a gradient" data-i18n-aria-label="settings.whichSurfaceToGiveAGradient"></div>
+              <div class="check-row" style="margin-top:8px"><input type="checkbox" id="themeGradientEnabled" aria-labelledby="themeGradientEnabledLabel"><span id="themeGradientEnabledLabel" data-i18n="settings.useAGradientForBackground"></span></div>
               <div class="gradient-editor" id="themeGradientEditor" hidden>
                 <div class="gradient-top">
-                  <div class="combo" data-self-wired id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+                  <div class="combo" data-self-wired id="themeGradientType" tabindex="0" role="combobox" aria-expanded="false" aria-label="Gradient type" data-i18n-aria-label="settings.gradientType"><button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
                   <div class="gradient-preview" id="themeGradientPreview"></div>
                 </div>
                 <div id="themeGradientLinearControls">
-                  <div class="gradient-control"><div class="label">Angle</div><input class="volume-slider rk-range" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value"></div>
+                  <div class="gradient-control"><div class="label" data-i18n="settings.angle"></div><input class="volume-slider rk-range" id="themeGradientAngle" type="range" min="0" max="359" step="1" aria-label="Gradient angle" data-i18n-aria-label="settings.gradientAngle"><input class="text-input gradient-number" id="themeGradientAngleValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient angle value" data-i18n-aria-label="settings.gradientAngleValue"></div>
                 </div>
                 <div id="themeGradientRadialControls" hidden>
-                  <div class="gradient-control"><div class="label">Center X</div><input class="volume-slider rk-range" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value"></div>
-                  <div class="gradient-control"><div class="label">Center Y</div><input class="volume-slider rk-range" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value"></div>
+                  <div class="gradient-control"><div class="label" data-i18n="settings.centerX"></div><input class="volume-slider rk-range" id="themeGradientCenterX" type="range" min="0" max="100" step="1" aria-label="Gradient center X" data-i18n-aria-label="settings.gradientCenterX"><input class="text-input gradient-number" id="themeGradientCenterXValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center X value" data-i18n-aria-label="settings.gradientCenterXValue"></div>
+                  <div class="gradient-control"><div class="label" data-i18n="settings.centerY"></div><input class="volume-slider rk-range" id="themeGradientCenterY" type="range" min="0" max="100" step="1" aria-label="Gradient center Y" data-i18n-aria-label="settings.gradientCenterY"><input class="text-input gradient-number" id="themeGradientCenterYValue" type="text" inputmode="numeric" maxlength="3" aria-label="Gradient center Y value" data-i18n-aria-label="settings.gradientCenterYValue"></div>
                 </div>
-                <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops"></div>
+                <div class="grad-ramp" id="themeGradientRamp" role="group" aria-label="Gradient stops" data-i18n-aria-label="settings.gradientStops"></div>
                 <div class="grad-ramp-foot">
-                  <span class="theme-section-hint">Click the ramp to add a stop, drag to move it, click a stop to recolor.</span>
-                  <button class="btn" type="button" id="removeGradientStopBtn" disabled>Remove stop</button>
+                  <span class="theme-section-hint" data-i18n="settings.clickTheRampToAddA"></span>
+                  <button class="btn" type="button" id="removeGradientStopBtn" disabled data-i18n="settings.removeStop"></button>
                 </div>
               </div>
             </div>
             <div class="theme-section">
-              <div class="theme-section-title"><span>Window behavior</span></div>
-              <div class="check-row"><input aria-label="Use dark icons, menus and native controls" id="themeCustomDark" type="checkbox"/><span>Use dark icons, menus and native controls<span class="control-note">Turn this off if your theme is light. It switches the icons, menus, and OBS's own controls between dark and light.</span></span></div>
+              <div class="theme-section-title"><span data-i18n="settings.windowBehavior"></span></div>
+              <div class="check-row"><input aria-label="Use dark icons, menus and native controls" id="themeCustomDark" type="checkbox" data-i18n-aria-label="settings.useDarkIconsMenusAndNative"/><span><span data-i18n="settings.useDarkIconsMenusAndNative"></span><span class="control-note" data-i18n="settings.turnThisOffIfYourTheme"></span></span></div>
             </div>
             <div class="form-row" style="grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; padding:0">
-              <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40">
-              <button class="btn" type="button" id="cancelThemeEditBtn" hidden>Cancel edit</button>
-              <button class="btn" type="button" id="saveThemeBtn">Save as preset</button>
+              <input class="text-input" id="themeName" type="text" spellcheck="false" placeholder="Name this theme" maxlength="40" data-i18n-placeholder="settings.nameThisTheme">
+              <button class="btn" type="button" id="cancelThemeEditBtn" hidden data-i18n="settings.cancelEdit"></button>
+              <button class="btn" type="button" id="saveThemeBtn" data-i18n="settings.saveAsPreset"></button>
             </div>
           </div>
         </div>
       </div>
       <div class="box">
-        <div class="box-title">App Icon</div>
+        <div class="box-title" data-i18n="settings.appIcon"></div>
         <div class="form-row">
-          <div class="label">Icon</div>
+          <div class="label" data-i18n="settings.icon"></div>
           <div class="field-wrap is-stacked">
             <div class="icon-grid" id="appIconGrid"></div>
           </div>
         </div>
         <div class="form-row" id="appIconCustomRow" hidden>
-          <div class="label">Custom file</div>
+          <div class="label" data-i18n="settings.customFile"></div>
           <div class="field-wrap">
-            <input class="text-input" id="appIconCustomPath" type="text" spellcheck="false" placeholder="C:\path\to\icon.ico  (.ico, .png, .jpg, .bmp)">
-            <button class="icon-btn field-browse" type="button" id="browseAppIcon" title="Choose image">
+            <input class="text-input" id="appIconCustomPath" type="text" spellcheck="false" placeholder="C:\path\to\icon.ico  (.ico, .png, .jpg, .bmp)" data-i18n-placeholder="settings.cPathToIconIcoIco">
+            <button class="icon-btn field-browse" type="button" id="browseAppIcon" title="Choose image" data-i18n-title="settings.chooseImage">
               <svg data-i="action/folder" viewBox="0 0 16 16" aria-hidden="true"></svg>
             </button>
           </div>
@@ -198,8 +198,8 @@
         <div class="form-row tight">
           <div></div>
           <div class="check-row">
-<input aria-label="Show recording dot" id="appIconRecordingDot" type="checkbox"/>
-<span>Show recording dot<span class="control-note">Puts a red dot on the OBS icon in the tray while you are recording or clipping. It covers the default OBS icon and custom ones alike, and turning it off removes the dot everywhere.</span></span>
+<input aria-label="Show recording dot" id="appIconRecordingDot" type="checkbox" data-i18n-aria-label="settings.showRecordingDot"/>
+<span><span data-i18n="settings.showRecordingDot"></span><span class="control-note" data-i18n="settings.putsARedDotOnThe"></span></span>
 
 </div>
         </div>
@@ -322,10 +322,10 @@
 
   // gradients are per surface. only these four: text, border and danger are colour roles that end up in border-color / color and in the helpers colour arithmetic, where a gradient value paints nothing.
   const GRADIENT_TARGETS = [
-    { key:"bg", label:"Background" },
-    { key:"panel", label:"Panel" },
-    { key:"field", label:"Field" },
-    { key:"accent", label:"Accent" },
+    { key:"bg", label:RK_M("settings.background") },
+    { key:"panel", label:RK_M("settings.panel") },
+    { key:"field", label:RK_M("settings.field") },
+    { key:"accent", label:RK_M("settings.accent") },
   ];
   let gradientTarget = "bg";
 
@@ -386,7 +386,7 @@
       button.className = "grad-target" + (entry.key === gradientTarget ? " is-active" : "") + (on ? " has-gradient" : "");
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", entry.key === gradientTarget ? "true" : "false");
-      button.dataset.tooltip = on ? RK_T("{target} uses a gradient", { target: RK_T(entry.label) }) : RK_T("{target} is a flat color", { target: RK_T(entry.label) });
+      button.dataset.tooltip = on ? RK_M("settings.targetUsesAGradient", { target: entry.label }) : RK_M("settings.targetIsAFlatColor", { target: entry.label });
       button.innerHTML = '<span class="grad-target-dot"></span>';
       button.appendChild(document.createTextNode(entry.label));
       button.addEventListener("click", () => {
@@ -402,8 +402,8 @@
   // pushes the selected targets spec into the shared editor controls.
   function loadGradientEditor() {
     const spec = currentGradient();
-    const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || "Background";
-    els.themeGradientEnabledLabel.textContent = RK_T("Use a gradient for {target}", { target: RK_T(label) });
+    const label = (GRADIENT_TARGETS.find((entry) => entry.key === gradientTarget) || {}).label || RK_M("settings.background");
+    els.themeGradientEnabledLabel.textContent = RK_M("settings.useAGradientForTarget", { target: label });
     els.themeGradientEnabled.checked = !!spec.enabled;
     els.themeGradientEditor.hidden = !spec.enabled;
     setComboValue(els.themeGradientType, spec.type === "radial" ? "radial" : "linear", false);
@@ -506,8 +506,8 @@
       handle.className = "grad-ramp-handle" + (stop === selectedGradientStop ? " is-selected" : "");
       handle.style.left = stop.position + "%";
       handle.style.setProperty("--color", stop.color);
-      handle.dataset.tooltip = RK_T("{color} at {position}%", { color: stop.color, position: stop.position });
-      handle.setAttribute("aria-label", RK_T("Gradient stop {number}, {color} at {position}%", { number: index + 1, color: stop.color, position: stop.position }));
+      handle.dataset.tooltip = RK_M("settings.colorAtPosition", { color: stop.color, position: stop.position });
+      handle.setAttribute("aria-label", RK_M("settings.gradientStopNumberColorAtPosition", { number: index + 1, color: stop.color, position: stop.position }));
 
       // a press that never moves is a recolor; anything that moves is a drag. distinguishing them here is what lets one handle do both without a separate edit button.
       handle.addEventListener("pointerdown", (event) => {
@@ -525,7 +525,7 @@
           moved = true;
           stop.position = next;
           live.style.left = next + "%";
-          live.dataset.tooltip = RK_T("{color} at {position}%", { color: stop.color, position: next });
+          live.dataset.tooltip = RK_M("settings.colorAtPosition", { color: stop.color, position: next });
           updateGradientPreview();
           applyThemeEditorChange();
         };
@@ -534,7 +534,7 @@
           live.removeEventListener("pointerup", up);
           live.classList.remove("is-dragging");
           if (moved) renderGradientStops();
-          else openColorDialog(stop.color, RK_T("Gradient stop {number}", { number: index + 1 }), (value) => {
+          else openColorDialog(stop.color, RK_M("settings.gradientStopNumber", { number: index + 1 }), (value) => {
             stop.color = cleanHexColor(value, stop.color);
             renderGradientStops();
             applyThemeEditorChange();
@@ -609,7 +609,7 @@
   function endThemeEdit() {
     editingThemeId = "";
     els.themeName.value = "";
-    els.saveThemeBtn.textContent = "Save as preset";
+    els.saveThemeBtn.textContent = RK_M("settings.saveAsPreset");
     els.cancelThemeEditBtn.hidden = true;
   }
   function selectTheme(id) {
@@ -653,16 +653,16 @@
       const edit = document.createElement("span");
       edit.className = "icon-tile-edit";
       edit.setAttribute("role", "button");
-      edit.setAttribute("aria-label", RK_T("Edit {name}", { name: label }));
-      edit.dataset.tooltip = "Edit";
+      edit.setAttribute("aria-label", RK_M("settings.editName", { name: label }));
+      edit.dataset.tooltip = RK_M("common.edit");
       edit.innerHTML = THEME_EDIT_SVG;
       edit.addEventListener("click", (e) => { e.stopPropagation(); editUserTheme(id); });
       tile.appendChild(edit);
       const del = document.createElement("span");
       del.className = "icon-tile-del";
       del.setAttribute("role", "button");
-      del.setAttribute("aria-label", RK_T("Remove {name}", { name: label }));
-      del.dataset.tooltip = "Remove";
+      del.setAttribute("aria-label", RK_M("settings.removeName", { name: label }));
+      del.dataset.tooltip = RK_M("common.remove");
       del.innerHTML = APPICON_X_SVG;
       del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserTheme(id); });
       tile.appendChild(del);
@@ -678,7 +678,7 @@
     state.themeCustom = Object.assign({}, theme.seed);
     fillThemeEditor(state.themeCustom);
     els.themeName.value = theme.label || id.slice(5);
-    els.saveThemeBtn.textContent = "Update preset";
+    els.saveThemeBtn.textContent = RK_M("settings.updatePreset");
     els.cancelThemeEditBtn.hidden = false;
     paintThemeSelection();
     applyThemePreview();
@@ -688,8 +688,8 @@
   async function deleteUserTheme(id) {
     let data;
     try { data = await helperJson("appearance/delete-theme?id=" + encodeURIComponent(id), { method: "POST" }); }
-    catch (e) { setStatus("Could not remove theme", "bad"); return; }
-    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove theme", "bad"); return; }
+    catch (e) { setStatus(RK_M("settings.couldNotRemoveTheme"), "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveTheme"), "bad"); return; }
     if (state.theme === id) {
       state.theme = "default";
       if (originalState) originalState.theme = "default";
@@ -705,7 +705,7 @@
     els.themeGrid.innerHTML = "";
     for (const th of (data.themes || []))
       els.themeGrid.appendChild(themeTile(th.id, th.label || th.id, th.swatch, !!th.deletable));
-    els.themeGrid.appendChild(themeTile("custom", "Custom…", null, false));
+    els.themeGrid.appendChild(themeTile("custom", RK_M("settings.custom"), null, false));
     if (!state.themeCustom && data.custom) state.themeCustom = data.custom;
     if (state.theme === "custom") fillThemeEditor(state.themeCustom);
     paintThemeSelection();
@@ -767,7 +767,7 @@
   els.themeGradientRamp.addEventListener("pointerdown", (event) => {
     if (event.target.closest(".grad-ramp-handle")) return;
     if (gradientStops.length >= GRADIENT_MAX_STOPS) {
-      setStatus(RK_T("A gradient can have at most {count} stops.", { count: GRADIENT_MAX_STOPS }), "bad");
+      setStatus(RK_M("settings.aGradientCanHaveAtMost", { count: GRADIENT_MAX_STOPS }), "bad");
       return;
     }
     const position = gradientPositionFromEvent(event);
@@ -788,7 +788,7 @@
   });
   els.themeCustomDark.addEventListener("change", applyThemeEditorChange);
   els.openThemeClipsBtn.addEventListener("click", () => {
-    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus(RK_T("Could not open Clips: {error}", { error: error.message || error }), "bad"));
+    helperJson("open-clips-window", { method:"POST" }).catch((error) => setStatus(RK_M("common.couldNotOpenClipsError", { error: error.message || error }), "bad"));
   });
   // cancelling an edit closes the editor and drops the unsaved colours back to whatever the preset actually holds
   els.cancelThemeEditBtn.addEventListener("click", () => {
@@ -798,7 +798,7 @@
   });
   els.saveThemeBtn.addEventListener("click", async () => {
     const name = (els.themeName.value || "").trim();
-    if (!name) { setStatus("Name the theme first", "bad"); els.themeName.focus(); return; }
+    if (!name) { setStatus(RK_M("settings.nameTheThemeFirst"), "bad"); els.themeName.focus(); return; }
     els.saveThemeBtn.disabled = true;
     let data;
     let failure = "";
@@ -811,7 +811,7 @@
       });
     } catch (e) { data = null; failure = e.message || String(e); }
     els.saveThemeBtn.disabled = false;
-    if (!data || !data.ok) { setStatus(failure || (data && data.message) || "Could not save theme", "bad"); return; }
+    if (!data || !data.ok) { setStatus(failure || (data && data.message) || RK_M("settings.couldNotSaveTheme"), "bad"); return; }
     const updated = !!editingThemeId;
     state.themeCustom = themeCustomState();
     state.theme = data.id;
@@ -820,7 +820,7 @@
     paintThemeSelection();
     applyThemePreview();
     markDirty();
-    setStatus(updated ? "Preset updated. Apply to update OBS." : "Preset saved. Apply to use it in OBS.", "good");
+    setStatus(updated ? RK_M("settings.presetUpdatedApplyToUpdateObs") : RK_M("settings.presetSavedApplyToUseIt"), "good");
   });
   /* renderThemeGrid -> boot() */
 
@@ -854,8 +854,8 @@
       const del = document.createElement("span");
       del.className = "icon-tile-del";
       del.setAttribute("role", "button");
-      del.setAttribute("aria-label", RK_T("Remove {name}", { name: label }));
-      del.title = "Remove";
+      del.setAttribute("aria-label", RK_M("settings.removeName", { name: label }));
+      del.title = RK_M("common.remove");
       del.innerHTML = APPICON_X_SVG;
       del.addEventListener("click", (e) => { e.stopPropagation(); deleteUserIcon(id); });
       tile.appendChild(del);
@@ -865,8 +865,8 @@
   async function deleteUserIcon(id) {
     let data;
     try { data = await helperJson("appearance/delete-icon?file=" + encodeURIComponent(id), { method: "POST" }); }
-    catch (e) { setStatus("Could not remove icon", "bad"); return; }
-    if (!data || !data.ok) { setStatus((data && data.message) || "Could not remove icon", "bad"); return; }
+    catch (e) { setStatus(RK_M("settings.couldNotRemoveIcon"), "bad"); return; }
+    if (!data || !data.ok) { setStatus((data && data.message) || RK_M("settings.couldNotRemoveIcon"), "bad"); return; }
     if (state.appIcon === id) {
       state.appIcon = "default";
       if (originalState) originalState.appIcon = "default";
@@ -879,7 +879,7 @@
     els.appIconGrid.innerHTML = "";
     for (const ic of (data.icons || []))
       els.appIconGrid.appendChild(appIconTile(ic.id, ic.label || ic.id, ic.url || "", ic.id === "default" ? "OBS" : "", !!ic.deletable));
-    els.appIconGrid.appendChild(appIconTile("custom", "Custom…", "", "＋", false));
+    els.appIconGrid.appendChild(appIconTile("custom", RK_M("settings.custom"), "", "＋", false));
     paintAppIconSelection();
   }
   /* renderAppIconGrid -> boot() */
@@ -890,7 +890,7 @@
   });
 
   function boot() {
-    fillCombo(els.themeGradientType, [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }]);
+    fillCombo(els.themeGradientType, [{ value: "linear", label: RK_M("settings.linear") }, { value: "radial", label: RK_M("settings.radial") }]);
     wireCombo(els.themeGradientType);
     renderThemeGrid();
     renderAppIconGrid();

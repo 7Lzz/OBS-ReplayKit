@@ -39,9 +39,9 @@
   .sens-slider.rk-range::-webkit-slider-runnable-track { background:transparent; }
 </style>
 <div class="form-row" data-search="microphone mic input device">
-  <div class="label">Microphone</div>
+  <div class="label" data-i18n="common.microphone"></div>
   <div class="field-wrap">
-    <div class="combo sep-after-first" data-self-wired id="micDevice" tabindex="0" role="combobox" aria-expanded="false" aria-label="Microphone">
+    <div class="combo sep-after-first" data-self-wired id="micDevice" tabindex="0" role="combobox" aria-expanded="false" aria-label="Microphone" data-i18n-aria-label="common.microphone">
       <button class="combo-button" type="button"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button>
       <div class="combo-menu" role="listbox"></div>
     </div>
@@ -51,9 +51,9 @@
   <div></div>
   <div class="field-wrap">
     <div class="mic-test">
-      <button class="btn is-primary" type="button" id="micTestBtn">Mic Test</button>
-      <span class="control-note">Plays your microphone back to you, with your volume, sensitivity, and noise settings applied.</span>
-      <div class="mic-meter" id="micMeter" role="img" aria-label="Microphone level"></div>
+      <button class="btn is-primary" type="button" id="micTestBtn" data-i18n="settings.micTest"></button>
+      <span class="control-note" data-i18n="settings.playsYourMicrophoneBackToYou"></span>
+      <div class="mic-meter" id="micMeter" role="img" aria-label="Microphone level" data-i18n-aria-label="settings.microphoneLevel"></div>
     </div>
   </div>
 </div>
@@ -62,42 +62,42 @@
   <div class="hint mic-note is-bad" id="micTestNote" role="status" aria-live="polite"></div>
 </div>
 <div class="form-row" data-search="microphone volume gain input level">
-  <div class="label">Microphone Volume</div>
+  <div class="label" data-i18n="settings.microphoneVolume"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="micVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Microphone volume">
-      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="micVolume" type="range" data-limit="micVolume" step="1" aria-label="Microphone volume slider"></div>
+      <input class="text-input volume-value" id="micVolumeValue" type="text" inputmode="numeric" autocomplete="off" aria-label="Microphone volume" data-i18n-aria-label="settings.microphoneVolume2">
+      <div class="volume-slider-wrap"><input class="volume-slider rk-range" id="micVolume" type="range" data-limit="micVolume" step="1" aria-label="Microphone volume slider" data-i18n-aria-label="settings.microphoneVolumeSlider"></div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-mic-reset="micVolume" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-mic-reset="micVolume" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row" data-search="input sensitivity noise gate threshold cut off gate microphone">
-  <div class="label">Input Sensitivity</div>
+  <div class="label" data-i18n="settings.inputSensitivity"></div>
   <div class="field-wrap">
     <div class="volume-control">
-      <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels">
+      <input class="text-input volume-value" id="micSenseValue" type="text" autocomplete="off" aria-label="Input sensitivity in decibels" data-i18n-aria-label="settings.inputSensitivityInDecibels">
       <div class="sens-wrap" id="micSenseWrap">
         <div class="sens-track"><div class="sens-level" id="micSenseLevel"></div></div>
-        <input class="sens-slider rk-range" id="micSense" type="range" min="-100" max="0" step="1" aria-label="Input sensitivity slider">
+        <input class="sens-slider rk-range" id="micSense" type="range" min="-100" max="0" step="1" aria-label="Input sensitivity slider" data-i18n-aria-label="settings.inputSensitivitySlider">
       </div>
     </div>
-    <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
+    <button class="icon-btn field-reset" type="button" data-mic-reset="micInputSensitivity" title="Reset to default" data-i18n-title="common.resetToDefault"><svg data-i="action/reset" viewBox="0 0 16 16" aria-hidden="true"></svg></button>
   </div>
 </div>
 <div class="form-row tight" data-search="noise suppression noise removal background noise keyboard fan">
   <div></div>
-  <div class="check-row"><input aria-label="Noise suppression" id="micNoise" type="checkbox"/><span>Noise suppression<span class="control-note">Reduces background noise like keyboard clicks and fans from your microphone.</span></span></div>
+  <div class="check-row"><input aria-label="Noise suppression" id="micNoise" type="checkbox" data-i18n-aria-label="settings.noiseSuppression"/><span><span data-i18n="settings.noiseSuppression"></span><span class="control-note" data-i18n="settings.reducesBackgroundNoiseLikeKeyboardClicks"></span></span></div>
 </div>
 <script>
 (function () {
   var HELPER = location.origin;
-  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error("The settings defaults and limits were not served with this page."); var DEF = { micDeviceId:SCHEMA.micDeviceId, micVolume:SCHEMA.micVolume, micNoiseSuppression:SCHEMA.micNoiseSuppression, micInputSensitivity:SCHEMA.micInputSensitivity };
+  var SCHEMA = window.RK_SETTING_DEFAULTS, LIMITS = window.RK_SETTING_LIMITS; if (!SCHEMA || !LIMITS) throw new Error(RK_M("settings.theSettingsDefaultsAndLimitsWere")); var DEF = { micDeviceId:SCHEMA.micDeviceId, micVolume:SCHEMA.micVolume, micNoiseSuppression:SCHEMA.micNoiseSuppression, micInputSensitivity:SCHEMA.micInputSensitivity };
   var VOL_MIN = LIMITS.micVolume.min, VOL_MAX = LIMITS.micVolume.max, SENS_MIN = LIMITS.micInputSensitivity.min, SENS_MAX = LIMITS.micInputSensitivity.max, BAR_WIDTH = 3, BAR_GAP = 3, BARS_MIN = 16, BARS_MAX = 240, POLL_MS = 66, FLOOR_DB = -60;
   // the real gate range obs supports is -96..0 (matches noise_gate_filters own VOL_MIN/VOL_MAX), which does not put -50 at the middle -- SENS_VMIN only widens where the handle can visually sit, four units of dead zone below the real floor, so the default lands dead center without changing what actually reaches obs
   var SENS_VMIN = -100;
   var host = { get:function (k) { return DEF[k]; }, set:function () {}, onChange:function () {} };
   var st = Object.assign({}, DEF);
-  var devices = [{ value:"default", label:"Default" }];
+  var devices = [{ value:"default", label:RK_M("settings.default") }];
 
   // the page states what it wants the helper to be doing (desired) and reconcile() walks the real state (mode) toward it one request at a time: off, a silent level monitor that feeds the sensitivity bar, or the playback test
   var mode = "off", desired = "off";
@@ -139,11 +139,11 @@
     var cur = String(st.micDeviceId || "default").toLowerCase();
     // a saved device that is unplugged still has to show as selected, otherwise the box would claim Default while obs is still pointed at the missing one
     if (cur !== "default" && !opts.some(function (o) { return o.value.toLowerCase() === cur; }))
-      opts.push({ value:st.micDeviceId, label:"Unavailable device", blurb:"not connected" });
+      opts.push({ value:st.micDeviceId, label:RK_M("settings.unavailableDevice"), unavailable:true, blurb:RK_M("settings.micNotConnected") });
     return opts;
   }
   // device names are user content; the built in Default and Unavailable entries are ui text
-  function isDeviceOption(o) { return o.value !== "default" && o.label !== "Unavailable device"; }
+  function isDeviceOption(o) { return o.value !== "default" && !o.unavailable; }
   function renderCombo() {
     var opts = deviceOptions();
     var cur = String(st.micDeviceId || "default").toLowerCase();
@@ -239,10 +239,10 @@
   resetVol.addEventListener("click", function () { commitVolume(DEF.micVolume); });
 
   // the far left of the bar is the gate being off, so it reads Off instead of a decibel value
-  function sensText(v) { return v <= SENS_MIN ? RK_T("Off") : RK_T("{value} dB", { value: v }); }
+  function sensText(v) { return v <= SENS_MIN ? RK_M("settings.off") : RK_M("settings.valueDb", { value: v }); }
   function parseSens(text) {
     var t = String(text).trim().toLowerCase();
-    if (t === "off" || t === RK_T("Off").toLowerCase()) return SENS_MIN;
+    if (t === "off" || t === RK_M("settings.off").toLowerCase()) return SENS_MIN;
     var n = parseInt(t.replace(/[^\d-]/g, ""), 10);
     return Number.isFinite(n) ? clampSens(n) : null;
   }
@@ -343,7 +343,7 @@
   }
   function syncTestUi() {
     var starting = opening && desired === "test";
-    testBtn.textContent = starting ? "Starting..." : (testOn() ? "Stop Test" : "Mic Test");
+    testBtn.textContent = starting ? RK_M("settings.micTestStarting") : (testOn() ? RK_M("settings.stopTest") : RK_M("settings.micTest"));
     testBtn.disabled = starting;
     renderNote();
   }
@@ -376,7 +376,7 @@
       stopPolling();
       target = 0;
       senseTarget = 0;
-      noteError = (e && e.message) || "Could not open the microphone.";
+      noteError = (e && e.message) || RK_M("settings.couldNotOpenTheMicrophone");
       // a test that cannot play still leaves the level monitor worth trying; a monitor that cannot open is given up on until the user acts
       desired = playback ? "monitor" : "off";
       blocked = !playback;
@@ -401,7 +401,7 @@
     if (message || ++recoveries > 3) {
       desired = "off";
       blocked = true;
-      noteError = message || "The microphone stopped unexpectedly.";
+      noteError = message || RK_M("settings.theMicrophoneStoppedUnexpectedly");
       syncTestUi();
       return;
     }
@@ -428,7 +428,7 @@
       stopPolling();
       target = 0;
       senseTarget = 0;
-      noteError = "Lost contact with ReplayKit, so the microphone stopped.";
+      noteError = RK_M("settings.lostContactWithReplaykitSoThe");
       syncTestUi();
       kickMeter();
     }).then(function () { polling = false; });
@@ -505,6 +505,9 @@
     var gate = host.get("micInputSensitivity");
     if (gate !== undefined && gate !== null) st.micInputSensitivity = clampSens(gate);
   }
+
+  // the setup wizard previews a picked language; the controls repaint their text in it
+  document.addEventListener("rk-language", function () { paintControls(); });
 
   window.RKMic = {
     init: function (h) { if (h) host = Object.assign(host, h); pull(); paintControls(); loadDevices(); },

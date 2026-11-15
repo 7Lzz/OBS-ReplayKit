@@ -197,8 +197,8 @@
 <div class="card is-opening" id="card">
   <div class="scroll">
     <header class="top">
-      <h1>Free-up Space</h1>
-      <button class="x" type="button" id="close" aria-label="Close">
+      <h1 data-i18n="common.freeUpSpace"></h1>
+      <button class="x" type="button" id="close" aria-label="Close" data-i18n-aria-label="common.close">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">{{glyph:editor/close}}</svg>
       </button>
       <p class="sub" id="sub">&nbsp;</p>
@@ -206,8 +206,8 @@
 
     <section class="sec">
       <div class="sec-head">
-        <h2>Storage Analysis</h2>
-        <button class="link" type="button" id="library">Go to Library</button>
+        <h2 data-i18n="storage.storageAnalysis"></h2>
+        <button class="link" type="button" id="library" data-i18n="storage.goToLibrary"></button>
       </div>
       <div class="bar" id="bar"><span class="seg clips"></span><span class="seg temp"></span><span class="seg thumbs"></span></div>
       <ul class="legend" id="legend"></ul>
@@ -215,30 +215,30 @@
 
     <section class="sec" id="cmpSec">
       <div class="sec-head">
-        <h2>Compress Clips<span class="cmp-mode" id="cmpMode">Fast</span></h2>
+        <h2><span data-i18n="storage.compressClips2"></span><span class="cmp-mode" id="cmpMode" data-i18n="common.fast"></span></h2>
         <div class="switch" id="cmpFavSwitch">
-          <label class="sw-hit"><input type="checkbox" id="cmpSkipFav" checked aria-label="Skip favorites"><span class="sw"></span></label>
-          <span>Skip favorites</span>
+          <label class="sw-hit"><input type="checkbox" id="cmpSkipFav" checked aria-label="Skip favorites" data-i18n-aria-label="storage.skipFavorites"><span class="sw"></span></label>
+          <span data-i18n="storage.skipFavorites"></span>
         </div>
       </div>
 
       <div id="cmpPick">
-        <div id="cmpEmpty" class="cmp-empty" hidden>Nothing worth compressing right now. Your biggest clips are small already or as compressed as they can get.</div>
+        <div id="cmpEmpty" class="cmp-empty" hidden data-i18n="storage.nothingWorthCompressingRightNowYour"></div>
         <div id="cmpList" class="cmp-list" hidden></div>
         <div class="cmp-tools" id="cmpTools" hidden>
-          <button class="link" type="button" id="cmpAll">Select all</button>
-          <button class="link" type="button" id="cmpNone">Clear</button>
-          <button class="link cmp-more" type="button" id="cmpMore" hidden>Show more clips</button>
+          <button class="link" type="button" id="cmpAll" data-i18n="storage.selectAll"></button>
+          <button class="link" type="button" id="cmpNone" data-i18n="common.clear"></button>
+          <button class="link cmp-more" type="button" id="cmpMore" hidden data-i18n="storage.showMoreClips"></button>
         </div>
         <div class="cmp-foot" id="cmpFoot">
           <div class="cmp-summary">
             <span class="hint" id="cmpPicked"></span>
             <div class="cmp-details">
-              <span class="cmp-estimate" id="cmpEstInfo" hidden>Estimated savings: <b id="cmpEstimateValue"></b></span>
+              <span class="cmp-estimate" id="cmpEstInfo" hidden><span data-i18n="storage.estimatedSavings"></span> <b id="cmpEstimateValue"></b></span>
               <span class="status" id="cmpStatus" role="status" aria-live="polite"></span>
             </div>
           </div>
-          <button class="btn is-primary" type="button" id="cmpGo" aria-describedby="cmpEstInfo">Compress</button>
+          <button class="btn is-primary" type="button" id="cmpGo" aria-describedby="cmpEstInfo" data-i18n="common.compress"></button>
         </div>
       </div>
 
@@ -249,8 +249,8 @@
           <p id="cmpWarningText"></p>
         </div>
         <div class="cmp-actions">
-          <button class="btn is-primary" type="button" id="cmpStart">Start compressing</button>
-          <button class="btn" type="button" id="cmpBack">Cancel</button>
+          <button class="btn is-primary" type="button" id="cmpStart" data-i18n="storage.startCompressing"></button>
+          <button class="btn" type="button" id="cmpBack" data-i18n="common.cancel"></button>
         </div>
       </div>
 
@@ -261,34 +261,34 @@
             <span class="pct" id="cmpPct">0%</span>
           </div>
           <div class="run-txt">
-            <div class="run-title" id="cmpTitle">Compressing</div>
+            <div class="run-title" id="cmpTitle" data-i18n="storage.compressing"></div>
             <div class="run-sub" id="cmpCurrent" translate="no"></div>
             <div class="run-sub" id="cmpSaved"></div>
-            <div class="cmp-actions"><button class="btn" type="button" id="cmpStop">Stop</button></div>
+            <div class="cmp-actions"><button class="btn" type="button" id="cmpStop" data-i18n="common.stop"></button></div>
           </div>
         </div>
         <div class="callout" style="margin-top:14px">
           <span class="bang" aria-hidden="true">!</span>
-          <p>Avoid gaming or other demanding tasks until this finishes. Your PC may feel a little slower meanwhile.</p>
+          <p data-i18n="storage.avoidGamingOrOtherDemandingTasks"></p>
         </div>
       </div>
 
       <div id="cmpDone" hidden>
         <p class="run-title" id="cmpDoneText"></p>
-        <div class="cmp-actions"><button class="btn" type="button" id="cmpOk">Done</button></div>
+        <div class="cmp-actions"><button class="btn" type="button" id="cmpOk" data-i18n="common.done"></button></div>
       </div>
     </section>
 
     <section class="sec">
       <div class="row">
-        <h2>Set a Storage Limit</h2>
-        <div class="combo limit-combo" id="limitCombo" role="combobox" aria-expanded="false" aria-label="Storage limit"><button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
+        <h2 data-i18n="storage.setAStorageLimit"></h2>
+        <div class="combo limit-combo" id="limitCombo" role="combobox" aria-expanded="false" aria-label="Storage limit" data-i18n-aria-label="common.storageLimit"><button class="combo-button" type="button" aria-haspopup="listbox"><span class="combo-label"></span><span class="combo-arrow"><svg data-i="nav/combo-arrow" viewBox="0 0 16 16" aria-hidden="true"></svg></span></button><div class="combo-menu" role="listbox"></div></div>
       </div>
       <div class="custom" id="custom">
-        <input id="customGb" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Storage limit in GB">
-        <span class="unit">GB</span>
-        <button class="btn" type="button" id="customSet">Set limit</button>
-        <button class="btn" type="button" id="customCancel">Cancel</button>
+        <input id="customGb" type="text" inputmode="numeric" maxlength="6" autocomplete="off" spellcheck="false" aria-label="Storage limit in GB" data-i18n-aria-label="storage.storageLimitInGb">
+        <span class="unit" data-i18n="storage.gb"></span>
+        <button class="btn" type="button" id="customSet" data-i18n="storage.setLimit"></button>
+        <button class="btn" type="button" id="customCancel" data-i18n="common.cancel"></button>
       </div>
       <div class="over" id="over">
         <p id="overText"></p>
@@ -333,7 +333,9 @@
   let pollTimer = 0;
 
   async function helperJson(path, options) {
-    const res = await fetch(HELPER + path, { cache:"no-store", ...(options || {}) });
+    let res;
+    try { res = await fetch(HELPER + path, { cache:"no-store", ...(options || {}) }); }
+    catch (_) { throw new Error(RK_M("clips.replaykitCouldNotBeReached")); }
     const body = await res.json().catch(() => ({}));
     if (!res.ok || body.ok === false) {
       const err = new Error(body.message || ("HTTP " + res.status));
@@ -344,13 +346,13 @@
   }
 
   function limitName(gb) {
-    if (!gb) return "No Limit";
+    if (!gb) return RK_M("storage.noLimit");
     const preset = PRESETS.find((p) => p[0] === gb);
     if (preset) return preset[1];
     return gb >= 1024 && gb % 1024 === 0 ? (gb / 1024) + " TB" : gb + " GB";
   }
 
-  function clipsText(n) { return n === 1 ? RK_T("1 clip") : RK_T("{count} clips", { count: n }); }
+  function clipsText(n) { return n === 1 ? RK_M("storage.n1Clip") : RK_M("storage.countClips", { count: n }); }
 
   function setStatus(el, text, isError) {
     el.textContent = text || "";
@@ -359,13 +361,13 @@
   }
 
   function renderSub(s) {
-    const parts = [RK_T("Used: <b>{used}</b> / <b>{limit}</b>", { used: s.usedText, limit: s.limitGb ? limitName(s.limitGb) : RK_T("no limit") })];
-    if (s.freeBytes >= 0) parts.push(s.drive ? RK_T("Free: <b>{free}</b> ({drive})", { free: s.freeText, drive: s.drive }) : RK_T("Free: <b>{free}</b>", { free: s.freeText }));
+    const parts = [RK_MH("storage.usedUsedLimit", { used: s.usedText, limit: s.limitGb ? limitName(s.limitGb) : RK_M("storage.noLimit2") })];
+    if (s.freeBytes >= 0) parts.push(s.drive ? RK_MH("storage.freeFreeDrive", { free: s.freeText, drive: s.drive }) : RK_MH("storage.freeFree", { free: s.freeText }));
     els.sub.innerHTML = parts.join('<span class="sep"></span>');
   }
 
   function renderBar(s) {
-    const items = [["clips", s.clipBytes, "Clips", s.usedText], ["temp", s.tempBytes, "Temporary files", s.tempText], ["thumbs", s.thumbBytes, "Thumbnails", s.thumbText]];
+    const items = [["clips", s.clipBytes, RK_M("common.clips"), s.usedText], ["temp", s.tempBytes, RK_M("storage.temporaryFiles"), s.tempText], ["thumbs", s.thumbBytes, RK_M("storage.thumbnails"), s.thumbText]];
     const total = items.reduce((n, i) => n + Math.max(0, i[1]), 0);
     const segs = els.bar.children;
     items.forEach((item, i) => {
@@ -374,14 +376,15 @@
       segs[i].style.width = item[1] > 0 ? "max(" + pct.toFixed(3) + "%, 4px)" : "0";
     });
     // the temporary files include what is kept to open clips quickly in the editor, which is made again from the clips whenever one is opened, so they can be emptied from here
-    els.legend.innerHTML = items.map((i) => '<li><i class="' + i[0] + '"></i><span>' + i[2] + "</span> " + i[3] + (i[0] === "temp" && i[1] > 0 ? ' <button class="clear-temp" type="button" data-clear-temp title="Delete the temporary files. The ones kept to open clips quickly are made again the next time a clip is opened.">Clear</button>' : "") + "</li>").join("");
+    els.legend.innerHTML = items.map((i) => '<li><i class="' + i[0] + '"></i><span>' + i[2] + "</span> " + i[3] + (i[0] === "temp" && i[1] > 0 ? ' <button class="clear-temp" type="button" data-clear-temp data-i18n-title="storage.deleteTheTemporaryFilesTheOnes" data-i18n="common.clear"></button>' : "") + "</li>").join("");
   }
 
   els.legend.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-clear-temp]");
     if (!button || button.disabled) return;
     button.disabled = true;
-    try { await helperJson("/storage/clear-temp", { method:"POST" }); } catch (_) {}
+    try { await helperJson("/storage/clear-temp", { method:"POST" }); }
+    catch (err) { setStatus(els.limitStatus, err.message, true); }
     refresh(true);
   });
 
@@ -389,8 +392,8 @@
     showLimit(s.limitGb);
     if (s.state === "over" && !plan) {
       els.over.classList.add("is-shown");
-      els.overText.innerHTML = RK_T("Your library is <b>{size}</b> over the limit.", { size: s.overText });
-      els.overActions.innerHTML = '<button class="btn" type="button" id="review">Review the oldest clips</button>';
+      els.overText.innerHTML = RK_MH("storage.yourLibraryIsSizeOverThe", { size: s.overText });
+      els.overActions.innerHTML = '<button class="btn" type="button" id="review" data-i18n="storage.reviewTheOldestClips"></button>';
       $("review").addEventListener("click", reviewPlan);
     } else if (s.state !== "over") {
       els.over.classList.remove("is-shown");
@@ -417,9 +420,9 @@
     const key = String(custom);
     if (key !== limitOptionsKey) {
       limitOptionsKey = key;
-      const options = [{ value:"0", label:"No Limit" }].concat(PRESETS.map((p) => ({ value:String(p[0]), label:p[1] })));
+      const options = [{ value:"0", label:RK_M("storage.noLimit") }].concat(PRESETS.map((p) => ({ value:String(p[0]), label:p[1] })));
       if (custom) options.push({ value:String(custom), label:limitName(custom) });
-      options.push({ value:"custom", label:"Custom..." });
+      options.push({ value:"custom", label:RK_M("settings.custom") });
       limitCombo.setOptions(options);
     }
     limitCombo.value = String(gb || 0);
@@ -433,7 +436,7 @@
       els.custom.classList.remove("is-shown");
       await refresh(false);
     } catch (err) {
-      setStatus(els.limitStatus, "Could not save the limit.", true);
+      setStatus(els.limitStatus, RK_M("storage.couldNotSaveTheLimit"), true);
     }
   }
 
@@ -453,7 +456,7 @@
 
   function applyCustom() {
     const gb = parseInt(els.customGb.value, 10);
-    if (!Number.isFinite(gb) || gb < 1 || gb > 1000000) { setStatus(els.limitStatus, "Enter a size in GB, at least 1.", true); return; }
+    if (!Number.isFinite(gb) || gb < 1 || gb > 1000000) { setStatus(els.limitStatus, RK_M("storage.enterASizeInGbAt"), true); return; }
     saveLimit(gb);
   }
   els.customSet.addEventListener("click", applyCustom);
@@ -468,18 +471,18 @@
     try {
       plan = await helperJson("/storage/trim-plan?t=" + Date.now());
     } catch (err) {
-      setStatus(els.limitStatus, "Could not read your library.", true);
+      setStatus(els.limitStatus, RK_M("storage.couldNotReadYourLibrary"), true);
       return;
     }
     if (!plan.count) {
-      els.overText.innerHTML = RK_T("Every clip that could go is a favorite, so <b>nothing can be deleted</b> for you. Pick a higher limit or delete clips by hand.");
+      els.overText.innerHTML = RK_MH("storage.everyClipThatCouldGoIs");
       els.overActions.innerHTML = "";
       return;
     }
-    const oldest = plan.count === 1 ? RK_T("1 oldest clip") : RK_T("{count} oldest clips", { count: plan.count });
-    els.overText.innerHTML = RK_T("ReplayKit will delete your <b>{clips}</b> (<b>{size}</b>). Favorites are kept.", { clips: oldest, size: plan.bytesText }) +
-      (plan.insufficient ? " " + RK_T("That is still not enough to get under the limit, because your favorites take the rest.") : "");
-    els.overActions.innerHTML = '<button class="btn is-solid" type="button" id="confirmTrim">' + RK_T("Delete {clips}", { clips: clipsText(plan.count) }) + '</button><button class="btn" type="button" id="cancelTrim">Keep them</button>';
+    const oldest = plan.count === 1 ? RK_M("storage.n1OldestClip") : RK_M("storage.countOldestClips", { count: plan.count });
+    els.overText.innerHTML = RK_MH("storage.replaykitWillDeleteYourClipsSize", { clips: oldest, size: plan.bytesText }) +
+      (plan.insufficient ? " " + RK_M("storage.thatIsStillNotEnoughTo") : "");
+    els.overActions.innerHTML = '<button class="btn is-solid" type="button" id="confirmTrim">' + RK_M("storage.deleteClips", { clips: clipsText(plan.count) }) + '</button><button class="btn" type="button" id="cancelTrim" data-i18n="storage.keepThem"></button>';
     $("confirmTrim").addEventListener("click", applyPlan);
     $("cancelTrim").addEventListener("click", () => { plan = null; if (summary) render(summary); });
   }
@@ -488,14 +491,14 @@
     if (!plan || busy) return;
     busy = true;
     $("confirmTrim").disabled = true;
-    $("confirmTrim").textContent = "Deleting...";
+    $("confirmTrim").textContent = RK_M("storage.deleting");
     try {
       const done = await helperJson("/storage/trim-apply?token=" + encodeURIComponent(plan.token), { method:"POST" });
       plan = null;
-      setStatus(els.limitStatus, done.failed ? RK_T("Deleted {clips}, freed {size} ({failed} could not be deleted).", { clips: clipsText(done.deleted), size: done.freedText, failed: done.failed }) : RK_T("Deleted {clips}, freed {size}.", { clips: clipsText(done.deleted), size: done.freedText }), !!done.failed);
+      setStatus(els.limitStatus, done.failed ? RK_M("storage.deletedClipsFreedSizeFailedCould", { clips: clipsText(done.deleted), size: done.freedText, failed: done.failed }) : RK_M("storage.deletedClipsFreedSize", { clips: clipsText(done.deleted), size: done.freedText }), !!done.failed);
     } catch (err) {
       plan = null;
-      setStatus(els.limitStatus, err.message || "Could not delete the clips.", true);
+      setStatus(els.limitStatus, err.message || RK_M("storage.couldNotDeleteTheClips"), true);
     } finally {
       busy = false;
       await refresh(true);
@@ -512,13 +515,13 @@
   function showCompressionType(mode) {
     cmp.mode = mode === "smaller" ? "smaller" : "fast";
     const smaller = cmp.mode === "smaller";
-    els.mode.textContent = smaller ? "Smaller" : "Fast";
+    els.mode.textContent = smaller ? RK_M("common.smaller") : RK_M("common.fast");
     els.mode.classList.toggle("is-slow", smaller);
     els.warning.classList.toggle("is-slow", smaller);
     els.warningText.textContent = smaller
-      ? "Smaller can take much longer and uses more CPU. Large libraries may take hours. Avoid gaming or other demanding tasks while it runs. It continues if you close this window and replaces each clip only when the result is smaller."
-      : "Fast uses your GPU when supported to finish sooner. It continues if you close this window and replaces each clip only when the result is smaller.";
-    els.empty.textContent = smaller ? "No large clips are eligible for Smaller compression." : "No large uncompressed clips are available for Fast compression.";
+      ? RK_M("storage.smallerCanTakeMuchLongerAnd")
+      : RK_M("storage.fastUsesYourGpuWhenSupported");
+    els.empty.textContent = smaller ? RK_M("storage.noLargeClipsAreEligibleFor") : RK_M("storage.noLargeUncompressedClipsAreAvailable");
   }
 
   function showPhase(phase) {
@@ -553,7 +556,7 @@
     els.picked.hidden = !has;
     els.tools.hidden = !has;
     els.more.hidden = !has || !cmp.hasMore || cmp.limit >= CMP_MAX;
-    els.more.textContent = RK_T("Show {count} more clips", { count: Math.min(CMP_PAGE, CMP_MAX - cmp.limit) });
+    els.more.textContent = RK_M("storage.showCountMoreClips", { count: Math.min(CMP_PAGE, CMP_MAX - cmp.limit) });
     els.list.textContent = "";
     const items = document.createElement("div");
     items.className = "cmp-items";
@@ -594,11 +597,11 @@
   function renderPickedFoot() {
     const count = cmp.picked.size;
     const estimate = pickedEstimate();
-    els.picked.innerHTML = count ? RK_T("<b>{count}</b> selected · {size}", { count: count, size: formatBytes(pickedBytes()) }) : "Pick the clips to compress";
+    els.picked.innerHTML = count ? RK_MH("storage.countSelectedSize", { count: count, size: formatBytes(pickedBytes()) }) : RK_M("storage.pickTheClipsToCompress");
     els.estInfo.hidden = !count || !estimate;
     els.estimateValue.textContent = count && estimate ? formatBytes(estimate) : "";
     els.go.disabled = cmp.loading || count === 0 || !!(summary && summary.busy);
-    els.go.textContent = count ? RK_T("Compress {clips}", { clips: clipsText(count) }) : "Compress";
+    els.go.textContent = count ? RK_M("storage.compressClips", { clips: clipsText(count) }) : RK_M("common.compress");
   }
 
   async function loadCandidates() {
@@ -607,7 +610,7 @@
     cmp.loading = true;
     els.go.disabled = true;
     els.more.disabled = true;
-    setStatus(els.cmpStatus, "Checking clip eligibility...");
+    setStatus(els.cmpStatus, RK_M("storage.checkingClipEligibility"));
     try {
       const data = await helperJson("/storage/compress-candidates?favorites=" + (els.skipFav.checked ? "0" : "1") + "&limit=" + cmp.limit + "&t=" + Date.now());
       if (generation !== cmp.loadGeneration) return;
@@ -621,7 +624,7 @@
       const kept = new Set();
       cmp.clips.forEach((c) => { if (firstPage || !previous.has(c.name) || cmp.picked.has(c.name)) kept.add(c.name); });
       cmp.picked = kept;
-      setStatus(els.cmpStatus, data.unchecked ? RK_T("{count} clips could not be checked and were left out.", { count: data.unchecked }) : "");
+      setStatus(els.cmpStatus, data.unchecked ? RK_M("storage.countClipsCouldNotBeChecked", { count: data.unchecked }) : "");
       renderPick();
     } catch (err) {
       if (generation !== cmp.loadGeneration) return;
@@ -629,7 +632,7 @@
       cmp.picked.clear();
       cmp.hasMore = false;
       renderPick();
-      setStatus(els.cmpStatus, err.message || "Could not check clip eligibility.", true);
+      setStatus(els.cmpStatus, err.message || RK_M("storage.couldNotCheckClipEligibility"), true);
     } finally {
       if (generation === cmp.loadGeneration) {
         cmp.loading = false;
@@ -647,10 +650,10 @@
     if (cmp.loading || !cmp.picked.size) return;
     setStatus(els.cmpStatus, "");
     const estimate = pickedEstimate();
-    const picked = cmp.picked.size === 1 ? RK_T("<b>1</b> clip") : RK_T("<b>{count}</b> clips", { count: cmp.picked.size });
+    const picked = cmp.picked.size === 1 ? RK_MH("common.n1Clip") : RK_MH("common.countClips", { count: cmp.picked.size });
     els.confirmSum.innerHTML = estimate
-      ? RK_T("Compressing {clips} ({size}) should free about <b>{estimate}</b>.", { clips: picked, size: formatBytes(pickedBytes()), estimate: formatBytes(estimate) })
-      : RK_T("Compressing {clips} ({size}).", { clips: picked, size: formatBytes(pickedBytes()) });
+      ? RK_MH("storage.compressingClipsSizeShouldFreeAbout", { clips: picked, size: formatBytes(pickedBytes()), estimate: formatBytes(estimate) })
+      : RK_M("storage.compressingClipsSize", { clips: picked, size: formatBytes(pickedBytes()) });
     showPhase("confirm");
   });
   els.back.addEventListener("click", () => showPhase("pick"));
@@ -667,7 +670,7 @@
       pollCompress(true);
     } catch (err) {
       showPhase("pick");
-      setStatus(els.cmpStatus, err.message || "Could not start compressing.", true);
+      setStatus(els.cmpStatus, err.message || RK_M("storage.couldNotStartCompressing"), true);
       if (err.body && err.body.changed) await loadCandidates();
     } finally {
       cmp.starting = false;
@@ -677,8 +680,9 @@
 
   els.stop.addEventListener("click", async () => {
     els.stop.disabled = true;
-    els.stop.textContent = "Stopping...";
-    try { await helperJson("/storage/compress-cancel", { method:"POST" }); } catch (_) {}
+    els.stop.textContent = RK_M("common.stopping");
+    try { await helperJson("/storage/compress-cancel", { method:"POST" }); }
+    catch (err) { els.stop.disabled = false; els.stop.textContent = RK_M("common.stop"); setStatus(els.cmpStatus, err.message, true); }
   });
 
   function acknowledgeDone() {
@@ -700,18 +704,18 @@
     els.arc.style.strokeDashoffset = String(RING * (1 - percent / 100));
     els.pct.textContent = percent + "%";
     const position = Math.min(st.total || 0, (st.done || 0) + (st.failed || 0) + 1);
-    els.runTitle.textContent = RK_T("Compressing {position} of {total}", { position: position, total: st.total || 0 });
+    els.runTitle.textContent = RK_M("storage.compressingPositionOfTotal", { position: position, total: st.total || 0 });
     els.runCurrent.textContent = st.current || "";
-    els.runSaved.innerHTML = RK_T("Freed so far: <b>{size}</b>", { size: st.savedText || "0 B" });
-    if (!st.cancelled) { els.stop.disabled = false; els.stop.textContent = "Stop"; }
+    els.runSaved.innerHTML = RK_MH("storage.freedSoFarSize", { size: st.savedText || "0 B" });
+    if (!st.cancelled) { els.stop.disabled = false; els.stop.textContent = RK_M("common.stop"); }
   }
 
   function paintDone(st) {
     if (st.mode) showCompressionType(st.mode);
     const clips = clipsText(st.done || 0);
-    let text = st.cancelled ? RK_T("Stopped after {clips}, freed {size}.", { clips: clips, size: st.savedText }) : RK_T("Compressed {clips} and freed {size}.", { clips: clips, size: st.savedText });
-    if (st.failed) text += " " + (st.error ? RK_T("{count} could not be compressed ({error}).", { count: st.failed, error: st.error }) : RK_T("{count} could not be compressed.", { count: st.failed }));
-    if (!st.done && !st.cancelled && st.failed && st.error) text = RK_T("Nothing was compressed: {error}", { error: st.error });
+    let text = st.cancelled ? RK_M("storage.stoppedAfterClipsFreedSize", { clips: clips, size: st.savedText }) : RK_M("storage.compressedClipsAndFreedSize", { clips: clips, size: st.savedText });
+    if (st.failed) text += " " + (st.error ? RK_M("storage.countCouldNotBeCompressedError", { count: st.failed, error: st.error }) : RK_M("storage.countCouldNotBeCompressed", { count: st.failed }));
+    if (!st.done && !st.cancelled && st.failed && st.error) text = RK_M("storage.nothingWasCompressedError", { error: st.error });
     els.doneText.textContent = text;
   }
 

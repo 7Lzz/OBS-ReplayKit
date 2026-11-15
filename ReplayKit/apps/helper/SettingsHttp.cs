@@ -135,59 +135,59 @@ namespace ReplayKitHelper
                     ["options"] = new JObject
                     {
                         ["recordingPresets"] = new JArray(
-                            new JObject { ["value"] = "performance", ["label"] = "Performance", ["blurb"] = "720p30. Lowest load and smaller files." },
-                            new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "1080p60. Recommended for most PCs." },
-                            new JObject { ["value"] = "quality", ["label"] = "Quality", ["blurb"] = "Higher-quality target for high-end PCs." }
+                            new JObject { ["value"] = "performance", ["label"] = Locales.Message("wizard.performance"), ["blurb"] = Locales.Message("settings.presetPerformanceBlurb") },
+                            new JObject { ["value"] = "balanced", ["label"] = Locales.Message("wizard.balanced"), ["blurb"] = Locales.Message("settings.presetBalancedBlurb") },
+                            new JObject { ["value"] = "quality", ["label"] = Locales.Message("wizard.quality"), ["blurb"] = Locales.Message("settings.presetQualityBlurb") }
                         ),
                         ["compressionModes"] = new JArray(
-                            new JObject { ["value"] = "lower_gpu", ["label"] = "Lowest GPU use", ["blurb"] = "Least encoder work. Larger clips." },
-                            new JObject { ["value"] = "balanced", ["label"] = "Balanced", ["blurb"] = "Good file size with modest encoder load." },
-                            new JObject { ["value"] = "smaller_files", ["label"] = "Smallest clips", ["blurb"] = "More encoder work for tighter files." },
-                            new JObject { ["value"] = "tiniest", ["label"] = "Microscopic GPU Cooker", ["blurb"] = "Preset P7 with two full resolution passes. The tiniest clips, and the most work your GPU can do for them." }
+                            new JObject { ["value"] = "lower_gpu", ["label"] = Locales.Message("settings.lowestGpuUse"), ["blurb"] = Locales.Message("settings.compressionLowerGpuBlurb") },
+                            new JObject { ["value"] = "balanced", ["label"] = Locales.Message("wizard.balanced"), ["blurb"] = Locales.Message("settings.compressionBalancedBlurb") },
+                            new JObject { ["value"] = "smaller_files", ["label"] = Locales.Message("settings.smallestClips"), ["blurb"] = Locales.Message("settings.compressionSmallerBlurb") },
+                            new JObject { ["value"] = "tiniest", ["label"] = Locales.Message("settings.microscopicGpuCooker"), ["blurb"] = Locales.Message("settings.compressionTiniestBlurb") }
                         ),
                         ["codecs"] = new JArray(
-                            new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = "Recommended. Plays everywhere: phones, browsers, Discord and editors." },
-                            new JObject { ["value"] = "h265", ["label"] = "HEVC / H.265", ["blurb"] = "Smaller files, but HEVC / H.265 clips may not play for some people, on some phones, browsers and apps." }
+                            new JObject { ["value"] = "h264", ["label"] = "H.264", ["blurb"] = Locales.Message("settings.codecH264Blurb") },
+                            new JObject { ["value"] = "h265", ["label"] = Locales.Message("settings.hevcH265"), ["blurb"] = Locales.Message("settings.codecH265Blurb") }
                         ),
                         ["recordingScaleModes"] = new JArray(
-                            new JObject { ["value"] = "native", ["label"] = "Native", ["blurb"] = "Record at your monitor's full resolution. Sharpest image, but more GPU load and bigger files." },
-                            new JObject { ["value"] = "downscale", ["label"] = "Downscale", ["blurb"] = "Shrink the recording to the size below. Lighter on the GPU and smaller files, slightly softer." }
+                            new JObject { ["value"] = "native", ["label"] = Locales.Message("settings.scaleNative"), ["blurb"] = Locales.Message("settings.scaleNativeBlurb") },
+                            new JObject { ["value"] = "downscale", ["label"] = Locales.Message("settings.scaleDownscale"), ["blurb"] = Locales.Message("settings.scaleDownscaleBlurb") }
                         ),
                         ["downscaleResolutions"] = BuildDownscaleResolutionList(),
                         ["recordingBuffers"] = ClipBuffer.Options(),
                         ["downscaleFilters"] = new JArray(
-                            new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = "Sharpest, 36-sample. Default." },
-                            new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = "16-sample, slightly softer than Lanczos." },
-                            new JObject { ["value"] = "area", ["label"] = "Area", ["blurb"] = "Clean average, no sharpening pass." },
-                            new JObject { ["value"] = "bilinear", ["label"] = "Bilinear", ["blurb"] = "Fastest, softest." }
+                            new JObject { ["value"] = "lanczos", ["label"] = "Lanczos", ["blurb"] = Locales.Message("settings.filterLanczosBlurb") },
+                            new JObject { ["value"] = "bicubic", ["label"] = "Bicubic", ["blurb"] = Locales.Message("settings.filterBicubicBlurb") },
+                            new JObject { ["value"] = "area", ["label"] = "Area", ["blurb"] = Locales.Message("settings.filterAreaBlurb") },
+                            new JObject { ["value"] = "bilinear", ["label"] = "Bilinear", ["blurb"] = Locales.Message("settings.filterBilinearBlurb") }
                         ),
                         ["overlays"] = new JArray(
-                            new JObject { ["value"] = "input_overlay", ["label"] = "WASD / mouse", ["blurb"] = "Simple keyboard and mouse overlay." },
-                            new JObject { ["value"] = "bongo_cat", ["label"] = "Bongo Cat", ["blurb"] = "Animated keyboard and mouse overlay." },
-                            new JObject { ["value"] = "off", ["label"] = "Off", ["blurb"] = "No input overlay in the OBS scene." }
+                            new JObject { ["value"] = "input_overlay", ["label"] = Locales.Message("settings.wasdMouse"), ["blurb"] = Locales.Message("settings.simpleKeyboardAndMouseOverlay") },
+                            new JObject { ["value"] = "bongo_cat", ["label"] = Locales.Message("settings.bongoCat"), ["blurb"] = Locales.Message("settings.animatedKeyboardAndMouseOverlay") },
+                            new JObject { ["value"] = "off", ["label"] = Locales.Message("settings.off"), ["blurb"] = Locales.Message("settings.noInputOverlayInTheObs") }
                         ),
                         ["inputOverlay"] = InputOverlayLayouts.Options(),
                         ["bongoModes"] = new JArray(
-                            new JObject { ["value"] = "standard", ["label"] = "Standard", ["blurb"] = "Mouse paw, plus 1 to 7, Q, E, R, A, S, D, W and Space." },
-                            new JObject { ["value"] = "keyboard", ["label"] = "Keyboard", ["blurb"] = "Two paws on the arrow keys, R, Left Ctrl and Left Shift." },
-                            new JObject { ["value"] = "feixue", ["label"] = "Feixue", ["blurb"] = "Game panel with W, A, S, D and Space, and a mouse paw." },
-                            new JObject { ["value"] = "mania", ["label"] = "Mania", ["blurb"] = "Rhythm game keys Z, X, comma and period." }
+                            new JObject { ["value"] = "standard", ["label"] = Locales.Message("common.standard"), ["blurb"] = Locales.Message("settings.mousePawPlus1To7") },
+                            new JObject { ["value"] = "keyboard", ["label"] = Locales.Message("settings.keyboard"), ["blurb"] = Locales.Message("settings.twoPawsOnTheArrowKeys") },
+                            new JObject { ["value"] = "feixue", ["label"] = Locales.Message("settings.feixue"), ["blurb"] = Locales.Message("settings.gamePanelWithWAS") },
+                            new JObject { ["value"] = "mania", ["label"] = Locales.Message("settings.mania"), ["blurb"] = Locales.Message("settings.rhythmGameKeysZXComma") }
                         ),
                         ["screenshareCaptureModes"] = new JArray(
-                            new JObject { ["value"] = "hybrid_auto", ["label"] = "Auto", ["blurb"] = "Desktop fallback with fullscreen Game Capture on top." },
-                            new JObject { ["value"] = "desktop", ["label"] = "Desktop", ["blurb"] = "Show the full ReplayKit desktop capture." },
-                            new JObject { ["value"] = "game_auto", ["label"] = "Game only", ["blurb"] = "Use OBS Game Capture for any fullscreen game." },
-                            new JObject { ["value"] = "game_window", ["label"] = "Specific game", ["blurb"] = "Use Window Capture for the selected game window." }
+                            new JObject { ["value"] = "hybrid_auto", ["label"] = Locales.Message("settings.captureAuto"), ["blurb"] = Locales.Message("settings.captureAutoBlurb") },
+                            new JObject { ["value"] = "desktop", ["label"] = Locales.Message("clips.desktop"), ["blurb"] = Locales.Message("settings.captureDesktopBlurb") },
+                            new JObject { ["value"] = "game_auto", ["label"] = Locales.Message("settings.gameOnly"), ["blurb"] = Locales.Message("settings.captureGameBlurb") },
+                            new JObject { ["value"] = "game_window", ["label"] = Locales.Message("settings.specificGame"), ["blurb"] = Locales.Message("settings.captureWindowBlurb") }
                         ),
                         ["screenshareGameWindows"] = new JArray(GetGameWindowCandidates(settings["screenshareGameWindow"]?.Value<string>() ?? "")),
                         ["captureDisplays"] = CaptureDisplayOptions(settings["captureDisplay"]?.Value<string>() ?? "primary"),
                         ["discordOutputModes"] = new JArray(
-                            new JObject { ["value"] = "projector", ["label"] = "Projector", ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
+                            new JObject { ["value"] = "projector", ["label"] = Locales.Message("common.projector"), ["blurb"] = "OBS Windowed Projector parked by ReplayKit." }
                         ),
                         ["keybinds"] = new JArray(
                             new JObject { ["value"] = "f8", ["label"] = "F8", ["blurb"] = "Default ReplayKit save hotkey.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F8" } },
-                            new JObject { ["value"] = "shift_backslash", ["label"] = "Shift + \\", ["blurb"] = "The classic ReplayKit save hotkey.", ["combo"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" } },
-                            new JObject { ["value"] = "ctrl_shift_s", ["label"] = "Ctrl + Shift + S", ["blurb"] = "Easy to remember, uses two modifiers.", ["combo"] = new JObject { ["control"] = true, ["shift"] = true, ["key"] = "OBS_KEY_S" } },
+                            new JObject { ["value"] = "shift_backslash", ["label"] = Locales.Message("settings.shift"), ["blurb"] = "The classic ReplayKit save hotkey.", ["combo"] = new JObject { ["shift"] = true, ["key"] = "OBS_KEY_BACKSLASH" } },
+                            new JObject { ["value"] = "ctrl_shift_s", ["label"] = Locales.Message("settings.ctrlShiftS"), ["blurb"] = "Easy to remember, uses two modifiers.", ["combo"] = new JObject { ["control"] = true, ["shift"] = true, ["key"] = "OBS_KEY_S" } },
                             new JObject { ["value"] = "f9", ["label"] = "F9", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F9" } },
                             new JObject { ["value"] = "f10", ["label"] = "F10", ["blurb"] = "Single function key.", ["combo"] = new JObject { ["key"] = "OBS_KEY_F10" } }
                         ),
@@ -600,10 +600,10 @@ namespace ReplayKitHelper
                 return;
             }
             Log.Write("CheckBongoCat: bongo cat input kind registered: " + loaded + ", source uses ReplayKit renderer: " + sourceCurrent + ", Bango Cat folder and baked models present: " + filesPresent + ".");
-            Notifications.Add("warning", BongoCatNoticeKey, Locales.T("Bongo Cat is not working"), !filesPresent
-                ? Locales.T("The Bongo Cat files are missing (the Bango Cat folder in OBS or the ReplayKit cat models), so the overlay cannot show. Antivirus can remove them. Run the ReplayKit installer again to put them back.")
-                : !loaded ? Locales.T("OBS started without the ReplayKit plugin that draws Bongo Cat, so the overlay cannot show. Restart OBS. If it keeps happening, run the ReplayKit installer again.")
-                : Locales.T("The Bongo Cat source is missing or still uses the older renderer. Run the ReplayKit installer again to repair the saved scene."));
+            Notifications.Add("warning", BongoCatNoticeKey, Locales.Message("settings.bongoCatIsNotWorking"), !filesPresent
+                ? Locales.Message("settings.theBongoCatFilesAreMissing")
+                : !loaded ? Locales.Message("settings.obsStartedWithoutTheReplaykitPlugin")
+                : Locales.Message("settings.theBongoCatSourceIsMissing"));
         }
 
         internal static bool TestOnlyOverlayVisualChanged(JObject previous, JObject settings)
@@ -697,7 +697,7 @@ namespace ReplayKitHelper
         {
             lock (SettingsStore.Gate)
             {
-                if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException("Missing settings body.");
+                if (string.IsNullOrWhiteSpace(body)) throw new InvalidOperationException(Locales.Message("settings.missingSettingsBody"));
                 var incoming = JObject.Parse(body);
                 string language = TakeLanguage(incoming);
                 var result = SaveSettings(incoming);

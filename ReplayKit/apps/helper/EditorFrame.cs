@@ -17,9 +17,9 @@ namespace ReplayKitHelper
         public static (int W, int H) Size(string aspect, int width, int height)
         {
             if (aspect == "original") return (width, height);
-            if (!Ratios.TryGetValue(aspect, out var ratio)) throw new ArgumentException("Unknown aspect ratio");
+            if (!Ratios.TryGetValue(aspect, out var ratio)) throw new ArgumentException(Locales.Message("editor.unknownAspectRatio"));
             int unit = (int)Math.Floor(Math.Min((double)width / ratio.W, (double)height / ratio.H) / 2) * 2;
-            if (unit < 2) throw new ArgumentException("The video is too small for this aspect ratio");
+            if (unit < 2) throw new ArgumentException(Locales.Message("editor.theVideoIsTooSmallFor"));
             return (unit * ratio.W, unit * ratio.H);
         }
 

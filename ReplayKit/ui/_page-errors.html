@@ -1,0 +1,18 @@
+<script>
+(function () {
+  // each distinct error goes to the helper log once, and a page stops after twenty so a broken poll cannot flood it
+  const sent = new Set();
+  function report(error) {
+    const text = error && (error.stack || error.message) ? String(error.stack || error.message) : String(error);
+    if (sent.has(text) || sent.size >= 20) return;
+    sent.add(text);
+    fetch(location.origin + "/page-error", {
+      method: "POST", cache: "no-store", keepalive: true,
+      body: JSON.stringify({ page: location.pathname, message: text.slice(0, 4000) }),
+    }).catch(function () {});
+  }
+  window.rkReportError = report;
+  window.addEventListener("error", function (e) { report(e.error || e.message); });
+  window.addEventListener("unhandledrejection", function (e) { report(e.reason); });
+})();
+</script>

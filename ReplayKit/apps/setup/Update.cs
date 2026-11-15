@@ -43,7 +43,7 @@ namespace ReplayKitSetup
         {
             if (complete) File.Delete(PendingFile());
             WriteResult(complete, complete ? "done" : "incomplete",
-                complete ? "ReplayKit setup completed." : "ReplayKit setup is incomplete. Run the installer again to finish the repair.");
+                complete ? SetupLocale.Message("setup.replaykitSetupCompleted") : SetupLocale.Message("setup.replaykitSetupIsIncompleteRunThe"));
         }
 
         private static void MarkUpdatePending()
@@ -185,7 +185,7 @@ namespace ReplayKitSetup
                 // stage markers: a process that is killed leaves no exception behind, so the last line in the log is the only thing that says where it got to.
                 Log("stage: obs closed, waiting for helper pid " + waitPid);
                 if (!WaitForPid(waitPid > 0 ? waitPid : 0, 60, LogBoth))
-                    throw new IOException("The old ReplayKit helper could not be stopped, so no files were changed.");
+                    throw new IOException(SetupLocale.Message("setup.theOldReplaykitHelperCouldNot"));
                 Log("stage: helper gone, clearing crash flags");
                 Obs.CleanupCrashFlags(LogBoth);
                 Log("stage: copying runtime files");
@@ -239,11 +239,11 @@ namespace ReplayKitSetup
             public int TotalSteps { get; set; }
             public List<string> Issues { get; } = new List<string>();
 
-            public void Render(int completed, string title, string detail, string state = "working")
+            public void Render(int completed, SetupLocale.Text title, SetupLocale.Text detail, string state = "working")
             {
                 string status = state == "done" ? "done" : (state == "failed" ? "failed" : "working");
-                string message = $"[{completed}/{Math.Max(1, TotalSteps)}] {status}: {title}";
-                if (!string.IsNullOrEmpty(detail)) message += " - " + detail;
+                string message = $"[{completed}/{Math.Max(1, TotalSteps)}] {status}: {title.English}";
+                if (!string.IsNullOrEmpty(detail.English)) message += " - " + detail.English;
                 Log(message);
                 try { Console.WriteLine(message); } catch (IOException) { }
             }
@@ -253,13 +253,13 @@ namespace ReplayKitSetup
                 string text = (message ?? "").Trim();
                 if (text.Length == 0) return;
                 Log(text);
-                if (Apply.LooksLikeIssue(text)) AddIssue(text);
+                if (Apply.LooksLikeIssue(text)) AddIssue(new SetupLocale.Text(text, text));
                 try { Console.WriteLine(text); } catch (IOException) { }
             }
 
-            public void AddIssue(string message)
+            public void AddIssue(SetupLocale.Text message)
             {
-                string cleaned = string.Join(" ", (message ?? "").Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
+                string cleaned = string.Join(" ", (message.Shown ?? "").Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
                 if (cleaned.Length > 118) cleaned = cleaned.Substring(0, 115) + "...";
                 if (cleaned.Length > 0 && !Issues.Contains(cleaned)) Issues.Add(cleaned);
             }
@@ -295,8 +295,8 @@ namespace ReplayKitSetup
                 Log("discord screenshare install starting");
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
                 var progress = new CleanupProgress { TotalSteps = 2 };
-                Apply.RunApplyStep(progress, 1, "Close OBS", "Stops OBS and ReplayKit helpers so the audio driver can be installed.", () => Cleanup.StopObsAndHelpers(progress.LogLine));
-                Apply.RunApplyStep(progress, 2, "Install OBS Stream Audio", "Installs the ReplayKit virtual audio device.", () => VbCable.EnsureVbcable(progress.LogLine));
+                Apply.RunApplyStep(progress, 1, SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersSo"), () => Cleanup.StopObsAndHelpers(progress.LogLine));
+                Apply.RunApplyStep(progress, 2, SetupLocale.Pair("setup.installObsStreamAudio"), SetupLocale.Pair("setup.installsTheReplaykitVirtualAudioDevice"), () => VbCable.EnsureVbcable(progress.LogLine));
                 var prefs = Prefs.LoadPrefs();
                 prefs.DiscordScreenshareEnabled = true;
                 prefs.DiscordProjectorEnabled = true;
@@ -320,8 +320,8 @@ namespace ReplayKitSetup
                 Log("discord screenshare removal starting");
                 if (startDelayMs > 0) Thread.Sleep(Math.Min(startDelayMs, 5000));
                 var progress = new CleanupProgress { TotalSteps = 2 };
-                Apply.RunApplyStep(progress, 1, "Close OBS", "Stops OBS and ReplayKit helpers so the audio driver can be removed.", () => Cleanup.StopObsAndHelpers(progress.LogLine));
-                Apply.RunApplyStep(progress, 2, "Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", () => VbCable.UninstallVbcable(progress.LogLine));
+                Apply.RunApplyStep(progress, 1, SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersSo2"), () => Cleanup.StopObsAndHelpers(progress.LogLine));
+                Apply.RunApplyStep(progress, 2, SetupLocale.Pair("setup.removeObsStreamAudio"), SetupLocale.Pair("setup.uninstallsTheReplaykitVirtualAudioDevice"), () => VbCable.UninstallVbcable(progress.LogLine));
                 var prefs = Prefs.LoadPrefs();
                 prefs.DiscordScreenshareEnabled = false;
                 prefs.DiscordProjectorEnabled = false;

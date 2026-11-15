@@ -33,7 +33,7 @@ namespace ReplayKitSetup
                     {
                         string target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
                         if (!target.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidDataException("Bundled entry is outside the unpack folder.");
+                            throw new InvalidDataException(SetupLocale.Message("setup.bundledEntryIsOutsideTheUnpack"));
                         if (entry.Name.Length == 0)
                         {
                             Directory.CreateDirectory(target);

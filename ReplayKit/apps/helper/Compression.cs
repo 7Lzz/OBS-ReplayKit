@@ -353,7 +353,7 @@ namespace ReplayKitHelper
                 proc.WaitForExit();
                 string combined = (stdoutTask?.Result ?? stdoutRemainder) + stderrTask.Result;
                 cancellationToken.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
+                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.externalToolExceededItsTimeLimit"));
                 return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = combined.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };
             }
         }
@@ -396,7 +396,7 @@ namespace ReplayKitHelper
                 proc.WaitForExit();
                 string errText = stderrTask.Result;
                 cancellationToken.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException("External tool exceeded its time limit.");
+                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.externalToolExceededItsTimeLimit"));
                 return new NativeCaptureResult { ExitCode = proc.ExitCode, Output = errText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList() };
             }
         }
@@ -533,7 +533,7 @@ namespace ReplayKitHelper
             string requestId = UploadState.NewRequestId();
 
             if (selected == null || !File.Exists(selected.Full))
-                return new JObject { ["ok"] = false, ["message"] = "Clip not found" };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") };
 
             var auth = Upload.CaptureAuth();
             long effCap = auth.SizeCap;
@@ -557,7 +557,7 @@ namespace ReplayKitHelper
                 double duration = metadata.Duration;
                 if (duration < 1)
                 {
-                    string msg = "Could not read video duration for compression.";
+                    string msg = Locales.Message("storage.couldNotReadVideoDurationFor");
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg };
                 }
@@ -566,7 +566,7 @@ namespace ReplayKitHelper
                 if (auth.DurationLimited && duration > Constants.STREAMABLE_FREE_MAX_DURATION_SEC)
                 {
                     int total = (int)Math.Round(duration);
-                    string msg = Locales.T("Clip is {length} long. Streamable's limit is 10 minutes -- trim it shorter first.", "length", (total / 60) + ":" + (total % 60).ToString("D2"));
+                    string msg = Locales.Message("common.clipIsLengthLongStreamableS", "length", (total / 60) + ":" + (total % 60).ToString("D2"));
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooLong"] = true, ["durationSec"] = total };
                 }
@@ -574,7 +574,7 @@ namespace ReplayKitHelper
                 long targetBytes = (long)Math.Floor(effCap * 0.88);
                 if (targetBytes < 5L * 1024 * 1024)
                 {
-                    string msg = "Upload size limit is too small for automatic compression.";
+                    string msg = Locales.Message("storage.uploadSizeLimitIsTooSmall");
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg };
                 }
@@ -586,7 +586,7 @@ namespace ReplayKitHelper
                 {
                     long capMb = effCap / 1024 / 1024;
                     long sizeMb = (long)Math.Ceiling(new FileInfo(selected.Full).Length / 1024.0 / 1024.0);
-                    string msg = Locales.T("Clip is too long to compress under {size} MB without going below a safe video bitrate", "size", capMb);
+                    string msg = Locales.Message("storage.clipIsTooLongToCompress", "size", capMb);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: selected.Name, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = sizeMb, ["capMb"] = capMb };
                 }
@@ -614,7 +614,7 @@ namespace ReplayKitHelper
                     Upload.HandleUploadCompletion(t, requestId, selectedName, sourcePath: selectedFull, auth: auth);
                 });
 
-                return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = "Compressing temp copy and uploading" };
+                return new JObject { ["ok"] = true, ["state"] = "compressing", ["clip"] = selectedName, ["requestId"] = requestId, ["message"] = Locales.Message("storage.compressingTempCopyAndUploading") };
             }
         }
     }

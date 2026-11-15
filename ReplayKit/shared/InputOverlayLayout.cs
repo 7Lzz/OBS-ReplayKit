@@ -24,25 +24,25 @@ namespace ReplayKitShared
 
         public sealed class Layout
         {
-            public string Id, Label, Blurb, Json, Sheet;
+            public string Id, Label, Json, Sheet;
         }
 
         // the json and sheet paths are relative to the input-overlay-presets folder
         public static readonly Layout[] Keyboards =
         {
-            new Layout { Id = "wasd-minimal", Label = "WASD", Blurb = "W, A, S and D with Q, E, Shift, Ctrl and Space.", Json = "wasd/wasd-minimal.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-full", Label = "WASD Full", Blurb = "WASD with Tab, R and F as well.", Json = "wasd/wasd-full.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant", Label = "Valorant", Blurb = "WASD with Tab, F, C and 4 for agent abilities.", Json = "wasd/wasd-valorant.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-valorant-micro", Label = "Valorant Small", Blurb = "WASD with Tab and C, and a shorter Space.", Json = "wasd/wasd-valorant-micro.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = "wasd-numbers", Label = "WASD Numbers", Blurb = "WASD with 1 to 5, Tab, Alt, R, T, F, G, Z, X, C, V and B.", Json = "wasd-extended-numeric/wasd-extended-numeric.json", Sheet = "wasd-extended-numeric/wasd-extended-numeric.png" },
-            new Layout { Id = "wasd-numbers-small", Label = "WASD Numbers Small", Blurb = "WASD with 1 to 4, Tab, Alt, R, Z, X and C.", Json = "wasd-extended-numeric/wasd-extended-numeric-min.json", Sheet = "wasd/wasd.png" },
-            new Layout { Id = Custom, Label = "Custom", Blurb = "Any keys you pick, in the look of WASD.", Json = null, Sheet = null },
+            new Layout { Id = "wasd-minimal", Label = "WASD", Json = "wasd/wasd-minimal.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-full", Label = "WASD Full", Json = "wasd/wasd-full.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-valorant", Label = "Valorant", Json = "wasd/wasd-valorant.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-valorant-micro", Label = "Valorant Small", Json = "wasd/wasd-valorant-micro.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = "wasd-numbers", Label = "WASD Numbers", Json = "wasd-extended-numeric/wasd-extended-numeric.json", Sheet = "wasd-extended-numeric/wasd-extended-numeric.png" },
+            new Layout { Id = "wasd-numbers-small", Label = "WASD Numbers Small", Json = "wasd-extended-numeric/wasd-extended-numeric-min.json", Sheet = "wasd/wasd.png" },
+            new Layout { Id = Custom, Label = "Custom", Json = null, Sheet = null },
         };
 
         public static readonly Layout[] Mice =
         {
-            new Layout { Id = "buttons", Label = "Buttons", Blurb = "Left, right and side buttons and the wheel.", Json = "mouse/mouse-no-movement.json", Sheet = "mouse/mouse.png" },
-            new Layout { Id = "off", Label = "Off", Blurb = "Only the keyboard.", Json = null, Sheet = null },
+            new Layout { Id = "buttons", Label = "Buttons", Json = "mouse/mouse-no-movement.json", Sheet = "mouse/mouse.png" },
+            new Layout { Id = "off", Label = "Off", Json = null, Sheet = null },
         };
 
         public static Layout FindKeyboard(string id) => Keyboards.FirstOrDefault(l => l.Id == id) ?? Keyboards[0];

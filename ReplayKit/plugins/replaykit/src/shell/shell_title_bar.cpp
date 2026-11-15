@@ -39,15 +39,6 @@ bool g_recWasActive = false;
 qint64 g_recMs = 0;
 quint64 g_recLastTickMs = 0;
 
-// the replay length the way the length field of the settings words it: 45s, 1m, 1m 30s
-QString ShellClipLengthText(int seconds)
-{
-	if (seconds < 60)
-		return QString("%1s").arg(seconds);
-	const int rest = seconds % 60;
-	return rest == 0 ? QString("%1m").arg(seconds / 60) : QString("%1m %2s").arg(seconds / 60).arg(rest);
-}
-
 } // namespace
 
 namespace {
@@ -61,7 +52,7 @@ constexpr qreal kUpdatePadRight = 11.0;
 
 ShellLogoButton::ShellLogoButton(QWidget *parent) : ShellTitleButton(kWidth, parent)
 {
-	SetTip(Tr("Quick actions"));
+	SetTip(TrMessage("common.quickActions"));
 }
 
 void ShellLogoButton::PaintGlyph(QPainter &p, const QRectF &pill, qreal hover)
@@ -93,7 +84,7 @@ ShellUpdateButton::ShellUpdateButton(Kind kind, QWidget *parent) : ShellTitleBut
 {
 	hide();
 	if (kind == Kind::Obs) {
-		SetTip(Tr("Click to see what changed"));
+		SetTip(TrMessage("shell.clickToSeeWhatChanged"));
 		onPress = [this]() {
 			// the version goes into the address as it is, so only a plain release number is let through
 			if (!QRegularExpression(QStringLiteral("^\\d{1,4}\\.\\d{1,4}\\.\\d{1,4}$")).match(m_version).hasMatch())
@@ -102,7 +93,7 @@ ShellUpdateButton::ShellUpdateButton(Kind kind, QWidget *parent) : ShellTitleBut
 		};
 		return;
 	}
-	SetTip(Tr("Click to install"));
+	SetTip(TrMessage("shell.clickToInstall"));
 	onPress = [this]() {
 		const QString version = m_version;
 		// the version goes into the address as it is, so only the characters a release tag uses are let through
@@ -201,7 +192,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_logo = new ShellLogoButton(this);
 	m_logo->onPress = [this]() { m_quick->Toggle(m_logo); };
 	m_clip = new ShellBadge(this);
-	m_clip->SetLabel(Tr("Clip"));
+	m_clip->SetLabel(TrMessage("common.clip"));
 	m_clip->onClick = [this]() {
 		m_hotkeys->Hide();
 		if (ClipBufferActive())
@@ -212,7 +203,7 @@ ShellTitleBar::ShellTitleBar(QMainWindow *mw)
 	m_clip->onContextMenu = [this]() { m_hotkeys->Toggle(m_clip, ShellHotkeyMenu::Kind::Clip); };
 	m_clip->onEnter = [this]() { m_hotkeys->Prepare(m_clip, ShellHotkeyMenu::Kind::Clip); };
 	m_rec = new ShellBadge(this);
-	m_rec->SetLabel(Tr("Record"));
+	m_rec->SetLabel(TrMessage("common.record"));
 	m_rec->onClick = [this]() {
 		m_hotkeys->Hide();
 		ToggleRecording();
@@ -280,7 +271,7 @@ void ShellTitleBar::SetLabels(const QString &recordKeybind, const QString &clipK
 	m_clip->SetKeys(clipKeybind);
 	m_rec->SetKeys(recordKeybind);
 	if (replaySeconds > 0)
-		m_clip->SetLabel(Tr("Clip {length}", {{"length", ShellClipLengthText(replaySeconds)}}));
+		m_clip->SetLabel(TrMessage("shell.clipLength", {{"length", LengthText(replaySeconds)}}));
 	LayoutChildren();
 }
 
@@ -302,16 +293,16 @@ void ShellTitleBar::RefreshStates()
 
 	m_clip->SetState(false, !clipping, false, QString());
 	m_clip->SetArmed(clipping);
-	m_clip->SetTip(clipping ? Tr("Save a clip") : Tr("Clipping is off. Click to open settings"));
+	m_clip->SetTip(clipping ? TrMessage("shell.saveAClip") : TrMessage("shell.clippingIsOffClickToOpen"));
 	QString timer;
 	if (recording) {
 		const qint64 s = g_recMs / 1000;
 		timer = s >= 3600 ? QString("%1:%2:%3").arg(s / 3600).arg((s / 60) % 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'))
 				  : QString("%1:%2").arg(s / 60, 2, 10, QChar('0')).arg(s % 60, 2, 10, QChar('0'));
 	}
-	m_rec->SetLabel(paused ? Tr("Paused") : recording ? Tr("Recording") : Tr("Record"));
+	m_rec->SetLabel(paused ? TrMessage("shell.paused") : recording ? TrMessage("common.recording") : TrMessage("common.record"));
 	m_rec->SetState(recording, false, paused, timer);
-	m_rec->SetTip(recording ? Tr("Stop recording") : Tr("Start recording"));
+	m_rec->SetTip(recording ? TrMessage("common.stopRecording") : TrMessage("common.startRecording"));
 	m_rec->Pulse((now / 600) % 2 == 0);
 	m_max->SetMaximized(m_mw && (ShellIsMaximized() || m_mw->isMaximized()));
 	// views that came and went (the obs settings are built and torn down by obs) change where the arrows can go

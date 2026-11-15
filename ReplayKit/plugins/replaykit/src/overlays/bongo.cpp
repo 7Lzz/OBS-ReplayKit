@@ -721,9 +721,9 @@ struct Bongo {
 };
 
 // obs copies a property label as it is added, so the buffer only has to live through that call
-QByteArray Label(const char *english)
+QByteArray Label(const QString &text)
 {
-	return Tr(english).toUtf8();
+	return text.toUtf8();
 }
 
 // the properties of VtuberGetProperties in its order; the mode list is the readable modes of the config, so it also works when obs asks without a source
@@ -743,7 +743,7 @@ obs_properties_t *Properties()
 	obs_properties_add_bool(props, "mouse_vertical_flip", Label("Mouse Vertical Flip").constData());
 	obs_properties_add_bool(props, "mask", Label("Use Mask").constData());
 	obs_properties_add_bool(props, "live2d", Label("Live2D").constData());
-	obs_properties_add_float_slider(props, "delay", Label("Speed").constData(), 0.0, 10.0, 0.1);
+	obs_properties_add_float_slider(props, "delay", Label(TrMessage("common.speed")).constData(), 0.0, 10.0, 0.1);
 	// kept for the same settings, but no Bango Cat model ships motions, so it changes nothing in the plugin either
 	obs_properties_add_bool(props, "random_motion", Label("Random Motion").constData());
 	obs_properties_add_bool(props, "breath", Label("Breath").constData());

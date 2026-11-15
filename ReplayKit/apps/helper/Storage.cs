@@ -139,7 +139,7 @@ namespace ReplayKitHelper
                 ["state"] = overBytes > 0 ? "over" : low ? "low" : "ok",
                 ["fraction"] = fraction,
                 ["usedText"] = FormatBytes(clipBytes),
-                ["limitText"] = limitBytes > 0 ? "of " + FormatBytes(limitBytes) : "No Limit",
+                ["limitText"] = limitBytes > 0 ? "of " + FormatBytes(limitBytes) : Locales.Message("storage.noLimit"),
                 ["freeText"] = FormatBytes(freeBytes),
                 ["tempText"] = FormatBytes(tempBytes),
                 ["thumbText"] = FormatBytes(thumbBytes),
@@ -186,9 +186,9 @@ namespace ReplayKitHelper
         private static SelectedClip SelectClip(string name, string folder, long size)
         {
             var selected = Clips.GetSafeClipPath(name, folder);
-            if (selected == null) throw new IOException("The selected clip is no longer available.");
+            if (selected == null) throw new IOException(Locales.Message("storage.theSelectedClipIsNoLonger"));
             var file = new FileInfo(selected.Full);
-            if (!file.Exists || file.Length != size) throw new IOException("The selected clip changed; review the library again.");
+            if (!file.Exists || file.Length != size) throw new IOException(Locales.Message("common.theSelectedClipChangedReviewThe"));
             return new SelectedClip { Path = selected, Size = size, WriteTime = file.LastWriteTimeUtc };
         }
 
@@ -230,7 +230,7 @@ namespace ReplayKitHelper
             }
             plan.Insufficient = plan.Bytes < plan.Over;
             if (!string.Equals(folder, Path.GetFullPath(AppConfig.GetClipDir()), StringComparison.OrdinalIgnoreCase))
-                throw new IOException("The clip folder changed; review the library again.");
+                throw new IOException(Locales.Message("storage.theClipFolderChangedReviewThe"));
             using (var sha = SHA256.Create())
             {
                 var text = folder.ToUpperInvariant() + "|" + limitBytes.ToString(CultureInfo.InvariantCulture) + "\n" +
@@ -259,10 +259,10 @@ namespace ReplayKitHelper
         public static JObject ApplyTrim(string token)
         {
             if (string.IsNullOrEmpty(token))
-                return new JObject { ["ok"] = false, ["message"] = "Review the clips to delete first." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.reviewTheClipsToDeleteFirst") };
             var plan = BuildTrimPlan();
             if (plan.Victims.Count == 0 || !string.Equals(plan.Token, token, StringComparison.Ordinal))
-                return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "Your library changed while you were looking. Review it again." };
+                return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.yourLibraryChangedWhileYouWere") };
             int deleted = 0, failed = 0;
             long freed = 0;
             foreach (var victim in plan.Victims)
@@ -333,10 +333,10 @@ namespace ReplayKitHelper
                 if (!fresh && Markers.TryGetValue(selected.Path.Full, out var cached) &&
                     cached.Size == selected.Size && cached.WriteTime == selected.WriteTime) return cached.Marker;
                 var marker = Compression.GetCompressMarker(selected.Path.Full);
-                if (!marker.Ok) throw new IOException("The clip compression history could not be read.");
+                if (!marker.Ok) throw new IOException(Locales.Message("storage.theClipCompressionHistoryCouldNot"));
                 var after = new FileInfo(selected.Path.Full);
                 if (!after.Exists || after.Length != selected.Size || after.LastWriteTimeUtc != selected.WriteTime)
-                    throw new IOException("The clip changed while its compression history was checked.");
+                    throw new IOException(Locales.Message("storage.theClipChangedWhileItsCompression"));
                 if (Markers.Count >= 256) Markers.Clear();
                 Markers[selected.Path.Full] = new VerifiedMarker { Size = selected.Size, WriteTime = selected.WriteTime, Marker = marker };
                 return marker;
@@ -397,16 +397,16 @@ namespace ReplayKitHelper
         public static JObject StartCompress(JArray names, string expectedMode = null)
         {
             if (names == null || names.Count == 0)
-                return new JObject { ["ok"] = false, ["message"] = "Pick at least one clip." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.pickAtLeastOneClip") };
             if (names.Count > MaxBatchClips)
-                return new JObject { ["ok"] = false, ["message"] = Locales.T("Select up to {count} clips at a time.", "count", MaxBatchClips) };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.selectUpToCountClipsAt", "count", MaxBatchClips) };
             string mode = ReplaykitSettings.GetStorageCompressionType();
             if (expectedMode != null && expectedMode != mode)
-                return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "The storage compression type changed. Review the clips again." };
+                return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.theStorageCompressionTypeChangedReview") };
             string folder = Path.GetFullPath(AppConfig.GetClipDir());
             string ffprobe = Compression.GetToolPaths()["ffprobe"]?.Value<string>();
             if (string.IsNullOrEmpty(ffprobe) || !File.Exists(ffprobe))
-                return new JObject { ["ok"] = false, ["message"] = "The clip compression history could not be checked. Reinstall ReplayKit to restore ffprobe." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theClipCompressionHistoryCouldNot2") };
             var known = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
             foreach (var clip in Clips.GetClipsList())
             {
@@ -419,7 +419,7 @@ namespace ReplayKitHelper
                 string name = token?.Type == JTokenType.String ? token.Value<string>() : null;
                 if (string.IsNullOrEmpty(name) || !known.TryGetValue(name, out var clip) ||
                     batch.Clips.Any(c => string.Equals(c.Path.Name, name, StringComparison.OrdinalIgnoreCase)))
-                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "The selected clips changed. Review the list again." };
+                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.theSelectedClipsChangedReviewThe") };
                 long size = clip["size"]?.Value<long>() ?? 0;
                 SelectedClip selected;
                 Compression.CompressMarker marker;
@@ -430,23 +430,23 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
-                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "A selected clip could not be verified. Review the list again." };
+                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.aSelectedClipCouldNotBe") };
                 }
                 if (size < MinCompressBytes || !CanCompress(mode, marker.Mode))
-                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = "A selected clip is no longer eligible. Review the list again." };
+                    return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = Locales.Message("storage.aSelectedClipIsNoLonger") };
                 batch.Clips.Add(selected);
                 batch.TotalBytes += size;
             }
             if (batch.Clips.Count == 0)
-                return new JObject { ["ok"] = false, ["message"] = "None of those clips are eligible for the selected compression type." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.noneOfThoseClipsAreEligible") };
             if (!string.Equals(folder, Path.GetFullPath(AppConfig.GetClipDir()), StringComparison.OrdinalIgnoreCase))
-                return new JObject { ["ok"] = false, ["message"] = "The clip folder changed; select the clips again." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.theClipFolderChangedSelectThe") };
             lock (CompressGate)
             {
                 if (_compress != null && _compress.Running)
-                    return new JObject { ["ok"] = false, ["message"] = "A compression is already running." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.aCompressionIsAlreadyRunning") };
                 if (HasActiveJob())
-                    return new JObject { ["ok"] = false, ["message"] = "Wait for the running upload, trim or compression to finish, or cancel it first." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.waitForTheRunningUploadTrim") };
                 if (!JobCoordinator.QueueCompression(batch.Clips.Select(c => c.Path.Full), out string queueError))
                     return new JObject { ["ok"] = false, ["changed"] = true, ["message"] = queueError };
                 batch.Running = true;
@@ -462,7 +462,7 @@ namespace ReplayKitHelper
             lock (CompressGate)
             {
                 if (_compress == null || !_compress.Running)
-                    return new JObject { ["ok"] = false, ["message"] = "Nothing is being compressed." };
+                    return new JObject { ["ok"] = false, ["message"] = Locales.Message("storage.nothingIsBeingCompressed") };
                 _compress.Cancelled = true;
             }
             return new JObject { ["ok"] = true };
@@ -617,12 +617,12 @@ namespace ReplayKitHelper
                     : Locales.Message("storage.compressFailedWithError", "count", failed, "error", error);
                 // the same popup as an exported gif, over the obs window from any view, with what was freed in large
                 bool nothing = done == 0 && failed > 0;
-                string title = nothing ? Locales.T("Compression did not finish") : cancelled ? Locales.T("Compression stopped") : Locales.T("Compression finished");
-                string body = nothing ? (string.IsNullOrEmpty(error) ? Locales.T("The clips could not be compressed.") : error)
+                string title = nothing ? Locales.Message("storage.compressionDidNotFinish") : cancelled ? Locales.Message("storage.compressionStopped") : Locales.Message("storage.compressionFinished");
+                string body = nothing ? (string.IsNullOrEmpty(error) ? Locales.Message("storage.theClipsCouldNotBeCompressed") : error)
                     : (cancelled ? Locales.Message("storage.compressedFreedStopped", "count", done, "size", FormatBytes(saved)) : Locales.Message("storage.compressedFreed", "count", done, "size", FormatBytes(saved))) + (failedText.Length > 0 ? " " + failedText : "");
                 var popup = nothing
-                    ? new JObject { ["icon"] = "warning", ["text"] = Locales.T("Nothing was compressed."), ["detail"] = body }
-                    : new JObject { ["icon"] = "check", ["text"] = Locales.T("Space freed"), ["big"] = FormatBytes(saved), ["detail"] = (Locales.Message("storage.compressed", "count", done) + " " + failedText).Trim() };
+                    ? new JObject { ["icon"] = "warning", ["text"] = Locales.Message("storage.nothingWasCompressed"), ["detail"] = body }
+                    : new JObject { ["icon"] = "check", ["text"] = Locales.Message("storage.spaceFreed"), ["big"] = FormatBytes(saved), ["detail"] = (Locales.Message("storage.compressed", "count", done) + " " + failedText).Trim() };
                 // the result is told in the popup, not the bell; only when the plugin cannot be reached is it left in the bell so it is not lost
                 if (!DonePopups.Show(nothing ? "warning" : "done", title, popup))
                     Notifications.Add(nothing ? "warning" : "info", "compress-batch", title, body);

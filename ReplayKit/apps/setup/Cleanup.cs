@@ -789,35 +789,35 @@ namespace ReplayKitSetup
 
         public static List<string> RunCleanup(IInstallProgress progress, bool keepUserSettings = true, bool removeObs = false)
         {
-            var steps = new List<(string Title, string Detail, Func<object> Action)>
+            var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>
             {
-                ("Close OBS", "Stops OBS and ReplayKit helpers, but keeps this setup window alive.", () => StopObsAndHelpers(progress.LogLine)),
-                ("Restore OBS browser", "Restores the original OBS browser process files.", () => ProcessHost.Restore(progress.LogLine)),
-                ("Remove launch permission", "Deletes the ReplayKit scheduled task.", () => ScheduledTask.DeleteElevationTask(progress.LogLine)),
-                ("Remove Windows startup", "Stops ReplayKit from launching OBS when Windows signs in.", () => Startup.ConfigureObsStartup(false, progress.LogLine)),
-                ("Remove Windows sleep override", "Restores default Windows sleep behavior for OBS.", () => SleepOverride.RemoveSleepOverride(progress.LogLine)),
-                ("Remove OBS plugins", "Deletes ReplayKit OBS plugins from the OBS install folder.", () => RemoveReplaykitPlugins(progress.LogLine)),
-                ("Remove ReplayKit from OBS", "Removes the ReplayKit scene, sources, Custom Controls dock, script entry and generated theme from OBS's own config.", () => RemoveReplaykitFromObsConfig(progress.LogLine)),
-                ("Remove clip notifications", "Removes the Start Menu shortcut and header registration used for clip-ready notifications.", () => RemoveClipNotificationShortcut(progress.LogLine)),
-                ("Remove OBS Stream Audio", "Uninstalls the ReplayKit virtual audio device.", () => VbCable.UninstallVbcable(progress.LogLine)),
-                ("Remove virtual display driver", "Deletes the optional virtual display driver if it exists.", () => VirtualDisplayDriver.Remove(progress.LogLine)),
+                (SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsAndReplaykitHelpersBut"), () => StopObsAndHelpers(progress.LogLine)),
+                (SetupLocale.Pair("setup.restoreObsBrowser"), SetupLocale.Pair("setup.restoresTheOriginalObsBrowserProcess"), () => ProcessHost.Restore(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeLaunchPermission"), SetupLocale.Pair("setup.deletesTheReplaykitScheduledTask"), () => ScheduledTask.DeleteElevationTask(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeWindowsStartup"), SetupLocale.Pair("setup.stopsReplaykitFromLaunchingObsWhen"), () => Startup.ConfigureObsStartup(false, progress.LogLine)),
+                (SetupLocale.Pair("setup.removeWindowsSleepOverride"), SetupLocale.Pair("setup.restoresDefaultWindowsSleepBehaviorFor"), () => SleepOverride.RemoveSleepOverride(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeObsPlugins"), SetupLocale.Pair("setup.deletesReplaykitObsPluginsFromThe"), () => RemoveReplaykitPlugins(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeReplaykitFromObs"), SetupLocale.Pair("setup.removesTheReplaykitSceneSourcesCustom"), () => RemoveReplaykitFromObsConfig(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeClipNotifications"), SetupLocale.Pair("setup.removesTheStartMenuShortcutAnd"), () => RemoveClipNotificationShortcut(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeObsStreamAudio"), SetupLocale.Pair("setup.uninstallsTheReplaykitVirtualAudioDevice"), () => VbCable.UninstallVbcable(progress.LogLine)),
+                (SetupLocale.Pair("setup.removeVirtualDisplayDriver"), SetupLocale.Pair("setup.deletesTheOptionalVirtualDisplayDriver"), () => VirtualDisplayDriver.Remove(progress.LogLine)),
             };
             if (keepUserSettings)
-                steps.Add(("Keep ReplayKit settings", "Saves current ReplayKit settings for the next install.", () => SaveUserSettings(progress.LogLine)));
+                steps.Add((SetupLocale.Pair("setup.keepReplaykitSettings"), SetupLocale.Pair("setup.savesCurrentReplaykitSettingsForThe"), () => SaveUserSettings(progress.LogLine)));
             else
-                steps.Add(("Remove ReplayKit settings", "Deletes saved ReplayKit preferences.", () => RemoveUserSettings(progress.LogLine)));
-            steps.Add(("Empty deleted history", "Deletes the clips and screenshots that are waiting in ReplayKit's deleted history, since nothing could restore or clear them once ReplayKit is gone.", () => EmptyDeletedHistory(progress.LogLine)));
-            steps.Add(("Wipe OBS ReplayKit config", "Deletes ReplayKit's OBS config folder while preserving OBS scenes and profiles.", () => WipeObsConfig(progress.LogLine)));
-            steps.Add(("Clear the setup cache", "Removes Streamable login data and schedules the cached uninstaller in LOCALAPPDATA for deletion on the next reboot.", () => ClearSetupCache(keepUserSettings, progress.LogLine)));
+                steps.Add((SetupLocale.Pair("setup.removeReplaykitSettings"), SetupLocale.Pair("setup.deletesSavedReplaykitPreferences"), () => RemoveUserSettings(progress.LogLine)));
+            steps.Add((SetupLocale.Pair("setup.emptyDeletedHistory"), SetupLocale.Pair("setup.deletesTheClipsAndScreenshotsThat"), () => EmptyDeletedHistory(progress.LogLine)));
+            steps.Add((SetupLocale.Pair("setup.wipeObsReplaykitConfig"), SetupLocale.Pair("setup.deletesReplaykitSObsConfigFolder"), () => WipeObsConfig(progress.LogLine)));
+            steps.Add((SetupLocale.Pair("setup.clearTheSetupCache"), SetupLocale.Pair("setup.removesStreamableLoginDataAndSchedules"), () => ClearSetupCache(keepUserSettings, progress.LogLine)));
             if (removeObs)
-                steps.Add(("Uninstall OBS Studio", "Runs OBS Studio's own uninstaller and clears what it leaves behind. Your OBS scenes and profiles in AppData are kept.", () => UninstallObsStudio(progress.LogLine)));
+                steps.Add((SetupLocale.Pair("setup.uninstallObsStudio"), SetupLocale.Pair("setup.runsObsStudioSOwnUninstaller"), () => UninstallObsStudio(progress.LogLine)));
 
             progress.TotalSteps = steps.Count;
             for (int i = 0; i < steps.Count; i++)
             {
                 Apply.RunApplyStep(progress, i + 1, steps[i].Title, steps[i].Detail, steps[i].Action);
             }
-            progress.Render(progress.TotalSteps, "Cleanup complete", "OBS ReplayKit changes were removed.", "done");
+            progress.Render(progress.TotalSteps, SetupLocale.Pair("setup.cleanupComplete"), SetupLocale.Pair("setup.obsReplaykitChangesWereRemoved"), "done");
             return progress.Issues;
         }
     }

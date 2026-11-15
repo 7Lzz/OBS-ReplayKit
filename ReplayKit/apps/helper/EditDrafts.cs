@@ -93,15 +93,15 @@ namespace ReplayKitHelper
         public static JObject Get(string name)
         {
             var clip = Clips.GetSafeClipPath(name);
-            if (clip == null) return Fail("Bad filename");
+            if (clip == null) return Fail(Locales.Message("common.badFilename"));
             JObject entry = null;
             try { ClipStore.Update(StorePath(), db => { entry = Entry(db, clip, out bool migrated); return migrated; }); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Get: " + ex.Message);
-                return Fail("The drafts could not be read");
+                return Fail(Locales.Message("editor.theDraftsCouldNotBeRead"));
             }
-            if (entry == null || !(entry["edit"] is JObject)) return Fail("There is no draft for this clip");
+            if (entry == null || !(entry["edit"] is JObject)) return Fail(Locales.Message("editor.thereIsNoDraftForThis"));
             return new JObject
             {
                 ["ok"] = true,
@@ -115,12 +115,12 @@ namespace ReplayKitHelper
         public static JObject Save(string name, JObject edit)
         {
             var clip = Clips.GetSafeClipPath(name);
-            if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
-            if (edit == null) return Fail("Bad edit");
-            if (Encoding.UTF8.GetByteCount(edit.ToString(Formatting.None)) > MaxEditBytes) return Fail("The edit is too large to keep");
+            if (clip == null || !File.Exists(clip.Full)) return Fail(Locales.Message("common.clipNotFound"));
+            if (edit == null) return Fail(Locales.Message("editor.badEdit"));
+            if (Encoding.UTF8.GetByteCount(edit.ToString(Formatting.None)) > MaxEditBytes) return Fail(Locales.Message("editor.theEditIsTooLargeTo"));
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             double duration = edit["duration"]?.Type == JTokenType.Float || edit["duration"]?.Type == JTokenType.Integer ? edit["duration"].Value<double>() : 0;
-            if (double.IsNaN(duration) || double.IsInfinity(duration) || duration < 0) return Fail("Invalid draft duration");
+            if (double.IsNaN(duration) || double.IsInfinity(duration) || duration < 0) return Fail(Locales.Message("editor.invalidDraftDuration"));
             var info = new FileInfo(clip.Full);
             try
             {
@@ -143,7 +143,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Save: " + ex.Message);
-                return Fail("The draft could not be kept");
+                return Fail(Locales.Message("editor.theDraftCouldNotBeKept"));
             }
             // the audio files a draft brought in live in a cache that is pruned by use, so each save counts as a use
             if (edit["imports"] is JArray imports)
@@ -160,12 +160,12 @@ namespace ReplayKitHelper
         public static JObject Delete(string name)
         {
             var clip = Clips.GetSafeClipPath(name);
-            if (clip == null) return Fail("Bad filename");
+            if (clip == null) return Fail(Locales.Message("common.badFilename"));
             try { ClipStore.Update(StorePath(), db => Remove(db, clip.Full)); }
             catch (Exception ex) when (ex is IOException || ex is JsonException || ex is UnauthorizedAccessException)
             {
                 Log.Write("EditDrafts.Delete: " + ex.Message);
-                return Fail("The draft could not be removed");
+                return Fail(Locales.Message("editor.theDraftCouldNotBeRemoved"));
             }
             return new JObject { ["ok"] = true };
         }

@@ -102,31 +102,31 @@ namespace ReplayKitHelper
         public static SpeechTranscript Parse(JObject data, double start, double end, SpeechTimings timings)
         {
             if (double.IsNaN(start) || double.IsNaN(end) || double.IsInfinity(start) || double.IsInfinity(end) || start < 0 || end <= start)
-                throw new InvalidDataException("Invalid subtitle range.");
-            if (timings == null || timings.Count == 0) throw new InvalidDataException("There is no speech map to place the words with.");
-            if (!(data["transcription"] is JArray segments)) throw new InvalidDataException("The speech engine returned an invalid transcript.");
+                throw new InvalidDataException(Locales.Message("editor.invalidSubtitleRange"));
+            if (timings == null || timings.Count == 0) throw new InvalidDataException(Locales.Message("editor.thereIsNoSpeechMapTo"));
+            if (!(data["transcription"] is JArray segments)) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedAnInvalid"));
             var result = new SpeechTranscript();
             var words = new List<Word>();
             int rejected = 0;
             foreach (var segment in segments)
             {
-                if (!(segment is JObject seg)) throw new InvalidDataException("The speech engine returned an invalid segment.");
-                if (seg["text"]?.Type != JTokenType.String) throw new InvalidDataException("The speech engine returned invalid subtitle text.");
+                if (!(segment is JObject seg)) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedAnInvalid2"));
+                if (seg["text"]?.Type != JTokenType.String) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedInvalidSubtitle"));
                 string text = seg.Value<string>("text").Trim();
                 if (text.Length == 0 || Sound.IsMatch(text)) continue;
                 if (Repeated(text)) { rejected++; continue; }
                 double from = Number(seg["offsets"]?["from"]) / 1000;
                 double to = Number(seg["offsets"]?["to"]) / 1000;
-                if (double.IsNaN(from) || double.IsNaN(to) || from < 0 || to < from) throw new InvalidDataException("The speech engine returned invalid segment timings.");
+                if (double.IsNaN(from) || double.IsNaN(to) || from < 0 || to < from) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedInvalidSegment"));
                 var timed = TimedWords(seg["tokens"] as JArray, text, from, to);
-                if (timed == null) throw new InvalidDataException("The speech engine did not provide word timings that could be aligned with the audio.");
+                if (timed == null) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineDidNotProvide"));
                 foreach (var word in timed)
                 {
                     // the piece is the one holding the middle of the word, and the word starts where its first sound was heard, inside that piece
                     word.Stretch = timings.PieceAt((word.First + word.Last) / 2);
                     word.Start = Math.Max(start, Math.Min(end, start + timings.ToSource(word.Stretch, word.First)));
                     words.Add(word);
-                    if (words.Count > 20000) throw new InvalidDataException("The transcript has too many words. Select a shorter section.");
+                    if (words.Count > 20000) throw new InvalidDataException(Locales.Message("editor.theTranscriptHasTooManyWords"));
                 }
             }
             words = words.OrderBy(word => word.Start).ToList();
@@ -160,7 +160,7 @@ namespace ReplayKitHelper
                 result.Words.Add(item);
             }
             result.Unsure = unsure;
-            if (rejected > 0 && words.Count == 0) throw new InvalidDataException("The speech engine returned repeated text instead of reliable speech. Choose the spoken language or an isolated voice track.");
+            if (rejected > 0 && words.Count == 0) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineReturnedRepeatedText"));
             if (rejected > 0) result.Warning = "Repeated or unreliable passages were skipped; review the subtitles.";
             return result;
         }

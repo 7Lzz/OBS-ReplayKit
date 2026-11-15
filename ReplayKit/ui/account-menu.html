@@ -106,28 +106,28 @@
 <body>
 <div class="panel">
   <div class="clip is-opening" id="clip">
-    <div class="head"><span class="head-title">Streamable account</span></div>
+    <div class="head"><span class="head-title" data-i18n="common.streamableAccount"></span></div>
 
     <div class="who">
-      <button class="av anon" id="avatar" type="button" aria-label="Change picture"></button>
+      <button class="av anon" id="avatar" type="button" aria-label="Change picture" data-i18n-aria-label="common.changePicture"></button>
       <div style="min-width:0">
-        <div class="who-name" id="name">Anonymous</div>
-        <div class="who-sub" id="sub">Not signed in</div>
+        <div class="who-name" id="name" data-i18n="common.anonymous"></div>
+        <div class="who-sub" id="sub" data-i18n="common.notSignedIn"></div>
         <div class="who-links">
-          <button class="who-link" type="button" id="changePicture">Change picture</button>
-          <button class="who-link" type="button" id="removePicture" hidden>Remove</button>
+          <button class="who-link" type="button" id="changePicture" data-i18n="common.changePicture"></button>
+          <button class="who-link" type="button" id="removePicture" hidden data-i18n="common.remove"></button>
         </div>
       </div>
     </div>
 
     <p class="note" id="note"></p>
-    <div class="busy" id="busy" hidden><i></i><span id="busyText">Opening Streamable...</span></div>
+    <div class="busy" id="busy" hidden><i></i><span id="busyText" data-i18n="common.openingStreamable"></span></div>
 
     <div class="actions">
-      <button class="btn is-primary" type="button" id="signIn">Sign in to Streamable</button>
-      <button class="btn" type="button" id="cancel" hidden>Cancel</button>
-      <button class="btn" type="button" id="open" hidden>Open Streamable</button>
-      <button class="btn is-danger" type="button" id="signOut" hidden>Sign out</button>
+      <button class="btn is-primary" type="button" id="signIn" data-i18n="common.signInToStreamable"></button>
+      <button class="btn" type="button" id="cancel" hidden data-i18n="common.cancel"></button>
+      <button class="btn" type="button" id="open" hidden data-i18n="account.openStreamable"></button>
+      <button class="btn is-danger" type="button" id="signOut" hidden data-i18n="common.signOut"></button>
     </div>
   </div>
 </div>
@@ -150,6 +150,8 @@
   let auth = { signedIn:false, name:"", plan:"", retentionDays:2 };
   // the version of the picked picture, empty for none; the picker blocks the request until it closes, so a second one is not opened meanwhile
   const picture = { version:"", picking:false, error:"" };
+  // a sign out the helper could not finish leaves the old sign-in on disk, so it says so instead of looking done
+  let signOutError = "";
   const flow = { active:false, poll:0, timeout:0 };
 
   async function helperJson(path, options) {
@@ -171,7 +173,7 @@
     return match ? match[0].toUpperCase() : "S";
   }
 
-  function planLabel(plan) { return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Free"; }
+  function planLabel(plan) { return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : RK_M("account.freePlan"); }
 
   function render(busyText) {
     const on = auth.signedIn;
@@ -197,17 +199,18 @@
     els.removePicture.hidden = !picture.version;
     // the account name is the users own, only the fallbacks are ui text
     if (on && auth.name) els.name.setAttribute("translate", "no"); else els.name.removeAttribute("translate");
-    els.name.textContent = on ? (auth.name || "Signed in") : "Anonymous";
-    els.sub.textContent = on ? RK_T("{plan} plan", { plan: planLabel(auth.plan) }) : "Not signed in";
+    els.name.textContent = on ? (auth.name || RK_M("common.signedIn")) : RK_M("common.anonymous");
+    els.sub.textContent = on ? RK_M("account.planPlan", { plan: planLabel(auth.plan) }) : RK_M("common.notSignedIn");
     els.note.innerHTML = on
-      ? RK_T("Uploads go to your Streamable account and are kept for <b>{days} days</b>.", { days: auth.retentionDays })
-      : RK_T("Clips you share upload without an account and stay up for <b>{days} days</b>. Sign in to use your own Streamable account.", { days: auth.retentionDays });
+      ? RK_MH("account.uploadsGoToYourStreamableAccount", { days: auth.retentionDays })
+      : RK_MH("account.clipsYouShareUploadWithoutAn", { days: auth.retentionDays });
     const working = !!busyText;
     els.busy.hidden = !working;
     if (working) els.busyText.textContent = busyText;
     els.note.hidden = working;
-    els.note.classList.toggle("is-error", !!picture.error);
-    if (picture.error) els.note.textContent = picture.error;
+    const error = picture.error || signOutError;
+    els.note.classList.toggle("is-error", !!error);
+    if (error) els.note.textContent = error;
     els.signIn.hidden = on || working;
     els.cancel.hidden = !working;
     els.open.hidden = !on || working;
@@ -229,15 +232,15 @@
     if (picture.picking) return;
     picture.picking = true;
     picture.error = "";
-    render(flow.active ? "Sign in in the Streamable window..." : "");
+    render(flow.active ? RK_M("common.signInInTheStreamableWindow") : "");
     try {
       const data = await helperJson("/profile-picture/" + (remove ? "clear" : "pick"), { method:"POST" });
       picture.version = typeof data.picture === "string" ? data.picture : "";
     } catch (e) {
-      picture.error = e.message || "That file could not be used as a picture.";
+      picture.error = e.message || RK_M("common.thatFileCouldNotBeUsed");
     }
     picture.picking = false;
-    render(flow.active ? "Sign in in the Streamable window..." : "");
+    render(flow.active ? RK_M("common.signInInTheStreamableWindow") : "");
   }
 
   async function readAccount() {
@@ -261,7 +264,7 @@
     if (flow.active) return;
     flow.active = true;
     let sawWindow = false;
-    render("Opening Streamable...");
+    render(RK_M("common.openingStreamable"));
     async function poll(first) {
       if (!flow.active) return;
       let res, data;
@@ -271,9 +274,9 @@
       } catch (_) { return; }
       if (!flow.active || !res.ok) return;
       if (data.signedIn) { apply(data); stopFlow(); render(); return; }
-      if (data.pending === true) { sawWindow = true; render("Sign in in the Streamable window..."); return; }
+      if (data.pending === true) { sawWindow = true; render(RK_M("common.signInInTheStreamableWindow")); return; }
       if (sawWindow) { stopFlow(); return; }
-      render("Opening Streamable...");
+      render(RK_M("common.openingStreamable"));
     }
     poll(true);
     flow.poll = setInterval(() => poll(false), LOGIN_POLL_MS);
@@ -290,8 +293,13 @@
   });
   els.signOut.addEventListener("click", () => {
     auth = { signedIn:false, name:"", plan:"", retentionDays:2 };
+    signOutError = "";
     render();
-    fetch(HELPER + "/logout", { method:"POST", cache:"no-store" }).then(() => readAccount()).catch(() => {});
+    fetch(HELPER + "/logout", { method:"POST", cache:"no-store" })
+      .then((res) => res.json().catch(() => ({ ok:false })))
+      .then((data) => { if (!data.ok) signOutError = data.message || RK_M("share.signInCouldNotBeCleared"); })
+      .catch(() => { signOutError = RK_M("share.signInCouldNotBeCleared"); })
+      .then(() => readAccount());
   });
 
   // the window is reused, so the plugin calls this on every open: read the account again and replay the unroll
@@ -300,7 +308,7 @@
     void els.clip.offsetWidth;
     els.clip.classList.add("is-opening");
     picture.error = "";
-    render(flow.active ? "Sign in in the Streamable window..." : "");
+    render(flow.active ? RK_M("common.signInInTheStreamableWindow") : "");
     readAccount();
   };
 

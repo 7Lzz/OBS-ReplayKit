@@ -9,9 +9,9 @@ namespace ReplayKitSetup
     {
         int TotalSteps { get; set; }
         List<string> Issues { get; }
-        void Render(int completed, string title, string detail, string state);
+        void Render(int completed, SetupLocale.Text title, SetupLocale.Text detail, string state);
         void LogLine(string message);
-        void AddIssue(string message);
+        void AddIssue(SetupLocale.Text message);
         // fine-grained progress inside the step currently being rendered, fraction 0..1 -- lets the bar move during the one long step (the OBS download) instead of sitting still. no-op for the headless reporters.
         void SubProgress(double fraction, string detail);
     }
@@ -35,7 +35,7 @@ namespace ReplayKitSetup
         }
 
         // Exceptions stop the flow; false results are reported as incomplete steps.
-        public static void RunApplyStep(IInstallProgress progress, int index, string title, string detail, Func<object> action)
+        public static void RunApplyStep(IInstallProgress progress, int index, SetupLocale.Text title, SetupLocale.Text detail, Func<object> action)
         {
             progress.Render(index - 1, title, detail, "working");
             object result;
@@ -45,13 +45,14 @@ namespace ReplayKitSetup
             }
             catch (Exception ex)
             {
-                progress.AddIssue($"{title} failed: {ex.Message}");
+                progress.AddIssue(new SetupLocale.Text(SetupLocale.Message("setup.stepFailedError", "step", title.Shown, "error", ex.Message),
+                    SetupLocale.Pair("setup.stepFailedError", "step", title.English, "error", SetupLocale.ToEnglish(ex.Message)).English));
                 progress.Render(index - 1, title, detail, "failed");
                 throw;
             }
             if (result is bool b && !b)
             {
-                progress.AddIssue($"{title} did not complete. Re-run the installer after fixing the issue.");
+                progress.AddIssue(new SetupLocale.Text(SetupLocale.Message("setup.stepDidNotComplete", "step", title.Shown), SetupLocale.Pair("setup.stepDidNotComplete", "step", title.English).English));
                 progress.Render(index, title, detail, "failed");
                 return;
             }
@@ -77,11 +78,11 @@ namespace ReplayKitSetup
             // capture before any step runs -- a genuine first install has no runtime settings file yet, and that is the only case that should arm the in-obs first-run wizard. a clean re-install just deleted it, so it counts too.
             bool firstInstall = !File.Exists(Prefs.RUNTIME_SETTINGS_FILE);
 
-            var steps = new List<(string Title, string Detail, Func<object> Action)>();
-            void Add(string title, string detail, Func<object> action) => steps.Add((title, detail, action));
+            var steps = new List<(SetupLocale.Text Title, SetupLocale.Text Detail, Func<object> Action)>();
+            void Add(SetupLocale.Text title, SetupLocale.Text detail, Func<object> action) => steps.Add((title, detail, action));
 
             // hard prerequisite: every step after this writes into the OBS install. a failed download used to fall through as a soft "issue" and the flow kept going, scattering plugins into a dead folder and still showing "Done".
-            Add("Install OBS Studio", "Installs OBS, or updates it to the version ReplayKit supports.", () =>
+            Add(SetupLocale.Pair("setup.installObsStudio"), SetupLocale.Pair("setup.installsObsOrUpdatesItTo"), () =>
             {
                 ObsDownloader.EnsureObsVersion(progress);
                 if (Obs.FindObsExe() == null)
@@ -94,20 +95,20 @@ namespace ReplayKitSetup
                 ProcessHost.Validate();
                 return (object)true;
             });
-            Add("Close OBS", "Stops OBS to write settings.", () => (object)Obs.CloseObs(progress.LogLine));
-            Add("Lock OBS updates", "Keeps OBS on a version ReplayKit supports.", () => (object)ObsUpdateLock.Lock(progress.LogLine));
-            Add("Install OBS process roles", "Prepares OBS browser and ReplayKit helper processes.", () => { ProcessHost.Install(progress.LogLine); return (object)true; });
-            Add("Clear old OBS files", "Removes files an OBS update left behind.", () => { ObsDownloader.RemoveReplacedCoreModules(progress.LogLine); return (object)true; });
-            Add("Back up current OBS settings", "Saves a restore copy first.", () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
-            Add("Prepare OBS settings folder", "Creates the config folder.", () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.closeObs"), SetupLocale.Pair("setup.stopsObsToWriteSettings"), () => (object)Obs.CloseObs(progress.LogLine));
+            Add(SetupLocale.Pair("setup.lockObsUpdates"), SetupLocale.Pair("setup.keepsObsOnAVersionReplaykit"), () => (object)ObsUpdateLock.Lock(progress.LogLine));
+            Add(SetupLocale.Pair("setup.installObsProcessRoles"), SetupLocale.Pair("setup.preparesObsBrowserAndReplaykitHelper"), () => { ProcessHost.Install(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.clearOldObsFiles"), SetupLocale.Pair("setup.removesFilesAnObsUpdateLeft"), () => { ObsDownloader.RemoveReplacedCoreModules(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.backUpCurrentObsSettings"), SetupLocale.Pair("setup.savesARestoreCopyFirst"), () => { Installer.BackupExistingConfig(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.prepareObsSettingsFolder"), SetupLocale.Pair("setup.createsTheConfigFolder"), () => { Directory.CreateDirectory(Config.OBS_CONFIG); Obs.CleanupCrashFlags(progress.LogLine); return (object)true; });
             // no helper means no dock, no clips, no settings ui -- throw so RunApplyStep stops the flow instead of the old behaviour where a false here only added a "needs attention" line while the rest ran anyway.
-            Add("Build ReplayKit helper", "Prepares the local helper.", () =>
+            Add(SetupLocale.Pair("setup.buildReplaykitHelper"), SetupLocale.Pair("setup.preparesTheLocalHelper"), () =>
             {
                 if (Installer.EnsureLauncherBuilt(progress.LogLine)) return (object)true;
-                throw new InvalidOperationException("OBS ReplayKit cannot run without the helper -- see the warning above for why it's missing.");
+                throw new InvalidOperationException(SetupLocale.Message("setup.obsReplaykitCannotRunWithoutThe"));
             });
             if (prefs.DiscordScreenshareEnabled)
-                Add("Enable Discord screenshare", "Installs the audio cable driver.", () =>
+                Add(SetupLocale.Pair("setup.enableDiscordScreenshare"), SetupLocale.Pair("setup.installsTheAudioCableDriver"), () =>
                 {
                     // no double install: if the cable is already there and its endpoint is renamed, EnsureVbcable would only re-bounce audiosrv for nothing.
                     if (VbCable.IsShareAudioReady())
@@ -119,50 +120,50 @@ namespace ReplayKitSetup
                 });
             // user explicitly unticked the box (not headless) and the cable is on the machine -- take it back off, so the checkbox is a real on/off for the whole feature on Update and Re-Install too.
             else if (discordScreenshare == false && VbCable.IsVbcableInstalled())
-                Add("Remove Discord screenshare", "Uninstalls the audio cable driver.", () => (object)VbCable.UninstallVbcable(progress.LogLine));
+                Add(SetupLocale.Pair("setup.removeDiscordScreenshare"), SetupLocale.Pair("setup.uninstallsTheAudioCableDriver"), () => (object)VbCable.UninstallVbcable(progress.LogLine));
             else
-                Add("Skip Discord screenshare", "Share Preview stays off.", () => (object)true);
-            Add("Write ReplayKit OBS profile", "Writes the ReplayKit OBS profile.", () =>
+                Add(SetupLocale.Pair("setup.skipDiscordScreenshare"), SetupLocale.Pair("setup.sharePreviewStaysOff"), () => (object)true);
+            Add(SetupLocale.Pair("setup.writeReplaykitObsProfile"), SetupLocale.Pair("setup.writesTheReplaykitObsProfile"), () =>
             {
                 bool ok = Installer.InstallObsConfig(prefs, progress.LogLine) > 0;
                 if (ok && firstInstall) Installer.MarkSetupWizardPending(progress.LogLine);
                 return (object)ok;
             });
-            Add("Apply default settings", "Turns on the defaults this version ships with.", () => (object)DefaultsMigration.Run(progress.LogLine));
-            Add("Enable OBS WebSocket", "Enables the local OBS WebSocket.", () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
-            Add("Install Custom Controls and Clips", "Adds the dock and Clips files.", () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
-            Add("Install ReplayKit plugin", "Adds the ReplayKit window, notifications and tray menu.", () => (object)NativePlugin.InstallReplaykitPlugin(progress.LogLine));
-            Add("Register clip notifications", "Lets clip-ready notifications show up as OBS in the Action Center.", () => (object)Installer.RegisterClipNotificationShortcut(progress.LogLine));
-            Add("Remove legacy launcher task", "Removes the old launcher task.", () => (object)Installer.RemoveObsElevationTask(progress.LogLine));
+            Add(SetupLocale.Pair("setup.applyDefaultSettings"), SetupLocale.Pair("setup.turnsOnTheDefaultsThisVersion"), () => (object)DefaultsMigration.Run(progress.LogLine));
+            Add(SetupLocale.Pair("setup.enableObsWebsocket"), SetupLocale.Pair("setup.enablesTheLocalObsWebsocket"), () => (object)Installer.ConfigureObsWebsocket(progress.LogLine));
+            Add(SetupLocale.Pair("setup.installCustomControlsAndClips"), SetupLocale.Pair("setup.addsTheDockAndClipsFiles"), () => (object)(Installer.InstallObsCustomDock(progress.LogLine) > 0));
+            Add(SetupLocale.Pair("setup.installReplaykitPlugin"), SetupLocale.Pair("setup.addsTheReplaykitWindowNotificationsAnd"), () => (object)NativePlugin.InstallReplaykitPlugin(progress.LogLine));
+            Add(SetupLocale.Pair("setup.registerClipNotifications"), SetupLocale.Pair("setup.letsClipReadyNotificationsShowUp"), () => (object)Installer.RegisterClipNotificationShortcut(progress.LogLine));
+            Add(SetupLocale.Pair("setup.removeLegacyLauncherTask"), SetupLocale.Pair("setup.removesTheOldLauncherTask"), () => (object)Installer.RemoveObsElevationTask(progress.LogLine));
             if (prefs.AllowSleepWhileActive)
-                Add("Allow monitor and PC sleep", "Lets Windows sleep during capture.", () => (object)Installer.InstallObsSleepOverride(true, progress.LogLine));
+                Add(SetupLocale.Pair("setup.allowMonitorAndPcSleep"), SetupLocale.Pair("setup.letsWindowsSleepDuringCapture"), () => (object)Installer.InstallObsSleepOverride(true, progress.LogLine));
             else
-                Add("Restore OBS sleep blocking", "Restores OBS sleep blocking.", () => (object)Installer.InstallObsSleepOverride(false, progress.LogLine));
+                Add(SetupLocale.Pair("setup.restoreObsSleepBlocking"), SetupLocale.Pair("setup.restoresObsSleepBlocking"), () => (object)Installer.InstallObsSleepOverride(false, progress.LogLine));
             if (prefs.PinObsTrayIcon)
-                Add("Pin OBS tray icon", "Pins the OBS tray icon.", () => { TrayPin.PinObsTrayIcon(progress.LogLine); return (object)true; });
+                Add(SetupLocale.Pair("setup.pinObsTrayIcon"), SetupLocale.Pair("setup.pinsTheObsTrayIcon"), () => { TrayPin.PinObsTrayIcon(progress.LogLine); return (object)true; });
             else
-                Add("Skip tray icon pinning", "Leaves the tray icon default.", () => { TrayPin.UnpinObsTrayIcon(progress.LogLine); return (object)true; });
-            Add("Install video tools", "Verifies the trim/compress tools.", () =>
+                Add(SetupLocale.Pair("setup.skipTrayIconPinning"), SetupLocale.Pair("setup.leavesTheTrayIconDefault"), () => { TrayPin.UnpinObsTrayIcon(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.installVideoTools"), SetupLocale.Pair("setup.verifiesTheTrimCompressTools"), () =>
             {
                 if (!Installer.InstallObsFfmpeg(progress.LogLine))
-                    throw new IOException("FFmpeg and FFprobe could not be installed or verified. Check your connection and run the installer again to repair trimming and compression.");
+                    throw new IOException(SetupLocale.Message("setup.ffmpegAndFfprobeCouldNotBe"));
                 return (object)true;
             });
-            Add("Install WASD/mouse overlay", "Adds the WASD/mouse overlay plugin.",
+            Add(SetupLocale.Pair("setup.installWasdMouseOverlay"), SetupLocale.Pair("setup.addsTheWasdMouseOverlayPlugin"),
                 () => (object)(InputOverlay.InstallInputOverlayPlugin(progress.LogLine) && InputOverlay.InstallInputOverlayPresets(progress.LogLine)));
-            Add("Install Bongo Cat overlay", "Verifies the Bongo Cat files and saved sources.", () =>
+            Add(SetupLocale.Pair("setup.installBongoCatOverlay"), SetupLocale.Pair("setup.verifiesTheBongoCatFilesAnd"), () =>
             {
                 if (!BongoCat.InstallBongoCat(progress.LogLine))
-                    throw new IOException("Bongo Cat could not be installed or repaired. Run the ReplayKit installer again to finish setting up the overlay.");
+                    throw new IOException(SetupLocale.Message("setup.bongoCatCouldNotBeInstalled"));
                 return (object)true;
             });
-            Add("Install motion blur filter", "Adds the motion blur filter.",
+            Add(SetupLocale.Pair("setup.installMotionBlurFilter"), SetupLocale.Pair("setup.addsTheMotionBlurFilter"),
                 () => (object)ShaderFilter.InstallReplaykitMotionBlurPlugin(progress.LogLine));
-            Add("Install desktop audio capture", "Adds desktop audio capture.", () => (object)WinCapture.InstallWinCaptureAudio(progress.LogLine));
-            Add("Prepare clip folders", "Creates the clip folders.", () => { Installer.EnsureRecordingDirs(prefs, progress.LogLine); return (object)true; });
-            Add("Set Windows startup", "Adds OBS to Windows startup.", () => (object)Startup.ConfigureObsStartup(prefs.ObsStartupEnabled, progress.LogLine));
-            Add("Prepare OBS theme", "Applies your theme before OBS starts.", () => { Installer.PrepareObsTheme(progress.LogLine); return (object)true; });
-            Add("Launch OBS", "Starts OBS.", () => (object)Obs.LaunchObs(progress.LogLine));
+            Add(SetupLocale.Pair("setup.installDesktopAudioCapture"), SetupLocale.Pair("setup.addsDesktopAudioCapture"), () => (object)WinCapture.InstallWinCaptureAudio(progress.LogLine));
+            Add(SetupLocale.Pair("setup.prepareClipFolders"), SetupLocale.Pair("setup.createsTheClipFolders"), () => { Installer.EnsureRecordingDirs(prefs, progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.setWindowsStartup"), SetupLocale.Pair("setup.addsObsToWindowsStartup"), () => (object)Startup.ConfigureObsStartup(prefs.ObsStartupEnabled, progress.LogLine));
+            Add(SetupLocale.Pair("setup.prepareObsTheme"), SetupLocale.Pair("setup.appliesYourThemeBeforeObsStarts"), () => { Installer.PrepareObsTheme(progress.LogLine); return (object)true; });
+            Add(SetupLocale.Pair("setup.launchObs"), SetupLocale.Pair("setup.startsObs"), () => (object)Obs.LaunchObs(progress.LogLine));
 
             progress.TotalSteps = steps.Count;
             for (int i = 0; i < steps.Count; i++)
@@ -171,7 +172,7 @@ namespace ReplayKitSetup
             }
             bool complete = progress.Issues.Count == 0;
             Update.RecordSetupResult(complete);
-            progress.Render(progress.TotalSteps, complete ? "Setup complete" : "Setup incomplete", complete ? "OBS ReplayKit is ready." : "Some steps need attention. See the setup log and run the installer again.", complete ? "done" : "failed");
+            progress.Render(progress.TotalSteps, complete ? SetupLocale.Pair("setup.setupComplete") : SetupLocale.Pair("setup.setupIncomplete"), complete ? SetupLocale.Pair("setup.obsReplaykitIsReady") : SetupLocale.Pair("setup.someStepsNeedAttentionSeeThe"), complete ? "done" : "failed");
             return progress.Issues;
         }
 

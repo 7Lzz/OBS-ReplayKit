@@ -35,32 +35,32 @@ namespace ReplayKitHelper
         private static SettingsResult GetObsWebSocketSettings()
         {
             string path = Path.Combine(Environment.GetEnvironmentVariable("APPDATA") ?? "", "obs-studio", "plugin_config", "obs-websocket", "config.json");
-            if (!File.Exists(path)) return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket config not found." };
+            if (!File.Exists(path)) return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketConfigNotFound") };
             JObject cfg;
             try { cfg = JObject.Parse(File.ReadAllText(path)); }
             catch (Exception ex) when (ex is JsonException || ex is IOException || ex is UnauthorizedAccessException)
             {
-                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket config is not valid JSON." };
+                return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketConfigIsNotValid") };
             }
 
             if (!(cfg["server_enabled"]?.Value<bool>() ?? false))
-                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket server is disabled." };
+                return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketServerIsDisabled") };
             string password = cfg["server_password"]?.Value<string>() ?? "";
             if ((cfg["auth_required"]?.Value<bool>() ?? false) && string.IsNullOrEmpty(password))
-                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket password is missing." };
+                return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketPasswordIsMissing") };
 
             int port = 6455;
             var portToken = cfg["server_port"];
             if (portToken != null) int.TryParse(portToken.ToString(), out port);
             if (port <= 0 || port > 65535)
-                return new SettingsResult { Ok = false, Unavailable = true, Message = "OBS websocket port is invalid." };
+                return new SettingsResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsWebsocketPortIsInvalid") };
             return new SettingsResult { Ok = true, Port = port, Password = password };
         }
 
         internal static string CreateAuthentication(string password, string salt, string challenge)
         {
             if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(salt) || string.IsNullOrEmpty(challenge))
-                throw new InvalidOperationException("OBS websocket authentication data is missing.");
+                throw new InvalidOperationException(Locales.Message("helper.obsWebsocketAuthenticationDataIsMissing"));
             using (var sha = SHA256.Create())
             {
                 string secret = Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(password + salt)));
@@ -78,9 +78,9 @@ namespace ReplayKitHelper
                 do
                 {
                     result = socket.ReceiveAsync(segment, token).GetAwaiter().GetResult();
-                    if (result.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException("OBS websocket closed the connection.");
+                    if (result.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException(Locales.Message("helper.obsWebsocketClosedTheConnection"));
                     if (result.MessageType != WebSocketMessageType.Text || ms.Length + result.Count > 16 * 1024 * 1024)
-                        throw new InvalidDataException("OBS websocket message is invalid or too large.");
+                        throw new InvalidDataException(Locales.Message("helper.obsWebsocketMessageIsInvalidOr"));
                     if (result.Count > 0) ms.Write(buffer, 0, result.Count);
                 } while (!result.EndOfMessage);
                 return JObject.Parse(Encoding.UTF8.GetString(ms.ToArray()));
@@ -133,7 +133,7 @@ namespace ReplayKitHelper
             {
                 var ar = probe.BeginConnect("127.0.0.1", settings.Port, null, null);
                 using (var wait = ar.AsyncWaitHandle)
-                    if (!wait.WaitOne(500)) throw new InvalidOperationException("OBS websocket is not reachable.");
+                    if (!wait.WaitOne(500)) throw new InvalidOperationException(Locales.Message("helper.obsWebsocketIsNotReachable"));
                 probe.EndConnect(ar);
             }
 
@@ -144,14 +144,14 @@ namespace ReplayKitHelper
                 socket.ConnectAsync(uri, token).GetAwaiter().GetResult();
 
                 var hello = ReceiveMessage(socket, token);
-                if (hello["op"]?.Value<int>() != 0) throw new InvalidOperationException("OBS websocket did not send Hello.");
+                if (hello["op"]?.Value<int>() != 0) throw new InvalidOperationException(Locales.Message("helper.obsWebsocketDidNotSendHello"));
                 var identify = new JObject { ["rpcVersion"] = 1, ["eventSubscriptions"] = 0 };
                 if (hello["d"]?["authentication"] is JObject auth)
                     identify["authentication"] = CreateAuthentication(settings.Password, auth["salt"]?.Value<string>(), auth["challenge"]?.Value<string>());
                 SendMessage(socket, new JObject { ["op"] = 1, ["d"] = identify }, token);
 
                 var identified = ReceiveMessage(socket, token);
-                if (identified["op"]?.Value<int>() != 2) throw new InvalidOperationException("OBS websocket did not identify this client.");
+                if (identified["op"]?.Value<int>() != 2) throw new InvalidOperationException(Locales.Message("helper.obsWebsocketDidNotIdentifyThis"));
             }
             catch
             {
@@ -174,7 +174,7 @@ namespace ReplayKitHelper
             // the whole connect-reuse-or-fresh + send + receive cycle runs under one lock -- the request/response matching below has no way to tell two concurrent callers requests apart on a shared socket, so at most one request can be in flight on it at a time regardless of how many callers fire one.
             lock (Server.State.ObsWebSocketLock)
             {
-                if (obsClosing) return new ObsWebSocketResult { Ok = false, Unavailable = true, Message = "OBS is closing." };
+                if (obsClosing) return new ObsWebSocketResult { Ok = false, Unavailable = true, Message = Locales.Message("helper.obsIsClosing") };
                 if (!settings.Ok)
                 {
                     CloseCached();

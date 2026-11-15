@@ -22,26 +22,6 @@ namespace ReplayKitShared
                 return JObject.Load(json, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
         }
 
-        // a resources/locale table of english text to its translation; a translation that lost or renamed a placeholder would drop a value from the sentence, and a | it added would split a file dialog filter, so those keep the english text
-        internal static Dictionary<string, string> ReadTable(Stream stream)
-        {
-            var table = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var prop in Read(stream).Properties())
-            {
-                if (prop.Value.Type != JTokenType.String) continue;
-                string value = prop.Value.Value<string>();
-                if (value.Length > 0 && SamePlaceholders(prop.Name, value) && (value.IndexOf('|') < 0 || prop.Name.IndexOf('|') >= 0)) table[prop.Name] = value;
-            }
-            return table;
-        }
-
-        private static bool SamePlaceholders(string english, string translated)
-        {
-            var a = Placeholder.Matches(english).Cast<Match>().Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal);
-            var b = Placeholder.Matches(translated).Cast<Match>().Select(m => m.Value).OrderBy(v => v, StringComparer.Ordinal);
-            return a.SequenceEqual(b);
-        }
-
         internal static void Overlay(JObject english, JObject translations)
         {
             foreach (var entry in english.Properties())

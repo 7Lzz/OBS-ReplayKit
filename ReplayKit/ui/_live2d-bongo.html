@@ -56,7 +56,7 @@
       var bake = got[0], img = got[1];
       if (bake.version !== 4 || bake.moc3 !== info.bake || !Array.isArray(bake.parameters) || !Array.isArray(bake.meshes) || !img) return null;
       bake.meshes.forEach(function (mesh) {
-        if (mesh.uv.length % 2 || mesh.indices.some(function (v) { return v < 0 || v >= mesh.uv.length / 2; })) throw new Error("Invalid Bongo mesh");
+        if (mesh.uv.length % 2 || mesh.indices.some(function (v) { return v < 0 || v >= mesh.uv.length / 2; })) throw new Error(RK_M("settings.invalidBongoMesh"));
         mesh.points = new Float32Array(mesh.uv.length);
         if (gl) {
           mesh.uvBuffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, mesh.uvBuffer); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.uv), gl.STATIC_DRAW);
@@ -404,7 +404,7 @@
       gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: true });
       if (gl) setupGl(); else ctx = canvas.getContext("2d");
       mounted = fetchJson(HELPER + "/bongo-cat/manifest").then(function (data) {
-        if (!data || !Array.isArray(data.modes) || !data.modes.length) throw new Error("No Bongo Cat modes");
+        if (!data || !Array.isArray(data.modes) || !data.modes.length) throw new Error(RK_M("settings.noBongoCatModes"));
         manifest = data;
         selectMode();
         new ResizeObserver(schedule).observe(canvas);

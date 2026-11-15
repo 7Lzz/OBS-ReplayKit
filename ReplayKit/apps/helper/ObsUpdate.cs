@@ -58,7 +58,7 @@ namespace ReplayKitHelper
         public static JObject PreviewBadge(string version)
         {
             version = (version ?? "").Trim();
-            if (version.Length > 0 && !Regex.IsMatch(version, @"^\d{1,4}\.\d{1,4}\.\d{1,4}$")) return new JObject { ["ok"] = false, ["message"] = "Bad version." };
+            if (version.Length > 0 && !Regex.IsMatch(version, @"^\d{1,4}\.\d{1,4}\.\d{1,4}$")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("update.badVersion") };
             readyVersion = version;
             return new JObject { ["ok"] = true, ["obsUpdateReady"] = version };
         }

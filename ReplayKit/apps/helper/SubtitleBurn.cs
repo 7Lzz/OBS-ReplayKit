@@ -354,7 +354,7 @@ namespace ReplayKitHelper
                 string file = Fonts.BundledFile(row.Style.Font);
                 if (file == null) continue;
                 string from = Fonts.BundledPath(row.Style.Font);
-                if (!File.Exists(from)) throw new InvalidOperationException(Locales.T("The {font} font is missing. Run the ReplayKit setup again.", "font", row.Style.Font));
+                if (!File.Exists(from)) throw new InvalidOperationException(Locales.Message("editor.theFontFontIsMissingRun", "font", row.Style.Font));
                 string to = Path.Combine(dir, FontsFolder, file);
                 Directory.CreateDirectory(Path.GetDirectoryName(to));
                 if (!File.Exists(to)) File.Copy(from, to);

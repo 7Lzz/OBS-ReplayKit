@@ -10,7 +10,7 @@ using ReplayKitShared;
 
 namespace ReplayKitHelper
 {
-    // the language of obs and replaykit, one setting: obs keeps it in user.ini [General] Language and with none set takes the first windows display language it ships, the same rule this class follows; replaykit translates from obs-replayKit\locale\<code>.json, a json object of english text to its translation, and keeps the english text for any string a file does not have
+    // the language of obs and replaykit, one setting: obs keeps it in user.ini [General] Language and with none set takes the first windows display language it ships, the same rule this class follows; replaykit takes its text from the message catalogs in obs-replayKit\locale\messages\<code>.json, and a message a catalog lacks stays english
     internal static class Locales
     {
         public const string English = ReplayKitShared.LanguageMatch.English;
@@ -28,15 +28,6 @@ namespace ReplayKitHelper
         private static string _listStamp;
         private static List<Language> _list;
         private static List<string> _obsCodes;
-        private static readonly Dictionary<string, CachedStrings> _strings = new Dictionary<string, CachedStrings>(StringComparer.Ordinal);
-
-        private sealed class CachedStrings
-        {
-            public DateTime Stamp;
-            public Dictionary<string, string> Table;
-            public string Version;
-        }
-
         // locale selection applies on restart, so the message assets can be cached for this helper session
         private static readonly Dictionary<string, JObject> MessagesByCode = new Dictionary<string, JObject>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> MessageVersions = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -67,11 +58,10 @@ namespace ReplayKitHelper
             }
         }
 
-        internal static string BundleVersion(string code, bool explicitPage)
+        internal static string BundleVersion(string code)
         {
             Messages(code);
-            lock (Gate)
-                return MessageVersions[code] + (explicitPage ? "" : "-" + StringsVersion(code));
+            lock (Gate) return MessageVersions[code];
         }
 
         internal static string Message(string id, params object[] pairs)
@@ -141,21 +131,6 @@ namespace ReplayKitHelper
             return ReplayKitShared.LanguageMatch.WindowsDefault(_obsCodes);
         }
 
-        // the table of a language: english text to its translation; empty for english and for a language without a file, so every string falls back to the english text
-        public static Dictionary<string, string> Strings(string code) => Load(code).Table;
-
-        // changes whenever the file of the language changes, so a page can keep the served strings cached until then
-        public static string StringsVersion(string code) => Load(code).Version;
-
-        // a text the helper makes itself, in the current language
-        public static string T(string english, params object[] vars)
-        {
-            string text = english;
-            if (Strings(Current()).TryGetValue(english, out string translated) && !string.IsNullOrEmpty(translated)) text = translated;
-            for (int i = 0; i + 1 < vars.Length; i += 2) text = text.Replace("{" + vars[i] + "}", Convert.ToString(vars[i + 1], System.Globalization.CultureInfo.CurrentCulture));
-            return text;
-        }
-
         public static JArray ToJson() => new JArray(Available().Select(l => new JObject { ["code"] = l.Code, ["name"] = l.Name, ["englishName"] = l.EnglishName }));
 
         // the plugin puts the pick into the user config obs holds and saves it, the way the language picker of obs does, so every later save and exit of obs keeps it; obs reads it only as it starts, so a change needs a restart. picking the windows language clears the key instead, so obs and replaykit keep following windows the way a fresh obs does. false when the plugin did not confirm
@@ -166,39 +141,6 @@ namespace ReplayKitHelper
             bool applied = PipeClient.SetObsLanguageAndWait(value, 3000);
             Log.Write("Locales.ApplyToObs: " + (value == "-" ? "follow windows" : value) + (applied ? "" : ", not confirmed by the plugin"));
             return applied;
-        }
-
-        private static CachedStrings Load(string code)
-        {
-            var empty = new CachedStrings { Table = new Dictionary<string, string>(StringComparer.Ordinal), Version = "0" };
-            if (code == English || !ReplayKitShared.LanguageMatch.IsSupported(code)) return empty;
-            string file = Path.Combine(Constants.APP_LOCALE_DIR, code + ".json");
-            DateTime stamp;
-            try { stamp = File.Exists(file) ? File.GetLastWriteTimeUtc(file) : DateTime.MinValue; }
-            catch (IOException) { stamp = DateTime.MinValue; }
-            lock (Gate)
-            {
-                if (_strings.TryGetValue(code, out var cached) && cached.Stamp == stamp) return cached;
-                var loaded = new CachedStrings { Stamp = stamp, Table = new Dictionary<string, string>(StringComparer.Ordinal), Version = "0" };
-                if (stamp != DateTime.MinValue)
-                {
-                    try
-                    {
-                        byte[] bytes = File.ReadAllBytes(file);
-                        using (var stream = new MemoryStream(bytes)) loaded.Table = MessageCatalog.ReadTable(stream);
-                        using (var sha = SHA256.Create()) loaded.Version = BitConverter.ToString(sha.ComputeHash(bytes), 0, 8).Replace("-", "").ToLowerInvariant();
-                    }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
-                    {
-                        // a broken file leaves the language in english rather than half translated
-                        Log.Write("Locales.Load " + code + ": " + ex.Message);
-                        loaded.Table.Clear();
-                        loaded.Version = "0";
-                    }
-                }
-                _strings[code] = loaded;
-                return loaded;
-            }
         }
 
         private static string EnglishNameOf(string code)

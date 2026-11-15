@@ -112,7 +112,7 @@ namespace ReplayKitHelper
         // what is still missing for this model, so the download size shown is the one about to happen
         private static long MissingBytes(Model model) => (EngineInstalled() ? 0 : EngineBytes) + (ModelInstalled(model) ? 0 : model.Bytes) + (VadInstalled() ? 0 : VadBytes);
 
-        private static JObject UnknownModel() => new JObject { ["ok"] = false, ["message"] = "Unknown speech model." };
+        private static JObject UnknownModel() => new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.unknownSpeechModel") };
 
         public static JObject Status(string modelId)
         {
@@ -184,7 +184,7 @@ namespace ReplayKitHelper
                             entry.ExtractToFile(Path.Combine(unpacked, name), true);
                         }
                     }
-                    if (EngineFiles.Any(f => !File.Exists(Path.Combine(unpacked, f)))) throw new InvalidDataException("The speech engine download is missing files.");
+                    if (EngineFiles.Any(f => !File.Exists(Path.Combine(unpacked, f)))) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineDownloadIsMissing"));
                     if (Directory.Exists(EngineDir)) Directory.Delete(EngineDir, true);
                     Directory.Move(unpacked, EngineDir);
                 }
@@ -239,8 +239,8 @@ namespace ReplayKitHelper
             using (var response = Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, overall.Token).GetAwaiter().GetResult())
             {
                 if (!response.IsSuccessStatusCode) throw new InvalidDataException("The speech-model download server returned HTTP " + (int)response.StatusCode + ".");
-                if (response.RequestMessage.RequestUri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException("The download left https.");
-                if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("The download is larger than expected.");
+                if (response.RequestMessage.RequestUri.Scheme != Uri.UriSchemeHttps) throw new InvalidDataException(Locales.Message("editor.theDownloadLeftHttps"));
+                if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException(Locales.Message("editor.theDownloadIsLargerThanExpected"));
                 using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
                 using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 using (var sha = SHA256.Create())
@@ -257,14 +257,14 @@ namespace ReplayKitHelper
                         }
                         if (count <= 0) break;
                         total += count;
-                        if (total > maxBytes) throw new InvalidDataException("The download is larger than expected.");
+                        if (total > maxBytes) throw new InvalidDataException(Locales.Message("editor.theDownloadIsLargerThanExpected"));
                         file.Write(buffer, 0, count);
                         sha.TransformBlock(buffer, 0, count, null, 0);
                         Interlocked.Add(ref _installDone, count);
                     }
                     sha.TransformFinalBlock(new byte[0], 0, 0);
                     string actual = BitConverter.ToString(sha.Hash).Replace("-", "");
-                    if (!string.Equals(actual, sha256, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The downloaded file did not match its expected hash.");
+                    if (!string.Equals(actual, sha256, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException(Locales.Message("editor.theDownloadedFileDidNotMatch"));
                     file.Flush(true);
                 }
             }
@@ -275,14 +275,14 @@ namespace ReplayKitHelper
         {
             var model = FindModel(modelId);
             if (model == null) return UnknownModel();
-            if (!Installed(model)) return new JObject { ["ok"] = false, ["message"] = "Auto subtitles are not set up yet." };
-            if (!Languages.Contains(language ?? "")) return new JObject { ["ok"] = false, ["message"] = "Unknown language." };
+            if (!Installed(model)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.autoSubtitlesAreNotSetUp") };
+            if (!Languages.Contains(language ?? "")) return new JObject { ["ok"] = false, ["message"] = Locales.Message("common.unknownLanguage") };
             var selected = Clips.GetSafeClipPath(clipName);
-            if (selected == null || !File.Exists(selected.Full)) return new JObject { ["ok"] = false, ["message"] = "The clip was not found." };
-            if (!(end > start) || start < 0 || end - start > 3 * 60 * 60) return new JObject { ["ok"] = false, ["message"] = "Nothing to listen to in that part of the clip." };
+            if (selected == null || !File.Exists(selected.Full)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.theClipWasNotFound") };
+            if (!(end > start) || start < 0 || end - start > 3 * 60 * 60) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.nothingToListenToInThat") };
             // the first stream is the mix of all the others, so it is only ever listened to alone
             if (tracks == null || tracks.Count == 0 || tracks.Count > 8 || tracks.Any(t => t < 0 || t > 31) || tracks.Distinct().Count() != tracks.Count || (tracks.Contains(0) && tracks.Count > 1))
-                return new JObject { ["ok"] = false, ["message"] = "Those audio tracks cannot be listened to." };
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.thoseAudioTracksCannotBeListened") };
 
             var job = new Job { Id = Guid.NewGuid().ToString("N") };
             lock (Gate)
@@ -303,7 +303,7 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
-                if (id == null || !Jobs.TryGetValue(id, out Job job)) return new JObject { ["ok"] = false, ["message"] = "Unknown job." };
+                if (id == null || !Jobs.TryGetValue(id, out Job job)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("editor.unknownJob") };
                 return new JObject { ["ok"] = true, ["state"] = job.State, ["percent"] = job.Percent, ["message"] = job.Error, ["warning"] = job.Warning, ["language"] = job.Language, ["words"] = job.State == "done" ? job.Words : null, ["alternatives"] = job.State == "done" ? job.Alternatives : null };
             }
         }
@@ -343,7 +343,7 @@ namespace ReplayKitHelper
                 lock (Gate) job.State = "preparing";
                 string wav = Path.Combine(work, "audio.wav");
                 string ffmpeg = Compression.FindCompressionFfmpeg();
-                if (string.IsNullOrEmpty(ffmpeg)) throw new InvalidOperationException("The video tools are missing. Run the ReplayKit setup again.");
+                if (string.IsNullOrEmpty(ffmpeg)) throw new InvalidOperationException(Locales.Message("editor.theVideoToolsAreMissingRun"));
                 var extract = new List<string>
                 {
                     "-hide_banner", "-loglevel", "error", "-ss", start.ToString("0.###", CultureInfo.InvariantCulture), "-i", clipPath,
@@ -356,7 +356,7 @@ namespace ReplayKitHelper
                 Compression.NativeCaptureResult extracted;
                 using (JobCoordinator.ReadSource(clipPath))
                     extracted = Compression.InvokeNativeCapture(ffmpeg, extract, job.Cancel.Token, 10 * 60 * 1000, true);
-                if (extracted.ExitCode != 0 || !File.Exists(wav)) throw new InvalidOperationException("The audio of the clip could not be read.");
+                if (extracted.ExitCode != 0 || !File.Exists(wav)) throw new InvalidOperationException(Locales.Message("editor.theAudioOfTheClipCould"));
 
                 lock (Gate) job.State = "listening";
                 // about one thread per physical core; the engine runs below normal priority so a game keeps its share
@@ -380,8 +380,8 @@ namespace ReplayKitHelper
                 };
                 RunTool(job, EngineExe, args, end - start);
                 string json = outBase + ".json";
-                if (!File.Exists(json)) throw new InvalidOperationException("The speech engine gave no result.");
-                if (new FileInfo(json).Length > 32 * 1024 * 1024) throw new InvalidDataException("The speech engine result is too large.");
+                if (!File.Exists(json)) throw new InvalidOperationException(Locales.Message("editor.theSpeechEngineGaveNoResult"));
+                if (new FileInfo(json).Length > 32 * 1024 * 1024) throw new InvalidDataException(Locales.Message("editor.theSpeechEngineResultIsToo"));
                 var data = JObject.Parse(File.ReadAllText(json, Encoding.UTF8));
                 var transcript = SpeechTranscript.Parse(data, start, end, timings);
                 string heard = data["result"]?["language"]?.Value<string>();
@@ -446,7 +446,7 @@ namespace ReplayKitHelper
                 args.AddRange(passes[p].Value);
                 RunTool(job, EngineExe, args, 0);
                 string json = outBase + ".json";
-                if (!File.Exists(json) || new FileInfo(json).Length > 4 * 1024 * 1024) throw new InvalidOperationException("The speech engine gave no result on the second listen.");
+                if (!File.Exists(json) || new FileInfo(json).Length > 4 * 1024 * 1024) throw new InvalidOperationException(Locales.Message("editor.theSpeechEngineGaveNoResult2"));
                 var texts = new string[stretches.Count];
                 foreach (var segment in JObject.Parse(File.ReadAllText(json, Encoding.UTF8))["transcription"] as JArray ?? new JArray())
                 {
@@ -496,7 +496,7 @@ namespace ReplayKitHelper
                 double from = Math.Max(0, double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) / 100);
                 double to = Math.Min(length, double.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) / 100);
                 if (to <= from) continue;
-                if (pieces.Count > 0 && from < pieces[pieces.Count - 1][0]) throw new InvalidDataException("The speech detector returned speech out of order.");
+                if (pieces.Count > 0 && from < pieces[pieces.Count - 1][0]) throw new InvalidDataException(Locales.Message("editor.theSpeechDetectorReturnedSpeechOut"));
                 if (pieces.Count > 0 && from - pieces[pieces.Count - 1][1] < SpeechJoinGap) pieces[pieces.Count - 1][1] = Math.Max(pieces[pieces.Count - 1][1], to);
                 else pieces.Add(new[] { from, to });
             }
@@ -514,9 +514,9 @@ namespace ReplayKitHelper
         {
             var reader = new BinaryReader(file);
             file.Position = 0;
-            if (file.Length < 12 || Encoding.ASCII.GetString(reader.ReadBytes(4)) != "RIFF") throw new InvalidDataException("The clip audio could not be read again.");
+            if (file.Length < 12 || Encoding.ASCII.GetString(reader.ReadBytes(4)) != "RIFF") throw new InvalidDataException(Locales.Message("editor.theClipAudioCouldNotBe"));
             reader.ReadInt32();
-            if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "WAVE") throw new InvalidDataException("The clip audio could not be read again.");
+            if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "WAVE") throw new InvalidDataException(Locales.Message("editor.theClipAudioCouldNotBe"));
             bool format = false;
             while (file.Position + 8 <= file.Length)
             {
@@ -541,7 +541,7 @@ namespace ReplayKitHelper
                 }
                 file.Position = body + size + (size & 1);
             }
-            throw new InvalidDataException("The clip audio could not be read again.");
+            throw new InvalidDataException(Locales.Message("editor.theClipAudioCouldNotBe"));
         }
 
         // the pieces of the clip audio (start and end in seconds) copied one after another to target with gap seconds of silence between them, streamed so a long clip is never held in memory whole; each piece comes back as its start and end in the clip audio and in target, or null when nothing of it was there
@@ -580,14 +580,14 @@ namespace ReplayKitHelper
                     for (long left = b - a; left > 0;)
                     {
                         int read = input.Read(buffer, 0, (int)Math.Min(buffer.Length, left));
-                        if (read <= 0) throw new InvalidDataException("The clip audio ended early.");
+                        if (read <= 0) throw new InvalidDataException(Locales.Message("editor.theClipAudioEndedEarly"));
                         output.Write(buffer, 0, read);
                         left -= read;
                         written += read;
                     }
                     placed.Add(new[] { a / 2.0 / PcmRate, b / 2.0 / PcmRate, at, written / 2.0 / PcmRate });
                 }
-                if (written > int.MaxValue - 36) throw new InvalidDataException("The audio is too long.");
+                if (written > int.MaxValue - 36) throw new InvalidDataException(Locales.Message("editor.theAudioIsTooLong"));
                 output.Position = 4;
                 writer.Write((int)(36 + written));
                 output.Position = 40;
@@ -631,7 +631,7 @@ namespace ReplayKitHelper
                 proc.WaitForExit();
                 string output = drain.GetAwaiter().GetResult();
                 job.Cancel.Token.ThrowIfCancellationRequested();
-                if (deadline.IsCancellationRequested) throw new TimeoutException("The speech engine took too long.");
+                if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("editor.theSpeechEngineTookTooLong"));
                 if (proc.ExitCode != 0)
                 {
                     Log.Write("Speech engine exit " + proc.ExitCode + ": " + tail);

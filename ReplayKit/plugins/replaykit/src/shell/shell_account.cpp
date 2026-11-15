@@ -45,7 +45,7 @@ QString InitialOf(const QString &name)
 
 ShellAccountButton::ShellAccountButton(QWidget *owner, QWidget *parent) : ShellTitleButton(kWidth, parent), m_owner(owner)
 {
-	SetTip(Tr("Streamable account"));
+	SetTip(TrMessage("common.streamableAccount"));
 	onPress = [this]() { TogglePanel(); };
 }
 
@@ -66,7 +66,7 @@ void ShellAccountButton::SetAccount(const Account &account)
 			m_picture.load(StateFilePath(QStringLiteral("profile_picture.png")), "PNG");
 	}
 	m_account = account;
-	SetTip(account.signedIn ? (account.name.isEmpty() ? Tr("Streamable: signed in") : Tr("Streamable: {name}", {{"name", account.name}})) : Tr("Streamable: anonymous"));
+	SetTip(account.signedIn ? (account.name.isEmpty() ? TrMessage("shell.streamableSignedIn") : TrMessage("shell.streamableName", {{"name", account.name}})) : TrMessage("shell.streamableAnonymous"));
 	update();
 }
 

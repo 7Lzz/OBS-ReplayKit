@@ -2,10 +2,8 @@
 <html lang="en" style="background:#272A33;color:#FFFFFF">
 <head>
 <script>
-// a dock still pointed at this file on disk has no helper page to take the address from, so it reads the generated helper-endpoint.js next to it
-if (location.protocol === "file:") document.write('<script src="helper-endpoint.js"><\/script>');
-// nor the translations, so its text stays english and RK_T only fills in the values
-if (!window.RK_T) window.RK_T = (english, vars) => String(english).replace(/\{([A-Za-z0-9_]+)\}/g, (match, key) => vars && vars[key] != null ? String(vars[key]) : match);
+// a dock still pointed at this file on disk has no helper page to take the address and the messages from, so it reads the generated helper-endpoint.js, the english catalog and the page runtime next to it, and shows english until it moves to the page the helper serves
+if (location.protocol === "file:") document.write('<script src="helper-endpoint.js"><\/script><script src="messages-en.js"><\/script><script src="i18n-runtime.js"><\/script>');
 </script>
 <script>
 if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
@@ -559,34 +557,34 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
 </head>
 <body style="background:#272A33;color:#FFFFFF">
   <div id="controlsFrame">
-    <button class="btn" id="mode-btn">Enable Share Preview</button>
+    <button class="btn" id="mode-btn" data-i18n="controls.enableSharePreview"></button>
     <div class="split-row">
-      <button class="btn" id="clip-toggle-btn">Start Clipping</button>
-      <button class="btn icon-btn" id="save-clip-btn" type="button" title="Save Clip" aria-label="Save Clip">
+      <button class="btn" id="clip-toggle-btn" data-i18n="common.startClipping"></button>
+      <button class="btn icon-btn" id="save-clip-btn" type="button" title="Save Clip" aria-label="Save Clip" data-i18n-title="common.saveClip" data-i18n-aria-label="common.saveClip">
         <!-- OBS's own replay-buffer save icon (data/obs-studio/themes/Dark/save.svg), fill -> currentColor -->
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:quick/save-clip}}</svg>
       </button>
     </div>
-    <button class="btn" id="record-btn">Start Recording</button>
+    <button class="btn" id="record-btn" data-i18n="common.startRecording2"></button>
     <div class="split-row">
-      <button class="btn" id="view-clips-btn">View Clips</button>
-      <button class="btn icon-btn" id="open-folder-btn" type="button" title="Open clips folder" aria-label="Open clips folder">
+      <button class="btn" id="view-clips-btn" data-i18n="common.viewClips"></button>
+      <button class="btn icon-btn" id="open-folder-btn" type="button" title="Open clips folder" aria-label="Open clips folder" data-i18n-title="common.openClipsFolder" data-i18n-aria-label="common.openClipsFolder">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">{{glyph:action/folder}}</svg>
       </button>
     </div>
     <div class="auth-wrap" id="auth-wrap">
       <button class="btn" id="auth-btn" type="button">
         <span class="dot"></span>
-        <span id="auth-label">Sign in to Streamable</span>
+        <span id="auth-label" data-i18n="common.signInToStreamable"></span>
       </button>
       <div class="auth-menu" id="auth-menu">
         <div class="info" id="auth-info"></div>
-        <div class="item" id="auth-logout">Sign out</div>
-        <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart.">Force re-login</div>
+        <div class="item" id="auth-logout" data-i18n="common.signOut"></div>
+        <div class="item" id="auth-force-signout" title="Wipes Streamable cookies from OBS so you can sign in as a different account. Requires an OBS restart." data-i18n-title="controls.wipesStreamableCookiesFromObsSo" data-i18n="controls.forceReLogin"></div>
       </div>
     </div>
-    <button class="btn" id="obs-settings-btn">OBS Studio Settings</button>
-    <button class="btn" id="settings-btn">ReplayKit Settings</button>
+    <button class="btn" id="obs-settings-btn" data-i18n="controls.obsStudioSettings"></button>
+    <button class="btn" id="settings-btn" data-i18n="common.replaykitSettings"></button>
   </div>
 
 <script>
@@ -691,8 +689,8 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
 
   function sharePreviewLabel(enabled, available) {
     // stays clickable when unavailable -- the click offers to set Share Preview up instead of doing nothing
-    if (available === false) return "Enable Share Preview";
-    return enabled ? "Disable Share Preview" : "Enable Share Preview";
+    if (available === false) return RK_M("controls.enableSharePreview");
+    return enabled ? RK_M("controls.disableSharePreview") : RK_M("controls.enableSharePreview");
   }
 
   function renderSharePreview(enabled, available) {
@@ -704,10 +702,10 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     modeBtn.textContent = sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable);
     modeBtn.disabled = sharePreviewActionInFlight;
     modeBtn.title = !sharePreviewAvailable
-      ? "Set up Discord screenshare so Discord and other apps can capture your OBS scene."
+      ? RK_M("controls.setUpDiscordScreenshareSoDiscord")
       : sharePreviewEnabled
-      ? "Stop letting Discord or other apps capture your OBS scene (Application screen share)."
-      : "Let Discord or other apps capture your OBS scene (use Application screen share).";
+      ? RK_M("controls.stopLettingDiscordOrOtherApps")
+      : RK_M("controls.letDiscordOrOtherAppsCapture");
   }
 
   async function saveReplay() {
@@ -716,17 +714,17 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
 
   // start / Stop Clipping = OBS replay buffer. save-clip is only useful while it is running.
   function renderClipState() {
-    if (!clipActionInFlight) clipToggleBtn.textContent = replayBufferActive ? "Stop Clipping" : "Start Clipping";
+    if (!clipActionInFlight) clipToggleBtn.textContent = replayBufferActive ? RK_M("common.stopClipping") : RK_M("common.startClipping");
     clipToggleBtn.classList.toggle("is-on", replayBufferActive && !clipActionInFlight);
     clipToggleBtn.title = replayBufferActive
-      ? "Stop the replay buffer. You will not be able to save clips until it is started again."
-      : "Start the replay buffer so you can save clips.";
+      ? RK_M("controls.stopTheReplayBufferYouWill")
+      : RK_M("controls.startTheReplayBufferSoYou");
     saveClipBtn.classList.toggle("is-muted", !replayBufferActive);
-    saveClipBtn.title = replayBufferActive ? "Save Clip" : "Start clipping first";
+    saveClipBtn.title = replayBufferActive ? RK_M("common.saveClip") : RK_M("controls.startClippingFirst");
   }
 
   function renderRecordState() {
-    if (!recordActionInFlight) recordBtn.textContent = recordActive ? "Stop Recording" : "Start Recording";
+    if (!recordActionInFlight) recordBtn.textContent = recordActive ? RK_M("common.stopRecording2") : RK_M("common.startRecording2");
     recordBtn.classList.toggle("is-recording", recordActive && !recordActionInFlight);
   }
 
@@ -898,13 +896,13 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     if (clipActionInFlight) return;
     clipActionInFlight = true;
     clipToggleBtn.classList.add("is-busy");
-    clipToggleBtn.textContent = replayBufferActive ? "Stopping..." : "Starting...";
+    clipToggleBtn.textContent = replayBufferActive ? RK_M("common.stopping") : RK_M("common.starting");
     try {
       const r = await helperJson("obs/replay-buffer", { method: "POST" });
       if (typeof r.active === "boolean") replayBufferActive = r.active;
     } catch (e) {
-      flashButton(clipToggleBtn, RK_T("Failed: {error}", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
-                  replayBufferActive ? "Stop Clipping" : "Start Clipping");
+      flashButton(clipToggleBtn, RK_M("controls.failedError", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
+                  replayBufferActive ? RK_M("common.stopClipping") : RK_M("common.startClipping"));
     } finally {
       clipActionInFlight = false;
       clipToggleBtn.classList.remove("is-busy");
@@ -916,13 +914,13 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     if (recordActionInFlight) return;
     recordActionInFlight = true;
     recordBtn.classList.add("is-busy");
-    recordBtn.textContent = recordActive ? "Stopping..." : "Starting...";
+    recordBtn.textContent = recordActive ? RK_M("common.stopping") : RK_M("common.starting");
     try {
       const r = await helperJson("obs/record", { method: "POST" });
       if (typeof r.active === "boolean") recordActive = r.active;
     } catch (e) {
-      flashButton(recordBtn, RK_T("Failed: {error}", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
-                  recordActive ? "Stop Recording" : "Start Recording");
+      flashButton(recordBtn, RK_M("controls.failedError", { error: e.message || e }).slice(0, 40), "is-flash-error", 2500,
+                  recordActive ? RK_M("common.stopRecording2") : RK_M("common.startRecording2"));
     } finally {
       recordActionInFlight = false;
       recordBtn.classList.remove("is-busy");
@@ -936,7 +934,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     try {
       await rkNativeConfirm("sharepreview-setup");
     } catch (e) {
-      flashButton(modeBtn, RK_T("Setup failed: {error}", { error: e.message || e }).slice(0, 42), "is-flash-error", 3000, "Enable Share Preview");
+      flashButton(modeBtn, RK_M("controls.setupFailedError", { error: e.message || e }).slice(0, 42), "is-flash-error", 3000, RK_M("controls.enableSharePreview"));
     }
   }
 
@@ -947,7 +945,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     sharePreviewActionInFlight = true;
     modeBtn.disabled = true;
     modeBtn.classList.add("is-busy");
-    modeBtn.textContent = nextEnabled ? "Enabling..." : "Disabling...";
+    modeBtn.textContent = nextEnabled ? RK_M("controls.enabling") : RK_M("controls.disabling");
     try {
       const result = await helperJson("share-preview", {
         method: "POST",
@@ -958,12 +956,12 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       const available = !(result && result.available === false);
       renderSharePreview(enabled, available);
       const warnings = Array.isArray(result && result.warnings) ? result.warnings : [];
-      flashButton(modeBtn, !available ? "Preview disabled" : warnings.length ? "Preview warning" : (enabled ? "Preview enabled" : "Preview disabled"),
+      flashButton(modeBtn, !available ? RK_M("controls.previewDisabled") : warnings.length ? RK_M("controls.previewWarning") : (enabled ? RK_M("controls.previewEnabled") : RK_M("controls.previewDisabled")),
                   warnings.length ? "is-flash-error" : "is-flash-success",
                   warnings.length ? 3000 : 1400,
                   sharePreviewLabel(enabled, available));
     } catch (e) {
-      flashButton(modeBtn, RK_T("Preview failed: {error}", { error: e.message || e }).slice(0, 42),
+      flashButton(modeBtn, RK_M("controls.previewFailedError", { error: e.message || e }).slice(0, 42),
                   "is-flash-error", 3000, sharePreviewLabel(sharePreviewEnabled, sharePreviewAvailable));
     } finally {
       modeBtn.classList.remove("is-busy");
@@ -997,7 +995,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
-  function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : "Free"; }
+  function planLabel(p) { return p ? p.charAt(0).toUpperCase() + p.slice(1) : RK_M("account.freePlan"); }
 
   function applyAuthData(data) {
     authState = {
@@ -1013,16 +1011,16 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
   function renderAuth() {
     if (authState.signedIn) {
       authBtn.classList.add("is-signed-in");
-      authLabel.textContent = "Signed in";
+      authLabel.textContent = RK_M("common.signedIn");
       authInfo.innerHTML =
         '<b class="spoiler" tabindex="0"' + (authState.username ? ' translate="no"' : "") + ">" +
-        escapeHtml(authState.username || RK_T("(signed in)")) + "</b><br>" +
+        escapeHtml(authState.username || RK_M("controls.signedIn")) + "</b><br>" +
         '<span translate="no">' + escapeHtml(planLabel(authState.plan)) + "</span> &middot; " +
-        "<span>" + escapeHtml(RK_T("{days}d retention", { days: authState.retentionDays })) + "</span>";
+        "<span>" + escapeHtml(RK_M("controls.daysDRetention", { days: authState.retentionDays })) + "</span>";
     } else {
       authBtn.classList.remove("is-signed-in");
-      authLabel.textContent = "Sign in to Streamable";
-      authInfo.innerHTML = "Not signed in";
+      authLabel.textContent = RK_M("common.signInToStreamable");
+      authInfo.innerHTML = RK_M("common.notSignedIn");
     }
   }
   renderAuth();
@@ -1066,7 +1064,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
   function setSigningIn(on, label) {
     if (on) {
       authBtn.classList.add("is-signing-in");
-      authLabel.textContent = label || "Signing in…";
+      authLabel.textContent = label || RK_M("controls.signingIn");
     } else {
       authBtn.classList.remove("is-signing-in");
       // renderauth() will set the right label based on current state.
@@ -1111,7 +1109,7 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
     loginWindowsCloseRequested = false;
     loginLastCloseRequestAt = 0;
     let sawWindowOpen = false;
-    setSigningIn(true, "Opening Streamable…");
+    setSigningIn(true, RK_M("common.openingStreamable2"));
 
     async function pollStatus(isStartCall) {
       if (!loginFlowActive) return;
@@ -1125,13 +1123,13 @@ if (location.protocol === "file:" && window.RK_HELPER_ORIGIN) {
       if (!loginFlowActive || !res.ok) return; // cleanup may have already fired while this request was in flight
       if (data.signedIn) {
         applyAuthData(data);
-        setSigningIn(true, "Signed in! Cleaning up…");
+        setSigningIn(true, RK_M("controls.signedInCleaningUp"));
         cleanupLoginFlow();
         return;
       }
-      if (data.pending === true) { sawWindowOpen = true; setSigningIn(true, "Sign in in the Streamable window…"); return; }
+      if (data.pending === true) { sawWindowOpen = true; setSigningIn(true, RK_M("controls.signInInTheStreamableWindow")); return; }
       if (sawWindowOpen) { cleanupLoginFlow(); return; } // really did close without finishing
-      setSigningIn(true, "Opening Streamable…"); // pending:false before weve ever seen it open -- still starting up
+      setSigningIn(true, RK_M("common.openingStreamable2")); // pending:false before weve ever seen it open -- still starting up
     }
 
     pollStatus(true); // opens the window (or focuses the existing one) and seeds status in the same call

@@ -43,16 +43,6 @@ std::optional<bool> g_clipOn;
 std::optional<bool> g_recordingOn;
 std::optional<bool> g_hideFromCapture;
 
-// "90" -> "1m 30s", "120" -> "2m", "45" -> "45s", the way the rest of the interface writes a length
-QString FormatLength(int seconds)
-{
-	if (seconds < 60)
-		return QStringLiteral("%1s").arg(seconds);
-	const int minutes = seconds / 60;
-	const int rest = seconds % 60;
-	return rest == 0 ? QStringLiteral("%1m").arg(minutes) : QStringLiteral("%1m %2s").arg(minutes).arg(rest);
-}
-
 QFont ToastFont()
 {
 	QFont font;
@@ -230,7 +220,7 @@ void ShowNow(ClipToastKind kind, double duration)
 	QString message;
 	if (clip) {
 		if (std::isfinite(duration) && duration >= 1 && duration <= (std::numeric_limits<int>::max)())
-			message = TrMessage("capture.clipSaved", {{"length", FormatLength(int(std::round(duration)))}});
+			message = TrMessage("capture.clipSaved", {{"length", LengthText(int(std::round(duration)))}});
 		else if (duration > 0 && duration < 1)
 			message = TrMessage("capture.clipSavedUnderSecond");
 		else

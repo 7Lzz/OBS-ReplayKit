@@ -98,7 +98,7 @@ void ShellStorage::enterEvent(QEnterEvent *event)
 	if (!g_notifyTip)
 		g_notifyTip = new NotifyTip();
 	const QRect anchor((width() - RailButtonSize) / 2, 0, RailButtonSize, RailButtonSize);
-	g_notifyTip->ShowFor(m_info.compressing ? Tr("Compressing clips {time}, {percent}%", {{"time", m_info.compressText}, {"percent", QString::number(m_info.compressPercent)}}) : Tr("Storage"),
+	g_notifyTip->ShowFor(m_info.compressing ? TrMessage("shell.compressingClipsTimePercent", {{"time", m_info.compressText}, {"percent", QString::number(m_info.compressPercent)}}) : TrMessage("common.storage"),
 			     QRect(mapToGlobal(anchor.topLeft()), anchor.size()), NotifyTip::Side::Right);
 }
 

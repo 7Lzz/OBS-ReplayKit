@@ -58,7 +58,7 @@ namespace ReplayKitHelper
                             string obsPath = ObsProcess.GetRunningObsPath();
                             if (obsPath == null)
                             {
-                                HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "Could not locate OBS executable path to relaunch from." });
+                                HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.couldNotLocateObsExecutablePath") });
                                 return false;
                             }
                             ObsProcess.ArmRelaunchAndCloseObs(obsPath, "/settings");

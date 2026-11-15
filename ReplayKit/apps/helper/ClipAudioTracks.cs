@@ -30,7 +30,7 @@ namespace ReplayKitHelper
         public static JObject Describe(string clipName, bool lowPriority = false)
         {
             var clip = Clips.GetSafeClipPath(clipName);
-            if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
+            if (clip == null || !File.Exists(clip.Full)) return Fail(Locales.Message("common.clipNotFound"));
             var entries = Mp4Tracks.ReadFile(clip.Full);
             var audio = entries?.Where(t => t.Audio).ToArray();
             int count = audio?.Length ?? 0;
@@ -39,8 +39,8 @@ namespace ReplayKitHelper
             for (int i = first; i < count; i++)
             {
                 string label = audio[i].HandlerName;
-                if (!Trim.AudioTrackLabels.Contains(label, StringComparer.Ordinal)) label = count >= 2 ? Trim.AudioTrackLabel(i) : "Audio";
-                tracks.Add(new JObject { ["index"] = i, ["label"] = label });
+                if (!Trim.AudioTrackLabels.Contains(label, StringComparer.Ordinal)) label = count >= 2 ? Trim.AudioTrackLabel(i) : Trim.SingleTrackLabel;
+                tracks.Add(new JObject { ["index"] = i, ["label"] = label, ["name"] = Trim.AudioTrackName(label) });
             }
             var result = new JObject { ["ok"] = true, ["audioTracks"] = count, ["tracks"] = tracks };
             if (count < 1)
@@ -183,14 +183,14 @@ namespace ReplayKitHelper
         public static JObject Inspect(string clipName)
         {
             var clip = Clips.GetSafeClipPath(clipName);
-            if (clip == null || !File.Exists(clip.Full)) return Fail("Clip not found");
+            if (clip == null || !File.Exists(clip.Full)) return Fail(Locales.Message("common.clipNotFound"));
             var list = new JArray();
             try
             {
                 using (var fs = new FileStream(clip.Full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 {
                     var tracks = Mp4Tracks.Read(fs);
-                    if (tracks == null) return Fail("Not an mp4 with a readable moov box");
+                    if (tracks == null) return Fail(Locales.Message("editor.notAnMp4WithAReadable"));
                     foreach (var t in tracks)
                         list.Add(new JObject { ["id"] = t.Id, ["kind"] = t.Audio ? "audio" : t.Video ? "video" : "other", ["enabled"] = (t.Flags & 1) != 0, ["flags"] = t.Flags, ["alternateGroup"] = t.AlternateGroup });
                 }

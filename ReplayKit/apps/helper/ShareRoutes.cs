@@ -43,7 +43,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/upload-latest threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Helper error: {error}", "error", ex.Message) });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("share.helperErrorError", "error", ex.Message) });
                 }
                 return false;
             }
@@ -52,7 +52,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.badFilename") }); return false; }
                 try
                 {
                     // bulk uploads pass quiet=1 -- one balloon toast + one clipboard write per clip is noise when a whole selection goes at once.
@@ -64,7 +64,7 @@ namespace ReplayKitHelper
                 catch (Exception ex)
                 {
                     Log.Write("/upload threw: " + ex.Message + "\n" + ex.StackTrace);
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.T("Helper error: {error}", "error", ex.Message) });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("share.helperErrorError", "error", ex.Message) });
                 }
                 return false;
             }
@@ -86,7 +86,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.badFilename") }); return false; }
                 bool removed = Clips.RemoveLink(selected.Name);
                 HttpResponse.SendJson(stream, removed ? 200 : 404, new JObject { ["ok"] = removed });
                 return false;
@@ -109,7 +109,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
+                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") }); return false; }
                 try
                 {
                     var result = Compression.StartCompressedStreamableUpload(selected);

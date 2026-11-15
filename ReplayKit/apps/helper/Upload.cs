@@ -32,7 +32,7 @@ namespace ReplayKitHelper
                 bool required = Server.State.Auth.SignedIn;
                 string cookies = required ? File.ReadAllText(AuthCore.GetAuthCookieJarPath()) : "";
                 if (required && string.IsNullOrWhiteSpace(cookies))
-                    throw new InvalidOperationException("Signed-in Streamable session is unavailable. Sign out and sign in again.");
+                    throw new InvalidOperationException(Locales.Message("share.signedInStreamableSessionIsUnavailable"));
                 return new UploadAuth(cookies, required, Constants.GetEffectiveUploadCap(), SubjectToStreamableDurationLimit(), Constants.GetEffectiveRetentionDays());
             }
         }
@@ -60,7 +60,7 @@ namespace ReplayKitHelper
                     ["ok"] = false,
                     ["tooLong"] = true,
                     ["durationSec"] = total,
-                    ["message"] = Locales.T("Clip is {length} long. Streamable's limit is 10 minutes -- trim it shorter first.", "length", mmss),
+                    ["message"] = Locales.Message("common.clipIsLengthLongStreamableS", "length", mmss),
                 };
             }
             catch (Exception ex)
@@ -83,8 +83,8 @@ namespace ReplayKitHelper
             }
             if (clip == null)
             {
-                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: "No mp4/mkv/mov clip found");
-                return new JObject { ["ok"] = false, ["message"] = "No mp4/mkv/mov clip found" };
+                UploadState.SetUploadState(requestId: requestId, state: "error", active: false, error: Locales.Message("share.noMp4MkvMovClipFound"));
+                return new JObject { ["ok"] = false, ["message"] = Locales.Message("share.noMp4MkvMovClipFound") };
             }
 
             string clipName = !string.IsNullOrWhiteSpace(displayName) ? displayName : clip.Name;
@@ -95,7 +95,7 @@ namespace ReplayKitHelper
                 string uploadFull = !string.IsNullOrWhiteSpace(uploadPath) ? Path.GetFullPath(uploadPath) : clip.Full;
                 if (!File.Exists(uploadFull))
                 {
-                    string msg = Locales.T("Upload file not found: {path}", "path", uploadFull);
+                    string msg = Locales.Message("share.uploadFileNotFoundPath", "path", uploadFull);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg };
                 }
@@ -115,7 +115,7 @@ namespace ReplayKitHelper
                     // keep this short -- the dock button caps display at 60 chars and the popup buttons cap at 28. full context goes via toast in the popup.
                     long mb = (long)Math.Ceiling(fi.Length / 1024.0 / 1024.0);
                     long cap = effCap / 1024 / 1024;
-                    string msg = Locales.T("Too big: {size} MB / {cap} MB limit", "size", mb, "cap", cap);
+                    string msg = Locales.Message("share.tooBigSizeMbCapMb", "size", mb, "cap", cap);
                     UploadState.SetUploadState(requestId: requestId, state: "error", active: false, clipName: clipName, error: msg);
                     return new JObject { ["ok"] = false, ["message"] = msg, ["tooBig"] = true, ["sizeMb"] = mb, ["capMb"] = cap };
                 }
@@ -202,8 +202,7 @@ namespace ReplayKitHelper
                 Path.Combine(Constants.HelperRoot, "obs-replaykit.ico"),
             })
             {
-                try { if (!string.IsNullOrEmpty(cand) && File.Exists(cand)) return cand; }
-                catch { }
+                if (!string.IsNullOrEmpty(cand) && File.Exists(cand)) return cand;
             }
             return null;
         }
@@ -213,9 +212,9 @@ namespace ReplayKitHelper
         {
             string shownName = string.IsNullOrEmpty(clipName) ? "" : Path.GetFileNameWithoutExtension(clipName);
             string body = string.IsNullOrEmpty(shownName)
-                ? (copied ? Locales.T("Your clip is ready and the link is on your clipboard") : Locales.T("Your clip is ready"))
-                : (copied ? Locales.T("Your \"{name}\" is ready, link copied to clipboard", "name", shownName) : Locales.T("Your \"{name}\" is ready", "name", shownName));
-            ToastNotify.Show(Locales.T("Clip Uploaded"), body, ResolveToastIconPath());
+                ? (copied ? Locales.Message("share.yourClipIsReadyAndThe") : Locales.Message("share.yourClipIsReady"))
+                : (copied ? Locales.Message("share.yourNameIsReadyLinkCopied", "name", shownName) : Locales.Message("share.yourNameIsReady", "name", shownName));
+            ToastNotify.Show(Locales.Message("share.clipUploaded"), body, ResolveToastIconPath());
         }
 
         // background transcode poller: streamables /transcode only queues the encode, and the video is watchable once /api/v1/videos/<shortcode> reports status 2. it runs as this exe in --transcode-poll mode outside the kill-on-close job, since a poll inside the helper died with it and left clips stuck on processing
@@ -256,7 +255,7 @@ namespace ReplayKitHelper
                     " -CopyLink " + (copyLink ? "1" : "0") +
                     " -Notify " + (notify ? "1" : "0");
                 if (Native.SpawnDetached(cmdLine, Constants.HelperRoot) <= 0)
-                    throw new InvalidOperationException("Could not launch the transcode status worker.");
+                    throw new InvalidOperationException(Locales.Message("share.couldNotLaunchTheTranscodeStatus"));
                 launched = true;
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)

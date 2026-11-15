@@ -207,7 +207,7 @@ namespace ReplayKitHelper
             string rootFull = Path.GetFullPath(profilesRoot).TrimEnd('\\');
             string profileDir = Path.GetFullPath(Path.Combine(profilesRoot, profileName));
             if (!profileDir.StartsWith(rootFull + "\\", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("OBS profile path resolved outside the OBS profiles directory.");
+                throw new InvalidOperationException(Locales.Message("settings.obsProfilePathResolvedOutsideThe"));
             return profileDir;
         }
 
@@ -236,7 +236,7 @@ namespace ReplayKitHelper
             var kinds = ObsWebSocket.InvokeRequest("GetInputKindList", new JObject { ["unversioned"] = true }, 3000);
             if (!kinds.Ok || !(kinds.Data?["inputKinds"] as JArray ?? new JArray()).Any(k => k.Value<string>() == BongoInputKind))
             {
-                warnings.Add("Bongo Cat needs the ReplayKit OBS plugin. Run the ReplayKit installer again, then restart OBS.");
+                warnings.Add(Locales.Message("settings.bongoCatNeedsTheReplaykitObs"));
                 return null;
             }
             string Kind(string name)
@@ -248,13 +248,13 @@ namespace ReplayKitHelper
             bool Rename(string from, string to)
             {
                 var result = ObsWebSocket.InvokeRequest("SetInputName", new JObject { ["inputName"] = from, ["newInputName"] = to }, 3000);
-                if (!result.Ok) warnings.Add(Locales.T("Could not set up Bongo Cat: {error}", "error", result.Message));
+                if (!result.Ok) warnings.Add(Locales.Message("settings.couldNotSetUpBongoCat", "error", result.Message));
                 return result.Ok;
             }
             bool Enable(JObject item, bool enabled)
             {
                 var result = SetSceneItemEnabled(sceneName, item, enabled);
-                if (result["ok"]?.Value<bool>() != true) { warnings.Add(Locales.T("Could not change Bongo Cat visibility: {error}", "error", result["message"])); return false; }
+                if (result["ok"]?.Value<bool>() != true) { warnings.Add(Locales.Message("settings.couldNotChangeBongoCatVisibility", "error", result["message"])); return false; }
                 return true;
             }
 
@@ -288,7 +288,7 @@ namespace ReplayKitHelper
                 }, 5000);
                 if (!created.Ok)
                 {
-                    warnings.Add(Locales.T("Could not create Bongo Cat overlay: {error}", "error", created.Message));
+                    warnings.Add(Locales.Message("settings.couldNotCreateBongoCatOverlay", "error", created.Message));
                     return null;
                 }
                 current = new JObject { ["sceneItemId"] = created.Data?["sceneItemId"]?.Value<int>() ?? 0, ["sourceName"] = "Bongo Cat Overlay" };
@@ -299,7 +299,7 @@ namespace ReplayKitHelper
                 {
                     ["inputName"] = "Bongo Cat Overlay", ["inputSettings"] = inputSettings, ["overlay"] = true,
                 }, 3000);
-                if (!update.Ok) warnings.Add(Locales.T("Could not update Bongo Cat settings: {error}", "error", update.Message));
+                if (!update.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateBongoCatSettings", "error", update.Message));
             }
             Enable(current, true);
             return current;
@@ -336,14 +336,14 @@ namespace ReplayKitHelper
         internal static void PlaceInputOverlayMember(string name, JObject settings, List<string> warnings)
         {
             var list = ObsWebSocket.InvokeRequest("GetGroupSceneItemList", new JObject { ["sceneName"] = "Group" }, 3000);
-            if (!list.Ok) { warnings.Add(Locales.T("Could not read the overlay group: {error}", "error", list.Message)); return; }
+            if (!list.Ok) { warnings.Add(Locales.Message("settings.couldNotReadTheOverlayGroup", "error", list.Message)); return; }
             var member = (list.Data?["sceneItems"] as JArray ?? new JArray()).OfType<JObject>().FirstOrDefault(i => i["sourceName"]?.Value<string>() == name);
             if (member == null) return;
             var moved = SetSceneItemTransform("Group", member, InputOverlayMemberTransform(name, settings));
-            if (moved["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not place {name}: {error}", "name", name, "error", moved["message"]));
+            if (moved["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPlaceNameError", "name", name, "error", moved["message"]));
             if (name != "Mouse Overlay") return;
             var shown = SetSceneItemEnabled("Group", member, InputOverlayMouseShown(settings));
-            if (shown["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not show or hide {name}: {error}", "name", name, "error", shown["message"]));
+            if (shown["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotShowOrHideName", "name", name, "error", shown["message"]));
         }
 
         // removing the inputs takes their items inside Group with them, and the empty Group item goes after
@@ -355,14 +355,14 @@ namespace ReplayKitHelper
                 if (!ObsWebSocket.InvokeRequest("GetInputSettings", new JObject { ["inputName"] = name }, 3000).Ok) continue;
                 var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
                 if (result.Ok) removed = true;
-                else warnings.Add(Locales.T("Could not remove {name}: {error}", "name", name, "error", result.Message));
+                else warnings.Add(Locales.Message("settings.couldNotRemoveNameError", "name", name, "error", result.Message));
             }
             var group = FindSceneItem(items, "Group");
             if (group != null)
             {
                 var result = RemoveSceneItem(sceneName, group);
                 if (result["ok"]?.Value<bool>() == true) removed = true;
-                else warnings.Add(Locales.T("Could not remove the input overlay group: {error}", "error", result["message"]));
+                else warnings.Add(Locales.Message("settings.couldNotRemoveTheInputOverlay", "error", result["message"]));
             }
             return removed;
         }
@@ -380,7 +380,7 @@ namespace ReplayKitHelper
                 if (input.Data?["inputKind"]?.Value<string>() == LegacyBongoInputKind && legacyLoaded) continue;
                 var result = ObsWebSocket.InvokeRequest("RemoveInput", new JObject { ["inputName"] = name }, 3000);
                 if (result.Ok) removed = true;
-                else warnings.Add(Locales.T("Could not remove {name}: {error}", "name", name, "error", result.Message));
+                else warnings.Add(Locales.Message("settings.couldNotRemoveNameError", "name", name, "error", result.Message));
             }
             return removed;
         }
@@ -424,7 +424,7 @@ namespace ReplayKitHelper
                              .ToList())
                 {
                     var rm = RemoveSceneItem(sceneName, stray);
-                    if (rm["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not remove a duplicate {source} item: {error}", "source", stray["sourceName"]?.Value<string>(), "error", rm["message"]));
+                    if (rm["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotRemoveADuplicateSource", "source", stray["sourceName"]?.Value<string>(), "error", rm["message"]));
                 }
                 var refreshed = GetSceneItems(sceneName);
                 if (refreshed["ok"]?.Value<bool>() == true) items = refreshed["items"] as JArray ?? items;
@@ -439,22 +439,22 @@ namespace ReplayKitHelper
             }
 
             var cursorResult = SetDisplayCaptureCursorLive(settings);
-            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not update the Display Capture cursor: {error}", "error", cursorResult["message"]));
+            if (cursorResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotUpdateTheDisplayCapture", "error", cursorResult["message"]));
 
             foreach (var captureName in new[] { "Display Capture", "Window Capture", "Game Capture" })
             {
                 var capture = FindSceneItem(items, captureName);
                 var captureTransform = MainCaptureTransform(captureName, preset);
                 var captureResult = SetSceneItemTransform(sceneName, capture, captureTransform);
-                if (captureResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not fit {captureName} to canvas: {error}", "captureName", captureName, "error", captureResult["message"]));
+                if (captureResult["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotFitCapturenameToCanvas", "captureName", captureName, "error", captureResult["message"]));
             }
 
             if (bongoEnabled && bongo != null)
             {
                 var rTransform = SetSceneItemTransform(sceneName, bongo, BongoTransform(preset, settings));
-                if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not position Bongo Cat overlay: {error}", "error", rTransform["message"]));
+                if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionBongoCatOverlay", "error", rTransform["message"]));
                 var rOpacity = ApplyOverlayOpacityLive("Bongo Cat Overlay", opacity, settings);
-                if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not set Bongo Cat overlay opacity: {error}", "error", rOpacity["message"]));
+                if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotSetBongoCatOverlay", "error", rOpacity["message"]));
             }
 
             if (overlayStyle == "input_overlay")
@@ -463,14 +463,14 @@ namespace ReplayKitHelper
                 if (group != null)
                 {
                     var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
-                    if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not position input overlay group: {error}", "error", rGroupTransform["message"]));
+                    if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionInputOverlayGroup", "error", rGroupTransform["message"]));
                 }
                 var keyboardFiles = InputOverlayMemberFiles("WASD Overlay", settings);
                 var mouseFiles = InputOverlayMemberFiles("Mouse Overlay", settings);
                 string wasdPng = keyboardFiles?.Sheet, wasdJson = keyboardFiles?.Json, mousePng = mouseFiles?.Sheet, mouseJson = mouseFiles?.Json;
                 if (string.IsNullOrWhiteSpace(wasdPng) || string.IsNullOrWhiteSpace(wasdJson) || string.IsNullOrWhiteSpace(mousePng) || string.IsNullOrWhiteSpace(mouseJson))
                 {
-                    warnings.Add("Input overlay assets are missing from the ReplayKit install, so OBS could not switch that overlay live.");
+                    warnings.Add(Locales.Message("settings.inputOverlayAssetsAreMissingFrom"));
                 }
                 else
                 {
@@ -489,14 +489,14 @@ namespace ReplayKitHelper
                         if (group != null)
                         {
                             var s = ObsWebSocket.InvokeRequest("SetInputSettings", new JObject { ["inputName"] = entry.name, ["inputSettings"] = io, ["overlay"] = true }, 3000);
-                            if (!s.Ok) warnings.Add(Locales.T("Could not update {name}: {error}", "name", entry.name, "error", s.Message));
+                            if (!s.Ok) warnings.Add(Locales.Message("settings.couldNotUpdateNameError", "name", entry.name, "error", s.Message));
                             PlaceInputOverlayMember(entry.name, settings, warnings);
                             continue;
                         }
                         var created = EnsureInputSceneItem(sceneName, entry.name, "input-overlay", io, true);
-                        if (created["ok"]?.Value<bool>() != true) { warnings.Add(Locales.T("Could not create {name}: {error}", "name", entry.name, "error", created["message"])); continue; }
+                        if (created["ok"]?.Value<bool>() != true) { warnings.Add(Locales.Message("settings.couldNotCreateNameError", "name", entry.name, "error", created["message"])); continue; }
                         var rTransform = SetSceneItemTransform(sceneName, created["item"] as JObject, InputOverlayMemberTransform(entry.name, settings));
-                        if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not position {name}: {error}", "name", entry.name, "error", rTransform["message"]));
+                        if (rTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionNameError", "name", entry.name, "error", rTransform["message"]));
                     }
                     if (group == null)
                     {
@@ -507,18 +507,18 @@ namespace ReplayKitHelper
                             var grouped = GetSceneItems(sceneName);
                             if (grouped["ok"]?.Value<bool>() == true) group = FindSceneItem(grouped["items"] as JArray, "Group");
                         }
-                        if (group == null) warnings.Add("Could not group the WASD and mouse overlays. Restart OBS to rebuild them.");
+                        if (group == null) warnings.Add(Locales.Message("settings.couldNotGroupTheWasdAnd"));
                         else
                         {
                             if (!InputOverlayMouseShown(settings)) PlaceInputOverlayMember("Mouse Overlay", settings, warnings);
                             var rGroupTransform = SetSceneItemTransform(sceneName, group, InputOverlayGroupTransform(preset, settings));
-                            if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not position input overlay group: {error}", "error", rGroupTransform["message"]));
+                            if (rGroupTransform["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotPositionInputOverlayGroup", "error", rGroupTransform["message"]));
                         }
                     }
                     foreach (var entry in entries)
                     {
                         var rOpacity = ApplyOverlayOpacityLive(entry.name, opacity, settings);
-                        if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add(Locales.T("Could not set {name} opacity: {error}", "name", entry.name, "error", rOpacity["message"]));
+                        if (rOpacity["ok"]?.Value<bool>() != true) warnings.Add(Locales.Message("settings.couldNotSetNameOpacityError", "name", entry.name, "error", rOpacity["message"]));
                     }
                 }
                 if (group != null) SetSceneItemEnabled(sceneName, group, true);

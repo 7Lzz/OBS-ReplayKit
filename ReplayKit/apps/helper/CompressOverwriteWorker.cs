@@ -65,7 +65,7 @@ namespace ReplayKitHelper
                 var srcInfo = new FileInfo(sourcePath);
                 if (!srcInfo.Exists || srcInfo.Length != preBytes ||
                     (expectedWriteTime.HasValue && srcInfo.LastWriteTimeUtc != expectedWriteTime.Value))
-                    return new CompressOverwriteResult { Ok = false, Message = "The selected clip changed; select it again." };
+                    return new CompressOverwriteResult { Ok = false, Message = Locales.Message("storage.theSelectedClipChangedSelectIt") };
                 if (srcInfo.Exists) { origLastWrite = srcInfo.LastWriteTimeUtc; origCreation = srcInfo.CreationTimeUtc; }
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { }
@@ -147,7 +147,7 @@ namespace ReplayKitHelper
             var diagnostics = stderrTask.GetAwaiter().GetResult();
             string stderr = diagnostics.Text;
             token.ThrowIfCancellationRequested();
-            if (deadline.IsCancellationRequested) throw new TimeoutException("Compression exceeded its time limit.");
+            if (deadline.IsCancellationRequested) throw new TimeoutException(Locales.Message("storage.compressionExceededItsTimeLimit"));
             if (!string.IsNullOrEmpty(stderr)) Log.Write("stderr: " + stderr, "compress", requestId);
             Log.Write("progress lines=" + linesSeen + " lastPct=" + lastReportedPct, "compress", requestId);
 
@@ -186,7 +186,7 @@ namespace ReplayKitHelper
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is System.ComponentModel.Win32Exception)
             {
                 try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch (Exception ex2) when (ex2 is IOException || ex2 is UnauthorizedAccessException) { }
-                string msg = Locales.T("Could not replace original: {error}", "error", ex.Message);
+                string msg = Locales.Message("common.couldNotReplaceOriginalError", "error", ex.Message);
                 UploadState.SetUploadState(requestId: requestId, state: "error", phase: "error", percent: 0, error: msg);
                 return new CompressOverwriteResult { Ok = false, Message = msg };
             }
@@ -224,9 +224,9 @@ namespace ReplayKitHelper
             try { CompressionHistory.Record(requestId, mode, preBytes, outBytes, scaleHeight); }
             catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException || ex is Newtonsoft.Json.JsonException)
             {
-                historyWarning = Locales.T("The clip was compressed, but its result could not be saved to compression history.");
+                historyWarning = Locales.Message("storage.theClipWasCompressedButIts");
                 Log.Write("Compression history: " + ex.Message, "compress", requestId);
-                try { Notifications.Add("warning", "compression-history", Locales.T("Compression history was not saved"), historyWarning); }
+                try { Notifications.Add("warning", "compression-history", Locales.Message("storage.compressionHistoryWasNotSaved"), historyWarning); }
                 catch (Exception notice) when (notice is IOException || notice is UnauthorizedAccessException || notice is Newtonsoft.Json.JsonException)
                 { Log.Write("Compression history notification: " + notice.Message, "compress", requestId); }
             }

@@ -39,12 +39,12 @@ namespace ReplayKitHelper
             if (path == "/mic/test/start")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
-                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
+                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.volumeMustBeANumber") }); return false; }
+                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.inputSensitivityMustBeANumber") }); return false; }
                 string noiseFlag = Q("ns");
-                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Noise suppression must be 0 or 1." }); return false; }
+                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.noiseSuppressionMustBe0Or") }); return false; }
                 string playbackFlag = Q("playback", "1");
-                if (playbackFlag != "0" && playbackFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Playback must be 0 or 1." }); return false; }
+                if (playbackFlag != "0" && playbackFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.playbackMustBe0Or1") }); return false; }
                 var started = MicTest.Start(Q("device"), volume, noiseFlag == "1", gate, playbackFlag == "1");
                 HttpResponse.SendJson(stream, started["ok"]?.Value<bool>() == true ? 200 : 400, started);
                 return false;
@@ -53,10 +53,10 @@ namespace ReplayKitHelper
             if (path == "/mic/test/params")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Volume must be a number." }); return false; }
-                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Input sensitivity must be a number." }); return false; }
+                if (!int.TryParse(Q("volume"), out int volume)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.volumeMustBeANumber") }); return false; }
+                if (!int.TryParse(Q("gate"), out int gate)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.inputSensitivityMustBeANumber") }); return false; }
                 string noiseFlag = Q("ns");
-                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Noise suppression must be 0 or 1." }); return false; }
+                if (noiseFlag != "0" && noiseFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.noiseSuppressionMustBe0Or") }); return false; }
                 var changed = MicTest.SetParams(volume, noiseFlag == "1", gate);
                 HttpResponse.SendJson(stream, changed["ok"]?.Value<bool>() == true ? 200 : 400, changed);
                 return false;
@@ -87,7 +87,7 @@ namespace ReplayKitHelper
                     string inputName = which == "mic" ? SettingsLiveApply.MicInputName : which == "desktop" ? SettingsLiveApply.DesktopAudioInputName : which == "discord" ? SettingsLiveApply.DiscordAudioInputName : null;
                     if (inputName == null || body["muted"]?.Type != JTokenType.Boolean)
                     {
-                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected input (mic, desktop or discord) and muted (true or false)." });
+                        HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedInputMicDesktopOrDiscord") });
                         return false;
                     }
                     var res = ObsWebSocket.InvokeRequest("SetInputMute", new JObject { ["inputName"] = inputName, ["inputMuted"] = body["muted"].Value<bool>() }, 3000);

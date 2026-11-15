@@ -93,7 +93,7 @@ namespace ReplayKitHelper
                         if (query.ContainsKey("offset")) int.TryParse(Q("offset"), out offset);
                         if (query.ContainsKey("limit")) int.TryParse(Q("limit"), out limit);
                         string game = Q("game", "all");
-                        if (game != "all" && game != "desktop" && game != "mixed" && game != "unknown" && !GameCatalog.ValidId(game)) throw new ArgumentException("Invalid game filter.");
+                        if (game != "all" && game != "desktop" && game != "mixed" && game != "unknown" && !GameCatalog.ValidId(game)) throw new ArgumentException(Locales.Message("clips.invalidGameFilter"));
                         HttpResponse.SendText(stream, 200, "OK", Clips.GetClipsPageJson(offset, limit, sort, game, QFlag("linked")), "application/json; charset=utf-8");
                     }
                     else
@@ -168,7 +168,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad filename" }); return false; }
+                if (selected == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.badFilename") }); return false; }
                 var result = Clips.DuplicateClip(selected);
                 HttpResponse.SendJson(stream, result["ok"]?.Value<bool>() == true ? 200 : 400, result);
                 return false;
@@ -211,7 +211,7 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
                 {
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "The screenshots could not be read" });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.theScreenshotsCouldNotBeRead") });
                 }
                 return false;
             }
@@ -222,7 +222,7 @@ namespace ReplayKitHelper
                 try
                 {
                     string root = path == "/open-screenshot-folder" ? Screenshots.Folder(create: true) : path == "/open-gif-folder" ? GifExports.Folder(true) : Path.GetFullPath(AppConfig.GetClipDir());
-                    if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip folder not found" }); return false; }
+                    if (!Directory.Exists(root)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipFolderNotFound") }); return false; }
                     // dedupe: if explorer already has the clip folder open, raise it instead of spawning another window. falls thru to the normal launch path if the com probe fails or no match is found.
                     var existing = Explorer.GetExplorerHwndForPath(root);
                     if (existing != IntPtr.Zero)
@@ -242,7 +242,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Clip not found" }); return false; }
+                if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.clipNotFound") }); return false; }
                 try { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["focused"] = Explorer.RevealInExplorer(selected.Full) }); }
                 catch (Exception ex) { HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = ex.Message }); }
                 return false;
@@ -255,7 +255,7 @@ namespace ReplayKitHelper
                 try
                 {
                     string shot = Screenshots.Resolve(query.ContainsKey("file") ? query["file"] : null);
-                    if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Screenshot not found" }); return false; }
+                    if (shot == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.screenshotNotFound") }); return false; }
                     var answer = new JObject { ["ok"] = true };
                     if (path == "/screenshots/delete") answer["kept"] = Screenshots.Delete(shot);
                     else if (path == "/screenshots/rename") answer["name"] = Screenshots.Rename(shot, query.ContainsKey("to") ? query["to"] : null);
@@ -345,7 +345,7 @@ namespace ReplayKitHelper
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is System.Runtime.InteropServices.ExternalException)
                 {
-                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = "The GIFs could not be read" });
+                    HttpResponse.SendJson(stream, 500, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.theGifsCouldNotBeRead") });
                 }
                 return false;
             }
@@ -360,26 +360,26 @@ namespace ReplayKitHelper
                     {
                         if (!double.TryParse(Q("start"), NumberStyles.Float, CultureInfo.InvariantCulture, out double start) ||
                             !double.TryParse(Q("end"), NumberStyles.Float, CultureInfo.InvariantCulture, out double end))
-                            throw new ArgumentException("Invalid GIF range.");
+                            throw new ArgumentException(Locales.Message("clips.invalidGifRange"));
                         string made = GifExports.Export(Q("file"), start, end);
                         long size = new FileInfo(Path.Combine(GifExports.Folder(), made)).Length;
                         answer["file"] = made;
                         answer["size"] = size;
                         // the popup over the obs window, so it is seen from any view; the clips page shows its own toast only when that popup could not be shown
-                        answer["popup"] = DonePopups.Show("done", "GIF exported",
+                        answer["popup"] = DonePopups.Show("done", Locales.Message("clips.gifExported"),
                             new JObject
                             {
                                 ["icon"] = "gif",
                                 ["media"] = "/gifs/file?file=" + Uri.EscapeDataString(made) + "&v=" + size,
                                 ["text"] = Path.GetFileNameWithoutExtension(made),
-                                ["detail"] = Locales.T("{size} · Saved to the GIFs section", "size", Storage.FormatBytes(size)),
-                                ["action"] = new JObject { ["label"] = "Go to GIF", ["kind"] = "reveal-gif", ["file"] = made },
+                                ["detail"] = Locales.Message("clips.sizeSavedToTheGifsSection", "size", Storage.FormatBytes(size)),
+                                ["action"] = new JObject { ["label"] = Locales.Message("clips.goToGif"), ["kind"] = "reveal-gif", ["file"] = made },
                             });
                     }
                     else
                     {
                         string gif = GifExports.Resolve(Q("file"));
-                        if (gif == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "GIF not found" }); return false; }
+                        if (gif == null) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.gifNotFound") }); return false; }
                         if (path == "/gifs/delete") answer["kept"] = GifExports.Delete(gif);
                         else if (path == "/gifs/rename") answer["name"] = GifExports.Rename(gif, Q("to"));
                         else if (path == "/gifs/copy") GifExports.Copy(gif);
@@ -417,12 +417,12 @@ namespace ReplayKitHelper
                 lock (RenameGate)
                 {
                     var selected = Clips.GetSafeClipPath(query.ContainsKey("file") ? query["file"] : null);
-                    if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = "Source clip not found" }); return false; }
+                    if (selected == null || !File.Exists(selected.Full)) { HttpResponse.SendJson(stream, 404, new JObject { ["ok"] = false, ["message"] = Locales.Message("common.sourceClipNotFound") }); return false; }
                     string newName = Clips.GetSafeFilename(query.ContainsKey("to") ? query["to"] : null);
-                    if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad new filename" }); return false; }
+                    if (newName == null) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.badNewFilename") }); return false; }
                     if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
                     // the name is all a rename changes; the pages keep the extension, and a clip under another one would be read as another kind of file
-                    if (!string.Equals(Path.GetExtension(newName), Path.GetExtension(selected.Name), StringComparison.OrdinalIgnoreCase)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "A rename keeps the file type of the clip" }); return false; }
+                    if (!string.Equals(Path.GetExtension(newName), Path.GetExtension(selected.Name), StringComparison.OrdinalIgnoreCase)) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.aRenameKeepsTheFileType") }); return false; }
                     // a renamed clip stays in its own folder, and the name stays unique across the clip folder and its game folders
                     try
                     {
@@ -435,7 +435,7 @@ namespace ReplayKitHelper
                     catch (ArgumentException ex) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = ex.Message }); return false; }
                     if (newName == selected.Name) { HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["name"] = newName }); return false; }
                     string newPath = Path.Combine(Path.GetDirectoryName(selected.Full), newName);
-                    if (newPath.Length >= 260) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "That name is too long" }); return false; }
+                    if (newPath.Length >= 260) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("clips.thatNameIsTooLong2") }); return false; }
                     // a change of capitals only is the same file to windows, so it is not a name another clip already has
                     bool caseOnly = string.Equals(newName, selected.Name, StringComparison.OrdinalIgnoreCase);
                     string editorView = query.ContainsKey("view") && (query["view"] == "clips" || query["view"] == "home") ? query["view"] : null;
@@ -448,7 +448,7 @@ namespace ReplayKitHelper
                         JobCoordinator.Commit(requestId, () => JobCoordinator.ChangeSource(selected.Full, () =>
                         {
                             // a restore from deleted history or a save can take the name between the check above and here
-                            if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath) || Clips.NameTaken(newName))) throw new IOException("A file with that name already exists");
+                            if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath) || Clips.NameTaken(newName))) throw new IOException(Locales.Message("clips.aFileWithThatNameAlready"));
                             fileId = ClipRenames.Identity(new FileInfo(selected.Full));
                             ClipFiles.MoveWhenFree(selected.Full, newPath);
                             JobCoordinator.RenameEditorSource(selected.Full, newPath, editorView);

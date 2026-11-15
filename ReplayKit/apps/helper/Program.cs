@@ -245,7 +245,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException("Cannot establish exclusive helper ownership.", ex);
+                throw new InvalidOperationException(Locales.Message("helper.cannotEstablishExclusiveHelperOwnership"), ex);
             }
         }
 
@@ -327,7 +327,7 @@ namespace ReplayKitHelper
             }
             catch (Exception ex)
             {
-                throw new IOException("Helper accept loop failed.", ex);
+                throw new IOException(Locales.Message("helper.helperAcceptLoopFailed"), ex);
             }
         }
 

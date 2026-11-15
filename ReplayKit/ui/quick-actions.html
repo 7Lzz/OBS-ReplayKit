@@ -60,7 +60,7 @@
 <body>
 <div class="panel">
   <div class="clip is-opening" id="clip">
-    <div class="head"><span class="head-title" id="title">Quick actions</span></div>
+    <div class="head"><span class="head-title" id="title" data-i18n="common.quickActions"></span></div>
     <div class="list" id="list"></div>
   </div>
 </div>
@@ -83,9 +83,9 @@
     if (tab > 0) document.documentElement.style.setProperty("--tab-width", tab + "px");
     try {
       const menu = JSON.parse(params.get("menu") || "{}");
-      state = { view:String(menu.view || ""), title:String(menu.title || "Quick actions"), groups:Array.isArray(menu.groups) ? menu.groups : [] };
+      state = { view:String(menu.view || ""), title:String(menu.title || RK_M("common.quickActions")), groups:Array.isArray(menu.groups) ? menu.groups : [] };
     } catch (_) {
-      state = { view:"", title:"Quick actions", groups:[] };
+      state = { view:"", title:RK_M("common.quickActions"), groups:[] };
     }
   }
 

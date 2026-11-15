@@ -24,24 +24,24 @@ namespace ReplayKitHelper
         // what a page offers, checked field by field; null and a message when any of it is not what a page sends
         public static JObject Set(string view, string body)
         {
-            if (!IsPageView(view)) return new JObject { ["ok"] = false, ["message"] = "Unknown view" };
+            if (!IsPageView(view)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownView") };
             JArray clean = new JArray();
             try
             {
                 var actions = (JObject.Parse(body ?? "{}")["actions"] as JArray) ?? new JArray();
-                if (actions.Count > MaxActions) return new JObject { ["ok"] = false, ["message"] = "Too many actions" };
+                if (actions.Count > MaxActions) return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.tooManyActions") };
                 foreach (var token in actions)
                 {
-                    if (!(token is JObject a)) return new JObject { ["ok"] = false, ["message"] = "Bad action" };
+                    if (!(token is JObject a)) return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badAction") };
                     string id = a["id"]?.Type == JTokenType.String ? a.Value<string>("id") : null;
                     string label = a["label"]?.Type == JTokenType.String ? a.Value<string>("label").Trim() : null;
                     string icon = a["icon"]?.Type == JTokenType.String ? a.Value<string>("icon") : "";
                     if (!IsId(id) || string.IsNullOrEmpty(label) || label.Length > 40 || (icon.Length > 0 && !IconPattern.IsMatch(icon)))
-                        return new JObject { ["ok"] = false, ["message"] = "Bad action" };
+                        return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badAction") };
                     clean.Add(new JObject { ["id"] = id, ["label"] = label, ["icon"] = icon, ["disabled"] = a["disabled"]?.Type == JTokenType.Boolean && a.Value<bool>("disabled") });
                 }
             }
-            catch (Newtonsoft.Json.JsonException) { return new JObject { ["ok"] = false, ["message"] = "Bad json" }; }
+            catch (Newtonsoft.Json.JsonException) { return new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badJson") }; }
             lock (Gate) Lists[view] = clean;
             return new JObject { ["ok"] = true };
         }

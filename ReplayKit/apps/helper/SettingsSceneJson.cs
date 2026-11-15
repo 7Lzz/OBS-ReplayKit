@@ -233,12 +233,12 @@ namespace ReplayKitHelper
             if (list.Ok && !string.IsNullOrEmpty(list.Data?["currentSceneCollectionName"]?.Value<string>()))
                 collectionName = list.Data["currentSceneCollectionName"].Value<string>();
             if (string.IsNullOrWhiteSpace(collectionName) || collectionName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                throw new InvalidOperationException("OBS scene collection name is invalid.");
+                throw new InvalidOperationException(Locales.Message("settings.obsSceneCollectionNameIsInvalid"));
 
             string rootFull = Path.GetFullPath(scenesRoot).TrimEnd('\\');
             string path = Path.GetFullPath(Path.Combine(scenesRoot, collectionName + ".json"));
             if (!path.StartsWith(rootFull + "\\", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("OBS scene collection path resolved outside the OBS scenes directory.");
+                throw new InvalidOperationException(Locales.Message("settings.obsSceneCollectionPathResolvedOutside"));
             return path;
         }
 

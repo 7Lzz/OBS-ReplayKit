@@ -19,11 +19,11 @@ ShellRail::ShellRail(QWidget *parent)
 	setAttribute(Qt::WA_OpaquePaintEvent, true);
 	setMouseTracking(true);
 	m_items = {
-		{Home, "rail-home.svg", Tr("Home"), false},
-		{Clips, "rail-clips.svg", Tr("Clips"), false},
-		{Projector, "rail-projector.svg", Tr("Projector"), false},
-		{Share, "rail-share-preview.svg", Tr("Share Preview"), false},
-		{Settings, "rail-settings.svg", Tr("Settings"), true},
+		{Home, "rail-home.svg", TrMessage("common.home"), false},
+		{Clips, "rail-clips.svg", TrMessage("common.clips"), false},
+		{Projector, "rail-projector.svg", TrMessage("common.projector"), false},
+		{Share, "rail-share-preview.svg", TrMessage("common.sharePreview"), false},
+		{Settings, "rail-settings.svg", TrMessage("shell.settings"), true},
 	};
 	for (Item &item : m_items)
 		item.renderer = new QSvgRenderer(IconPath(QStringLiteral("nav/") + QString::fromLatin1(item.iconFile)), this);
@@ -203,7 +203,7 @@ void ShellRail::SetHover(int index)
 		g_notifyTip = new NotifyTip();
 	QString tip = m_items[index].tip;
 	if (m_items[index].id == Share)
-		tip = !m_shareAvailable ? Tr("Set up Share Preview") : m_shareOn ? Tr("Share Preview: on") : Tr("Share Preview: off");
+		tip = !m_shareAvailable ? TrMessage("shell.setUpSharePreview") : m_shareOn ? TrMessage("shell.sharePreviewOn") : TrMessage("shell.sharePreviewOff");
 	g_notifyTip->ShowFor(tip, QRect(mapToGlobal(ItemRect(index).topLeft().toPoint()), ItemRect(index).size().toSize()), NotifyTip::Side::Right);
 }
 

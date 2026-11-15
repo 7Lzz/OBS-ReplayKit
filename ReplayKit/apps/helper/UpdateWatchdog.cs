@@ -53,7 +53,7 @@ namespace ReplayKitHelper
             {
                 ["ok"] = false,
                 ["stage"] = "aborted",
-                ["message"] = "The installer stopped without confirming completion. Run the ReplayKit installer again to finish the update or repair.",
+                ["message"] = Locales.Message("update.theInstallerStoppedWithoutConfirmingCompletion"),
                 ["version"] = targetVersion ?? "",
                 ["releaseUrl"] = releaseUrl ?? "",
                 ["finishedAt"] = DateTime.UtcNow.ToString("o"),

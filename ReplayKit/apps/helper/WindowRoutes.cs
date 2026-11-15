@@ -37,7 +37,7 @@ namespace ReplayKitHelper
                 {
                     string kind = string.IsNullOrWhiteSpace(req.Body) ? null : JObject.Parse(req.Body).Value<string>("kind");
                     if (kind != "sharepreview-setup" && kind != "streamable-relogin")
-                        throw new InvalidOperationException("Unknown confirm kind.");
+                        throw new InvalidOperationException(Locales.Message("helper.unknownConfirmKind"));
                     PipeClient.SendUiConfirm(kind);
                     HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 }
@@ -83,7 +83,7 @@ namespace ReplayKitHelper
                 string title = Q("title");
                 if (title != "ReplayKit Settings" && title != "ReplayKit Update" && title != "ReplayKit Setup")
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unsupported window title." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unsupportedWindowTitle") });
                     return false;
                 }
                 // a page the clean layout embeds in the obs window has no window of its own to close; the plugin just puts the obs window back on its home view
@@ -167,7 +167,7 @@ namespace ReplayKitHelper
                 else if (title == "Clips") { minW = 850; minH = 620; }
                 else if (title == "ReplayKit Update") { minW = 480; minH = 400; }
                 else if (title == "ReplayKit Setup") { minW = 640; minH = 520; }
-                else { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unsupported window title." }); return false; }
+                else { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unsupportedWindowTitle") }); return false; }
                 bool resizing = false;
                 try { resizing = Native.BeginResizeWindow(title, minW, minH, maxW, maxH); } catch { }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["resizing"] = resizing });
@@ -179,7 +179,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string edge = Q("edge");
-                if (edge != "right" && edge != "bottom" && edge != "corner") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown edge." }); return false; }
+                if (edge != "right" && edge != "bottom" && edge != "corner") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownEdge") }); return false; }
                 bool resizing = Native.ObsMainResizable() && PipeClient.SendShellResize(edge);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true, ["resizing"] = resizing });
                 return false;
@@ -192,7 +192,7 @@ namespace ReplayKitHelper
                 string title = Q("title");
                 if (!int.TryParse(Q("w"), out int w) || !int.TryParse(Q("h"), out int h) || w <= 0 || h <= 0)
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Missing or invalid w/h." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.missingOrInvalidWH") });
                     return false;
                 }
                 bool applied = false;
@@ -241,7 +241,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string view = Q("view");
-                if (view != "home" && view != "clips" && view != "settings" && view != "setup") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown view." }); return false; }
+                if (view != "home" && view != "clips" && view != "settings" && view != "setup") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownView2") }); return false; }
                 PipeClient.SendViewShown(view);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -251,7 +251,7 @@ namespace ReplayKitHelper
             if (path == "/shell/ping")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!int.TryParse(Q("n"), NumberStyles.None, CultureInfo.InvariantCulture, out int pingNumber) || pingNumber < 1) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected n." }); return false; }
+                if (!int.TryParse(Q("n"), NumberStyles.None, CultureInfo.InvariantCulture, out int pingNumber) || pingNumber < 1) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedN") }); return false; }
                 PipeClient.SendShellPong(pingNumber);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -264,13 +264,13 @@ namespace ReplayKitHelper
                 if (path == "/shell/settings-dirty")
                 {
                     string dirtyFlag = Q("dirty");
-                    if (dirtyFlag != "0" && dirtyFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected dirty 0 or 1." }); return false; }
+                    if (dirtyFlag != "0" && dirtyFlag != "1") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedDirty0Or1") }); return false; }
                     PipeClient.SendSettingsDirty(dirtyFlag == "1");
                 }
                 else
                 {
                     string target = Q("to");
-                    if (target != "home" && target != "clips" && target != "setup" && target != "projector") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Unknown view." }); return false; }
+                    if (target != "home" && target != "clips" && target != "setup" && target != "projector") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.unknownView2") }); return false; }
                     PipeClient.SendSettingsLeave(target);
                 }
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
@@ -282,7 +282,7 @@ namespace ReplayKitHelper
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
                 string direction = Q("dir");
-                if (direction != "back" && direction != "forward") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected dir back or forward." }); return false; }
+                if (direction != "back" && direction != "forward") { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedDirBackOrForward") }); return false; }
                 PipeClient.SendShellNav(direction);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;
@@ -296,7 +296,7 @@ namespace ReplayKitHelper
                 string playing = Q("state");
                 if (!Regex.IsMatch(source, "^[A-Za-z0-9_-]{1,40}$") || (playing != "1" && playing != "0"))
                 {
-                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Expected src and state (1 or 0)." });
+                    HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.expectedSrcAndState1Or") });
                     return false;
                 }
                 bool holding = PlaybackWake.Report(source, playing == "1");
@@ -331,7 +331,7 @@ namespace ReplayKitHelper
             if (path == "/obs-menu")
             {
                 if (req.Method != "POST") { HttpResponse.SendText(stream, 405, "Method Not Allowed", "POST required"); return false; }
-                if (!int.TryParse(Q("index", ""), out int menuIndex) || menuIndex < 0 || menuIndex > 15) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = "Bad menu." }); return false; }
+                if (!int.TryParse(Q("index", ""), out int menuIndex) || menuIndex < 0 || menuIndex > 15) { HttpResponse.SendJson(stream, 400, new JObject { ["ok"] = false, ["message"] = Locales.Message("helper.badMenu") }); return false; }
                 PipeClient.SendObsMenu(menuIndex);
                 HttpResponse.SendJson(stream, 200, new JObject { ["ok"] = true });
                 return false;

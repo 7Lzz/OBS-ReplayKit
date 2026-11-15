@@ -38,9 +38,9 @@ namespace ReplayKitSetup
             public LogProgress(Action<string> log) { this.log = log; }
             public int TotalSteps { get; set; }
             public List<string> Issues { get; } = new List<string>();
-            public void Render(int completed, string title, string detail, string state) { }
+            public void Render(int completed, SetupLocale.Text title, SetupLocale.Text detail, string state) { }
             public void LogLine(string message) => log?.Invoke(message);
-            public void AddIssue(string message) => log?.Invoke("warn: " + message);
+            public void AddIssue(SetupLocale.Text message) => log?.Invoke("warn: " + message.English);
             public void SubProgress(double fraction, string detail) { }
         }
 
@@ -159,7 +159,7 @@ namespace ReplayKitSetup
                     return false;
                 }
 
-                progress.SubProgress(1.0, "Installing OBS Studio...");
+                progress.SubProgress(1.0, SetupLocale.Message("setup.installingObsStudio"));
                 log("running the OBS installer silently...");
                 // OBSs /S installer aborts (exit 6, ~1s) when it cannot overwrite a loaded file -- almost always the virtual-camera filter that a browser / capture app holds locked. move any locked file aside first.
                 PrepareObsInstallDir(Config.PROGRAMFILES_OBS_DIR, log);
@@ -210,10 +210,10 @@ namespace ReplayKitSetup
                     string mb = total > 0
                         ? $"{done / (1024 * 1024)} / {total / (1024 * 1024)} MB"
                         : $"{done / (1024 * 1024)} MB";
-                    progress.SubProgress(frac, SetupLocale.T("Downloading OBS Studio  {size}", "size", mb));
+                    progress.SubProgress(frac, SetupLocale.Message("setup.downloadingObsStudioSize", "size", mb));
                 });
                 long done = new FileInfo(dst).Length;
-                progress.SubProgress(1.0, "Downloaded OBS Studio");
+                progress.SubProgress(1.0, SetupLocale.Message("setup.downloadedObsStudio"));
                 log($"OBS installer downloaded ({done} bytes)");
                 return true;
             }

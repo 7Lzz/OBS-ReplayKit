@@ -38,14 +38,14 @@ namespace ReplayKitHelper
             path = Path.GetFullPath(path);
             lock (Gate)
             {
-                if (!Changing.Add(path)) throw new IOException("That clip is already being changed.");
+                if (!Changing.Add(path)) throw new IOException(Locales.Message("helper.thatClipIsAlreadyBeingChanged"));
                 try
                 {
                     var wait = System.Diagnostics.Stopwatch.StartNew();
                     while (Readers.ContainsKey(path))
                     {
                         int remaining = (int)Math.Max(0, 30000 - wait.ElapsedMilliseconds);
-                        if (remaining == 0 || !Monitor.Wait(Gate, remaining)) throw new IOException("The clip is still being prepared. Rename it after preparation finishes.");
+                        if (remaining == 0 || !Monitor.Wait(Gate, remaining)) throw new IOException(Locales.Message("helper.theClipIsStillBeingPrepared"));
                     }
                     change();
                 }
@@ -190,7 +190,7 @@ namespace ReplayKitHelper
                 int running = Jobs.Values.Count(j => !j.Instant);
                 if (!instant && running >= Constants.MAX_CONCURRENT_VIDEO_JOBS)
                 {
-                    message = Locales.T("Already running {count} clip operations", "count", running);
+                    message = Locales.Message("helper.alreadyRunningCountClipOperations", "count", running);
                     return null;
                 }
                 var job = new Reservation(requestId, paths, instant);
@@ -206,7 +206,7 @@ namespace ReplayKitHelper
         {
             lock (Gate)
             {
-                if (!Jobs.TryGetValue(id, out var job)) throw new InvalidOperationException("Clip operation is no longer reserved.");
+                if (!Jobs.TryGetValue(id, out var job)) throw new InvalidOperationException(Locales.Message("helper.clipOperationIsNoLongerReserved"));
                 return job;
             }
         }
@@ -237,7 +237,7 @@ namespace ReplayKitHelper
                 lock (gate)
                 {
                     Source.Token.ThrowIfCancellationRequested();
-                    if (started || finished) throw new InvalidOperationException("Operation already started.");
+                    if (started || finished) throw new InvalidOperationException(Locales.Message("helper.operationAlreadyStarted"));
                     started = true;
                     Task.Run(work).ContinueWith(task =>
                     {
@@ -262,7 +262,7 @@ namespace ReplayKitHelper
             {
                 lock (gate)
                 {
-                    if (finished || committed) throw new InvalidOperationException("Operation already completed.");
+                    if (finished || committed) throw new InvalidOperationException(Locales.Message("helper.operationAlreadyCompleted"));
                     Source.Token.ThrowIfCancellationRequested();
                     action();
                     committed = true;
